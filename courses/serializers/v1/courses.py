@@ -1,7 +1,7 @@
 from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_serializer
 
 from cms.serializers import CoursePageSerializer
 from courses import models
@@ -72,7 +72,9 @@ class CourseSerializer(BaseCourseSerializer):
             "programs",
         ]
 
-
+@extend_schema_serializer(
+    component_name="V1CourseRunSerializer",
+)
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
@@ -113,7 +115,9 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         )
         return flexible_price_exists  # noqa: RET504
 
-
+@extend_schema_serializer(
+    component_name="V1CourseWithCourseRunsSerializer",
+)  
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 

@@ -18,6 +18,7 @@ from courses.serializers.v1.base import (
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_dated_courseruns
 from flexiblepricing.api import is_courseware_flexible_price_approved
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -42,6 +43,7 @@ class CourseSerializer(BaseCourseSerializer):
     min_weekly_hours = serializers.SerializerMethodField()
     max_weekly_hours = serializers.SerializerMethodField()
 
+    @extend_schema_field(bool)
     def get_required_prerequisites(self, instance):
         """
         Check if the prerequisites field is populated in the course page CMS.
@@ -54,6 +56,7 @@ class CourseSerializer(BaseCourseSerializer):
             and instance.page.prerequisites != ""
         )
 
+    @extend_schema_field(str)
     def get_duration(self, instance):
         """
         Get the duration of the course from the course page CMS.
@@ -63,6 +66,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
+    @extend_schema_field(str)
     def get_time_commitment(self, instance):
         """
         Get the time commitment of the course from the course page CMS.
@@ -72,6 +76,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
+    @extend_schema_field(int)
     def get_min_weekly_hours(self, instance):
         """
         Get the min weekly hours of the course from the course page CMS.
@@ -81,6 +86,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
+    @extend_schema_field(int)
     def get_max_weekly_hours(self, instance):
         """
         Get the max weekly hours of the course from the course page CMS.
@@ -90,11 +96,13 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
+    @extend_schema_field(str)
     def get_next_run_id(self, instance):
         """Get next run id"""
         run = instance.first_unexpired_run
         return run.id if run is not None else None
 
+    @extend_schema_field(list[dict])
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
             from courses.serializers.v1.base import BaseProgramSerializer
@@ -103,6 +111,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
+    @extend_schema_field(list[dict])
     def get_topics(self, instance):
         """List topics of a course"""
         if hasattr(instance, "page") and instance.page is not None:
@@ -112,6 +121,7 @@ class CourseSerializer(BaseCourseSerializer):
             )
         return []
 
+    @extend_schema_field(str)
     def get_certificate_type(self, instance):
         if instance.programs:
             program = instance.programs[0]
@@ -119,6 +129,7 @@ class CourseSerializer(BaseCourseSerializer):
                 return "MicroMasters Credential"
         return "Certificate of Completion"
 
+    @extend_schema_field(str)
     def get_availability(self, instance):
         """Get course availability"""
         dated_courseruns = get_dated_courseruns(instance.courseruns)
@@ -126,6 +137,7 @@ class CourseSerializer(BaseCourseSerializer):
             return "anytime"
         return "dated"
 
+    @extend_schema_field(int)
     def get_min_weeks(self, instance):
         """
         Get the min weeks of the course from the CMS page.
@@ -135,6 +147,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
+    @extend_schema_field(int)
     def get_max_weeks(self, instance):
         """
         Get the max weeks of the course from the CMS page.
@@ -166,7 +179,9 @@ class CourseSerializer(BaseCourseSerializer):
             "max_weekly_hours",
         ]
 
-
+@extend_schema_serializer(
+    component_name="V2CourseRunSerializer",
+)
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
@@ -190,6 +205,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             }
         return data
 
+    @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         if not self.context or not self.context.get("include_approved_financial_aid"):
             return False

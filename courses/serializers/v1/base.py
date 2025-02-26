@@ -147,6 +147,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         except models.CourseRunCertificate.DoesNotExist:
             return None
 
+    @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         instance_run = instance[0].run if isinstance(instance, list) else instance.run
         instance_user = (
@@ -157,6 +158,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         )
         return flexible_price_exists  # noqa: RET504
 
+    @extend_schema_field(list[dict])
     def get_grades(self, instance):
         instance_run = instance[0].run if isinstance(instance, list) else instance.run
         instance_user = (

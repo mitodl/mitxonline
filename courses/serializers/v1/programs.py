@@ -3,7 +3,7 @@ from django.db.models import Q
 from mitol.common.utils import now_in_utc
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from drf_spectacular.utils import extend_schema_serializer
+from drf_spectacular.utils import extend_schema_serializer, extend_schema_field
 
 from cms.serializers import ProgramPageSerializer
 from courses import models
@@ -24,8 +24,53 @@ from main.serializers import StrictFieldsSerializer
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
+class ProgramRequirementDataSerializer(StrictFieldsSerializer):
+    """Serializer for ProgramRequirement data"""
+
+    node_type = serializers.ChoiceField(
+        choices=(
+            models.ProgramRequirementNodeType.OPERATOR,
+            models.ProgramRequirementNodeType.COURSE,
+        )
+    )
+    course = serializers.CharField(source="course_id", allow_null=True, default=None)
+    program = serializers.CharField(source="program_id", required=False)
+    title = serializers.CharField(allow_null=True, default=None)
+    operator = serializers.CharField(allow_null=True, default=None)
+    operator_value = serializers.CharField(allow_null=True, default=None)
+    elective_flag = serializers.BooleanField(allow_null=True, default=False)
+
+
+class ProgramRequirementSerializer(StrictFieldsSerializer):
+    """Serializer for a ProgramRequirement"""
+
+    id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    data = ProgramRequirementDataSerializer()
+
+    def get_fields(self):
+        """Override because 'children' is a recursive structure"""
+        fields = super().get_fields()
+        fields["children"] = ProgramRequirementSerializer(many=True, default=[])
+        return fields
+
+
+class ProgramRequirementTreeSerializer(BaseProgramRequirementTreeSerializer):
+    child = ProgramRequirementSerializer()
+
+
+class PartnerSchoolSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.PartnerSchool
+        fields = "__all__"
+
+
+class LearnerProgramRecordShareSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.LearnerProgramRecordShare
+        fields = "__all__"
+
 @extend_schema_serializer(
-    component_name="V1ProgramSerializer"  # Give it a unique name
+    component_name="V1ProgramSerializer"
 )
 class ProgramSerializer(serializers.ModelSerializer):
     """Program model serializer"""
@@ -36,6 +81,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     page = serializers.SerializerMethodField()
     departments = DepartmentSerializer(many=True, read_only=True)
 
+    @extend_schema_field(CourseWithCourseRunsSerializer)
     def get_courses(self, instance):
         """Serializer for courses"""
         return CourseWithCourseRunsSerializer(
@@ -44,12 +90,35 @@ class ProgramSerializer(serializers.ModelSerializer):
             context={"include_page_fields": True},
         ).data
 
+    @extend_schema_field({
+        "type": "object",
+        "properties": {
+            "required": {
+                "type": "array",
+                "items": {
+                    "type": "integer",  # Assuming course.id is an integer
+                    "description": "ID of a required course",
+                },
+                "description": "List of IDs for required courses",
+            },
+            "electives": {
+                "type": "array",
+                "items": {
+                    "type": "integer",  # Assuming course.id is an integer
+                    "description": "ID of an elective course",
+                },
+                "description": "List of IDs for elective courses",
+            },
+        },
+        "description": "A dictionary containing lists of required and elective course IDs",
+    })
     def get_requirements(self, instance):
         return {
             "required": [course.id for course in instance.required_courses],
             "electives": [course.id for course in instance.elective_courses],
         }
 
+    @extend_schema_field(ProgramRequirementTreeSerializer)
     def get_req_tree(self, instance):
         req_root = instance.get_requirements_root()
 
@@ -58,6 +127,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return ProgramRequirementTreeSerializer(instance=req_root).data
 
+    @extend_schema_field(ProgramPageSerializer)
     def get_page(self, instance):
         if hasattr(instance, "page"):
             return ProgramPageSerializer(instance.page).data
@@ -139,8 +209,6 @@ class FullProgramSerializer(ProgramSerializer):
             "requirements",
             "req_tree",
         ]
-
-
 class ProgramCertificateSerializer(serializers.ModelSerializer):
     """ProgramCertificate model serializer"""
 
@@ -148,64 +216,18 @@ class ProgramCertificateSerializer(serializers.ModelSerializer):
         model = models.ProgramCertificate
         fields = ["uuid", "link"]
 
-
 class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     program = ProgramSerializer()
     enrollments = CourseRunEnrollmentSerializer(many=True)
     certificate = serializers.SerializerMethodField(read_only=True)
 
+    @extend_schema_field(ProgramCertificateSerializer)
     def get_certificate(self, user_program_enrollment):
         """
         Resolve a certificate for this enrollment if it exists
         """
         certificate = user_program_enrollment.get("certificate")
         return ProgramCertificateSerializer(certificate).data if certificate else None
-
-
-class ProgramRequirementDataSerializer(StrictFieldsSerializer):
-    """Serializer for ProgramRequirement data"""
-
-    node_type = serializers.ChoiceField(
-        choices=(
-            models.ProgramRequirementNodeType.OPERATOR,
-            models.ProgramRequirementNodeType.COURSE,
-        )
-    )
-    course = serializers.CharField(source="course_id", allow_null=True, default=None)
-    program = serializers.CharField(source="program_id", required=False)
-    title = serializers.CharField(allow_null=True, default=None)
-    operator = serializers.CharField(allow_null=True, default=None)
-    operator_value = serializers.CharField(allow_null=True, default=None)
-    elective_flag = serializers.BooleanField(allow_null=True, default=False)
-
-
-class ProgramRequirementSerializer(StrictFieldsSerializer):
-    """Serializer for a ProgramRequirement"""
-
-    id = serializers.IntegerField(required=False, allow_null=True, default=None)
-    data = ProgramRequirementDataSerializer()
-
-    def get_fields(self):
-        """Override because 'children' is a recursive structure"""
-        fields = super().get_fields()
-        fields["children"] = ProgramRequirementSerializer(many=True, default=[])
-        return fields
-
-
-class ProgramRequirementTreeSerializer(BaseProgramRequirementTreeSerializer):
-    child = ProgramRequirementSerializer()
-
-
-class PartnerSchoolSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.PartnerSchool
-        fields = "__all__"
-
-
-class LearnerProgramRecordShareSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.LearnerProgramRecordShare
-        fields = "__all__"
 
 
 class LearnerRecordSerializer(serializers.BaseSerializer):

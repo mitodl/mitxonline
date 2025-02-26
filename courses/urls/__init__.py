@@ -17,9 +17,9 @@ urlpatterns = [
 ]
 
 urlpatterns += [
-    path("api/records/program/<pk>/share/", v1.get_learner_record_share),
-    path("api/records/program/<pk>/revoke/", v1.revoke_learner_record_share),
-    path("api/records/program/<pk>/", v1.get_learner_record),
+    path("api/records/program/<int:pk>/share/", v1.get_learner_record_share),
+    path("api/records/program/<int:pk>/revoke/", v1.revoke_learner_record_share),
+    path("api/records/program/<int:pk>/", v1.get_learner_record),
     path(
         "api/records/shared/<uuid>/",
         v1.get_learner_record_from_uuid,

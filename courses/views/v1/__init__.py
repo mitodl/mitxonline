@@ -1,5 +1,4 @@
 """Course views version 1"""
-
 import logging
 from typing import Optional, Tuple, Union  # noqa: UP035
 from drf_spectacular.utils import extend_schema
@@ -180,6 +179,13 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         if self.paginator and self.request.query_params.get("page", None) is None:
             return None
         return super().paginate_queryset(queryset)
+
+    @extend_schema(
+        operation_id="courses_retrieve_v1",
+        description="API view set for Courses - v1"
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
 
 
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
@@ -421,7 +427,9 @@ class UserEnrollmentsApiViewSet(
             # or separate out the APIs into function-based views.
             raise NotImplementedError
 
-
+@extend_schema(
+    responses={200: UserProgramEnrollmentDetailSerializer},
+)
 class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 

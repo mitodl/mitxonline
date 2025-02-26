@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 from social_core.backends.email import EmailAuth
 from social_django.models import UserSocialAuth
 from social_django.utils import load_backend
+from drf_spectacular.utils import extend_schema
 
 from authentication.serializers import (
     LoginEmailSerializer,
@@ -81,7 +82,10 @@ class LoginPasswordView(SocialAuthAPIView):
         """Return the serializer cls"""
         return LoginPasswordSerializer
 
-
+@extend_schema(
+    request=RegisterEmailSerializer,
+    responses={200: RegisterEmailSerializer},
+)
 class RegisterEmailView(SocialAuthAPIView):
     """Email register view"""
 
@@ -137,7 +141,10 @@ class RegisterConfirmView(SocialAuthAPIView, GenericAPIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+@extend_schema(
+    request=RegisterDetailsSerializer,
+    responses={200: RegisterDetailsSerializer},
+)
 class RegisterDetailsView(SocialAuthAPIView):
     """Email registration details view"""
 
@@ -159,7 +166,10 @@ class RegisterDetailsView(SocialAuthAPIView):
             )
         return resp
 
-
+@extend_schema(
+    request=RegisterExtraDetailsSerializer,
+    responses={200: RegisterExtraDetailsSerializer},
+)
 class RegisterExtraDetailsView(SocialAuthAPIView):
     """Email registration extra details view"""
 
