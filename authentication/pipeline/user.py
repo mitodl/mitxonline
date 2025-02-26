@@ -115,7 +115,7 @@ def get_username(strategy, backend, user=None, details=None, *args, **kwargs):  
         user (User): the current user
     """
 
-    if backend.name == OlOpenIdConnectAuth.name:
+    if backend and backend.name == OlOpenIdConnectAuth.name:
         return {"username": details["username"] if not user else user.username}
 
     return {"username": None if not user else strategy.storage.user.get_username(user)}
