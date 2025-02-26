@@ -73,11 +73,8 @@ def create_ol_oidc_user(strategy, details, backend, user=None, *args, **kwargs):
     if retval.get("is_new"):
         # the backend should be setting the is_active flag to True (and it seems
         # to be doing that!) but it isn't so we need to set it to active here.
-        user = retval["user"]
-        user.is_active = True
-        user.save()
-
-        retval["user"] = user
+        retval["user"].is_active = True
+        retval["user"].save()
 
     return retval
 
