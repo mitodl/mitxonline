@@ -2,6 +2,7 @@
 
 import logging
 
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -18,7 +19,6 @@ from courses.serializers.v1.base import (
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_dated_courseruns
 from flexiblepricing.api import is_courseware_flexible_price_approved
-from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -179,6 +179,7 @@ class CourseSerializer(BaseCourseSerializer):
             "max_weekly_hours",
         ]
 
+
 @extend_schema_serializer(
     component_name="V2CourseRunSerializer",
 )
@@ -224,6 +225,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             else False
         )
         return flexible_price_exists  # noqa: RET504
+
 
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""

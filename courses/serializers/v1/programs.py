@@ -1,9 +1,9 @@
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from mitol.common.utils import now_in_utc
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from drf_spectacular.utils import extend_schema_serializer, extend_schema_field
 
 from cms.serializers import ProgramPageSerializer
 from courses import models
@@ -23,6 +23,7 @@ from courses.serializers.v1.departments import DepartmentSerializer
 from main.serializers import StrictFieldsSerializer
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
+
 
 class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     """Serializer for ProgramRequirement data"""
@@ -69,9 +70,8 @@ class LearnerProgramRecordShareSerializer(serializers.ModelSerializer):
         model = models.LearnerProgramRecordShare
         fields = "__all__"
 
-@extend_schema_serializer(
-    component_name="V1ProgramSerializer"
-)
+
+@extend_schema_serializer(component_name="V1ProgramSerializer")
 class ProgramSerializer(serializers.ModelSerializer):
     """Program model serializer"""
 
@@ -90,28 +90,30 @@ class ProgramSerializer(serializers.ModelSerializer):
             context={"include_page_fields": True},
         ).data
 
-    @extend_schema_field({
-        "type": "object",
-        "properties": {
-            "required": {
-                "type": "array",
-                "items": {
-                    "type": "integer",  # Assuming course.id is an integer
-                    "description": "ID of a required course",
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "required": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer",  # Assuming course.id is an integer
+                        "description": "ID of a required course",
+                    },
+                    "description": "List of IDs for required courses",
                 },
-                "description": "List of IDs for required courses",
-            },
-            "electives": {
-                "type": "array",
-                "items": {
-                    "type": "integer",  # Assuming course.id is an integer
-                    "description": "ID of an elective course",
+                "electives": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer",  # Assuming course.id is an integer
+                        "description": "ID of an elective course",
+                    },
+                    "description": "List of IDs for elective courses",
                 },
-                "description": "List of IDs for elective courses",
             },
-        },
-        "description": "A dictionary containing lists of required and elective course IDs",
-    })
+            "description": "A dictionary containing lists of required and elective course IDs",
+        }
+    )
     def get_requirements(self, instance):
         return {
             "required": [course.id for course in instance.required_courses],
@@ -209,12 +211,15 @@ class FullProgramSerializer(ProgramSerializer):
             "requirements",
             "req_tree",
         ]
+
+
 class ProgramCertificateSerializer(serializers.ModelSerializer):
     """ProgramCertificate model serializer"""
 
     class Meta:
         model = models.ProgramCertificate
         fields = ["uuid", "link"]
+
 
 class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     program = ProgramSerializer()

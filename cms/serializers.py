@@ -2,8 +2,8 @@
 
 import bleach
 from django.templatetags.static import static
-from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
+from rest_framework import serializers
 
 from cms import models
 from cms.api import get_wagtail_img_src

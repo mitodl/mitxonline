@@ -4,6 +4,7 @@ Course API Views version 2
 
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 
@@ -22,7 +23,6 @@ from courses.serializers.v2.departments import (
 )
 from courses.serializers.v2.programs import ProgramSerializer
 from courses.utils import get_enrollable_courses, get_unenrollable_courses
-from drf_spectacular.utils import extend_schema
 
 
 class Pagination(PageNumberPagination):
@@ -105,9 +105,8 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         return {**super().get_serializer_context(), **added_context}
 
     @extend_schema(
-        operation_id="courses_retrieve_v2",
-        description="API view set for Courses - v2"
-    ) 
+        operation_id="courses_retrieve_v2", description="API view set for Courses - v2"
+    )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 

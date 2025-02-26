@@ -1,5 +1,5 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from drf_spectacular.utils import extend_schema_field, extend_schema
 
 from cms.serializers import CoursePageSerializer
 from courses import models
@@ -33,6 +33,7 @@ class BaseCourseSerializer(serializers.ModelSerializer):
             "type",
         ]
 
+
 class BaseCourseRunSerializer(serializers.ModelSerializer):
     """Minimal CourseRun model serializer"""
 
@@ -58,7 +59,6 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     @extend_schema_field(bool)
     def get_is_archived(self, instance):
         return instance.is_enrollable and instance.is_past
-
 
     class Meta:
         model = models.CourseRun

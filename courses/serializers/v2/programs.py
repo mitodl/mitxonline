@@ -1,7 +1,7 @@
 import logging
 
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
-from drf_spectacular.utils import extend_schema_serializer, extend_schema_field
 
 from cms.serializers import ProgramPageSerializer
 from courses.models import Program, ProgramRequirementNodeType
@@ -13,7 +13,6 @@ from courses.serializers.v1.departments import DepartmentSerializer
 from main.serializers import StrictFieldsSerializer
 
 logger = logging.getLogger(__name__)
-
 
 
 class ProgramRequirementDataSerializer(StrictFieldsSerializer):
@@ -48,6 +47,8 @@ class ProgramRequirementSerializer(StrictFieldsSerializer):
 
 class ProgramRequirementTreeSerializer(BaseProgramRequirementTreeSerializer):
     child = ProgramRequirementSerializer()
+
+
 @extend_schema_serializer(
     component_name="V2ProgramSerializer",
 )
@@ -212,4 +213,3 @@ class ProgramSerializer(serializers.ModelSerializer):
             "min_weekly_hours",
             "max_weekly_hours",
         ]
-

@@ -1,7 +1,13 @@
+from typing import Optional
+
+from drf_spectacular.utils import (
+    extend_schema_field,
+    extend_schema_serializer,
+    inline_serializer,
+)
 from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from drf_spectacular.utils import extend_schema, extend_schema_serializer
 
 from cms.serializers import CoursePageSerializer
 from courses import models
@@ -16,8 +22,6 @@ from courses.serializers.v1.departments import DepartmentSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
-from typing import Optional, List
-from drf_spectacular.utils import extend_schema_field, inline_serializer
 
 
 class CourseSerializer(BaseCourseSerializer):
@@ -72,6 +76,7 @@ class CourseSerializer(BaseCourseSerializer):
             "programs",
         ]
 
+
 @extend_schema_serializer(
     component_name="V1CourseRunSerializer",
 )
@@ -115,9 +120,10 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         )
         return flexible_price_exists  # noqa: RET504
 
+
 @extend_schema_serializer(
     component_name="V1CourseWithCourseRunsSerializer",
-)  
+)
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
@@ -128,6 +134,7 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
         fields = CourseSerializer.Meta.fields + [  # noqa: RUF005
             "courseruns",
         ]
+
 
 class CourseRunWithCourseSerializer(CourseRunSerializer):
     """
@@ -143,9 +150,9 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
     products = ProductRelatedField(
         many=True,
         read_only=True,
-        help_text="List of products associated with this course run"
+        help_text="List of products associated with this course run",
     )
-    
+
     @extend_schema_field(str)
     def get_courseware_url(self, instance) -> Optional[str]:
         """Get the courseware URL"""
@@ -185,7 +192,7 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
             "is_enrollable",
             "is_archived",
             "course_number",
-            "products"
+            "products",
         ]
 
 

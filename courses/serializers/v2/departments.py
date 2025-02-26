@@ -1,8 +1,8 @@
 from django.db.models import Q
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from courses.models import CourseRun, Department
-from drf_spectacular.utils import extend_schema_field
 from courses.utils import get_enrollable_course_run_filter
 
 

@@ -1,7 +1,7 @@
 """Course views version 1"""
+
 import logging
 from typing import Optional, Tuple, Union  # noqa: UP035
-from drf_spectacular.utils import extend_schema
 
 import django_filters
 from django.contrib.auth.models import User
@@ -11,6 +11,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 from mitol.olposthog.features import is_enabled
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -181,8 +182,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         return super().paginate_queryset(queryset)
 
     @extend_schema(
-        operation_id="courses_retrieve_v1",
-        description="API view set for Courses - v1"
+        operation_id="courses_retrieve_v1", description="API view set for Courses - v1"
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
@@ -218,7 +218,11 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_context(self):
         added_context = {}
-        if self.request and self.request.query_params and self.request.query_params.get("relevant_to", None):
+        if (
+            self.request
+            and self.request.query_params
+            and self.request.query_params.get("relevant_to", None)
+        ):
             added_context["include_enrolled_flag"] = True
         return {**super().get_serializer_context(), **added_context}
 
@@ -426,6 +430,7 @@ class UserEnrollmentsApiViewSet(
             # to update the rest of the fields in the PATCH request
             # or separate out the APIs into function-based views.
             raise NotImplementedError
+
 
 @extend_schema(
     responses={200: UserProgramEnrollmentDetailSerializer},
