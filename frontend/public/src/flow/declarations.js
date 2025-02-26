@@ -23,6 +23,7 @@ declare type Settings = {
   posthog_api_token: ?string,
   posthog_api_host: ?string,
   unified_ecommerce_url: ?string,
+  oidc_login_url: ?string,
 }
 declare var SETTINGS: Settings
 
