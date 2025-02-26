@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer
@@ -37,7 +38,25 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     """Minimal CourseRun model serializer"""
 
     is_archived = serializers.SerializerMethodField()
+    title = serializers.CharField()
+    start_date = serializers.DateTimeField()
+    end_date = serializers.DateTimeField()
+    enrollment_start = serializers.DateTimeField()
+    enrollment_end = serializers.DateTimeField()
+    expiration_date = serializers.DateTimeField()
+    courseware_url = serializers.URLField()
+    courseware_id = serializers.CharField()
+    certificate_available_date = serializers.DateTimeField()
+    upgrade_deadline = serializers.DateTimeField()
+    is_upgradable = serializers.BooleanField()
+    is_enrollable = serializers.BooleanField()
+    is_self_paced = serializers.BooleanField()
+    run_tag = serializers.CharField()
+    id = serializers.IntegerField()
+    live = serializers.BooleanField()
+    course_number = serializers.CharField()
 
+    @extend_schema_field(bool)
     def get_is_archived(self, instance):
         return instance.is_enrollable and instance.is_past
 
@@ -79,6 +98,14 @@ class BaseProgramSerializer(serializers.ModelSerializer):
         fields = ["title", "readable_id", "id", "type"]
 
 
+class CourseRunCertificateSerializer(serializers.ModelSerializer):
+    """CourseRunCertificate model serializer"""
+
+    class Meta:
+        model = models.CourseRunCertificate
+        fields = ["uuid", "link"]
+
+
 class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     certificate = serializers.SerializerMethodField(read_only=True)
     enrollment_mode = serializers.ChoiceField(
@@ -87,6 +114,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     approved_flexible_price_exists = serializers.SerializerMethodField()
     grades = serializers.SerializerMethodField(read_only=True)
 
+    @extend_schema_field(CourseRunCertificateSerializer)
     def get_certificate(self, enrollment):
         """
         Resolve a certificate for this enrollment if it exists
@@ -119,6 +147,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         except models.CourseRunCertificate.DoesNotExist:
             return None
 
+    @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         instance_run = instance[0].run if isinstance(instance, list) else instance.run
         instance_user = (
@@ -129,6 +158,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         )
         return flexible_price_exists  # noqa: RET504
 
+    @extend_schema_field(list[dict])
     def get_grades(self, instance):
         instance_run = instance[0].run if isinstance(instance, list) else instance.run
         instance_user = (
@@ -163,14 +193,6 @@ class ProductRelatedField(serializers.RelatedField):
             instance=instance, context=self.context
         )
         return serializer.data
-
-
-class CourseRunCertificateSerializer(serializers.ModelSerializer):
-    """CourseRunCertificate model serializer"""
-
-    class Meta:
-        model = models.CourseRunCertificate
-        fields = ["uuid", "link"]
 
 
 class CourseRunGradeSerializer(serializers.ModelSerializer):

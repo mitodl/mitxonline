@@ -1000,7 +1000,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         return self.program.readable_id
 
     @property
-    def link(self):
+    def link(self) -> str:
         """
         Get the link at which this certificate will be served
         Format: /certificate/program/<uuid>/
