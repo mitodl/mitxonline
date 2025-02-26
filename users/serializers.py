@@ -2,16 +2,16 @@
 
 import logging
 import re
+from typing import List
 
 import pycountry
 from django.db import transaction
+from drf_spectacular.utils import extend_schema_field
 from requests import HTTPError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from social_django.models import UserSocialAuth
-from typing import List
-from drf_spectacular.utils import extend_schema_field
 
 from hubspot_sync.task_helpers import sync_hubspot_user
 

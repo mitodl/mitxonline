@@ -17,6 +17,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import RedirectView, TemplateView, View
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.common.utils import now_in_utc
 from mitol.olposthog.features import is_enabled as is_posthog_enabled
 from mitol.payment_gateway.api import PaymentGateway
@@ -35,7 +36,6 @@ from rest_framework.viewsets import (
     ViewSet,
 )
 from rest_framework_extensions.mixins import NestedViewSetMixin
-from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import api
@@ -188,6 +188,7 @@ class ProductViewSet(ReadOnlyModelViewSet):
             .prefetch_related("purchasable_object")
         )
 
+
 @extend_schema(
     parameters=[
         OpenApiParameter(
@@ -195,7 +196,7 @@ class ProductViewSet(ReadOnlyModelViewSet):
             type=str,
             location=OpenApiParameter.PATH,
             description="Username of the basket owner",
-            required=True
+            required=True,
         )
     ]
 )
@@ -216,6 +217,7 @@ class BasketViewSet(
     def get_queryset(self):
         return Basket.objects.filter(user=self.request.user).all()
 
+
 @extend_schema(
     parameters=[
         OpenApiParameter(
@@ -223,15 +225,15 @@ class BasketViewSet(
             type=int,
             location=OpenApiParameter.PATH,
             description="ID of the basket",
-            required=True
+            required=True,
         ),
         OpenApiParameter(
             name="id",
             type=int,
             location=OpenApiParameter.PATH,
             description="ID of the basket item",
-            required=True
-        )
+            required=True,
+        ),
     ]
 )
 class BasketItemViewSet(
@@ -258,6 +260,7 @@ class BasketItemViewSet(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
 
+
 @extend_schema(
     parameters=[
         OpenApiParameter(
@@ -265,15 +268,15 @@ class BasketItemViewSet(
             type=int,
             location=OpenApiParameter.PATH,
             description="ID of the basket",
-            required=True
+            required=True,
         ),
         OpenApiParameter(
             name="id",
             type=int,
             location=OpenApiParameter.PATH,
             description="ID of the basket discount",
-            required=True
-        )
+            required=True,
+        ),
     ]
 )
 class BasketDiscountViewSet(ReadOnlyModelViewSet):
@@ -350,15 +353,15 @@ class DiscountViewSet(ModelViewSet):
             type=int,
             location=OpenApiParameter.PATH,
             description="ID of the parent discount",
-            required=True
+            required=True,
         ),
         OpenApiParameter(
             name="id",
             type=int,
-            location=OpenApiParameter.PATH, 
+            location=OpenApiParameter.PATH,
             description="ID of the discount product",
-            required=True
-        )
+            required=True,
+        ),
     ]
 )
 class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
@@ -408,22 +411,23 @@ class NestedDiscountRedemptionViewSet(NestedViewSetMixin, ModelViewSet):
     permission_classes = (IsAuthenticated, IsAdminUser)
     pagination_class = RefinePagination
 
+
 @extend_schema(
     parameters=[
         OpenApiParameter(
             name="parent_lookup_discount",
-            type=int, 
+            type=int,
             location=OpenApiParameter.PATH,
             description="ID of the parent discount",
-            required=True
+            required=True,
         ),
         OpenApiParameter(
             name="id",
             type=int,
             location=OpenApiParameter.PATH,
             description="ID of the user discount",
-            required=True
-        )
+            required=True,
+        ),
     ]
 )
 class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
@@ -488,33 +492,45 @@ class UserDiscountViewSet(ModelViewSet):
     pagination_class = RefinePagination
 
 
-from rest_framework import serializers
 from drf_spectacular.utils import extend_schema
+from rest_framework import serializers
+
 
 # Add serializers for request/response schemas
 class RedeemDiscountRequestSerializer(serializers.Serializer):
     """Serializer for discount redemption requests"""
+
     discount = serializers.CharField(required=True)
+
 
 class RedeemDiscountResponseSerializer(serializers.Serializer):
     """Serializer for discount redemption responses"""
+
     message = serializers.CharField()
     code = serializers.CharField()
 
+
 class AddToCartRequestSerializer(serializers.Serializer):
     """Serializer for add to cart requests"""
+
     product_id = serializers.IntegerField(required=True)
+
 
 class AddToCartResponseSerializer(serializers.Serializer):
     """Serializer for add to cart responses"""
+
     message = serializers.CharField()
+
 
 class CheckoutApiViewSet(ViewSet):
     """API viewset for checkout operations"""
+
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
 
-    @action(detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout")
+    @action(
+        detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
+    )
     def start_checkout(self, request):
         """
         API call to start the checkout process. This assembles the basket items
@@ -535,9 +551,14 @@ class CheckoutApiViewSet(ViewSet):
     @extend_schema(
         request=RedeemDiscountRequestSerializer,
         responses={200: RedeemDiscountResponseSerializer},
-        description="Apply a discount code to the current basket"
+        description="Apply a discount code to the current basket",
     )
-    @action(detail=False, methods=["post"], name="Redeem Discount", url_name="redeem_discount")
+    @action(
+        detail=False,
+        methods=["post"],
+        name="Redeem Discount",
+        url_name="redeem_discount",
+    )
     def redeem_discount(self, request):
         """
         API call to redeem a discount. Discounts are attached to the basket so
@@ -616,7 +637,7 @@ class CheckoutApiViewSet(ViewSet):
     @extend_schema(
         request=AddToCartRequestSerializer,
         responses={200: AddToCartResponseSerializer},
-        description="Add a product to the shopping cart"
+        description="Add a product to the shopping cart",
     )
     @action(
         detail=False,
@@ -646,11 +667,9 @@ class CheckoutApiViewSet(ViewSet):
 
     @extend_schema(
         responses={200: BasketWithProductSerializer},
-        description="Get current cart contents"
+        description="Get current cart contents",
     )
-    @action(
-        detail=False, methods=["get"], name="Cart Info", url_name="cart"
-    )
+    @action(detail=False, methods=["get"], name="Cart Info", url_name="cart")
     def cart(self, request):
         """
         Returns the current cart, with the product info embedded.
@@ -780,23 +799,27 @@ class CheckoutCallbackView(View):
 
 from rest_framework import serializers
 
+
 # Add a serializer for the cybersource payment response
 class CybersourcePaymentResponseSerializer(serializers.Serializer):
     """Serializer for Cybersource payment callback responses"""
+
     req_reference_number = serializers.CharField(required=True)
     decision = serializers.CharField(required=True)
     message = serializers.CharField(required=True)
     reason_code = serializers.CharField(required=True)
     transaction_id = serializers.CharField(required=True)
 
+
 @extend_schema(
     request=CybersourcePaymentResponseSerializer,
     responses={200: None},
-    description="Endpoint for Cybersource server-to-server payment callbacks"
+    description="Endpoint for Cybersource server-to-server payment callbacks",
 )
 @method_decorator(csrf_exempt, name="dispatch")
 class BackofficeCallbackView(APIView):
     """API view for processing Cybersource payment callbacks"""
+
     authentication_classes = []  # disables authentication
     permission_classes = []  # disables permission
     serializer_class = CybersourcePaymentResponseSerializer

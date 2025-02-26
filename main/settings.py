@@ -25,10 +25,10 @@ from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
 from redbeat import RedBeatScheduler
-from openapi.settings_spectacular import open_spectacular_settings
 
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
+from openapi.settings_spectacular import open_spectacular_settings
 
 VERSION = "0.112.1"
 
@@ -951,9 +951,7 @@ REST_FRAMEWORK = {
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "ALLOWED_VERSIONS": [
-        "v0"
-    ],
+    "ALLOWED_VERSIONS": ["v0"],
 }
 
 # Relative URL to be used by Djoser for the link in the password reset email

@@ -1,4 +1,5 @@
 from django.contrib.contenttypes.models import ContentType
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from courses.models import Course, Program
@@ -7,7 +8,6 @@ from ecommerce.models import Discount
 from ecommerce.serializers import DiscountSerializer
 from flexiblepricing import models
 from users.serializers import UserSerializer
-from drf_spectacular.utils import extend_schema_field
 
 
 class CurrencyExchangeRateSerializer(serializers.ModelSerializer):

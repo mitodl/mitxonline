@@ -7,9 +7,9 @@ from oauth2_provider.contrib.rest_framework import IsAuthenticatedOrTokenHasScop
 from rest_framework import mixins, viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.filters import SearchFilter
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.generics import GenericAPIView
 
 from hubspot_sync.task_helpers import sync_hubspot_user
 from main.permissions import UserIsOwnerPermission

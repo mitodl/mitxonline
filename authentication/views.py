@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.views import LogoutView
 from django.shortcuts import render, reverse
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
 from rest_framework.generics import GenericAPIView
@@ -17,7 +18,6 @@ from rest_framework.views import APIView
 from social_core.backends.email import EmailAuth
 from social_django.models import UserSocialAuth
 from social_django.utils import load_backend
-from drf_spectacular.utils import extend_schema
 
 from authentication.serializers import (
     LoginEmailSerializer,
@@ -82,6 +82,7 @@ class LoginPasswordView(SocialAuthAPIView):
         """Return the serializer cls"""
         return LoginPasswordSerializer
 
+
 @extend_schema(
     request=RegisterEmailSerializer,
     responses={200: RegisterEmailSerializer},
@@ -112,7 +113,7 @@ class RegisterEmailView(SocialAuthAPIView):
 
 class RegisterConfirmView(SocialAuthAPIView, GenericAPIView):
     """Email registration confirmation view"""
-    
+
     serializer_class = RegisterConfirmSerializer
     permission_classes = []
     authentication_classes = []
@@ -141,6 +142,7 @@ class RegisterConfirmView(SocialAuthAPIView, GenericAPIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @extend_schema(
     request=RegisterDetailsSerializer,
     responses={200: RegisterDetailsSerializer},
@@ -165,6 +167,7 @@ class RegisterDetailsView(SocialAuthAPIView):
                 max_age=USER_MSG_COOKIE_MAX_AGE,
             )
         return resp
+
 
 @extend_schema(
     request=RegisterExtraDetailsSerializer,

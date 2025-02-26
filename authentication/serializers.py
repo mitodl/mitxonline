@@ -4,9 +4,9 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.http import HttpResponseRedirect
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from social_core.backends.email import EmailAuth
-from drf_spectacular.utils import extend_schema_field
 from social_core.exceptions import AuthException, InvalidEmail
 from social_core.utils import (
     partial_pipeline_data,
