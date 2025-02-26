@@ -528,7 +528,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
 
     class Meta:
-        ordering = ["id"]
+        ordering = ["readable_id"]
 
     objects = CourseQuerySet.as_manager()
     title = models.CharField(max_length=255)

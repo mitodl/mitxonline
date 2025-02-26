@@ -15,9 +15,14 @@ import {
 
 import type { Store } from "redux"
 import type { CurrentUser } from "../flow/authTypes"
+import {
+  cartItemsCountQuery,
+  cartItemsCountSelector
+} from "../lib/queries/cart"
 
 type Props = {
   currentUser: ?CurrentUser,
+  cartItemsCount: number,
   store: Store<*, *>,
   addUserNotification: Function
 }
@@ -41,22 +46,29 @@ export class HeaderApp extends React.Component<Props, void> {
   }
 
   render() {
-    const { currentUser } = this.props
+    const { currentUser, cartItemsCount } = this.props
 
     if (!currentUser) {
       // application is still loading
       return <div />
     }
 
-    return <Header currentUser={currentUser} location={null} />
+    return (
+      <Header
+        currentUser={currentUser}
+        cartItemsCount={cartItemsCount}
+        location={null}
+      />
+    )
   }
 }
 
 const mapStateToProps = createStructuredSelector({
-  currentUser: currentUserSelector
+  currentUser:    currentUserSelector,
+  cartItemsCount: cartItemsCountSelector
 })
 
-const mapPropsToConfig = () => [users.currentUserQuery()]
+const mapPropsToConfig = () => [cartItemsCountQuery(), users.currentUserQuery()]
 
 const mapDispatchToProps = {
   addUserNotification

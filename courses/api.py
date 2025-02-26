@@ -187,7 +187,7 @@ def create_run_enrollments(  # noqa: C901
                 enrollment.edx_enrolled = edx_request_success
                 if change_status is not None:
                     enrollment.change_status = change_status
-                    enrollment.save_and_log()
+                    enrollment.save_and_log(None)
                 # Case (Upgrade): When user was enrolled in free mode and now enrolls in paid mode (e.g. Verified)
                 # So, User has an active enrollment and the only changing thing is going to be enrollment mode
                 if enrollment.active and enrollment_mode_changed:
@@ -297,42 +297,6 @@ def deactivate_run_enrollment(
         line_id = line.first().id
         sync_hubspot_line_by_line_id(line_id)
     return run_enrollment
-
-
-def deactivate_program_enrollment(
-    program_enrollment,
-    change_status,
-    keep_failed_enrollments=False,  # noqa: FBT002
-):
-    """
-    Helper method to deactivate a ProgramEnrollment
-
-    Args:
-        program_enrollment (ProgramEnrollment): The program enrollment to deactivate
-        change_status (str): The change status to set on the enrollment when deactivating
-        keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
-            in the database even if the enrollment fails in edX.
-
-    Returns:
-        tuple of ProgramEnrollment, list(CourseRunEnrollment): The deactivated enrollments
-    """
-    program_run_enrollments = program_enrollment.get_run_enrollments()
-
-    deactivated_course_runs = []
-    for run_enrollment in program_run_enrollments:
-        if deactivate_run_enrollment(
-            run_enrollment,
-            change_status=change_status,
-            keep_failed_enrollments=keep_failed_enrollments,
-        ):
-            deactivated_course_runs.append(run_enrollment)  # noqa: PERF401
-
-    if deactivated_course_runs:
-        program_enrollment.deactivate_and_save(change_status, no_user=True)
-    else:
-        return None, None
-
-    return program_enrollment, deactivated_course_runs
 
 
 def defer_enrollment(  # noqa: C901

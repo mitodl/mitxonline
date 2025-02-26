@@ -9,7 +9,7 @@ authors  = ["MIT ODL"]
 
 
 [tool.poetry.dependencies]
-python = "3.9.18"
+python = "3.10.16"
 
 beautifulsoup4 = "^4.8.2"
 bleach = "^5.0.1"
@@ -60,13 +60,13 @@ mitol-django-olposthog = "^2024.5.14"
 mitol-django-google-sheets = "^2024.7.3"
 mitol-django-mail = "2023.12.19"
 mitol-django-common = "2023.12.19"
-mitol-django-authentication = "2023.12.19"
+mitol-django-authentication = "^2025.2.12"
 django-hijack = "^3.6.0"
 django-viewflow = "^2.2.7"
 django-reversion = "^5.1.0"
 django-filter = "^24.3"
-wagtail = "^6.2.1"
 drf-spectacular = "^0.28.0"
+wagtail = "6.3"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -445,7 +445,7 @@ class ChangeEmailRequestUpdateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         """Updates an email change request"""
-        if User.objects.filter(email=instance.new_email).exists():
+        if User.objects.filter(email__iexact=instance.new_email).exists():
             log.debug(
                 "User %s tried to change email address to one already in use", instance
             )

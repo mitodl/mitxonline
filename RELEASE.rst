@@ -1,6 +1,41 @@
 Release Notes
 =============
 
+Version 0.112.1 (Released February 24, 2025)
+---------------
+
+- Fix deferral error (#2544)
+
+Version 0.112.0 (Released February 20, 2025)
+---------------
+
+- docs yml correct python version (#2541)
+- Upgrade Python 3.10.16 (#2540)
+
+Version 0.111.7 (Released February 14, 2025)
+---------------
+
+- Match email with iexact filter for a change request (#2537)
+
+Version 0.111.6 (Released February 11, 2025)
+---------------
+
+- Order courses for selection in cms CoursePage (#2535)
+- Adding cart items info to the header (#2517)
+
+Version 0.111.5 (Released February 10, 2025)
+---------------
+
+- Removing deactivate enrollment and tranfer enrollment (#2533)
+- fix(deps): update dependency postcss to v8.5.1 (#2530)
+- fix(deps): update dependency oidc-client-ts to v2.4.1 (#2529)
+- fix(deps): update dependency @sentry/browser to v8.53.0 (#2527)
+- fix(deps): update babel monorepo (#2526)
+- chore(deps): update dependency ruff to ^0.9 (#2525)
+- chore(deps): update dependency bpython to ^0.25 (#2524)
+- fix(deps): update react monorepo (#2523)
+- fix(deps): update dependency express to v4.21.2 (#2522)
+
 Version 0.111.4 (Released February 04, 2025)
 ---------------
 
