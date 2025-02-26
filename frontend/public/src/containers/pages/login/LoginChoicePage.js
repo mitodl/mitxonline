@@ -6,7 +6,7 @@ import { LOGIN_EMAIL_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 
-import { routes, getNextParam } from "../../../lib/urls"
+import { routes } from "../../../lib/urls"
 
 import type { RouterHistory, Location } from "react-router"
 
@@ -14,7 +14,7 @@ import { Link } from "react-router-dom"
 
 type Props = {
   location: Location,
-  history: RouterHistory,
+  history: RouterHistory
 }
 
 export class LoginChoicePage extends React.Component<Props> {
@@ -56,7 +56,6 @@ export class LoginChoicePage extends React.Component<Props> {
   }
 }
 
-const mapDispatchToProps = {
-}
+const mapDispatchToProps = {}
 
 export default compose(connect(null, mapDispatchToProps))(LoginChoicePage)
