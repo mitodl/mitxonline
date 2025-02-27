@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.112.2
+Version 0.112.2 (Released February 27, 2025)
 ---------------
 
 - Bump mitold-django-authentication (#2552)
