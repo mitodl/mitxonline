@@ -343,7 +343,7 @@ def defer_enrollment(  # noqa: C901
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
-        return downgraded_enrollments, None
+        return first_or_none(downgraded_enrollments), None
 
     if not force and not from_enrollment.active:
         raise ValidationError(
