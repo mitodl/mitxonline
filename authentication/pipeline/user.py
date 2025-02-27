@@ -7,10 +7,13 @@ from mitol.common.utils import dict_without_keys
 from social_core.backends.email import EmailAuth
 from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
+from social_core.pipeline.user import create_user
 
+from authentication.backends.ol_open_id_connect import OlOpenIdConnectAuth
 from authentication.exceptions import (
     EmailBlockedException,
     InvalidPasswordException,
+    RequireEmailException,
     RequirePasswordAndPersonalInfoException,
     RequirePasswordException,
     RequireRegistrationException,
@@ -30,6 +33,55 @@ NAME_MIN_LENGTH = 2
 # pylint: disable=keyword-arg-before-vararg
 
 
+def forbid_hijack(strategy, backend, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
+    """
+    Forbid an admin user from trying to login/register while hijacking another user
+
+    Args:
+        strategy (social_django.strategy.DjangoStrategy): the strategy used to authenticate
+        backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
+    """
+    # As first step in pipeline, stop a hijacking admin from going any further
+    if bool(strategy.session_get("hijack_history")):
+        raise AuthException("You are hijacking another user, don't try to login again")  # noqa: EM101
+    return {}
+
+
+# Pipeline steps for OIDC logins
+
+
+def create_ol_oidc_user(strategy, details, backend, user=None, *args, **kwargs):
+    """
+    Create the user if we're using the ol-oidc backend.
+
+    This also does a blocked user check and makes sure there's an email address.
+    If the created user is new, we make sure they're set active. (If the user is
+    inactive, they'll get knocked out of the pipeline elsewhere.)
+    """
+
+    if backend.name != OlOpenIdConnectAuth.name:
+        return {}
+
+    if "email" not in details:
+        raise RequireEmailException(backend, None)
+
+    if "email" in details and is_user_email_blocked(details["email"]):
+        raise EmailBlockedException(backend, None)
+
+    retval = create_user(strategy, details, backend, user, *args, **kwargs)
+
+    if retval.get("is_new"):
+        # the backend should be setting the is_active flag to True (and it seems
+        # to be doing that!) but it isn't so we need to set it to active here.
+        retval["user"].is_active = True
+        retval["user"].save()
+
+    return retval
+
+
+# Pipeline steps for email logins
+
+
 def validate_email_auth_request(strategy, backend, user=None, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
     """
     Validates an auth request for email
@@ -40,6 +92,7 @@ def validate_email_auth_request(strategy, backend, user=None, *args, **kwargs): 
         user (User): the current user
     """
     if backend.name != EmailAuth.name:
+        log.error("skipping over whatever function this is because it's not email!")
         return {}
 
     # if there's a user, force this to be a login
@@ -49,7 +102,7 @@ def validate_email_auth_request(strategy, backend, user=None, *args, **kwargs): 
     return {}
 
 
-def get_username(strategy, backend, user=None, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
+def get_username(strategy, backend, user=None, details=None, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
     """
     Gets the username for a user
 
@@ -58,6 +111,10 @@ def get_username(strategy, backend, user=None, *args, **kwargs):  # pylint: disa
         backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
         user (User): the current user
     """
+
+    if backend and backend.name == OlOpenIdConnectAuth.name:
+        return {"username": details["username"] if not user else user.username}
+
     return {"username": None if not user else strategy.storage.user.get_username(user)}
 
 
@@ -85,6 +142,7 @@ def create_user_via_email(
         RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
     """
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_REGISTER:
+        log.error("skipping over whatever function this is because it's not email!")
         return {}
 
     if user is not None:
@@ -192,6 +250,7 @@ def validate_password(
         InvalidPasswordException: if the password does not match the user, or the user is not active.
     """
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_LOGIN:
+        log.error("skipping over whatever function this is because it's not email!")
         return {}
 
     data = strategy.request_data()
@@ -206,20 +265,6 @@ def validate_password(
     if not user or not user.check_password(password) or not user.is_active:
         raise InvalidPasswordException(backend, current_partial)
 
-    return {}
-
-
-def forbid_hijack(strategy, backend, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
-    """
-    Forbid an admin user from trying to login/register while hijacking another user
-
-    Args:
-        strategy (social_django.strategy.DjangoStrategy): the strategy used to authenticate
-        backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
-    """
-    # As first step in pipeline, stop a hijacking admin from going any further
-    if bool(strategy.session_get("hijack_history")):
-        raise AuthException("You are hijacking another user, don't try to login again")  # noqa: EM101
     return {}
 
 
