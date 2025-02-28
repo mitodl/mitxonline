@@ -92,7 +92,6 @@ def validate_email_auth_request(strategy, backend, user=None, *args, **kwargs): 
         user (User): the current user
     """
     if backend.name != EmailAuth.name:
-        log.error("skipping over whatever function this is because it's not email!")
         return {}
 
     # if there's a user, force this to be a login
@@ -142,7 +141,6 @@ def create_user_via_email(
         RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
     """
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_REGISTER:
-        log.error("skipping over whatever function this is because it's not email!")
         return {}
 
     if user is not None:
@@ -250,7 +248,6 @@ def validate_password(
         InvalidPasswordException: if the password does not match the user, or the user is not active.
     """
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_LOGIN:
-        log.error("skipping over whatever function this is because it's not email!")
         return {}
 
     data = strategy.request_data()

@@ -20,13 +20,10 @@ class OlOpenIdConnectAuth(OpenIdConnectAuth):
         """Get the user details from the API response"""
         details = super().get_user_details(response)
 
-        log.error("User details: %s", details)
-        log.error("Response: %s", response)
-
-        returnable = {
+        return {
             **details,
             "global_id": response.get("sub", None),
-            "name": response.get("name", "we didn't get a name for some reason"),
+            "name": response.get("name", None),
             "is_active": True,
             "profile": {
                 "name": response.get("name", ""),
@@ -35,9 +32,6 @@ class OlOpenIdConnectAuth(OpenIdConnectAuth):
                 else None,
             },
         }
-
-        log.error("Returning: %s", returnable)
-        return returnable
 
     def __str__(self):
         return "OL OpenID Connect (ol-oidc)"
