@@ -198,7 +198,11 @@ def create_run_enrollments(  # noqa: C901
                 if enrollment.active and enrollment_mode_changed:
                     enrollment.update_mode_and_save(mode=mode)
 
-                if not enrollment.active and enrollment_mode_changed and mode == EDX_ENROLLMENT_AUDIT_MODE:
+                if (
+                    not enrollment.active
+                    and enrollment_mode_changed
+                    and mode == EDX_ENROLLMENT_AUDIT_MODE
+                ):
                     is_enrollment_downgraded = True
 
                 elif not enrollment.active:
