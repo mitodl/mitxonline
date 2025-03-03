@@ -110,7 +110,7 @@ def user(db):
 
 
 @pytest.fixture(autouse=True)
-def payment_gateway_settings():  # noqa: PT004
+def payment_gateway_settings():
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
