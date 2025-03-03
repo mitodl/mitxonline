@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.112.3
+---------------
+
+- Allow to defer enrollment without to_run (#2554)
+
 Version 0.112.2 (Released February 27, 2025)
 ---------------
 
