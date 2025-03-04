@@ -105,7 +105,9 @@ def create_run_enrollments(  # noqa: C901
 ):
     """
     Creates local records of a user's enrollment in course runs, and attempts to enroll them
-    in edX via API
+    in edX via API.
+    Updates the enrollment mode and change_status if the user is already enrolled in the course run
+    and now is changing the enrollment mode, (e.g. pays or re-enrolls again or getting deferred)
 
     Args:
         user (User): The user to enroll
@@ -168,6 +170,7 @@ def create_run_enrollments(  # noqa: C901
     else:
         edx_request_success = True
 
+    is_enrollment_downgraded = False
     for run in runs:
         try:
             enrollment, created = CourseRunEnrollment.all_objects.get_or_create(
@@ -189,9 +192,18 @@ def create_run_enrollments(  # noqa: C901
                     enrollment.change_status = change_status
                     enrollment.save_and_log(None)
                 # Case (Upgrade): When user was enrolled in free mode and now enrolls in paid mode (e.g. Verified)
+                # Case (Downgrade): When user was enrolled in paid mode and downgrades to a free mode in case
+                # of deferral(e.g. Audit)
                 # So, User has an active enrollment and the only changing thing is going to be enrollment mode
                 if enrollment.active and enrollment_mode_changed:
                     enrollment.update_mode_and_save(mode=mode)
+
+                if (
+                    not enrollment.active
+                    and enrollment_mode_changed
+                    and mode == EDX_ENROLLMENT_AUDIT_MODE
+                ):
+                    is_enrollment_downgraded = True
 
                 elif not enrollment.active:
                     if enrollment_mode_changed:
@@ -207,7 +219,8 @@ def create_run_enrollments(  # noqa: C901
             )
         else:
             successful_enrollments.append(enrollment)
-            if enrollment.edx_enrolled:
+            if enrollment.edx_enrolled and not is_enrollment_downgraded:
+                # Do not send enrollment email if the user was downgraded.
                 mail_api.send_course_run_enrollment_email(enrollment)
     return successful_enrollments, edx_request_success
 
