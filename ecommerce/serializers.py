@@ -115,6 +115,11 @@ class ProductPurchasableObjectField(serializers.RelatedField):
     )
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
+        if isinstance(value, ProgramRun):
+            return ProgramRunProductPurchasableObjectSerializer(instance=value).data
+        elif isinstance(value, CourseRun):
+            return CourseRunProductPurchasableObjectSerializer(instance=value).data
+
         error_message = (
             f"Unexpected type for Product.purchasable_object: {value.__class__}"
         )
