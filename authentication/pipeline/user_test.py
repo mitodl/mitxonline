@@ -560,7 +560,7 @@ def test_limit_one_auth_per_backend_conflicting_auth(mocker, user):
     mock_backend.name = "email"
     UserSocialAuthFactory.create(user=user, provider=mock_backend.name)
 
-    assert UserSocialAuth.filter(user=user, provider=mock_backend.name).count() == 1
+    assert UserSocialAuth.objects.filter(user=user, provider=mock_backend.name).count() == 1
 
     with pytest.raises(AuthException):
         user_actions.limit_one_auth_per_backend(backend=mock_backend, user=user, strategy=mock_strategy, uid="non-matching")

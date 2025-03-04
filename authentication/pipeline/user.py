@@ -63,7 +63,7 @@ def get_username(strategy, backend, user=None, *args, **kwargs):  # pylint: disa
     return {"username": None if not user else strategy.storage.user.get_username(user)}
 
 
-def limit_one_auth_per_backend(strategy, backend, user, uid, **kwargs):  # pylint: disable=unused-argument
+def limit_one_auth_per_backend(strategy, backend, user, uid, **kwargs):  # pylint: disable=unused-argument # noqa: ARG001
     """
     Limit the user to one social auth account per backend
 
@@ -76,7 +76,6 @@ def limit_one_auth_per_backend(strategy, backend, user, uid, **kwargs):  # pylin
     if not user:
         return {}
 
-    user_storage = strategy.storage.user
     social_auths = UserSocialAuth.objects.filter(user=user, provider=backend.name)
 
     # if there's at least one social auth and any of them don't match the incoming uid
