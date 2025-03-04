@@ -21,7 +21,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.common.utils import now_in_utc
 from mitol.olposthog.features import is_enabled as is_posthog_enabled
 from mitol.payment_gateway.api import PaymentGateway
-from rest_framework import mixins, status
+from rest_framework import mixins, serializers, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError
@@ -36,8 +36,6 @@ from rest_framework.viewsets import (
     ViewSet,
 )
 from rest_framework_extensions.mixins import NestedViewSetMixin
-from rest_framework import serializers
-from drf_spectacular.utils import extend_schema
 
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import api
