@@ -36,6 +36,8 @@ from rest_framework.viewsets import (
     ViewSet,
 )
 from rest_framework_extensions.mixins import NestedViewSetMixin
+from rest_framework import serializers
+from drf_spectacular.utils import extend_schema
 
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import api
@@ -492,10 +494,6 @@ class UserDiscountViewSet(ModelViewSet):
     pagination_class = RefinePagination
 
 
-from drf_spectacular.utils import extend_schema
-from rest_framework import serializers
-
-
 # Add serializers for request/response schemas
 class RedeemDiscountRequestSerializer(serializers.Serializer):
     """Serializer for discount redemption requests"""
@@ -797,9 +795,6 @@ class CheckoutCallbackView(View):
                 return self.post_checkout_redirect(order.state, order, request)
 
 
-from rest_framework import serializers
-
-
 # Add a serializer for the cybersource payment response
 class CybersourcePaymentResponseSerializer(serializers.Serializer):
     """Serializer for Cybersource payment callback responses"""
@@ -824,7 +819,7 @@ class BackofficeCallbackView(APIView):
     permission_classes = []  # disables permission
     serializer_class = CybersourcePaymentResponseSerializer
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):  # noqa: ARG002
         """
         This endpoint is called by Cybersource as a server-to-server call
         to respond with the payment details.

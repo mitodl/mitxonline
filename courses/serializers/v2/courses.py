@@ -234,7 +234,7 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
 
     class Meta:
         model = models.Course
-        fields = CourseSerializer.Meta.fields + ["courseruns"]
+        fields = [*CourseSerializer.Meta.fields, "courseruns"]
 
 
 class CourseRunWithCourseSerializer(CourseRunSerializer):

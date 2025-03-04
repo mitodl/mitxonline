@@ -3,7 +3,6 @@ MITxOnline ecommerce serializers
 """
 
 from decimal import Decimal
-from typing import Dict, List
 
 import pytz
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
@@ -70,6 +69,9 @@ class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
         ]
 
 
+class InvalidPurchasableObjectTypeError(Exception):
+    """Exception raised for invalid purchasable object types."""
+
 class ProductPurchasableObjectField(serializers.RelatedField):
     """Field for serializing purchasable objects (CourseRun or ProgramRun)"""
 
@@ -112,14 +114,8 @@ class ProductPurchasableObjectField(serializers.RelatedField):
     )
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
-        if isinstance(value, ProgramRun):
-            return ProgramRunProductPurchasableObjectSerializer(instance=value).data
-        elif isinstance(value, CourseRun):
-            return CourseRunProductPurchasableObjectSerializer(instance=value).data
-        raise Exception(
-            "Unexpected type for Product.purchasable_object:",
-            value.__class__,
-        )
+        error_message = f"Unexpected type for Product.purchasable_object: {value.__class__}"
+        raise InvalidPurchasableObjectTypeError(error_message)
 
 
 class BaseProductSerializer(serializers.ModelSerializer):
@@ -266,7 +262,7 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
             },
         }
     )
-    def get_basket_items(self, instance) -> List[Dict[str, any]]:
+    def get_basket_items(self, instance) -> list[dict[str, any]]:
         """
         Get items in the basket with their associated product details
 
@@ -298,8 +294,8 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
             basket_item.discounted_price for basket_item in instance.basket_items.all()
         )
 
-    @extend_schema_field(List[BasketDiscountSerializer])
-    def get_discounts(self, instance) -> List[Dict[str, any]]:
+    @extend_schema_field(list[BasketDiscountSerializer])
+    def get_discounts(self, instance) -> list[dict[str, any]]:
         """
         Exclude zero value discounts and return applicable discounts on the basket.
 

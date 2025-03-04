@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Optional
 
 from drf_spectacular.utils import (
@@ -185,15 +187,7 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
 
     class Meta:
         model = models.CourseRun
-        fields = CourseRunSerializer.Meta.fields + [
-            "course",
-            "courseware_url",
-            "is_upgradable",
-            "is_enrollable",
-            "is_archived",
-            "course_number",
-            "products",
-        ]
+        fields = [*CourseRunSerializer.Meta.fields, "course", "courseware_url", "is_upgradable", "is_enrollable", "is_archived", "course_number", "products"]
 
 
 class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
