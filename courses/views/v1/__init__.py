@@ -166,8 +166,12 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_context(self):
         added_context = {}
-        if self.request and self.request.query_params and self.request.query_params.get("readable_id", None):
-                added_context["all_runs"] = True
+        if (
+            self.request
+            and self.request.query_params
+            and self.request.query_params.get("readable_id", None)
+        ):
+            added_context["all_runs"] = True
 
         return {**super().get_serializer_context(), **added_context}
 
