@@ -2,7 +2,6 @@
 
 import logging
 import re
-from typing import List
 
 import pycountry
 from django.db import transaction
@@ -231,7 +230,7 @@ class UserSerializer(serializers.ModelSerializer):
         """Returns the username or None in the case of AnonymousUser"""
         return getattr(instance, "username", None)
 
-    @extend_schema_field(List[str])
+    @extend_schema_field(list[str])
     def get_grants(self, instance):
         return instance.get_all_permissions()
 
@@ -507,7 +506,7 @@ class CountrySerializer(serializers.Serializer):
         if instance.alpha_2 in ("US", "CA"):
             return StateProvinceSerializer(
                 instance=sorted(
-                    list(pycountry.subdivisions.get(country_code=instance.alpha_2)),
+                    pycountry.subdivisions.get(country_code=instance.alpha_2),
                     key=lambda state: state.name,
                 ),
                 many=True,

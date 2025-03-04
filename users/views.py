@@ -100,7 +100,7 @@ class CountriesStatesViewSet(viewsets.GenericViewSet, GenericAPIView):
 
     def get_queryset(self):
         """Get list of countries ordered by name"""
-        return sorted(list(pycountry.countries), key=lambda country: country.name)
+        return sorted(pycountry.countries, key=lambda country: country.name)
 
     def list(self, request):  # pylint:disable=unused-argument  # noqa: ARG002
         """Get generator for countries/states list"""
