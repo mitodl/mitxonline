@@ -220,6 +220,7 @@ def create_run_enrollments(  # noqa: C901
         else:
             successful_enrollments.append(enrollment)
             if enrollment.edx_enrolled and not is_enrollment_downgraded:
+                # Do not send enrollment email if the user was downgraded.
                 mail_api.send_course_run_enrollment_email(enrollment)
     return successful_enrollments, edx_request_success
 
