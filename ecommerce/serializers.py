@@ -72,6 +72,7 @@ class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
 class InvalidPurchasableObjectTypeError(Exception):
     """Exception raised for invalid purchasable object types."""
 
+
 class ProductPurchasableObjectField(serializers.RelatedField):
     """Field for serializing purchasable objects (CourseRun or ProgramRun)"""
 
@@ -114,7 +115,9 @@ class ProductPurchasableObjectField(serializers.RelatedField):
     )
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
-        error_message = f"Unexpected type for Product.purchasable_object: {value.__class__}"
+        error_message = (
+            f"Unexpected type for Product.purchasable_object: {value.__class__}"
+        )
         raise InvalidPurchasableObjectTypeError(error_message)
 
 
