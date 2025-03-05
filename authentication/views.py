@@ -219,6 +219,10 @@ class CustomLogoutView(LogoutView):
         user_social_auth_record = storage.user.get_social_auth_for_user(
             user, provider=OlOpenIdConnectAuth.name
         ).first()
+
+        if not user_social_auth_record:
+            return False
+
         id_token = user_social_auth_record.extra_data.get("id_token")
         qs = urlencode(
             {
@@ -252,7 +256,7 @@ class CustomLogoutView(LogoutView):
         **kwargs,  # noqa: ARG002
     ):
         """
-        GET endpoint for loggin a user out.
+        GET endpoint for logging a user out.
 
         The logout redirect path the user follows is:
 
@@ -263,9 +267,14 @@ class CustomLogoutView(LogoutView):
 
         """
         user = getattr(request, "user", None)
+        keycloak_redirect = self._keycloak_logout_url(user)
+
+        if not keycloak_redirect:
+            return super().get(request)
+
         if user and user.is_authenticated:
             super().get(request)
-            return redirect(self._keycloak_logout_url(user))
+            return redirect(keycloak_redirect)
         else:
             return redirect(settings.LOGOUT_REDIRECT_URL)
 
