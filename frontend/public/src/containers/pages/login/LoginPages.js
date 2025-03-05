@@ -4,7 +4,6 @@ import { Switch, Route } from "react-router-dom"
 
 import { routes } from "../../../lib/urls"
 
-import LoginChoicePage from "./LoginChoicePage"
 import LoginEmailPage from "./LoginEmailPage"
 import LoginPasswordPage from "./LoginPasswordPage"
 import LoginForgotPasswordPage from "./LoginForgotPasswordPage"
@@ -27,8 +26,7 @@ const ForgotPasswordPages = () => (
 
 const LoginPages = () => (
   <Switch>
-    <Route exact path={routes.login.begin} component={LoginChoicePage} />
-    <Route exact path={routes.login.email} component={LoginEmailPage} />
+    <Route exact path={routes.login.begin} component={LoginEmailPage} />
     <Route exact path={routes.login.password} component={LoginPasswordPage} />
     <Route
       path={routes.login.forgot.toString()}

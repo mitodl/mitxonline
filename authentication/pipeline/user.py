@@ -70,9 +70,9 @@ def create_ol_oidc_user(strategy, details, backend, user=None, *args, **kwargs):
 
     retval = create_user(strategy, details, backend, user, *args, **kwargs)
 
+    # When we have deprecated direct login, remove this and default the is_active
+    # flag to True in the User model.
     if retval.get("is_new"):
-        # the backend should be setting the is_active flag to True (and it seems
-        # to be doing that!) but it isn't so we need to set it to active here.
         retval["user"].is_active = True
         retval["user"].save()
 
