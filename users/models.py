@@ -120,29 +120,6 @@ COMPANY_SIZE_CHOICES = (
 )
 
 
-class CompanySizeEnum(str, Enum):
-    SMALL_STARTUP = "1"
-    SMALL_HOME = "9"
-    SMALL = "99"
-    SMALL_MEDIUM = "999"
-    MEDIUM = "9999"
-    LARGE = "10000"
-    OTHER = "0"
-
-    @property
-    def description(self):
-        descriptions = {
-            self.SMALL_STARTUP: "Small/Start-up (1+ employees)",
-            self.SMALL_HOME: "Small/Home office (1-9 employees)",
-            self.SMALL: "Small (10-99 employees)",
-            self.SMALL_MEDIUM: "Small to medium-sized (100-999 employees)",
-            self.MEDIUM: "Medium-sized (1000-9999 employees)",
-            self.LARGE: "Large Enterprise (10,000+ employees)",
-            self.OTHER: "Other (N/A or Don't know)",
-        }
-        return descriptions[self.value]
-
-
 YRS_EXPERIENCE_CHOICES = (
     (None, "----"),
     (2, "Less than 2 years"),
@@ -153,29 +130,6 @@ YRS_EXPERIENCE_CHOICES = (
     (21, "More than 20 years"),
     (0, "Prefer not to say"),
 )
-
-
-class YearsExperienceEnum(str, Enum):
-    LESS_THAN_2 = "2"
-    TWO_TO_FIVE = "5"
-    SIX_TO_TEN = "10"
-    ELEVEN_TO_FIFTEEN = "15"
-    SIXTEEN_TO_TWENTY = "20"
-    MORE_THAN_TWENTY = "21"
-    PREFER_NOT_TO_SAY = "0"
-
-    @property
-    def description(self):
-        descriptions = {
-            self.LESS_THAN_2: "Less than 2 years",
-            self.TWO_TO_FIVE: "2-5 years",
-            self.SIX_TO_TEN: "6 - 10 years",
-            self.ELEVEN_TO_FIFTEEN: "11 - 15 years",
-            self.SIXTEEN_TO_TWENTY: "16 - 20 years",
-            self.MORE_THAN_TWENTY: "More than 20 years",
-            self.PREFER_NOT_TO_SAY: "Prefer not to say",
-        }
-        return descriptions[self.value]
 
 
 HIGHEST_EDUCATION_CHOICES = (
@@ -458,16 +412,8 @@ class UserProfile(TimestampedModel):
     job_title = models.CharField(max_length=128, blank=True, null=True, default="")  # noqa: DJ001
     industry = models.CharField(max_length=60, blank=True, null=True, default="")  # noqa: DJ001
     job_function = models.CharField(max_length=60, blank=True, null=True, default="")  # noqa: DJ001
-    company_size = models.IntegerField(
-        null=True,
-        blank=True,
-        choices=[(e.value, e.description) for e in CompanySizeEnum],
-    )
-    years_experience = models.IntegerField(
-        null=True,
-        blank=True,
-        choices=[(e.value, e.description) for e in YearsExperienceEnum],
-    )
+    company_size = models.IntegerField(null=True, blank=True, choices=COMPANY_SIZE_CHOICES)
+    years_experience = models.IntegerField(null=True, blank=True, choices=YRS_EXPERIENCE_CHOICES)
     leadership_level = models.CharField(  # noqa: DJ001
         max_length=60, null=True, blank=True, default=""
     )
