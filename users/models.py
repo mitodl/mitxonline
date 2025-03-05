@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import timedelta
-from enum import Enum
 
 import pycountry
 from django.conf import settings
@@ -412,8 +411,12 @@ class UserProfile(TimestampedModel):
     job_title = models.CharField(max_length=128, blank=True, null=True, default="")  # noqa: DJ001
     industry = models.CharField(max_length=60, blank=True, null=True, default="")  # noqa: DJ001
     job_function = models.CharField(max_length=60, blank=True, null=True, default="")  # noqa: DJ001
-    company_size = models.IntegerField(null=True, blank=True, choices=COMPANY_SIZE_CHOICES)
-    years_experience = models.IntegerField(null=True, blank=True, choices=YRS_EXPERIENCE_CHOICES)
+    company_size = models.IntegerField(
+        null=True, blank=True, choices=COMPANY_SIZE_CHOICES
+    )
+    years_experience = models.IntegerField(
+        null=True, blank=True, choices=YRS_EXPERIENCE_CHOICES
+    )
     leadership_level = models.CharField(  # noqa: DJ001
         max_length=60, null=True, blank=True, default=""
     )
