@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.112.4
+Version 0.112.4 (Released March 05, 2025)
 ---------------
 
 - making downgrade not send email (#2558)
