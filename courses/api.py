@@ -196,14 +196,10 @@ def create_run_enrollments(  # noqa: C901
                 # of deferral(e.g. Audit)
                 # So, User has an active enrollment and the only changing thing is going to be enrollment mode
                 if enrollment.active and enrollment_mode_changed:
+                    if mode == EDX_ENROLLMENT_AUDIT_MODE and enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE:
+                        # Downgrade the enrollment
+                        is_enrollment_downgraded = True
                     enrollment.update_mode_and_save(mode=mode)
-
-                if (
-                    not enrollment.active
-                    and enrollment_mode_changed
-                    and mode == EDX_ENROLLMENT_AUDIT_MODE
-                ):
-                    is_enrollment_downgraded = True
 
                 elif not enrollment.active:
                     if enrollment_mode_changed:
