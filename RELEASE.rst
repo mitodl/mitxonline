@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.112.4
+---------------
+
+- making downgrade not send email (#2558)
+- No emails for downgrading enrollment (#2556)
+
 Version 0.112.3 (Released March 03, 2025)
 ---------------
 
