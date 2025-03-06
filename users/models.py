@@ -184,7 +184,7 @@ class UserManager(BaseUserManager):
         fields = {
             **extra_fields,
             "email": email,
-            "global_id": extra_fields.get("global_id"),
+            "global_id": extra_fields.get("global_id", ""),
         }
         if username is not None:
             fields["username"] = username
