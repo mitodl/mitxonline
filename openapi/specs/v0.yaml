@@ -316,6 +316,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/AddToCartResponse'
           description: ''
+  /api/checkout/basket_items_count/:
+    get:
+      operationId: api_checkout_basket_items_count_retrieve
+      description: API viewset for checkout operations
+      tags:
+      - api
+      responses:
+        '200':
+          description: No response body
   /api/checkout/cart/:
     get:
       operationId: api_checkout_cart_retrieve
@@ -3342,6 +3351,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/AddToCartResponse'
           description: ''
+  /api/v0/checkout/basket_items_count/:
+    get:
+      operationId: checkout_basket_items_count_retrieve
+      description: API viewset for checkout operations
+      tags:
+      - checkout
+      responses:
+        '200':
+          description: No response body
   /api/v0/checkout/cart/:
     get:
       operationId: checkout_cart_retrieve
@@ -6214,15 +6232,15 @@ components:
       - confirmed
     CompanySizeEnum:
       enum:
-      - '1'
-      - '9'
-      - '99'
-      - '999'
-      - '9999'
-      - '10000'
-      - '0'
-      type: string
+      - 1
+      - 9
+      - 99
+      - 999
+      - 9999
+      - 10000
+      - 0
       description: |-
+        * `None` - ----
         * `1` - Small/Start-up (1+ employees)
         * `9` - Small/Home office (1-9 employees)
         * `99` - Small (10-99 employees)
@@ -9496,15 +9514,15 @@ components:
       - topics
     YearsExperienceEnum:
       enum:
-      - '2'
-      - '5'
-      - '10'
-      - '15'
-      - '20'
-      - '21'
-      - '0'
-      type: string
+      - 2
+      - 5
+      - 10
+      - 15
+      - 20
+      - 21
+      - 0
       description: |-
+        * `None` - ----
         * `2` - Less than 2 years
         * `5` - 2-5 years
         * `10` - 6 - 10 years

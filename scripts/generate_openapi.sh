@@ -15,7 +15,7 @@ docker compose run --no-deps --rm web \
 ##################################################
 # Generate API Client
 ##################################################
-
+exit 0
 GENERATOR_VERSION=v7.2.0
 
 docker run --rm -v "${PWD}:/local" -w /local openapitools/openapi-generator-cli:${GENERATOR_VERSION} \
