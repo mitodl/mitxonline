@@ -37,7 +37,7 @@ const AnonymousMenu = ({ mobileView }: Props) => {
         <li>
           <MixedLink
             id={"login".concat(identifierPostfix)}
-            dest={SETTINGS.oidc_login_url}
+            dest={SETTINGS.oidc_login_url || ""}
             className="simple"
             aria-label="Sign In"
           >
@@ -49,7 +49,7 @@ const AnonymousMenu = ({ mobileView }: Props) => {
         <li>
           <MixedLink
             id={"createAccount".concat(identifierPostfix)}
-            dest={SETTINGS.oidc_login_url}
+            dest={SETTINGS.oidc_login_url || ""}
             className="simple button"
             aria-label="Create Account"
           >
