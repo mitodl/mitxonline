@@ -12,38 +12,41 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         """Add arguments to the command."""
 
-        parser.add_argument(
-            "email",
-            type=str,
-            help="The email of the user to promote/demote.",
+        subparsers = parser.add_subparsers(
+            title="Action",
+            dest="subcommand",
+            required=True,
         )
 
-        parser.add_argument(
-            "--promote",
-            action="store_true",
-            help="Promote the user to staff.",
-        )
+        promote_parser = subparsers.add_parser("promote", help="Promote a user.")
+        demote_parser = subparsers.add_parser("demote", help="Demote a user.")
 
-        parser.add_argument(
-            "--demote",
-            action="store_true",
-            help="Demote the user from staff.",
-        )
-
-        parser.add_argument(
+        promote_parser.add_argument(
             "--superuser",
             action="store_true",
             help="Promote the user to superuser.",
         )
+        promote_parser.add_argument(
+            "--email",
+            type=str,
+            help="The email of the user to promote/demote.",
+            required=True,
+        )
 
-    def handle(self, **options) -> None:
-        """Handle the command."""
+        demote_parser.add_argument(
+            "--staff",
+            action="store_true",
+            help="Demote the user from superuser to staff.",
+        )
+        demote_parser.add_argument(
+            "--email",
+            type=str,
+            help="The email of the user to promote/demote.",
+            required=True,
+        )
 
-        email = options["email"]
-        promote = options["promote"]
-        demote = options["demote"]
-        superuser = options["superuser"]
-        verb = ""
+    def _get_user(self, email: str) -> get_user_model:
+        """Get a user by email."""
 
         User = get_user_model()
 
@@ -53,33 +56,55 @@ class Command(BaseCommand):
             errmsg = f"User with email {email} does not exist."
             raise CommandError(errmsg) from exc
 
-        if promote and demote:
-            errmsg = "You cannot provide both --promote and --demote."
-            raise CommandError(errmsg)
+        return user
 
-        if promote:
-            verb = "promoted"
-            user.is_staff = True
+    def handle_promote(self, *args, **options) -> None:  # noqa: ARG002
+        """Handle user promotion."""
 
-            if superuser:
-                verb = f"{verb} to superuser"
-                user.is_superuser = True
+        email = options["email"]
+        superuser = options["superuser"]
 
-            user.save()
-        elif demote:
-            verb = "demoted"
-            # Demoting a superuser just makes them staff.
-            if superuser:
-                verb = f"{verb} from superuser to staff"
-                user.is_staff = True
-                user.is_superuser = False
-            else:
-                user.is_staff = False
-                user.is_superuser = False
+        user = self._get_user(email)
 
-            user.save()
+        user.is_staff = True
+        user.is_superuser = superuser
+
+        user.save()
+
+        superuser_str = " to superuser" if superuser else ""
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Successfully promoted user {user.email}{superuser_str}."
+            )
+        )
+
+    def handle_demote(self, *args, **options) -> None:  # noqa: ARG002
+        """Handle user demotion."""
+
+        email = options["email"]
+        staff = options["staff"]
+
+        user = self._get_user(email)
+
+        user.is_staff = staff and user.is_superuser
+        user.is_superuser = False
+
+        user.save()
+
+        staff_str = " from superuser to staff" if staff else ""
+        self.stdout.write(
+            self.style.SUCCESS(f"Successfully demoted user {user.email}{staff_str}.")
+        )
+
+    def handle(self, **options) -> None:
+        """Handle the command."""
+
+        subcommand = options["subcommand"]
+
+        if subcommand == "promote":
+            self.handle_promote(**options)
+        elif subcommand == "demote":
+            self.handle_demote(**options)
         else:
-            errmsg = "You must provide either --promote or --demote."
+            errmsg = "You must specify promote or demote."
             raise CommandError(errmsg)
-
-        self.stdout.write(self.style.SUCCESS(f"Successfully {verb} user {user.email}."))
