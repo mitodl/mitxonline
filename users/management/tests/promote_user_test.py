@@ -17,19 +17,19 @@ def test_promote_user_bad_args(user):
     with pytest.raises(CommandError) as exc:
         call_command(
             "promote_user",
-            "--promote",
-            "--demote",
-            user.email,
+            "promote",
+            "demote",
+            email=user.email,
             stdout=out,
         )
 
-    assert "You cannot provide both --promote and --demote." in str(exc.value)
+    assert "unrecognized arguments" in str(exc.value)
 
     with pytest.raises(CommandError) as exc:
         call_command(
             "promote_user",
-            "--promote",
-            FAKE.email(),
+            "promote",
+            email=FAKE.email(),
             stdout=out,
         )
 
@@ -39,11 +39,11 @@ def test_promote_user_bad_args(user):
         call_command(
             "promote_user",
             "--superuser",
-            user.email,
+            email=user.email,
             stdout=out,
         )
 
-    assert "You must provide either --promote or --demote" in str(exc.value)
+    assert "invalid choice" in str(exc.value)
 
 
 @pytest.mark.parametrize("to_superuser", [True, False])
@@ -54,16 +54,16 @@ def test_promote_user(user, to_superuser):
     if to_superuser:
         call_command(
             "promote_user",
-            "--promote",
+            "promote",
             "--superuser",
-            user.email,
+            email=user.email,
             stdout=out,
         )
     else:
         call_command(
             "promote_user",
-            "--promote",
-            user.email,
+            "promote",
+            email=user.email,
             stdout=out,
         )
 
@@ -92,9 +92,9 @@ def test_demote_user(user, from_superuser):
 
         call_command(
             "promote_user",
-            "--demote",
-            "--superuser",
-            user.email,
+            "demote",
+            "--staff",
+            email=user.email,
             stdout=out,
         )
     else:
@@ -103,8 +103,8 @@ def test_demote_user(user, from_superuser):
 
         call_command(
             "promote_user",
-            "--demote",
-            user.email,
+            "demote",
+            email=user.email,
             stdout=out,
         )
 
