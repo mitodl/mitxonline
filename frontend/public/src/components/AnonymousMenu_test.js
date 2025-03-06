@@ -9,7 +9,7 @@ import { routes } from "../lib/urls"
 
 describe("AnonymousMenu component (email login version)", () => {
   beforeEach(() => {
-    SETTINGS.oidc_login_url = false
+    SETTINGS.oidc_login_url = ""
   })
 
   it("has a link to login", () => {
