@@ -175,6 +175,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
             "grades",
         ]
 
+
 @extend_schema_field(ProductFlexibilePriceSerializer)
 class ProductRelatedField(serializers.RelatedField):
     """serializer for the Product generic field"""

@@ -567,7 +567,8 @@ class DiscountSerializer(serializers.ModelSerializer):
             "expiration_date",
         ]
         depth = 2
-        
+
+
 class ProductFlexibilePriceSerializer(BaseProductSerializer):
     product_flexible_price = serializers.SerializerMethodField()
 
