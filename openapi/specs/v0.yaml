@@ -8192,6 +8192,47 @@ components:
       - id
       - price
       - purchasable_object
+    ProductFlexibilePrice:
+      type: object
+      description: Simple serializer for Product without related purchasable objects
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+        product_flexible_price:
+          type: string
+          readOnly: true
+      required:
+      - description
+      - id
+      - price
+      - product_flexible_price
+    ProductFlexibilePriceRequest:
+      type: object
+      description: Simple serializer for Product without related purchasable objects
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+      required:
+      - description
+      - price
     ProductRequest:
       type: object
       description: Simple serializer for Product without related purchasable objects
@@ -9145,7 +9186,8 @@ components:
         products:
           type: array
           items:
-            type: string
+            allOf:
+            - $ref: '#/components/schemas/ProductFlexibilePrice'
           readOnly: true
           description: List of products associated with this course run
         approved_flexible_price_exists:
@@ -9429,7 +9471,8 @@ components:
         products:
           type: array
           items:
-            type: string
+            allOf:
+            - $ref: '#/components/schemas/ProductFlexibilePrice'
           readOnly: true
         approved_flexible_price_exists:
           type: boolean
