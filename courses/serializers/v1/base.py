@@ -114,7 +114,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     approved_flexible_price_exists = serializers.SerializerMethodField()
     grades = serializers.SerializerMethodField(read_only=True)
 
-    @extend_schema_field(CourseRunCertificateSerializer)
+    @extend_schema_field(CourseRunCertificateSerializer(allow_null=True))
     def get_certificate(self, enrollment):
         """
         Resolve a certificate for this enrollment if it exists

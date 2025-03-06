@@ -6440,6 +6440,7 @@ components:
         certificate:
           allOf:
           - $ref: '#/components/schemas/CourseRunCertificate'
+          nullable: true
           readOnly: true
         enrollment_mode:
           allOf:
