@@ -1,4 +1,5 @@
 """CMS app serializers"""
+from __future__ import annotations
 
 import bleach
 from django.templatetags.static import static
@@ -124,7 +125,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         )
 
     @extend_schema_field(int)
-    def get_current_price(self, instance):
+    def get_current_price(self, instance) -> int | None:
         relevant_product = (
             instance.product.active_products.filter().order_by("-price").first()
             if instance.product.active_products

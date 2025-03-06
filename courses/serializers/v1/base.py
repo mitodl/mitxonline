@@ -38,16 +38,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     """Minimal CourseRun model serializer"""
 
     is_archived = serializers.SerializerMethodField()
-    title = serializers.CharField()
-    start_date = serializers.DateTimeField()
-    end_date = serializers.DateTimeField()
-    enrollment_start = serializers.DateTimeField()
-    enrollment_end = serializers.DateTimeField()
-    expiration_date = serializers.DateTimeField()
     courseware_url = serializers.URLField()
-    courseware_id = serializers.CharField()
-    certificate_available_date = serializers.DateTimeField()
-    upgrade_deadline = serializers.DateTimeField()
     is_upgradable = serializers.BooleanField()
     is_enrollable = serializers.BooleanField()
     is_self_paced = serializers.BooleanField()
@@ -114,7 +105,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     approved_flexible_price_exists = serializers.SerializerMethodField()
     grades = serializers.SerializerMethodField(read_only=True)
 
-    @extend_schema_field(CourseRunCertificateSerializer)
+    @extend_schema_field(CourseRunCertificateSerializer(allow_null=True))
     def get_certificate(self, enrollment):
         """
         Resolve a certificate for this enrollment if it exists
@@ -184,7 +175,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
             "grades",
         ]
 
-
+@extend_schema_field(ProductFlexibilePriceSerializer)
 class ProductRelatedField(serializers.RelatedField):
     """serializer for the Product generic field"""
 

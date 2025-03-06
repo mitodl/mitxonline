@@ -57,7 +57,9 @@ def postprocess_x_enum_descriptions(result, generator, request, public):  # noqa
 
             # sometimes there are descriptions for empty values
             # that aren't present in `"enums"`
-            if key in schema["enum"]:
+            # regex keys are always strings
+            enums_as_str = [str(e) for e in schema["enum"]]
+            if key in enums_as_str:
                 descriptions_by_value[key] = description
 
         if len(descriptions_by_value.values()) != len(schema["enum"]):
@@ -66,7 +68,7 @@ def postprocess_x_enum_descriptions(result, generator, request, public):  # noqa
 
         if descriptions_by_value:
             schema["x-enum-descriptions"] = [
-                descriptions_by_value[value] for value in schema["enum"]
+                descriptions_by_value[str(value)] for value in schema["enum"]
             ]
 
     return result

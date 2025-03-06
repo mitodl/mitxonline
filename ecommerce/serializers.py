@@ -149,25 +149,6 @@ class ProductSerializer(BaseProductSerializer):
         model = models.Product
 
 
-class ProductFlexibilePriceSerializer(BaseProductSerializer):
-    product_flexible_price = serializers.SerializerMethodField()
-
-    def get_product_flexible_price(self, instance):
-        if "request" not in self.context:
-            return None
-
-        discount_record = determine_courseware_flexible_price_discount(
-            instance, self.context["request"].user
-        )
-        return DiscountSerializer(discount_record, context=self.context).data
-
-    class Meta:
-        fields = BaseProductSerializer.Meta.fields + [  # noqa: RUF005
-            "product_flexible_price",
-        ]
-        model = models.Product
-
-
 class BasketItemSerializer(serializers.ModelSerializer):
     """BasketItem model serializer"""
 
@@ -586,6 +567,25 @@ class DiscountSerializer(serializers.ModelSerializer):
             "expiration_date",
         ]
         depth = 2
+        
+class ProductFlexibilePriceSerializer(BaseProductSerializer):
+    product_flexible_price = serializers.SerializerMethodField()
+
+    @extend_schema_field(DiscountSerializer(allow_null=True))
+    def get_product_flexible_price(self, instance):
+        if "request" not in self.context:
+            return None
+
+        discount_record = determine_courseware_flexible_price_discount(
+            instance, self.context["request"].user
+        )
+        return DiscountSerializer(discount_record, context=self.context).data
+
+    class Meta:
+        fields = BaseProductSerializer.Meta.fields + [  # noqa: RUF005
+            "product_flexible_price",
+        ]
+        model = models.Product
 
 
 class DiscountRedemptionSerializer(serializers.ModelSerializer):
