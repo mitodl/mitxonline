@@ -118,6 +118,7 @@ COMPANY_SIZE_CHOICES = (
     (0, "Other (N/A or Don't know)"),
 )
 
+
 YRS_EXPERIENCE_CHOICES = (
     (None, "----"),
     (2, "Less than 2 years"),
@@ -128,6 +129,7 @@ YRS_EXPERIENCE_CHOICES = (
     (21, "More than 20 years"),
     (0, "Prefer not to say"),
 )
+
 
 HIGHEST_EDUCATION_CHOICES = (
     (None, "----"),

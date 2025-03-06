@@ -11,6 +11,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 from mitol.olposthog.features import is_enabled
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -165,7 +166,11 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_context(self):
         added_context = {}
-        if self.request.query_params.get("readable_id", None):
+        if (
+            self.request
+            and self.request.query_params
+            and self.request.query_params.get("readable_id", None)
+        ):
             added_context["all_runs"] = True
 
         return {**super().get_serializer_context(), **added_context}
@@ -178,6 +183,12 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         if self.paginator and self.request.query_params.get("page", None) is None:
             return None
         return super().paginate_queryset(queryset)
+
+    @extend_schema(
+        operation_id="courses_retrieve_v1", description="API view set for Courses - v1"
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
 
 
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
@@ -210,7 +221,11 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_context(self):
         added_context = {}
-        if self.request.query_params.get("relevant_to", None):
+        if (
+            self.request
+            and self.request.query_params
+            and self.request.query_params.get("relevant_to", None)
+        ):
             added_context["include_enrolled_flag"] = True
         return {**super().get_serializer_context(), **added_context}
 
@@ -335,6 +350,10 @@ def create_enrollment_view(request):
     return resp
 
 
+@extend_schema(
+    request=CourseRunEnrollmentSerializer,
+    responses={200: CourseRunEnrollmentSerializer},
+)
 class UserEnrollmentsApiViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
@@ -416,6 +435,9 @@ class UserEnrollmentsApiViewSet(
             raise NotImplementedError
 
 
+@extend_schema(
+    responses={200: UserProgramEnrollmentDetailSerializer},
+)
 class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -487,6 +509,9 @@ class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@extend_schema(
+    responses={200: LearnerRecordSerializer},
+)
 def get_learner_record(request, pk):
     program = Program.objects.get(pk=pk)
 
@@ -495,6 +520,10 @@ def get_learner_record(request, pk):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@extend_schema(
+    request=PartnerSchoolSerializer,
+    responses={200: LearnerRecordSerializer},
+)
 def get_learner_record_share(request, pk):
     """
     Sets up a sharing link for the learner's record. Returns back the entire
