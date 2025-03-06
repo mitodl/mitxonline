@@ -9065,33 +9065,58 @@ components:
       properties:
         title:
           type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
         start_date:
           type: string
           format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
         end_date:
           type: string
           format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
         enrollment_start:
           type: string
           format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
         enrollment_end:
           type: string
           format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
         expiration_date:
           type: string
           format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
         courseware_url:
           type: string
           description: Get the courseware URL
           readOnly: true
         courseware_id:
           type: string
+          maxLength: 255
         certificate_available_date:
           type: string
           format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
         upgrade_deadline:
           type: string
           format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
         is_upgradable:
           type: boolean
           description: Check if the course run is upgradable
@@ -9131,15 +9156,10 @@ components:
           readOnly: true
       required:
       - approved_flexible_price_exists
-      - certificate_available_date
       - course
       - course_number
       - courseware_id
       - courseware_url
-      - end_date
-      - enrollment_end
-      - enrollment_start
-      - expiration_date
       - id
       - is_archived
       - is_enrollable
@@ -9148,9 +9168,7 @@ components:
       - live
       - products
       - run_tag
-      - start_date
       - title
-      - upgrade_deadline
     V1CourseRunRequest:
       type: object
       description: CourseRun model serializer - also serializes the parent Course.
@@ -9158,30 +9176,55 @@ components:
         title:
           type: string
           minLength: 1
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
         start_date:
           type: string
           format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
         end_date:
           type: string
           format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
         enrollment_start:
           type: string
           format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
         enrollment_end:
           type: string
           format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
         expiration_date:
           type: string
           format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
         courseware_id:
           type: string
           minLength: 1
+          maxLength: 255
         certificate_available_date:
           type: string
           format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
         upgrade_deadline:
           type: string
           format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
         is_self_paced:
           type: boolean
         run_tag:
@@ -9192,19 +9235,12 @@ components:
         live:
           type: boolean
       required:
-      - certificate_available_date
       - courseware_id
-      - end_date
-      - enrollment_end
-      - enrollment_start
-      - expiration_date
       - id
       - is_self_paced
       - live
       - run_tag
-      - start_date
       - title
-      - upgrade_deadline
     V1CourseWithCourseRuns:
       type: object
       description: Course model serializer - also serializes child course runs
@@ -9321,32 +9357,57 @@ components:
       properties:
         title:
           type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
         start_date:
           type: string
           format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
         end_date:
           type: string
           format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
         enrollment_start:
           type: string
           format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
         enrollment_end:
           type: string
           format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
         expiration_date:
           type: string
           format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
         courseware_url:
           type: string
           format: uri
         courseware_id:
           type: string
+          maxLength: 255
         certificate_available_date:
           type: string
           format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
         upgrade_deadline:
           type: string
           format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
         is_upgradable:
           type: boolean
         is_enrollable:
@@ -9374,14 +9435,9 @@ components:
           readOnly: true
       required:
       - approved_flexible_price_exists
-      - certificate_available_date
       - course_number
       - courseware_id
       - courseware_url
-      - end_date
-      - enrollment_end
-      - enrollment_start
-      - expiration_date
       - id
       - is_archived
       - is_enrollable
@@ -9390,9 +9446,7 @@ components:
       - live
       - products
       - run_tag
-      - start_date
       - title
-      - upgrade_deadline
     V2Program:
       type: object
       description: Program Model Serializer v2
