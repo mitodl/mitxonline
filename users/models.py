@@ -184,7 +184,7 @@ class UserManager(BaseUserManager):
         fields = {
             **extra_fields,
             "email": email,
-            "global_id": extra_fields.get("global_id", uuid.uuid4()),
+            "global_id": extra_fields.get("global_id"),
         }
         if username is not None:
             fields["username"] = username
@@ -260,8 +260,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     # We allow a blank value so we can have out-of-band users - we may want a
     # Django user that's not connected to an SSO user, for instance.
     global_id = models.CharField(
-        unique=True,
-        max_length=255,
+        max_length=36,
         blank=True,
         default="",
         help_text="The SSO ID (usually a Keycloak UUID) for the user.",
