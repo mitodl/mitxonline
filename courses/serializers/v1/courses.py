@@ -48,6 +48,7 @@ class CourseSerializer(BaseCourseSerializer):
                 "title": serializers.CharField(),
                 "readable_id": serializers.CharField(),
             },
+            allow_null=True,
         )
     )
     def get_programs(self, instance):

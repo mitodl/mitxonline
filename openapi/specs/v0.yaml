@@ -6340,6 +6340,7 @@ components:
         programs:
           allOf:
           - $ref: '#/components/schemas/Program'
+          nullable: true
           readOnly: true
       required:
       - departments
@@ -9316,6 +9317,7 @@ components:
         programs:
           allOf:
           - $ref: '#/components/schemas/Program'
+          nullable: true
           readOnly: true
         courseruns:
           type: array
