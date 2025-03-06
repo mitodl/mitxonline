@@ -8209,7 +8209,9 @@ components:
           type: boolean
           description: Controls visibility of the product in the app.
         product_flexible_price:
-          type: string
+          allOf:
+          - $ref: '#/components/schemas/Discount'
+          nullable: true
           readOnly: true
       required:
       - description
