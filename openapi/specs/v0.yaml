@@ -6326,6 +6326,7 @@ components:
           maxLength: 255
         next_run_id:
           type: integer
+          nullable: true
           description: Get next run id
           readOnly: true
         departments:
@@ -9303,6 +9304,7 @@ components:
           maxLength: 255
         next_run_id:
           type: integer
+          nullable: true
           description: Get next run id
           readOnly: true
         departments:
