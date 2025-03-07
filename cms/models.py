@@ -1168,6 +1168,12 @@ class CoursePage(ProductPage):
         blank=True,
         help_text="The topics for this course page.",
     )
+    sub_topics = ParentalManyToManyField(
+        "courses.CoursesSubTopic",
+        null=True,
+        blank=True,
+        help_text="The subtopics for this course page.",
+    )
 
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
