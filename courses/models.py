@@ -513,7 +513,7 @@ class CoursesTopic(TimestampedModel):
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name="subtopics",
+        related_name="topics",
     )
     objects = CoursesTopicQuerySet.as_manager()
 
@@ -523,6 +523,26 @@ class CoursesTopic(TimestampedModel):
     def __str__(self):
         return self.name
 
+
+class CoursesSubTopic(TimestampedModel):
+    """
+    Subtopics for all courses (e.g. "Ancient History")
+    """
+
+    name = models.CharField(max_length=128)
+    parent = models.ForeignKey(
+        CoursesTopic,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="subtopics",
+    )
+
+    class Meta:
+        unique_together = ("name", "parent")
+
+    def __str__(self):
+        return self.name
 
 class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
