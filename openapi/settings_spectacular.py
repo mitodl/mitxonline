@@ -16,4 +16,7 @@ open_spectacular_settings = {
         "drf_spectacular.hooks.postprocess_schema_enums",
         "openapi.hooks.postprocess_x_enum_descriptions",
     ],
+    "PREPROCESSING_HOOKS": [
+        "openapi.hooks.exclude_paths_hook",
+    ],
 }

@@ -156,32 +156,26 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
         help_text="List of products associated with this course run",
     )
 
-    @extend_schema_field(str)
     def get_courseware_url(self, instance) -> Optional[str]:
         """Get the courseware URL"""
         return instance.courseware_url
 
-    @extend_schema_field(bool)
     def get_is_upgradable(self, instance) -> bool:
         """Check if the course run is upgradable"""
         return instance.is_upgradable
 
-    @extend_schema_field(bool)
     def get_is_enrollable(self, instance) -> bool:
         """Check if the course run is enrollable"""
         return instance.is_enrollable
 
-    @extend_schema_field(bool)
     def get_is_archived(self, instance) -> bool:
         """Check if the course run is archived"""
         return instance.is_enrollable and instance.is_past
 
-    @extend_schema_field(str)
     def get_course_number(self, instance) -> str:
         """Get the course number"""
         return instance.course_number
 
-    @extend_schema_field(list[dict])
     def get_products(self, instance) -> list[dict]:
         """Get products associated with this course run"""
         return super().get_products(instance)

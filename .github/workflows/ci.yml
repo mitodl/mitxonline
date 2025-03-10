@@ -199,7 +199,7 @@ jobs:
                   command-args: |
                     --output $GENERATOR_OUTPUT_DIR_CI \
                     --ignore-file-override $GENERATOR_IGNORE_FILE \
-                    -c ./scripts/openapi-configs/typescript-axios-v0.yaml
+                    -c scripts/openapi-configs/typescript-axios-v0.yaml
         
               - name: Format freshly generated client
                 run: npx prettier $GENERATOR_OUTPUT_DIR_CI/**/*.ts --no-semi --write

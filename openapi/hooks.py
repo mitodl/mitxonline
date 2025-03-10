@@ -56,7 +56,7 @@ def postprocess_x_enum_descriptions(result, generator, request, public):  # noqa
             description = match["description"]
 
             # sometimes there are descriptions for empty values
-            # that aren't present in `"enums"`
+            # that aren"t present in `"enums"`
             # regex keys are always strings
             enums_as_str = [str(e) for e in schema["enum"]]
             if key in enums_as_str:
@@ -72,3 +72,51 @@ def postprocess_x_enum_descriptions(result, generator, request, public):  # noqa
             ]
 
     return result
+
+def exclude_paths_hook(endpoints, **kwargs):
+    # List of path prefixes to exclude
+    EXCLUDED_PATHS = [
+        "/api/hubspot_sync/",
+        "/api/flexible_pricing/",
+        "/api/cms/",
+        "/api/v0/baskets/",
+        "/api/v0/discounts/",
+        "/api/v0/flexible_pricing/",
+        "/cms/",
+        "/api/login/",
+        "/api/register/",
+        "/api/password_reset/",
+        "/api/set_password/",
+        "/api/auths/",
+        "/.well-known/openid-configuration",
+        "/api/countries/",
+        "/api/users/",
+        "/api/change-emails/",
+        "/api/user_search/",
+        "/api/partnerschools/",
+        "/api/v1/partnerschools/",
+        "/api/v0/products/",
+        "/api/products/",
+        "/api/checkout/",
+        "/api/discounts/",
+        "/api/baskets/",
+        "/api/orders/",
+        "/api/checkout/",
+        "/api/instructor/",
+        "/api/v0/checkout/",
+        "/api/v0/orders/",
+    ]
+
+    # Filter out endpoints whose paths start with any of the excluded prefixes
+    filtered_endpoints = [
+        (path, path_regex, method, callback)
+        for (path, path_regex, method, callback) in endpoints
+        if not any(path.startswith(prefix) for prefix in EXCLUDED_PATHS)
+    ]
+
+    # Print the filtered endpoints for debugging
+    print("Filtered Endpoints:")
+    for endpoint in filtered_endpoints:
+        print(endpoint)
+
+    return filtered_endpoints

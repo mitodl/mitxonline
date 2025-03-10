@@ -2,6 +2,7 @@
 
 import logging
 from typing import Optional, Tuple, Union  # noqa: UP035
+import uuid
 
 import django_filters
 from django.contrib.auth.models import User
@@ -509,10 +510,7 @@ class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-@extend_schema(
-    responses={200: LearnerRecordSerializer},
-)
-def get_learner_record(request, pk):
+def get_learner_record(request, pk) -> LearnerRecordSerializer:
     program = Program.objects.get(pk=pk)
 
     return Response(LearnerRecordSerializer(program, context={"request": request}).data)
@@ -584,7 +582,7 @@ def revoke_learner_record_share(request, pk):
 
 @api_view(["GET"])
 @permission_classes([])
-def get_learner_record_from_uuid(request, uuid):  # noqa: ARG001
+def get_learner_record_from_uuid(request, uuid: uuid):  # noqa: ARG001
     """
     Does mostly the same thing as get_learner_record, but sets context to skip
     the partner school and sharing information.
