@@ -226,7 +226,7 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     enrollments = CourseRunEnrollmentSerializer(many=True)
     certificate = serializers.SerializerMethodField(read_only=True)
 
-    @extend_schema_field(ProgramCertificateSerializer)
+    @extend_schema_field(ProgramCertificateSerializer(allow_null=True))
     def get_certificate(self, user_program_enrollment):
         """
         Resolve a certificate for this enrollment if it exists
