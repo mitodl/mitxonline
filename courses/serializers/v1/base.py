@@ -38,14 +38,6 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     """Minimal CourseRun model serializer"""
 
     is_archived = serializers.SerializerMethodField()
-    courseware_url = serializers.URLField()
-    is_upgradable = serializers.BooleanField()
-    is_enrollable = serializers.BooleanField()
-    is_self_paced = serializers.BooleanField()
-    run_tag = serializers.CharField()
-    id = serializers.IntegerField()
-    live = serializers.BooleanField()
-    course_number = serializers.CharField()
 
     @extend_schema_field(bool)
     def get_is_archived(self, instance):
