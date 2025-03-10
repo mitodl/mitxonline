@@ -66,8 +66,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    @extend_schema_field(str)
-    def get_time_commitment(self, instance):
+    def get_time_commitment(self, instance) -> str | None:
         """
         Get the time commitment of the course from the course page CMS.
         """
