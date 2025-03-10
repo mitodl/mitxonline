@@ -39,8 +39,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
     def get_description(self, instance):
         return bleach.clean(instance.description, tags=[], strip=True)
 
-    @extend_schema_field(str)
-    def get_effort(self, instance):
+    def get_effort(self, instance) -> str | None:
         return (
             bleach.clean(instance.effort, tags=[], strip=True)
             if instance.effort
