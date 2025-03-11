@@ -2,7 +2,7 @@
 
 import logging
 from typing import Optional, Tuple, Union  # noqa: UP035
-import uuid
+from rest_framework.views import APIView
 
 import django_filters
 from django.contrib.auth.models import User
@@ -17,6 +17,7 @@ from mitol.olposthog.features import is_enabled
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
+from rest_framework.generics import GenericAPIView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -115,6 +116,20 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
         if self.paginator and self.request.query_params.get("page", None) is None:
             return None
         return super().paginate_queryset(queryset)
+
+    @extend_schema(
+        operation_id="programs_retrieve_v1",
+        description="API view set for Programs - v1"
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+    
+    @extend_schema(
+        operation_id="programs_list_v1",
+        description="List Programs - v1"
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 
 class CourseFilterSet(django_filters.FilterSet):
@@ -282,73 +297,81 @@ def _validate_enrollment_post_request(
     return None, user, run
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def create_enrollment_view(request):
-    """View to handle direct POST requests to enroll in a course run"""
-    resp, user, run = _validate_enrollment_post_request(request)
-    if resp is not None:
-        return resp
-    _, edx_request_success = create_run_enrollments(
-        user=user,
-        runs=[run],
-        keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+class CreateEnrollmentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=None,  # No request body for this view
+        responses={
+            200: None,  # No response body or specify a serializer if needed
+            302: None,  # Redirect response
+        },
     )
-
-    def respond(data, status=True):  # noqa: FBT002
+    def post(self, request):
         """
-        Either return a redirect or Ok/Fail based on status.
+        View to handle direct POST requests to enroll in a course run.
         """
+        resp, user, run = _validate_enrollment_post_request(request)
+        if resp is not None:
+            return resp
 
-        if "isapi" in request.data:
-            return Response("Ok" if status else "Fail")
+        _, edx_request_success = create_run_enrollments(
+            user=user,
+            runs=[run],
+            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+        )
 
-        return HttpResponseRedirect(data)
+        def respond(data, status=True):  # noqa: FBT002
+            """
+            Either return a redirect or Ok/Fail based on status.
+            """
+            if "isapi" in request.data:
+                return Response("Ok" if status else "Fail")
+            return HttpResponseRedirect(data)
 
-    if edx_request_success or is_enabled(features.IGNORE_EDX_FAILURES):
-        resp = respond(reverse("user-dashboard"))
-        cookie_value = {
-            "type": USER_MSG_TYPE_ENROLLED,
-            "run": run.course.title,
-        }
+        if edx_request_success or is_enabled(features.IGNORE_EDX_FAILURES):
+            resp = respond(reverse("user-dashboard"))
+            cookie_value = {
+                "type": USER_MSG_TYPE_ENROLLED,
+                "run": run.course.title,
+            }
 
-        # Check for an existing fulfilled order prior, otherwise get or create a PendingOrder.
-        # This can occur if the user has a verified enrollment that is not synced with Edx,
-        # and then attempts to enroll in the course again.
-        product = Product.objects.filter(
-            object_id=run.id,
-            content_type=ContentType.objects.get_for_model(CourseRun),
-        ).first()
-        if product is None:
-            log.exception("No product found for that course with courseware_id %s", run)
-        else:
-            product_version = Version.objects.get_for_object(product).first()
-            product_object_id = product.object_id
-            product_content_type = product.content_type_id
-            order = FulfilledOrder.objects.filter(
-                state=OrderStatus.FULFILLED,
-                purchaser=user,
-                lines__purchased_object_id=product_object_id,
-                lines__purchased_content_type_id=product_content_type,
-                lines__product_version=product_version,
-            )
-            if not order:
-                # Create PendingOrder
-                order = PendingOrder.create_from_product(product, user)
-                sync_hubspot_deal(order)
+            # Check for an existing fulfilled order prior, otherwise get or create a PendingOrder.
+            product = Product.objects.filter(
+                object_id=run.id,
+                content_type=ContentType.objects.get_for_model(CourseRun),
+            ).first()
+            if product is None:
+                log.exception("No product found for that course with courseware_id %s", run)
             else:
-                sync_hubspot_deal(order.first())
-    else:
-        resp = respond(request.headers["Referer"])
-        cookie_value = {
-            "type": USER_MSG_TYPE_ENROLL_FAILED,
-        }
-    resp.set_cookie(
-        key=USER_MSG_COOKIE_NAME,
-        value=encode_json_cookie_value(cookie_value),
-        max_age=USER_MSG_COOKIE_MAX_AGE,
-    )
-    return resp
+                product_version = Version.objects.get_for_object(product).first()
+                product_object_id = product.object_id
+                product_content_type = product.content_type_id
+                order = FulfilledOrder.objects.filter(
+                    state=OrderStatus.FULFILLED,
+                    purchaser=user,
+                    lines__purchased_object_id=product_object_id,
+                    lines__purchased_content_type_id=product_content_type,
+                    lines__product_version=product_version,
+                )
+                if not order:
+                    # Create PendingOrder
+                    order = PendingOrder.create_from_product(product, user)
+                    sync_hubspot_deal(order)
+                else:
+                    sync_hubspot_deal(order.first())
+        else:
+            resp = respond(request.headers["Referer"])
+            cookie_value = {
+                "type": USER_MSG_TYPE_ENROLL_FAILED,
+            }
+
+        resp.set_cookie(
+            key=USER_MSG_COOKIE_NAME,
+            value=encode_json_cookie_value(cookie_value),
+            max_age=USER_MSG_COOKIE_MAX_AGE,
+        )
+        return resp
 
 
 @extend_schema(
@@ -508,97 +531,114 @@ class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = PartnerSchool.objects.all()
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_learner_record(request, pk) -> LearnerRecordSerializer:
-    program = Program.objects.get(pk=pk)
+class GetLearnerRecordView(APIView):
+    """View to get learner record by program ID"""
 
-    return Response(LearnerRecordSerializer(program, context={"request": request}).data)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-@extend_schema(
-    request=PartnerSchoolSerializer,
-    responses={200: LearnerRecordSerializer},
-)
-def get_learner_record_share(request, pk):
-    """
-    Sets up a sharing link for the learner's record. Returns back the entire
-    learner record.
-    """
-    program = Program.objects.get(pk=pk)
-
-    school = None
-
-    if "partnerSchool" in request.data and request.data["partnerSchool"] is not None:
-        # OK here to just turn on the existing partner school share if there's
-        # already one - these technically don't get revoked.
-        try:
-            school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
-        except:  # noqa: E722
-            return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
-
-        (ps_share, created) = LearnerProgramRecordShare.objects.filter(
-            user=request.user, program=program, partner_school=school
-        ).get_or_create(user=request.user, program=program, partner_school=school)
-        ps_share.is_active = True
-        ps_share.save()
-
-        # Send email
-        send_partner_school_email.delay(ps_share.share_uuid)
-    else:
-        # If we're creating an anonymous one, we need to check to make sure the
-        # existing link hasn't been deactivated (if there is one). We don't
-        # want to re-activate an existing one so people can revoke the links
-        # that are out there and get new ones. But, if there's a still active
-        # record out there, we don't want to make another new one either.
-
-        (ps_share, created) = LearnerProgramRecordShare.objects.filter(
-            user=request.user, program=program, partner_school=None, is_active=True
-        ).get_or_create(
-            user=request.user, program=program, partner_school=None, is_active=True
-        )
-
-    return Response(LearnerRecordSerializer(program, context={"request": request}).data)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def revoke_learner_record_share(request, pk):
-    """
-    Disables sharing links for the learner's record. This only applies to the
-    anonymous ones; shares sent to partner schools are always allowed once they
-    are sent.
-    """
-    program = Program.objects.get(pk=pk)
-
-    LearnerProgramRecordShare.objects.filter(
-        user=request.user, partner_school=None, program=program
-    ).update(is_active=False)
-
-    return Response(LearnerRecordSerializer(program, context={"request": request}).data)
-
-
-@api_view(["GET"])
-@permission_classes([])
-def get_learner_record_from_uuid(request, uuid: uuid):  # noqa: ARG001
-    """
-    Does mostly the same thing as get_learner_record, but sets context to skip
-    the partner school and sharing information.
-    """
-    record = LearnerProgramRecordShare.objects.filter(
-        is_active=True, share_uuid=uuid
-    ).first()
-
-    if record is None:
-        return Response([], status=status.HTTP_404_NOT_FOUND)
-
-    return Response(
-        LearnerRecordSerializer(
-            record.program, context={"user": record.user, "anonymous_pull": True}
-        ).data
+    @extend_schema(
+        operation_id="learner_record_retrieve_by_id",
+        description="Get learner record using program ID",
+        responses={200: LearnerRecordSerializer},
     )
+    def get(self, request, pk):
+        """
+        Retrieve the learner record for a specific program.
+        """
+        program = Program.objects.get(pk=pk)
+        serializer = LearnerRecordSerializer(program, context={"request": request})
+        return Response(serializer.data)
+
+
+class LearnerRecordShareView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=PartnerSchoolSerializer,
+        responses={200: LearnerRecordSerializer},
+    )
+    def post(self, request, pk):
+        """
+        Sets up a sharing link for the learner's record. Returns back the entire
+        learner record.
+        """
+        program = Program.objects.get(pk=pk)
+
+        school = None
+
+        if "partnerSchool" in request.data and request.data["partnerSchool"] is not None:
+            try:
+                school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
+            except:  # noqa: E722
+                return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
+
+            (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+                user=request.user, program=program, partner_school=school
+            ).get_or_create(user=request.user, program=program, partner_school=school)
+            ps_share.is_active = True
+            ps_share.save()
+
+            send_partner_school_email.delay(ps_share.share_uuid)
+        else:
+            (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+                user=request.user, program=program, partner_school=None, is_active=True
+            ).get_or_create(
+                user=request.user, program=program, partner_school=None, is_active=True
+            )
+
+        return Response(LearnerRecordSerializer(program, context={"request": request}).data)
+
+
+class RevokeLearnerRecordShareView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=None,  # No request body for this view
+        responses={200: LearnerRecordSerializer},  # Specify the response serializer
+    )
+    def post(self, request, pk: int):
+        """
+        Disables sharing links for the learner's record. This only applies to the
+        anonymous ones; shares sent to partner schools are always allowed once they
+        are sent.
+        """
+        program = Program.objects.get(pk=pk)
+
+        LearnerProgramRecordShare.objects.filter(
+            user=request.user, partner_school=None, program=program
+        ).update(is_active=False)
+
+        return Response(LearnerRecordSerializer(program, context={"request": request}).data)
+
+class LearnerRecordFromUUIDView(GenericAPIView):
+    """View to get learner record from UUID"""
+
+    permission_classes = []
+    serializer_class = LearnerRecordSerializer
+
+    @extend_schema(
+        operation_id="learner_record_retrieve_by_uuid",
+        description="Get learner record using share UUID"
+    )
+    def get(self, request, uuid):
+        """
+        Get learner record from UUID. Sets context to skip the partner school 
+        and sharing information.
+        """
+        record = LearnerProgramRecordShare.objects.filter(
+            is_active=True,
+            share_uuid=uuid
+        ).first()
+
+        if record is None:
+            return Response([], status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(
+            record.program,
+            context={
+                "user": record.user,
+                "anonymous_pull": True
+            }
+        )
+        return Response(serializer.data)
 
 
 @permission_classes([])
@@ -606,6 +646,25 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Departments"""
 
     serializer_class = DepartmentWithCountSerializer
+
+    def get_queryset(self):
+        return Department.objects.annotate(
+            courses=Count("course"), programs=Count("program")
+        )
+
+    @extend_schema(
+        operation_id="departments_retrieve_v1",
+        description="Get department details - v1"
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    @extend_schema(
+        operation_id="departments_list_v1",
+        description="List departments - v1"
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         return Department.objects.annotate(

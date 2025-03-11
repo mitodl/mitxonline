@@ -17,16 +17,12 @@ urlpatterns = [
 ]
 
 urlpatterns += [
-    path("api/records/program/<int:pk>/share/", v1.get_learner_record_share),
-    path("api/records/program/<int:pk>/revoke/", v1.revoke_learner_record_share),
-    path("api/records/program/<int:pk>/", v1.get_learner_record),
-    path(
-        "api/records/shared/<uuid>/",
-        v1.get_learner_record_from_uuid,
-        name="shared_learner_record_from_uuid",
-    ),
+    path('learner-record-share/<int:pk>/', v1.LearnerRecordShareView.as_view(), name='learner-record-share'),
+    path('revoke-learner-record-share/<int:pk>/', v1.RevokeLearnerRecordShareView.as_view(), name='revoke-learner-record-share'),
+    path('learner-record/<int:pk>/', v1.GetLearnerRecordView.as_view(), name='get-learner-record'),
+    path('learner-record/<uuid:uuid>/', v1.LearnerRecordFromUUIDView.as_view(), name="shared_learner_record_from_uuid")
 ]
 
 urlpatterns += [
-    path("enrollments/", v1.create_enrollment_view, name="create-enrollment-via-form"),
+    path('create-enrollment/', v1.CreateEnrollmentView.as_view(), name='create-enrollment'),
 ]

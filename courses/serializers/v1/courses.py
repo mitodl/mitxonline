@@ -81,7 +81,7 @@ class CourseSerializer(BaseCourseSerializer):
 
 
 @extend_schema_serializer(
-    component_name="V1CourseRunSerializer",
+    component_name="V1BaseCourseRun"
 )
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
@@ -138,7 +138,9 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
             "courseruns",
         ]
 
-
+@extend_schema_serializer(
+    component_name="V1CourseRunWithCourse"
+)
 class CourseRunWithCourseSerializer(CourseRunSerializer):
     """
     CourseRun model serializer - also serializes the parent Course.

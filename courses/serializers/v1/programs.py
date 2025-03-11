@@ -90,34 +90,10 @@ class ProgramSerializer(serializers.ModelSerializer):
             context={"include_page_fields": True},
         ).data
 
-    @extend_schema_field(
-        {
-            "type": "object",
-            "properties": {
-                "required": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer",  # Assuming course.id is an integer
-                        "description": "ID of a required course",
-                    },
-                    "description": "List of IDs for required courses",
-                },
-                "electives": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer",  # Assuming course.id is an integer
-                        "description": "ID of an elective course",
-                    },
-                    "description": "List of IDs for elective courses",
-                },
-            },
-            "description": "A dictionary containing lists of required and elective course IDs",
-        }
-    )
     def get_requirements(self, instance):
         return {
-            "required": [course.id for course in instance.required_courses],
-            "electives": [course.id for course in instance.elective_courses],
+            "required": [course.id for course in instance.required_courses if course is not None],
+            "electives": [course.id for course in instance.elective_courses if course is not None],
         }
 
     @extend_schema_field(ProgramRequirementTreeSerializer)
@@ -241,6 +217,28 @@ class LearnerRecordSerializer(serializers.BaseSerializer):
     Pass the program you want the record for and attach the learner via context
     object.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields = {
+            'user': serializers.DictField(
+                child=serializers.CharField(),
+                help_text="User information including name, email, and username"
+            ),
+            'program': serializers.DictField(
+                child=serializers.DictField(),
+                help_text="Program details including title, readable_id, courses, and requirements"
+            ),
+            'sharing': LearnerProgramRecordShareSerializer(
+                many=True,
+                help_text="Active program record shares for this user"
+            ),
+            'partner_schools': PartnerSchoolSerializer(
+                many=True,
+                help_text="List of partner schools"
+            )
+        }
+
 
     def to_representation(self, instance):
         """
