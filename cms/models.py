@@ -63,7 +63,7 @@ from courses.models import (
     CourseRun,
     CourseRunCertificate,
     Program,
-    ProgramCertificate,
+    ProgramCertificate, CoursesTopicQuerySet, CoursesTopic,
 )
 from flexiblepricing.api import (
     determine_auto_approval,
@@ -643,6 +643,7 @@ class InstructorPageLink(models.Model):  # noqa: DJ008
     ]
 
 
+@register_snippet
 class TopicsPair(models.Model):
     """
     Model to store the parent and child topics
@@ -650,21 +651,22 @@ class TopicsPair(models.Model):
     parent_topic = models.ForeignKey(
         "courses.CoursesTopic",
         on_delete=models.CASCADE,
-        related_name="parent_topic",
+        limit_choices_to={"parent": None},
+        related_name="parent_topics",
     )
     child_topic = models.ForeignKey(
         "courses.CoursesTopic",
         on_delete=models.CASCADE,
-        related_name="child_topic",
+        related_name="child_topics",
     )
 
-    def get_child_topics(self):
-        return self.child_topics.all()
-
     panels = [
-        PageChooserPanel("parent_topic", "courses.CoursesTopic"),
-        PageChooserPanel("child_topic", "courses.CoursesTopic"),
+        FieldPanel("parent_topic"),
+        FieldPanel("child_topic"),
     ]
+
+    def __str__(self):
+        return self.parent_topic.name + " -> " + self.child_topic.name
 
 
 class HomePage(VideoPlayerConfigMixin):
@@ -1192,18 +1194,12 @@ class CoursePage(ProductPage):
         null=True,
         blank=True,
         help_text="The topics for this course page.",
-    )
-    sub_topics = ParentalManyToManyField(
-        "courses.CoursesSubTopic",
-        null=True,
-        blank=True,
-        help_text="The subtopics for this course page.",
+        limit_choices_to=~models.Q(parent=None),
     )
     topic_pairs = ParentalManyToManyField(
         "cms.TopicsPair",
-        null=True,
         blank=True,
-        help_text="The parent and child topics for this course page.",
+        help_text="The topic pairs for this course page.",
     )
 
     search_fields = Page.search_fields + [  # noqa: RUF005
@@ -1291,6 +1287,7 @@ class CoursePage(ProductPage):
 
     content_panels = [  # noqa: RUF005
         FieldPanel("course"),
+        FieldPanel("topics"),
         FieldPanel("topic_pairs"),
     ] + ProductPage.content_panels
 

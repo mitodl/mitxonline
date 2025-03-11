@@ -519,30 +519,13 @@ class CoursesTopic(TimestampedModel):
 
     class Meta:
         unique_together = ("name", "parent")
+        ordering = ["parent"]
 
     def __str__(self):
+        if self.parent:
+            return f"{self.parent.name} -> {self.name}"
         return self.name
 
-
-class CoursesSubTopic(TimestampedModel):
-    """
-    Subtopics for all courses (e.g. "Ancient History")
-    """
-
-    name = models.CharField(max_length=128)
-    parent = models.ForeignKey(
-        CoursesTopic,
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-        related_name="subtopics",
-    )
-
-    class Meta:
-        unique_together = ("name", "parent")
-
-    def __str__(self):
-        return self.name
 
 class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
