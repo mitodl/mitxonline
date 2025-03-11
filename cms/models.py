@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from json import dumps
 from urllib.parse import quote_plus
 
+from django import forms
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
@@ -23,7 +24,7 @@ from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
-from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel, MultiFieldPanel
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import (
@@ -642,6 +643,30 @@ class InstructorPageLink(models.Model):  # noqa: DJ008
     ]
 
 
+class TopicsPair(models.Model):
+    """
+    Model to store the parent and child topics
+    """
+    parent_topic = models.ForeignKey(
+        "courses.CoursesTopic",
+        on_delete=models.CASCADE,
+        related_name="parent_topic",
+    )
+    child_topic = models.ForeignKey(
+        "courses.CoursesTopic",
+        on_delete=models.CASCADE,
+        related_name="child_topic",
+    )
+
+    def get_child_topics(self):
+        return self.child_topics.all()
+
+    panels = [
+        PageChooserPanel("parent_topic", "courses.CoursesTopic"),
+        PageChooserPanel("child_topic", "courses.CoursesTopic"),
+    ]
+
+
 class HomePage(VideoPlayerConfigMixin):
     """
     Site home page
@@ -1174,6 +1199,12 @@ class CoursePage(ProductPage):
         blank=True,
         help_text="The subtopics for this course page.",
     )
+    topic_pairs = ParentalManyToManyField(
+        "cms.TopicsPair",
+        null=True,
+        blank=True,
+        help_text="The parent and child topics for this course page.",
+    )
 
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
@@ -1260,7 +1291,7 @@ class CoursePage(ProductPage):
 
     content_panels = [  # noqa: RUF005
         FieldPanel("course"),
-        FieldPanel("topics"),
+        FieldPanel("topic_pairs"),
     ] + ProductPage.content_panels
 
 
