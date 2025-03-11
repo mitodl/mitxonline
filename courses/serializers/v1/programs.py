@@ -24,7 +24,9 @@ from main.serializers import StrictFieldsSerializer
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
-
+@extend_schema_serializer(
+    component_name="V1ProgramRequirementData"
+)
 class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     """Serializer for ProgramRequirement data"""
 
@@ -41,7 +43,9 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     operator_value = serializers.CharField(allow_null=True, default=None)
     elective_flag = serializers.BooleanField(allow_null=True, default=False)
 
-
+@extend_schema_serializer(
+    component_name="V1ProgramRequirement"
+)
 class ProgramRequirementSerializer(StrictFieldsSerializer):
     """Serializer for a ProgramRequirement"""
 
@@ -90,10 +94,33 @@ class ProgramSerializer(serializers.ModelSerializer):
             context={"include_page_fields": True},
         ).data
 
+    @extend_schema_field({
+        "type": "object",
+        "properties": {
+            "required": {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {"type": "integer"},
+                    ]
+                },
+                "description": "List of required course IDs"
+            },
+            "electives": {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {"type": "integer"},
+                    ]
+                },
+                "description": "List of elective course IDs"
+            }
+        }
+    })
     def get_requirements(self, instance):
         return {
-            "required": [course.id for course in instance.required_courses if course is not None],
-            "electives": [course.id for course in instance.elective_courses if course is not None],
+            "required": [course.id for course in instance.required_courses],
+            "electives": [course.id for course in instance.elective_courses],
         }
 
     @extend_schema_field(ProgramRequirementTreeSerializer)

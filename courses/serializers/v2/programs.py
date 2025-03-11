@@ -14,7 +14,9 @@ from main.serializers import StrictFieldsSerializer
 
 logger = logging.getLogger(__name__)
 
-
+@extend_schema_serializer(
+    component_name="V2ProgramRequirementData"
+)
 class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     """Serializer for ProgramRequirement data"""
 
@@ -31,7 +33,9 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     operator_value = serializers.CharField(allow_null=True, default=None)
     elective_flag = serializers.BooleanField(allow_null=True, default=False)
 
-
+@extend_schema_serializer(
+    component_name="V2ProgramRequirement"
+)
 class ProgramRequirementSerializer(StrictFieldsSerializer):
     """Serializer for a ProgramRequirement"""
 
@@ -74,7 +78,29 @@ class ProgramSerializer(serializers.ModelSerializer):
     def get_courses(self, instance):
         return [course[0].id for course in instance.courses if course[0].live]
 
-    @extend_schema_field(dict)
+    @extend_schema_field({
+        "type": "object",
+        "properties": {
+            "required": {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {"type": "integer"},
+                    ]
+                },
+                "description": "List of required course IDs"
+            },
+            "electives": {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {"type": "integer"},
+                    ]
+                },
+                "description": "List of elective course IDs"
+            }
+        }
+    })
     def get_requirements(self, instance):
         return {
             "required": [course.id for course in instance.required_courses],

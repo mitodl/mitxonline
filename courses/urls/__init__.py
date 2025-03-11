@@ -24,5 +24,5 @@ urlpatterns += [
 ]
 
 urlpatterns += [
-    path('create-enrollment/', v1.CreateEnrollmentView.as_view(), name='create-enrollment'),
+    path('enrollments/', v1.CreateEnrollmentView.as_view(), name='create-enrollment-via-form"'),
 ]
