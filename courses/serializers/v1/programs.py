@@ -238,33 +238,29 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
         return ProgramCertificateSerializer(certificate).data if certificate else None
 
 
-class LearnerRecordSerializer(serializers.BaseSerializer):
+class LearnerRecordSerializer(serializers.Serializer):
     """
     Gathers the various data needed to display the learner's program record.
     Pass the program you want the record for and attach the learner via context
     object.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields = {
-            'user': serializers.DictField(
-                child=serializers.CharField(),
-                help_text="User information including name, email, and username"
-            ),
-            'program': serializers.DictField(
-                child=serializers.DictField(),
-                help_text="Program details including title, readable_id, courses, and requirements"
-            ),
-            'sharing': LearnerProgramRecordShareSerializer(
-                many=True,
-                help_text="Active program record shares for this user"
-            ),
-            'partner_schools': PartnerSchoolSerializer(
-                many=True,
-                help_text="List of partner schools"
-            )
-        }
+    user = serializers.DictField(
+        child=serializers.CharField(),
+        help_text="User information including name, email, and username"
+    )
+    program = serializers.DictField(
+        child=serializers.DictField(),
+        help_text="Program details including title, readable_id, courses, and requirements"
+    )
+    sharing = LearnerProgramRecordShareSerializer(
+        many=True,
+        help_text="Active program record shares for this user"
+    )
+    partner_schools = PartnerSchoolSerializer(
+        many=True,
+        help_text="List of partner schools"
+    )
 
 
     def to_representation(self, instance):
