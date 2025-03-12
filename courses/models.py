@@ -513,14 +513,17 @@ class CoursesTopic(TimestampedModel):
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name="subtopics",
+        related_name="child_topics",
     )
     objects = CoursesTopicQuerySet.as_manager()
 
     class Meta:
         unique_together = ("name", "parent")
+        ordering = ["parent__name", "name"]
 
     def __str__(self):
+        if self.parent:
+            return f"{self.parent.name} -> {self.name}"
         return self.name
 
 
