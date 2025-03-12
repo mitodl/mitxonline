@@ -513,7 +513,7 @@ class CoursesTopic(TimestampedModel):
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name="topics",
+        related_name="child_topics",
     )
     objects = CoursesTopicQuerySet.as_manager()
 

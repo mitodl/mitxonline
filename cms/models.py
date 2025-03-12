@@ -1167,7 +1167,7 @@ class CoursePage(ProductPage):
         "courses.CoursesTopic",
         null=True,
         blank=True,
-        help_text="The topics for this course page.",
+        help_text="Select topic pairs (primary -> secondary) for this course page.",
         limit_choices_to=~models.Q(parent=None),
     )
 
