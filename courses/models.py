@@ -519,7 +519,7 @@ class CoursesTopic(TimestampedModel):
 
     class Meta:
         unique_together = ("name", "parent")
-        ordering = ["parent"]
+        ordering = ["parent__name", "name"]
 
     def __str__(self):
         if self.parent:

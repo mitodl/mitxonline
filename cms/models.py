@@ -643,32 +643,6 @@ class InstructorPageLink(models.Model):  # noqa: DJ008
     ]
 
 
-@register_snippet
-class TopicsPair(models.Model):
-    """
-    Model to store the parent and child topics
-    """
-    parent_topic = models.ForeignKey(
-        "courses.CoursesTopic",
-        on_delete=models.CASCADE,
-        limit_choices_to={"parent": None},
-        related_name="parent_topics",
-    )
-    child_topic = models.ForeignKey(
-        "courses.CoursesTopic",
-        on_delete=models.CASCADE,
-        related_name="child_topics",
-    )
-
-    panels = [
-        FieldPanel("parent_topic"),
-        FieldPanel("child_topic"),
-    ]
-
-    def __str__(self):
-        return self.parent_topic.name + " -> " + self.child_topic.name
-
-
 class HomePage(VideoPlayerConfigMixin):
     """
     Site home page
@@ -1196,11 +1170,6 @@ class CoursePage(ProductPage):
         help_text="The topics for this course page.",
         limit_choices_to=~models.Q(parent=None),
     )
-    topic_pairs = ParentalManyToManyField(
-        "cms.TopicsPair",
-        blank=True,
-        help_text="The topic pairs for this course page.",
-    )
 
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
@@ -1288,7 +1257,6 @@ class CoursePage(ProductPage):
     content_panels = [  # noqa: RUF005
         FieldPanel("course"),
         FieldPanel("topics"),
-        FieldPanel("topic_pairs"),
     ] + ProductPage.content_panels
 
 
