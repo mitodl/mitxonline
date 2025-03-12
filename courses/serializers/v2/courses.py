@@ -109,8 +109,13 @@ class CourseSerializer(BaseCourseSerializer):
         if hasattr(instance, "page") and instance.page is not None:
             all_topics = []
             course_topics = instance.page.topics.all()
-            parent_topics = CoursesTopic.objects.filter(child_topics__in=all_topics).distinct()
-            all_topics = sorted([{"name": topic.name} for topic in course_topics], key=lambda topic: topic["name"])
+            parent_topics = CoursesTopic.objects.filter(
+                child_topics__in=all_topics
+            ).distinct()
+            all_topics = sorted(
+                [{"name": topic.name} for topic in course_topics],
+                key=lambda topic: topic["name"],
+            )
             for parent_topic in parent_topics:
                 all_topics.append({"name": parent_topic.name})
             return all_topics

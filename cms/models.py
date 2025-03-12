@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 from json import dumps
 from urllib.parse import quote_plus
 
-from django import forms
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
@@ -24,7 +23,11 @@ from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
-from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel, MultiFieldPanel
+from wagtail.admin.panels import (
+    FieldPanel,
+    InlinePanel,
+    PageChooserPanel,
+)
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import (
@@ -63,7 +66,7 @@ from courses.models import (
     CourseRun,
     CourseRunCertificate,
     Program,
-    ProgramCertificate, CoursesTopicQuerySet, CoursesTopic,
+    ProgramCertificate,
 )
 from flexiblepricing.api import (
     determine_auto_approval,
