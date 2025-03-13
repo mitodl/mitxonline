@@ -177,7 +177,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           file: coverage/lcov.info
-  
+
   openapi-generated-client-check-v0:
             # This job checks that the output of openapi-generator-typescript-axios that
             # is checked into version control is up-to-date.
@@ -189,7 +189,7 @@ jobs:
               COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
             runs-on: ubuntu-latest
             steps:
-        
+
               - name: Generate Fresh API Client
                 uses: openapi-generators/openapitools-generator-action@v1
                 with:
@@ -200,10 +200,10 @@ jobs:
                     --output $GENERATOR_OUTPUT_DIR_CI \
                     --ignore-file-override $GENERATOR_IGNORE_FILE \
                     -c scripts/openapi-configs/typescript-axios-v0.yaml
-        
+
               - name: Format freshly generated client
                 run: npx prettier $GENERATOR_OUTPUT_DIR_CI/**/*.ts --no-semi --write
-        
+
               # Kept getting tripped up on npmignore and the git push script, neither
               # of which are really important, so just check the generated TypeScript
               # files instead.

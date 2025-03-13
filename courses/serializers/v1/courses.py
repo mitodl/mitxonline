@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from drf_spectacular.utils import (
     extend_schema_field,
     extend_schema_serializer,
@@ -80,9 +78,7 @@ class CourseSerializer(BaseCourseSerializer):
         ]
 
 
-@extend_schema_serializer(
-    component_name="V1BaseCourseRun"
-)
+@extend_schema_serializer(component_name="V1BaseCourseRun")
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
@@ -138,9 +134,8 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
             "courseruns",
         ]
 
-@extend_schema_serializer(
-    component_name="V1CourseRunWithCourse"
-)
+
+@extend_schema_serializer(component_name="V1CourseRunWithCourse")
 class CourseRunWithCourseSerializer(CourseRunSerializer):
     """
     CourseRun model serializer - also serializes the parent Course.
