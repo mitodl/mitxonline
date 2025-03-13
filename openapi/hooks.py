@@ -73,7 +73,7 @@ def postprocess_x_enum_descriptions(result, generator, request, public):  # noqa
 
     return result
 
-def exclude_paths_hook(endpoints, **kwargs):
+def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
     # List of path prefixes to exclude
     EXCLUDED_PATHS = [
         "/api/hubspot_sync/",
@@ -108,10 +108,8 @@ def exclude_paths_hook(endpoints, **kwargs):
     ]
 
     # Filter out endpoints whose paths start with any of the excluded prefixes
-    filtered_endpoints = [
+    return [
         (path, path_regex, method, callback)
         for (path, path_regex, method, callback) in endpoints
         if not any(path.startswith(prefix) for prefix in EXCLUDED_PATHS)
     ]
-
-    return filtered_endpoints

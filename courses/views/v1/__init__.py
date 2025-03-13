@@ -644,7 +644,7 @@ class LearnerRecordFromUUIDView(GenericAPIView):
         operation_id="learner_record_retrieve_by_uuid",
         description="Get learner record using share UUID"
     )
-    def get(self, request, uuid):
+    def get(self, _, uuid):
         """
         Get learner record from UUID. Sets context to skip the partner school 
         and sharing information.
@@ -691,8 +691,3 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-
-    def get_queryset(self):
-        return Department.objects.annotate(
-            courses=Count("course"), programs=Count("program")
-        )
