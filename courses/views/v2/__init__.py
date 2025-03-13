@@ -49,15 +49,12 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         operation_id="programs_retrieve_v2",
-        description="API view set for Programs - v2"
+        description="API view set for Programs - v2",
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-    
-    @extend_schema(
-        operation_id="programs_list_v2",
-        description="List Programs - v2"
-    )
+
+    @extend_schema(operation_id="programs_list_v2", description="List Programs - v2")
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
@@ -119,15 +116,14 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         return {**super().get_serializer_context(), **added_context}
 
     @extend_schema(
-        operation_id="api_v2_courses_retrieve", 
-        description="Retrieve a specific course - API v2"
+        operation_id="api_v2_courses_retrieve",
+        description="Retrieve a specific course - API v2",
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
     @extend_schema(
-        operation_id="api_v2_courses_list",
-        description="List all courses - API v2"
+        operation_id="api_v2_courses_list", description="List all courses - API v2"
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
@@ -141,17 +137,16 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Department.objects.all().order_by("name")
-    
+
     @extend_schema(
         operation_id="departments_retrieve_v2",
-        description="Get department details - v2"
+        description="Get department details - v2",
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
     @extend_schema(
-        operation_id="departments_list_v2",
-        description="List departments - v2"
+        operation_id="departments_list_v2", description="List departments - v2"
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)

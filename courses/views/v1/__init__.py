@@ -2,7 +2,6 @@
 
 import logging
 from typing import Optional, Tuple, Union  # noqa: UP035
-from rest_framework.views import APIView
 
 import django_filters
 from django.contrib.auth.models import User
@@ -12,17 +11,18 @@ from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from mitol.olposthog.features import is_enabled
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
-from rest_framework.generics import GenericAPIView
 from rest_framework.decorators import permission_classes
+from rest_framework.generics import GenericAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from reversion.models import Version
 
 from courses.api import (
@@ -119,15 +119,12 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         operation_id="programs_retrieve_v1",
-        description="API view set for Programs - v1"
+        description="API view set for Programs - v1",
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-    
-    @extend_schema(
-        operation_id="programs_list_v1",
-        description="List Programs - v1"
-    )
+
+    @extend_schema(operation_id="programs_list_v1", description="List Programs - v1")
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
@@ -201,18 +198,18 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         return super().paginate_queryset(queryset)
 
     @extend_schema(
-        operation_id="api_v1_courses_retrieve", 
-        description="Retrieve a specific course - API v1"
+        operation_id="api_v1_courses_retrieve",
+        description="Retrieve a specific course - API v1",
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
     @extend_schema(
-        operation_id="api_v1_courses_list",
-        description="List all courses - API v1"
+        operation_id="api_v1_courses_list", description="List all courses - API v1"
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
 
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for CourseRuns"""
@@ -350,7 +347,9 @@ class CreateEnrollmentView(APIView):
                 content_type=ContentType.objects.get_for_model(CourseRun),
             ).first()
             if product is None:
-                log.exception("No product found for that course with courseware_id %s", run)
+                log.exception(
+                    "No product found for that course with courseware_id %s", run
+                )
             else:
                 product_version = Version.objects.get_for_object(product).first()
                 product_object_id = product.object_id
@@ -387,13 +386,13 @@ class CreateEnrollmentView(APIView):
     responses={200: CourseRunEnrollmentSerializer},
     parameters=[
         OpenApiParameter(
-            name='id',
+            name="id",
             type=OpenApiTypes.INT,
             location=OpenApiParameter.PATH,
-            description='Course run enrollment ID',
-            required=True
+            description="Course run enrollment ID",
+            required=True,
         )
-    ]
+    ],
 )
 class UserEnrollmentsApiViewSet(
     mixins.CreateModelMixin,
@@ -480,13 +479,13 @@ class UserEnrollmentsApiViewSet(
     responses={200: UserProgramEnrollmentDetailSerializer},
     parameters=[
         OpenApiParameter(
-            name='id',
+            name="id",
             type=OpenApiTypes.INT,
             location=OpenApiParameter.PATH,
-            description='Program enrollment ID',
-            required=True
+            description="Program enrollment ID",
+            required=True,
         )
-    ]
+    ],
 )
 class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
@@ -590,7 +589,10 @@ class LearnerRecordShareView(APIView):
 
         school = None
 
-        if "partnerSchool" in request.data and request.data["partnerSchool"] is not None:
+        if (
+            "partnerSchool" in request.data
+            and request.data["partnerSchool"] is not None
+        ):
             try:
                 school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
             except:  # noqa: E722
@@ -610,7 +612,9 @@ class LearnerRecordShareView(APIView):
                 user=request.user, program=program, partner_school=None, is_active=True
             )
 
-        return Response(LearnerRecordSerializer(program, context={"request": request}).data)
+        return Response(
+            LearnerRecordSerializer(program, context={"request": request}).data
+        )
 
 
 class RevokeLearnerRecordShareView(APIView):
@@ -632,7 +636,10 @@ class RevokeLearnerRecordShareView(APIView):
             user=request.user, partner_school=None, program=program
         ).update(is_active=False)
 
-        return Response(LearnerRecordSerializer(program, context={"request": request}).data)
+        return Response(
+            LearnerRecordSerializer(program, context={"request": request}).data
+        )
+
 
 class LearnerRecordFromUUIDView(GenericAPIView):
     """View to get learner record from UUID"""
@@ -642,27 +649,22 @@ class LearnerRecordFromUUIDView(GenericAPIView):
 
     @extend_schema(
         operation_id="learner_record_retrieve_by_uuid",
-        description="Get learner record using share UUID"
+        description="Get learner record using share UUID",
     )
     def get(self, _, uuid):
         """
-        Get learner record from UUID. Sets context to skip the partner school 
+        Get learner record from UUID. Sets context to skip the partner school
         and sharing information.
         """
         record = LearnerProgramRecordShare.objects.filter(
-            is_active=True,
-            share_uuid=uuid
+            is_active=True, share_uuid=uuid
         ).first()
 
         if record is None:
             return Response([], status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.get_serializer(
-            record.program,
-            context={
-                "user": record.user,
-                "anonymous_pull": True
-            }
+            record.program, context={"user": record.user, "anonymous_pull": True}
         )
         return Response(serializer.data)
 
@@ -680,14 +682,13 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         operation_id="departments_retrieve_v1",
-        description="Get department details - v1"
+        description="Get department details - v1",
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
     @extend_schema(
-        operation_id="departments_list_v1",
-        description="List departments - v1"
+        operation_id="departments_list_v1", description="List departments - v1"
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
