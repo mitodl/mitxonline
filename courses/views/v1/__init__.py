@@ -12,13 +12,13 @@ from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from mitol.olposthog.features import is_enabled
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
 from rest_framework.generics import GenericAPIView
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -201,11 +201,18 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         return super().paginate_queryset(queryset)
 
     @extend_schema(
-        operation_id="courses_retrieve_v1", description="API view set for Courses - v1"
+        operation_id="api_v1_courses_retrieve", 
+        description="Retrieve a specific course - API v1"
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
+    @extend_schema(
+        operation_id="api_v1_courses_list",
+        description="List all courses - API v1"
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for CourseRuns"""
@@ -306,6 +313,7 @@ class CreateEnrollmentView(APIView):
             200: None,  # No response body or specify a serializer if needed
             302: None,  # Redirect response
         },
+        operation_id="api_enrollments_create",
     )
     def post(self, request):
         """
@@ -377,6 +385,15 @@ class CreateEnrollmentView(APIView):
 @extend_schema(
     request=CourseRunEnrollmentSerializer,
     responses={200: CourseRunEnrollmentSerializer},
+    parameters=[
+        OpenApiParameter(
+            name='id',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.PATH,
+            description='Course run enrollment ID',
+            required=True
+        )
+    ]
 )
 class UserEnrollmentsApiViewSet(
     mixins.CreateModelMixin,
@@ -461,6 +478,15 @@ class UserEnrollmentsApiViewSet(
 
 @extend_schema(
     responses={200: UserProgramEnrollmentDetailSerializer},
+    parameters=[
+        OpenApiParameter(
+            name='id',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.PATH,
+            description='Program enrollment ID',
+            required=True
+        )
+    ]
 )
 class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]

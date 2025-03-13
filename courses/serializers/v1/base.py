@@ -1,3 +1,4 @@
+from typing import Optional
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -38,10 +39,30 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     """Minimal CourseRun model serializer"""
 
     is_archived = serializers.SerializerMethodField()
+    is_upgradable = serializers.SerializerMethodField()
+    is_enrollable = serializers.SerializerMethodField()
+    course_number = serializers.SerializerMethodField()
+    courseware_url = serializers.SerializerMethodField()
 
-    @extend_schema_field(bool)
-    def get_is_archived(self, instance):
+    def get_courseware_url(self, instance) -> Optional[str]:
+        """Get the courseware URL"""
+        return instance.courseware_url
+
+    def get_is_upgradable(self, instance) -> bool:
+        """Check if the course run is upgradable"""
+        return instance.is_upgradable
+
+    def get_is_enrollable(self, instance) -> bool:
+        """Check if the course run is enrollable"""
+        return instance.is_enrollable
+
+    def get_is_archived(self, instance) -> bool:
+        """Check if the course run is archived"""
         return instance.is_enrollable and instance.is_past
+
+    def get_course_number(self, instance) -> str:
+        """Get the course number"""
+        return instance.course_number
 
     class Meta:
         model = models.CourseRun

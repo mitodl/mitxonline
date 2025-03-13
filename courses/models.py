@@ -914,7 +914,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         return self.course_run.courseware_id
 
     @property
-    def link(self):
+    def link(self) -> str:
         """
         Get the link at which this certificate will be served
         Format: /certificate/<uuid>/

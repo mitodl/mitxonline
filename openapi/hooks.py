@@ -114,9 +114,4 @@ def exclude_paths_hook(endpoints, **kwargs):
         if not any(path.startswith(prefix) for prefix in EXCLUDED_PATHS)
     ]
 
-    # Print the filtered endpoints for debugging
-    print("Filtered Endpoints:")
-    for endpoint in filtered_endpoints:
-        print(endpoint)
-
     return filtered_endpoints

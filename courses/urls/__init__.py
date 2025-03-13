@@ -11,7 +11,6 @@ router = routers.SimpleRouter()
 
 
 urlpatterns = [
-    path("api/", include(urls_v1, "v1")),
     path("api/v1/", include(urls_v1, "v1")),
     path("api/v2/", include(urls_v2, "v2")),
 ]

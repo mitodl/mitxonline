@@ -4,365 +4,6 @@ info:
   version: 0.0.1 (v0)
   description: MIT public API
 paths:
-  /api/course_runs/:
-    get:
-      operationId: api_course_runs_list
-      description: API view set for CourseRuns
-      parameters:
-      - in: query
-        name: id
-        schema:
-          type: integer
-      - in: query
-        name: live
-        schema:
-          type: boolean
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/V1CourseRunWithCourse'
-          description: ''
-  /api/course_runs/{id}/:
-    get:
-      operationId: api_course_runs_retrieve
-      description: API view set for CourseRuns
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this course run.
-        required: true
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/V1CourseRunWithCourse'
-          description: ''
-  /api/courses/:
-    get:
-      operationId: api_courses_list
-      description: API view set for Courses
-      parameters:
-      - in: query
-        name: courserun_is_enrollable
-        schema:
-          type: boolean
-      - in: query
-        name: id
-        schema:
-          type: integer
-      - in: query
-        name: live
-        schema:
-          type: boolean
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - in: query
-        name: page__live
-        schema:
-          type: boolean
-      - name: page_size
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      - in: query
-        name: readable_id
-        schema:
-          type: string
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedV1CourseWithCourseRunsList'
-          description: ''
-  /api/courses/{id}/:
-    get:
-      operationId: courses_retrieve_v1
-      description: API view set for Courses - v1
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this course.
-        required: true
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/V1CourseWithCourseRuns'
-          description: ''
-  /api/departments/:
-    get:
-      operationId: departments_list_v1
-      description: List departments - v1
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DepartmentWithCount'
-          description: ''
-  /api/departments/{id}/:
-    get:
-      operationId: departments_retrieve_v1
-      description: Get department details - v1
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this department.
-        required: true
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DepartmentWithCount'
-          description: ''
-  /api/enrollments/:
-    get:
-      operationId: api_enrollments_list
-      description: API view set for user enrollments
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CourseRunEnrollment'
-          description: ''
-    post:
-      operationId: api_enrollments_create
-      description: API view set for user enrollments
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CourseRunEnrollment'
-          description: ''
-  /api/enrollments/{id}/:
-    put:
-      operationId: api_enrollments_update
-      description: API view set for user enrollments
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CourseRunEnrollment'
-          description: ''
-    patch:
-      operationId: api_enrollments_partial_update
-      description: API view set for user enrollments
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedCourseRunEnrollmentRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedCourseRunEnrollmentRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedCourseRunEnrollmentRequest'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CourseRunEnrollment'
-          description: ''
-    delete:
-      operationId: api_enrollments_destroy
-      description: API view set for user enrollments
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CourseRunEnrollment'
-          description: ''
-  /api/program_enrollments/:
-    get:
-      operationId: api_program_enrollments_list
-      description: |-
-        Returns a unified set of program and course enrollments for the current
-        user.
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/UserProgramEnrollmentDetail'
-          description: ''
-  /api/program_enrollments/{id}/:
-    delete:
-      operationId: api_program_enrollments_destroy
-      description: |-
-        Unenroll the user from this program. This is simpler than the corresponding
-        function for CourseRunEnrollments; edX doesn't really know what programs
-        are so there's nothing to process there.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserProgramEnrollmentDetail'
-          description: ''
-  /api/programs/:
-    get:
-      operationId: programs_list_v1
-      description: List Programs - v1
-      parameters:
-      - in: query
-        name: id
-        schema:
-          type: integer
-      - in: query
-        name: live
-        schema:
-          type: boolean
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: page_size
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      - in: query
-        name: readable_id
-        schema:
-          type: string
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedV1ProgramList'
-          description: ''
-  /api/programs/{id}/:
-    get:
-      operationId: programs_retrieve_v1
-      description: API view set for Programs - v1
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this program.
-        required: true
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/V1Program'
-          description: ''
   /api/v1/course_runs/:
     get:
       operationId: course_runs_list
@@ -409,8 +50,8 @@ paths:
           description: ''
   /api/v1/courses/:
     get:
-      operationId: courses_list
-      description: API view set for Courses
+      operationId: api_v1_courses_list
+      description: List all courses - API v1
       parameters:
       - in: query
         name: courserun_is_enrollable
@@ -455,8 +96,8 @@ paths:
           description: ''
   /api/v1/courses/{id}/:
     get:
-      operationId: courses_retrieve_v1_2
-      description: API view set for Courses - v1
+      operationId: api_v1_courses_retrieve
+      description: Retrieve a specific course - API v1
       parameters:
       - in: path
         name: id
@@ -475,7 +116,7 @@ paths:
           description: ''
   /api/v1/departments/:
     get:
-      operationId: departments_list_v1_2
+      operationId: departments_list_v1
       description: List departments - v1
       tags:
       - departments
@@ -490,7 +131,7 @@ paths:
           description: ''
   /api/v1/departments/{id}/:
     get:
-      operationId: departments_retrieve_v1_2
+      operationId: departments_retrieve_v1
       description: Get department details - v1
       parameters:
       - in: path
@@ -512,6 +153,13 @@ paths:
     get:
       operationId: enrollments_list
       description: API view set for user enrollments
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Course run enrollment ID
+        required: true
       tags:
       - enrollments
       responses:
@@ -526,6 +174,13 @@ paths:
     post:
       operationId: enrollments_create
       description: API view set for user enrollments
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Course run enrollment ID
+        required: true
       tags:
       - enrollments
       requestBody:
@@ -555,7 +210,8 @@ paths:
       - in: path
         name: id
         schema:
-          type: string
+          type: integer
+        description: Course run enrollment ID
         required: true
       tags:
       - enrollments
@@ -585,7 +241,8 @@ paths:
       - in: path
         name: id
         schema:
-          type: string
+          type: integer
+        description: Course run enrollment ID
         required: true
       tags:
       - enrollments
@@ -614,7 +271,8 @@ paths:
       - in: path
         name: id
         schema:
-          type: string
+          type: integer
+        description: Course run enrollment ID
         required: true
       tags:
       - enrollments
@@ -631,6 +289,13 @@ paths:
       description: |-
         Returns a unified set of program and course enrollments for the current
         user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Program enrollment ID
+        required: true
       tags:
       - program_enrollments
       responses:
@@ -653,7 +318,8 @@ paths:
       - in: path
         name: id
         schema:
-          type: string
+          type: integer
+        description: Program enrollment ID
         required: true
       tags:
       - program_enrollments
@@ -666,7 +332,7 @@ paths:
           description: ''
   /api/v1/programs/:
     get:
-      operationId: programs_list_v1_2
+      operationId: programs_list_v1
       description: List Programs - v1
       parameters:
       - in: query
@@ -704,7 +370,7 @@ paths:
           description: ''
   /api/v1/programs/{id}/:
     get:
-      operationId: programs_retrieve_v1_2
+      operationId: programs_retrieve_v1
       description: API view set for Programs - v1
       parameters:
       - in: path
@@ -724,8 +390,8 @@ paths:
           description: ''
   /api/v2/courses/:
     get:
-      operationId: courses_list_2
-      description: API view set for Courses
+      operationId: api_v2_courses_list
+      description: List all courses - API v2
       parameters:
       - in: query
         name: courserun_is_enrollable
@@ -776,8 +442,8 @@ paths:
           description: ''
   /api/v2/courses/{id}/:
     get:
-      operationId: courses_retrieve_v2
-      description: API view set for Courses - v2
+      operationId: api_v2_courses_retrieve
+      description: Retrieve a specific course - API v2
       parameters:
       - in: path
         name: id
@@ -893,7 +559,7 @@ paths:
           description: ''
   /enrollments/:
     post:
-      operationId: enrollments_create_2
+      operationId: api_enrollments_create
       description: View to handle direct POST requests to enroll in a course run.
       tags:
       - enrollments
@@ -1121,6 +787,10 @@ components:
           readOnly: true
         link:
           type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/<uuid>/
+            Example: /certificate/93ebd74e-5f88-4b47-bb09-30a6d575328f/
           readOnly: true
       required:
       - link
@@ -1374,7 +1044,8 @@ components:
           - $ref: '#/components/schemas/PaymentTypeEnum'
           - $ref: '#/components/schemas/NullEnum'
         is_redeemed:
-          type: string
+          type: boolean
+          description: Returns True if the discount has been redeemed
           readOnly: true
         activation_date:
           type: string
@@ -1851,6 +1522,8 @@ components:
             course run on their dashboard.
         courseware_url:
           type: string
+          nullable: true
+          description: Get the courseware URL
           readOnly: true
         courseware_id:
           type: string
@@ -1868,13 +1541,16 @@ components:
           description: The date beyond which the learner can not enroll in paid course
             mode.
         is_upgradable:
-          type: string
+          type: boolean
+          description: Check if the course run is upgradable
           readOnly: true
         is_enrollable:
-          type: string
+          type: boolean
+          description: Check if the course run is enrollable
           readOnly: true
         is_archived:
           type: boolean
+          description: Check if the course run is archived
           readOnly: true
         is_self_paced:
           type: boolean
@@ -1890,6 +1566,7 @@ components:
           type: boolean
         course_number:
           type: string
+          description: Get the course number
           readOnly: true
         products:
           type: array
@@ -2288,6 +1965,8 @@ components:
             course run on their dashboard.
         courseware_url:
           type: string
+          nullable: true
+          description: Get the courseware URL
           readOnly: true
         courseware_id:
           type: string
@@ -2305,13 +1984,16 @@ components:
           description: The date beyond which the learner can not enroll in paid course
             mode.
         is_upgradable:
-          type: string
+          type: boolean
+          description: Check if the course run is upgradable
           readOnly: true
         is_enrollable:
-          type: string
+          type: boolean
+          description: Check if the course run is enrollable
           readOnly: true
         is_archived:
           type: boolean
+          description: Check if the course run is archived
           readOnly: true
         is_self_paced:
           type: boolean
@@ -2327,6 +2009,7 @@ components:
           type: boolean
         course_number:
           type: string
+          description: Get the course number
           readOnly: true
         products:
           type: array
