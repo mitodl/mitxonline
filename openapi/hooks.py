@@ -73,6 +73,7 @@ def postprocess_x_enum_descriptions(result, generator, request, public):  # noqa
 
     return result
 
+
 def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
     # List of path prefixes to exclude
     EXCLUDED_PATHS = [
