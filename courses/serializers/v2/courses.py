@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
+from courses.models import CoursesTopic
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
@@ -114,10 +115,18 @@ class CourseSerializer(BaseCourseSerializer):
     def get_topics(self, instance):
         """List topics of a course"""
         if hasattr(instance, "page") and instance.page is not None:
-            return sorted(
-                [{"name": topic.name} for topic in instance.page.topics.all()],
+            all_topics = []
+            course_topics = instance.page.topics.all()
+            parent_topics = CoursesTopic.objects.filter(
+                child_topics__in=all_topics
+            ).distinct()
+            all_topics = sorted(
+                [{"name": topic.name} for topic in course_topics],
                 key=lambda topic: topic["name"],
             )
+            for parent_topic in parent_topics:
+                all_topics.append({"name": parent_topic.name})
+            return all_topics
         return []
 
     @extend_schema_field(str)

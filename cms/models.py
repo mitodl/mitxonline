@@ -23,7 +23,11 @@ from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
-from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
+from wagtail.admin.panels import (
+    FieldPanel,
+    InlinePanel,
+    PageChooserPanel,
+)
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import (
@@ -1166,7 +1170,8 @@ class CoursePage(ProductPage):
         "courses.CoursesTopic",
         null=True,
         blank=True,
-        help_text="The topics for this course page.",
+        help_text="Select topic pairs (primary -> secondary) for this course page.",
+        limit_choices_to=~models.Q(parent=None),
     )
 
     search_fields = Page.search_fields + [  # noqa: RUF005

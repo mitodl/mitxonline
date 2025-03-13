@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 0.112.4 (Released March 05, 2025)
+---------------
+
+- making downgrade not send email (#2558)
+- No emails for downgrading enrollment (#2556)
+
+Version 0.112.3 (Released March 03, 2025)
+---------------
+
+- Allow to defer enrollment without to_run (#2554)
+
+Version 0.112.2 (Released February 27, 2025)
+---------------
+
+- Bump mitold-django-authentication (#2552)
+
 Version 0.112.1 (Released February 24, 2025)
 ---------------
 
