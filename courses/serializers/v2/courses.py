@@ -1,5 +1,7 @@
 """Courses v2 serializers"""
 
+from __future__ import annotations
+
 import logging
 
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
