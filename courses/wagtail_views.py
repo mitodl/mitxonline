@@ -13,4 +13,4 @@ class CourseTopicViewSet(ModelViewSet):
     search_fields = ["name"]
     form_fields = ["parent", "name"]
     list_display = ["name", "parent"]
-    add_to_admin_menu = True
+    add_to_admin_menu = False
