@@ -18,6 +18,7 @@ export const routes = {
   // authentication related routes
   login: include("/signin/", {
     begin:    "",
+    email:    "email/",
     password: "password/", // pragma: allowlist secret
     forgot:   include("forgot-password/", {
       begin:   "",
