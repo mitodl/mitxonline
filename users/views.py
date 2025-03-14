@@ -7,6 +7,7 @@ from oauth2_provider.contrib.rest_framework import IsAuthenticatedOrTokenHasScop
 from rest_framework import mixins, viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.filters import SearchFilter
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
@@ -80,21 +81,31 @@ class ChangeEmailRequestViewSet(
         )
 
     def get_serializer_class(self):
-        if self.action == "create":  # noqa: RET503
+        """
+        Return the appropriate serializer class based on the action
+        """
+        if self.action == "create":
             return ChangeEmailRequestCreateSerializer
-        elif self.action == "partial_update":
+        elif self.action in ["update", "partial_update"]:
             return ChangeEmailRequestUpdateSerializer
+        # Default case
+        return ChangeEmailRequestCreateSerializer
 
 
-class CountriesStatesViewSet(viewsets.ViewSet):
+class CountriesStatesViewSet(viewsets.GenericViewSet, GenericAPIView):
     """Retrieve viewset of countries, with states/provinces for US and Canada"""
 
     permission_classes = []
+    serializer_class = CountrySerializer
+
+    def get_queryset(self):
+        """Get list of countries ordered by name"""
+        return sorted(pycountry.countries, key=lambda country: country.name)
 
     def list(self, request):  # pylint:disable=unused-argument  # noqa: ARG002
         """Get generator for countries/states list"""
-        queryset = sorted(list(pycountry.countries), key=lambda country: country.name)  # noqa: C414
-        serializer = CountrySerializer(queryset, many=True)
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
 

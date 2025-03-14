@@ -386,7 +386,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         return heap
 
     @cached_property
-    def required_courses(self):
+    def required_courses(self) -> list:
         """
         Returns just the courses under the "Required Courses" node.
         """
@@ -407,7 +407,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         )
 
     @cached_property
-    def elective_courses(self):
+    def elective_courses(self) -> list:
         """
         Returns just the courses under the "Required Courses" node.
         """
@@ -917,7 +917,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         return self.course_run.courseware_id
 
     @property
-    def link(self):
+    def link(self) -> str:
         """
         Get the link at which this certificate will be served
         Format: /certificate/<uuid>/
@@ -1003,7 +1003,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         return self.program.readable_id
 
     @property
-    def link(self):
+    def link(self) -> str:
         """
         Get the link at which this certificate will be served
         Format: /certificate/program/<uuid>/
