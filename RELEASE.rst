@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.113.0
+---------------
+
+- Remove duplicated course topics (#2565)
+- Selecting course topics in the cms admin (#2563)
+- Update dependency django to v4.2.20 [SECURITY] (#2562)
+
 Version 0.112.4 (Released March 05, 2025)
 ---------------
 
