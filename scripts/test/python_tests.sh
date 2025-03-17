@@ -17,9 +17,9 @@ function run_test {
 	return $status
 }
 
-run_test pytest
 run_test ./scripts/test/detect_missing_migrations.sh
 run_test ./scripts/test/no_auto_migrations.sh
 run_test ./scripts/test/openapi_spec_check.sh
+run_test pytest
 
 exit $status
