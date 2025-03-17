@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.113.0
+Version 0.113.0 (Released March 17, 2025)
 ---------------
 
 - Remove duplicated course topics (#2565)
