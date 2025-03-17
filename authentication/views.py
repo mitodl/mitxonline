@@ -7,8 +7,10 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.views import LogoutView
 from django.shortcuts import render, reverse
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -81,6 +83,10 @@ class LoginPasswordView(SocialAuthAPIView):
         return LoginPasswordSerializer
 
 
+@extend_schema(
+    request=RegisterEmailSerializer,
+    responses={200: RegisterEmailSerializer},
+)
 class RegisterEmailView(SocialAuthAPIView):
     """Email register view"""
 
@@ -105,14 +111,42 @@ class RegisterEmailView(SocialAuthAPIView):
         return super().post(request)
 
 
-class RegisterConfirmView(SocialAuthAPIView):
+class RegisterConfirmView(SocialAuthAPIView, GenericAPIView):
     """Email registration confirmation view"""
 
+    serializer_class = RegisterConfirmSerializer
+    permission_classes = []
+    authentication_classes = []
+
     def get_serializer_cls(self):
-        """Return the serializer cls"""
+        """Return the serializer class"""
         return RegisterConfirmSerializer
 
+    def post(self, request):
+        """
+        Handle POST requests to confirm email registration
+        """
+        if bool(request.session.get("hijack_history")):
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
+        serializer_cls = self.get_serializer_cls()
+        strategy = load_drf_strategy(request)
+        backend = load_backend(strategy, EmailAuth.name, None)
+        serializer = serializer_cls(
+            data=request.data,
+            context={"request": request, "strategy": strategy, "backend": backend},
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    request=RegisterDetailsSerializer,
+    responses={200: RegisterDetailsSerializer},
+)
 class RegisterDetailsView(SocialAuthAPIView):
     """Email registration details view"""
 
@@ -135,6 +169,10 @@ class RegisterDetailsView(SocialAuthAPIView):
         return resp
 
 
+@extend_schema(
+    request=RegisterExtraDetailsSerializer,
+    responses={200: RegisterExtraDetailsSerializer},
+)
 class RegisterExtraDetailsView(SocialAuthAPIView):
     """Email registration extra details view"""
 

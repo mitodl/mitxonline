@@ -17,10 +17,11 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import RedirectView, TemplateView, View
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.common.utils import now_in_utc
 from mitol.olposthog.features import is_enabled as is_posthog_enabled
 from mitol.payment_gateway.api import PaymentGateway
-from rest_framework import mixins, status
+from rest_framework import mixins, serializers, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError
@@ -188,6 +189,17 @@ class ProductViewSet(ReadOnlyModelViewSet):
         )
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="username",
+            type=str,
+            location=OpenApiParameter.PATH,
+            description="Username of the basket owner",
+            required=True,
+        )
+    ]
+)
 class BasketViewSet(
     NestedViewSetMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet
 ):
@@ -206,6 +218,24 @@ class BasketViewSet(
         return Basket.objects.filter(user=self.request.user).all()
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_basket",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket item",
+            required=True,
+        ),
+    ]
+)
 class BasketItemViewSet(
     NestedViewSetMixin, ListCreateAPIView, mixins.DestroyModelMixin, GenericViewSet
 ):
@@ -231,6 +261,24 @@ class BasketItemViewSet(
         )
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_basket",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket discount",
+            required=True,
+        ),
+    ]
+)
 class BasketDiscountViewSet(ReadOnlyModelViewSet):
     """Applied basket discounts"""
 
@@ -298,6 +346,24 @@ class DiscountViewSet(ModelViewSet):
         raise ParseError(f"Batch creation failed: {otherSerializer.errors}")  # noqa: EM102
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_discount",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent discount",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the discount product",
+            required=True,
+        ),
+    ]
+)
 class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     """API view set for Discounts"""
 
@@ -346,6 +412,24 @@ class NestedDiscountRedemptionViewSet(NestedViewSetMixin, ModelViewSet):
     pagination_class = RefinePagination
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_discount",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent discount",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the user discount",
+            required=True,
+        ),
+    ]
+)
 class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
     """
     API view set for User Discounts. This one is for use within a Discount.
@@ -408,10 +492,63 @@ class UserDiscountViewSet(ModelViewSet):
     pagination_class = RefinePagination
 
 
+# Add serializers for request/response schemas
+class RedeemDiscountRequestSerializer(serializers.Serializer):
+    """Serializer for discount redemption requests"""
+
+    discount = serializers.CharField(required=True)
+
+
+class RedeemDiscountResponseSerializer(serializers.Serializer):
+    """Serializer for discount redemption responses"""
+
+    message = serializers.CharField()
+    code = serializers.CharField()
+
+
+class AddToCartRequestSerializer(serializers.Serializer):
+    """Serializer for add to cart requests"""
+
+    product_id = serializers.IntegerField(required=True)
+
+
+class AddToCartResponseSerializer(serializers.Serializer):
+    """Serializer for add to cart responses"""
+
+    message = serializers.CharField()
+
+
 class CheckoutApiViewSet(ViewSet):
+    """API viewset for checkout operations"""
+
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
 
+    @action(
+        detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
+    )
+    def start_checkout(self, request):
+        """
+        API call to start the checkout process. This assembles the basket items
+        into an Order with Lines for each item, applies the attached basket
+        discounts, and then calls the payment gateway to prepare for payment.
+        Returns:
+            - JSON payload from the ol-django payment gateway app. The payment
+              gateway returns data necessary to construct a form that will
+              ultimately POST to the actual payment processor.
+        """
+        try:
+            payload = api.generate_checkout_payload(request)
+        except ObjectDoesNotExist:
+            return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        return Response(payload)
+
+    @extend_schema(
+        request=RedeemDiscountRequestSerializer,
+        responses={200: RedeemDiscountResponseSerializer},
+        description="Apply a discount code to the current basket",
+    )
     @action(
         detail=False,
         methods=["post"],
@@ -493,6 +630,11 @@ class CheckoutApiViewSet(ViewSet):
             }
         )
 
+    @extend_schema(
+        request=AddToCartRequestSerializer,
+        responses={200: AddToCartResponseSerializer},
+        description="Add a product to the shopping cart",
+    )
     @action(
         detail=False,
         methods=["post"],
@@ -519,27 +661,10 @@ class CheckoutApiViewSet(ViewSet):
             }
         )
 
-    @action(
-        detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
+    @extend_schema(
+        responses={200: BasketWithProductSerializer},
+        description="Get current cart contents",
     )
-    def start_checkout(self, request):
-        """
-        API call to start the checkout process. This assembles the basket items
-        into an Order with Lines for each item, applies the attached basket
-        discounts, and then calls the payment gateway to prepare for payment.
-
-        Returns:
-            - JSON payload from the ol-django payment gateway app. The payment
-              gateway returns data necessary to construct a form that will
-              ultimately POST to the actual payment processor.
-        """
-        try:
-            payload = api.generate_checkout_payload(request)
-        except ObjectDoesNotExist:
-            return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
-
-        return Response(payload)
-
     @action(detail=False, methods=["get"], name="Cart Info", url_name="cart")
     def cart(self, request):
         """
@@ -668,28 +793,38 @@ class CheckoutCallbackView(View):
                 return self.post_checkout_redirect(order.state, order, request)
 
 
+# Add a serializer for the cybersource payment response
+class CybersourcePaymentResponseSerializer(serializers.Serializer):
+    """Serializer for Cybersource payment callback responses"""
+
+    req_reference_number = serializers.CharField(required=True)
+    decision = serializers.CharField(required=True)
+    message = serializers.CharField(required=True)
+    reason_code = serializers.CharField(required=True)
+    transaction_id = serializers.CharField(required=True)
+
+
+@extend_schema(
+    request=CybersourcePaymentResponseSerializer,
+    responses={200: None},
+    description="Endpoint for Cybersource server-to-server payment callbacks",
+)
 @method_decorator(csrf_exempt, name="dispatch")
 class BackofficeCallbackView(APIView):
+    """API view for processing Cybersource payment callbacks"""
+
     authentication_classes = []  # disables authentication
     permission_classes = []  # disables permission
+    serializer_class = CybersourcePaymentResponseSerializer
 
     def post(self, request, *args, **kwargs):  # noqa: ARG002
         """
         This endpoint is called by Cybersource as a server-to-server call
-        in order to respond with the payment details.
-
-        Returns:
-            - HTTP_200_OK if the Order is found.
-
-        Raises:
-            - Http404 if the Order is not found.
+        to respond with the payment details.
         """
         with transaction.atomic():
             order = api.get_order_from_cybersource_payment_response(request)
 
-            # We only want to process responses related to orders which are PENDING
-            # otherwise we can conclude that we already received a response through
-            # the user's browser.
             if order is None:
                 raise Http404
             elif order.state == OrderStatus.PENDING:
