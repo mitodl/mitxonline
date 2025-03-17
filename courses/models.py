@@ -1309,7 +1309,7 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
         return serialize_model_object(self)
 
     @property
-    def grade_percent(self):
+    def grade_percent(self) -> Decimal:
         """Returns the grade field value as a number out of 100 (or None if the value is None)"""
         return (
             Decimal(self.grade * 100).quantize(exp=Decimal(1), rounding=ROUND_HALF_EVEN)
