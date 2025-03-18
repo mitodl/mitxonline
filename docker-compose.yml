@@ -192,8 +192,8 @@ services:
       - KEYCLOAK_PORT=${KEYCLOAK_PORT:-7080}
       - KEYCLOAK_SSL_PORT=${KEYCLOAK_SSL_PORT:-7443}
     ports:
-      - ${KEYCLOAK_PORT}:${KEYCLOAK_PORT}
-      - ${KEYCLOAK_SSL_PORT}:${KEYCLOAK_SSL_PORT}
+      - ${KEYCLOAK_PORT}:${KEYCLOAK_PORT:-7080}
+      - ${KEYCLOAK_SSL_PORT}:${KEYCLOAK_SSL_PORT:-7443}
     networks:
       default:
         aliases:
