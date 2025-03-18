@@ -9,7 +9,7 @@ authors  = ["MIT ODL"]
 
 
 [tool.poetry.dependencies]
-python = "3.10.16"
+python = "3.12.9"
 
 beautifulsoup4 = "^4.8.2"
 bleach = "^5.0.1"
