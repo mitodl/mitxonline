@@ -1,4 +1,5 @@
 from django.contrib.contenttypes.models import ContentType
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from courses.models import Course, Program
@@ -38,6 +39,7 @@ class FlexiblePriceTierSerializer(serializers.ModelSerializer):
             "income_threshold_usd",
         ]
 
+    @extend_schema_field(BaseCourseSerializer)
     def get_courseware_object(self, instance):
         if instance.courseware_content_type.model == "course":
             return BaseCourseSerializer(instance=instance.courseware_object).data
@@ -137,6 +139,7 @@ class FlexiblePriceAdminSerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
+    @extend_schema_field(BaseCourseSerializer)
     def get_courseware(self, instance):
         """
         Returns serialized courseware object.
@@ -152,12 +155,14 @@ class FlexiblePriceAdminSerializer(serializers.ModelSerializer):
 
         return None
 
+    @extend_schema_field(DiscountSerializer)
     def get_discount(self, instance):
         """
         Returns applied discount information for a Financial Assistance Request.
         """
         return DiscountSerializer(instance=instance.tier.discount).data
 
+    @extend_schema_field(DiscountSerializer)
     def get_applicable_discounts(self, instance):
         """
         Returns discount options for a Financial Assistance Request.
@@ -176,6 +181,7 @@ class FlexiblePriceAdminSerializer(serializers.ModelSerializer):
             many=True,
         ).data
 
+    @extend_schema_field(FlexiblePriceIncomeSerializer)
     def get_income(self, instance):
         """
         Returns income information associated with a flexible price request.
@@ -193,6 +199,7 @@ class FlexiblePriceCoursewareAdminSerializer(serializers.ModelSerializer):
     readable_id = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
 
+    @extend_schema_field(BaseCourseSerializer)
     def get_courseware_object(self, instance):
         course_content_type = ContentType.objects.get(
             app_label="courses", model="course"
@@ -209,24 +216,28 @@ class FlexiblePriceCoursewareAdminSerializer(serializers.ModelSerializer):
                 Program.objects.filter(id=instance["courseware_object_id"]).first()
             ).data
 
+    @extend_schema_field(str)
     def get_id(self, instance):
         """
         Returns serialized courseware id.
         """
         return self.get_courseware_object(instance)["id"]
 
+    @extend_schema_field(str)
     def get_type(self, instance):
         """
         Returns serialized courseware type.
         """
         return self.get_courseware_object(instance)["type"]
 
+    @extend_schema_field(str)
     def get_readable_id(self, instance):
         """
         Returns serialized courseware readable id.
         """
         return self.get_courseware_object(instance)["readable_id"]
 
+    @extend_schema_field(str)
     def get_title(self, instance):
         """
         Returns serialized courseware title.

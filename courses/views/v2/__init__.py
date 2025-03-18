@@ -4,6 +4,7 @@ Course API Views version 2
 
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 
@@ -45,6 +46,17 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = (
         Program.objects.filter().order_by("title").prefetch_related("departments")
     )
+
+    @extend_schema(
+        operation_id="programs_retrieve_v2",
+        description="API view set for Programs - v2",
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    @extend_schema(operation_id="programs_list_v2", description="List Programs - v2")
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 
 class IdInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
@@ -103,6 +115,19 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
         return {**super().get_serializer_context(), **added_context}
 
+    @extend_schema(
+        operation_id="api_v2_courses_retrieve",
+        description="Retrieve a specific course - API v2",
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    @extend_schema(
+        operation_id="api_v2_courses_list", description="List all courses - API v2"
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
 
 class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Departments"""
@@ -112,6 +137,19 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Department.objects.all().order_by("name")
+
+    @extend_schema(
+        operation_id="departments_retrieve_v2",
+        description="Get department details - v2",
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    @extend_schema(
+        operation_id="departments_list_v2", description="List departments - v2"
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 
 class CourseTopicViewSet(viewsets.ReadOnlyModelViewSet):

@@ -290,7 +290,8 @@ class Discount(TimestampedModel):
         super().clean(*args, **kwargs)
 
     @cached_property
-    def is_redeemed(self):
+    def is_redeemed(self) -> bool:
+        """Returns True if the discount has been redeemed"""
         return DiscountRedemption.objects.filter(redeemed_discount=self).exists()
 
     def check_validity(self, user: User):

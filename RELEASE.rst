@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.113.1
+---------------
+
+- Reset change_status on all requests to create_run_enrollment (#2566)
+- Open api (#2549)
+
 Version 0.113.0 (Released March 17, 2025)
 ---------------
 
