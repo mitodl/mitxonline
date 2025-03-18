@@ -108,6 +108,10 @@ def create_run_enrollments(  # noqa: C901
     in edX via API.
     Updates the enrollment mode and change_status if the user is already enrolled in the course run
     and now is changing the enrollment mode, (e.g. pays or re-enrolls again or getting deferred)
+    Possible cases are:
+    1. Downgrade: Verified to Audit via a deferral
+    2. Upgrade: Audit to Verified via a payment
+    3. Reactivation: Audit to Audit or Verified to Verified via a re-enrollment
 
     Args:
         user (User): The user to enroll
@@ -188,9 +192,9 @@ def create_run_enrollments(  # noqa: C901
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
                 enrollment.edx_enrolled = edx_request_success
-                if change_status is not None:
-                    enrollment.change_status = change_status
-                    enrollment.save_and_log(None)
+                # This resets the change_status if the enrollment was reactivated or Upgraded/Downgraded
+                enrollment.change_status = change_status
+                enrollment.save_and_log(None)
                 # Case (Upgrade): When user was enrolled in free mode and now enrolls in paid mode (e.g. Verified)
                 # Case (Downgrade): When user was enrolled in paid mode and downgrades to a free mode in case
                 # of deferral(e.g. Audit)
