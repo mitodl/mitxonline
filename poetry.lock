@@ -778,12 +778,12 @@ files = [
 
 [[package]]
 name = "cybersource-rest-client-python"
-version = "0.0.54"
+version = "0.0.62"
 description = "SDK for the CyberSource REST API"
 optional = false
 python-versions = "*"
 files = [
-    {file = "cybersource_rest_client_python-0.0.54.tar.gz", hash = "sha256:893e05559074b6989b4a0b89b4ddaaa93537e7b47c925bcea8c91947345f3fde"},
+    {file = "cybersource-rest-client-python-0.0.62.tar.gz", hash = "sha256:69f0bc60e0e15cb99ed82d736f5775e92e7a10a62bde8c4c74a17d45cd4dde09"},
 ]
 
 [package.dependencies]
@@ -793,7 +793,6 @@ DateTime = "*"
 jwcrypto = "*"
 pycryptodome = "*"
 PyJWT = "*"
-pyOpenSSL = "<=23.2.0"
 setuptools = "*"
 six = "*"
 urllib3 = "*"
@@ -2377,20 +2376,20 @@ setuptools = "*"
 
 [[package]]
 name = "mitol-django-payment-gateway"
-version = "2023.12.19"
+version = "2025.3.17"
 description = "Django application to handle payment processing"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 files = [
-    {file = "mitol-django-payment-gateway-2023.12.19.tar.gz", hash = "sha256:3aa89300237c905e363e40b5d1a9cdfd84437fef67483b85c1984a3131baaf45"},
-    {file = "mitol_django_payment_gateway-2023.12.19-py3-none-any.whl", hash = "sha256:50ce1457bc41ac86c4fa6bdb62f6be4bd5feeff8e24303d3ae1b8e17ba57e36d"},
+    {file = "mitol_django_payment_gateway-2025.3.17-py3-none-any.whl", hash = "sha256:ea1a436d3157f0ab9362606d15e28c161777e1870f8df3b965a4b71d34cdf2bd"},
+    {file = "mitol_django_payment_gateway-2025.3.17.tar.gz", hash = "sha256:e65a2aaa078f93e5ff90b7eba16ebe3d4779f55b200efb72f049478b4b3a2e7a"},
 ]
 
 [package.dependencies]
-cybersource-rest-client-python = ">=0.0.36"
+cybersource-rest-client-python = ">=0.0.59"
 django = ">=3.0"
+django-stubs = ">=1.13.1"
 mitol-django-common = "*"
-setuptools = "*"
 
 [[package]]
 name = "monotonic"
@@ -4270,4 +4269,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.12.9"
-content-hash = "ee5b5a05ea25e43864c080ae1b4f9751e2513f11c4bd26efc4dcccabc5461e72"
+content-hash = "c77cae1b7b80244d057e434bb4551b950fafe198780e5e8cb1895ac77c28a89d"
