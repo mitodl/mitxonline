@@ -221,7 +221,7 @@ class CustomLogoutView(LogoutView):
         ).first()
 
         if not user_social_auth_record:
-            return False
+            return None
 
         id_token = user_social_auth_record.extra_data.get("id_token")
         qs = urlencode(
