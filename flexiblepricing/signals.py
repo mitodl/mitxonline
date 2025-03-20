@@ -2,15 +2,20 @@
 Signals for mitxonline course certificates
 """
 
+from decimal import Decimal
+import logging
+import uuid
 import requests
 from django.conf import settings
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.models import FlexiblePrice
 
+logger = logging.getLogger(__name__)
 
 @receiver(
     post_save,
@@ -20,35 +25,55 @@ from flexiblepricing.models import FlexiblePrice
 def handle_flexible_price_save(
     sender,  # pylint: disable=unused-argument  # noqa: ARG001
     instance,
-    created, # pylint: disable=unused-argument  # noqa: ARG001
+    created,  # pylint: disable=unused-argument  # noqa: ARG001
     **kwargs,  # pylint: disable=unused-argument  # noqa: ARG001
 ):
     """
     When a FlexiblePrice is saved.
     """
-
     if instance.status == FlexiblePriceStatus.APPROVED:
         with transaction.atomic():
             url = "http://host.docker.internal:9080//api/v0/payments/discounts/"
 
+            #handle when there are no active products
+            if not instance.courseware_object.active_products:
+                logger.warning(
+                    "No active products found for courseware object (FlexiblePrice ID: %s)",
+                    instance.id
+                )
+                return
+
+            amount = determine_courseware_flexible_price_discount(
+                instance.courseware_object.active_products.first(),
+                instance.user
+            ).amount
+        
+
             # Discount data
             discount_data = {
-                "discount_code": "WELCOME2024",
-                "discount_type": "percent-off",
-                "amount": 10.00,  # 10% off
-                "activation_date": "2024-03-19",
-                "expiration_date": "2024-12-31",
-                "max_redemptions": 100,
-                "description": "Welcome discount for new users",
+                "codes": str(uuid.uuid4()),
+                "discount_type": "fixed-price",
+                "amount": float(amount),
                 "payment_type": "financial-assistance",
             }
 
             # Make POST request
-            response = requests.post(url, json=discount_data, headers={"Authorization": "Api-Key 2BzQwz7b.Mn96w8OGpLnhVBTRVA5XM6scLSgG5WLg"})
+            response = requests.post(
+                url, 
+                json=discount_data,
+                headers={"Authorization": "Api-Key 2BzQwz7b.Mn96w8OGpLnhVBTRVA5XM6scLSgG5WLg"}
+            )
             
             if response.status_code == 201:
-                print("Discount created successfully!")
-                print(response.json())
+                logger.info(
+                    "Discount created successfully for FlexiblePrice ID: %s. Response: %s",
+                    instance.id,
+                    response.json()
+                )
             else:
-                print(f"Error creating discount: {response.status_code}")
-                print(response.json())
+                logger.error(
+                    "Error creating discount for FlexiblePrice ID: %s. Status: %s, Response: %s",
+                    instance.id,
+                    response.status_code,
+                    response.json()
+                )
