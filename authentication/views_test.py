@@ -524,17 +524,17 @@ class AuthStateMachine(RuleBasedStateMachine):
         return response.json()
 
 
-AuthStateMachine.TestCase.settings = hypothesis_settings(
-    max_examples=100,
-    stateful_step_count=10,
-    deadline=None,
-    verbosity=Verbosity.normal,
-    suppress_health_check=[HealthCheck.filter_too_much],
-)
-
 
 class AuthStateTestCase(HTestCase, AuthStateMachine.TestCase):
     """TestCase for AuthStateMachine"""
+    settings = hypothesis_settings(
+        max_examples=100,
+        stateful_step_count=10,
+        deadline=None,
+        verbosity=Verbosity.normal,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
+
 
 
 @pytest.mark.usefixtures("mock_email_send")
