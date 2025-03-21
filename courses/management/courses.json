@@ -12,11 +12,12 @@
             "max_weekly_hours": null,
             "courseruns": [
                 {
+                    "courseware_id": "course-v1:MITxT+0.003x+1T",
                     "is_upgradable": false,
                     "is_enrollable": true,
                     "is_archived": true,
                     "is_self_paced": false,
-                    "run_tag": "3T2023",
+                    "run_tag": "1T",
                     "live": true
                 }
             ]
