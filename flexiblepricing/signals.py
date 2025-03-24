@@ -2,7 +2,6 @@
 Signals for mitxonline course certificates
 """
 
-from decimal import Decimal
 import logging
 import uuid
 import requests
@@ -11,7 +10,7 @@ from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from flexiblepricing.api import determine_courseware_flexible_price_discount
+from flexiblepricing.api import determine_courseware_flexible_price_discount, get_ecommerce_products_by_courseware_name
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.models import FlexiblePrice
 
@@ -33,7 +32,19 @@ def handle_flexible_price_save(
     """
     if instance.status == FlexiblePriceStatus.APPROVED:
         with transaction.atomic():
-            url = "http://host.docker.internal:9080//api/v0/payments/discounts/"
+
+            products = get_ecommerce_products_by_courseware_name(instance.courseware_object.first_unexpired_run.courseware_id)
+            product_id = products[-1]["id"]
+
+            # If there are no products, log a warning and return
+            if not products:
+                logger.warning(
+                    "No products found for courseware object (FlexiblePrice ID: %s)",
+                    instance.id
+                )
+                return
+
+            url = f"{settings.UNIFIED_ECOMMERCE_URL}/api/v0/payments/discounts/"
 
             #handle when there are no active products
             if not instance.courseware_object.active_products:
@@ -47,7 +58,6 @@ def handle_flexible_price_save(
                 instance.courseware_object.active_products.first(),
                 instance.user
             ).amount
-        
 
             # Discount data
             discount_data = {
@@ -55,16 +65,19 @@ def handle_flexible_price_save(
                 "discount_type": "fixed-price",
                 "amount": float(amount),
                 "payment_type": "financial-assistance",
+                "users": [instance.user.email],
+                "product": product_id,
+                "automatic": True,
             }
 
             # Make POST request
-            response = requests.post(
-                url, 
+            response = requests.post(  # noqa: S113
+                url,
                 json=discount_data,
                 headers={"Authorization": "Api-Key 2BzQwz7b.Mn96w8OGpLnhVBTRVA5XM6scLSgG5WLg"}
             )
-            
-            if response.status_code == 201:
+
+            if response.status_code == 201:  # noqa: PLR2004
                 logger.info(
                     "Discount created successfully for FlexiblePrice ID: %s. Response: %s",
                     instance.id,
@@ -75,5 +88,5 @@ def handle_flexible_price_save(
                     "Error creating discount for FlexiblePrice ID: %s. Status: %s, Response: %s",
                     instance.id,
                     response.status_code,
-                    response.json()
+                    response
                 )

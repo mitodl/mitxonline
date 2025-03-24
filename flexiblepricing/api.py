@@ -5,6 +5,7 @@ import logging
 from collections import namedtuple
 from datetime import datetime
 from typing import Union
+import requests
 
 import pytz
 from django.contrib.auth.models import AnonymousUser
@@ -33,6 +34,7 @@ from flexiblepricing.models import (
     FlexiblePrice,
     FlexiblePriceTier,
 )
+from main import settings
 from main.constants import DISALLOWED_CURRENCY_TYPES
 from main.settings import TIME_ZONE
 
@@ -444,3 +446,32 @@ def create_default_flexible_pricing_page(
     form_page.refresh_from_db()
 
     return form_page
+
+
+def get_ecommerce_products_by_courseware_name(courseware_id: str):
+    """
+    Gets products filtered by name and system slug using the ProductViewSet.
+    """
+    # Base URL - adjust to match your environment
+    base_url = f"{settings.UNIFIED_ECOMMERCE_URL}/api/v0/meta/product/"
+
+    # Query parameters for filtering
+    params = {
+        "sku": courseware_id,
+        "system__slug": "mitxonline",
+    }
+
+    try:
+        response = requests.get(base_url, params=params)  # noqa: S113
+        response.raise_for_status()  # Raise an exception for bad status codes
+
+        if response.status_code == 200:  # noqa: PLR2004
+            products = response.json()["results"]
+            log.info("Found products for courseware_id: %s", courseware_id)
+            for product in products:
+                log.debug("Product found: %s (SKU: %s)", product['name'], product['sku'])
+            return products
+
+    except requests.exceptions.RequestException:
+        log.exception("Error fetching products for courseware_id %s", courseware_id)
+        return None
