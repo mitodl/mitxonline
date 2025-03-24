@@ -36,9 +36,12 @@ def handle_flexible_price_save(sender, instance, created, **kwargs):  # pylint: 
 
 def _should_process_flexible_price(instance) -> bool:
     """Check if the instance meets basic processing criteria."""
-    if not hasattr(instance, 'status'):
+    if not hasattr(instance, "status"):
         return False
-    return instance.status in (FlexiblePriceStatus.APPROVED, FlexiblePriceStatus.AUTO_APPROVED)
+    return instance.status in (
+        FlexiblePriceStatus.APPROVED,
+        FlexiblePriceStatus.AUTO_APPROVED,
+    )
 
 
 def _process_flexible_price_discount(instance):
@@ -64,8 +67,10 @@ def _process_flexible_price_discount(instance):
 
 def _validate_courseware_object(instance):
     """Validate and return the courseware object if valid."""
-    if not getattr(instance, 'courseware_object', None):
-        logger.warning("No courseware object found for FlexiblePrice ID: %s", instance.id)
+    if not getattr(instance, "courseware_object", None):
+        logger.warning(
+            "No courseware object found for FlexiblePrice ID: %s", instance.id
+        )
         return None
     return instance.courseware_object
 
@@ -74,7 +79,7 @@ def _validate_course_run(courseware_object, instance_id):
     """Validate and return the first unexpired run if valid."""
     try:
         first_run = courseware_object.first_unexpired_run
-        if not first_run or not getattr(first_run, 'courseware_id', None):
+        if not first_run or not getattr(first_run, "courseware_id", None):
             logger.warning("Invalid course run for FlexiblePrice ID: %s", instance_id)
             return None
         else:
@@ -92,7 +97,7 @@ def _get_valid_product_id(courseware_id, instance_id):
             logger.warning("No products found for FlexiblePrice ID: %s", instance_id)
             return None
 
-        product_id = products[-1].get('id')
+        product_id = products[-1].get("id")
         if not product_id:
             logger.error("Invalid product structure for ID: %s", instance_id)
         else:
@@ -105,17 +110,16 @@ def _get_valid_product_id(courseware_id, instance_id):
 def _calculate_discount_amount(courseware_object, instance):
     """Calculate and return the discount amount if valid."""
     try:
-        active_products = getattr(courseware_object, 'active_products', None)
+        active_products = getattr(courseware_object, "active_products", None)
         if not active_products or not active_products.exists():
             logger.warning("No active products for FlexiblePrice ID: %s", instance.id)
             return None
 
         discount_result = determine_courseware_flexible_price_discount(
-            active_products.first(),
-            getattr(instance, 'user', None)
+            active_products.first(), getattr(instance, "user", None)
         )
 
-        if not discount_result or not hasattr(discount_result, 'amount'):
+        if not discount_result or not hasattr(discount_result, "amount"):
             logger.error("Invalid discount result for ID: %s", instance.id)
             return None
 
@@ -136,7 +140,7 @@ def _create_discount_api_call(instance, product_id, amount):
             "discount_type": "fixed-price",
             "amount": amount,
             "payment_type": "financial-assistance",
-            "users": [getattr(instance.user, 'email', '')],
+            "users": [getattr(instance.user, "email", "")],
             "product": product_id,
             "automatic": True,
         }
@@ -145,14 +149,17 @@ def _create_discount_api_call(instance, product_id, amount):
             url,
             json=discount_data,
             headers={"Authorization": f"Api-Key {api_key}"},
-            timeout=10
+            timeout=10,
         )
 
         if response.status_code == 201:
             logger.info("Discount created for ID: %s", instance.id)
         else:
-            logger.error("Discount creation failed for ID %s. Status: %s",
-                       instance.id, response.status_code)
+            logger.error(
+                "Discount creation failed for ID %s. Status: %s",
+                instance.id,
+                response.status_code,
+            )
     except requests.exceptions.RequestException:
         logger.exception("API request failed for ID %s", instance.id)
     except (KeyError, ValueError, TypeError):
@@ -161,5 +168,8 @@ def _create_discount_api_call(instance, product_id, amount):
 
 def _log_unexpected_error(instance, error):
     """Log unexpected errors at the top level."""
-    logger.critical("Unhandled exception for ID %s: %s",
-                   getattr(instance, 'id', 'unknown'), str(error))
+    logger.critical(
+        "Unhandled exception for ID %s: %s",
+        getattr(instance, "id", "unknown"),
+        str(error),
+    )
