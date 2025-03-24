@@ -260,7 +260,7 @@ def test_create_edx_auth_token(settings, user):
     access_token = "def456"
     code = "ghi789"
     expires_in = 3600  # Add explicit expires_in value
-    
+
     responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}{settings.OPENEDX_SOCIAL_LOGIN_PATH}",
@@ -285,7 +285,7 @@ def test_create_edx_auth_token(settings, user):
         json={
             "refresh_token": refresh_token,
             "access_token": access_token,
-            "expires_in": expires_in
+            "expires_in": expires_in,
         },
         status=status.HTTP_200_OK,
     )
