@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=FlexiblePrice, dispatch_uid="flexibleprice_post_save")
-def handle_flexible_price_save(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
+def handle_flexible_price_save(sender, instance, created, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
     """Orchestrate the flexible price processing workflow."""
     if not _should_process_flexible_price(instance):
         return
@@ -148,7 +148,7 @@ def _create_discount_api_call(instance, product_id, amount):
             timeout=10
         )
 
-        if response.status_code == 201:
+        if response.status_code == 201:  # noqa: PLR2004
             logger.info("Discount created for ID: %s", instance.id)
         else:
             logger.error("Discount creation failed for ID %s. Status: %s",
