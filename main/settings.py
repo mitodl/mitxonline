@@ -1213,4 +1213,9 @@ UNIFIED_ECOMMERCE_URL = get_string(
     description="The base URL for Unified Ecommerce.",
 )
 
+UNIFIED_ECOMMERCE_API_KEY = get_string(
+    name="UNIFIED_ECOMMERCE_API_KEY",
+    description="The API key for Unified Ecommerce.",
+)
+
 SPECTACULAR_SETTINGS = open_spectacular_settings

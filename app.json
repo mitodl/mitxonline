@@ -616,6 +616,10 @@
       "description": "The base URL for Unified Ecommerce.",
       "required": false
     },
+    "UNIFIED_ECOMMERCE_API_KEY": {
+      "description": "The API key for Unified Ecommerce.",
+      "required": false
+    },
     "USE_X_FORWARDED_HOST": {
       "description": "Set HOST header to original domain accessed by user",
       "required": false

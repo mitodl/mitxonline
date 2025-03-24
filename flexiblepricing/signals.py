@@ -30,7 +30,7 @@ def handle_flexible_price_save(
     """
     When a FlexiblePrice is saved.
     """
-    if instance.status == FlexiblePriceStatus.APPROVED:
+    if instance.status in (FlexiblePriceStatus.APPROVED, FlexiblePriceStatus.AUTO_APPROVED):
         with transaction.atomic():
 
             products = get_ecommerce_products_by_courseware_name(instance.courseware_object.first_unexpired_run.courseware_id)
@@ -74,7 +74,7 @@ def handle_flexible_price_save(
             response = requests.post(  # noqa: S113
                 url,
                 json=discount_data,
-                headers={"Authorization": "Api-Key 2BzQwz7b.Mn96w8OGpLnhVBTRVA5XM6scLSgG5WLg"}
+                headers={"Authorization": f"Api-Key {settings.UNIFIED_ECOMMERCE_API_KEY}"}
             )
 
             if response.status_code == 201:  # noqa: PLR2004
