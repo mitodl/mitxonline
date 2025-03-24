@@ -42,18 +42,18 @@ def handle_flexible_price_save(
         with transaction.atomic():
             if not instance.courseware_object:
                 logger.warning(
-                    "No courseware object found for FlexiblePrice ID: %s",
-                    instance.id
+                    "No courseware object found for FlexiblePrice ID: %s", instance.id
                 )
                 return
 
             if not instance.courseware_object.first_unexpired_run:
                 logger.warning(
-                    "No unexpired run found for FlexiblePrice ID: %s",
-                    instance.id
+                    "No unexpired run found for FlexiblePrice ID: %s", instance.id
                 )
                 return
-            products = get_ecommerce_products_by_courseware_name(instance.courseware_object.first_unexpired_run.courseware_id)
+            products = get_ecommerce_products_by_courseware_name(
+                instance.courseware_object.first_unexpired_run.courseware_id
+            )
             product_id = products[-1]["id"]
 
             # If there are no products, log a warning and return
