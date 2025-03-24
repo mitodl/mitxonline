@@ -24,10 +24,10 @@ def mocked_product_signal(mocker):  # noqa: PT004
 
 
 @pytest.fixture(autouse=True)
-def mocked_flexibleprice_signal(mocker):  # noqa: PT004
+def mocked_flexibleprice_signal(mocker):
     """Mock FlexiblePrice signals"""
     mocker.patch("flexiblepricing.signals.get_ecommerce_products_by_courseware_name")
-    mocker.patch("flexiblepricing.signals.requests.post")
+    # mocker.patch("flexiblepricing.signals.requests.post")
 
 
 def pytest_addoption(parser):

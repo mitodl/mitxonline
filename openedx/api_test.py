@@ -256,9 +256,11 @@ def test_validate_edx_username_conflict(settings, user):  # noqa: F811
 @freeze_time("2019-03-24 11:50:36")
 def test_create_edx_auth_token(settings, user):
     """Tests create_edx_auth_token makes the expected incantations to create a OpenEdxApiAuth"""
-    refresh_token = "abc123"  # noqa: S105
-    access_token = "def456"  # noqa: S105
+    refresh_token = "abc123"
+    access_token = "def456"
     code = "ghi789"
+    expires_in = 3600  # Add explicit expires_in value
+    
     responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}{settings.OPENEDX_SOCIAL_LOGIN_PATH}",
@@ -280,22 +282,24 @@ def test_create_edx_auth_token(settings, user):
     responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/oauth2/access_token",
-        json=dict(  # noqa: C408
-            refresh_token=refresh_token, access_token=access_token, expires_in=3600
-        ),
+        json={
+            "refresh_token": refresh_token,
+            "access_token": access_token,
+            "expires_in": expires_in
+        },
         status=status.HTTP_200_OK,
     )
 
     create_edx_auth_token(user)
 
     assert len(responses.calls) == 4
-    assert dict(parse_qsl(responses.calls[3].request.body)) == dict(  # noqa: C408
-        code=code,
-        grant_type="authorization_code",
-        client_id=settings.OPENEDX_API_CLIENT_ID,
-        client_secret=settings.OPENEDX_API_CLIENT_SECRET,
-        redirect_uri=f"{settings.SITE_BASE_URL}/login/_private/complete",
-    )
+    assert dict(parse_qsl(responses.calls[3].request.body)) == {
+        "code": code,
+        "grant_type": "authorization_code",
+        "client_id": settings.OPENEDX_API_CLIENT_ID,
+        "client_secret": settings.OPENEDX_API_CLIENT_SECRET,
+        "redirect_uri": f"{settings.SITE_BASE_URL}/login/_private/complete",
+    }
 
     assert OpenEdxApiAuth.objects.filter(user=user).exists()
 
@@ -303,7 +307,6 @@ def test_create_edx_auth_token(settings, user):
 
     assert auth.refresh_token == refresh_token
     assert auth.access_token == access_token
-    # plus expires_in, minutes 10 seconds
     assert auth.access_token_expires_on == now_in_utc() + timedelta(
         minutes=59, seconds=50
     )
