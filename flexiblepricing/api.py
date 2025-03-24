@@ -5,9 +5,9 @@ import logging
 from collections import namedtuple
 from datetime import datetime
 from typing import Union
-import requests
 
 import pytz
+import requests
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
@@ -469,7 +469,9 @@ def get_ecommerce_products_by_courseware_name(courseware_id: str):
             products = response.json()["results"]
             log.info("Found products for courseware_id: %s", courseware_id)
             for product in products:
-                log.debug("Product found: %s (SKU: %s)", product['name'], product['sku'])
+                log.debug(
+                    "Product found: %s (SKU: %s)", product["name"], product["sku"]
+                )
             return products
 
     except requests.exceptions.RequestException:
