@@ -4,17 +4,22 @@ Signals for mitxonline course certificates
 
 import logging
 import uuid
+
 import requests
 from django.conf import settings
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from flexiblepricing.api import determine_courseware_flexible_price_discount, get_ecommerce_products_by_courseware_name
+from flexiblepricing.api import (
+    determine_courseware_flexible_price_discount,
+    get_ecommerce_products_by_courseware_name,
+)
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.models import FlexiblePrice
 
 logger = logging.getLogger(__name__)
+
 
 @receiver(
     post_save,
@@ -30,7 +35,10 @@ def handle_flexible_price_save(
     """
     When a FlexiblePrice is saved.
     """
-    if instance.status in (FlexiblePriceStatus.APPROVED, FlexiblePriceStatus.AUTO_APPROVED):
+    if instance.status in (
+        FlexiblePriceStatus.APPROVED,
+        FlexiblePriceStatus.AUTO_APPROVED,
+    ):
         with transaction.atomic():
             if not instance.courseware_object:
                 logger.warning(
@@ -52,23 +60,22 @@ def handle_flexible_price_save(
             if not products:
                 logger.warning(
                     "No products found for courseware object (FlexiblePrice ID: %s)",
-                    instance.id
+                    instance.id,
                 )
                 return
 
             url = f"{settings.UNIFIED_ECOMMERCE_URL}/api/v0/payments/discounts/"
 
-            #handle when there are no active products
+            # handle when there are no active products
             if not instance.courseware_object.active_products:
                 logger.warning(
                     "No active products found for courseware object (FlexiblePrice ID: %s)",
-                    instance.id
+                    instance.id,
                 )
                 return
 
             amount = determine_courseware_flexible_price_discount(
-                instance.courseware_object.active_products.first(),
-                instance.user
+                instance.courseware_object.active_products.first(), instance.user
             ).amount
 
             # Discount data
@@ -86,19 +93,21 @@ def handle_flexible_price_save(
             response = requests.post(  # noqa: S113
                 url,
                 json=discount_data,
-                headers={"Authorization": f"Api-Key {settings.UNIFIED_ECOMMERCE_API_KEY}"}
+                headers={
+                    "Authorization": f"Api-Key {settings.UNIFIED_ECOMMERCE_API_KEY}"
+                },
             )
 
             if response.status_code == 201:  # noqa: PLR2004
                 logger.info(
                     "Discount created successfully for FlexiblePrice ID: %s. Response: %s",
                     instance.id,
-                    response.json()
+                    response.json(),
                 )
             else:
                 logger.error(
                     "Error creating discount for FlexiblePrice ID: %s. Status: %s, Response: %s",
                     instance.id,
                     response.status_code,
-                    response
+                    response,
                 )
