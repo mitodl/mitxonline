@@ -1215,6 +1215,7 @@ UNIFIED_ECOMMERCE_URL = get_string(
 
 UNIFIED_ECOMMERCE_API_KEY = get_string(
     name="UNIFIED_ECOMMERCE_API_KEY",
+    default="",
     description="The API key for Unified Ecommerce.",
 )
 
