@@ -66,6 +66,9 @@ services:
     environment:
       << : *py-environment
       PORT: 8011
+      # these are necessary to get the hostname from the varnish proxy
+      USE_X_FORWARDED_HOST: true
+      USE_X_FORWARDED_PORT: true
     env_file: .env
     links:
       - db
@@ -86,7 +89,7 @@ services:
     ports:
       - "8012:8012"
     environment:
-      PUBLIC_PATH: http://${MITX_ONLINE_HOSTNAME:-mitxonline.odl.local}:8012/
+      PUBLIC_PATH: ${MITX_ONLINE_WATCH_BASE_URL:-http://mitxonline.odl.local:8012/}
       NODE_ENV: ${NODE_ENV:-development}
       DOCKER_HOST: ${DOCKER_HOST:-missing}
       CONTAINER_NAME: 'watch'
@@ -128,7 +131,7 @@ services:
     ports:
        - "8016:8016"
     environment:
-      PUBLIC_PATH: http://${MITX_ONLINE_HOSTNAME:-mitxonline.odl.local}:8016/
+      PUBLIC_PATH: ${MITX_ONLINE_REFINE_BASE_URL:-http://mitxonline.odl.local:8016/}
       PORT: 8016
       NODE_ENV: ${NODE_ENV:-development}
     volumes:
