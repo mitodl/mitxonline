@@ -36,8 +36,6 @@ def handle_flexible_price_save(sender, instance, created, **kwargs):  # pylint: 
 
 def _should_process_flexible_price(instance) -> bool:
     """Check if the instance meets basic processing criteria."""
-    if not hasattr(instance, "status"):
-        return False
     return instance.status in (
         FlexiblePriceStatus.APPROVED,
         FlexiblePriceStatus.AUTO_APPROVED,
