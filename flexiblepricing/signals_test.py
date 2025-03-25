@@ -51,23 +51,29 @@ class TestFlexiblePriceSignals(TestCase):
 
     def test_validate_course_run_valid(self):
         """Test validation with valid course run"""
+
         class MockCourseware:
             first_unexpired_run = type("Run", (), {"courseware_id": "test"})
+
         courseware = MockCourseware()
         assert _validate_course_run(courseware, 1) is not None
 
     def test_validate_course_run_invalid(self):
         """Test validation with invalid course run"""
+
         class MockCourseware:
             first_unexpired_run = None
+
         courseware = MockCourseware()
         assert _validate_course_run(courseware, 1) is None
 
     @patch("flexiblepricing.signals.logger")
     def test_validate_course_run_logs_warning(self, mock_logger):
         """Test that invalid course run logs warning"""
+
         class MockCourseware:
             first_unexpired_run = None
+
         _validate_course_run(MockCourseware(), 1)
         mock_logger.warning.assert_called_once()
 
@@ -99,20 +105,22 @@ class TestFlexiblePriceSignals(TestCase):
 
     def test_calculate_discount_amount_success(self):
         """Test successful discount calculation"""
+
         class MockProduct:
             def exists(self):
                 return True
+
             def first(self):
                 return "product"
-        
+
         class MockCourseware:
             active_products = MockProduct()
-        
+
         discount = DiscountFactory(amount=100)
-        
+
         with patch(
             "flexiblepricing.signals.determine_courseware_flexible_price_discount",
-            return_value=discount
+            return_value=discount,
         ):
             fp = FlexiblePriceFactory()
             courseware = MockCourseware()
@@ -120,9 +128,10 @@ class TestFlexiblePriceSignals(TestCase):
 
     def test_calculate_discount_amount_no_active_products(self):
         """Test case with no active products"""
+
         class MockCourseware:
             active_products = None
-        
+
         fp = FlexiblePriceFactory()
         assert _calculate_discount_amount(MockCourseware(), fp) is None
 
@@ -130,16 +139,17 @@ class TestFlexiblePriceSignals(TestCase):
     def test_calculate_discount_amount_invalid_result(self, mock_determine):
         """Test invalid discount result"""
         mock_determine.return_value = None
-        
+
         class MockProduct:
             def exists(self):
                 return True
+
             def first(self):
                 return "product"
-        
+
         class MockCourseware:
             active_products = MockProduct()
-        
+
         fp = FlexiblePriceFactory()
         assert _calculate_discount_amount(MockCourseware(), fp) is None
 
@@ -151,10 +161,10 @@ class TestFlexiblePriceSignals(TestCase):
         """Test successful API call"""
         mock_response = type("Response", (), {"status_code": 201})
         mock_post.return_value = mock_response
-        
+
         fp = FlexiblePriceFactory(user__email="test@example.com")
         _create_discount_api_call(fp, "product-id", 100)
-        
+
         assert mock_post.called
         assert "test@example.com" in mock_post.call_args[1]["json"]["users"]
 
