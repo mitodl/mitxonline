@@ -21,7 +21,7 @@ export const learnerRecordQueryKey = "learner_record"
 
 export const enrollmentsQuery = () => ({
   queryKey:  enrollmentsQueryKey,
-  url:       "/api/enrollments/",
+  url:       "/api//v1/enrollments/",
   transform: json => ({
     enrollments: json
   }),
@@ -32,7 +32,7 @@ export const enrollmentsQuery = () => ({
 
 export const programEnrollmentsQuery = () => ({
   queryKey:  programEnrollmentsQueryKey,
-  url:       "/api/program_enrollments/",
+  url:       "/api/v1/program_enrollments/",
   transform: json => ({
     program_enrollments: json
   }),
@@ -43,7 +43,7 @@ export const programEnrollmentsQuery = () => ({
 
 export const enrollmentQuery = () => ({
   queryKey:  enrollmentQuery,
-  url:       "/api/enrollments/${enrollmentId}",
+  url:       "/api/v1/enrollments/${enrollmentId}",
   transform: json => ({
     enrollment: json
   }),
@@ -75,7 +75,7 @@ export const sharedLearnerRecordQuery = (uuid: string) => ({
 })
 
 export const deactivateEnrollmentMutation = (enrollmentId: number) => ({
-  url:     `/api/enrollments/${enrollmentId}/`,
+  url:     `/api/v1/enrollments/${enrollmentId}/`,
   options: {
     ...getCsrfOptions(),
     method: "DELETE"
@@ -102,7 +102,7 @@ export const deactivateEnrollmentMutation = (enrollmentId: number) => ({
 })
 
 export const deactivateProgramEnrollmentMutation = (programId: number) => ({
-  url:     `/api/program_enrollments/${programId}/`,
+  url:     `/api/v1/program_enrollments/${programId}/`,
   options: {
     ...getCsrfOptions(),
     method: "DELETE"
@@ -119,7 +119,7 @@ export const courseEmailsSubscriptionMutation = (
   enrollmentId: number,
   emailsSubscription: string = ""
 ) => ({
-  url:  `/api/enrollments/${enrollmentId}/`,
+  url:  `/api/v1/enrollments/${enrollmentId}/`,
   body: {
     receive_emails: emailsSubscription
   },
