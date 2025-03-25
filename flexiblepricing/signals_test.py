@@ -154,9 +154,11 @@ class TestFlexiblePriceSignals(TestCase):
         assert _calculate_discount_amount(MockCourseware(), fp) is None
 
     @patch("flexiblepricing.signals.requests.post")
-    @patch("flexiblepricing.signals.settings",
-           UNIFIED_ECOMMERCE_URL="http://test.com",
-           UNIFIED_ECOMMERCE_API_KEY="test-key")
+    @patch(
+        "flexiblepricing.signals.settings",
+        UNIFIED_ECOMMERCE_URL="http://test.com",
+        UNIFIED_ECOMMERCE_API_KEY="test-key",
+    )
     def test_create_discount_api_call_success(self, mock_settings, mock_post):  # noqa: ARG002
         """Test successful API call"""
         mock_response = type("Response", (), {"status_code": 201})
@@ -169,9 +171,11 @@ class TestFlexiblePriceSignals(TestCase):
         assert "test@example.com" in mock_post.call_args[1]["json"]["users"]
 
     @patch("flexiblepricing.signals.requests.post")
-    @patch("flexiblepricing.signals.settings",
-           UNIFIED_ECOMMERCE_URL="http://test.com",
-           UNIFIED_ECOMMERCE_API_KEY="test-key")
+    @patch(
+        "flexiblepricing.signals.settings",
+        UNIFIED_ECOMMERCE_URL="http://test.com",
+        UNIFIED_ECOMMERCE_API_KEY="test-key",
+    )
     def test_create_discount_api_call_failure(self, mock_settings, mock_post):  # noqa: ARG002
         """Test failed API call"""
         mock_response = type("Response", (), {"status_code": 400})
@@ -196,7 +200,10 @@ class TestFlexiblePriceSignals(TestCase):
         mock_process.assert_not_called()
 
     @patch("flexiblepricing.signals.logger")
-    @patch("flexiblepricing.signals._process_flexible_price_discount", side_effect=ValueError("test"))
+    @patch(
+        "flexiblepricing.signals._process_flexible_price_discount",
+        side_effect=ValueError("test"),
+    )
     def test_handle_flexible_price_save_error(self, mock_process, mock_logger):  # noqa: ARG002
         """Test that errors are logged"""
         FlexiblePriceFactory(status=FlexiblePriceStatus.APPROVED)
