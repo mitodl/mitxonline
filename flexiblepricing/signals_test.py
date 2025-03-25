@@ -6,16 +6,13 @@ from django.test import TestCase
 from ecommerce.factories import DiscountFactory
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
-from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.signals import (
     _calculate_discount_amount,
     _create_discount_api_call,
     _get_valid_product_id,
-    _process_flexible_price_discount,
     _should_process_flexible_price,
     _validate_course_run,
     _validate_courseware_object,
-    handle_flexible_price_save,
 )
 
 
@@ -150,7 +147,7 @@ class TestFlexiblePriceSignals(TestCase):
     @patch("flexiblepricing.signals.settings",
            UNIFIED_ECOMMERCE_URL="http://test.com",
            UNIFIED_ECOMMERCE_API_KEY="test-key")
-    def test_create_discount_api_call_success(self, mock_settings, mock_post):
+    def test_create_discount_api_call_success(self, mock_settings, mock_post):  # noqa: ARG002
         """Test successful API call"""
         mock_response = type("Response", (), {"status_code": 201})
         mock_post.return_value = mock_response
@@ -165,7 +162,7 @@ class TestFlexiblePriceSignals(TestCase):
     @patch("flexiblepricing.signals.settings",
            UNIFIED_ECOMMERCE_URL="http://test.com",
            UNIFIED_ECOMMERCE_API_KEY="test-key")
-    def test_create_discount_api_call_failure(self, mock_settings, mock_post):
+    def test_create_discount_api_call_failure(self, mock_settings, mock_post):  # noqa: ARG002
         """Test failed API call"""
         mock_response = type("Response", (), {"status_code": 400})
         mock_post.return_value = mock_response
@@ -177,7 +174,7 @@ class TestFlexiblePriceSignals(TestCase):
 
     @patch("flexiblepricing.signals.logger")
     @patch("flexiblepricing.signals._process_flexible_price_discount")
-    def test_handle_flexible_price_save_approved(self, mock_process, mock_logger):
+    def test_handle_flexible_price_save_approved(self, mock_process, mock_logger):  # noqa: ARG002
         """Test that approved status triggers processing"""
         FlexiblePriceFactory(status=FlexiblePriceStatus.APPROVED)
         mock_process.assert_called_once()
@@ -190,7 +187,7 @@ class TestFlexiblePriceSignals(TestCase):
 
     @patch("flexiblepricing.signals.logger")
     @patch("flexiblepricing.signals._process_flexible_price_discount", side_effect=ValueError("test"))
-    def test_handle_flexible_price_save_error(self, mock_process, mock_logger):
+    def test_handle_flexible_price_save_error(self, mock_process, mock_logger):  # noqa: ARG002
         """Test that errors are logged"""
         FlexiblePriceFactory(status=FlexiblePriceStatus.APPROVED)
         mock_logger.critical.assert_called_once()

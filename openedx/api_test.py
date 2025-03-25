@@ -256,8 +256,8 @@ def test_validate_edx_username_conflict(settings, user):  # noqa: F811
 @freeze_time("2019-03-24 11:50:36")
 def test_create_edx_auth_token(settings, user):
     """Tests create_edx_auth_token makes the expected incantations to create a OpenEdxApiAuth"""
-    refresh_token = "abc123"
-    access_token = "def456"
+    refresh_token = "abc123"  # noqa: S105
+    access_token = "def456"  # noqa: S105
     code = "ghi789"
     expires_in = 3600  # Add explicit expires_in value
 
