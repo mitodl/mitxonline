@@ -181,7 +181,11 @@ class UserManager(BaseUserManager):
     def _create_user(self, username, email, password, **extra_fields):
         """Create and save a user with the given email and password"""
         email = self.normalize_email(email)
-        fields = {**extra_fields, "email": email}
+        fields = {
+            **extra_fields,
+            "email": email,
+            "global_id": extra_fields.get("global_id", ""),
+        }
         if username is not None:
             fields["username"] = username
         user = self.model(**fields)
@@ -245,8 +249,21 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     is_staff = models.BooleanField(
         default=False, help_text="The user can access the admin site"
     )
+    # When we have deprecated direct login, default the is_active flag to True
+    # and remove the related code in authentication/pipeline/user.py.
     is_active = models.BooleanField(
         default=False, help_text="The user account is active"
+    )
+
+    # global_id points to the SSO ID for the user (so, usually the Keycloak ID,
+    # which is a UUID). We store it as a string in case the SSO source changes.
+    # We allow a blank value so we can have out-of-band users - we may want a
+    # Django user that's not connected to an SSO user, for instance.
+    global_id = models.CharField(
+        max_length=36,
+        blank=True,
+        default="",
+        help_text="The SSO ID (usually a Keycloak UUID) for the user.",
     )
 
     hubspot_sync_datetime = DateTimeField(null=True)

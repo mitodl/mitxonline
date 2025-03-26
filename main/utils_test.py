@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytest
 import pytz
+from django.urls import reverse
 from mitol.common.utils.urls import remove_password_from_url
 
 from main.models import AuditModel
@@ -30,15 +31,18 @@ def test_get_field_names():
     }
 
 
-def test_get_js_settings(settings, rf):
+@pytest.mark.parametrize("include_oidc_login", [True, False])
+def test_get_js_settings(settings, rf, include_oidc_login):
     """Test get_js_settings"""
     settings.GA_TRACKING_ID = "fake"
     settings.ENVIRONMENT = "test"
     settings.VERSION = "4.5.6"
     settings.EMAIL_SUPPORT = "support@text.com"
     settings.RECAPTCHA_SITE_KEY = "fake_key"
+    settings.EXPOSE_OIDC_LOGIN = include_oidc_login
 
     request = rf.get("/")
+    oidc_login_url = reverse("social:begin", kwargs={"backend": "ol-oidc"})
 
     assert get_js_settings(request) == {
         "gaTrackingID": "fake",
@@ -52,6 +56,7 @@ def test_get_js_settings(settings, rf):
         "posthog_api_token": settings.POSTHOG_PROJECT_API_KEY,
         "posthog_api_host": settings.POSTHOG_API_HOST,
         "unified_ecommerce_url": settings.UNIFIED_ECOMMERCE_URL,
+        "oidc_login_url": oidc_login_url if include_oidc_login else None,
     }
 
 
