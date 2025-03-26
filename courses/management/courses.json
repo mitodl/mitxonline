@@ -2,7 +2,7 @@
     {
         "title": "Case 1: Course Current, Two Runs Enrollment Open, Upgrade Available",
         "readable_id": "course-v1:MITxT+0.001x",
-        "description": "This course is currently active, open for enrollment, and has an upgrade option available.",
+        "description": "This course is currently active, with two runs open for enrollment, and both have an upgrade option available.",
         "topics": [],
         "price": 100,
         "min_weeks": null,
@@ -48,7 +48,7 @@
     {
         "title": "Case 2: Two Runs Enrollment Open, Upgrade Available Only Future",
         "readable_id": "course-v1:MITxT+0.002x",
-        "description": "This course is currently active, open for enrollment, and has an upgrade option available.",
+        "description": "This course has two runs open for enrollment active, one current, second with upgrade option available.",
         "topics": [],
         "price": 100,
         "min_weeks": null,

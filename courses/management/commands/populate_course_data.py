@@ -42,7 +42,7 @@ def generate_run_defaults(run):
         run_defaults['start_date'] = f"{previous_year}{run['start_date']}"
         run_defaults['end_date'] = f"{previous_year}{run['end_date']}"
         run_defaults['enrollment_start'] = f"{previous_year}{run['enrollment_start']}"
-        run_defaults['enrollment_end'] = f"{previous_year}{run['enrollment_end']}"
+        run_defaults['enrollment_end'] = f"{now.year}{run['enrollment_end']}"
         run_defaults["run_tag"] = f"{run['run_tag']}{previous_year}"
 
     return run_defaults
