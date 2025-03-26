@@ -27,28 +27,24 @@ def generate_run_defaults(run):
     run_defaults = {
         "run_tag": f"{run['run_tag']}{now.year}",
         "live": True,
+        "title": run['title'],
+        "upgrade_deadline": f"{now.year}{run['upgrade_deadline']}"
     }
-    if run['is_archived']:
-        # If the run is archived, set the start and end dates to be in the past
-        previous_year = now.year-1
-        run_defaults['start_date'] = f"{previous_year}{run['start_date']}"
-        run_defaults['end_date'] = f"{previous_year}{run['end_date']}"
-        run_defaults['enrollment_start'] = f"{previous_year}{run['enrollment_start']}"
-        run_defaults['enrollment_end'] = f"{previous_year}{run['enrollment_end']}"
-        run_defaults["run_tag"] = f"{run['run_tag']}{previous_year}"
-
-    if run["is_upgradable"]:
-        run_defaults['upgrade_deadline'] = f"{now.year}{run['upgrade_deadline']}"
-
-    if run["is_self_paced"]:
-        run_defaults['start_date'] = f"{now.year}{run['start_date']}"
-        run_defaults['end_date'] = f"{now.year}{run['end_date']}"
 
     if run["is_enrollable"]:
         run_defaults['enrollment_start'] = f"{now.year}{run['enrollment_start']}"
         run_defaults['enrollment_end'] = f"{now.year}{run['enrollment_end']}"
         run_defaults["start_date"] = f"{now.year}{run['start_date']}"
         run_defaults['end_date'] = f"{now.year}{run['end_date']}"
+    if run['is_archived']:
+        # If the run is archived, set the start and end dates to be in the past
+        previous_year = (now-timedelta(days=365)).year
+        run_defaults['start_date'] = f"{previous_year}{run['start_date']}"
+        run_defaults['end_date'] = f"{previous_year}{run['end_date']}"
+        run_defaults['enrollment_start'] = f"{previous_year}{run['enrollment_start']}"
+        run_defaults['enrollment_end'] = f"{previous_year}{run['enrollment_end']}"
+        run_defaults["run_tag"] = f"{run['run_tag']}{previous_year}"
+
     return run_defaults
 
 
@@ -60,10 +56,11 @@ def create_courses_from_data_list(course_data_list):
         course_defaults = {
             "title": course_data['title'],
             "readable_id": course_data['readable_id'],
+            "live": True,
         }
         # Set the description to make this course easily identifiable as a 'fake'
         # Create the course and its course runs
-        course, created = Course.objects.get_or_create(title=course_data['title'], defaults=course_defaults)
+        course, created = Course.objects.update_or_create(title=course_data['title'], defaults=course_defaults)
 
         if not CoursePage.objects.filter(course=course).exists():
             course_cms_page = CoursePage(
@@ -88,17 +85,20 @@ def create_courses_from_data_list(course_data_list):
                 courseware_id=run['courseware_id'],
                 defaults=run_defaults
             )
+            if created:
+                course.courseruns.add(course_run)
+
+            ### Create a product for the course run
             course_run_content_type = ContentType.objects.get(
                 app_label="courses", model="courserun"
             )
-            product, created = Product.objects.get_or_create(
-                    object_id=course_run.id,
-                    content_type=course_run_content_type,
-                    is_active=True,
-                    defaults={"description": course_run.courseware_id, "price": run['price']},
+            if run["is_upgradable"]:
+                product, created = Product.objects.update_or_create(
+                        object_id=course_run.id,
+                        content_type=course_run_content_type,
+                        is_active=True,
+                        defaults={"description": course_run.courseware_id, "price": run['price']},
                 )
-            if created:
-                course.courseruns.add(course_run)
 
         if created:
             course.departments.add(department)
