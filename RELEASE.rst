@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.113.1
+Version 0.113.1 (Released March 26, 2025)
 ---------------
 
 - Fix API issue caused by non-versioned API (#2574)
