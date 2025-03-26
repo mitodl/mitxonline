@@ -21,7 +21,7 @@ export const learnerRecordQueryKey = "learner_record"
 
 export const enrollmentsQuery = () => ({
   queryKey:  enrollmentsQueryKey,
-  url:       "/api//v1/enrollments/",
+  url:       "/api/v1/enrollments/",
   transform: json => ({
     enrollments: json
   }),
