@@ -111,18 +111,11 @@ class Command(BaseCommand):
     Seed the database with a set course, course run data, for testing purposes.
 
     The course states should be valid for the current calendar year. When the new year comes need to run
-    ./manage.py populate_course_data --update
+    ./manage.py populate_course_data
     to update the course run dates to the current year.
     """
     help = "Seed the database with a set course, course run data, for testing purposes."
 
-    def add_arguments(self, parser):
-        parser.add_argument(
-            "--update",
-            action="store_true",
-            dest="update",
-            help="If provided, update the existing course data instead of creating new ones.",
-        )
 
     def handle(self, *args, **options):  # pylint: disable=too-many-locals  # noqa: ARG002
         course_data_list = load_json_from_file(COURSE_DATA_PATH)
