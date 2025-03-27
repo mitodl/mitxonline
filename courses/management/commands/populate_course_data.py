@@ -1,19 +1,16 @@
 
-from datetime import timedelta, datetime
-import pytz
+import reversion
+from datetime import timedelta
 from django.contrib.contenttypes.models import ContentType
 from mitol.common.utils import now_in_utc
 
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
+from django.core.management.base import BaseCommand
 
-from cms.factories import CoursePageFactory
-from cms.models import CoursePage, HomePage, CourseIndexPage
+from cms.models import CoursePage, CourseIndexPage
 from courses.management.utils import load_json_from_file
 from courses.models import CourseRun, Course, Department
 from ecommerce.models import Product
-from users.api import fetch_user
 
 User = get_user_model()
 
@@ -88,17 +85,18 @@ def create_courses_from_data_list(course_data_list):
             if created:
                 course.courseruns.add(course_run)
 
-            ### Create a product for the course run
+            # Create a product for the course run
             course_run_content_type = ContentType.objects.get(
                 app_label="courses", model="courserun"
             )
             if run["is_upgradable"]:
-                product, created = Product.objects.update_or_create(
-                        object_id=course_run.id,
-                        content_type=course_run_content_type,
-                        is_active=True,
-                        defaults={"description": course_run.courseware_id, "price": run['price']},
-                )
+                with reversion.create_revision():
+                    product, created = Product.objects.update_or_create(
+                            object_id=course_run.id,
+                            content_type=course_run_content_type,
+                            is_active=True,
+                            defaults={"description": course_run.courseware_id, "price": run['price']},
+                    )
 
         if created:
             course.departments.add(department)
@@ -115,7 +113,6 @@ class Command(BaseCommand):
     to update the course run dates to the current year.
     """
     help = "Seed the database with a set course, course run data, for testing purposes."
-
 
     def handle(self, *args, **options):  # pylint: disable=too-many-locals  # noqa: ARG002
         course_data_list = load_json_from_file(COURSE_DATA_PATH)
