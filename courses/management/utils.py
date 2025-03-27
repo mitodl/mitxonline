@@ -1,6 +1,6 @@
 """Utility functions/classes for course management commands"""
+
 import json
-from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 from mitol.common.utils.collections import has_equal_properties
@@ -236,6 +236,6 @@ def load_json_from_file(project_rel_filepath):
     """
     Loads JSON data from a file
     """
-    path = '{}/{}'.format(settings.BASE_DIR, project_rel_filepath)
-    with open(path, 'r') as f:  # noqa: PTH123
+    path = f"{settings.BASE_DIR}/{project_rel_filepath}"
+    with open(path) as f:  # noqa: PTH123
         return json.load(f)
