@@ -47,9 +47,6 @@ files = [
     {file = "asgiref-3.8.1.tar.gz", hash = "sha256:c343bd80a0bec947a9860adb4c432ffa7db769836c64238fc34bdc3fec84d590"},
 ]
 
-[package.dependencies]
-typing-extensions = {version = ">=4", markers = "python_version < \"3.11\""}
-
 [package.extras]
 tests = ["mypy (>=0.800)", "pytest", "pytest-asyncio"]
 
@@ -70,17 +67,6 @@ six = ">=1.12.0"
 [package.extras]
 astroid = ["astroid (>=1,<2)", "astroid (>=2,<4)"]
 test = ["astroid (>=1,<2)", "astroid (>=2,<4)", "pytest"]
-
-[[package]]
-name = "async-timeout"
-version = "4.0.3"
-description = "Timeout context manager for asyncio programs"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "async-timeout-4.0.3.tar.gz", hash = "sha256:4640d96be84d82d02ed59ea2b7105a0f7b33abe8703703cd0ab0bf87c427522f"},
-    {file = "async_timeout-4.0.3-py3-none-any.whl", hash = "sha256:7405140ff1230c310e51dc27b3145b9092d659ce68ff733fb0cefe3ee42be028"},
-]
 
 [[package]]
 name = "attrs"
@@ -243,7 +229,6 @@ greenlet = "*"
 pygments = "*"
 pyxdg = "*"
 requests = "*"
-typing_extensions = {version = "*", markers = "python_version < \"3.11\""}
 
 [package.extras]
 clipboard = ["pyperclip"]
@@ -654,9 +639,6 @@ files = [
     {file = "coverage-7.5.0.tar.gz", hash = "sha256:cf62d17310f34084c59c01e027259076479128d11e4661bb6c9acb38c5e19bb8"},
 ]
 
-[package.dependencies]
-tomli = {version = "*", optional = true, markers = "python_full_version <= \"3.11.0a6\" and extra == \"toml\""}
-
 [package.extras]
 toml = ["tomli"]
 
@@ -796,12 +778,12 @@ files = [
 
 [[package]]
 name = "cybersource-rest-client-python"
-version = "0.0.54"
+version = "0.0.62"
 description = "SDK for the CyberSource REST API"
 optional = false
 python-versions = "*"
 files = [
-    {file = "cybersource_rest_client_python-0.0.54.tar.gz", hash = "sha256:893e05559074b6989b4a0b89b4ddaaa93537e7b47c925bcea8c91947345f3fde"},
+    {file = "cybersource-rest-client-python-0.0.62.tar.gz", hash = "sha256:69f0bc60e0e15cb99ed82d736f5775e92e7a10a62bde8c4c74a17d45cd4dde09"},
 ]
 
 [package.dependencies]
@@ -811,7 +793,6 @@ DateTime = "*"
 jwcrypto = "*"
 pycryptodome = "*"
 PyJWT = "*"
-pyOpenSSL = "<=23.2.0"
 setuptools = "*"
 six = "*"
 urllib3 = "*"
@@ -1173,7 +1154,6 @@ files = [
 asgiref = "*"
 django = "*"
 django-stubs-ext = ">=5.1.3"
-tomli = {version = "*", markers = "python_version < \"3.11\""}
 types-PyYAML = "*"
 typing-extensions = ">=4.11.0"
 
@@ -1451,20 +1431,6 @@ files = [
     {file = "et_xmlfile-1.1.0-py3-none-any.whl", hash = "sha256:a2ba85d1d6a74ef63837eed693bcb89c3f752169b0e3e7ae5b16ca5e1b3deada"},
     {file = "et_xmlfile-1.1.0.tar.gz", hash = "sha256:8eb9e2bc2f8c97e37a2dc85a09ecdcdec9d8a396530a6d5a33b30b9a92da0c5c"},
 ]
-
-[[package]]
-name = "exceptiongroup"
-version = "1.2.1"
-description = "Backport of PEP 654 (exception groups)"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "exceptiongroup-1.2.1-py3-none-any.whl", hash = "sha256:5258b9ed329c5bbdd31a309f53cbfb0b155341807f6ff7606a1e801a891b29ad"},
-    {file = "exceptiongroup-1.2.1.tar.gz", hash = "sha256:a4785e48b045528f5bfe627b6ad554ff32def154f42372786903b7abcfe1aa16"},
-]
-
-[package.extras]
-test = ["pytest (>=6)"]
 
 [[package]]
 name = "executing"
@@ -1776,29 +1742,36 @@ dev = ["black", "pytest"]
 
 [[package]]
 name = "hypothesis"
-version = "4.23.9"
-description = "A library for property based testing"
+version = "6.127.2"
+description = "A library for property-based testing"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+python-versions = ">=3.9"
 files = [
-    {file = "hypothesis-4.23.9-py2-none-any.whl", hash = "sha256:54eea352c89eee8a0c4a74607b275471033f380dad27c33be5a9b647dd8680fa"},
-    {file = "hypothesis-4.23.9-py3-none-any.whl", hash = "sha256:7905eaf59be8ff599b0122a582b196751ce63ba40f6e9b4c70d878873f48f51d"},
-    {file = "hypothesis-4.23.9.tar.gz", hash = "sha256:a0e756dbd9042403d7d3fa8b281c4b0bd0bd621011a79259fb36b219861238af"},
+    {file = "hypothesis-6.127.2-py3-none-any.whl", hash = "sha256:9b1b5e4e8adc82d01351d4e814ebdd38e2f3173f489de098b418c7a026f100c0"},
+    {file = "hypothesis-6.127.2.tar.gz", hash = "sha256:725343a65846c3627399398a6206adca3e1433786fdcfaa16ca0d114900849a5"},
 ]
 
 [package.dependencies]
-attrs = ">=16.0.0"
+attrs = ">=22.2.0"
+sortedcontainers = ">=2.1.0,<3.0.0"
 
 [package.extras]
-all = ["django (>=1.11)", "dpcontracts (>=0.4)", "lark-parser (>=0.6.5)", "numpy (>=1.9.0)", "pandas (>=0.19)", "pytest (>=3.0)", "python-dateutil (>=1.4)", "pytz", "pytz (>=2014.1)"]
+all = ["black (>=19.10b0)", "click (>=7.0)", "crosshair-tool (>=0.0.82)", "django (>=4.2)", "dpcontracts (>=0.4)", "hypothesis-crosshair (>=0.0.19)", "lark (>=0.10.1)", "libcst (>=0.3.16)", "numpy (>=1.19.3)", "pandas (>=1.1)", "pytest (>=4.6)", "python-dateutil (>=1.4)", "pytz (>=2014.1)", "redis (>=3.0.0)", "rich (>=9.0.0)", "tzdata (>=2025.1)", "watchdog (>=4.0.0)"]
+cli = ["black (>=19.10b0)", "click (>=7.0)", "rich (>=9.0.0)"]
+codemods = ["libcst (>=0.3.16)"]
+crosshair = ["crosshair-tool (>=0.0.82)", "hypothesis-crosshair (>=0.0.19)"]
 dateutil = ["python-dateutil (>=1.4)"]
-django = ["django (>=1.11)", "pytz"]
+django = ["django (>=4.2)"]
 dpcontracts = ["dpcontracts (>=0.4)"]
-lark = ["lark-parser (>=0.6.5)"]
-numpy = ["numpy (>=1.9.0)"]
-pandas = ["pandas (>=0.19)"]
-pytest = ["pytest (>=3.0)"]
+ghostwriter = ["black (>=19.10b0)"]
+lark = ["lark (>=0.10.1)"]
+numpy = ["numpy (>=1.19.3)"]
+pandas = ["pandas (>=1.1)"]
+pytest = ["pytest (>=4.6)"]
 pytz = ["pytz (>=2014.1)"]
+redis = ["redis (>=3.0.0)"]
+watchdog = ["watchdog (>=4.0.0)"]
+zoneinfo = ["tzdata (>=2025.1)"]
 
 [[package]]
 name = "identify"
@@ -1859,9 +1832,8 @@ files = [
 ]
 
 [package.dependencies]
-decorator = {version = "*", markers = "python_version > \"3.6\" and python_version < \"3.11\""}
-ipython = {version = ">=7.31.1", markers = "python_version > \"3.6\" and python_version < \"3.11\""}
-tomli = {version = "*", markers = "python_version > \"3.6\" and python_version < \"3.11\""}
+decorator = {version = "*", markers = "python_version >= \"3.11\""}
+ipython = {version = ">=7.31.1", markers = "python_version >= \"3.11\""}
 
 [[package]]
 name = "ipython"
@@ -1877,7 +1849,6 @@ files = [
 [package.dependencies]
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
 decorator = "*"
-exceptiongroup = {version = "*", markers = "python_version < \"3.11\""}
 jedi = ">=0.16"
 matplotlib-inline = "*"
 pexpect = {version = ">4.3", markers = "sys_platform != \"win32\""}
@@ -1898,17 +1869,6 @@ parallel = ["ipyparallel"]
 qtconsole = ["qtconsole"]
 test = ["pickleshare", "pytest (<7.1)", "pytest-asyncio (<0.22)", "testpath"]
 test-extra = ["curio", "matplotlib (!=3.2.0)", "nbformat", "numpy (>=1.22)", "pandas", "pickleshare", "pytest (<7.1)", "pytest-asyncio (<0.22)", "testpath", "trio"]
-
-[[package]]
-name = "isodate"
-version = "0.7.2"
-description = "An ISO 8601 date/time/duration parser and formatter"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "isodate-0.7.2-py3-none-any.whl", hash = "sha256:28009937d8031054830160fce6d409ed342816b543597cece116d966c6d99e15"},
-    {file = "isodate-0.7.2.tar.gz", hash = "sha256:4cd1aa0f43ca76f4a6c6c0292a85f40b35ec2e43e315b59f06e6d32171a953e6"},
-]
 
 [[package]]
 name = "jedi"
@@ -2239,13 +2199,13 @@ traitlets = "*"
 
 [[package]]
 name = "mitol-django-authentication"
-version = "2025.2.12"
+version = "2025.3.17"
 description = "MIT Open Learning django app extensions for oauth toolkit"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 files = [
-    {file = "mitol_django_authentication-2025.2.12-py3-none-any.whl", hash = "sha256:83d88022fc473276ad1dee1f97346dc81ad9e63d8ac3b63bc8e2ac6666a8500a"},
-    {file = "mitol_django_authentication-2025.2.12.tar.gz", hash = "sha256:0d313252c05c37aac39e70bd1d1d5889aa4fe1baa2494c2945ec7b2bee2bad3c"},
+    {file = "mitol_django_authentication-2025.3.17-py3-none-any.whl", hash = "sha256:f3849bc2469bcbe78fed9b0e999dfed2bf6c9d2923c4e2420d6d54a71f8a99bb"},
+    {file = "mitol_django_authentication-2025.3.17.tar.gz", hash = "sha256:296f3f4ef03722560da5435fc16d5844fc6bbbb8685fdce325dbc95044354952"},
 ]
 
 [package.dependencies]
@@ -2256,8 +2216,10 @@ djangorestframework = ">=3.0.0"
 djoser = "2.3.1"
 mitol-django-common = "*"
 mitol-django-mail = "*"
-python3-saml = ">=1.10.1"
 social-auth-app-django = ">=5.4.0"
+
+[package.extras]
+touchstone = ["python3-saml (>=1.10.1)"]
 
 [[package]]
 name = "mitol-django-common"
@@ -2414,20 +2376,20 @@ setuptools = "*"
 
 [[package]]
 name = "mitol-django-payment-gateway"
-version = "2023.12.19"
+version = "2025.3.17"
 description = "Django application to handle payment processing"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 files = [
-    {file = "mitol-django-payment-gateway-2023.12.19.tar.gz", hash = "sha256:3aa89300237c905e363e40b5d1a9cdfd84437fef67483b85c1984a3131baaf45"},
-    {file = "mitol_django_payment_gateway-2023.12.19-py3-none-any.whl", hash = "sha256:50ce1457bc41ac86c4fa6bdb62f6be4bd5feeff8e24303d3ae1b8e17ba57e36d"},
+    {file = "mitol_django_payment_gateway-2025.3.17-py3-none-any.whl", hash = "sha256:ea1a436d3157f0ab9362606d15e28c161777e1870f8df3b965a4b71d34cdf2bd"},
+    {file = "mitol_django_payment_gateway-2025.3.17.tar.gz", hash = "sha256:e65a2aaa078f93e5ff90b7eba16ebe3d4779f55b200efb72f049478b4b3a2e7a"},
 ]
 
 [package.dependencies]
-cybersource-rest-client-python = ">=0.0.36"
+cybersource-rest-client-python = ">=0.0.59"
 django = ">=3.0"
+django-stubs = ">=1.13.1"
 mitol-django-common = "*"
-setuptools = "*"
 
 [[package]]
 name = "monotonic"
@@ -3216,11 +3178,9 @@ files = [
 
 [package.dependencies]
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
-exceptiongroup = {version = ">=1.0.0rc8", markers = "python_version < \"3.11\""}
 iniconfig = "*"
 packaging = "*"
 pluggy = ">=0.12,<2.0"
-tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 
 [package.extras]
 testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
@@ -3356,26 +3316,6 @@ mysql = ["mysql-connector-python"]
 postgresql = ["psycopg2"]
 
 [[package]]
-name = "python3-saml"
-version = "1.16.0"
-description = "Saml Python Toolkit. Add SAML support to your Python software using this library"
-optional = false
-python-versions = "*"
-files = [
-    {file = "python3-saml-1.16.0.tar.gz", hash = "sha256:97c9669aecabc283c6e5fb4eb264f446b6e006f5267d01c9734f9d8bffdac133"},
-    {file = "python3_saml-1.16.0-py2-none-any.whl", hash = "sha256:c49097863c278ff669a337a96c46dc1f25d16307b4bb2679d2d1733cc4f5176a"},
-    {file = "python3_saml-1.16.0-py3-none-any.whl", hash = "sha256:20b97d11b04f01ee22e98f4a38242e2fea2e28fbc7fbc9bdd57cab5ac7fc2d0d"},
-]
-
-[package.dependencies]
-isodate = ">=0.6.1"
-lxml = ">=4.6.5,<4.7.0 || >4.7.0"
-xmlsec = ">=1.3.9"
-
-[package.extras]
-test = ["coverage (>=4.5.2)", "flake8 (>=3.6.0,<=5.0.0)", "freezegun (>=0.3.11,<=1.1.0)", "pytest (>=4.6)"]
-
-[[package]]
 name = "pytz"
 version = "2024.1"
 description = "World timezone definitions, modern and historical"
@@ -3467,9 +3407,6 @@ files = [
     {file = "redis-4.6.0-py3-none-any.whl", hash = "sha256:e2b03db868160ee4591de3cb90d40ebb50a90dd302138775937f6a42b7ed183c"},
     {file = "redis-4.6.0.tar.gz", hash = "sha256:585dc516b9eb042a619ef0a39c3d7d55fe81bdb4df09a52c9cdde0d07bf1aa7d"},
 ]
-
-[package.dependencies]
-async-timeout = {version = ">=4.0.2", markers = "python_full_version <= \"3.11.2\""}
 
 [package.extras]
 hiredis = ["hiredis (>=1.0.0)"]
@@ -3852,6 +3789,17 @@ azuread = ["cryptography (>=2.1.1)"]
 saml = ["python3-saml (>=1.5.0)"]
 
 [[package]]
+name = "sortedcontainers"
+version = "2.4.0"
+description = "Sorted Containers -- Sorted List, Sorted Dict, Sorted Set"
+optional = false
+python-versions = "*"
+files = [
+    {file = "sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0"},
+    {file = "sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88"},
+]
+
+[[package]]
 name = "soupsieve"
 version = "2.5"
 description = "A modern CSS selector implementation for Beautiful Soup."
@@ -3947,17 +3895,6 @@ python-versions = "*"
 files = [
     {file = "text-unidecode-1.3.tar.gz", hash = "sha256:bad6603bb14d279193107714b288be206cac565dfa49aa5b105294dd5c4aab93"},
     {file = "text_unidecode-1.3-py2.py3-none-any.whl", hash = "sha256:1311f10e8b895935241623731c2ba64f4c455287888b18189350b67134a822e8"},
-]
-
-[[package]]
-name = "tomli"
-version = "2.0.1"
-description = "A lil' TOML parser"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc"},
-    {file = "tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f"},
 ]
 
 [[package]]
@@ -4250,7 +4187,7 @@ files = [
 [package.dependencies]
 defusedxml = ">=0.7,<1.0"
 filetype = ">=1.0.10,<1.1.0 || >1.1.0"
-pillow-heif = {version = ">=0.10.0,<1.0.0", optional = true, markers = "extra == \"heif\" and python_version < \"3.12\""}
+pillow-heif = {version = ">=0.13.0,<1.0.0", optional = true, markers = "extra == \"heif\" and python_version >= \"3.12\""}
 
 [package.extras]
 docs = ["Sphinx (>=7.0)", "sphinx-wagtail-theme (>=6.1.1,<7.0)", "sphinx_copybutton (>=0.5)", "sphinxcontrib-spelling (>=8.0,<9.0)"]
@@ -4275,76 +4212,6 @@ attrs = "*"
 
 [package.extras]
 test = ["pytest"]
-
-[[package]]
-name = "xmlsec"
-version = "1.3.14"
-description = "Python bindings for the XML Security Library"
-optional = false
-python-versions = ">=3.5"
-files = [
-    {file = "xmlsec-1.3.14-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:4dea6df3ffcb65d0b215678c3a0fe7bbc66785d6eae81291296e372498bad43a"},
-    {file = "xmlsec-1.3.14-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:1fa1311f7489d050dde9028f5a2b5849c2927bb09c9a93491cb2f28fdc563912"},
-    {file = "xmlsec-1.3.14-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:28cd9f513cf01dc0c5b9d9f0728714ecde2e7f46b3b6f63de91f4ae32f3008b3"},
-    {file = "xmlsec-1.3.14-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:77749b338503fb6e151052c664064b34264f4168e2cb0cca1de78b7e5312a783"},
-    {file = "xmlsec-1.3.14-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4af81ce8044862ec865782efd353d22abdcd95b92364eef3c934de57ae6d5852"},
-    {file = "xmlsec-1.3.14-cp310-cp310-musllinux_1_1_aarch64.whl", hash = "sha256:cf35a25be3eb6263b2e0544ba26294651113fab79064f994d347a2ca5973e8e2"},
-    {file = "xmlsec-1.3.14-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:004e8a82e26728bf8a60f8ece1ef3ffafdac30ef538139dfe28870e8503ca64a"},
-    {file = "xmlsec-1.3.14-cp310-cp310-win32.whl", hash = "sha256:e6cbc914d77678db0c8bc39e723d994174633d18f9d6be4665ec29cce978a96d"},
-    {file = "xmlsec-1.3.14-cp310-cp310-win_amd64.whl", hash = "sha256:4922afa9234d1c5763950b26c328a5320019e55eb6000272a79dfe54fee8e704"},
-    {file = "xmlsec-1.3.14-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:7799a9ff3593f9dd43464e18b1a621640bffc40456c47c23383727f937dca7fc"},
-    {file = "xmlsec-1.3.14-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:1fe23c2dd5f5dbcb24f40e2c1061e2672a32aabee7cf8ac5337036a485607d72"},
-    {file = "xmlsec-1.3.14-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0be3b7a28e54a03b87faf07fb3c6dc3e50a2c79b686718c3ad08300b8bf6bb67"},
-    {file = "xmlsec-1.3.14-cp311-cp311-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:48e894ad3e7de373f56efc09d6a56f7eae73a8dd4cec8943313134849e9c6607"},
-    {file = "xmlsec-1.3.14-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:204d3c586b8bd6f02a5d4c59850a8157205569d40c32567f49576fa5795d897d"},
-    {file = "xmlsec-1.3.14-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:6679cec780386d848e7351d4b0de92c4483289ea4f0a2187e216159f939a4c6b"},
-    {file = "xmlsec-1.3.14-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:c4d41c83c8a2b8d8030204391ebeb6174fbdb044f0331653c4b5a4ce4150bcc0"},
-    {file = "xmlsec-1.3.14-cp311-cp311-win32.whl", hash = "sha256:df4aa0782a53032fd35e18dcd6d328d6126324bfcfdef0cb5c2856f25b4b6f94"},
-    {file = "xmlsec-1.3.14-cp311-cp311-win_amd64.whl", hash = "sha256:1072878301cb9243a54679e0520e6a5be2266c07a28b0ecef9e029d05a90ffcd"},
-    {file = "xmlsec-1.3.14-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:1eb3dcf244a52f796377112d8f238dbb522eb87facffb498425dc8582a84a6bf"},
-    {file = "xmlsec-1.3.14-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:330147ce59fbe56a9be5b2085d739c55a569f112576b3f1b33681f87416eaf33"},
-    {file = "xmlsec-1.3.14-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ed4034939d8566ccdcd3b4e4f23c63fd807fb8763ae5668d59a19e11640a8242"},
-    {file = "xmlsec-1.3.14-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:a98eadfcb0c3b23ccceb7a2f245811f8d784bd287640dcfe696a26b9db1e2fc0"},
-    {file = "xmlsec-1.3.14-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:86ff7b2711557c1087b72b0a1a88d82eafbf2a6d38b97309a6f7101d4a7041c3"},
-    {file = "xmlsec-1.3.14-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:774d5d1e45f07f953c1cc14fd055c1063f0725f7248b6b0e681f59fd8638934d"},
-    {file = "xmlsec-1.3.14-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:bd10ca3201f164482775a7ce61bf7ee9aade2e7d032046044dd0f6f52c91d79d"},
-    {file = "xmlsec-1.3.14-cp312-cp312-win32.whl", hash = "sha256:19c86bab1498e4c2e56d8e2c878f461ccb6e56b67fd7522b0c8fda46d8910781"},
-    {file = "xmlsec-1.3.14-cp312-cp312-win_amd64.whl", hash = "sha256:d0762f4232bce2c7f6c0af329db8b821b4460bbe123a2528fb5677d03db7a4b5"},
-    {file = "xmlsec-1.3.14-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:03ccba7dacf197850de954666af0221c740a5de631a80136362a1559223fab75"},
-    {file = "xmlsec-1.3.14-cp36-cp36m-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:c12900e1903e289deb84eb893dca88591d6884d3e3cda4fb711b8812118416e8"},
-    {file = "xmlsec-1.3.14-cp36-cp36m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6566434e2e5c58e472362a6187f208601f1627a148683a6f92bd16479f1d9e20"},
-    {file = "xmlsec-1.3.14-cp36-cp36m-musllinux_1_1_x86_64.whl", hash = "sha256:2401e162aaab7d9416c3405bac7a270e5f370988a0f1f46f0f29b735edba87e1"},
-    {file = "xmlsec-1.3.14-cp36-cp36m-win32.whl", hash = "sha256:ba3b39c493e3b04354615068a3218f30897fcc2f42c6d8986d0c1d63aca87782"},
-    {file = "xmlsec-1.3.14-cp36-cp36m-win_amd64.whl", hash = "sha256:4edd8db4df04bbac9c4a5ab4af855b74fe2bf2c248d07cac2e6d92a485f1a685"},
-    {file = "xmlsec-1.3.14-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:b6dd86f440fec9242515c64f0be93fec8b4289287db1f6de2651eee9995aaecb"},
-    {file = "xmlsec-1.3.14-cp37-cp37m-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:ad1634cabe0915fe2a12e142db0ed2daf5be80cbe3891a2cecbba0750195cc6b"},
-    {file = "xmlsec-1.3.14-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dba457ff87c39cbae3c5020475a728d24bbd9d00376df9af9724cd3bb59ff07a"},
-    {file = "xmlsec-1.3.14-cp37-cp37m-musllinux_1_1_x86_64.whl", hash = "sha256:12d90059308bb0c1b94bde065784e6852999d08b91bcb2048c17e62b954acb07"},
-    {file = "xmlsec-1.3.14-cp37-cp37m-win32.whl", hash = "sha256:ce4e165a1436697e5e39587c4fba24db4545a5c9801e0d749f1afd09ad3ab901"},
-    {file = "xmlsec-1.3.14-cp37-cp37m-win_amd64.whl", hash = "sha256:7e8e0171916026cbe8e2022c959558d02086655fd3c3466f2bc0451b09cf9ee8"},
-    {file = "xmlsec-1.3.14-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:c42735cc68fdb4c6065cf0a0701dfff3a12a1734c63a36376349af9a5481f27b"},
-    {file = "xmlsec-1.3.14-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:38e035bf48300b7dbde2dd01d3b8569f8584fc9c73809be13886e6b6c77b74fb"},
-    {file = "xmlsec-1.3.14-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:73eabf5ef58189d81655058cf328c1dfa9893d89f1bff5fc941481f08533f338"},
-    {file = "xmlsec-1.3.14-cp38-cp38-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:bddd2a2328b4e08c8a112e06cf2cd2b4d281f4ad94df15b4cef18f06cdc49d78"},
-    {file = "xmlsec-1.3.14-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:57fed3bc7943681c9ed4d2221600ab440f060d8d1a8f92f346f2b41effe175b8"},
-    {file = "xmlsec-1.3.14-cp38-cp38-musllinux_1_1_aarch64.whl", hash = "sha256:147934bd39dfd840663fb6b920ea9201455fa886427975713f1b42d9f20b9b29"},
-    {file = "xmlsec-1.3.14-cp38-cp38-musllinux_1_1_x86_64.whl", hash = "sha256:e732a75fcb6b84872b168f972fbbf3749baf76308635f14015d1d35ed0c5719c"},
-    {file = "xmlsec-1.3.14-cp38-cp38-win32.whl", hash = "sha256:b109cdf717257fd4daa77c1d3ec8a3fb2a81318a6d06a36c55a8a53ae381ae5e"},
-    {file = "xmlsec-1.3.14-cp38-cp38-win_amd64.whl", hash = "sha256:b7ba2ea38e3d9efa520b14f3c0b7d99a7c055244ae5ba8bc9f4ca73b18f3a215"},
-    {file = "xmlsec-1.3.14-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:1b9b5de6bc69fdec23147e5f712cb05dc86df105462f254f140d743cc680cc7b"},
-    {file = "xmlsec-1.3.14-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:82ac81deb7d7bf5cc8a748148948e5df5386597ff43fb92ec651cc5c7addb0e7"},
-    {file = "xmlsec-1.3.14-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0bae37b2920115cf00759ee9fb7841cbdebcef3a8a92734ab93ae8fa41ac581d"},
-    {file = "xmlsec-1.3.14-cp39-cp39-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:4fac2a787ae3b9fb761f9aec6b9f10f2d1c1b87abb574ebd8ff68435bdc97e3d"},
-    {file = "xmlsec-1.3.14-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:34c61ec0c0e70fda710290ae74b9efe1928d9242ed82c4eecf97aa696cff68e6"},
-    {file = "xmlsec-1.3.14-cp39-cp39-musllinux_1_1_aarch64.whl", hash = "sha256:995e87acecc263a2f6f2aa3cc204268f651cac8f4d7a2047f11b2cd49979cc38"},
-    {file = "xmlsec-1.3.14-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:2f84a1c509c52773365645a87949081ee9ea9c535cd452048cc8ca4ad3b45666"},
-    {file = "xmlsec-1.3.14-cp39-cp39-win32.whl", hash = "sha256:7882963e9cb9c0bd0e8c2715a29159a366417ff4a30d8baf42b05bc5cf249446"},
-    {file = "xmlsec-1.3.14-cp39-cp39-win_amd64.whl", hash = "sha256:a487c3d144f791c32f5e560aa27a705fba23171728b8a8511f36de053ff6bc93"},
-    {file = "xmlsec-1.3.14.tar.gz", hash = "sha256:934f804f2f895bcdb86f1eaee236b661013560ee69ec108d29cdd6e5f292a2d9"},
-]
-
-[package.dependencies]
-lxml = ">=3.8"
 
 [[package]]
 name = "zope-interface"
@@ -4401,5 +4268,5 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 
 [metadata]
 lock-version = "2.0"
-python-versions = "3.10.16"
-content-hash = "71ce257c8fc6f55927abb2ecfb256a65868b061bd73244d4f112f04122b6d9d1"
+python-versions = "3.12.9"
+content-hash = "c77cae1b7b80244d057e434bb4551b950fafe198780e5e8cb1895ac77c28a89d"
