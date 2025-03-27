@@ -3,13 +3,13 @@ Signals for mitxonline course certificates
 """
 
 import logging
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.tasks import process_flexible_price_discount_task
-
 
 logger = logging.getLogger(__name__)
 
