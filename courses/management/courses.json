@@ -1,0 +1,153 @@
+[
+    {
+        "title": "Case 1: Course Current, Two Runs Enrollment Open, Upgrade Available",
+        "readable_id": "course-v1:MITxT+0.001x",
+        "description": "This course is currently active, with two runs open for enrollment, and both have an upgrade option available.",
+        "topics": [],
+        "price": 100,
+        "min_weeks": null,
+        "max_weeks": null,
+        "min_weekly_hours": 3,
+        "max_weekly_hours": 6,
+        "length": "8 weeks",
+        "course_runs": [
+            {
+                "courseware_id": "course-v1:MITxT+0.001x+1T",
+                "title": "Case 1: Course Current, Two Runs Enrollment Open, Upgrade Available",
+                "upgrade_deadline": "-12-31T23:59:59Z",
+                "start_date": "-01-01T00:00:00Z",
+                "end_date": "-12-31T23:59:59Z",
+                "enrollment_start": "-01-01T00:00:00Z",
+                "enrollment_end": "-12-31T23:59:59Z",
+                "is_upgradable": true,
+                "is_enrollable": true,
+                "is_archived": false,
+                "is_self_paced": false,
+                "run_tag": "1T",
+                "live": true,
+                "price": 100
+            },
+            {
+                "courseware_id": "course-v1:MITxT+0.001x+2T",
+                "title": "Case 1: Course Current, Two Runs Enrollment Open, Upgrade Available",
+                "upgrade_deadline": "-12-31T23:59:59Z",
+                "start_date": "-12-30T00:00:00Z",
+                "end_date": "-12-31T23:59:59Z",
+                "enrollment_start": "-01-01T00:00:00Z",
+                "enrollment_end": "-12-31T23:59:59Z",
+                "is_upgradable": true,
+                "is_enrollable": true,
+                "is_archived": false,
+                "is_self_paced": false,
+                "run_tag": "2T",
+                "live": true,
+                "price": 100
+            }
+        ]
+    },
+    {
+        "title": "Case 2: Two Runs Enrollment Open, Upgrade Available Only Future",
+        "readable_id": "course-v1:MITxT+0.002x",
+        "description": "This course has two runs open for enrollment active, one current, second with upgrade option available.",
+        "topics": [],
+        "price": 100,
+        "min_weeks": null,
+        "max_weeks": null,
+        "min_weekly_hours": 3,
+        "max_weekly_hours": 6,
+        "length": "8 weeks",
+        "course_runs": [
+            {
+                "courseware_id": "course-v1:MITxT+0.002x+1T",
+                "title": "Case 2: Two Runs Enrollment Open, Upgrade Available Only Future",
+                "upgrade_deadline": "-01-01T23:59:59Z",
+                "start_date": "-01-01T00:00:00Z",
+                "end_date": "-12-31T23:59:59Z",
+                "enrollment_start": "-01-01T00:00:00Z",
+                "enrollment_end": "-12-31T23:59:59Z",
+                "is_upgradable": false,
+                "is_enrollable": true,
+                "is_archived": false,
+                "is_self_paced": false,
+                "run_tag": "1T",
+                "live": true,
+                "price": 100
+            },
+            {
+                "courseware_id": "course-v1:MITxT+0.002x+2T",
+                "title": "Case 2: Two Runs Enrollment Open, Upgrade Available Only Future",
+                "upgrade_deadline": "-12-31T23:59:59Z",
+                "start_date": "-12-30T00:00:00Z",
+                "end_date": "-12-31T23:59:59Z",
+                "enrollment_start": "-01-01T00:00:00Z",
+                "enrollment_end": "-12-31T23:59:59Z",
+                "is_upgradable": true,
+                "is_enrollable": true,
+                "is_archived": false,
+                "is_self_paced": false,
+                "run_tag": "2T",
+                "live": true,
+                "price": 100
+            }
+        ]
+    },
+    {
+        "title": "Case 3: Course Ended, Enrollment Open, No Upgrade",
+        "readable_id": "course-v1:MITxT+0.003x",
+        "description": "This course has ended but is still open for enrollment. No upgrade option is available.",
+        "topics": [],
+        "min_weeks": null,
+        "max_weeks": null,
+        "min_weekly_hours": 3,
+        "max_weekly_hours": 6,
+        "length": "8 weeks",
+        "course_runs": [
+            {
+                "courseware_id": "course-v1:MITxT+0.003x+1T",
+                "title": "Case 3: Course Ended, Enrollment Open, No Upgrade",
+                "upgrade_deadline": "-01-01T23:59:59Z",
+                "start_date": "-04-04T00:00:00Z",
+                "end_date": "-12-31T23:59:59Z",
+                "enrollment_start": "-01-01T00:00:00Z",
+                "enrollment_end": "-12-31T23:59:59Z",
+                "is_upgradable": false,
+                "is_enrollable": true,
+                "is_archived": true,
+                "is_self_paced": false,
+                "run_tag": "1T",
+                "live": true,
+                "price": 100
+            }
+        ]
+    },
+    {
+        "title": "Case 4: Course Current, Enrollment Open, Upgrade Available",
+        "readable_id": "course-v1:MITxT+0.004x",
+        "description": "This course is currently active, open for enrollment, and has an upgrade option available.",
+        "topics": [],
+        "price": 100,
+        "min_weeks": null,
+        "max_weeks": null,
+        "min_weekly_hours": 3,
+        "max_weekly_hours": 6,
+        "length": "8 weeks",
+        "course_runs": [
+            {
+                "courseware_id": "course-v1:MITxT+0.004x+1T",
+                "title": "Case 4: Course Current, Enrollment Open, Upgrade Available",
+                "upgrade_deadline": "-12-31T23:59:59Z",
+                "start_date": "-01-01T00:00:00Z",
+                "end_date": "-12-31T23:59:59Z",
+                "enrollment_start": "-01-01T00:00:00Z",
+                "enrollment_end": "-12-31T23:59:59Z",
+                "is_upgradable": true,
+                "is_enrollable": true,
+                "is_archived": false,
+                "is_self_paced": false,
+                "run_tag": "1T",
+                "live": true,
+                "price": 100
+            }
+        ]
+    }
+]
