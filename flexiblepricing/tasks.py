@@ -3,11 +3,12 @@ Periodic task that updates currency exchange rates.
 """
 
 import logging
-from urllib.parse import quote_plus, urljoin
 import uuid
+from urllib.parse import quote_plus, urljoin
 
 import requests
 from django.conf import settings
+from django.db import transaction
 
 from courses.utils import get_enrollable_courseruns_qs
 from flexiblepricing.api import determine_courseware_flexible_price_discount, get_ecommerce_products_by_courseware_name, update_currency_exchange_rate
@@ -21,7 +22,6 @@ from flexiblepricing.mail_api import (
 )
 from flexiblepricing.models import FlexiblePrice
 from main.celery import app
-from django.db import transaction
 
 
 def get_open_exchange_rates_url(endpoint):
@@ -238,6 +238,7 @@ def _create_discount_api_call(instance, product_id, amount):
         logger.exception("API request failed for ID %s", instance.id)
     except (KeyError, ValueError, TypeError):
         logger.exception("Unexpected API error for ID %s", instance.id)
+
 
 @app.task
 def process_flexible_price_discount_task(instance_id):
