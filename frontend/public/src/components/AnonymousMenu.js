@@ -1,4 +1,5 @@
 // @flow
+/* global SETTINGS: false */
 
 import React from "react"
 
@@ -32,26 +33,54 @@ const AnonymousMenu = ({ mobileView }: Props) => {
           {makeNavLink("Catalog")}
         </MixedLink>
       </li>
-      <li>
-        <MixedLink
-          id={"login".concat(identifierPostfix)}
-          dest={routes.login.begin}
-          className="simple"
-          aria-label="Sign In"
-        >
-          {makeNavLink("Sign In")}
-        </MixedLink>
-      </li>
-      <li>
-        <MixedLink
-          id={"createAccount".concat(identifierPostfix)}
-          dest={routes.register.begin}
-          className="simple button"
-          aria-label="Create Account"
-        >
-          {makeNavLink("Create Account")}
-        </MixedLink>
-      </li>
+      {SETTINGS.oidc_login_url && (
+        <li>
+          <MixedLink
+            id={"login".concat(identifierPostfix)}
+            dest={SETTINGS.oidc_login_url || ""}
+            className="simple"
+            aria-label="Sign In"
+          >
+            {makeNavLink("Sign In")}
+          </MixedLink>
+        </li>
+      )}
+      {SETTINGS.oidc_login_url && (
+        <li>
+          <MixedLink
+            id={"createAccount".concat(identifierPostfix)}
+            dest={SETTINGS.oidc_login_url || ""}
+            className="simple button"
+            aria-label="Create Account"
+          >
+            {makeNavLink("Create Account")}
+          </MixedLink>
+        </li>
+      )}
+      {!SETTINGS.oidc_login_url && (
+        <li>
+          <MixedLink
+            id={"login".concat(identifierPostfix)}
+            dest={routes.login.begin}
+            className="simple"
+            aria-label="Sign In"
+          >
+            {makeNavLink("Sign In")}
+          </MixedLink>
+        </li>
+      )}
+      {!SETTINGS.oidc_login_url && (
+        <li>
+          <MixedLink
+            id={"createAccount".concat(identifierPostfix)}
+            dest={routes.register.begin}
+            className="simple button"
+            aria-label="Create Account"
+          >
+            {makeNavLink("Create Account")}
+          </MixedLink>
+        </li>
+      )}
     </ul>
   )
 }

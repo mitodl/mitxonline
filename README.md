@@ -10,6 +10,10 @@ mitxonline follows the same [initial setup steps outlined in the common OL web a
 Run through those steps **including the addition of `/etc/hosts` aliases and the optional step for running the
 `createsuperuser` command**.
 
+### Keycloak Integration
+
+See `README-keycloak.md` for information on setting MITx Online to authenticate via Keycloak. A sample Keycloak instance is included (but not enabled by default), or you can use an external one.
+
 ### Configure mitxonline and Open edX
 
 See MITx Online integration with edx:

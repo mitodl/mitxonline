@@ -1,10 +1,13 @@
 """Utility functions/classes for course management commands"""
 
+import json
+
 from django.core.management.base import BaseCommand, CommandError
 from mitol.common.utils.collections import has_equal_properties
 
 from courses import mail_api
 from courses.models import CourseRun, CourseRunEnrollment, Program, ProgramEnrollment
+from main import settings
 from openedx.api import enroll_in_edx_course_runs
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
@@ -227,3 +230,12 @@ class EnrollmentChangeCommand(BaseCommand):
         ) as exc:
             self.stdout.write(self.style.WARNING(str(exc)))
         return False
+
+
+def load_json_from_file(project_rel_filepath):
+    """
+    Loads JSON data from a file
+    """
+    path = f"{settings.BASE_DIR}/{project_rel_filepath}"
+    with open(path) as f:  # noqa: PTH123
+        return json.load(f)
