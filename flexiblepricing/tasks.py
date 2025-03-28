@@ -11,7 +11,11 @@ from django.conf import settings
 from django.db import transaction
 
 from courses.utils import get_enrollable_courseruns_qs
-from flexiblepricing.api import determine_courseware_flexible_price_discount, get_ecommerce_products_by_courseware_name, update_currency_exchange_rate
+from flexiblepricing.api import (
+    determine_courseware_flexible_price_discount,
+    get_ecommerce_products_by_courseware_name,
+    update_currency_exchange_rate,
+)
 from flexiblepricing.exceptions import (
     ExceededAPICallsException,
     UnexpectedAPIErrorException,
@@ -114,10 +118,12 @@ def _process_flexible_price_discount(instance):
         return
 
     # Determine if courseware_object is a program or course
-    is_program = hasattr(courseware_object, 'courses')
-    
+    is_program = hasattr(courseware_object, "courses")
+
     if is_program:
-        logger.info("Processing program discounts for FlexiblePrice ID: %s", instance.id)
+        logger.info(
+            "Processing program discounts for FlexiblePrice ID: %s", instance.id
+        )
         # Handle program - loop through all courses
         for course in courseware_object.courses:
             _process_course_discounts(course, instance)
@@ -126,22 +132,23 @@ def _process_flexible_price_discount(instance):
         # Handle single course
         _process_course_discounts(courseware_object, instance)
 
+
 def _process_course_discounts(course, instance):
     """Process discounts for a single course and its runs."""
     logger = logging.getLogger()
-    
+
     # Get all active course runs
     course_runs = get_enrollable_courseruns_qs(valid_courses=[course[0]])
-    
+
     if not course_runs:
         logger.warning("No unexpired runs found for course %s", course.id)
         return
-    
+
     for run in course_runs:
-        if not getattr(run, 'courseware_id', None):
+        if not getattr(run, "courseware_id", None):
             logger.warning("Invalid courseware_id for run %s", run.id)
             continue
-            
+
         product_id = _get_valid_product_id(run.courseware_id, instance.id)
         if not product_id:
             continue
@@ -188,15 +195,11 @@ def _calculate_discount_amount(course_run, instance):
     logger = logging.getLogger()
     try:
         product = course_run.products.filter(is_active=True).first()
-        discount = determine_courseware_flexible_price_discount(
-            product, instance.user
-        )
+        discount = determine_courseware_flexible_price_discount(product, instance.user)
         if discount:
-            return  float(discount.amount)
+            return float(discount.amount)
         else:
-            logger.warning(
-                "No discount found for FlexiblePrice ID: %s", instance.id
-            )
+            logger.warning("No discount found for FlexiblePrice ID: %s", instance.id)
     except (KeyError, ValueError, TypeError):
         logger.exception("Error calculating discount for ID %s", instance.id)
         return None
