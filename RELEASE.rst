@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.113.2
+Version 0.113.2 (Released March 31, 2025)
 ---------------
 
 - Seed data for testing courses locally and RC (#2571)
