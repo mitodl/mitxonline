@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.113.2 (Released March 31, 2025)
+---------------
+
+- Seed data for testing courses locally and RC (#2571)
+- automatically create cache table (#2568)
+- Add OIDC login via social-auth (#2550)
+
 Version 0.113.1 (Released March 26, 2025)
 ---------------
 
