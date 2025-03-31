@@ -8,6 +8,7 @@ from social_core.backends.email import EmailAuth
 from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
 from social_core.pipeline.user import create_user
+from social_django.models import UserSocialAuth
 
 from authentication.backends.ol_open_id_connect import OlOpenIdConnectAuth
 from authentication.exceptions import (
@@ -115,6 +116,32 @@ def get_username(strategy, backend, user=None, details=None, *args, **kwargs):  
         return {"username": details["username"] if not user else user.username}
 
     return {"username": None if not user else strategy.storage.user.get_username(user)}
+
+
+def limit_one_auth_per_backend(strategy, backend, user, uid, **kwargs):  # pylint: disable=unused-argument # noqa: ARG001
+    """
+    Limit the user to one social auth account per backend
+
+    Args:
+        strategy (social_django.strategy.DjangoStrategy): the strategy used to authenticate
+        backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
+        user (User): the current user
+        uid (str): the uid of the user
+    """
+    if not user:
+        return {}
+
+    social_auths = UserSocialAuth.objects.filter(user=user, provider=backend.name)
+
+    # if there's at least one social auth and any of them don't match the incoming uid
+    # we have or are trying to add multiple accounts
+    if social_auths and any(auth.uid != uid for auth in social_auths):
+        raise AuthException(
+            backend.name,
+            "Another account is already linked to your MITxOnline account.",
+        )
+
+    return {}
 
 
 @partial
