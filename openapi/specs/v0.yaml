@@ -4,6 +4,100 @@ info:
   version: 0.0.1 (v0)
   description: MIT public API
 paths:
+  /api/records/program/{id}/:
+    get:
+      operationId: learner_record_retrieve_by_id
+      description: Get learner record using program ID
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerRecord'
+          description: ''
+  /api/records/program/{id}/revoke/:
+    post:
+      operationId: api_records_program_revoke_create
+      description: |-
+        Disables sharing links for the learner's record. This only applies to the
+        anonymous ones; shares sent to partner schools are always allowed once they
+        are sent.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerRecord'
+          description: ''
+  /api/records/program/{id}/share/:
+    post:
+      operationId: api_records_program_share_create
+      description: |-
+        Sets up a sharing link for the learner's record. Returns back the entire
+        learner record.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerSchoolRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerSchoolRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerSchoolRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerRecord'
+          description: ''
+  /api/records/shared/{uuid}/:
+    get:
+      operationId: learner_record_retrieve_by_uuid
+      description: Get learner record using share UUID
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerRecord'
+          description: ''
   /api/v1/course_runs/:
     get:
       operationId: course_runs_list
@@ -550,100 +644,6 @@ paths:
           description: No response body
         '302':
           description: No response body
-  /learner-record-share/{id}/:
-    post:
-      operationId: learner_record_share_create
-      description: |-
-        Sets up a sharing link for the learner's record. Returns back the entire
-        learner record.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - learner-record-share
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PartnerSchoolRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PartnerSchoolRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PartnerSchoolRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LearnerRecord'
-          description: ''
-  /learner-record/{id}/:
-    get:
-      operationId: learner_record_retrieve_by_id
-      description: Get learner record using program ID
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - learner-record
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LearnerRecord'
-          description: ''
-  /learner-record/{uuid}/:
-    get:
-      operationId: learner_record_retrieve_by_uuid
-      description: Get learner record using share UUID
-      parameters:
-      - in: path
-        name: uuid
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - learner-record
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LearnerRecord'
-          description: ''
-  /revoke-learner-record-share/{id}/:
-    post:
-      operationId: revoke_learner_record_share_create
-      description: |-
-        Disables sharing links for the learner's record. This only applies to the
-        anonymous ones; shares sent to partner schools are always allowed once they
-        are sent.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - revoke-learner-record-share
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LearnerRecord'
-          description: ''
 components:
   schemas:
     AvailabilityEnum:
