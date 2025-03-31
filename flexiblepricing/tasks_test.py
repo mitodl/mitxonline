@@ -234,14 +234,14 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             "No courseware object found for FlexiblePrice ID: %s", instance.id
         )
 
-    @patch('myapp.tasks.get_ecommerce_products_by_courseware_name')
+    @patch('flexiblepricing.tasks.get_ecommerce_products_by_courseware_name')
     def test_get_valid_product_id_success(self, mock_get_products):
         """Test _get_valid_product_id with valid product"""
         mock_get_products.return_value = [{'id': '123'}]
         result = _get_valid_product_id('test-course', 1)
         self.assertEqual(result, '123')
 
-    @patch('myapp.tasks.get_ecommerce_products_by_courseware_name')
+    @patch('flexiblepricing.tasks.get_ecommerce_products_by_courseware_name')
     def test_get_valid_product_id_no_products(self, mock_get_products):
         """Test _get_valid_product_id with no products"""
         mock_get_products.return_value = []
@@ -251,7 +251,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             "No products found for FlexiblePrice ID: %s", 1
         )
 
-    @patch('myapp.tasks.get_ecommerce_products_by_courseware_name')
+    @patch('flexiblepricing.tasks.get_ecommerce_products_by_courseware_name')
     def test_get_valid_product_id_request_exception(self, mock_get_products):
         """Test _get_valid_product_id with request exception"""
         mock_get_products.side_effect = requests.exceptions.RequestException()
@@ -261,7 +261,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             "Product retrieval failed for ID %s", 1, exc_info=True
         )
 
-    @patch('myapp.tasks.determine_courseware_flexible_price_discount')
+    @patch('flexiblepricing.tasks.determine_courseware_flexible_price_discount')
     def test_calculate_discount_amount_success(self, mock_determine_discount):
         """Test _calculate_discount_amount with valid discount"""
         mock_discount = MagicMock(amount='10.00')
@@ -271,7 +271,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         result = _calculate_discount_amount(self.course_run, instance)
         self.assertEqual(result, 10.0)
 
-    @patch('myapp.tasks.determine_courseware_flexible_price_discount')
+    @patch('flexiblepricing.tasks.determine_courseware_flexible_price_discount')
     def test_calculate_discount_amount_no_discount(self, mock_determine_discount):
         """Test _calculate_discount_amount with no discount"""
         mock_determine_discount.return_value = None
@@ -283,7 +283,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             "No discount found for FlexiblePrice ID: %s", instance.id
         )
 
-    @patch('myapp.tasks.requests.post')
+    @patch('flexiblepricing.tasks.requests.post')
     @override_settings(
         UNIFIED_ECOMMERCE_URL='http://test.com',
         UNIFIED_ECOMMERCE_API_KEY='test-key'
@@ -300,7 +300,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         mock_post.assert_called_once()
         self.logger_mock.assert_called_with("Discount created for ID: %s", instance.id)
 
-    @patch('myapp.tasks.requests.post')
+    @patch('flexiblepricing.tasks.requests.post')
     @override_settings(
         UNIFIED_ECOMMERCE_URL='http://test.com',
         UNIFIED_ECOMMERCE_API_KEY='test-key'
@@ -320,8 +320,8 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             400
         )
 
-    @patch('myapp.tasks._process_course_discounts')
-    @patch('myapp.tasks.get_enrollable_courseruns_qs')
+    @patch('flexiblepricing.tasks._process_course_discounts')
+    @patch('flexiblepricing.tasks.get_enrollable_courseruns_qs')
     def test_process_flexible_price_discount_course(self, mock_get_runs, mock_process):
         """Test _process_flexible_price_discount with course"""
         mock_get_runs.return_value = [self.course_run]
@@ -334,8 +334,8 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         )
         mock_process.assert_called_once()
 
-    @patch('myapp.tasks._process_course_discounts')
-    @patch('myapp.tasks.get_enrollable_courseruns_qs')
+    @patch('flexiblepricing.tasks._process_course_discounts')
+    @patch('flexiblepricing.tasks.get_enrollable_courseruns_qs')
     def test_process_flexible_price_discount_program(self, mock_get_runs, mock_process):
         """Test _process_flexible_price_discount with program"""
         mock_get_runs.return_value = [self.course_run]
@@ -348,14 +348,14 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         )
         self.assertEqual(mock_process.call_count, len(self.program.courses))
 
-    @patch('myapp.tasks._process_flexible_price_discount')
+    @patch('flexiblepricing.tasks._process_flexible_price_discount')
     def test_process_flexible_price_discount_task_success(self, mock_process):
         """Test process_flexible_price_discount_task success"""
         instance = FlexiblePriceFactory()
         process_flexible_price_discount_task(instance.id)
         mock_process.assert_called_once_with(instance)
 
-    @patch('myapp.tasks.FlexiblePrice.objects.get')
+    @patch('flexiblepricing.tasks.FlexiblePrice.objects.get')
     def test_process_flexible_price_discount_task_error(self, mock_get):
         """Test process_flexible_price_discount_task with error"""
         mock_get.side_effect = ValueError("Test error")
@@ -365,9 +365,9 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             "Error processing flexible price discount", exc_info=True
         )
 
-    @patch('myapp.tasks._get_valid_product_id')
-    @patch('myapp.tasks._calculate_discount_amount')
-    @patch('myapp.tasks._create_discount_api_call')
+    @patch('flexiblepricing.tasks._get_valid_product_id')
+    @patch('flexiblepricing.tasks._calculate_discount_amount')
+    @patch('flexiblepricing.tasks._create_discount_api_call')
     def test_process_course_discounts_success(self, mock_create, mock_calculate, mock_get_product):
         """Test _process_course_discounts with valid data"""
         mock_get_product.return_value = 'product-123'
@@ -378,7 +378,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         
         mock_create.assert_called_once_with(instance, 'product-123', 10.0)
 
-    @patch('myapp.tasks.get_enrollable_courseruns_qs')
+    @patch('flexiblepricing.tasks.get_enrollable_courseruns_qs')
     def test_process_course_discounts_no_runs(self, mock_get_runs):
         """Test _process_course_discounts with no course runs"""
         mock_get_runs.return_value = []
