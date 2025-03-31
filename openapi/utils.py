@@ -15,10 +15,10 @@ def extend_schema_get_queryset(queryset: QuerySet):
     """
 
     def decorate(get_queryset):
-        def decorated(self, *args, **kwrags):
+        def decorated(self, *args, **kwargs):
             if getattr(self, "swagger_fake_view", False):  # drf-yasg comp
                 return queryset
-            return get_queryset(self, *args, **kwrags)
+            return get_queryset(self, *args, **kwargs)
 
         return decorated
 
