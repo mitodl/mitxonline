@@ -13,6 +13,8 @@ from django.db.models import Count, DateTimeField, Q
 from django.utils.translation import gettext_lazy as _
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
+from django_scim.models import AbstractSCIMUserMixin
+
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
 
@@ -234,7 +236,7 @@ class FaultyOpenEdxUserManager(BaseUserManager):
         )
 
 
-class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
+class User(AbstractBaseUser, TimestampedModel, PermissionsMixin, AbstractSCIMUserMixin):
     """Primary user class"""
 
     EMAIL_FIELD = "email"
@@ -274,6 +276,23 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     def get_full_name(self):
         """Returns the user's fullname"""
         return self.name
+
+    @property
+    def first_name(self):
+        return self.legal_address.first_name
+
+    @first_name.setter
+    def first_name(self, value):
+        self.legal_address.first_name = value
+
+
+    @property
+    def last_name(self):
+        return self.legal_address.last_name
+
+    @first_name.setter
+    def last_name(self, value):
+        self.legal_address.last_name = value
 
     @property
     def is_editor(self) -> bool:

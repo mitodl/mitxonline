@@ -24,6 +24,7 @@ from mitol.common.envs import (
 from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
+from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
@@ -213,6 +214,7 @@ INSTALLED_APPS = (
     "mitol.authentication.apps.TransitionalAuthenticationApp",
     "mitol.payment_gateway.apps.PaymentGatewayApp",
     "mitol.olposthog.apps.OlPosthog",
+    "mitol.scim.apps.ScimApp",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
     "viewflow",
     "openapi",
@@ -221,6 +223,8 @@ INSTALLED_APPS = (
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
 #     INSTALLED_APPS += ("localdev.seed",)  # noqa: ERA001
+
+SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",

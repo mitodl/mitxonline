@@ -1,4 +1,4 @@
-FROM python:3.10.16 as base
+FROM python:3.10.16 AS base
 LABEL maintainer "ODL DevOps <mitx-devops@mit.edu>"
 
 # Add package files, install updated node and pip
@@ -54,17 +54,17 @@ RUN apt-get clean && apt-get purge
 # Set pip cache folder, as it is breaking pip when it is on a shared volume
 ENV XDG_CACHE_HOME /tmp/.cache
 
-FROM base as django
+FROM base AS django
 
 USER mitodl
 
-FROM base as django-server
+FROM base AS django-server
 
 EXPOSE 8013
 ENV PORT 8013
 CMD uwsgi uwsgi.ini
 
-FROM base as jupyter-notebook
+FROM base AS jupyter-notebook
 
 RUN pip install --force-reinstall jupyter
 
