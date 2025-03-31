@@ -32,7 +32,7 @@ urlpatterns += [
         name="get-learner-record",
     ),
     path(
-        "learner-record/<uuid:uuid>/",
+        "api/records/shared/<uuid:uuid>/",
         v1.LearnerRecordFromUUIDView.as_view(),
         name="shared_learner_record_from_uuid",
     ),
