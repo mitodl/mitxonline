@@ -153,13 +153,6 @@ paths:
     get:
       operationId: enrollments_list
       description: API view set for user enrollments
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: Course run enrollment ID
-        required: true
       tags:
       - enrollments
       responses:
@@ -174,13 +167,6 @@ paths:
     post:
       operationId: enrollments_create
       description: API view set for user enrollments
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: Course run enrollment ID
-        required: true
       tags:
       - enrollments
       requestBody:
@@ -196,7 +182,7 @@ paths:
               $ref: '#/components/schemas/CourseRunEnrollmentRequest'
         required: true
       responses:
-        '200':
+        '201':
           content:
             application/json:
               schema:
@@ -211,7 +197,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: Course run enrollment ID
+        description: A unique integer value identifying this course run enrollment.
         required: true
       tags:
       - enrollments
@@ -242,7 +228,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: Course run enrollment ID
+        description: A unique integer value identifying this course run enrollment.
         required: true
       tags:
       - enrollments
@@ -272,17 +258,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: Course run enrollment ID
+        description: A unique integer value identifying this course run enrollment.
         required: true
       tags:
       - enrollments
       responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CourseRunEnrollment'
-          description: ''
+        '204':
+          description: No response body
   /api/v1/program_enrollments/:
     get:
       operationId: program_enrollments_list
