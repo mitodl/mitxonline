@@ -17,17 +17,17 @@ urlpatterns = [
 
 urlpatterns += [
     path(
-        "learner-record-share/<int:pk>/",
+        "api/records/program/<int:pk>/share/",
         v1.LearnerRecordShareView.as_view(),
         name="learner-record-share",
     ),
     path(
-        "revoke-learner-record-share/<int:pk>/",
+        "api/records/program/<int:pk>/revoke/",
         v1.RevokeLearnerRecordShareView.as_view(),
         name="revoke-learner-record-share",
     ),
     path(
-        "learner-record/<int:pk>/",
+        "api/records/program/<int:pk>/",
         v1.GetLearnerRecordView.as_view(),
         name="get-learner-record",
     ),
