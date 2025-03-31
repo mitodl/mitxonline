@@ -78,6 +78,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/LearnerRecord'
           description: ''
+  /api/records/shared/{uuid}/:
+    get:
+      operationId: learner_record_retrieve_by_uuid
+      description: Get learner record using share UUID
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerRecord'
+          description: ''
   /api/v1/course_runs/:
     get:
       operationId: course_runs_list
@@ -624,26 +644,6 @@ paths:
           description: No response body
         '302':
           description: No response body
-  /learner-record/{uuid}/:
-    get:
-      operationId: learner_record_retrieve_by_uuid
-      description: Get learner record using share UUID
-      parameters:
-      - in: path
-        name: uuid
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - learner-record
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LearnerRecord'
-          description: ''
 components:
   schemas:
     AvailabilityEnum:
