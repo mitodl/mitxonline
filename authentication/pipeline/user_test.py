@@ -10,11 +10,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from rest_framework import status
 from social_core.backends.email import EmailAuth
-from social_django.utils import load_backend, load_strategy
 from social_core.exceptions import AuthException
 from social_django.models import UserSocialAuth
-
-
+from social_django.utils import load_backend, load_strategy
 
 from authentication.exceptions import (
     EmailBlockedException,
@@ -638,11 +636,18 @@ def test_create_ol_oidc_user(  # noqa: PLR0913
     else:
         assert response == {}
 
+
 def test_limit_one_auth_per_backend_no_user(mocker):
     """limit_one_auth_per_backend should not error if the user doesn't exist"""
     mock_strategy = mocker.Mock()
     mock_backend = mocker.Mock()
-    assert user_actions.limit_one_auth_per_backend(strategy=mock_strategy, backend=mock_backend, user=None, uid=None) == {}
+    assert (
+        user_actions.limit_one_auth_per_backend(
+            strategy=mock_strategy, backend=mock_backend, user=None, uid=None
+        )
+        == {}
+    )
+
 
 @pytest.mark.django_db
 def test_limit_one_auth_per_backend_conflicting_auth(mocker, user):
@@ -652,7 +657,12 @@ def test_limit_one_auth_per_backend_conflicting_auth(mocker, user):
     mock_backend.name = "email"
     UserSocialAuthFactory.create(user=user, provider=mock_backend.name)
 
-    assert UserSocialAuth.objects.filter(user=user, provider=mock_backend.name).count() == 1
+    assert (
+        UserSocialAuth.objects.filter(user=user, provider=mock_backend.name).count()
+        == 1
+    )
 
     with pytest.raises(AuthException):
-        user_actions.limit_one_auth_per_backend(backend=mock_backend, user=user, strategy=mock_strategy, uid="non-matching")
+        user_actions.limit_one_auth_per_backend(
+            backend=mock_backend, user=user, strategy=mock_strategy, uid="non-matching"
+        )
