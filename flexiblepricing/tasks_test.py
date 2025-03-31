@@ -234,14 +234,14 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             "No courseware object found for FlexiblePrice ID: %s", instance.id
         )
 
-    @patch('flexiblepricing.tasks.get_ecommerce_products_by_courseware_name')
+    @patch('flexiblepricing.api.get_ecommerce_products_by_courseware_name')
     def test_get_valid_product_id_success(self, mock_get_products):
         """Test _get_valid_product_id with valid product"""
         mock_get_products.return_value = [{'id': '123'}]
         result = _get_valid_product_id('test-course', 1)
         self.assertEqual(result, '123')
 
-    @patch('flexiblepricing.tasks.get_ecommerce_products_by_courseware_name')
+    @patch('flexiblepricing.api.get_ecommerce_products_by_courseware_name')
     def test_get_valid_product_id_no_products(self, mock_get_products):
         """Test _get_valid_product_id with no products"""
         mock_get_products.return_value = []
@@ -251,7 +251,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             "No products found for FlexiblePrice ID: %s", 1
         )
 
-    @patch('flexiblepricing.tasks.get_ecommerce_products_by_courseware_name')
+    @patch('flexiblepricing.api.get_ecommerce_products_by_courseware_name')
     def test_get_valid_product_id_request_exception(self, mock_get_products):
         """Test _get_valid_product_id with request exception"""
         mock_get_products.side_effect = requests.exceptions.RequestException()
