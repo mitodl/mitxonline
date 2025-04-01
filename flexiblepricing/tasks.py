@@ -8,8 +8,8 @@ from urllib.parse import quote_plus, urljoin
 
 import requests
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 
 from courses.utils import get_enrollable_courseruns_qs
 from flexiblepricing.api import (
