@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.113.3
+---------------
+
+- Revert "Prevent linking existing user if uid is different" (#2581)
+- Fix API path (#2578)
+- Improve openapi schema for enrollments API (#2577)
+- Prevent linking existing user if uid is different (#2546)
+
 Version 0.113.2 (Released March 31, 2025)
 ---------------
 
