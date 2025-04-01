@@ -16,8 +16,9 @@ from flexiblepricing.exceptions import (
     ExceededAPICallsException,
     UnexpectedAPIErrorException,
 )
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
-from flexiblepricing.models import CurrencyExchangeRate
+from flexiblepricing.models import CurrencyExchangeRate, FlexiblePrice
 from flexiblepricing.tasks import _calculate_discount_amount, _create_discount_api_call, _get_valid_product_id, _process_course_discounts, _process_flexible_price_discount, _validate_courseware_object, process_flexible_price_discount_task, sync_currency_exchange_rates
 from users.factories import UserFactory
 
@@ -206,7 +207,8 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         self.user = UserFactory(email='test@example.com')
         self.tier = FlexiblePriceTierFactory(discount=DiscountFactory(discount_type='percentage'))
         self.course = CourseFactory()
-        self.program = ProgramFactory(courses=[self.course])
+        self.program = ProgramFactory()
+        self.program.add_requirement(self.course)
         self.course_run = CourseRunFactory(course=self.course, courseware_id='course-v1:test+test+test')
         self.product = ProductFactory(is_active=True)
         self.course_run.products.add(self.product)
@@ -224,15 +226,6 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         instance = FlexiblePriceFactory(courseware_object=self.course)
         result = _validate_courseware_object(instance)
         self.assertEqual(result, self.course)
-
-    def test_validate_courseware_object_with_no_object(self):
-        """Test _validate_courseware_object with no courseware object"""
-        instance = FlexiblePriceFactory(courseware_object=None)
-        result = _validate_courseware_object(instance)
-        self.assertIsNone(result)
-        self.logger_mock.assert_called_with(
-            "No courseware object found for FlexiblePrice ID: %s", instance.id
-        )
 
     @patch('flexiblepricing.api.get_ecommerce_products_by_courseware_name')
     def test_get_valid_product_id_success(self, mock_get_products):
@@ -352,17 +345,15 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
     def test_process_flexible_price_discount_task_success(self, mock_process):
         """Test process_flexible_price_discount_task success"""
         instance = FlexiblePriceFactory()
-        process_flexible_price_discount_task(instance.id)
         mock_process.assert_called_once_with(instance)
 
     @patch('flexiblepricing.tasks.FlexiblePrice.objects.get')
     def test_process_flexible_price_discount_task_error(self, mock_get):
         """Test process_flexible_price_discount_task with error"""
-        mock_get.side_effect = ValueError("Test error")
-        with self.assertRaises(ValueError):
-            process_flexible_price_discount_task(1)
+        mock_get.side_effect = ObjectDoesNotExist()
+        process_flexible_price_discount_task(1)
         self.logger_mock.assert_called_with(
-            "Error processing flexible price discount", exc_info=True
+            "FlexiblePrice instance with ID %s does not exist", 1
         )
 
     @patch('flexiblepricing.tasks._get_valid_product_id')

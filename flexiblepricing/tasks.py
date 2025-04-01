@@ -9,6 +9,7 @@ from urllib.parse import quote_plus, urljoin
 import requests
 from django.conf import settings
 from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 
 from courses.utils import get_enrollable_courseruns_qs
 from flexiblepricing.api import (
@@ -249,7 +250,11 @@ def process_flexible_price_discount_task(instance_id):
     Process the flexible price discount for the given instance.
     """
     log = logging.getLogger()
-    instance = FlexiblePrice.objects.get(id=instance_id)
+    try:
+        instance = FlexiblePrice.objects.get(id=instance_id)
+    except ObjectDoesNotExist:
+        log.error("FlexiblePrice instance with ID %s does not exist", instance_id)
+        return
     try:
         with transaction.atomic():
             _process_flexible_price_discount(instance)
