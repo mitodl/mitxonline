@@ -15,6 +15,7 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
+from openedx.models import OpenEdxUser
 
 # Defined in edX Profile model
 from users.constants import USERNAME_MAX_LEN
@@ -161,7 +162,7 @@ OPENEDX_HIGHEST_EDUCATION_MAPPINGS = (
 )
 
 
-def _post_create_user(user):
+def _post_create_user(user, username):
     """
     Create records related to the user
 
@@ -170,6 +171,7 @@ def _post_create_user(user):
     """
     LegalAddress.objects.create(user=user)
     UserProfile.objects.create(user=user)
+    OpenEdxUser.objects.create(user=user, edx_username=username)
 
 
 class UserManager(BaseUserManager):
@@ -191,7 +193,9 @@ class UserManager(BaseUserManager):
         user = self.model(**fields)
         user.set_password(password)
         user.save(using=self._db)
-        _post_create_user(user)
+
+        _post_create_user(user, username)
+
         return user
 
     def create_user(self, username, email=None, password=None, **extra_fields):

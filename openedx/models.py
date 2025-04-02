@@ -4,7 +4,11 @@ from django.conf import settings
 from django.db import models
 from mitol.common.models import TimestampedModel
 
-from openedx.constants import OPENEDX_PLATFORM_CHOICES, PLATFORM_EDX
+from openedx.constants import (
+    OPENEDX_PLATFORM_CHOICES,
+    OPENEDX_USERNAME_MAX_LEN,
+    PLATFORM_EDX,
+)
 
 
 class OpenEdxUser(TimestampedModel):
@@ -17,6 +21,9 @@ class OpenEdxUser(TimestampedModel):
     )
     platform = models.CharField(
         max_length=20, choices=OPENEDX_PLATFORM_CHOICES, default=PLATFORM_EDX
+    )
+    edx_username = models.CharField(  # noqa: DJ001
+        null=True, unique=True, max_length=OPENEDX_USERNAME_MAX_LEN
     )
     has_been_synced = models.BooleanField(
         default=False,
