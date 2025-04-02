@@ -21,7 +21,7 @@ def generate_run_defaults(run):
     """Generates default values for a CourseRun based on the provided run data"""
     now = now_in_utc()
     run_defaults = {
-        "run_tag": f"{run['run_tag']}{now.year}",
+        "run_tag": f"fake-{run['run_tag']}{now.year}",
         "live": True,
         "title": run["title"],
         "upgrade_deadline": f"{now.year}{run['upgrade_deadline']}",
@@ -39,7 +39,7 @@ def generate_run_defaults(run):
         run_defaults["end_date"] = f"{previous_year}{run['end_date']}"
         run_defaults["enrollment_start"] = f"{previous_year}{run['enrollment_start']}"
         run_defaults["enrollment_end"] = f"{now.year}{run['enrollment_end']}"
-        run_defaults["run_tag"] = f"{run['run_tag']}{previous_year}"
+        run_defaults["run_tag"] = f"fake-{run['run_tag']}{previous_year}"
 
     return run_defaults
 

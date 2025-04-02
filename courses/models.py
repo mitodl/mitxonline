@@ -769,6 +769,13 @@ class CourseRun(TimestampedModel):
         )
 
     @property
+    def is_fake_course_run(self):
+        """
+        Checks if a course run is a fake course run
+        """
+        return self.run_tag.startswith("fake-")
+
+    @property
     def courseware_url(self):
         """
         Full URL for this CourseRun as it exists in the courseware
