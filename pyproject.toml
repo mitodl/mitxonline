@@ -9,7 +9,7 @@ authors  = ["MIT ODL"]
 
 
 [tool.poetry.dependencies]
-python = "3.10.16"
+python = "3.12.9"
 
 beautifulsoup4 = "^4.8.2"
 bleach = "^5.0.1"
@@ -35,13 +35,13 @@ djoser = "^2.1.0"
 drf-extensions = "^0.7.1"
 edx-api-client = "^1.9.0"
 hubspot-api-client = "^6.1.0"
-hypothesis = "4.23.9"
+hypothesis = "6.127.2"
 ipython = "^8.0.0"
 mitol-django-google-sheets-deferrals = "2023.12.19"
 mitol-django-google-sheets-refunds = "2023.12.19"
 mitol-django-hubspot-api = "2023.12.19"
 mitol-django-openedx = "2023.12.19"
-mitol-django-payment-gateway = "2023.12.19"
+mitol-django-payment-gateway = "2025.3.17"
 newrelic = "^6.4.1.158"
 posthog = "^3.0.1"
 psycopg2 = "^2.9.5"
