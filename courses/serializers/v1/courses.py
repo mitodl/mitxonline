@@ -32,7 +32,6 @@ class CourseSerializer(BaseCourseSerializer):
     page = CoursePageSerializer(read_only=True)
     programs = serializers.SerializerMethodField()
 
-    @extend_schema_field(int)
     def get_next_run_id(self, instance) -> int | None:
         """Get next run id"""
         run = instance.first_unexpired_run
