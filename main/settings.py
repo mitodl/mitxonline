@@ -382,6 +382,8 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.social_user",
     # Associates the current social details with another user account with the same email address.
     "social_core.pipeline.social_auth.associate_by_email",
+    # Make sure we are not creating duplicate auth
+    "authentication.pipeline.user.limit_one_auth_per_backend",
     # validate an incoming email auth request
     "authentication.pipeline.user.validate_email_auth_request",
     # validate the user's email either it is blocked or not.
