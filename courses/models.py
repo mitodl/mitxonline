@@ -30,6 +30,7 @@ from courses.constants import (
     ENROLLABLE_ITEM_ID_SEPARATOR,
     SYNCED_COURSE_RUN_FIELD_MSG,
 )
+from courses.management.commands.populate_course_data import FAKE_TAG_PREFIX
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
@@ -773,7 +774,7 @@ class CourseRun(TimestampedModel):
         """
         Checks if a course run is a fake course run
         """
-        return self.run_tag.startswith("fake-")
+        return self.run_tag.startswith(FAKE_TAG_PREFIX)
 
     @property
     def courseware_url(self):
