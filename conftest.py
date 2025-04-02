@@ -23,6 +23,12 @@ def mocked_product_signal(mocker):  # noqa: PT004
     mocker.patch("ecommerce.signals.sync_hubspot_product")
 
 
+@pytest.fixture(autouse=True)
+def mocked_flexibleprice_signal(mocker):  # noqa: PT004
+    """Mock FlexiblePrice signals"""
+    mocker.patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
+
+
 def pytest_addoption(parser):
     """Pytest hook that adds command line parameters"""
     parser.addoption(

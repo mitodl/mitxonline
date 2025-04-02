@@ -15,3 +15,4 @@ class CoursesConfig(AppConfig):
         Ready handler. Import signals.
         """
         import courses.signals  # noqa: F401
+        import flexiblepricing.signals  # noqa: F401
