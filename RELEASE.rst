@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.113.3
+Version 0.113.3 (Released April 02, 2025)
 ---------------
 
 - Revert "Prevent linking existing user if uid is different" (#2581)
