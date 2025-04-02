@@ -10,9 +10,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from rest_framework import status
 from social_core.backends.email import EmailAuth
-from social_django.utils import load_backend, load_strategy
 from social_core.exceptions import AuthException
 from social_django.models import UserSocialAuth
+from social_django.utils import load_backend, load_strategy
 
 from authentication.exceptions import (
     EmailBlockedException,
@@ -635,6 +635,7 @@ def test_create_ol_oidc_user(  # noqa: PLR0913
             assert not strategy.create_user.called
     else:
         assert response == {}
+
 
 def test_limit_one_auth_per_backend_no_user(mocker):
     """limit_one_auth_per_backend should not error if the user doesn't exist"""

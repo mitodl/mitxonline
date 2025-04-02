@@ -312,4 +312,3 @@ def limit_one_auth_per_backend(strategy, backend, user, uid, **kwargs):  # pylin
         )
 
     return {}
-
