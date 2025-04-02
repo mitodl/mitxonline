@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
@@ -107,8 +109,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "electives": [course.id for course in instance.elective_courses],
         }
 
-    @extend_schema_field(dict)
-    def get_required_prerequisites(self, instance):
+    def get_required_prerequisites(self, instance) -> bool:
         """
         Check if the prerequisites field is populated in the program page CMS.
         """
@@ -118,8 +119,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             and instance.page.prerequisites != ""
         )
 
-    @extend_schema_field(int)
-    def get_duration(self, instance):
+    def get_duration(self, instance) -> str:
         """
         Get the length/duration field from the program page CMS.
         """
@@ -171,8 +171,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             return "MicroMasters Credential"
         return "Certificate of Completion"
 
-    @extend_schema_field(int)
-    def get_min_weekly_hours(self, instance):
+    def get_min_weekly_hours(self, instance) -> str | None:
         """
         Get the min weekly hours of the course from the course page CMS.
         """
@@ -181,8 +180,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
-    @extend_schema_field(int)
-    def get_max_weekly_hours(self, instance):
+    def get_max_weekly_hours(self, instance) -> str | None:
         """
         Get the max weekly hours of the course from the course page CMS.
         """
