@@ -729,6 +729,7 @@ components:
           readOnly: true
         current_price:
           type: integer
+          nullable: true
           readOnly: true
         instructors:
           type: array
