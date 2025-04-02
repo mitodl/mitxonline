@@ -843,7 +843,7 @@ components:
           pattern: ^[\w\-+:\.]+$
           maxLength: 255
         next_run_id:
-          type: string
+          type: integer
           nullable: true
           description: Get next run id
           readOnly: true
@@ -905,12 +905,13 @@ components:
           description: Get course availability
           readOnly: true
         min_weekly_hours:
-          type: integer
+          type: string
+          nullable: true
           description: Get the min weekly hours of the course from the course page
             CMS.
           readOnly: true
         max_weekly_hours:
-          type: integer
+          type: string
           nullable: true
           description: Get the max weekly hours of the course from the course page
             CMS.
@@ -2103,13 +2104,12 @@ components:
           format: date-time
           nullable: true
         required_prerequisites:
-          type: object
-          additionalProperties: {}
+          type: boolean
           description: Check if the prerequisites field is populated in the program
             page CMS.
           readOnly: true
         duration:
-          type: integer
+          type: string
           description: Get the length/duration field from the program page CMS.
           readOnly: true
         min_weeks:
@@ -2126,12 +2126,14 @@ components:
             CMS.
           readOnly: true
         min_weekly_hours:
-          type: integer
+          type: string
+          nullable: true
           description: Get the min weekly hours of the course from the course page
             CMS.
           readOnly: true
         max_weekly_hours:
-          type: integer
+          type: string
+          nullable: true
           description: Get the max weekly hours of the course from the course page
             CMS.
           readOnly: true
