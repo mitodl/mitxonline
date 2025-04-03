@@ -1,13 +1,11 @@
 import operator as op
 import random
-import uuid
 from datetime import datetime, timedelta
 
 import freezegun
 import pytest
 import pytz
 import reversion
-from django.conf import settings
 from django.forms.models import model_to_dict
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
@@ -77,13 +75,6 @@ def discounts():
 def user(db):
     """Creates a user"""
     return UserFactory.create()
-
-
-@pytest.fixture(autouse=True)
-def payment_gateway_settings():  # noqa: PT004
-    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
-    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
-    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
 
 
 @pytest.fixture(autouse=True)

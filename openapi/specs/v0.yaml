@@ -673,6 +673,7 @@ components:
           maxLength: 255
         next_run_id:
           type: integer
+          nullable: true
           description: Get next run id
           readOnly: true
         departments:
@@ -728,6 +729,7 @@ components:
           readOnly: true
         current_price:
           type: integer
+          nullable: true
           readOnly: true
         instructors:
           type: array
@@ -842,6 +844,7 @@ components:
           maxLength: 255
         next_run_id:
           type: string
+          nullable: true
           description: Get next run id
           readOnly: true
         departments:
@@ -858,6 +861,7 @@ components:
           items:
             type: object
             additionalProperties: {}
+          nullable: true
           readOnly: true
         topics:
           type: array
@@ -882,10 +886,12 @@ components:
           readOnly: true
         min_weeks:
           type: integer
+          nullable: true
           description: Get the min weeks of the course from the CMS page.
           readOnly: true
         max_weeks:
           type: integer
+          nullable: true
           description: Get the max weeks of the course from the CMS page.
           readOnly: true
         time_commitment:
@@ -905,6 +911,7 @@ components:
           readOnly: true
         max_weekly_hours:
           type: integer
+          nullable: true
           description: Get the max weekly hours of the course from the course page
             CMS.
           readOnly: true
@@ -1771,6 +1778,7 @@ components:
           maxLength: 255
         next_run_id:
           type: integer
+          nullable: true
           description: Get next run id
           readOnly: true
         departments:

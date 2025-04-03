@@ -91,6 +91,7 @@ responses = "^0.25.0"
 ruff = "^0.9"
 semantic-version = "^2.10.0"
 wagtail-factories = "^4.2"
+pytest-xdist = {extras = ["psutil"], version = "^3.6.1"}
 
 [tool.ruff]
 target-version = "py39"

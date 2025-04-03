@@ -88,8 +88,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    @extend_schema_field(int)
-    def get_max_weekly_hours(self, instance):
+    def get_max_weekly_hours(self, instance) -> int | None:
         """
         Get the max weekly hours of the course from the course page CMS.
         """
@@ -98,14 +97,12 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    @extend_schema_field(str)
-    def get_next_run_id(self, instance):
+    def get_next_run_id(self, instance) -> str | None:
         """Get next run id"""
         run = instance.first_unexpired_run
         return run.id if run is not None else None
 
-    @extend_schema_field(list[dict])
-    def get_programs(self, instance):
+    def get_programs(self, instance) -> list[dict] | None:
         if self.context.get("all_runs", False):
             from courses.serializers.v1.base import BaseProgramSerializer
 
@@ -147,8 +144,7 @@ class CourseSerializer(BaseCourseSerializer):
             return "anytime"
         return "dated"
 
-    @extend_schema_field(int)
-    def get_min_weeks(self, instance):
+    def get_min_weeks(self, instance) -> int | None:
         """
         Get the min weeks of the course from the CMS page.
         """
@@ -157,8 +153,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    @extend_schema_field(int)
-    def get_max_weeks(self, instance):
+    def get_max_weeks(self, instance) -> int | None:
         """
         Get the max weeks of the course from the CMS page.
         """

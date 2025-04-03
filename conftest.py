@@ -1,5 +1,6 @@
 """Project conftest"""
 
+import uuid
 from types import SimpleNamespace  # noqa: F401
 
 import pytest
@@ -21,6 +22,13 @@ def default_settings(monkeypatch, settings):  # noqa: PT004
 def mocked_product_signal(mocker):  # noqa: PT004
     """Mock hubspot_sync signals"""
     mocker.patch("ecommerce.signals.sync_hubspot_product")
+
+
+@pytest.fixture(autouse=True)
+def payment_gateway_settings(settings):  # noqa: PT004
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
 
 
 def pytest_addoption(parser):
