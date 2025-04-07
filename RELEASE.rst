@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.114.1
+---------------
+
+- Successfully enroll in test course runs without calling edX (#2584)
+
 Version 0.114.0 (Released April 07, 2025)
 ---------------
 
