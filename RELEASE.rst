@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.114.0
+Version 0.114.0 (Released April 07, 2025)
 ---------------
 
 - Add xdist so tests can be run faster (#2585)
