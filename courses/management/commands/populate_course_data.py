@@ -26,6 +26,7 @@ def generate_run_defaults(run):
         "live": True,
         "title": run["title"],
         "upgrade_deadline": f"{now.year}{run['upgrade_deadline']}",
+        "is_self_paced": run["is_self_paced"],
     }
 
     if run["is_enrollable"]:
