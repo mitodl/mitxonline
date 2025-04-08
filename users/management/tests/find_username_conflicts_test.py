@@ -14,10 +14,10 @@ def test_find_username_conflicts(with_accents):
     users = UserFactory.create_batch(2)
 
     if with_accents:
-        users[0].username = "aeiou"
+        users[0].edx_username = "aeiou"
         users[0].save()
 
-        users[1].username = "aéîöü"
+        users[1].edx_username = "aéîöü"
         users[1].save()
 
     output = StringIO()

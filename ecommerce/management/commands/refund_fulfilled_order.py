@@ -73,12 +73,12 @@ class Command(BaseCommand):
         for enrollment in run_enrollments:
             if kwargs.get("unenroll"):
                 self.stdout.write(
-                    f"Unenrolling {order.purchaser.username} in {enrollment.run}"
+                    f"Unenrolling {order.purchaser.edx_username} in {enrollment.run}"
                 )
                 deactivate_run_enrollment(enrollment, "refunded", True)  # noqa: FBT003
             else:
                 self.stdout.write(
-                    f"Changing enrollment for {order.purchaser.username} in {enrollment.run} to 'audit'"
+                    f"Changing enrollment for {order.purchaser.edx_username} in {enrollment.run} to 'audit'"
                 )
 
                 enrollment.update_mode_and_save("audit")

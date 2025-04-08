@@ -152,7 +152,7 @@ def test_create_edx_user(user, settings, application, access_token_count):
         == settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
     )
     assert dict(parse_qsl(responses.calls[0].request.body)) == {
-        "username": user.username,
+        "username": user.edx_username,
         "email": user.email,
         "name": user.name,
         "provider": settings.OPENEDX_OAUTH_PROVIDER,
@@ -233,7 +233,7 @@ def test_validate_edx_username_conflict(settings, user):
     """Test that validate_username_email_with_edx handles a username validation conflict"""
     edx_username_validation_response_mock(True, settings)  # noqa: FBT003
 
-    assert validate_username_email_with_edx(user.username, "example@mit.edu")
+    assert validate_username_email_with_edx(user.edx_username, "example@mit.edu")
 
 
 @responses.activate
@@ -250,7 +250,7 @@ def test_validate_edx_username_conflict(settings, user):  # noqa: F811
         status=status.HTTP_400_BAD_REQUEST,
     )
     with pytest.raises(EdxApiRegistrationValidationException):
-        validate_username_email_with_edx(user.username, "example@mit.edu")
+        validate_username_email_with_edx(user.edx_username, "example@mit.edu")
 
 
 @responses.activate
@@ -463,13 +463,13 @@ def test_enroll_in_edx_course_runs(settings, mocker, user):
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[0].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
-        username=user.username,
+        username=user.edx_username,
         force_enrollment=True,
     )
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[1].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
-        username=user.username,
+        username=user.edx_username,
         force_enrollment=True,
     )
     assert enroll_results == [enroll_return_values[0], enroll_return_values[2]]
@@ -652,7 +652,7 @@ def test_unenroll_edx_course_run(mocker):
     mock_client = mocker.MagicMock()
     run_enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
     courseware_id = run_enrollment.run.courseware_id
-    username = run_enrollment.user.username
+    username = run_enrollment.user.edx_username
     enroll_return_value = mocker.Mock(
         json={"course_id": courseware_id, "user": username}
     )
@@ -673,7 +673,7 @@ def test_update_user_edx_name(mocker, user):
     user.name = "Test Name"
     mock_client = mocker.MagicMock()
     update_name_return_value = mocker.Mock(
-        json={"name": user.name, "username": user.username, "email": user.email}
+        json={"name": user.name, "username": user.edx_username, "email": user.email}
     )
     mock_client.user_info.update_user_name = mocker.Mock(
         return_value=update_name_return_value
@@ -681,7 +681,7 @@ def test_update_user_edx_name(mocker, user):
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     updated_user = update_edx_user_name(user)
     mock_client.user_info.update_user_name.assert_called_once_with(
-        user.username, user.name
+        user.edx_username, user.name
     )
     assert update_name_return_value == updated_user
 

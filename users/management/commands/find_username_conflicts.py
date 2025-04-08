@@ -34,7 +34,7 @@ class Command(BaseCommand):
         username_lookup = {}
 
         for user in all_users:
-            normalized_username = self.make_normalized_username(user.username)
+            normalized_username = self.make_normalized_username(user.edx_username)
             if normalized_username not in username_lookup:
                 username_lookup[normalized_username] = [user.id]
             else:

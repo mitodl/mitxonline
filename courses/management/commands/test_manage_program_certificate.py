@@ -27,7 +27,7 @@ def edx_grade_json(user):
     return {
         "passed": True,
         "course_id": "test_course_id",
-        "username": user.username,
+        "username": user.edx_username,
         "percent": 0.5,
     }
 
@@ -52,7 +52,7 @@ def test_program_certificate_management_invalid_program():
     test_user = UserFactory.create()
     with pytest.raises(CommandError) as command_error:
         manage_program_certificates.Command().handle(
-            user=test_user.username, create=True
+            user=test_user.edx_username, create=True
         )
     assert (
         str(command_error.value) == f"Could not find program with readable_id={None}."
@@ -60,7 +60,7 @@ def test_program_certificate_management_invalid_program():
 
     with pytest.raises(CommandError) as command_error:
         manage_program_certificates.Command().handle(
-            user=test_user.username, create=True, program="test"
+            user=test_user.edx_username, create=True, program="test"
         )
     assert str(command_error.value) == "Could not find program with readable_id=test."
 
@@ -113,7 +113,7 @@ def test_program_certificate_management_revoke_unrevoke_success(user, revoke, un
         revoke=revoke,
         unrevoke=unrevoke,
         program=program.readable_id,
-        user=user.username,
+        user=user.edx_username,
     )
     certificate.refresh_from_db()
     assert certificate.is_revoked is (True if revoke else False)  # noqa: SIM210
@@ -142,7 +142,7 @@ def test_program_certificate_management_create(
     manage_program_certificates.Command().handle(
         create=True,
         program=program_with_empty_requirements.readable_id,
-        user=user.username,
+        user=user.edx_username,
     )
 
     generated_certificates = ProgramCertificate.objects.filter(
@@ -178,7 +178,7 @@ def test_program_certificate_management_force_create(
     manage_program_certificates.Command().handle(
         create=True,
         program=program_with_requirements.program.readable_id,
-        user=user.username,
+        user=user.edx_username,
         force=True,
     )
 

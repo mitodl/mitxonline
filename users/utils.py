@@ -125,12 +125,12 @@ def ensure_active_user(user):
         except HTTPError as exc:
             log.error(  # noqa: TRY400
                 "%s (%s): Failed to repair (%s)",
-                user.username,
+                user.edx_username,
                 user.email,
                 get_error_response_summary(exc.response),
             )
         except Exception:  # pylint: disable=broad-except
-            log.exception("%s (%s): Failed to repair", user.username, user.email)
+            log.exception("%s (%s): Failed to repair", user.edx_username, user.email)
 
 
 def format_recipient(user: User) -> str:

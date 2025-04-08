@@ -42,7 +42,7 @@ class TestUnblockUsers(TestCase):
         assert BlockList.objects.all().count() == 0
 
         mocked_bulk_retire_edx_users.return_value = {
-            "successful_user_retirements": [user.username]
+            "successful_user_retirements": [user.edx_username]
         }
         self.RETIRE_USER_COMMAND.handle(
             "retire_users", users=[test_email], block_users=True
