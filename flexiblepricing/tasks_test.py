@@ -18,7 +18,7 @@ from flexiblepricing.exceptions import (
     UnexpectedAPIErrorException,
 )
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
-from flexiblepricing.models import CurrencyExchangeRate
+from flexiblepricing.models import CurrencyExchangeRate, FlexiblePrice
 from flexiblepricing.tasks import (
     _calculate_discount_amount,
     _create_discount_api_call,
@@ -325,38 +325,63 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         )
 
     @patch("flexiblepricing.tasks._process_course_discounts")
-    @patch("flexiblepricing.tasks.get_enrollable_courseruns_qs")
-    def test_process_flexible_price_discount_course(self, mock_get_runs, mock_process):
+    @patch("flexiblepricing.tasks._validate_courseware_object")
+    @patch("flexiblepricing.tasks.logging.getLogger")
+    def test_process_flexible_price_discount_course(
+        self, mock_get_logger, mock_validate, mock_process
+    ):
         """Test _process_flexible_price_discount with course"""
-        mock_get_runs.return_value = [self.course_run]
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+
         instance = FlexiblePriceFactory(courseware_object=self.course)
+        mock_validate.return_value = self.course
 
         _process_flexible_price_discount(instance)
 
-        self.logger_mock.assert_called_with(
-            "Processing course discounts for FlexiblePrice ID: %s", instance.id
+        mock_logger.info.assert_any_call(
+            "Processing course discounts for FlexiblePrice ID: %s", 
+            instance.id
         )
-        mock_process.assert_called_once()
+
+        mock_process.assert_called_once_with(self.course, instance)
 
     @patch("flexiblepricing.tasks._process_course_discounts")
-    @patch("flexiblepricing.tasks.get_enrollable_courseruns_qs")
-    def test_process_flexible_price_discount_program(self, mock_get_runs, mock_process):
+    @patch("flexiblepricing.tasks._validate_courseware_object")
+    @patch("flexiblepricing.tasks.logging.getLogger")
+    def test_process_flexible_price_discount_program(
+        self, mock_get_logger, mock_validate, mock_process
+    ):
         """Test _process_flexible_price_discount with program"""
-        mock_get_runs.return_value = [self.course_run]
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+        
         instance = FlexiblePriceFactory(courseware_object=self.program)
+        mock_validate.return_value = self.program
 
         _process_flexible_price_discount(instance)
 
-        self.logger_mock.assert_called_with(
-            "Processing program discounts for FlexiblePrice ID: %s", instance.id
+        mock_logger.info.assert_any_call(
+            "Processing program discounts for FlexiblePrice ID: %s", 
+            instance.id
         )
+
         self.assertEqual(mock_process.call_count, len(self.program.courses))
+        for i, course in enumerate(self.program.courses):
+            args, _ = mock_process.call_args_list[i]
+            self.assertEqual(args[0], course)
+            self.assertEqual(args[1], instance)
 
     @patch("flexiblepricing.tasks._process_flexible_price_discount")
     def test_process_flexible_price_discount_task_success(self, mock_process):
         """Test process_flexible_price_discount_task success"""
-        instance = FlexiblePriceFactory()
-        mock_process.assert_called_once_with(instance)
+        instance = FlexiblePriceFactory(status=FlexiblePriceStatus.APPROVED)
+
+        mock_process.assert_called_once()
+
+        args, _ = mock_process.call_args
+        called_instance = args[0]
+        self.assertEqual(called_instance.id, instance.id)
 
     @patch("flexiblepricing.tasks.FlexiblePrice.objects.get")
     def test_process_flexible_price_discount_task_error(self, mock_get):
@@ -368,19 +393,34 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         )
 
     @patch("flexiblepricing.tasks._get_valid_product_id")
-    @patch("flexiblepricing.tasks._calculate_discount_amount")
+    @patch("flexiblepricing.tasks._calculate_discount_amount") 
     @patch("flexiblepricing.tasks._create_discount_api_call")
+    @patch("flexiblepricing.tasks.get_enrollable_courseruns_qs")
     def test_process_course_discounts_success(
-        self, mock_create, mock_calculate, mock_get_product
+        self, mock_get_runs, mock_create, mock_calculate, mock_get_product
     ):
         """Test _process_course_discounts with valid data"""
-        mock_get_product.return_value = "product-123"
+        # Setup mock course run
+        mock_course_run = MagicMock()
+        mock_course_run.courseware_id = "course-run-123"
+        mock_course_run.products.filter.return_value = [MagicMock()]
+        
+        # Configure mocks
+        mock_get_runs.return_value = [mock_course_run]
+        mock_get_product.return_value = "valid-product-123" 
         mock_calculate.return_value = 10.0
 
+        # Create test instance
         instance = FlexiblePriceFactory(user=self.user, tier=self.tier)
+        
+        # Execute
         _process_course_discounts(self.course, instance)
 
-        mock_create.assert_called_once_with(instance, "product-123", 10.0)
+        # Verify calls
+        mock_get_runs.assert_called_once_with(valid_courses=[self.course])
+        mock_get_product.assert_called_once_with("course-run-123", instance.id)
+        mock_calculate.assert_called_once_with(mock_course_run, instance)
+        mock_create.assert_called_once_with(instance, "valid-product-123", 10.0)
 
     @patch("flexiblepricing.tasks.get_enrollable_courseruns_qs")
     def test_process_course_discounts_no_runs(self, mock_get_runs):
