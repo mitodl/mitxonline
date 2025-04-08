@@ -51,7 +51,7 @@ class FlexiblePricingRequestSubmission(AbstractFormSubmission):
     def __str__(self):
         formdata = json.loads(self.form_data)
         return "Flexible Pricing request from {user}: annual income {income}".format(
-            user=self.user.username, income=formdata["your_income"]
+            user=self.user.edx_username, income=formdata["your_income"]
         )
 
 
@@ -140,7 +140,7 @@ class FlexiblePrice(TimestampedModel):
         return serialize_model_object(self)
 
     def __str__(self):
-        return f'FP for user "{self.user.username}" in status "{self.status}"'
+        return f'FP for user "{self.user.edx_username}" in status "{self.status}"'
 
     def is_approved(self):
         return (

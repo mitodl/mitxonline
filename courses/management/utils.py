@@ -192,7 +192,7 @@ class EnrollmentChangeCommand(BaseCommand):
             "Course run enrollment record {}. "
             "Attempting to enroll the user {} ({}) in {} on edX...".format(
                 "created" if created else "updated",
-                to_user.username,
+                to_user.edx_username,
                 to_user.email,
                 to_run.courseware_id,
             )

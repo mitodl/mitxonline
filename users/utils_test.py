@@ -9,6 +9,7 @@ import pytest
 import pytz
 from django.conf import settings
 
+from users.factories import UserFactory
 from users.utils import (
     determine_approx_age,
     ensure_active_user,
@@ -65,11 +66,13 @@ def test_is_duplicate_username_error(exception_text, expected_value):
     assert is_duplicate_username_error(exception_text) is expected_value
 
 
+@pytest.mark.django_db
 @patch("openedx.api.repair_faulty_edx_user", return_value=(None, None))
-def test_ensure_active_user(mock_repair_faulty_edx_user, user):
+def test_ensure_active_user(mock_repair_faulty_edx_user):
     """
     Test that ensure_active_user activates and tries to repair openedx user record
     """
+    user = UserFactory.create(no_openedx_user=True)
     user.is_active = False
     user.save()
 

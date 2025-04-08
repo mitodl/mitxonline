@@ -119,9 +119,9 @@ def test_validate_email_auth_request(mocker, rf, has_user, expected):
 def test_get_username(mocker, user):
     """Tests that we get a username for a new user"""
     mock_strategy = mocker.Mock()
-    mock_strategy.storage.user.get_username.return_value = user.username
+    mock_strategy.storage.user.get_username.return_value = user.edx_username
     assert user_actions.get_username(mock_strategy, None, user) == {
-        "username": user.username
+        "username": user.edx_username
     }
     mock_strategy.storage.user.get_username.assert_called_once_with(user)
 
@@ -315,7 +315,7 @@ def test_create_user_via_email(
         flow=SocialAuthState.FLOW_REGISTER,
     )
     assert isinstance(response["user"], User) is True
-    assert response["user"].username == "custom-username"
+    assert response["user"].edx_username == "custom-username"
     assert response["user"].is_active is True
     assert response["username"] == "custom-username"
     assert response["is_new"] is True

@@ -47,7 +47,7 @@ def test_sync_hubspot_user(mocker, mock_exception_log, user, raise_exc):
     mock_sync.assert_called_once_with(user.id)
     if raise_exc:
         mock_exception_log.assert_called_once_with(
-            "Exception calling sync_contact_with_hubspot for user %s", user.username
+            "Exception calling sync_contact_with_hubspot for user %s", user.edx_username
         )
     else:
         mock_exception_log.assert_not_called()

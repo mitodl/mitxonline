@@ -76,7 +76,7 @@ class Command(BaseCommand):
                 enrollment.save_and_log(None)
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"Successfully enrolled user {user.username} ({user.email}) in course run '{course_run.courseware_id}'"
+                        f"Successfully enrolled user {user.edx_username} ({user.email}) in course run '{course_run.courseware_id}'"
                     )
                 )
 

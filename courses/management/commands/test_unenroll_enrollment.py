@@ -50,14 +50,14 @@ def test_unenroll_enrollment_invalid_run():
 
     test_user = UserFactory.create()
     with pytest.raises(CommandError) as command_error:
-        unenroll_enrollment.Command().handle(user=test_user.username)
+        unenroll_enrollment.Command().handle(user=test_user.edx_username)
     assert (
         str(command_error.value)
         == f"Could not find course run with courseware_id={None}"
     )
 
     with pytest.raises(CommandError) as command_error:
-        unenroll_enrollment.Command().handle(user=test_user.username, run="test")
+        unenroll_enrollment.Command().handle(user=test_user.edx_username, run="test")
     assert (
         str(command_error.value) == "Could not find course run with courseware_id=test"
     )
@@ -95,7 +95,7 @@ def test_unenroll_enrollment(patches):
     assert enrollment.edx_enrolled is True
     unenroll_enrollment.Command().handle(
         run=enrollment.run.courseware_id,
-        user=enrollment.user.username,
+        user=enrollment.user.edx_username,
     )
     patches.edx_unenroll.assert_called_once_with(enrollment)
     patches.sync_hubspot_line_by_line_id.assert_called_once()
@@ -127,7 +127,7 @@ def test_unenroll_enrollment_without_edx(mocker):
     # Unenrolling without mocker and keep_failed_enrollments argument
     unenroll_enrollment.Command().handle(
         run=enrollment.run.courseware_id,
-        user=enrollment.user.username,
+        user=enrollment.user.edx_username,
     )
     enrollment.refresh_from_db()
     # Enrollment will remain as it is
@@ -138,7 +138,7 @@ def test_unenroll_enrollment_without_edx(mocker):
     # Unenrolling with keep_failed_enrollments argument
     unenroll_enrollment.Command().handle(
         run=enrollment.run.courseware_id,
-        user=enrollment.user.username,
+        user=enrollment.user.edx_username,
         keep_failed_enrollments=True,
     )
     enrollment.refresh_from_db()

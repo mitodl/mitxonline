@@ -122,7 +122,7 @@ def test_get_basket(user_drf_client, user):
     basket = BasketFactory.create(user=user)
     BasketItemFactory.create(basket=basket)
     resp = user_drf_client.get(
-        reverse("basket-detail", kwargs={"username": user.username})
+        reverse("basket-detail", kwargs={"username": user.edx_username})
     )
     assert_drf_json_equal(resp.json(), BasketSerializer(basket).data)
 
@@ -153,7 +153,7 @@ def test_delete_basket_item(user_drf_client, user):
     basket = basket_item.basket
     assert basket.basket_items.count() == 1
     user_drf_client.delete(
-        f"/api/baskets/{user.username}/items/{basket_item.id}/",
+        f"/api/baskets/{user.edx_username}/items/{basket_item.id}/",
         content_type="application/json",
     )
     assert BasketItem.objects.filter(basket=basket).count() == 0

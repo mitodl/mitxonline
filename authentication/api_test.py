@@ -23,7 +23,7 @@ def test_create_user_reattempt(mocker):
     username collisions are experienced repeatedly
     """
     username = "testuser"
-    fake_user = UserFactory.build()
+    fake_user = UserFactory.create()
     patched_find_username = mocker.patch(
         "authentication.api.find_available_username",
         side_effect=["testuser1", "testuser2", "testuser3"],
