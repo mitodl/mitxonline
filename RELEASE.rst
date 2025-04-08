@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.114.1
+---------------
+
+- Small fix for the fake test course runs (#2591)
+- adding GTM code to header (#2579)
+- add more scenarios (#2588)
+- Add edx username field to OpenEdxUser (#2589)
+- Successfully enroll in test course runs without calling edX (#2584)
+
 Version 0.114.0 (Released April 07, 2025)
 ---------------
 
