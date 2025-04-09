@@ -260,7 +260,6 @@ def test_create_edx_auth_token(settings, user):
     refresh_token = "abc123"  # noqa: S105
     access_token = "def456"  # noqa: S105
     code = "ghi789"
-    expires_in = 3600  # Add explicit expires_in value
 
     responses.add(
         responses.GET,
@@ -283,24 +282,22 @@ def test_create_edx_auth_token(settings, user):
     responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/oauth2/access_token",
-        json={
-            "refresh_token": refresh_token,
-            "access_token": access_token,
-            "expires_in": expires_in,
-        },
+        json=dict(  # noqa: C408
+            refresh_token=refresh_token, access_token=access_token, expires_in=3600
+        ),
         status=status.HTTP_200_OK,
     )
 
     create_edx_auth_token(user)
 
     assert len(responses.calls) == 4
-    assert dict(parse_qsl(responses.calls[3].request.body)) == {
-        "code": code,
-        "grant_type": "authorization_code",
-        "client_id": settings.OPENEDX_API_CLIENT_ID,
-        "client_secret": settings.OPENEDX_API_CLIENT_SECRET,
-        "redirect_uri": f"{settings.SITE_BASE_URL}/login/_private/complete",
-    }
+    assert dict(parse_qsl(responses.calls[3].request.body)) == dict(  # noqa: C408
+        code=code,
+        grant_type="authorization_code",
+        client_id=settings.OPENEDX_API_CLIENT_ID,
+        client_secret=settings.OPENEDX_API_CLIENT_SECRET,
+        redirect_uri=f"{settings.SITE_BASE_URL}/login/_private/complete",
+    )
 
     assert OpenEdxApiAuth.objects.filter(user=user).exists()
 
