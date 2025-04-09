@@ -2039,7 +2039,8 @@ components:
           readOnly: true
         courses:
           type: array
-          items: {}
+          items:
+            type: integer
           readOnly: true
         requirements:
           type: object
@@ -2082,8 +2083,11 @@ components:
           type: boolean
         topics:
           type: array
-          items: {}
-          description: List all topics in all courses in the program
+          items:
+            type: object
+            properties:
+              name:
+                type: string
           readOnly: true
         availability:
           $ref: '#/components/schemas/AvailabilityEnum'
@@ -2110,18 +2114,22 @@ components:
           readOnly: true
         duration:
           type: string
+          nullable: true
           description: Get the length/duration field from the program page CMS.
           readOnly: true
         min_weeks:
           type: integer
+          nullable: true
           description: Get the min weeks of the program from the CMS page.
           readOnly: true
         max_weeks:
           type: integer
+          nullable: true
           description: Get the max weeks of the program from the CMS page.
           readOnly: true
         time_commitment:
           type: string
+          nullable: true
           description: Get the effort/time_commitment field from the program page
             CMS.
           readOnly: true

@@ -74,8 +74,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     min_weekly_hours = serializers.SerializerMethodField()
     max_weekly_hours = serializers.SerializerMethodField()
 
-    @extend_schema_field(list)
-    def get_courses(self, instance):
+    def get_courses(self, instance) -> list[int]:
         return [course[0].id for course in instance.courses if course[0].live]
 
     @extend_schema_field(
@@ -119,7 +118,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             and instance.page.prerequisites != ""
         )
 
-    def get_duration(self, instance) -> str:
+    def get_duration(self, instance) -> str | None:
         """
         Get the length/duration field from the program page CMS.
         """
@@ -128,8 +127,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
-    @extend_schema_field(str)
-    def get_time_commitment(self, instance):
+    def get_time_commitment(self, instance) -> str | None:
         """
         Get the effort/time_commitment field from the program page CMS.
         """
@@ -154,7 +152,19 @@ class ProgramSerializer(serializers.ModelSerializer):
         else:
             return {"feature_image_src": get_thumbnail_url(None)}
 
-    @extend_schema_field(list)
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                    },
+                },
+            },
+        }
+    )
     def get_topics(self, instance):
         """List all topics in all courses in the program"""
         topics = set(  # noqa: C401
@@ -189,8 +199,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
-    @extend_schema_field(int)
-    def get_min_weeks(self, instance):
+    def get_min_weeks(self, instance) -> int | None:
         """
         Get the min weeks of the program from the CMS page.
         """
@@ -199,8 +208,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
-    @extend_schema_field(int)
-    def get_max_weeks(self, instance):
+    def get_max_weeks(self, instance) -> int | None:
         """
         Get the max weeks of the program from the CMS page.
         """
