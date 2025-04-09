@@ -4,9 +4,9 @@ Test for flexible pricing celery tasks
 
 import logging
 from unittest.mock import MagicMock, patch
-import requests
 
 import pytest
+import requests
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -19,7 +19,7 @@ from flexiblepricing.exceptions import (
     UnexpectedAPIErrorException,
 )
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
-from flexiblepricing.models import CurrencyExchangeRate, FlexiblePrice
+from flexiblepricing.models import CurrencyExchangeRate
 from flexiblepricing.tasks import (
     _calculate_discount_amount,
     _create_discount_api_call,
@@ -30,7 +30,6 @@ from flexiblepricing.tasks import (
     process_flexible_price_discount_task,
     sync_currency_exchange_rates,
 )
-from main import settings
 from users.factories import UserFactory
 
 
@@ -239,7 +238,6 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         self.product = ProductFactory(is_active=True)
         self.course_run.products.add(self.product)
 
-
         self.logger = logging.getLogger()
         self.logger_mock = MagicMock()
         self.logger.info = self.logger_mock
@@ -268,9 +266,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         result = _get_valid_product_id(product.purchasable_object.id, 1)
 
         assert result == product.id
-        mock_get_products.assert_called_once_with(
-            product.purchasable_object.id
-        )
+        mock_get_products.assert_called_once_with(product.purchasable_object.id)
         mock_logger.info.assert_not_called()
 
     @patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
@@ -289,9 +285,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         mock_get_products.side_effect = requests.exceptions.RequestException()
         result = _get_valid_product_id("test-course", 1)
         assert result is None
-        self.logger_mock.assert_called_with(
-            "Product retrieval failed for ID %s", 1
-        )
+        self.logger_mock.assert_called_with("Product retrieval failed for ID %s", 1)
 
     @patch("flexiblepricing.tasks.determine_courseware_flexible_price_discount")
     def test_calculate_discount_amount_success(self, mock_determine_discount):
@@ -364,8 +358,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         _process_flexible_price_discount(instance)
 
         mock_logger.info.assert_any_call(
-            "Processing course discounts for FlexiblePrice ID: %s", 
-            instance.id
+            "Processing course discounts for FlexiblePrice ID: %s", instance.id
         )
 
         mock_process.assert_called_once_with(self.course, instance)
@@ -386,8 +379,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         _process_flexible_price_discount(instance)
 
         mock_logger.info.assert_any_call(
-            "Processing program discounts for FlexiblePrice ID: %s", 
-            instance.id
+            "Processing program discounts for FlexiblePrice ID: %s", instance.id
         )
 
         assert mock_process.call_count == len(self.program.courses)
@@ -432,7 +424,9 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         mock_get_product.return_value = "123"
         mock_calculate.return_value = 10.0
 
-        instance = FlexiblePriceFactory(user=self.user, tier=self.tier, courseware_object=self.course)
+        instance = FlexiblePriceFactory(
+            user=self.user, tier=self.tier, courseware_object=self.course
+        )
 
         _process_course_discounts(self.course, instance)
 
