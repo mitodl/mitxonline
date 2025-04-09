@@ -807,8 +807,7 @@ components:
         grades:
           type: array
           items:
-            type: object
-            additionalProperties: {}
+            $ref: '#/components/schemas/CourseRunGrade'
           readOnly: true
       required:
       - approved_flexible_price_exists
@@ -828,6 +827,32 @@ components:
           writeOnly: true
       required:
       - run_id
+    CourseRunGrade:
+      type: object
+      description: CourseRunGrade serializer
+      properties:
+        grade:
+          type: number
+          format: double
+          maximum: 1.0
+          minimum: 0.0
+        letter_grade:
+          type: string
+          nullable: true
+          maxLength: 6
+        passed:
+          type: boolean
+        set_by_admin:
+          type: boolean
+        grade_percent:
+          type: number
+          format: double
+          description: Returns the grade field value as a number out of 100 (or None
+            if the value is None)
+          readOnly: true
+      required:
+      - grade
+      - grade_percent
     CourseWithCourseRuns:
       type: object
       description: Course model serializer - also serializes child course runs
