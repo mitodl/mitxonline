@@ -253,7 +253,7 @@ def process_flexible_price_discount_task(instance_id):
     try:
         instance = FlexiblePrice.objects.get(id=instance_id)
     except ObjectDoesNotExist:
-        log.error("FlexiblePrice instance with ID %s does not exist", instance_id)
+        log.exception("FlexiblePrice instance with ID %s does not exist", instance_id)
         return
     try:
         with transaction.atomic():
