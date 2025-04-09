@@ -1,6 +1,44 @@
 Release Notes
 =============
 
+Version 0.114.1 (Released April 09, 2025)
+---------------
+
+- Small fix for the fake test course runs (#2591)
+- adding GTM code to header (#2579)
+- add more scenarios (#2588)
+- Add edx username field to OpenEdxUser (#2589)
+- Successfully enroll in test course runs without calling edX (#2584)
+
+Version 0.114.0 (Released April 07, 2025)
+---------------
+
+- Add xdist so tests can be run faster (#2585)
+- A few small schema fixes (optional fields) (#2583)
+
+Version 0.113.3 (Released April 02, 2025)
+---------------
+
+- Revert "Prevent linking existing user if uid is different" (#2581)
+- Fix API path (#2578)
+- Improve openapi schema for enrollments API (#2577)
+- Prevent linking existing user if uid is different (#2546)
+
+Version 0.113.2 (Released March 31, 2025)
+---------------
+
+- Seed data for testing courses locally and RC (#2571)
+- automatically create cache table (#2568)
+- Add OIDC login via social-auth (#2550)
+
+Version 0.113.1 (Released March 26, 2025)
+---------------
+
+- Fix API issue caused by non-versioned API (#2574)
+- Fix varnish config for arbitrary hostnames (#2573)
+- Reset change_status on all requests to create_run_enrollment (#2566)
+- Open api (#2549)
+
 Version 0.113.0 (Released March 17, 2025)
 ---------------
 

@@ -124,7 +124,6 @@ class CoursePageSerializer(BaseCoursePageSerializer):
             else ""
         )
 
-    @extend_schema_field(int)
     def get_current_price(self, instance) -> int | None:
         relevant_product = (
             instance.product.active_products.filter().order_by("-price").first()

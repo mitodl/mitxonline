@@ -73,6 +73,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLLED,
 )
 from main.utils import encode_json_cookie_value, redirect_with_user_message
+from openapi.utils import extend_schema_get_queryset
 from openedx.api import (
     subscribe_to_edx_course_emails,
     sync_enrollments_with_edx,
@@ -381,19 +382,6 @@ class CreateEnrollmentView(APIView):
         return resp
 
 
-@extend_schema(
-    request=CourseRunEnrollmentSerializer,
-    responses={200: CourseRunEnrollmentSerializer},
-    parameters=[
-        OpenApiParameter(
-            name="id",
-            type=OpenApiTypes.INT,
-            location=OpenApiParameter.PATH,
-            description="Course run enrollment ID",
-            required=True,
-        )
-    ],
-)
 class UserEnrollmentsApiViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
@@ -406,6 +394,7 @@ class UserEnrollmentsApiViewSet(
     serializer_class = CourseRunEnrollmentSerializer
     permission_classes = [IsAuthenticated]
 
+    @extend_schema_get_queryset(CourseRunEnrollment.objects.none())
     def get_queryset(self):
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)

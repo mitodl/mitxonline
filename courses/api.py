@@ -150,29 +150,30 @@ def create_run_enrollments(  # noqa: C901
             if program_enrollment.change_status is not None:
                 program_enrollment.reactivate_and_save()
 
-    try:
-        enroll_in_edx_course_runs(
-            user,
-            runs,
-            mode=mode,
-        )
-    except (
-        UnknownEdxApiEnrollException,
-        NoEdxApiAuthError,
-        RequestsConnectionError,
-        EdxApiEnrollErrorException,
-        HTTPError,
-    ):
-        log.exception(
-            "edX enrollment failure for user: %s, runs: %s",
-            user,
-            [run.courseware_id for run in runs],
-        )
-        edx_request_success = False
-        if not keep_failed_enrollments:
-            return successful_enrollments, edx_request_success
-    else:
-        edx_request_success = True
+    edx_request_success = True
+    if not runs[0].is_fake_course_run:
+        # Make the API call to enroll the user in edX only if the run is not a fake course run
+        try:
+            enroll_in_edx_course_runs(
+                user,
+                runs,
+                mode=mode,
+            )
+        except (
+            UnknownEdxApiEnrollException,
+            NoEdxApiAuthError,
+            RequestsConnectionError,
+            EdxApiEnrollErrorException,
+            HTTPError,
+        ):
+            log.exception(
+                "edX enrollment failure for user: %s, runs: %s",
+                user,
+                [run.courseware_id for run in runs],
+            )
+            edx_request_success = False
+            if not keep_failed_enrollments:
+                return successful_enrollments, edx_request_success
 
     is_enrollment_downgraded = False
     for run in runs:

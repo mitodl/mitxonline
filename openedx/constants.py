@@ -17,3 +17,5 @@ PRO_ENROLL_MODE_ERROR_TEXTS = (
 )
 # The amount of minutes after creation that a openedx model record should be eligible for repair
 OPENEDX_REPAIR_GRACE_PERIOD_MINS = 5
+
+OPENEDX_USERNAME_MAX_LEN = 30

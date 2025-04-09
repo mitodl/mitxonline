@@ -30,7 +30,7 @@ from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.113.0"
+VERSION = "0.114.1"
 
 log = logging.getLogger()
 
@@ -202,7 +202,7 @@ INSTALLED_APPS = (
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
-    # ol-dango apps, must be after this project's apps for template precedence
+    # ol-django apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
     "mitol.google_sheets.apps.GoogleSheetsApp",
     "mitol.google_sheets_refunds.apps.GoogleSheetsRefundsApp",
@@ -248,7 +248,6 @@ SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/signin"
-LOGIN_ERROR_URL = "/signin"
 LOGOUT_REDIRECT_URL = get_string(
     name="LOGOUT_REDIRECT_URL",
     default="/",
@@ -335,10 +334,23 @@ ROBOTS_CACHE_TIMEOUT = get_int(
     description="How long the robots.txt file should be cached",
 )
 
+# Social Auth Configuration
+
+AUTHENTICATION_BACKENDS = (
+    "authentication.backends.ol_open_id_connect.OlOpenIdConnectAuth",
+    "social_core.backends.email.EmailAuth",
+    "oauth2_provider.backends.OAuth2Backend",
+    "django.contrib.auth.backends.ModelBackend",
+)
+
 SOCIAL_AUTH_LOGIN_ERROR_URL = "login"
 SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [urlparse(SITE_BASE_URL).netloc]
+SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = [
+    "global_id",
+]
 
 # Email backend settings
+
 SOCIAL_AUTH_EMAIL_FORM_URL = "login"
 SOCIAL_AUTH_EMAIL_FORM_HTML = "login.html"
 
@@ -386,6 +398,8 @@ SOCIAL_AUTH_PIPELINE = (
     "authentication.pipeline.user.get_username",
     # Create a user if one doesn't exist, and require a password and name
     "authentication.pipeline.user.create_user_via_email",
+    # If we're using the OIDC backend, create the user from the OIDC response
+    "authentication.pipeline.user.create_ol_oidc_user",
     # verify the user against export compliance
     # "authentication.pipeline.compliance.verify_exports_compliance",
     # Create the record that associates the social account with the user.
@@ -399,11 +413,59 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.user.user_details",
 )
 
+
+# Social Auth OIDC configuration
+
+SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT = get_string(
+    name="SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT",
+    default=None,
+    description="The configuration endpoint for the OIDC provider",
+)
+
+SOCIAL_AUTH_OL_OIDC_KEY = get_string(
+    name="SOCIAL_AUTH_OL_OIDC_KEY",
+    default="some available client id",
+    description="The client id for the OIDC provider",
+)
+
+SOCIAL_AUTH_OL_OIDC_SECRET = get_string(
+    name="SOCIAL_AUTH_OL_OIDC_SECRET",
+    default="some super secret key",
+    description="The client secret for the OIDC provider",
+)
+
+SOCIAL_AUTH_OL_OIDC_SCOPE = ["ol-profile"]
+
 AUTH_CHANGE_EMAIL_TTL_IN_MINUTES = get_int(
     name="AUTH_CHANGE_EMAIL_TTL_IN_MINUTES",
     default=60 * 24,
     description="Expiry time for a change email request, default is 1440 minutes(1 day)",
 )
+
+# Disable the OIDC button on the signin screen.
+# Doesn't actually disable OIDC login - you can still go to /login/ol-oidc/
+# (assuming OIDC is set up).
+EXPOSE_OIDC_LOGIN = get_bool(
+    name="EXPOSE_OIDC_LOGIN",
+    default=False,
+    description="Expose the OIDC login functionality.",
+)
+
+# These are used for logout.
+KEYCLOAK_BASE_URL = get_string(
+    name="KEYCLOAK_BASE_URL",
+    default="http://mit-keycloak-base-url.edu",
+    description="Base URL for the Keycloak instance.",
+)
+
+KEYCLOAK_REALM_NAME = get_string(
+    name="KEYCLOAK_REALM_NAME",
+    default="olapps",
+    description="Name of the realm the app uses in Keycloak.",
+)
+
+
+# Social Auth Configuration end
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.8/howto/static-files/
@@ -900,13 +962,6 @@ CACHES = {
         "LOCATION": "durable_cache",
     },
 }
-
-AUTHENTICATION_BACKENDS = (
-    "social_core.backends.email.EmailAuth",
-    "oauth2_provider.backends.OAuth2Backend",
-    "django.contrib.auth.backends.ModelBackend",
-)
-
 
 # required for migrations
 OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"  # noqa: S105

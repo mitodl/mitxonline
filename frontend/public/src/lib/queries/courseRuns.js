@@ -12,7 +12,7 @@ export const programsQueryKey = "programs"
 
 export const courseRunsQuery = (courseKey: string = "") => ({
   queryKey:  courseRunsQueryKey,
-  url:       `/api/course_runs/?relevant_to=${encodeURIComponent(courseKey)}`,
+  url:       `/api/v1/course_runs/?relevant_to=${encodeURIComponent(courseKey)}`,
   transform: json => ({
     courseRuns: json
   }),
@@ -22,8 +22,10 @@ export const courseRunsQuery = (courseKey: string = "") => ({
 })
 
 export const coursesQuery = (courseKey: string = "") => ({
-  queryKey:  coursesQueryKey,
-  url:       `/api/courses/?readable_id=${encodeURIComponent(courseKey)}&live=true`,
+  queryKey: coursesQueryKey,
+  url:      `/api/v1/courses/?readable_id=${encodeURIComponent(
+    courseKey
+  )}&live=true`,
   transform: json => ({
     courses: json
   }),
@@ -35,7 +37,7 @@ export const coursesQuery = (courseKey: string = "") => ({
 // This will need to be updated to v2 once we get the courses endpoint to allow for multiple ID query
 export const programsQuery = (programKey: string = "") => ({
   queryKey:  programsQueryKey,
-  url:       `/api/programs/?readable_id=${encodeURIComponent(programKey)}`,
+  url:       `/api/v1/programs/?readable_id=${encodeURIComponent(programKey)}`,
   transform: json => ({
     programs: json
   }),
