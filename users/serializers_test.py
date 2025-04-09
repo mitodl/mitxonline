@@ -59,10 +59,10 @@ def test_validate_required_fields(valid_address_dict, field, value, error):
     [
         [lazy_fixture("valid_address_dict"), None],  # noqa: PT007
         [lazy_fixture("intl_address_dict"), None],  # noqa: PT007
-        [
+        (
             lazy_fixture("invalid_address_dict"),
             "Invalid state specified",
-        ],
+        ),
         [lazy_fixture("address_no_state_dict"), None],  # noqa: PT007
     ],
 )
