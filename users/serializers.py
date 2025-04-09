@@ -259,8 +259,8 @@ class UserSerializer(serializers.ModelSerializer):
                 RequestsConnectionError,
                 EdxApiRegistrationValidationException,
             ) as exc:
-                log.exception("Unable to create user account", exc)  # noqa: PLE1205, TRY401
-                raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)  # noqa: B904
+                log.exception("Unable to create user account")
+                raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG) from exc
             if openedx_validation_msg_dict["username"]:
                 raise serializers.ValidationError(
                     {
