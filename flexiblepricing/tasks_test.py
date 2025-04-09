@@ -4,6 +4,7 @@ Test for flexible pricing celery tasks
 
 import logging
 from unittest.mock import MagicMock, patch
+import requests
 
 import pytest
 from django.core.exceptions import ObjectDoesNotExist
@@ -29,6 +30,7 @@ from flexiblepricing.tasks import (
     process_flexible_price_discount_task,
     sync_currency_exchange_rates,
 )
+from main import settings
 from users.factories import UserFactory
 
 
@@ -214,7 +216,16 @@ def test_financial_assistance_denied_email(status, flexprice, admin_drf_client):
 
 
 class TestFlexiblePriceDiscountProcessing(TestCase):
+    """
+    Test cases for flexible price discount processing.
+    """
+
     def setUp(self):
+        """
+        Set up test data for flexible price discount processing tests.
+        This includes creating a user, course, program, course run, product,
+        and flexible price tier instance.
+        """
         self.user = UserFactory(email="test@example.com")
         self.tier = FlexiblePriceTierFactory(
             discount=DiscountFactory(discount_type="percentage")
@@ -228,7 +239,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         self.product = ProductFactory(is_active=True)
         self.course_run.products.add(self.product)
 
-        # Set up test logger
+
         self.logger = logging.getLogger()
         self.logger_mock = MagicMock()
         self.logger.info = self.logger_mock
@@ -240,33 +251,46 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         """Test _validate_courseware_object with valid courseware object"""
         instance = FlexiblePriceFactory(courseware_object=self.course)
         result = _validate_courseware_object(instance)
-        self.assertEqual(result, self.course)
+        assert result == self.course
 
-    @patch("flexiblepricing.api.get_ecommerce_products_by_courseware_name")
-    def test_get_valid_product_id_success(self, mock_get_products):
+    @patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
+    @patch("flexiblepricing.tasks.logging.getLogger")
+    def test_get_valid_product_id_success(self, mock_logger, mock_get_products):
         """Test _get_valid_product_id with valid product"""
-        mock_get_products.return_value = [{"id": "123"}]
-        result = _get_valid_product_id("test-course", 1)
-        self.assertEqual(result, "123")
 
-    @patch("flexiblepricing.api.get_ecommerce_products_by_courseware_name")
+        product = ProductFactory()
+        mock_get_products.return_value = [
+            {
+                "id": product.id,
+            }
+        ]
+
+        result = _get_valid_product_id(product.purchasable_object.id, 1)
+
+        assert result == product.id
+        mock_get_products.assert_called_once_with(
+            product.purchasable_object.id
+        )
+        mock_logger.info.assert_not_called()
+
+    @patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
     def test_get_valid_product_id_no_products(self, mock_get_products):
         """Test _get_valid_product_id with no products"""
         mock_get_products.return_value = []
         result = _get_valid_product_id("test-course", 1)
-        self.assertIsNone(result)
+        assert result is None
         self.logger_mock.assert_called_with(
             "No products found for FlexiblePrice ID: %s", 1
         )
 
-    @patch("flexiblepricing.api.get_ecommerce_products_by_courseware_name")
+    @patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
     def test_get_valid_product_id_request_exception(self, mock_get_products):
         """Test _get_valid_product_id with request exception"""
         mock_get_products.side_effect = requests.exceptions.RequestException()
         result = _get_valid_product_id("test-course", 1)
-        self.assertIsNone(result)
+        assert result is None
         self.logger_mock.assert_called_with(
-            "Product retrieval failed for ID %s", 1, exc_info=True
+            "Product retrieval failed for ID %s", 1
         )
 
     @patch("flexiblepricing.tasks.determine_courseware_flexible_price_discount")
@@ -277,7 +301,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         instance = FlexiblePriceFactory(user=self.user)
 
         result = _calculate_discount_amount(self.course_run, instance)
-        self.assertEqual(result, 10.0)
+        assert result == 10.0
 
     @patch("flexiblepricing.tasks.determine_courseware_flexible_price_discount")
     def test_calculate_discount_amount_no_discount(self, mock_determine_discount):
@@ -286,7 +310,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         instance = FlexiblePriceFactory(user=self.user)
 
         result = _calculate_discount_amount(self.course_run, instance)
-        self.assertIsNone(result)
+        assert result is None
         self.logger_mock.assert_called_with(
             "No discount found for FlexiblePrice ID: %s", instance.id
         )
@@ -355,7 +379,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         """Test _process_flexible_price_discount with program"""
         mock_logger = MagicMock()
         mock_get_logger.return_value = mock_logger
-        
+
         instance = FlexiblePriceFactory(courseware_object=self.program)
         mock_validate.return_value = self.program
 
@@ -366,11 +390,11 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             instance.id
         )
 
-        self.assertEqual(mock_process.call_count, len(self.program.courses))
+        assert mock_process.call_count == len(self.program.courses)
         for i, course in enumerate(self.program.courses):
             args, _ = mock_process.call_args_list[i]
-            self.assertEqual(args[0], course)
-            self.assertEqual(args[1], instance)
+            assert args[0] == course
+            assert args[1] == instance
 
     @patch("flexiblepricing.tasks._process_flexible_price_discount")
     def test_process_flexible_price_discount_task_success(self, mock_process):
@@ -381,7 +405,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
 
         args, _ = mock_process.call_args
         called_instance = args[0]
-        self.assertEqual(called_instance.id, instance.id)
+        assert called_instance.id == instance.id
 
     @patch("flexiblepricing.tasks.FlexiblePrice.objects.get")
     def test_process_flexible_price_discount_task_error(self, mock_get):
@@ -393,34 +417,29 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         )
 
     @patch("flexiblepricing.tasks._get_valid_product_id")
-    @patch("flexiblepricing.tasks._calculate_discount_amount") 
+    @patch("flexiblepricing.tasks._calculate_discount_amount")
     @patch("flexiblepricing.tasks._create_discount_api_call")
     @patch("flexiblepricing.tasks.get_enrollable_courseruns_qs")
     def test_process_course_discounts_success(
         self, mock_get_runs, mock_create, mock_calculate, mock_get_product
     ):
         """Test _process_course_discounts with valid data"""
-        # Setup mock course run
         mock_course_run = MagicMock()
         mock_course_run.courseware_id = "course-run-123"
         mock_course_run.products.filter.return_value = [MagicMock()]
-        
-        # Configure mocks
+
         mock_get_runs.return_value = [mock_course_run]
-        mock_get_product.return_value = "valid-product-123" 
+        mock_get_product.return_value = "123"
         mock_calculate.return_value = 10.0
 
-        # Create test instance
         instance = FlexiblePriceFactory(user=self.user, tier=self.tier)
-        
-        # Execute
+
         _process_course_discounts(self.course, instance)
 
-        # Verify calls
         mock_get_runs.assert_called_once_with(valid_courses=[self.course])
         mock_get_product.assert_called_once_with("course-run-123", instance.id)
         mock_calculate.assert_called_once_with(mock_course_run, instance)
-        mock_create.assert_called_once_with(instance, "valid-product-123", 10.0)
+        mock_create.assert_called_once_with(instance, "123", 10.0)
 
     @patch("flexiblepricing.tasks.get_enrollable_courseruns_qs")
     def test_process_course_discounts_no_runs(self, mock_get_runs):
