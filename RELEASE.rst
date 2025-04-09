@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.114.1
+Version 0.114.1 (Released April 09, 2025)
 ---------------
 
 - Small fix for the fake test course runs (#2591)
