@@ -432,7 +432,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         mock_get_product.return_value = "123"
         mock_calculate.return_value = 10.0
 
-        instance = FlexiblePriceFactory(user=self.user, tier=self.tier)
+        instance = FlexiblePriceFactory(user=self.user, tier=self.tier, courseware_object=self.course)
 
         _process_course_discounts(self.course, instance)
 
