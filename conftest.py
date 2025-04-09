@@ -29,7 +29,7 @@ def mocked_flexibleprice_signal(mocker):  # noqa: PT004
     """Mock FlexiblePrice signals"""
     mocker.patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
 
-
+@pytest.fixture(autouse=True)
 def payment_gateway_settings(settings):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
