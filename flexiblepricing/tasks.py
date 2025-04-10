@@ -11,7 +11,6 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 
-from courses.api import get_relevant_course_run_qset
 from flexiblepricing.api import (
     determine_courseware_flexible_price_discount,
     get_ecommerce_products_by_courseware_name,
