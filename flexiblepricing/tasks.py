@@ -11,6 +11,8 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 
+from courses.api import get_relevant_course_run_qset
+from courses.models import Course
 from courses.utils import get_enrollable_courseruns_qs
 from flexiblepricing.api import (
     determine_courseware_flexible_price_discount,
@@ -127,7 +129,7 @@ def _process_flexible_price_discount(instance):
         )
         # Handle program - loop through all courses
         for course in courseware_object.courses:
-            _process_course_discounts(course, instance)
+            _process_course_discounts(course[0], instance)
     else:
         logger.info("Processing course discounts for FlexiblePrice ID: %s", instance.id)
         # Handle single course
@@ -139,7 +141,7 @@ def _process_course_discounts(course, instance):
     logger = logging.getLogger()
 
     # Get all active course runs
-    course_runs = get_enrollable_courseruns_qs(valid_courses=[course])
+    course_runs = get_relevant_course_run_qset(course)
 
     if not course_runs:
         logger.warning("No unexpired runs found for course %s", course.id)
@@ -149,7 +151,6 @@ def _process_course_discounts(course, instance):
         if not getattr(run, "courseware_id", None):
             logger.warning("Invalid courseware_id for run %s", run.id)
             continue
-
         product_id = _get_valid_product_id(run.courseware_id, instance.id)
         if not product_id:
             continue
