@@ -421,6 +421,25 @@ files = [
 ]
 
 [[package]]
+name = "channels"
+version = "4.2.2"
+description = "Brings async, event-driven capabilities to Django."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "channels-4.2.2-py3-none-any.whl", hash = "sha256:ff36a6e1576cacf40bcdc615fa7aece7a709fc4fdd2dc87f2971f4061ffdaa81"},
+    {file = "channels-4.2.2.tar.gz", hash = "sha256:8d7208e48ab8fdb972aaeae8311ce920637d97656ffc7ae5eca4f93f84bcd9a0"},
+]
+
+[package.dependencies]
+asgiref = ">=3.6.0,<4"
+Django = ">=4.2"
+
+[package.extras]
+daphne = ["daphne (>=4.0.0)"]
+tests = ["async-timeout", "coverage (>=4.5,<5.0)", "pytest", "pytest-asyncio", "pytest-django"]
+
+[[package]]
 name = "charset-normalizer"
 version = "3.3.2"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
@@ -2250,6 +2269,23 @@ files = [
 
 [package.dependencies]
 traitlets = "*"
+
+[[package]]
+name = "mitol-django-apigateway"
+version = "2025.4.4.1"
+description = "MIT Open Learning Django app for API Gateway support"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "mitol_django_apigateway-2025.4.4.1-py3-none-any.whl", hash = "sha256:d933c225ba30ca7044d812d5cdb6573691d2dc0cc906095e57b1febaaba9b10f"},
+    {file = "mitol_django_apigateway-2025.4.4.1.tar.gz", hash = "sha256:f66b0705f85a5851d937ec7f2b9b737212fc1b2a104cf8a885519664cd6d3dfd"},
+]
+
+[package.dependencies]
+channels = ">=4.2.0"
+django = ">=3.0"
+django-stubs = ">=1.13.1"
+edx-opaque-keys = "2.2.2"
 
 [[package]]
 name = "mitol-django-authentication"
@@ -4460,4 +4496,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.10.16"
-content-hash = "102014938b5082e0e9e02f4f9453c3c435cc6f3427d0a41cdd3500d9d844df7e"
+content-hash = "fe8380067d8c2b8e65d0f3a22197eea93b3d15d366653911ac30118165dac751"
