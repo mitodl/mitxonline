@@ -141,7 +141,7 @@ def _process_course_discounts(course, instance):
     logger = logging.getLogger()
 
     # Get all active course runs
-    course_runs = get_relevant_course_run_qset(course)
+    course_runs = get_enrollable_courseruns_qs(valid_courses=[course])
 
     if not course_runs:
         logger.warning("No unexpired runs found for course %s", course.id)
