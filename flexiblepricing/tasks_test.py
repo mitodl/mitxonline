@@ -385,7 +385,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         assert mock_process.call_count == len(self.program.courses)
         for i, course in enumerate(self.program.courses):
             args, _ = mock_process.call_args_list[i]
-            assert args[0] == course
+            assert args[0] == course[0]
             assert args[1] == instance
 
     @patch("flexiblepricing.tasks._process_flexible_price_discount")
