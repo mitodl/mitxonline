@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 import pytz
-from factory import Faker, LazyAttribute, SubFactory, Trait
+from factory import Faker, LazyAttribute, SelfAttribute, SubFactory, Trait
 from factory.django import DjangoModelFactory
 from mitol.common.utils import now_in_utc
 
@@ -17,6 +17,7 @@ class OpenEdxUserFactory(DjangoModelFactory):
     user = SubFactory("users.factories.UserFactory")
     platform = PLATFORM_EDX
     has_been_synced = True
+    edx_username = SelfAttribute("user.username")
 
     class Meta:
         model = OpenEdxUser

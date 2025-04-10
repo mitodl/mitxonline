@@ -59,7 +59,7 @@ def test_create_user_too_many_attempts(mocker):
     Test that create_user_with_generated_username exits if there are too many attempts
     """
     attempt_limit = 2
-    mocker.patch("authentication.api.edx_username_COLLISION_ATTEMPTS", attempt_limit)
+    mocker.patch("authentication.api.USERNAME_COLLISION_ATTEMPTS", attempt_limit)
     patched_save = mocker.patch.object(
         UserSerializer,
         "save",

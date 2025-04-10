@@ -188,7 +188,6 @@ class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     email = WriteableSerializerMethodField()
     username = serializers.CharField(
-        source="edx_username",
         validators=[
             UniqueValidator(
                 queryset=User.objects.all(),

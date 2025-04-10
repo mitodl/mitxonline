@@ -570,21 +570,27 @@ def test_retry_failed_enroll_grace_period(mocker):
     "no_openedx_user,no_edx_auth",  # noqa: PT006
     itertools.product([True, False], [True, False]),
 )
-def test_repair_faulty_edx_user(mocker, user, no_openedx_user, no_edx_auth):
+def test_repair_faulty_edx_user(mocker, no_openedx_user, no_edx_auth):
     """
     Tests that repair_faulty_edx_user creates OpenEdxUser/OpenEdxApiAuth objects as necessary and
     returns flags that indicate what was created
     """
+    user = UserFactory.create(
+        no_openedx_user=no_openedx_user, no_openedx_api_auth=no_edx_auth
+    )
+
     patched_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
     mocker.patch(
         "openedx.api.create_edx_user",
         return_value=True if no_openedx_user else False,  # noqa: SIM210
     )
-    openedx_api_auth = None if no_edx_auth else OpenEdxApiAuthFactory.build()
-    user.openedx_api_auth = openedx_api_auth
 
     created_user, created_auth_token = repair_faulty_edx_user(user)
-    assert patched_create_edx_auth_token.called is no_edx_auth
+
+    if no_edx_auth:
+        patched_create_edx_auth_token.assert_called_once_with(user)
+    else:
+        patched_create_edx_auth_token.assert_not_called()
     assert created_user is no_openedx_user
     assert created_auth_token is no_edx_auth
 
