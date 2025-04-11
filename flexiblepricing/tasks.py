@@ -3,12 +3,20 @@ Periodic task that updates currency exchange rates.
 """
 
 import logging
+import uuid
 from urllib.parse import quote_plus, urljoin
 
 import requests
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 
-from flexiblepricing.api import update_currency_exchange_rate
+from courses.utils import get_enrollable_courseruns_qs
+from flexiblepricing.api import (
+    determine_courseware_flexible_price_discount,
+    get_ecommerce_products_by_courseware_name,
+    update_currency_exchange_rate,
+)
 from flexiblepricing.exceptions import (
     ExceededAPICallsException,
     UnexpectedAPIErrorException,
@@ -101,3 +109,153 @@ def notify_financial_assistance_request_denied_email(
     send_financial_assistance_request_denied_email(
         flexible_price, email_subject, email_body
     )
+
+
+def _process_flexible_price_discount(instance):
+    """Handle the core discount creation logic."""
+    logger = logging.getLogger()
+    courseware_object = _validate_courseware_object(instance)
+    if not courseware_object:
+        return
+
+    # Determine if courseware_object is a program or course
+    is_program = hasattr(courseware_object, "courses")
+
+    if is_program:
+        logger.info(
+            "Processing program discounts for FlexiblePrice ID: %s", instance.id
+        )
+        # Handle program - loop through all courses
+        for course in courseware_object.courses:
+            _process_course_discounts(course[0], instance)
+    else:
+        logger.info("Processing course discounts for FlexiblePrice ID: %s", instance.id)
+        # Handle single course
+        _process_course_discounts(courseware_object, instance)
+
+
+def _process_course_discounts(course, instance):
+    """Process discounts for a single course and its runs."""
+    logger = logging.getLogger()
+
+    # Get all active course runs
+    course_runs = get_enrollable_courseruns_qs(valid_courses=[course])
+
+    if not course_runs:
+        logger.warning("No unexpired runs found for course %s", course.id)
+        return
+
+    for run in course_runs:
+        if not getattr(run, "courseware_id", None):
+            logger.warning("Invalid courseware_id for run %s", run.id)
+            continue
+        product_id = _get_valid_product_id(run.courseware_id, instance.id)
+        if not product_id:
+            continue
+
+        discount_amount = _calculate_discount_amount(run, instance)
+        if not discount_amount:
+            continue
+
+        _create_discount_api_call(instance, product_id, discount_amount)
+
+
+def _validate_courseware_object(instance):
+    """Validate and return the courseware object if valid."""
+    logger = logging.getLogger()
+    if not getattr(instance, "courseware_object", None):
+        logger.warning(
+            "No courseware object found for FlexiblePrice ID: %s", instance.id
+        )
+        return None
+    return instance.courseware_object
+
+
+def _get_valid_product_id(courseware_id, instance_id):
+    """Retrieve and validate the product ID."""
+    logger = logging.getLogger()
+    try:
+        products = get_ecommerce_products_by_courseware_name(courseware_id)
+        if not products:
+            logger.warning("No products found for FlexiblePrice ID: %s", instance_id)
+            return None
+
+        product_id = products[-1].get("id")
+        if not product_id:
+            logger.error("Invalid product structure for ID: %s", instance_id)
+        else:
+            return product_id
+    except (requests.exceptions.RequestException, ValueError):
+        logger.exception("Product retrieval failed for ID %s", instance_id)
+        return None
+
+
+def _calculate_discount_amount(course_run, instance):
+    """Calculate and return the discount amount if valid."""
+    logger = logging.getLogger()
+    try:
+        product = course_run.products.filter(is_active=True).first()
+        discount = determine_courseware_flexible_price_discount(product, instance.user)
+        if discount:
+            return float(discount.amount)
+        else:
+            logger.warning("No discount found for FlexiblePrice ID: %s", instance.id)
+    except (KeyError, ValueError, TypeError):
+        logger.exception("Error calculating discount for ID %s", instance.id)
+        return None
+
+
+def _create_discount_api_call(instance, product_id, amount):
+    """Make the API call to create the discount."""
+    logger = logging.getLogger()
+    try:
+        url = f"{settings.UNIFIED_ECOMMERCE_URL}/api/v0/payments/discounts/"
+        api_key = settings.UNIFIED_ECOMMERCE_API_KEY
+
+        discount_data = {
+            "codes": str(uuid.uuid4()),
+            "discount_type": instance.tier.discount.discount_type,
+            "amount": amount,
+            "payment_type": "financial-assistance",
+            "users": [getattr(instance.user, "email", "")],
+            "product": product_id,
+            "automatic": True,
+        }
+
+        response = requests.post(
+            url,
+            json=discount_data,
+            headers={"Authorization": f"Api-Key {api_key}"},
+            timeout=10,
+        )
+
+        if response.status_code == 201:  # noqa: PLR2004
+            logger.info("Discount created for ID: %s", instance.id)
+        else:
+            logger.error(
+                "Discount creation failed for ID %s. Status: %s",
+                instance.id,
+                response.status_code,
+            )
+    except requests.exceptions.RequestException:
+        logger.exception("API request failed for ID %s", instance.id)
+    except (KeyError, ValueError, TypeError):
+        logger.exception("Unexpected API error for ID %s", instance.id)
+
+
+@app.task
+def process_flexible_price_discount_task(instance_id):
+    """
+    Process the flexible price discount for the given instance.
+    """
+    log = logging.getLogger()
+    try:
+        instance = FlexiblePrice.objects.get(id=instance_id)
+    except ObjectDoesNotExist:
+        log.exception("FlexiblePrice instance with ID %s does not exist", instance_id)
+        return
+    try:
+        with transaction.atomic():
+            _process_flexible_price_discount(instance)
+    except (ValueError, TypeError, AttributeError):
+        log.exception("Error processing flexible price discount")

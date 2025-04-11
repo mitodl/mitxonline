@@ -260,6 +260,7 @@ def test_create_edx_auth_token(settings, user):
     refresh_token = "abc123"  # noqa: S105
     access_token = "def456"  # noqa: S105
     code = "ghi789"
+
     responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}{settings.OPENEDX_SOCIAL_LOGIN_PATH}",
@@ -304,7 +305,6 @@ def test_create_edx_auth_token(settings, user):
 
     assert auth.refresh_token == refresh_token
     assert auth.access_token == access_token
-    # plus expires_in, minutes 10 seconds
     assert auth.access_token_expires_on == now_in_utc() + timedelta(
         minutes=59, seconds=50
     )

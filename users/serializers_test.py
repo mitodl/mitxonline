@@ -5,8 +5,6 @@ import responses
 from django.contrib.auth.models import AnonymousUser
 from django.test.client import RequestFactory
 from pytest_lazyfixture import lazy_fixture
-from requests import HTTPError
-from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
@@ -14,7 +12,6 @@ from fixtures.common import (
     valid_address_dict,
 )
 from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
-from openedx.exceptions import EdxApiRegistrationValidationException
 from users.factories import UserFactory
 from users.models import HIGHEST_EDUCATION_CHOICES, ChangeEmailRequest, LegalAddress
 from users.serializers import (
@@ -62,7 +59,10 @@ def test_validate_required_fields(valid_address_dict, field, value, error):
     [
         [lazy_fixture("valid_address_dict"), None],  # noqa: PT007
         [lazy_fixture("intl_address_dict"), None],  # noqa: PT007
-        [lazy_fixture("invalid_address_dict"), "Invalid state specified"],  # noqa: PT007
+        (
+            lazy_fixture("invalid_address_dict"),
+            "Invalid state specified",
+        ),
         [lazy_fixture("address_no_state_dict"), None],  # noqa: PT007
     ],
 )
@@ -255,20 +255,40 @@ def test_username_validation_exception(user, settings):
     )
 
 
+@responses.activate
 @pytest.mark.django_db
-@pytest.mark.parametrize(
-    "exception_raised",
-    [EdxApiRegistrationValidationException, RequestsConnectionError, HTTPError],
-)
-def test_username_validation_connection_exception(
-    mocker, exception_raised, valid_address_dict
-):
+def test_username_validation_connection_error(mocker, valid_address_dict):
     """
     UserSerializer should raise a RequestsConnectionError or HTTPError if the connection to OpenEdx
     fails.  The serializer should raise a validation error.
     """
-    mocker.patch(
-        "openedx.api.validate_username_email_with_edx", side_effect=exception_raised
+    # no responses registered triggers a connection error
+    serializer = UserSerializer(
+        data={
+            "username": "unique-username",
+            "email": "email11111@example.com",
+            "password": "abcdefghi123",
+            "legal_address": valid_address_dict,
+        }
+    )
+    assert serializer.is_valid() is False
+    assert serializer.errors == {
+        "non_field_errors": ["Unable to register at this time, please try again later"]
+    }
+
+
+@responses.activate
+@pytest.mark.django_db
+def test_username_validation_server_error(settings, mocker, valid_address_dict):
+    """
+    UserSerializer should raise a RequestsConnectionError or HTTPError if the connection to OpenEdx
+    fails.  The serializer should raise a validation error.
+    """
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
+        json={},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
     )
 
     serializer = UserSerializer(
@@ -279,8 +299,10 @@ def test_username_validation_connection_exception(
             "legal_address": valid_address_dict,
         }
     )
-    with pytest.raises(Exception):  # noqa: B017, PT011
-        assert serializer.is_valid() is False
+    assert serializer.is_valid() is False
+    assert serializer.errors == {
+        "non_field_errors": ["Unable to register at this time, please try again later"]
+    }
 
 
 @responses.activate
