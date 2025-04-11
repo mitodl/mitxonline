@@ -150,7 +150,7 @@ class Command(BaseCommand):
                     if user_discounts is not None:
                         self.stderr.write(
                             self.style.ERROR(
-                                f"Discount already exists for {user.username} in course {row[1]}, skipping"
+                                f"Discount already exists for {user.edx_username} in course {row[1]}, skipping"
                             )
                         )
                         continue

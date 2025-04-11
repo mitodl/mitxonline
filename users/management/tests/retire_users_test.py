@@ -79,7 +79,7 @@ def test_retire_user_with_email(mocker):
 
     mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
-        return_value={"successful_user_retirements": [user.username]},
+        return_value={"successful_user_retirements": [user.edx_username]},
     )
 
     assert user.is_active is True
@@ -92,7 +92,7 @@ def test_retire_user_with_email(mocker):
     assert user.is_active is False
     assert "retired_email" in user.email
     assert UserSocialAuth.objects.filter(user=user).count() == 0
-    mock_bulk_retire_edx_users.assert_called_with(user.username)
+    mock_bulk_retire_edx_users.assert_called_with(user.edx_username)
 
 
 @pytest.mark.django_db
@@ -111,7 +111,7 @@ def test_retire_user_blocking_with_email(mocker):
 
     mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
-        return_value={"successful_user_retirements": [user.username]},
+        return_value={"successful_user_retirements": [user.edx_username]},
     )
     COMMAND.handle("retire_users", users=[test_email], block_users=True)
 
@@ -121,7 +121,7 @@ def test_retire_user_blocking_with_email(mocker):
     assert UserSocialAuth.objects.filter(user=user).count() == 0
     assert BlockList.objects.all().count() == 1
     assert BlockList.objects.filter(hashed_email=hashed_email).count() == 1
-    mock_bulk_retire_edx_users.assert_called_with(user.username)
+    mock_bulk_retire_edx_users.assert_called_with(user.edx_username)
 
 
 @pytest.mark.django_db
@@ -170,7 +170,7 @@ def test_user_blocking_if_not_requested(mocker):
 
     mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
-        return_value={"successful_user_retirements": [user.username]},
+        return_value={"successful_user_retirements": [user.edx_username]},
     )
     COMMAND.handle("retire_users", users=[test_email])
 
@@ -179,4 +179,4 @@ def test_user_blocking_if_not_requested(mocker):
     assert "retired_email" in user.email
     assert UserSocialAuth.objects.filter(user=user).count() == 0
     assert BlockList.objects.all().count() == 0
-    mock_bulk_retire_edx_users.assert_called_with(user.username)
+    mock_bulk_retire_edx_users.assert_called_with(user.edx_username)

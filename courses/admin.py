@@ -355,7 +355,7 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
     )
     def get_user_username(self, obj):
         """Returns the related User username"""
-        return obj.user.username
+        return obj.user.edx_username
 
     @admin.display(
         description="Course Run",

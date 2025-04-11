@@ -50,6 +50,7 @@ def test_create_user(create_func, exp_staff, exp_superuser, exp_is_active, passw
     assert user.is_staff is exp_staff
     assert user.is_superuser is exp_superuser
     assert user.is_active is exp_is_active
+    assert user.edx_username == username
     if password is not None:
         assert user.check_password(password)
 

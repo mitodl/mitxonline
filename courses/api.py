@@ -741,7 +741,7 @@ def manage_course_run_certificate_access(user, courseware_id, revoke_state):
     except CourseRunCertificate.DoesNotExist:
         log.warning(
             "Course run certificate for user: %s and course_run: %s does not exist.",
-            user.username,
+            user.edx_username,
             course_run,
         )
         return False
@@ -864,7 +864,7 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
     if program_cert:
         log.info(
             "Program certificate for [%s] in program [%s] is created.",
-            user.username,
+            user.edx_username,
             program.title,
         )
         sync_hubspot_user(user)
@@ -875,7 +875,7 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
         if created:
             log.info(
                 "Program enrollment for [%s] in program [%s] is created.",
-                user.username,
+                user.edx_username,
                 program.title,
             )
 
@@ -927,7 +927,7 @@ def manage_program_certificate_access(user, program, revoke_state):
     except ProgramCertificate.DoesNotExist:
         log.warning(
             "Program certificate for user: %s and program: %s does not exist.",
-            user.username,
+            user.edx_username,
             program.readable_id,
         )
         return False

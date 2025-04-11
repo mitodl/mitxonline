@@ -109,14 +109,16 @@ class Command(BaseCommand):
         new_account.legal_address.last_name = kwargs["lastname"]
         new_account.legal_address.country = kwargs["countrycode"]
 
-        self.stdout.write(self.style.SUCCESS(f"Created user {new_account.username}."))
+        self.stdout.write(
+            self.style.SUCCESS(f"Created user {new_account.edx_username}.")
+        )
 
         try:
             openedx_create_user(new_account)
         except:  # noqa: E722
             self.stdout.write(
                 self.style.ERROR(
-                    f"An error occurred creating the Open edX user for {new_account.username}; will queue it for later."
+                    f"An error occurred creating the Open edX user for {new_account.edx_username}; will queue it for later."
                 )
             )
             openedx_create_user_from_id.apply_async(
@@ -126,7 +128,7 @@ class Command(BaseCommand):
         if kwargs["enroll"] is not None and len(kwargs["enroll"]) > 0:
             call_command(
                 "create_enrollment",
-                user=new_account.username,
+                user=new_account.edx_username,
                 run=kwargs["enroll"],
                 keep_failed_enrollments=True,
             )

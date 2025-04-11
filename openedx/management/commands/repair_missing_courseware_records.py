@@ -33,7 +33,7 @@ class Command(BaseCommand):
         user_attr = options.get("user")
         if user_attr is not None:
             user = fetch_user(user_attr)
-            self.stdout.write(f"Repairing user '{user.username}' ({user.email})")
+            self.stdout.write(f"Repairing user '{user.edx_username}' ({user.email})")
             users = [user]
         else:
             users_to_repair = User.faulty_openedx_users
@@ -50,7 +50,7 @@ class Command(BaseCommand):
             except HTTPError as exc:
                 self.stderr.write(
                     self.style.ERROR(
-                        f"{user.username} ({user.email}): "
+                        f"{user.edx_username} ({user.email}): "
                         f"Failed to repair ({get_error_response_summary(exc.response)})"
                     )
                 )
@@ -58,7 +58,7 @@ class Command(BaseCommand):
             except Exception as exc:  # pylint: disable=broad-except  # noqa: BLE001
                 self.stderr.write(
                     self.style.ERROR(
-                        f"{user.username} ({user.email}): Failed to repair (Exception: {exc!s})"
+                        f"{user.edx_username} ({user.email}): Failed to repair (Exception: {exc!s})"
                     )
                 )
                 error_count += 1
@@ -69,7 +69,7 @@ class Command(BaseCommand):
                     result.append("Created edX auth token")
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"{user.username} ({user.email}): {', '.join(result)}"
+                        f"{user.edx_username} ({user.email}): {', '.join(result)}"
                     )
                 )
                 success_count += 1

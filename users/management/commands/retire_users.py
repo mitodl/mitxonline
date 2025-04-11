@@ -104,8 +104,8 @@ class Command(BaseCommand):
                 )
                 continue
 
-            resp = bulk_retire_edx_users(user.username)
-            if user.username not in resp["successful_user_retirements"]:
+            resp = bulk_retire_edx_users(user.edx_username)
+            if user.edx_username not in resp["successful_user_retirements"]:
                 self.stderr.write(
                     self.style.ERROR(
                         f"Could not initiate retirement request on edX for user {user}"

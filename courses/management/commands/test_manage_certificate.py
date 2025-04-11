@@ -23,7 +23,7 @@ def edx_grade_json(user):
     return {
         "passed": True,
         "course_id": "test_course_id",
-        "username": user.username,
+        "username": user.edx_username,
         "percent": 0.5,
     }
 
@@ -44,12 +44,12 @@ def test_certificate_management_invalid_run():
 
     test_user = UserFactory.create()
     with pytest.raises(CommandError) as command_error:
-        manage_certificates.Command().handle(user=test_user.username, create=True)
+        manage_certificates.Command().handle(user=test_user.edx_username, create=True)
     assert str(command_error.value) == "The command needs a valid course run."
 
     with pytest.raises(CommandError) as command_error:
         manage_certificates.Command().handle(
-            user=test_user.username, create=True, run="test"
+            user=test_user.edx_username, create=True, run="test"
         )
     assert str(command_error.value) == "Could not find run with courseware_id=test."
 
@@ -137,7 +137,7 @@ def test_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke, 
         revoke=revoke,
         unrevoke=unrevoke,
         run=course_run.courseware_id,
-        user=user.username,
+        user=user.edx_username,
     )
     certificate.refresh_from_db()
     assert certificate.is_revoked is (True if revoke else False)  # noqa: SIM210
@@ -171,7 +171,7 @@ def test_certificate_management_create(mocker, user, edx_grade_json, revoked):
         ],
     )
     manage_certificates.Command().handle(
-        create=True, run=course_run.courseware_id, user=user.username
+        create=True, run=course_run.courseware_id, user=user.edx_username
     )
 
     generated_certificates = CourseRunCertificate.objects.filter(

@@ -52,7 +52,9 @@ class Command(BaseCommand):
         successes = failures = 0
 
         for user in users:
-            self.stdout.write(f"Updating profile for '{user.username}' ({user.email})")
+            self.stdout.write(
+                f"Updating profile for '{user.edx_username}' ({user.email})"
+            )
 
             try:
                 result = update_edx_user_profile(user)  # noqa: F841
@@ -60,7 +62,7 @@ class Command(BaseCommand):
             except Exception as e:  # noqa: BLE001
                 self.stdout.write(
                     self.style.ERROR(
-                        f"Sync did not complete successfully for user {user.username}: {e}"
+                        f"Sync did not complete successfully for user {user.edx_username}: {e}"
                     )
                 )
                 failures += 1

@@ -224,7 +224,7 @@ class Command(BaseCommand):
                 )
 
                 results.append(
-                    f"Processed user {user.username} ({user.email}) in course run {course_run.courseware_id}. Result - {result_summary}"
+                    f"Processed user {user.edx_username} ({user.email}) in course run {course_run.courseware_id}. Result - {result_summary}"
                 )
 
             for result in results:

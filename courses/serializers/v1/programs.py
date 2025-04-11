@@ -343,7 +343,7 @@ class LearnerRecordSerializer(serializers.Serializer):
             "user": {
                 "name": user.name,
                 "email": user.email,
-                "username": user.username,
+                "username": user.edx_username,
             },
             "program": {
                 "title": instance.title,
