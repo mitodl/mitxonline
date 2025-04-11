@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.114.2
+---------------
+
+- Make Preview certificate work in the CMS (#2597)
+- Populate edx_username from existing user records (#2593)
+- OpenAPI Schema Fixes (#2595)
+
 Version 0.114.1 (Released April 09, 2025)
 ---------------
 
