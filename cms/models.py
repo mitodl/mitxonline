@@ -422,8 +422,16 @@ class CertificatePage(CourseProgramChildPage):
         context = {}
 
         if request.is_preview:
+            is_program_certificate = False
+            if isinstance(self.parent, ProgramPage):
+                is_program_certificate = True
+                product_name = self.parent.program.title
+            else:
+                product_name = self.parent.course.title
             preview_context = {
+                "uuid": "fake-uuid",
                 "learner_name": "Anthony M. Stark",
+                "product_name": product_name,
                 "start_date": (
                     self.parent.product.first_unexpired_run.start_date
                     if self.parent.product.first_unexpired_run
@@ -435,6 +443,7 @@ class CertificatePage(CourseProgramChildPage):
                     else datetime.now() + timedelta(days=45)  # noqa: DTZ005
                 ),
                 "CEUs": self.CEUs,
+                "is_program_certificate": is_program_certificate,
             }
         elif self.certificate:
             # Verify that the certificate in fact is for this same course

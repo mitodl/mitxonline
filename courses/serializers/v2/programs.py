@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
@@ -72,8 +74,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     min_weekly_hours = serializers.SerializerMethodField()
     max_weekly_hours = serializers.SerializerMethodField()
 
-    @extend_schema_field(list)
-    def get_courses(self, instance):
+    def get_courses(self, instance) -> list[int]:
         return [course[0].id for course in instance.courses if course[0].live]
 
     @extend_schema_field(
@@ -107,8 +108,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "electives": [course.id for course in instance.elective_courses],
         }
 
-    @extend_schema_field(dict)
-    def get_required_prerequisites(self, instance):
+    def get_required_prerequisites(self, instance) -> bool:
         """
         Check if the prerequisites field is populated in the program page CMS.
         """
@@ -118,8 +118,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             and instance.page.prerequisites != ""
         )
 
-    @extend_schema_field(int)
-    def get_duration(self, instance):
+    def get_duration(self, instance) -> str | None:
         """
         Get the length/duration field from the program page CMS.
         """
@@ -128,8 +127,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
-    @extend_schema_field(str)
-    def get_time_commitment(self, instance):
+    def get_time_commitment(self, instance) -> str | None:
         """
         Get the effort/time_commitment field from the program page CMS.
         """
@@ -154,7 +152,19 @@ class ProgramSerializer(serializers.ModelSerializer):
         else:
             return {"feature_image_src": get_thumbnail_url(None)}
 
-    @extend_schema_field(list)
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                    },
+                },
+            },
+        }
+    )
     def get_topics(self, instance):
         """List all topics in all courses in the program"""
         topics = set(  # noqa: C401
@@ -171,8 +181,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             return "MicroMasters Credential"
         return "Certificate of Completion"
 
-    @extend_schema_field(int)
-    def get_min_weekly_hours(self, instance):
+    def get_min_weekly_hours(self, instance) -> str | None:
         """
         Get the min weekly hours of the course from the course page CMS.
         """
@@ -181,8 +190,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
-    @extend_schema_field(int)
-    def get_max_weekly_hours(self, instance):
+    def get_max_weekly_hours(self, instance) -> str | None:
         """
         Get the max weekly hours of the course from the course page CMS.
         """
@@ -191,8 +199,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
-    @extend_schema_field(int)
-    def get_min_weeks(self, instance):
+    def get_min_weeks(self, instance) -> int | None:
         """
         Get the min weeks of the program from the CMS page.
         """
@@ -201,8 +208,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
-    @extend_schema_field(int)
-    def get_max_weeks(self, instance):
+    def get_max_weeks(self, instance) -> int | None:
         """
         Get the max weeks of the program from the CMS page.
         """

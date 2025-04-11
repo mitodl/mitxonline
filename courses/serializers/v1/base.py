@@ -113,6 +113,14 @@ class CourseRunCertificateSerializer(serializers.ModelSerializer):
         fields = ["uuid", "link"]
 
 
+class CourseRunGradeSerializer(serializers.ModelSerializer):
+    """CourseRunGrade serializer"""
+
+    class Meta:
+        model = models.CourseRunGrade
+        fields = ["grade", "letter_grade", "passed", "set_by_admin", "grade_percent"]
+
+
 class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     certificate = serializers.SerializerMethodField(read_only=True)
     enrollment_mode = serializers.ChoiceField(
@@ -165,7 +173,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         )
         return flexible_price_exists  # noqa: RET504
 
-    @extend_schema_field(list[dict])
+    @extend_schema_field(CourseRunGradeSerializer(many=True))
     def get_grades(self, instance):
         instance_run = instance[0].run if isinstance(instance, list) else instance.run
         instance_user = (
@@ -201,11 +209,3 @@ class ProductRelatedField(serializers.RelatedField):
             instance=instance, context=self.context
         )
         return serializer.data
-
-
-class CourseRunGradeSerializer(serializers.ModelSerializer):
-    """CourseRunGrade serializer"""
-
-    class Meta:
-        model = models.CourseRunGrade
-        fields = ["grade", "letter_grade", "passed", "set_by_admin", "grade_percent"]

@@ -807,8 +807,7 @@ components:
         grades:
           type: array
           items:
-            type: object
-            additionalProperties: {}
+            $ref: '#/components/schemas/CourseRunGrade'
           readOnly: true
       required:
       - approved_flexible_price_exists
@@ -828,6 +827,32 @@ components:
           writeOnly: true
       required:
       - run_id
+    CourseRunGrade:
+      type: object
+      description: CourseRunGrade serializer
+      properties:
+        grade:
+          type: number
+          format: double
+          maximum: 1.0
+          minimum: 0.0
+        letter_grade:
+          type: string
+          nullable: true
+          maxLength: 6
+        passed:
+          type: boolean
+        set_by_admin:
+          type: boolean
+        grade_percent:
+          type: number
+          format: double
+          description: Returns the grade field value as a number out of 100 (or None
+            if the value is None)
+          readOnly: true
+      required:
+      - grade
+      - grade_percent
     CourseWithCourseRuns:
       type: object
       description: Course model serializer - also serializes child course runs
@@ -843,7 +868,7 @@ components:
           pattern: ^[\w\-+:\.]+$
           maxLength: 255
         next_run_id:
-          type: string
+          type: integer
           nullable: true
           description: Get next run id
           readOnly: true
@@ -905,12 +930,13 @@ components:
           description: Get course availability
           readOnly: true
         min_weekly_hours:
-          type: integer
+          type: string
+          nullable: true
           description: Get the min weekly hours of the course from the course page
             CMS.
           readOnly: true
         max_weekly_hours:
-          type: integer
+          type: string
           nullable: true
           description: Get the max weekly hours of the course from the course page
             CMS.
@@ -2038,7 +2064,8 @@ components:
           readOnly: true
         courses:
           type: array
-          items: {}
+          items:
+            type: integer
           readOnly: true
         requirements:
           type: object
@@ -2081,8 +2108,11 @@ components:
           type: boolean
         topics:
           type: array
-          items: {}
-          description: List all topics in all courses in the program
+          items:
+            type: object
+            properties:
+              name:
+                type: string
           readOnly: true
         availability:
           $ref: '#/components/schemas/AvailabilityEnum'
@@ -2103,35 +2133,40 @@ components:
           format: date-time
           nullable: true
         required_prerequisites:
-          type: object
-          additionalProperties: {}
+          type: boolean
           description: Check if the prerequisites field is populated in the program
             page CMS.
           readOnly: true
         duration:
-          type: integer
+          type: string
+          nullable: true
           description: Get the length/duration field from the program page CMS.
           readOnly: true
         min_weeks:
           type: integer
+          nullable: true
           description: Get the min weeks of the program from the CMS page.
           readOnly: true
         max_weeks:
           type: integer
+          nullable: true
           description: Get the max weeks of the program from the CMS page.
           readOnly: true
         time_commitment:
           type: string
+          nullable: true
           description: Get the effort/time_commitment field from the program page
             CMS.
           readOnly: true
         min_weekly_hours:
-          type: integer
+          type: string
+          nullable: true
           description: Get the min weekly hours of the course from the course page
             CMS.
           readOnly: true
         max_weekly_hours:
-          type: integer
+          type: string
+          nullable: true
           description: Get the max weekly hours of the course from the course page
             CMS.
           readOnly: true
