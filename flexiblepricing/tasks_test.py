@@ -2,22 +2,35 @@
 Test for flexible pricing celery tasks
 """
 
-from unittest.mock import patch
+import logging
+from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
+from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from courses.factories import CourseRunFactory
-from ecommerce.factories import ProductFactory
+from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from ecommerce.factories import DiscountFactory, ProductFactory
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.exceptions import (
     ExceededAPICallsException,
     UnexpectedAPIErrorException,
 )
-from flexiblepricing.factories import FlexiblePriceFactory
+from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import CurrencyExchangeRate
-from flexiblepricing.tasks import sync_currency_exchange_rates
+from flexiblepricing.tasks import (
+    _calculate_discount_amount,
+    _create_discount_api_call,
+    _get_valid_product_id,
+    _process_course_discounts,
+    _process_flexible_price_discount,
+    _validate_courseware_object,
+    process_flexible_price_discount_task,
+    sync_currency_exchange_rates,
+)
+from users.factories import UserFactory
 
 
 class TaskConfigurationTest(TestCase):
@@ -199,3 +212,237 @@ def test_financial_assistance_denied_email(status, flexprice, admin_drf_client):
             mocked_mailer.assert_called()
         else:
             mocked_mailer.assert_not_called()
+
+
+class TestFlexiblePriceDiscountProcessing(TestCase):
+    """
+    Test cases for flexible price discount processing.
+    """
+
+    def setUp(self):
+        """
+        Set up test data for flexible price discount processing tests.
+        This includes creating a user, course, program, course run, product,
+        and flexible price tier instance.
+        """
+        self.user = UserFactory(email="test@example.com")
+        self.tier = FlexiblePriceTierFactory(
+            discount=DiscountFactory(discount_type="percentage")
+        )
+        self.course = CourseFactory()
+        self.program = ProgramFactory()
+        self.program.add_requirement(self.course)
+        self.course_run = CourseRunFactory(
+            course=self.course, courseware_id="course-v1:test+test+test"
+        )
+        self.product = ProductFactory(is_active=True)
+        self.course_run.products.add(self.product)
+
+        self.logger = logging.getLogger()
+        self.logger_mock = MagicMock()
+        self.logger.info = self.logger_mock
+        self.logger.warning = self.logger_mock
+        self.logger.error = self.logger_mock
+        self.logger.exception = self.logger_mock
+
+    def test_validate_courseware_object_with_valid_object(self):
+        """Test _validate_courseware_object with valid courseware object"""
+        instance = FlexiblePriceFactory(courseware_object=self.course)
+        result = _validate_courseware_object(instance)
+        assert result == self.course
+
+    @patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
+    @patch("flexiblepricing.tasks.logging.getLogger")
+    def test_get_valid_product_id_success(self, mock_logger, mock_get_products):
+        """Test _get_valid_product_id with valid product"""
+
+        product = ProductFactory()
+        mock_get_products.return_value = [
+            {
+                "id": product.id,
+            }
+        ]
+
+        result = _get_valid_product_id(product.purchasable_object.id, 1)
+
+        assert result == product.id
+        mock_get_products.assert_called_once_with(product.purchasable_object.id)
+        mock_logger.info.assert_not_called()
+
+    @patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
+    def test_get_valid_product_id_no_products(self, mock_get_products):
+        """Test _get_valid_product_id with no products"""
+        mock_get_products.return_value = []
+        result = _get_valid_product_id("test-course", 1)
+        assert result is None
+        self.logger_mock.assert_called_with(
+            "No products found for FlexiblePrice ID: %s", 1
+        )
+
+    @patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
+    def test_get_valid_product_id_request_exception(self, mock_get_products):
+        """Test _get_valid_product_id with request exception"""
+        mock_get_products.side_effect = requests.exceptions.RequestException()
+        result = _get_valid_product_id("test-course", 1)
+        assert result is None
+        self.logger_mock.assert_called_with("Product retrieval failed for ID %s", 1)
+
+    @patch("flexiblepricing.tasks.determine_courseware_flexible_price_discount")
+    def test_calculate_discount_amount_success(self, mock_determine_discount):
+        """Test _calculate_discount_amount with valid discount"""
+        mock_discount = MagicMock(amount="10.00")
+        mock_determine_discount.return_value = mock_discount
+        instance = FlexiblePriceFactory(user=self.user)
+
+        result = _calculate_discount_amount(self.course_run, instance)
+        assert result == 10.0
+
+    @patch("flexiblepricing.tasks.determine_courseware_flexible_price_discount")
+    def test_calculate_discount_amount_no_discount(self, mock_determine_discount):
+        """Test _calculate_discount_amount with no discount"""
+        mock_determine_discount.return_value = None
+        instance = FlexiblePriceFactory(user=self.user)
+
+        result = _calculate_discount_amount(self.course_run, instance)
+        assert result is None
+        self.logger_mock.assert_called_with(
+            "No discount found for FlexiblePrice ID: %s", instance.id
+        )
+
+    @patch("flexiblepricing.tasks.requests.post")
+    @override_settings(
+        UNIFIED_ECOMMERCE_URL="http://test.com", UNIFIED_ECOMMERCE_API_KEY="test-key"
+    )
+    def test_create_discount_api_call_success(self, mock_post):
+        """Test _create_discount_api_call with successful response"""
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_post.return_value = mock_response
+
+        instance = FlexiblePriceFactory(user=self.user, tier=self.tier)
+        _create_discount_api_call(instance, "product-123", 10.0)
+
+        mock_post.assert_called_once()
+        self.logger_mock.assert_called_with("Discount created for ID: %s", instance.id)
+
+    @patch("flexiblepricing.tasks.requests.post")
+    @override_settings(
+        UNIFIED_ECOMMERCE_URL="http://test.com", UNIFIED_ECOMMERCE_API_KEY="test-key"
+    )
+    def test_create_discount_api_call_failure(self, mock_post):
+        """Test _create_discount_api_call with failed response"""
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_post.return_value = mock_response
+
+        instance = FlexiblePriceFactory(user=self.user, tier=self.tier)
+        _create_discount_api_call(instance, "product-123", 10.0)
+
+        self.logger_mock.assert_called_with(
+            "Discount creation failed for ID %s. Status: %s", instance.id, 400
+        )
+
+    @patch("flexiblepricing.tasks._process_course_discounts")
+    @patch("flexiblepricing.tasks._validate_courseware_object")
+    @patch("flexiblepricing.tasks.logging.getLogger")
+    def test_process_flexible_price_discount_course(
+        self, mock_get_logger, mock_validate, mock_process
+    ):
+        """Test _process_flexible_price_discount with course"""
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+
+        instance = FlexiblePriceFactory(courseware_object=self.course)
+        mock_validate.return_value = self.course
+
+        _process_flexible_price_discount(instance)
+
+        mock_logger.info.assert_any_call(
+            "Processing course discounts for FlexiblePrice ID: %s", instance.id
+        )
+
+        mock_process.assert_called_once_with(self.course, instance)
+
+    @patch("flexiblepricing.tasks._process_course_discounts")
+    @patch("flexiblepricing.tasks._validate_courseware_object")
+    @patch("flexiblepricing.tasks.logging.getLogger")
+    def test_process_flexible_price_discount_program(
+        self, mock_get_logger, mock_validate, mock_process
+    ):
+        """Test _process_flexible_price_discount with program"""
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+
+        instance = FlexiblePriceFactory(courseware_object=self.program)
+        mock_validate.return_value = self.program
+
+        _process_flexible_price_discount(instance)
+
+        mock_logger.info.assert_any_call(
+            "Processing program discounts for FlexiblePrice ID: %s", instance.id
+        )
+
+        assert mock_process.call_count == len(self.program.courses)
+        for i, course in enumerate(self.program.courses):
+            args, _ = mock_process.call_args_list[i]
+            assert args[0] == course[0]
+            assert args[1] == instance
+
+    @patch("flexiblepricing.tasks._process_flexible_price_discount")
+    def test_process_flexible_price_discount_task_success(self, mock_process):
+        """Test process_flexible_price_discount_task success"""
+        instance = FlexiblePriceFactory(status=FlexiblePriceStatus.APPROVED)
+
+        mock_process.assert_called_once()
+
+        args, _ = mock_process.call_args
+        called_instance = args[0]
+        assert called_instance.id == instance.id
+
+    @patch("flexiblepricing.tasks.FlexiblePrice.objects.get")
+    def test_process_flexible_price_discount_task_error(self, mock_get):
+        """Test process_flexible_price_discount_task with error"""
+        mock_get.side_effect = ObjectDoesNotExist()
+        process_flexible_price_discount_task(1)
+        self.logger_mock.assert_called_with(
+            "FlexiblePrice instance with ID %s does not exist", 1
+        )
+
+    @patch("flexiblepricing.tasks._get_valid_product_id")
+    @patch("flexiblepricing.tasks._calculate_discount_amount")
+    @patch("flexiblepricing.tasks._create_discount_api_call")
+    @patch("flexiblepricing.tasks.get_enrollable_courseruns_qs")
+    def test_process_course_discounts_success(
+        self, mock_get_runs, mock_create, mock_calculate, mock_get_product
+    ):
+        """Test _process_course_discounts with valid data"""
+        mock_course_run = MagicMock()
+        mock_course_run.courseware_id = "course-run-123"
+        mock_course_run.products.filter.return_value = [MagicMock()]
+
+        mock_get_runs.return_value = [mock_course_run]
+        mock_get_product.return_value = "123"
+        mock_calculate.return_value = 10.0
+
+        instance = FlexiblePriceFactory(
+            user=self.user, tier=self.tier, courseware_object=self.course
+        )
+
+        _process_course_discounts(self.course, instance)
+
+        mock_get_runs.assert_called_once_with(valid_courses=[self.course])
+        mock_get_product.assert_called_once_with("course-run-123", instance.id)
+        mock_calculate.assert_called_once_with(mock_course_run, instance)
+        mock_create.assert_called_once_with(instance, "123", 10.0)
+
+    @patch("flexiblepricing.tasks.get_enrollable_courseruns_qs")
+    def test_process_course_discounts_no_runs(self, mock_get_runs):
+        """Test _process_course_discounts with no course runs"""
+        mock_get_runs.return_value = []
+        instance = FlexiblePriceFactory()
+
+        _process_course_discounts(self.course, instance)
+
+        self.logger_mock.assert_called_with(
+            "No unexpired runs found for course %s", self.course.id
+        )

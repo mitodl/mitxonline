@@ -636,6 +636,10 @@
       "description": "Token to access the status API.",
       "required": false
     },
+    "UNIFIED_ECOMMERCE_API_KEY": {
+      "description": "The API key for Unified Ecommerce.",
+      "required": false
+    },
     "UNIFIED_ECOMMERCE_URL": {
       "description": "The base URL for Unified Ecommerce.",
       "required": false
