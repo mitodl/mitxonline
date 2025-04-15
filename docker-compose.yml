@@ -223,15 +223,6 @@ services:
       - ./config/apisix/config.yaml:/usr/local/apisix/conf/config.yaml
       - ./config/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml
       - ./config/apisix/debug.yaml:/usr/local/apisix/conf/debug.yaml
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9080/apisix/admin/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: on-failure
-    depends_on:
-      - nginx
 
 
 volumes:
