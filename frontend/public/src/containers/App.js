@@ -36,6 +36,7 @@ import {
   cartItemsCountQuery,
   cartItemsCountSelector
 } from "../lib/queries/cart"
+import RegisterDetailsPage from "./pages/register/new_RegisterDetailsPage"
 
 type Props = {
   match: Match,
@@ -94,6 +95,10 @@ export class App extends React.Component<Props, void> {
             <PrivateRoute
               path={urljoin(match.url, String(routes.profile))}
               component={EditProfilePage}
+            />
+            <PrivateRoute
+              path={urljoin(match.url, String(routes.create_profile))}
+              component={RegisterDetailsPage}
             />
             <Route
               path={urljoin(match.url, String(routes.account.confirmEmail))}

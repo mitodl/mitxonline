@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.views import LogoutView
 from django.shortcuts import redirect, render, reverse
 from drf_spectacular.utils import extend_schema
-from rest_framework import status
+from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
