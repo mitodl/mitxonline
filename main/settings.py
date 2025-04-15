@@ -1281,7 +1281,7 @@ SPECTACULAR_SETTINGS = open_spectacular_settings
 # but not use it and use Django's built-in users instead.
 MITOL_APIGATEWAY_DISABLE_MIDDLEWARE = get_bool(
     name="MITOL_APIGATEWAY_DISABLE_MIDDLEWARE",
-    default=False,
+    default=True,
     description="Disable middleware",
 )
 
