@@ -29,7 +29,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
-from mitol.common.envs import import_settings_modules
+from mitol.apigateway.settings import *
 
 VERSION = "0.114.1"
 
@@ -37,8 +37,6 @@ log = logging.getLogger()
 
 # set log level on cssutils - should be fairly high or it will log messages for Outlook-specific styling
 cssutils.log.setLevel(logging.CRITICAL)
-
-import_settings_modules(globals(), "mitol.apigateway.settings")
 
 ENVIRONMENT = get_string(
     name="MITX_ONLINE_ENVIRONMENT",
@@ -342,10 +340,10 @@ ROBOTS_CACHE_TIMEOUT = get_int(
 # Social Auth Configuration
 
 AUTHENTICATION_BACKENDS = (
+    "mitol.apigateway.backends.ApisixRemoteUserBackend",
     "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
-    "mitol.apigateway.backends.ApisixRemoteUserBackend",
 )
 
 SOCIAL_AUTH_LOGIN_ERROR_URL = "login"
@@ -1281,7 +1279,7 @@ SPECTACULAR_SETTINGS = open_spectacular_settings
 # Disable middleware. For local testing - you can have the middleware in place
 # but not use it and use Django's built-in users instead.
 MITOL_APIGATEWAY_DISABLE_MIDDLEWARE = get_bool(
-    "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE", default=False
+    name="MITOL_APIGATEWAY_DISABLE_MIDDLEWARE", default=False, description="Disable middleware"
 )
 
 # Maps user data from the upstream API gateway to the user model(s)
@@ -1300,11 +1298,6 @@ MITOL_APIGATEWAY_USERINFO_MODEL_MAP = {
     # Key is the model name, then a list of tuples of header field name, model
     # field name, and default. The FK for the related user should be "user".
     "additional_models": {
-        # Sample:
-        "users.UserProfile": [
-            ("email_optin", "email_optin", False),
-            ("country_code", "country_code", ""),
-        ],
         # ..then add additional ones here if needed
     },
 }
@@ -1328,8 +1321,9 @@ MITOL_APIGATEWAY_LOGOUT_URL = "/logout"
 # Set to the default URL the user should be sent to when logging out.
 # If there's no redirect URL specified otherwise, the user gets sent here.
 MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST = get_string(
-    "MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST",
+    name="MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST",
     default="/",
+    description="The URL to redirect to after logging out",
 )
 
 # Set to the list of hosts the app is allowed to redirect to.

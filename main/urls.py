@@ -22,6 +22,7 @@ from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
+from mitol.apigateway.views import ApiGatewayLogoutView
 
 from cms.views import instructor_page
 from main.views import cms_signin_redirect_to_site_signin, index, refine
@@ -86,6 +87,7 @@ urlpatterns = [
     path("", include("cms.urls")),
     # Example view
     path("", index, name="main-index"),
+    path("logout/", ApiGatewayLogoutView.as_view(), name="logout"),
 ] + (
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
