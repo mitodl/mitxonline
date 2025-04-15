@@ -29,7 +29,16 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
-from mitol.apigateway.settings import *
+from mitol.apigateway.settings import (
+    MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS,
+    MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST,
+    MITOL_APIGATEWAY_DISABLE_MIDDLEWARE,
+    MITOL_APIGATEWAY_LOGOUT_URL,
+    MITOL_APIGATEWAY_USERINFO_CREATE,
+    MITOL_APIGATEWAY_USERINFO_ID_SEARCH_FIELD,
+    MITOL_APIGATEWAY_USERINFO_MODEL_MAP,
+    MITOL_APIGATEWAY_USERINFO_UPDATE,
+)
 
 VERSION = "0.114.1"
 
