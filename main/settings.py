@@ -13,6 +13,7 @@ import cssutils
 import dj_database_url
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
+from mitol.apigateway.settings import *
 from mitol.common.envs import (
     get_bool,
     get_delimited_list,
@@ -1288,7 +1289,9 @@ SPECTACULAR_SETTINGS = open_spectacular_settings
 # Disable middleware. For local testing - you can have the middleware in place
 # but not use it and use Django's built-in users instead.
 MITOL_APIGATEWAY_DISABLE_MIDDLEWARE = get_bool(
-    name="MITOL_APIGATEWAY_DISABLE_MIDDLEWARE", default=False, description="Disable middleware"
+    name="MITOL_APIGATEWAY_DISABLE_MIDDLEWARE",
+    default=False,
+    description="Disable middleware",
 )
 
 # Maps user data from the upstream API gateway to the user model(s)

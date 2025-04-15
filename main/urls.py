@@ -18,11 +18,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path
+from mitol.apigateway.views import ApiGatewayLogoutView
 from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
-from mitol.apigateway.views import ApiGatewayLogoutView
 
 from cms.views import instructor_page
 from main.views import cms_signin_redirect_to_site_signin, index, refine
