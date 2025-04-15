@@ -216,7 +216,7 @@ services:
       - KEYCLOAK_DISCOVERY_URL=${KEYCLOAK_DISCOVERY_URL:-https://kc.odl.local:7443/realms/ol-local/.well-known/openid-configuration}
       - APISIX_PORT=${APISIX_PORT:-9080}
       - APISIX_SESSION_SECRET_KEY=${APISIX_SESSION_SECRET_KEY:-something_at_least_16_characters}
-      - UE_LOGOUT_URL=${UE_LOGOUT_URL:-http://ue.odl.local:9080/auth/logout/}
+      - APP_LOGOUT_URL=${APP_LOGOUT_URL:-http://ue.odl.local:9080/auth/logout/}
     ports:
       - ${APISIX_PORT}:${APISIX_PORT}
     volumes:

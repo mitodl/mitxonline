@@ -2,12 +2,6 @@ apisix:
   enable_admin: false
   enable_dev_mode: false
 
-etcd:
-  host:
-    - "http://etcd:2379"
-  prefix: "/apisix"
-  timeout: 30
-
 deployment:
   role: data_plane
   role_data_plane:

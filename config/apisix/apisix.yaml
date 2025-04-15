@@ -48,7 +48,7 @@ routes:
         post_logout_redirect_uri: ${{APP_LOGOUT_URL}}
         unauth_action: "auth"
       redirect:
-      	uri: "/dashboard"
+        uri: "/dashboard"
     uris:
       - "/login*"
   - id: 3
@@ -60,3 +60,5 @@ routes:
     plugins:
       redirect:
         uri: "/logout"
+
+#END
