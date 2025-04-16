@@ -4,15 +4,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0025_add_global_id_field'),
+        ("users", "0025_add_global_id_field"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='user',
-            name='is_active',
-            field=models.BooleanField(default=True, help_text='The user account is active'),
+            model_name="user",
+            name="is_active",
+            field=models.BooleanField(
+                default=True, help_text="The user account is active"
+            ),
         ),
     ]
