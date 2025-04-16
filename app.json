@@ -214,6 +214,14 @@
       "description": "Disable middleware",
       "required": false
     },
+    "MITOL_APIGATEWAY_USERINFO_CREATE": {
+      "description": "Create users that we see but aren't aware of",
+      "required": false
+    },
+    "MITOL_APIGATEWAY_USERINFO_UPDATE": {
+      "description": "Update users we've seen before",
+      "required": false
+    },
     "MITOL_AUTHENTICATION_FROM_EMAIL": {
       "description": "E-mail to use for the from field",
       "required": false

@@ -256,7 +256,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     # When we have deprecated direct login, default the is_active flag to True
     # and remove the related code in authentication/pipeline/user.py.
     is_active = models.BooleanField(
-        default=False, help_text="The user account is active"
+        default=True, help_text="The user account is active"
     )
 
     # global_id points to the SSO ID for the user (so, usually the Keycloak ID,
