@@ -30,7 +30,7 @@ pytestmark = pytest.mark.django_db
 @pytest.mark.parametrize(
     "create_func,exp_staff,exp_superuser,exp_is_active",  # noqa: PT006
     [
-        [User.objects.create_user, False, False, False],  # noqa: PT007
+        [User.objects.create_user, False, False, True],  # noqa: PT007
         [User.objects.create_superuser, True, True, True],  # noqa: PT007
     ],
 )
