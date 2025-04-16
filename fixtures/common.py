@@ -23,6 +23,7 @@ def staff_user(db):  # noqa: ARG001
     """Staff user fixture"""
     return UserFactory.create(is_staff=True)
 
+
 @pytest.fixture
 def admin_user(db):  # noqa: ARG001
     """Admin user fixture"""
