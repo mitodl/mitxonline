@@ -14,6 +14,9 @@ x-environment:
   CELERY_TASK_ALWAYS_EAGER: 'False'
   REDIS_URL: redis://redis:6379/4
   DOCKER_HOST: ${DOCKER_HOST:-missing}
+  APISIX_PORT: ${APISIX_PORT:-9080}
+  KEYCLOAK_PORT: ${KEYCLOAK_PORT:-7080}
+  KEYCLOAK_SSL_PORT: ${KEYCLOAK_SSL_PORT:-7443}
 
 x-extra-hosts:
   &default-extra-hosts # pragma: allowlist secret
@@ -203,6 +206,23 @@ services:
       - keycloak-store:/etc/keycloak-store
       - ./config/keycloak/tls:/etc/x509/https
       - ./config/keycloak/realms:/opt/keycloak/data/import
+
+  api:
+    image: apache/apisix:latest
+    environment:
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-ol-local}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apisix}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - KEYCLOAK_DISCOVERY_URL=${KEYCLOAK_DISCOVERY_URL:-https://kc.odl.local:7443/realms/ol-local/.well-known/openid-configuration}
+      - APISIX_PORT=${APISIX_PORT:-9080}
+      - APISIX_SESSION_SECRET_KEY=${APISIX_SESSION_SECRET_KEY:-something_at_least_16_characters}
+      - APP_LOGOUT_URL=${APP_LOGOUT_URL:-http://ue.odl.local:9080/auth/logout/}
+    ports:
+      - ${APISIX_PORT}:${APISIX_PORT}
+    volumes:
+      - ./config/apisix/config.yaml:/usr/local/apisix/conf/config.yaml
+      - ./config/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml
+      - ./config/apisix/debug.yaml:/usr/local/apisix/conf/debug.yaml
 
 
 volumes:

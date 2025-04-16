@@ -13,6 +13,7 @@ import cssutils
 import dj_database_url
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
+from mitol.apigateway.settings import *  # noqa: F403  # noqa: F403
 from mitol.common.envs import (
     get_bool,
     get_delimited_list,
@@ -217,6 +218,7 @@ INSTALLED_APPS = (
     "viewflow",
     "openapi",
     "drf_spectacular",
+    "mitol.apigateway.apps.ApigatewayApp",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
@@ -237,6 +239,7 @@ MIDDLEWARE = (
     "hijack.middleware.HijackUserMiddleware",
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
+    "mitol.apigateway.middleware.ApisixUserMiddleware",
 )
 
 # enable the nplusone profiler only in debug mode
@@ -337,7 +340,7 @@ ROBOTS_CACHE_TIMEOUT = get_int(
 # Social Auth Configuration
 
 AUTHENTICATION_BACKENDS = (
-    "authentication.backends.ol_open_id_connect.OlOpenIdConnectAuth",
+    "mitol.apigateway.backends.ApisixRemoteUserBackend",
     "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
@@ -1275,3 +1278,72 @@ UNIFIED_ECOMMERCE_API_KEY = get_string(
 )
 
 SPECTACULAR_SETTINGS = open_spectacular_settings
+
+
+# apigateway configuration
+
+# Disable middleware. For local testing - you can have the middleware in place
+# but not use it and use Django's built-in users instead.
+MITOL_APIGATEWAY_DISABLE_MIDDLEWARE = get_bool(
+    name="MITOL_APIGATEWAY_DISABLE_MIDDLEWARE",
+    default=True,
+    description="Disable middleware",
+)
+
+# Maps user data from the upstream API gateway to the user model(s)
+MITOL_APIGATEWAY_USERINFO_MODEL_MAP = {
+    # Mappings to the user model.
+    "user_fields": {
+        # Keys are data returned from the API gateway.
+        # Values are tuple of model name (from above) and field name.
+        # The base model is "user".
+        "preferred_username": "username",
+        "email": "email",
+        "sub": "global_id",
+        "name": "name",
+    },
+    # Additional models to map in.
+    # Key is the model name, then a list of tuples of header field name, model
+    # field name, and default. The FK for the related user should be "user".
+    "additional_models": {
+        # ..then add additional ones here if needed
+    },
+}
+
+MITOL_APIGATEWAY_USERINFO_ID_SEARCH_FIELD = "global_id"
+
+# Set to True to create users that we see but aren't aware of.
+# Set to False if you're managing that elsewhere (like with social-auth).
+MITOL_APIGATEWAY_USERINFO_CREATE = get_bool(
+    name="MITOL_APIGATEWAY_USERINFO_CREATE",
+    default=True,
+    description="Create users that we see but aren't aware of",
+)
+
+# Set to True to update users we've seen before. If you set this to False, make
+# sure there's a backchannel way to update the user data (SCIM, etc) or user
+# info will fall out of sync with the IdP pretty quickly.
+MITOL_APIGATEWAY_USERINFO_UPDATE = get_bool(
+    name="MITOL_APIGATEWAY_USERINFO_UPDATE",
+    default=True,
+    description="Update users we've seen before",
+)
+
+# URL configuation
+
+# Set to the URL that APISIX uses for logout.
+MITOL_APIGATEWAY_LOGOUT_URL = "/logout"
+
+# Set to the default URL the user should be sent to when logging out.
+# If there's no redirect URL specified otherwise, the user gets sent here.
+MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST = get_string(
+    name="MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST",
+    default="/",
+    description="The URL to redirect to after logging out",
+)
+
+# Set to the list of hosts the app is allowed to redirect to.
+MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = [
+    "localhost",
+    "mitxonline.odl.local",
+]

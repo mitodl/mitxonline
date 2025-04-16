@@ -385,6 +385,7 @@ class UserSerializer(serializers.ModelSerializer):
             "created_on",
             "updated_on",
             "grants",
+            "global_id",
         )
 
 
