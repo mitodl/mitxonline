@@ -2272,13 +2272,13 @@ traitlets = "*"
 
 [[package]]
 name = "mitol-django-apigateway"
-version = "2025.4.4.1"
+version = "2025.4.15"
 description = "MIT Open Learning Django app for API Gateway support"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "mitol_django_apigateway-2025.4.4.1-py3-none-any.whl", hash = "sha256:d933c225ba30ca7044d812d5cdb6573691d2dc0cc906095e57b1febaaba9b10f"},
-    {file = "mitol_django_apigateway-2025.4.4.1.tar.gz", hash = "sha256:f66b0705f85a5851d937ec7f2b9b737212fc1b2a104cf8a885519664cd6d3dfd"},
+    {file = "mitol_django_apigateway-2025.4.15-py3-none-any.whl", hash = "sha256:f32008761c326661853c57a5d8ec6aea740d7002ddeb5612eb16d3870fd9d81e"},
+    {file = "mitol_django_apigateway-2025.4.15.tar.gz", hash = "sha256:741094ef5205cadaca02c6f4f9d7c0340b70f27d17e43c982ca1ffa5eac00268"},
 ]
 
 [package.dependencies]
