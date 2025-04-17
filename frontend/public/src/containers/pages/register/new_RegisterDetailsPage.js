@@ -37,7 +37,7 @@ import type {
 
 type RegisterProps = {|
   location: Location,
-  history: RouterHistory,
+  history: RouterHistory
 |}
 
 type StateProps = {|
@@ -49,7 +49,7 @@ type DispatchProps = {|
     name: string,
     username: string,
     legalAddress: LegalAddress,
-    userProfile: UserProfile,
+    userProfile: UserProfile
   ) => Promise<HttpResponse<AuthResponse>>,
   getCurrentUser: () => Promise<HttpResponse<User>>,
   addUserNotification: Function
@@ -63,11 +63,7 @@ type Props = {|
 
 export class RegisterDetailsPage extends React.Component<Props> {
   async onSubmit(detailsData: any, { setSubmitting, setErrors }: any) {
-    const {
-      history,
-      registerDetails,
-      addUserNotification
-    } = this.props
+    const { history, registerDetails, addUserNotification } = this.props
 
     try {
       const { body } = await registerDetails(
@@ -161,15 +157,10 @@ const registerDetails = (
   name: string,
   username: string,
   legalAddress: LegalAddress,
-  userProfile: UserProfile,
+  userProfile: UserProfile
 ) =>
   mutateAsync(
-    auth.registerDetailsMutation(
-      name,
-      username,
-      legalAddress,
-      userProfile,
-    )
+    auth.registerDetailsMutation(name, username, legalAddress, userProfile)
   )
 
 const getCurrentUser = () =>

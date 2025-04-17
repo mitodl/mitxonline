@@ -33,8 +33,7 @@ const INITIAL_VALUES = {
 const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
   <Formik
     onSubmit={onSubmit}
-    validationSchema={legalAddressValidation
-      .concat(profileValidation)}
+    validationSchema={legalAddressValidation.concat(profileValidation)}
     initialValues={INITIAL_VALUES}
     validateOnChange={false}
     validateOnBlur={false}

@@ -25,7 +25,6 @@ const DEFAULT_OPTIONS = {
 }
 
 export default {
-
   registerDetailsMutation: (
     name: string,
     password: string,
@@ -67,5 +66,5 @@ export default {
       partial_token: partialToken,
       next
     }
-  }),
+  })
 }
