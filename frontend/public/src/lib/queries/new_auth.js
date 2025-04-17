@@ -1,20 +1,14 @@
 // @flow
 import { nthArg } from "ramda"
 
-import { FLOW_REGISTER } from "../auth"
-
-import type {
-  AuthResponse,
-  LegalAddress,
-  UserProfile
-} from "../../flow/authTypes"
+import type { LegalAddress, UserProfile } from "../../flow/authTypes"
 
 // uses the next piece of state which is the second argument
 const nextState = nthArg(1)
 
 const DEFAULT_OPTIONS = {
-  update:     {},
-  options:    {
+  update:  {},
+  options: {
     method: "POST"
   }
 }
@@ -24,7 +18,7 @@ export default {
     name: string,
     username: string,
     legalAddress: LegalAddress,
-    userProfile: ?UserProfile,
+    userProfile: ?UserProfile
   ) => ({
     ...DEFAULT_OPTIONS,
     url:  "/api/profile/details/",
@@ -32,7 +26,7 @@ export default {
       name,
       username,
       legal_address: legalAddress,
-      user_profile:  userProfile,
+      user_profile:  userProfile
     }
   }),
 

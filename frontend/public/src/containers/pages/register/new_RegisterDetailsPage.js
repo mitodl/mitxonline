@@ -2,10 +2,7 @@
 /* global SETTINGS: false */
 import React from "react"
 import DocumentTitle from "react-document-title"
-import {
-  ALERT_TYPE_DANGER,
-  REGISTER_DETAILS_PAGE_TITLE
-} from "../../../constants"
+import { REGISTER_DETAILS_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { mutateAsync, requestAsync } from "redux-query"
@@ -15,12 +12,6 @@ import { createStructuredSelector } from "reselect"
 import auth from "../../../lib/queries/new_auth"
 import users from "../../../lib/queries/users"
 import { routes } from "../../../lib/urls"
-import {
-  STATE_ERROR,
-  handleAuthResponse,
-  STATE_REGISTER_DETAILS,
-  STATE_SUCCESS
-} from "../../../lib/auth"
 import queries from "../../../lib/queries"
 
 import RegisterDetailsForm from "../../../components/forms/new_RegisterDetailsForm"
@@ -63,7 +54,7 @@ type Props = {|
 
 export class RegisterDetailsPage extends React.Component<Props> {
   async onSubmit(detailsData: any, { setSubmitting, setErrors }: any) {
-    const { history, registerDetails, addUserNotification } = this.props
+    const { registerDetails } = this.props
 
     try {
       const { body } = await registerDetails(
@@ -73,25 +64,10 @@ export class RegisterDetailsPage extends React.Component<Props> {
         detailsData.user_profile
       )
 
-      if (body.errors) {
-        body.errors.forEach(error => {
-          addUserNotification({
-            "registration-failed-status": {
-              type:  ALERT_TYPE_DANGER,
-              props: {
-                text: error
-              }
-            }
-          })
-        })
-      }
-
-      if (body.state === STATE_SUCCESS) {
-        const nextParam = body.redirect_url
-        body.redirect_url = routes.register.additionalDetails
-        if (nextParam) {
-          body.redirect_url += `?next=${encodeURIComponent(nextParam)}`
-        }
+      if (body.errors && body.errors.length > 0) {
+        setErrors(body.errors)
+      } else {
+        window.location = routes.create_profile
       }
     } finally {
       setSubmitting(false)

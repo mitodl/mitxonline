@@ -22,7 +22,7 @@ class RegisterDetailsSerializer(serializers.Serializer):
     legal_address = LegalAddressSerializer(write_only=True)
     user_profile = UserProfileSerializer(write_only=True)
 
-    def save(self, validated_data):  # noqa: ARG002
+    def create(self, validated_data):  # noqa: ARG002
         """Save user legal address and user profile"""
         legal_address_data = validated_data.pop("legal_address")
         user_profile_data = validated_data.pop("user_profile", None)
