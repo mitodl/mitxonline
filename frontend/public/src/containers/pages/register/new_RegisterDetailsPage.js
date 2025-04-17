@@ -93,31 +93,6 @@ export class RegisterDetailsPage extends React.Component<Props> {
           body.redirect_url += `?next=${encodeURIComponent(nextParam)}`
         }
       }
-
-      /* eslint-disable camelcase */
-      handleAuthResponse(history, body, {
-        [STATE_ERROR]: ({ field_errors }: AuthResponse) =>
-          setErrors(field_errors),
-        [STATE_REGISTER_DETAILS]: ({ field_errors }: AuthResponse) => {
-          // Validation failures will result in a 200 API response that still points to this page but contains
-          // field errors.
-          if (field_errors) {
-            setErrors(field_errors)
-
-            if (field_errors["email"]) {
-              addUserNotification({
-                "registration-failed-status": {
-                  type:  ALERT_TYPE_DANGER,
-                  props: {
-                    text: field_errors["email"]
-                  }
-                }
-              })
-            }
-          }
-        }
-      })
-      /* eslint-enable camelcase */
     } finally {
       setSubmitting(false)
     }

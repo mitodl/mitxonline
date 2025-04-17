@@ -7,27 +7,46 @@ from django.http import HttpResponseRedirect
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-
-PARTIAL_PIPELINE_TOKEN_KEY = "partial_pipeline_token"  # noqa: S105
+from hubspot_sync.task_helpers import sync_hubspot_user
+from users.serializers import UserSerializer, LegalAddressSerializer, UserProfileSerializer
 
 log = logging.getLogger()
-
 User = get_user_model()
 
 
 class RegisterDetailsSerializer(serializers.Serializer):
     """Serializer for registration details"""
 
-    password = serializers.CharField(min_length=8, write_only=True)
     name = serializers.CharField(write_only=True)
+    username = serializers.CharField(write_only=True)
+    legal_address = LegalAddressSerializer(write_only=True)
+    user_profile = UserProfileSerializer(write_only=True)
 
-    def create(self, validated_data):  # noqa: ARG002
-        """Try to 'save' the request"""
-        return super()._authenticate(SocialAuthState.FLOW_REGISTER)
+    def save(self, validated_data):  # noqa: ARG002
+        """Save user legal address and user profile"""
+        legal_address_data = validated_data.pop("legal_address")
+        user_profile_data = validated_data.pop("user_profile", None)
+        user = User.objects.get(username=validated_data["username"])
+        if legal_address_data:
+            legal_address = LegalAddressSerializer(
+                user.legal_address, data=legal_address_data
+            )
+            if legal_address.is_valid():
+                legal_address.save()
+
+        if user_profile_data:
+            user_profile = UserProfileSerializer(
+                user.user_profile, data=user_profile_data
+            )
+            if user_profile.is_valid():
+                user_profile.save()
+
+        sync_hubspot_user(user)
+        return user
 
 
 class RegisterExtraDetailsSerializer(serializers.Serializer):
-    """Serializer for registration details"""
+    """Serializer for extra registration details"""
 
     gender = serializers.CharField(write_only=True)
     birth_year = serializers.CharField(write_only=True)
@@ -49,7 +68,3 @@ class RegisterExtraDetailsSerializer(serializers.Serializer):
     highest_education = serializers.CharField(
         write_only=True, allow_blank=True, required=False
     )
-
-    def create(self, validated_data):  # noqa: ARG002
-        """Try to 'save' the request"""
-        return super()._authenticate(SocialAuthState.FLOW_REGISTER)
