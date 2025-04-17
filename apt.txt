@@ -6,3 +6,5 @@ zlib1g-dev
 net-tools
 libpq-dev
 postgresql-client
+build-essential
+libcairo2-dev
