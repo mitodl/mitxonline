@@ -10,7 +10,9 @@ from django.contrib.auth.views import LogoutView, LoginView
 from django.shortcuts import redirect, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from rest_framework import permissions, status
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -49,8 +51,8 @@ def get_redirect_url(request):
 class ProfileDetailsAPIView(APIView):
     """API view for profile update endpoints"""
 
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = [IsAuthenticated]
 
     def get_serializer_cls(self):  # pragma: no cover
         """Return the serializer cls"""

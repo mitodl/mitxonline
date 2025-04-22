@@ -2,6 +2,7 @@
 import { nthArg } from "ramda"
 
 import type { LegalAddress, UserProfile } from "../../flow/authTypes"
+import {getCsrfOptions} from "./util";
 
 // uses the next piece of state which is the second argument
 const nextState = nthArg(1)
@@ -9,6 +10,7 @@ const nextState = nthArg(1)
 const DEFAULT_OPTIONS = {
   update:  {},
   options: {
+    ...getCsrfOptions(),
     method: "POST"
   }
 }

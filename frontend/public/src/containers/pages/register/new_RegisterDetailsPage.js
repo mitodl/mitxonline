@@ -41,7 +41,7 @@ type DispatchProps = {|
     username: string,
     legalAddress: LegalAddress,
     userProfile: UserProfile
-  ) => Promise<HttpResponse<AuthResponse>>,
+  ) => Promise<HttpResponse>,
   getCurrentUser: () => Promise<HttpResponse<User>>,
   addUserNotification: Function
 |}
@@ -55,7 +55,6 @@ type Props = {|
 export class RegisterDetailsPage extends React.Component<Props> {
   async onSubmit(detailsData: any, { setSubmitting, setErrors }: any) {
     const { registerDetails } = this.props
-
     try {
       const { body } = await registerDetails(
         detailsData.name,
@@ -67,7 +66,7 @@ export class RegisterDetailsPage extends React.Component<Props> {
       if (body.errors && body.errors.length > 0) {
         setErrors(body.errors)
       } else {
-        window.location = routes.create_profile
+        window.location = routes.create_profile_extra
       }
     } finally {
       setSubmitting(false)
