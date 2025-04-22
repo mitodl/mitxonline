@@ -8,7 +8,7 @@ WORKDIR /tmp
 COPY apt.txt /tmp/apt.txt
 RUN apt-get update && \
     apt-get install --no-install-recommends -y $(grep -vE "^\s*#" apt.txt  | tr "\n" " ") && \
-    apt-get clean && \ 
+    apt-get clean && \
     apt-get purge -y && \
     rm -rf /var/lib/apt-lists/*
 
