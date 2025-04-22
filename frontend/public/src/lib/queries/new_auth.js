@@ -1,7 +1,7 @@
 // @flow
 
 import type { LegalAddress, UserProfile } from "../../flow/authTypes"
-import {getCsrfOptions} from "./util"
+import { getCsrfOptions } from "./util"
 
 // uses the next piece of state which is the second argument
 
