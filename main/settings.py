@@ -538,18 +538,19 @@ EMAIL_USE_TLS = get_bool(
     description="Outgoing e-mail TLS setting",
 )
 
-MITX_ONLINE_REPLY_TO_ADDRESS = get_string(
-    name="MITX_ONLINE_REPLY_TO_ADDRESS",
-    default="webmaster@localhost",
-    description="E-mail to use for reply-to address of emails",
-)
-
 DEFAULT_FROM_EMAIL = get_string(
     name="MITX_ONLINE_FROM_EMAIL",
     default="webmaster@localhost",
     description="E-mail to use for the from field",
 )
 
+MITX_ONLINE_REPLY_TO_ADDRESS = get_string(
+    name="MITX_ONLINE_REPLY_TO_ADDRESS",
+    default=DEFAULT_FROM_EMAIL,
+    description="E-mail to use for reply-to address of emails",
+)
+
+MAILGUN_FROM_EMAIL = DEFAULT_FROM_EMAIL
 MAILGUN_SENDER_DOMAIN = get_string(
     name="MAILGUN_SENDER_DOMAIN",
     default=None,
@@ -573,16 +574,11 @@ MAILGUN_RECIPIENT_OVERRIDE = get_string(
     dev_only=True,
     description="Override the recipient for outgoing email, development only",
 )
-MAILGUN_FROM_EMAIL = get_string(
-    name="MAILGUN_FROM_EMAIL",
-    default="no-reply@localhost",
-    description="Email which mail comes from",
-)
 
 EMAIL_SUPPORT = get_string(
     name="MITX_ONLINE_SUPPORT_EMAIL",
     default=MAILGUN_RECIPIENT_OVERRIDE or "support@localhost",
-    description="Email address listed for customer support",
+    description="Email address listed for customer support in the frontend. Not used for sending email.",
 )
 
 NOTIFICATION_EMAIL_BACKEND = get_string(
