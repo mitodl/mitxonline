@@ -209,6 +209,8 @@ services:
 
   api:
     image: apache/apisix:latest
+    profiles:
+      - apisix
     environment:
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-ol-local}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apisix}
