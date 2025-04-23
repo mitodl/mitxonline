@@ -190,10 +190,6 @@
       "description": "Maximum number of emails to send in a batch",
       "required": false
     },
-    "MAILGUN_FROM_EMAIL": {
-      "description": "Email which mail comes from",
-      "required": false
-    },
     "MAILGUN_KEY": {
       "description": "The token for authenticating against the Mailgun API",
       "required": true
@@ -483,7 +479,7 @@
       "required": false
     },
     "MITX_ONLINE_SUPPORT_EMAIL": {
-      "description": "Email address listed for customer support",
+      "description": "Email address listed for customer support in the frontend. Not used for sending email.",
       "required": false
     },
     "MITX_ONLINE_USE_S3": {
