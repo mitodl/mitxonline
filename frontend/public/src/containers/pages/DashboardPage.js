@@ -32,6 +32,8 @@ import AddlProfileFieldsForm from "../../components/forms/AddlProfileFieldsForm"
 
 import type { RunEnrollment, ProgramEnrollment } from "../../flow/courseTypes"
 import type { User } from "../../flow/authTypes"
+import type { Country } from "../../flow/authTypes"
+import queries from "../../lib/queries"
 
 // this needs pretty drastic cleanup but not until the program bits are refactored
 // to not depend on the props coming from here
@@ -48,8 +50,14 @@ type DashboardPageProps = {
   updateAddlFields: (currentUser: User) => Promise<any>,
   addUserNotification: Function,
   closeDrawer: Function,
-  forceRequest: Function | null
+  forceRequest: Function | null,
+  countries: Array<Country>
 }
+
+type Props = {|
+  ...StateProps,
+  ...DispatchProps,
+|}
 
 const DashboardTab = {
   courses:  "courses",
@@ -63,6 +71,10 @@ type DashboardPageState = {
   showAddlProfileFieldsModal: boolean,
   destinationUrl: string
 }
+
+type StateProps = {|
+  countries: ?Array<Country>,
+|}
 
 export class DashboardPage extends React.Component<
   DashboardPageProps,
@@ -187,7 +199,7 @@ export class DashboardPage extends React.Component<
   }
 
   renderAddlProfileFieldsModal() {
-    const { currentUser } = this.props
+    const { currentUser, countries } = this.props
     const { showAddlProfileFieldsModal } = this.state
 
     return (
@@ -218,6 +230,7 @@ export class DashboardPage extends React.Component<
             onCancel={() => this.toggleAddlProfileFieldsModal()}
             user={currentUser}
             requireTypeFields={true}
+            countries={countries}
           ></AddlProfileFieldsForm>
         </ModalBody>
       </Modal>
@@ -225,7 +238,7 @@ export class DashboardPage extends React.Component<
   }
 
   render() {
-    const { isLoading, programEnrollments, forceRequest } = this.props
+    const { isLoading, programEnrollments, forceRequest, countries } = this.props
 
     const myCourseClasses = `dash-tab${
       this.state.currentTab === DashboardTab.courses ? " active" : ""
@@ -299,10 +312,11 @@ const mapStateToProps = createStructuredSelector({
   enrollments:        enrollmentsSelector,
   programEnrollments: programEnrollmentsSelector,
   currentUser:        currentUserSelector,
-  isLoading:          pathOr(true, ["queries", enrollmentsQueryKey, "isPending"])
+  isLoading:          pathOr(true, ["queries", enrollmentsQueryKey, "isPending"]),
+  countries:   queries.users.countriesSelector
 })
 
-const mapPropsToConfig = () => [enrollmentsQuery(), programEnrollmentsQuery()]
+const mapPropsToConfig = () => [enrollmentsQuery(), programEnrollmentsQuery(), queries.users.countriesQuery()]
 
 const deactivateEnrollment = (enrollmentId: number) =>
   mutateAsync(deactivateEnrollmentMutation(enrollmentId))

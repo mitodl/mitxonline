@@ -26,6 +26,7 @@ import {
   programEnrollmentsQueryKey,
   programEnrollmentsSelector
 } from "../lib/queries/enrollment"
+import queries from "../lib/queries"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
@@ -332,7 +333,7 @@ export class ProgramProductDetailEnroll extends React.Component<
   }
 
   renderAddlProfileFieldsModal() {
-    const { currentUser } = this.props
+    const { currentUser, countries } = this.props
     const { showAddlProfileFieldsModal } = this.state
 
     return (
@@ -363,6 +364,7 @@ export class ProgramProductDetailEnroll extends React.Component<
             onCancel={() => this.toggleAddlProfileFieldsModal()}
             user={currentUser}
             requireTypeFields={true}
+            countries={countries}
           ></AddlProfileFieldsForm>
         </ModalBody>
       </Modal>
@@ -473,7 +475,8 @@ const mapStateToProps = createStructuredSelector({
     "queries",
     programEnrollmentsQueryKey,
     "isPending"
-  ])
+  ]),
+  countries:   queries.users.countriesSelector,
 })
 
 const mapPropsToConfig = props => [

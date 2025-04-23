@@ -40,6 +40,7 @@ import type { User } from "../flow/authTypes"
 import type { Product } from "../flow/cartTypes"
 import { addUserNotification } from "../actions"
 import { applyCartMutation } from "../lib/queries/cart"
+import queries from "../lib/queries"
 
 type Props = {
   courseId: ?string,
@@ -483,7 +484,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderAddlProfileFieldsModal() {
-    const { currentUser } = this.props
+    const { currentUser, countries } = this.props
     const { showAddlProfileFieldsModal } = this.state
 
     return (
@@ -514,6 +515,7 @@ export class CourseProductDetailEnroll extends React.Component<
             onCancel={() => this.toggleAddlProfileFieldsModal()}
             user={currentUser}
             requireTypeFields={true}
+            countries={countries}
           ></AddlProfileFieldsForm>
         </ModalBody>
       </Modal>
@@ -678,7 +680,8 @@ const mapStateToProps = createStructuredSelector({
   courses:         coursesSelector,
   currentUser:     currentUserSelector,
   courseIsLoading: pathOr(true, ["queries", coursesQueryKey, "isPending"]),
-  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"])
+  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"]),
+  countries:   queries.users.countriesSelector
 })
 
 const mapPropsToConfig = props => [
