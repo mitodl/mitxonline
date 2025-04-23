@@ -2,13 +2,12 @@
 
 from urllib.parse import urlencode, urljoin, urlparse
 
-from drf_spectacular.utils import extend_schema
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.views import LogoutView, LoginView
+from django.contrib.auth.views import LoginView, LogoutView
 from django.shortcuts import redirect, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
@@ -19,9 +18,15 @@ from rest_framework.views import APIView
 from social_django.utils import load_strategy
 
 from authentication.backends.ol_open_id_connect import OlOpenIdConnectAuth
-
-from authentication.new_serializers import RegisterDetailsSerializer, RegisterExtraDetailsSerializer
-from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME, USER_MSG_TYPE_PROFILE_CREATED
+from authentication.new_serializers import (
+    RegisterDetailsSerializer,
+    RegisterExtraDetailsSerializer,
+)
+from main.constants import (
+    USER_MSG_COOKIE_MAX_AGE,
+    USER_MSG_COOKIE_NAME,
+    USER_MSG_TYPE_PROFILE_CREATED,
+)
 from main.utils import encode_json_cookie_value, is_success_response
 
 User = get_user_model()

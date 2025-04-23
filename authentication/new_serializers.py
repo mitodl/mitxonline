@@ -4,13 +4,13 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.http import HttpResponseRedirect
-from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
 
 from hubspot_sync.task_helpers import sync_hubspot_user
-from users.serializers import UserSerializer, LegalAddressSerializer, UserProfileSerializer, USERNAME_ALREADY_EXISTS_MSG
+from users.serializers import (
+    LegalAddressSerializer,
+    UserProfileSerializer,
+)
 
 log = logging.getLogger()
 User = get_user_model()
@@ -24,7 +24,7 @@ class RegisterDetailsSerializer(serializers.Serializer):
     legal_address = LegalAddressSerializer(write_only=True)
     user_profile = UserProfileSerializer(write_only=True)
 
-    def create(self, validated_data):  # noqa: ARG002
+    def create(self, validated_data):
         """Save user legal address and user profile"""
         request = self.context["request"]
         user = request.user
@@ -78,14 +78,12 @@ class RegisterExtraDetailsSerializer(serializers.Serializer):
         write_only=True, allow_blank=True, required=False
     )
 
-    def create(self, validated_data):  # noqa: ARG002
+    def create(self, validated_data):
         """Save user extra details"""
         request = self.context["request"]
         user = request.user
         with transaction.atomic():
-            user_profile = UserProfileSerializer(
-                user.user_profile, data=validated_data
-            )
+            user_profile = UserProfileSerializer(user.user_profile, data=validated_data)
             if user_profile.is_valid():
                 user_profile.save()
 

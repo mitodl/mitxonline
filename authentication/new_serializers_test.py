@@ -1,12 +1,15 @@
 import pytest
-from fixtures.common import (
-    valid_address_dict,
+
+from authentication.new_serializers import (
+    RegisterDetailsSerializer,
+    RegisterExtraDetailsSerializer,
 )
-from authentication.new_serializers import RegisterDetailsSerializer, RegisterExtraDetailsSerializer
 
 
 @pytest.mark.django_db
-def test_register_details_serializer_create(user, valid_address_dict, user_profile_dict, rf):
+def test_register_details_serializer_create(
+    user, valid_address_dict, user_profile_dict, rf
+):
     """Test the create method of RegisterDetailsSerializer"""
 
     request = rf.post("/api/profile/details/")
@@ -24,7 +27,7 @@ def test_register_details_serializer_create(user, valid_address_dict, user_profi
 
     assert serializer.is_valid()
     user = serializer.save()
-    assert user.name is "John Doe"
+    assert user.name == "John Doe"
 
 
 @pytest.mark.django_db

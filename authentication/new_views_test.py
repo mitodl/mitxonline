@@ -1,13 +1,9 @@
 import pytest
 from django.urls import reverse
 from rest_framework import status
+
 from users.api import User
-
-
-from fixtures.common import (
-    valid_address_dict,
-)
-from users.models import UserProfile, MALE
+from users.models import MALE, UserProfile
 
 
 @pytest.mark.django_db
@@ -20,7 +16,9 @@ def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
         "legal_address": valid_address_dict,
         "user_profile": {},
     }
-    resp = client.post(reverse("profile-details-api"), data, content_type="application/json")
+    resp = client.post(
+        reverse("profile-details-api"), data, content_type="application/json"
+    )
 
     assert resp.status_code == status.HTTP_200_OK
     # Checks that user's name in database is also updated
@@ -30,9 +28,10 @@ def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
         "name": "John Doe",
         "user_profile": {},
     }
-    resp = client.post(reverse("profile-details-api"), data, content_type="application/json")
+    resp = client.post(
+        reverse("profile-details-api"), data, content_type="application/json"
+    )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-
 
 
 @pytest.mark.django_db
@@ -51,7 +50,9 @@ def test_post_user_extra_detail(mocker, client, user):
         "leadership_level": "Mid-level",
         "highest_education": "Bachelor's degree",
     }
-    resp = client.post(reverse("profile-extra-api"), data, content_type="application/json")
+    resp = client.post(
+        reverse("profile-extra-api"), data, content_type="application/json"
+    )
 
     assert resp.status_code == status.HTTP_200_OK
     user_profile = UserProfile.objects.get(user=user)
@@ -63,5 +64,7 @@ def test_post_user_extra_detail(mocker, client, user):
         "birth_year": "not-a-year",
         "company": "",
     }
-    resp = client.post(reverse("profile-extra-api"), data, content_type="application/json")
+    resp = client.post(
+        reverse("profile-extra-api"), data, content_type="application/json"
+    )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST

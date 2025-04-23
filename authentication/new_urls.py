@@ -4,10 +4,11 @@ from django.urls import path
 from django.urls.conf import include
 
 from authentication.new_views import (
-    CustomLogoutView,
     CustomLoginView,
+    CustomLogoutView,
+    RegisterDetailsView,
+    RegisterExtraDetailsView,
     well_known_openid_configuration,
-    RegisterDetailsView, RegisterExtraDetailsView,
 )
 
 urlpatterns = [

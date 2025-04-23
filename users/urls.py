@@ -3,6 +3,9 @@
 from django.urls import include, path
 from rest_framework import routers
 
+from users.new_views import (
+    CurrentUserRetrieveUpdateViewSet as NewCurrentUserRetrieveUpdateViewSet,
+)
 from users.views import (
     ChangeEmailRequestViewSet,
     CountriesStatesViewSet,
@@ -10,7 +13,6 @@ from users.views import (
     UserRetrieveViewSet,
     UsersViewSet,
 )
-from users.new_views import CurrentUserRetrieveUpdateViewSet as NewCurrentUserRetrieveUpdateViewSet
 
 router = routers.DefaultRouter()
 router.register(r"users", UserRetrieveViewSet, basename="users_api")
