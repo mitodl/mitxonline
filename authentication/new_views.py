@@ -1,6 +1,6 @@
 """Authentication views"""
 
-from urllib.parse import quote, urlencode, urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 
 from drf_spectacular.utils import extend_schema
 
@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.views import LogoutView, LoginView
 from django.shortcuts import redirect, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from rest_framework import permissions, status
+from rest_framework import status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
 from rest_framework.permissions import IsAuthenticated
@@ -21,7 +21,7 @@ from social_django.utils import load_strategy
 from authentication.backends.ol_open_id_connect import OlOpenIdConnectAuth
 
 from authentication.new_serializers import RegisterDetailsSerializer, RegisterExtraDetailsSerializer
-from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME, USER_MSG_TYPE_COMPLETED_AUTH
+from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME, USER_MSG_TYPE_PROFILE_CREATED
 from main.utils import encode_json_cookie_value, is_success_response
 
 User = get_user_model()
@@ -214,7 +214,7 @@ class RegisterDetailsView(ProfileDetailsAPIView):
                 key=USER_MSG_COOKIE_NAME,
                 value=encode_json_cookie_value(
                     {
-                        "type": USER_MSG_TYPE_COMPLETED_AUTH,
+                        "type": USER_MSG_TYPE_PROFILE_CREATED,
                     }
                 ),
                 max_age=USER_MSG_COOKIE_MAX_AGE,
