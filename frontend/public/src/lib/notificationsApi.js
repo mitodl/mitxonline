@@ -17,7 +17,8 @@ import {
   USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE,
   USER_MSG_TYPE_PAYMENT_REVIEW,
   USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
-  USER_MSG_TYPE_DISCOUNT_INVALID
+  USER_MSG_TYPE_DISCOUNT_INVALID,
+  USER_MSG_TYPE_PROFILE_CREATED
 } from "../constants"
 
 type UserMessage = {
@@ -70,6 +71,10 @@ export function parseStoredUserMessage(
   case USER_MSG_TYPE_COMPLETED_AUTH:
     alertType = ALERT_TYPE_SUCCESS
     msgText = "Account created!"
+    break
+  case USER_MSG_TYPE_PROFILE_CREATED:
+    alertType = ALERT_TYPE_SUCCESS
+    msgText = "Profile Created!"
     break
   case USER_MSG_TYPE_PAYMENT_DECLINED:
     alertType = ALERT_TYPE_DANGER
