@@ -77,3 +77,17 @@ class RegisterExtraDetailsSerializer(serializers.Serializer):
     highest_education = serializers.CharField(
         write_only=True, allow_blank=True, required=False
     )
+
+    def create(self, validated_data):  # noqa: ARG002
+        """Save user extra details"""
+        request = self.context["request"]
+        user = request.user
+        with transaction.atomic():
+            user_profile = UserProfileSerializer(
+                user.user_profile, data=validated_data
+            )
+            if user_profile.is_valid():
+                user_profile.save()
+
+        sync_hubspot_user(user)
+        return user

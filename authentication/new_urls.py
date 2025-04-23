@@ -17,12 +17,12 @@ urlpatterns = [
     path(
         "api/profile/details/",
         RegisterDetailsView.as_view(),
-        name="profile-details",
+        name="profile-details-api",
     ),
     path(
         "api/profile/extra/",
         RegisterExtraDetailsView.as_view(),
-        name="profile-extra",
+        name="profile-extra-api",
     ),
     path(
         ".well-known/openid-configuration",
