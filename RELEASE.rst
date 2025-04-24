@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.115.0
+---------------
+
+- chore(deps): update redis docker tag to v7 (#2040)
+- fix(deps): update dependency redis (#2038)
+- Make email settings more clear (#2605)
+- New user onboarding api and ui with Keycloak (#2601)
+- Remove unused serializer (#2602)
+- 7056 apisix integration for mitx online (#2599)
+- 6810 update financial assistance to use ue discount codes (#2572)
+
 Version 0.114.2 (Released April 24, 2025)
 ---------------
 
