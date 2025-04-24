@@ -9,7 +9,7 @@ from rest_framework import serializers
 from hubspot_sync.task_helpers import sync_hubspot_user
 from users.serializers import (
     LegalAddressSerializer,
-    UserProfileSerializer,
+    UserProfileSerializer, OpenEdxUserSerializer,
 )
 
 log = logging.getLogger()
@@ -23,9 +23,10 @@ class RegisterDetailsSerializer(serializers.Serializer):
     username = serializers.CharField(write_only=True)
     legal_address = LegalAddressSerializer(write_only=True)
     user_profile = UserProfileSerializer(write_only=True)
+    open_edx_user = OpenEdxUserSerializer(write_only=True)
 
     def create(self, validated_data):
-        """Save user legal address and user profile"""
+        """Save user legal address and user profile and edx username"""
         request = self.context["request"]
         user = request.user
         username = validated_data.pop("username")
@@ -33,7 +34,6 @@ class RegisterDetailsSerializer(serializers.Serializer):
         legal_address_data = validated_data.pop("legal_address")
         user_profile_data = validated_data.pop("user_profile", None)
         with transaction.atomic():
-            user.username = username
             user.name = name
             user.save()
             if legal_address_data:
@@ -49,6 +49,13 @@ class RegisterDetailsSerializer(serializers.Serializer):
                 )
                 if user_profile.is_valid():
                     user_profile.save()
+
+            if username:
+                open_edx_user = OpenEdxUserSerializer(
+                    user.openedx_users.first(), data=username
+                )
+                if open_edx_user.is_valid():
+                    open_edx_user.save()
 
         sync_hubspot_user(user)
         return user

@@ -20,6 +20,7 @@ from main.constants import USER_REGISTRATION_FAILED_MSG
 from main.serializers import WriteableSerializerMethodField
 from openedx.api import validate_username_email_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
+from openedx.models import OpenEdxUser
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
 
@@ -85,6 +86,27 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "type_is_educator",
             "type_is_other",
         )
+
+
+class OpenEdxUserSerializer(serializers.ModelSerializer):
+    """Serializer for OpenEdx user"""
+
+    edx_username = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        validators=[
+            UniqueValidator(
+                queryset=OpenEdxUser.objects.all(),
+                message=USERNAME_ALREADY_EXISTS_MSG,
+                lookup="iexact",
+            )
+        ],
+    )
+
+    class Meta:
+        model = OpenEdxUser
+        fields = ("edx_username",)
 
 
 class LegalAddressSerializer(serializers.ModelSerializer):
