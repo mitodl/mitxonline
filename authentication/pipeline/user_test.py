@@ -1,10 +1,12 @@
 """Tests of user pipeline actions"""
 # pylint: disable=redefined-outer-name
 
+import faker
 import pytest
 import responses
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from rest_framework import status
 from social_core.backends.email import EmailAuth
@@ -25,6 +27,7 @@ from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
 from users.factories import UserFactory
 
 User = get_user_model()
+FAKE = faker.Faker()
 
 
 @pytest.fixture
@@ -38,6 +41,17 @@ def mock_email_backend(mocker, backend_settings):
     """Fixture that returns a fake EmailAuth backend object"""
     backend = mocker.Mock()
     backend.name = "email"
+    backend.setting.side_effect = lambda key, default, **kwargs: backend_settings.get(  # noqa: ARG005
+        key, default
+    )
+    return backend
+
+
+@pytest.fixture
+def mock_ol_oidc_backend(mocker, backend_settings):
+    """Fixture that returns a fake OlOpenIdConnectAuth backend object"""
+    backend = mocker.Mock()
+    backend.name = "ol-oidc"
     backend.setting.side_effect = lambda key, default, **kwargs: backend_settings.get(  # noqa: ARG005
         key, default
     )
@@ -540,3 +554,82 @@ def test_create_user_when_email_blocked(mocker):
             pipeline_index=0,
             flow=SocialAuthState.FLOW_REGISTER,
         )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    (
+        "new_user_login",
+        "use_backend",
+    ),
+    [
+        (False, "email"),
+        (False, "oidc"),
+        (True, "oidc"),
+    ],
+)
+def test_create_ol_oidc_user(  # noqa: PLR0913
+    mocker,
+    new_user_login,
+    use_backend,
+    mock_email_backend,
+    mock_ol_oidc_backend,
+    mock_create_user_strategy,
+):
+    """Tests that create_ol_oidc_user creates a new user for an OIDC login"""
+
+    backend = mock_email_backend if use_backend == "email" else mock_ol_oidc_backend
+    user_global_id = FAKE.uuid4()
+    base_details = {
+        "email": "admin@odl.local",
+        "global_id": user_global_id,
+        "is_active": True,
+        "name": "Test Admin",
+        "username": "admin@odl.local",
+    }
+    details = {
+        **base_details,
+        "first_name": "Test",
+        "fullname": "Test Admin",
+        "last_name": "Admin",
+        "profile": {
+            "email_optin": None,
+            "name": "Test Admin",
+        },
+    }
+
+    user = None if new_user_login else UserFactory.create(**base_details)
+
+    strategy = mock_create_user_strategy
+    strategy.request_data.return_value = {
+        **strategy.request_data.return_value,
+        "global_id": user_global_id,
+        "is_active": True,
+    }
+
+    if new_user_login:
+        strategy.create_user = mocker.Mock(
+            side_effect=lambda *args, **kwargs: UserFactory.create(  # noqa: ARG005
+                password="fake password",  # noqa: S106
+                **base_details,
+            )
+        )
+
+        with pytest.raises(ObjectDoesNotExist):
+            User.objects.get(global_id=user_global_id)
+
+    response = user_actions.create_ol_oidc_user(
+        strategy, details, backend, user, pipeline_index=0
+    )
+
+    if use_backend == "oidc":
+        if new_user_login:
+            assert response["is_new"]
+            assert response["user"].global_id == user_global_id
+            assert strategy.create_user.called
+            assert User.objects.get(global_id=user_global_id)
+        else:
+            assert not response["is_new"]
+            assert not strategy.create_user.called
+    else:
+        assert response == {}

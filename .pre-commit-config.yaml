@@ -43,6 +43,9 @@ repos:
           - compliance/test_data/cybersource/
           - --exclude-files
           - ".*_test.js"
+          - --exclude-files
+          - "config/keycloak/*"
+        additional_dependencies: ["gibberish-detector"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: "v0.7.0"
     hooks:

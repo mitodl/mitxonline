@@ -122,6 +122,10 @@
       "description": "Timeout (in seconds) for requests made via the edX API client",
       "required": false
     },
+    "EXPOSE_OIDC_LOGIN": {
+      "description": "Expose the OIDC login functionality.",
+      "required": false
+    },
     "FASTLY_AUTH_TOKEN": {
       "description": "Optional token for the Fastly purge API.",
       "required": false
@@ -170,16 +174,20 @@
       "description": "Number of milliseconds to wait between consecutive Hubspot calls",
       "required": false
     },
+    "KEYCLOAK_BASE_URL": {
+      "description": "Base URL for the Keycloak instance.",
+      "required": false
+    },
+    "KEYCLOAK_REALM_NAME": {
+      "description": "Name of the realm the app uses in Keycloak.",
+      "required": false
+    },
     "LOGOUT_REDIRECT_URL": {
       "description": "Url to redirect to after logout, typically Open edX's own logout url",
       "required": false
     },
     "MAILGUN_BATCH_CHUNK_SIZE": {
       "description": "Maximum number of emails to send in a batch",
-      "required": false
-    },
-    "MAILGUN_FROM_EMAIL": {
-      "description": "Email which mail comes from",
       "required": false
     },
     "MAILGUN_KEY": {
@@ -192,6 +200,22 @@
     },
     "MEDIA_ROOT": {
       "description": "The root directory for locally stored media. Typically not used.",
+      "required": false
+    },
+    "MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST": {
+      "description": "The URL to redirect to after logging out",
+      "required": false
+    },
+    "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE": {
+      "description": "Disable middleware",
+      "required": false
+    },
+    "MITOL_APIGATEWAY_USERINFO_CREATE": {
+      "description": "Create users that we see but aren't aware of",
+      "required": false
+    },
+    "MITOL_APIGATEWAY_USERINFO_UPDATE": {
+      "description": "Update users we've seen before",
       "required": false
     },
     "MITOL_AUTHENTICATION_FROM_EMAIL": {
@@ -455,7 +479,7 @@
       "required": false
     },
     "MITX_ONLINE_SUPPORT_EMAIL": {
-      "description": "Email address listed for customer support",
+      "description": "Email address listed for customer support in the frontend. Not used for sending email.",
       "required": false
     },
     "MITX_ONLINE_USE_S3": {
@@ -608,8 +632,28 @@
       "description": "Name of the site. e.g MITx Online",
       "required": false
     },
+    "SOCIAL_AUTH_OL_OIDC_KEY": {
+      "description": "The client id for the OIDC provider",
+      "required": false
+    },
+    "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": {
+      "description": "The configuration endpoint for the OIDC provider",
+      "required": false
+    },
+    "SOCIAL_AUTH_OL_OIDC_SECRET": {
+      "description": "The client secret for the OIDC provider",
+      "required": false
+    },
     "STATUS_TOKEN": {
       "description": "Token to access the status API.",
+      "required": false
+    },
+    "UNIFIED_ECOMMERCE_API_KEY": {
+      "description": "The API key for Unified Ecommerce.",
+      "required": false
+    },
+    "UNIFIED_ECOMMERCE_URL": {
+      "description": "The base URL for Unified Ecommerce.",
       "required": false
     },
     "USE_X_FORWARDED_HOST": {

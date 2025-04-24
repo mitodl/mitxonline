@@ -7,16 +7,7 @@ import {
   formatPrettyMonthDate
 } from "../lib/util"
 import { Formik, Form, Field } from "formik"
-import {
-  Dropdown,
-  DropdownToggle,
-  DropdownMenu,
-  DropdownItem,
-  Button,
-  Modal,
-  ModalHeader,
-  ModalBody
-} from "reactstrap"
+import { Button, Modal, ModalHeader, ModalBody } from "reactstrap"
 import { partial, pathOr } from "ramda"
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
@@ -72,8 +63,7 @@ type EnrolledItemCardState = {
   submittingEnrollmentId: number | null,
   emailSettingsModalVisibility: boolean,
   runUnenrollmentModalVisibility: boolean,
-  programUnenrollmentModalVisibility: boolean,
-  menuVisibility: boolean
+  programUnenrollmentModalVisibility: boolean
 }
 
 export class EnrolledItemCard extends React.Component<
@@ -84,8 +74,7 @@ export class EnrolledItemCard extends React.Component<
     submittingEnrollmentId:             null,
     emailSettingsModalVisibility:       false,
     runUnenrollmentModalVisibility:     false,
-    programUnenrollmentModalVisibility: false,
-    menuVisibility:                     false
+    programUnenrollmentModalVisibility: false
   }
 
   toggleEmailSettingsModalVisibility = () => {
@@ -106,13 +95,6 @@ export class EnrolledItemCard extends React.Component<
     const { runUnenrollmentModalVisibility } = this.state
     this.setState({
       runUnenrollmentModalVisibility: !runUnenrollmentModalVisibility
-    })
-  }
-
-  toggleMenuVisibility = () => {
-    const { menuVisibility } = this.state
-    this.setState({
-      menuVisibility: !menuVisibility
     })
   }
 
@@ -424,9 +406,6 @@ export class EnrolledItemCard extends React.Component<
   renderCourseEnrollment() {
     const { enrollment, currentUser, isProgramCard, redirectToCourseHomepage } =
       this.props
-
-    const { menuVisibility } = this.state
-
     const financialAssistanceLink =
       isFinancialAssistanceAvailable(enrollment.run) &&
       !enrollment.approved_flexible_price_exists ? (
@@ -552,38 +531,36 @@ export class EnrolledItemCard extends React.Component<
                   </a>
                 )}
               </div>
-              <Dropdown
-                isOpen={menuVisibility}
-                toggle={this.toggleMenuVisibility.bind(this)}
+              <button
+                className="dropdown-toggle menu-button"
+                data-bs-toggle="dropdown"
+                aria-haspopup="true"
+                aria-expanded="false"
+                type="button"
                 id={`enrollmentDropdown-${enrollment.id}`}
               >
-                <DropdownToggle
-                  className="d-inline-flex unstyled dot-menu"
-                  aria-label={menuTitle}
-                >
-                  <span className="material-icons" title={menuTitle}>
-                    more_vert
-                  </span>
-                </DropdownToggle>
-                <DropdownMenu end>
-                  <span id={`unenrollButtonWrapper-${enrollment.id}`}>
-                    <DropdownItem
-                      className="unstyled d-block"
-                      onClick={onUnenrollClick}
-                    >
-                      Unenroll
-                    </DropdownItem>
-                  </span>
-                  <span id="subscribeButtonWrapper">
-                    <DropdownItem
-                      className="unstyled d-block"
-                      onClick={() => this.toggleEmailSettingsModalVisibility()}
-                    >
-                      Email Settings
-                    </DropdownItem>
-                  </span>
-                </DropdownMenu>
-              </Dropdown>
+                <span className="material-icons" title={menuTitle}>
+                  more_vert
+                </span>
+              </button>
+              <ul className="dropdown-menu dropdown-menu-end">
+                <li className="dropdown-item">
+                  <button
+                    className="unenroll-btn unstyled d-block"
+                    onClick={onUnenrollClick}
+                  >
+                    Unenroll
+                  </button>
+                </li>
+                <li className="dropdown-item">
+                  <button
+                    className="unstyled d-block"
+                    onClick={() => this.toggleEmailSettingsModalVisibility()}
+                  >
+                    Email Settings
+                  </button>
+                </li>
+              </ul>
               {this.renderRunUnenrollmentModal(enrollment)}
               {this.renderEmailSettingsDialog(enrollment)}
             </div>
@@ -637,7 +614,6 @@ export class EnrolledItemCard extends React.Component<
 
   renderProgramEnrollment() {
     const { enrollment } = this.props
-    const { menuVisibility } = this.state
 
     const title = enrollment.program.title
     const certificateLinks = null
@@ -680,32 +656,30 @@ export class EnrolledItemCard extends React.Component<
                   </a>
                 </h2>
               </div>
-              <Dropdown
-                isOpen={menuVisibility}
-                toggle={this.toggleMenuVisibility.bind(this)}
-                id={`programEnrollmentDropdown-${enrollment.id}`}
+              <button
+                className="dropdown-toggle menu-button"
+                data-bs-toggle="dropdown"
+                aria-haspopup="true"
+                aria-expanded="false"
+                type="button"
+                id={`enrollmentDropdown-${enrollment.id}`}
               >
-                <DropdownToggle
-                  className="d-inline-flex unstyled dot-menu"
-                  aria-label={menuTitle}
-                >
-                  <span className="material-icons" title={menuTitle}>
-                    more_vert
-                  </span>
-                </DropdownToggle>
-                <DropdownMenu end>
-                  <span id={`unenrollButtonWrapper-${enrollment.id}`}>
-                    <DropdownItem
-                      className="unstyled d-block"
-                      onClick={() =>
-                        this.toggleProgramUnenrollmentModalVisibility()
-                      }
-                    >
-                      Unenroll
-                    </DropdownItem>
-                  </span>
-                </DropdownMenu>
-              </Dropdown>
+                <span className="material-icons" title={menuTitle}>
+                  more_vert
+                </span>
+              </button>
+              <ul className="dropdown-menu dropdown-menu-end">
+                <li className="dropdown-item">
+                  <button
+                    className="unenroll-btn unstyled d-block"
+                    onClick={() =>
+                      this.toggleProgramUnenrollmentModalVisibility()
+                    }
+                  >
+                    Unenroll
+                  </button>
+                </li>
+              </ul>
               {this.renderProgramUnenrollmentModal(enrollment)}
             </div>
             <div className="detail detail-program">

@@ -11,6 +11,8 @@ import {
 import { routes } from "../lib/urls"
 import { makeRegisterAuthResponse } from "../factories/auth"
 
+const util = require("../lib/util")
+
 describe("auth lib function", () => {
   it("generateLoginRedirectUrl should generate a url to redirect to after login", () => {
     window.location = "/protected/route?var=abc"
@@ -45,6 +47,31 @@ describe("auth lib function", () => {
         handleAuthResponse(history, response, handlers)
 
         sinon.assert.calledWith(handler, response)
+      })
+    })
+    ;[true, false].forEach(flagState => {
+      it(`redirects through Unified Ecommerce properly if the feature flag is ${
+        flagState ? "enabled" : "disabled"
+      }`, () => {
+        const response = makeRegisterAuthResponse({
+          state:        "success",
+          redirect_url: "/"
+        })
+        const handlers = {}
+        global.SETTINGS = {
+          unified_ecommerce_url: "http://ecommerce"
+        }
+
+        sandbox.stub(util, "checkFeatureFlag").returns(flagState)
+
+        assert.equal(
+          util.checkFeatureFlag("enable_unified_ecommerce", "anonymousUser"),
+          flagState
+        )
+
+        handleAuthResponse(history, response, handlers)
+
+        assert.equal(window.location.hostname, flagState ? "ecommerce" : "fake")
       })
     })
   })

@@ -23,7 +23,11 @@ from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
-from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
+from wagtail.admin.panels import (
+    FieldPanel,
+    InlinePanel,
+    PageChooserPanel,
+)
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import (
@@ -418,8 +422,16 @@ class CertificatePage(CourseProgramChildPage):
         context = {}
 
         if request.is_preview:
+            is_program_certificate = False
+            if isinstance(self.parent, ProgramPage):
+                is_program_certificate = True
+                product_name = self.parent.program.title
+            else:
+                product_name = self.parent.course.title
             preview_context = {
+                "uuid": "fake-uuid",
                 "learner_name": "Anthony M. Stark",
+                "product_name": product_name,
                 "start_date": (
                     self.parent.product.first_unexpired_run.start_date
                     if self.parent.product.first_unexpired_run
@@ -431,6 +443,7 @@ class CertificatePage(CourseProgramChildPage):
                     else datetime.now() + timedelta(days=45)  # noqa: DTZ005
                 ),
                 "CEUs": self.CEUs,
+                "is_program_certificate": is_program_certificate,
             }
         elif self.certificate:
             # Verify that the certificate in fact is for this same course
@@ -1102,7 +1115,10 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         FieldPanel("feature_image"),
         FieldPanel("video_url"),
         FieldPanel("faculty_section_title"),
-        InlinePanel("linked_instructors", label="Faculty Members"),
+        InlinePanel(
+            "linked_instructors",
+            label="Faculty Members",
+        ),
     ]
 
     subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
@@ -1139,8 +1155,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
 
     def get_context(self, request, *args, **kwargs):  # noqa: ARG002
         instructors = [
-            member.linked_instructor_page
-            for member in self.linked_instructors.order_by("order").all()
+            member.linked_instructor_page for member in self.linked_instructors.all()
         ]
 
         return {
@@ -1164,7 +1179,8 @@ class CoursePage(ProductPage):
         "courses.CoursesTopic",
         null=True,
         blank=True,
-        help_text="The topics for this course page.",
+        help_text="Select topic pairs (primary -> secondary) for this course page.",
+        limit_choices_to=~models.Q(parent=None),
     )
 
     search_fields = Page.search_fields + [  # noqa: RUF005

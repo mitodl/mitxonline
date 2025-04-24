@@ -3,6 +3,9 @@
 from django.urls import include, path
 from rest_framework import routers
 
+from users.new_views import (
+    CurrentUserRetrieveUpdateViewSet as NewCurrentUserRetrieveUpdateViewSet,
+)
 from users.views import (
     ChangeEmailRequestViewSet,
     CountriesStatesViewSet,
@@ -26,6 +29,13 @@ urlpatterns = [
             {"patch": "update", "get": "retrieve"}
         ),
         name="users_api-me",
+    ),
+    path(
+        "api/users/current_user/",
+        NewCurrentUserRetrieveUpdateViewSet.as_view(
+            {"patch": "update", "get": "retrieve"}
+        ),
+        name="users_api-current_user",
     ),
     path("api/", include(router.urls)),
 ]

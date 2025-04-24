@@ -4,6 +4,7 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.http import HttpResponseRedirect
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from social_core.backends.email import EmailAuth
 from social_core.exceptions import AuthException, InvalidEmail
@@ -52,6 +53,7 @@ class SocialAuthSerializer(serializers.Serializer):
     redirect_url = serializers.CharField(read_only=True, default=None)
     extra_data = serializers.SerializerMethodField()
 
+    @extend_schema_field(serializers.DictField())
     def get_extra_data(self, instance):
         """Serialize extra_data"""
         if instance.user is not None:

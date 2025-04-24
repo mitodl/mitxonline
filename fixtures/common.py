@@ -25,6 +25,12 @@ def staff_user(db):  # noqa: ARG001
 
 
 @pytest.fixture
+def admin_user(db):  # noqa: ARG001
+    """Admin user fixture"""
+    return UserFactory.create(is_superuser=True, is_staff=True)
+
+
+@pytest.fixture
 def user_client(user):
     """Django test client that is authenticated with the user"""
     client = Client()

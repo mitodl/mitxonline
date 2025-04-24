@@ -510,12 +510,12 @@ describe("CatalogPage", function() {
           courses: {
             count:   3,
             results: courses,
-            next:    "http://fake.com/api/courses/?page=2"
+            next:    "http://fake.com/api/v1/courses/?page=2"
           },
           programs: {
             count:   4,
             results: programs,
-            next:    "http://fake.com/api/courses/?page=2"
+            next:    "http://fake.com/api/v1/courses/?page=2"
           },
           departments: [
             {
@@ -659,7 +659,7 @@ describe("CatalogPage", function() {
           courses: {
             count:   2,
             results: courses,
-            next:    "http://fake.com/api/courses/?page=2"
+            next:    "http://fake.com/api/v1/courses/?page=2"
           },
           programs: {
             count:   2,
@@ -785,7 +785,7 @@ describe("CatalogPage", function() {
           courses: {
             count:   1,
             results: courses,
-            next:    "http://fake.com/api/courses/?page=2"
+            next:    "http://fake.com/api/v1/courses/?page=2"
           },
           programs: {
             count:   1,
@@ -846,12 +846,12 @@ describe("CatalogPage", function() {
           courses: {
             count:   1,
             results: courses,
-            next:    "http://fake.com/api/courses/?page=2"
+            next:    "http://fake.com/api/v1/courses/?page=2"
           },
           programs: {
             count:   4,
             results: programs,
-            next:    "http://fake.com/api/courses/?page=2"
+            next:    "http://fake.com/api/v1/courses/?page=2"
           },
           departments: [
             {

@@ -142,7 +142,6 @@ def generate_checkout_payload(request):
             }
 
     callback_uri = request.build_absolute_uri(reverse("checkout-result-callback"))
-
     payload = PaymentGateway.start_payment(
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
         gateway_order,

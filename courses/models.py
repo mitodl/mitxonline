@@ -386,7 +386,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         return heap
 
     @cached_property
-    def required_courses(self):
+    def required_courses(self) -> list:
         """
         Returns just the courses under the "Required Courses" node.
         """
@@ -407,7 +407,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         )
 
     @cached_property
-    def elective_courses(self):
+    def elective_courses(self) -> list:
         """
         Returns just the courses under the "Required Courses" node.
         """
@@ -513,14 +513,17 @@ class CoursesTopic(TimestampedModel):
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name="subtopics",
+        related_name="child_topics",
     )
     objects = CoursesTopicQuerySet.as_manager()
 
     class Meta:
         unique_together = ("name", "parent")
+        ordering = ["parent__name", "name"]
 
     def __str__(self):
+        if self.parent:
+            return f"{self.parent.name} -> {self.name}"
         return self.name
 
 
@@ -528,7 +531,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
 
     class Meta:
-        ordering = ["id"]
+        ordering = ["readable_id"]
 
     objects = CourseQuerySet.as_manager()
     title = models.CharField(max_length=255)
@@ -766,6 +769,13 @@ class CourseRun(TimestampedModel):
         )
 
     @property
+    def is_fake_course_run(self):
+        """
+        Checks if a course run is a fake course run
+        """
+        return self.run_tag.startswith("fake")
+
+    @property
     def courseware_url(self):
         """
         Full URL for this CourseRun as it exists in the courseware
@@ -914,7 +924,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         return self.course_run.courseware_id
 
     @property
-    def link(self):
+    def link(self) -> str:
         """
         Get the link at which this certificate will be served
         Format: /certificate/<uuid>/
@@ -1000,7 +1010,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         return self.program.readable_id
 
     @property
-    def link(self):
+    def link(self) -> str:
         """
         Get the link at which this certificate will be served
         Format: /certificate/program/<uuid>/
@@ -1306,7 +1316,7 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
         return serialize_model_object(self)
 
     @property
-    def grade_percent(self):
+    def grade_percent(self) -> Decimal:
         """Returns the grade field value as a number out of 100 (or None if the value is None)"""
         return (
             Decimal(self.grade * 100).quantize(exp=Decimal(1), rounding=ROUND_HALF_EVEN)

@@ -4,6 +4,7 @@
 
 python3 manage.py collectstatic --noinput --clear
 python3 manage.py migrate --noinput
+python3 manage.py createcachetable
 python3 manage.py configure_wagtail
 
 health_urls=(

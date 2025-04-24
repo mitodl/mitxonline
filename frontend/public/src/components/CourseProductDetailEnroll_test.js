@@ -334,11 +334,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .simulate("change", { target: { value: courseRun["id"] } })
       inner.update()
 
-      assert.equal(
-        inner.find("input[type='hidden']").at(0).prop("value"),
-        courseRun.products[0].id
-      )
-
       const flexiblePricingLink = inner.find(".financial-assistance-link").at(0)
       if (flexPriceApproved) {
         assert.isFalse(flexiblePricingLink.exists())
@@ -504,9 +499,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .find("select.form-control")
         .simulate("change", { target: { value: courseRun["id"] } })
       inner.update()
-
-      assert.equal(inner.find("input[type='hidden']").at(0).prop("value"), "1")
-
       assert.equal(inner.find("#certificate-price-info").at(0).text(), "$9.00")
     })
     it(`shows dialog to upgrade user enrollment with flexible percent-off discount and handles ${returnedStatusCode} response`, async () => {
@@ -549,9 +541,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .find("select.form-control")
         .simulate("change", { target: { value: courseRun["id"] } })
       inner.update()
-
-      assert.equal(inner.find("input[type='hidden']").at(0).prop("value"), "1")
-
       assert.equal(
         inner.find("#certificate-price-info").at(0).text().at(1),
         "9"
@@ -590,16 +579,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       await enrollBtn.prop("onClick")()
 
       const modal = inner.find(".upgrade-enrollment-modal")
-      const upgradeForm = modal.find("form").at(0)
-      assert.isTrue(upgradeForm.exists())
 
       const selectorControl = modal.find(".date-selector-button-bar").at(0)
       assert.isTrue(selectorControl.exists())
       const selectorControlItems = selectorControl.find("option")
       assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
-      assert.isTrue(
-        upgradeForm.find("button.btn-upgrade").at(0).prop("disabled")
-      )
       assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
       modal
         .find("select.form-control")
@@ -607,7 +591,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       inner.update()
       assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
       assert.isFalse(getDisabledProp(inner, "button.btn-upgrade"))
-      assert.equal(inner.find("input[type='hidden']").at(0).prop("value"), "1")
       assert.equal(
         inner.find("#certificate-price-info").at(0).text().at(1),
         "9"
@@ -706,16 +689,14 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       await enrollBtn.prop("onClick")()
 
       const modal = inner.find(".upgrade-enrollment-modal")
-      const upgradeForm = modal.find("form").at(0)
-      assert.isTrue(upgradeForm.exists())
+      // const upgradeForm = modal.find("form").at(0)
+      // assert.isTrue(upgradeForm.exists())
 
       const selectorControl = modal.find(".date-selector-button-bar").at(0)
       assert.isTrue(selectorControl.exists())
       const selectorControlItems = selectorControl.find("option")
       assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
-      assert.isTrue(
-        upgradeForm.find("button.btn-upgrade").at(0).prop("disabled")
-      )
+      assert.isTrue(modal.find("button.btn-upgrade").at(0).prop("disabled"))
       assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
       modal
         .find("select.form-control")

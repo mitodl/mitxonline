@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from drf_spectacular.utils import (
+    extend_schema_field,
+    extend_schema_serializer,
+    inline_serializer,
+)
 from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -25,11 +32,22 @@ class CourseSerializer(BaseCourseSerializer):
     page = CoursePageSerializer(read_only=True)
     programs = serializers.SerializerMethodField()
 
-    def get_next_run_id(self, instance):
+    def get_next_run_id(self, instance) -> int | None:
         """Get next run id"""
         run = instance.first_unexpired_run
         return run.id if run is not None else None
 
+    @extend_schema_field(
+        inline_serializer(
+            name="ProgramSerializer",
+            fields={
+                "id": serializers.IntegerField(),
+                "title": serializers.CharField(),
+                "readable_id": serializers.CharField(),
+            },
+            allow_null=True,
+        )
+    )
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
             from courses.serializers.v1.base import BaseProgramSerializer
@@ -59,6 +77,7 @@ class CourseSerializer(BaseCourseSerializer):
         ]
 
 
+@extend_schema_serializer(component_name="V1BaseCourseRun")
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
@@ -82,6 +101,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             }
         return data
 
+    @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         # Get the User object if it exists.
         user = self.context["request"].user if "request" in self.context else None
@@ -99,6 +119,9 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         return flexible_price_exists  # noqa: RET504
 
 
+@extend_schema_serializer(
+    component_name="V1CourseWithCourseRunsSerializer",
+)
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
@@ -111,17 +134,39 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
         ]
 
 
+@extend_schema_serializer(component_name="V1CourseRunWithCourse")
 class CourseRunWithCourseSerializer(CourseRunSerializer):
     """
     CourseRun model serializer - also serializes the parent Course.
     """
 
     course = CourseSerializer(read_only=True, context={"include_page_fields": True})
+    courseware_url = serializers.SerializerMethodField()
+    is_upgradable = serializers.SerializerMethodField()
+    is_enrollable = serializers.SerializerMethodField()
+    is_archived = serializers.SerializerMethodField()
+    course_number = serializers.SerializerMethodField()
+    products = ProductRelatedField(
+        many=True,
+        read_only=True,
+        help_text="List of products associated with this course run",
+    )
+
+    def get_products(self, instance) -> list[dict]:
+        """Get products associated with this course run"""
+        return super().get_products(instance)
 
     class Meta:
         model = models.CourseRun
-        fields = CourseRunSerializer.Meta.fields + [  # noqa: RUF005
+        fields = [
+            *CourseRunSerializer.Meta.fields,
             "course",
+            "courseware_url",
+            "is_upgradable",
+            "is_enrollable",
+            "is_archived",
+            "course_number",
+            "products",
         ]
 
 

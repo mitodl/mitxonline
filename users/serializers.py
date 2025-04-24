@@ -5,6 +5,7 @@ import re
 
 import pycountry
 from django.db import transaction
+from drf_spectacular.utils import extend_schema_field
 from requests import HTTPError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
@@ -144,6 +145,7 @@ class ExtendedLegalAddressSerializer(LegalAddressSerializer):
 
     email = serializers.SerializerMethodField()
 
+    @extend_schema_field(str)
     def get_email(self, instance):
         """Get email from the linked user object"""
         return instance.user.email
@@ -218,14 +220,17 @@ class UserSerializer(serializers.ModelSerializer):
 
         return trimmed_value
 
+    @extend_schema_field(str)
     def get_email(self, instance):
         """Returns the email or None in the case of AnonymousUser"""
         return getattr(instance, "email", None)
 
+    @extend_schema_field(str)
     def get_username(self, instance):
         """Returns the username or None in the case of AnonymousUser"""
         return getattr(instance, "username", None)
 
+    @extend_schema_field(list[str])
     def get_grants(self, instance):
         return instance.get_all_permissions()
 
@@ -254,8 +259,8 @@ class UserSerializer(serializers.ModelSerializer):
                 RequestsConnectionError,
                 EdxApiRegistrationValidationException,
             ) as exc:
-                log.exception("Unable to create user account", exc)  # noqa: PLE1205, TRY401
-                raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)  # noqa: B904
+                log.exception("Unable to create user account")
+                raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG) from exc
             if openedx_validation_msg_dict["username"]:
                 raise serializers.ValidationError(
                     {
@@ -380,6 +385,7 @@ class UserSerializer(serializers.ModelSerializer):
             "created_on",
             "updated_on",
             "grants",
+            "global_id",
         )
 
 
@@ -439,7 +445,7 @@ class ChangeEmailRequestUpdateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         """Updates an email change request"""
-        if User.objects.filter(email=instance.new_email).exists():
+        if User.objects.filter(email__iexact=instance.new_email).exists():
             log.debug(
                 "User %s tried to change email address to one already in use", instance
             )
@@ -483,22 +489,25 @@ class CountrySerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
     states = serializers.SerializerMethodField()
 
-    def get_code(self, instance):
+    @extend_schema_field(str)
+    def get_code(self, instance) -> str:
         """Get the country alpha_2 code"""
         return instance.alpha_2
 
-    def get_name(self, instance):
+    @extend_schema_field(str)
+    def get_name(self, instance) -> str:
         """Get the country name (common name preferred if available)"""
         if hasattr(instance, "common_name"):
             return instance.common_name
         return instance.name
 
-    def get_states(self, instance):
+    @extend_schema_field(list[dict])
+    def get_states(self, instance) -> list[dict]:
         """Get a list of states/provinces if USA or Canada"""
         if instance.alpha_2 in ("US", "CA"):
             return StateProvinceSerializer(
-                instance=sorted(  # noqa: C414
-                    list(pycountry.subdivisions.get(country_code=instance.alpha_2)),
+                instance=sorted(
+                    pycountry.subdivisions.get(country_code=instance.alpha_2),
                     key=lambda state: state.name,
                 ),
                 many=True,

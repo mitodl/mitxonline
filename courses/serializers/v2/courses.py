@@ -1,7 +1,10 @@
 """Courses v2 serializers"""
 
+from __future__ import annotations
+
 import logging
 
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -9,6 +12,7 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
+from courses.models import CoursesTopic
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
@@ -42,6 +46,7 @@ class CourseSerializer(BaseCourseSerializer):
     min_weekly_hours = serializers.SerializerMethodField()
     max_weekly_hours = serializers.SerializerMethodField()
 
+    @extend_schema_field(bool)
     def get_required_prerequisites(self, instance):
         """
         Check if the prerequisites field is populated in the course page CMS.
@@ -54,6 +59,7 @@ class CourseSerializer(BaseCourseSerializer):
             and instance.page.prerequisites != ""
         )
 
+    @extend_schema_field(str)
     def get_duration(self, instance):
         """
         Get the duration of the course from the course page CMS.
@@ -63,7 +69,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    def get_time_commitment(self, instance):
+    def get_time_commitment(self, instance) -> str | None:
         """
         Get the time commitment of the course from the course page CMS.
         """
@@ -72,7 +78,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    def get_min_weekly_hours(self, instance):
+    def get_min_weekly_hours(self, instance) -> str | None:
         """
         Get the min weekly hours of the course from the course page CMS.
         """
@@ -81,7 +87,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    def get_max_weekly_hours(self, instance):
+    def get_max_weekly_hours(self, instance) -> str | None:
         """
         Get the max weekly hours of the course from the course page CMS.
         """
@@ -90,12 +96,12 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    def get_next_run_id(self, instance):
+    def get_next_run_id(self, instance) -> int | None:
         """Get next run id"""
         run = instance.first_unexpired_run
         return run.id if run is not None else None
 
-    def get_programs(self, instance):
+    def get_programs(self, instance) -> list[dict] | None:
         if self.context.get("all_runs", False):
             from courses.serializers.v1.base import BaseProgramSerializer
 
@@ -103,15 +109,25 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
+    @extend_schema_field(list[dict])
     def get_topics(self, instance):
         """List topics of a course"""
         if hasattr(instance, "page") and instance.page is not None:
-            return sorted(
-                [{"name": topic.name} for topic in instance.page.topics.all()],
+            course_topics = instance.page.topics.all()
+            parent_topics = CoursesTopic.objects.filter(
+                child_topics__in=course_topics
+            ).distinct()
+            all_topics = sorted(
+                [{"name": topic.name} for topic in course_topics],
                 key=lambda topic: topic["name"],
             )
+
+            for parent_topic in parent_topics:
+                all_topics.append({"name": parent_topic.name})
+            return all_topics
         return []
 
+    @extend_schema_field(str)
     def get_certificate_type(self, instance):
         if instance.programs:
             program = instance.programs[0]
@@ -119,6 +135,7 @@ class CourseSerializer(BaseCourseSerializer):
                 return "MicroMasters Credential"
         return "Certificate of Completion"
 
+    @extend_schema_field(str)
     def get_availability(self, instance):
         """Get course availability"""
         dated_courseruns = get_dated_courseruns(instance.courseruns)
@@ -126,7 +143,7 @@ class CourseSerializer(BaseCourseSerializer):
             return "anytime"
         return "dated"
 
-    def get_min_weeks(self, instance):
+    def get_min_weeks(self, instance) -> int | None:
         """
         Get the min weeks of the course from the CMS page.
         """
@@ -135,7 +152,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    def get_max_weeks(self, instance):
+    def get_max_weeks(self, instance) -> int | None:
         """
         Get the max weeks of the course from the CMS page.
         """
@@ -167,6 +184,9 @@ class CourseSerializer(BaseCourseSerializer):
         ]
 
 
+@extend_schema_serializer(
+    component_name="V2CourseRunSerializer",
+)
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
@@ -190,6 +210,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             }
         return data
 
+    @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         if not self.context or not self.context.get("include_approved_financial_aid"):
             return False
@@ -213,24 +234,11 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
-    courseruns = serializers.SerializerMethodField(read_only=True)
-
-    def get_courseruns(self, instance):
-        context = {
-            "include_approved_financial_aid": self.context.get(
-                "include_approved_financial_aid", False
-            )
-        }
-
-        return CourseRunSerializer(
-            instance.courseruns.all(), many=True, read_only=True, context=context
-        ).data
+    courseruns = CourseRunSerializer(many=True, read_only=True)
 
     class Meta:
         model = models.Course
-        fields = CourseSerializer.Meta.fields + [  # noqa: RUF005
-            "courseruns",
-        ]
+        fields = [*CourseSerializer.Meta.fields, "courseruns"]
 
 
 class CourseRunWithCourseSerializer(CourseRunSerializer):

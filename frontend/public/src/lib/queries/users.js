@@ -52,5 +52,14 @@ export default {
     body:      {
       ...profileData
     }
+  }),
+  newEditProfileMutation: (profileData: UserProfileForm) => ({
+    ...DEFAULT_OPTIONS,
+    transform: transformCurrentUser,
+    update:    updateResult,
+    url:       "/api/users/current_user",
+    body:      {
+      ...profileData
+    }
   })
 }
