@@ -219,6 +219,7 @@ INSTALLED_APPS = (
     "openapi",
     "drf_spectacular",
     "mitol.apigateway.apps.ApigatewayApp",
+    "b2b",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
