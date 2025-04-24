@@ -124,12 +124,12 @@ def create_edx_user(user):
                 country=user.legal_address.country if user.legal_address else None,
                 state=user.legal_address.us_state if user.legal_address else None,
                 gender=user.user_profile.gender if user.user_profile else None,
-                year_of_birth=user.user_profile.year_of_birth
-                if user.user_profile
-                else None,
-                level_of_education=user.user_profile.level_of_education
-                if user.user_profile
-                else None,
+                year_of_birth=(
+                    user.user_profile.year_of_birth if user.user_profile else None
+                ),
+                level_of_education=(
+                    user.user_profile.level_of_education if user.user_profile else None
+                ),
                 provider=settings.OPENEDX_OAUTH_PROVIDER,
                 access_token=access_token.token,
                 **OPENEDX_REQUEST_DEFAULTS,
@@ -245,12 +245,12 @@ def update_edx_user_profile(user):
             country=user.legal_address.country if user.legal_address else None,
             state=user.legal_address.edx_us_state if user.legal_address else None,
             gender=user.user_profile.edx_gender if user.user_profile else None,
-            year_of_birth=user.user_profile.year_of_birth
-            if user.user_profile
-            else None,
-            level_of_education=user.user_profile.level_of_education
-            if user.user_profile
-            else None,
+            year_of_birth=(
+                user.user_profile.year_of_birth if user.user_profile else None
+            ),
+            level_of_education=(
+                user.user_profile.level_of_education if user.user_profile else None
+            ),
         ),
         headers={
             "Authorization": f"Bearer {auth.access_token}",

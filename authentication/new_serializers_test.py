@@ -1,0 +1,72 @@
+import pytest
+
+from authentication.new_serializers import (
+    RegisterDetailsSerializer,
+    RegisterExtraDetailsSerializer,
+)
+
+
+@pytest.mark.django_db
+def test_register_details_serializer_create(
+    user, valid_address_dict, user_profile_dict, rf
+):
+    """Test the create method of RegisterDetailsSerializer"""
+
+    request = rf.post("/api/profile/details/")
+    request.user = user
+
+    data = {
+        "name": "John Doe",
+        "username": "johndoe",
+        "legal_address": valid_address_dict,
+        "user_profile": user_profile_dict,
+    }
+
+    serializer = RegisterDetailsSerializer(data=data, context={"request": request})
+    assert serializer.is_valid(), serializer.errors
+
+    assert serializer.is_valid()
+    user = serializer.save()
+    assert user.name == "John Doe"
+
+
+@pytest.mark.django_db
+def test_register_details_serializer_invalid_data(user, invalid_address_dict, rf):
+    """Test RegisterDetailsSerializer with invalid data"""
+    request = rf.post("/api/profile/details/")
+    request.user = user
+
+    data = {
+        "name": "John Doe",
+        "username": "johndoe",
+        "legal_address": invalid_address_dict,
+        "user_profile": {},
+    }
+
+    serializer = RegisterDetailsSerializer(data=data, context={"request": request})
+
+    assert serializer.is_valid() is not True
+
+
+@pytest.mark.django_db
+def test_register_extra_details_serializer_valid_data(user):
+    """Test RegisterExtraDetailsSerializer with valid data"""
+    data = {
+        "gender": "Male",
+        "birth_year": "1990",
+        "company": "TechCorp",
+        "job_title": "Engineer",
+        "industry": "Technology",
+        "job_function": "Development",
+        "years_experience": "5",
+        "company_size": "100-500",
+        "leadership_level": "Mid-level",
+        "highest_education": "Bachelor's",
+    }
+
+    serializer = RegisterExtraDetailsSerializer(data=data)
+    assert serializer.is_valid(), serializer.errors
+    validated_data = serializer.validated_data
+    assert validated_data["gender"] == "Male"
+    assert validated_data["birth_year"] == "1990"
+    assert validated_data["company"] == "TechCorp"

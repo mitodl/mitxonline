@@ -459,7 +459,7 @@ body.new-design {
     }
   }
 
-  .upgrade-enrollment-modal {
+  .upgrade-enrollment-modal, .added-to-cart-modal {
     max-width: 750px;
     .cancel-link {
       margin: 20px 0;
@@ -468,15 +468,52 @@ body.new-design {
       text-align: left;
     }
     .enroll-now-free {
-      font-size: 16px;
+      padding: 10px 20px;
+      font-size: 15px;
       font-weight: 400;
-      text-decoration: underline;
+      text-decoration: none;
       box-shadow: none;
-      border: none;
+      border: 1px solid #DFE5EC;
+      background: rgba(3, 21, 45, 0.05);
     }
     .enroll-now-free:focus-visible {
       border-radius: 0;
       outline: 2px #28977e solid;
+    }
+
+    div.new-design {
+      text-align: right !important;
+
+      .btn-upgrade {
+        width: 86%;
+        padding: 15px 30px;
+        background-image: none !important;
+        text-align: left;
+
+        div.upgrade-btn-text {
+            display: inline-block;
+            margin-left: 16px;
+        }
+
+        strong {
+          font-size: 20px;
+          line-height: 24.2px;
+        }
+
+        span {
+          font-size: 18px;
+          line-height: 21.78px;
+        }
+
+        i.shopping-cart-line-icon {
+          background-image: url("/static/images/shopping-cart-line.svg");
+          display: inline-block;
+          filter: invert(100%) sepia(95%) saturate(0%) hue-rotate(19deg) brightness(103%) contrast(100%);
+          vertical-align: super;
+          width: 24px;
+          height: 24px;
+        }
+      }
     }
 
     form {
@@ -487,16 +524,18 @@ body.new-design {
         background-color: #A41E34;
         color: white;
         text-align: left;
-        background-image: url('/static/images/arrow-line-right.png');
-        background-position: 90% 50%;
-        background-repeat: no-repeat;
-        padding: 11px 22px;
+        background-image: url('/static/images/arrow-line-right.png') !important;
+        background-position: 90% 50% !important;
+        background-repeat: no-repeat !important;
+        padding: 14px 22px;
+
+
       }
       .btn-upgrade:focus-visible {
           border-color: #82192a;
           outline: 0;
           box-shadow: 0 0 0 0.25rem rgba(177, 65, 82, .5);
-        }
+      }
     }
 
     ul {
@@ -546,6 +585,10 @@ body.new-design {
     padding: 15px;
     margin: 0 1px;
 
+    div {
+      padding: 0;
+    }
+
     div.certificate-pricing-logo {
       img {
         width: 40px;
@@ -558,7 +601,9 @@ body.new-design {
       font-size: 18px;
       margin-bottom: 0;
       span.text-danger {
+        color: #A41E34 !important;
         font-size: 15px;
+        font-weight: 400;
       }
     }
 
@@ -580,15 +625,12 @@ body.new-design {
   }
 
   div.upgrade-options-row {
-    margin: 30px 1px 20px 1px;
-
+    margin: 23px 1px 8px 1px;
     display: flex;
-    padding: 0px;
-    justify-content: space-between;
+    padding: 0;
+    justify-content: space-evenly;
     align-items: center;
     align-self: stretch;
-
-    // border-bottom: 1px solid var(--BorderGrey, #DFE5EC);
     border: none;
 
     div {
@@ -785,6 +827,29 @@ body.new-design {
       }
     }
   }
+  a.finaid-link {
+    display: block;
+    color: #03152D;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 24px;
+    text-decoration: underline;
+
+
+    &:hover{
+      text-decoration: none !important;
+    }
+
+    a {
+      color: black;
+      font-weight: 400;
+
+      &:hover{
+        color: $brand-darker-bg;
+        text-decoration: none !important;
+      }
+    }
+  }
 }
 
 .popover-header {
@@ -797,4 +862,38 @@ body.new-design {
   text-decoration: underline;
   background-color: transparent;
   border: none;
+}
+
+.added-to-cart-modal {
+
+  .go-to-cart-btn-text {
+    img {
+      margin-left: 10px;
+    }
+  }
+  .green-label {
+    background-color: rgba(0, 173, 0, 0.2);
+    width: 100%;
+    padding: 11px 16px 11px 16px;
+    border-radius: 4px 0 0 0;
+    opacity: 90%;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: left;
+  }
+  .green-check-circle-icon {
+    display: inline-block;
+    vertical-align: middle;
+    width: 16px;
+    height: 16px;
+    margin-right: 10px
+  }
+
+  .right-arrow-icon {
+    width: 24px;
+    height: 24px;
+    filter: invert(100%) sepia(95%) saturate(0%) hue-rotate(19deg) brightness(103%) contrast(100%);
+  }
+
 }

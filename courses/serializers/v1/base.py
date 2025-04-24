@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from typing import Optional
+
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer
@@ -37,9 +42,30 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     """Minimal CourseRun model serializer"""
 
     is_archived = serializers.SerializerMethodField()
+    is_upgradable = serializers.SerializerMethodField()
+    is_enrollable = serializers.SerializerMethodField()
+    course_number = serializers.SerializerMethodField()
+    courseware_url = serializers.SerializerMethodField()
 
-    def get_is_archived(self, instance):
+    def get_courseware_url(self, instance) -> Optional[str]:
+        """Get the courseware URL"""
+        return instance.courseware_url
+
+    def get_is_upgradable(self, instance) -> bool:
+        """Check if the course run is upgradable"""
+        return instance.is_upgradable
+
+    def get_is_enrollable(self, instance) -> bool:
+        """Check if the course run is enrollable"""
+        return instance.is_enrollable
+
+    def get_is_archived(self, instance) -> bool:
+        """Check if the course run is archived"""
         return instance.is_enrollable and instance.is_past
+
+    def get_course_number(self, instance) -> str:
+        """Get the course number"""
+        return instance.course_number
 
     class Meta:
         model = models.CourseRun
@@ -79,6 +105,22 @@ class BaseProgramSerializer(serializers.ModelSerializer):
         fields = ["title", "readable_id", "id", "type"]
 
 
+class CourseRunCertificateSerializer(serializers.ModelSerializer):
+    """CourseRunCertificate model serializer"""
+
+    class Meta:
+        model = models.CourseRunCertificate
+        fields = ["uuid", "link"]
+
+
+class CourseRunGradeSerializer(serializers.ModelSerializer):
+    """CourseRunGrade serializer"""
+
+    class Meta:
+        model = models.CourseRunGrade
+        fields = ["grade", "letter_grade", "passed", "set_by_admin", "grade_percent"]
+
+
 class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     certificate = serializers.SerializerMethodField(read_only=True)
     enrollment_mode = serializers.ChoiceField(
@@ -87,6 +129,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     approved_flexible_price_exists = serializers.SerializerMethodField()
     grades = serializers.SerializerMethodField(read_only=True)
 
+    @extend_schema_field(CourseRunCertificateSerializer(allow_null=True))
     def get_certificate(self, enrollment):
         """
         Resolve a certificate for this enrollment if it exists
@@ -119,6 +162,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         except models.CourseRunCertificate.DoesNotExist:
             return None
 
+    @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         instance_run = instance[0].run if isinstance(instance, list) else instance.run
         instance_user = (
@@ -129,6 +173,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         )
         return flexible_price_exists  # noqa: RET504
 
+    @extend_schema_field(CourseRunGradeSerializer(many=True))
     def get_grades(self, instance):
         instance_run = instance[0].run if isinstance(instance, list) else instance.run
         instance_user = (
@@ -155,6 +200,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         ]
 
 
+@extend_schema_field(ProductFlexibilePriceSerializer)
 class ProductRelatedField(serializers.RelatedField):
     """serializer for the Product generic field"""
 
@@ -163,19 +209,3 @@ class ProductRelatedField(serializers.RelatedField):
             instance=instance, context=self.context
         )
         return serializer.data
-
-
-class CourseRunCertificateSerializer(serializers.ModelSerializer):
-    """CourseRunCertificate model serializer"""
-
-    class Meta:
-        model = models.CourseRunCertificate
-        fields = ["uuid", "link"]
-
-
-class CourseRunGradeSerializer(serializers.ModelSerializer):
-    """CourseRunGrade serializer"""
-
-    class Meta:
-        model = models.CourseRunGrade
-        fields = ["grade", "letter_grade", "passed", "set_by_admin", "grade_percent"]

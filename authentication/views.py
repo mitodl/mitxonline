@@ -6,17 +6,20 @@ import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.views import LogoutView
-from django.shortcuts import render, reverse
+from django.shortcuts import redirect, render, reverse
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from social_core.backends.email import EmailAuth
 from social_django.models import UserSocialAuth
-from social_django.utils import load_backend
+from social_django.utils import load_backend, load_strategy
 
+from authentication.backends.ol_open_id_connect import OlOpenIdConnectAuth
 from authentication.serializers import (
     LoginEmailSerializer,
     LoginPasswordSerializer,
@@ -81,6 +84,10 @@ class LoginPasswordView(SocialAuthAPIView):
         return LoginPasswordSerializer
 
 
+@extend_schema(
+    request=RegisterEmailSerializer,
+    responses={200: RegisterEmailSerializer},
+)
 class RegisterEmailView(SocialAuthAPIView):
     """Email register view"""
 
@@ -105,14 +112,42 @@ class RegisterEmailView(SocialAuthAPIView):
         return super().post(request)
 
 
-class RegisterConfirmView(SocialAuthAPIView):
+class RegisterConfirmView(SocialAuthAPIView, GenericAPIView):
     """Email registration confirmation view"""
 
+    serializer_class = RegisterConfirmSerializer
+    permission_classes = []
+    authentication_classes = []
+
     def get_serializer_cls(self):
-        """Return the serializer cls"""
+        """Return the serializer class"""
         return RegisterConfirmSerializer
 
+    def post(self, request):
+        """
+        Handle POST requests to confirm email registration
+        """
+        if bool(request.session.get("hijack_history")):
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
+        serializer_cls = self.get_serializer_cls()
+        strategy = load_drf_strategy(request)
+        backend = load_backend(strategy, EmailAuth.name, None)
+        serializer = serializer_cls(
+            data=request.data,
+            context={"request": request, "strategy": strategy, "backend": backend},
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    request=RegisterDetailsSerializer,
+    responses={200: RegisterDetailsSerializer},
+)
 class RegisterDetailsView(SocialAuthAPIView):
     """Email registration details view"""
 
@@ -135,6 +170,10 @@ class RegisterDetailsView(SocialAuthAPIView):
         return resp
 
 
+@extend_schema(
+    request=RegisterExtraDetailsSerializer,
+    responses={200: RegisterExtraDetailsSerializer},
+)
 class RegisterExtraDetailsView(SocialAuthAPIView):
     """Email registration extra details view"""
 
@@ -163,6 +202,43 @@ def confirmation_sent(request, **kwargs):  # pylint: disable=unused-argument  # 
 class CustomLogoutView(LogoutView):
     """Custom view to modify base functionality in django.contrib.auth.views.LogoutView"""
 
+    def _keycloak_logout_url(self, user):
+        """
+        Return the OpenID Connect logout URL for a user based on
+        their SocialAuth record's id_token and the currently
+        configured Keycloak environment variables.
+
+        Args:
+            user (User): User model record associated with the SocialAuth record.
+
+        Returns:
+            string: The URL to redirect the user to in order to logout.
+        """
+        strategy = load_strategy()
+        storage = strategy.storage
+        user_social_auth_record = storage.user.get_social_auth_for_user(
+            user, provider=OlOpenIdConnectAuth.name
+        ).first()
+
+        if not user_social_auth_record:
+            return None
+
+        id_token = user_social_auth_record.extra_data.get("id_token")
+        qs = urlencode(
+            {
+                "id_token_hint": id_token,
+                "post_logout_redirect_uri": self.request.build_absolute_uri(
+                    settings.LOGOUT_REDIRECT_URL
+                ),
+            }
+        )
+
+        return (
+            f"{settings.KEYCLOAK_BASE_URL}/realms/"
+            f"{settings.KEYCLOAK_REALM_NAME}/protocol/openid-connect/logout"
+            f"?{qs}"
+        )
+
     def get_next_page(self):
         next_page = super().get_next_page()
 
@@ -172,6 +248,35 @@ class CustomLogoutView(LogoutView):
             params = {"redirect_url": settings.SITE_BASE_URL}
             next_page += ("&" if urlparse(next_page).query else "?") + urlencode(params)
             return next_page
+
+    def get(
+        self,
+        request,
+        *args,  # noqa: ARG002
+        **kwargs,  # noqa: ARG002
+    ):
+        """
+        GET endpoint for logging a user out.
+
+        The logout redirect path the user follows is:
+
+        - api.example.com/logout (this view)
+        - keycloak.example.com/realms/REALM/protocol/openid-connect/logout
+        - api.example.com/app (see main/urls.py)
+        - app.example.com
+
+        """
+        user = getattr(request, "user", None)
+        keycloak_redirect = self._keycloak_logout_url(user)
+
+        if not keycloak_redirect:
+            return super().get(request)
+
+        if user and user.is_authenticated:
+            super().get(request)
+            return redirect(keycloak_redirect)
+        else:
+            return redirect(settings.LOGOUT_REDIRECT_URL)
 
 
 @api_view(["GET"])

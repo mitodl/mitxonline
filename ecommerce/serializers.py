@@ -5,6 +5,7 @@ MITxOnline ecommerce serializers
 from decimal import Decimal
 
 import pytz
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer
@@ -68,17 +69,61 @@ class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
         ]
 
 
+class InvalidPurchasableObjectTypeError(Exception):
+    """Exception raised for invalid purchasable object types."""
+
+
 class ProductPurchasableObjectField(serializers.RelatedField):
+    """Field for serializing purchasable objects (CourseRun or ProgramRun)"""
+
+    @extend_schema_field(
+        {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "run_tag": {"type": "string"},
+                        "start_date": {"type": "string", "format": "date-time"},
+                        "end_date": {"type": "string", "format": "date-time"},
+                    },
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "title": {"type": "string"},
+                        "run_tag": {"type": "string"},
+                        "start_date": {"type": "string", "format": "date-time"},
+                        "end_date": {"type": "string", "format": "date-time"},
+                        "course": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "integer"},
+                                "title": {"type": "string"},
+                                "page": {"type": "object"},
+                            },
+                        },
+                        "readable_id": {"type": "string"},
+                        "enrollment_start": {"type": "string", "format": "date-time"},
+                        "enrollment_end": {"type": "string", "format": "date-time"},
+                        "course_number": {"type": "string"},
+                    },
+                },
+            ]
+        }
+    )
     def to_representation(self, value):
-        """Serialize the purchasable object using a serializer that matches the model type (either a Program Run or a Course Run)"""
+        """Serialize the purchasable object using appropriate serializer"""
         if isinstance(value, ProgramRun):
             return ProgramRunProductPurchasableObjectSerializer(instance=value).data
         elif isinstance(value, CourseRun):
             return CourseRunProductPurchasableObjectSerializer(instance=value).data
-        raise Exception(  # noqa: TRY002
-            "Unexpected to find type for Product.purchasable_object:",  # noqa: EM101
-            value.__class__,
+
+        error_message = (
+            f"Unexpected type for Product.purchasable_object: {value.__class__}"
         )
+        raise InvalidPurchasableObjectTypeError(error_message)
 
 
 class BaseProductSerializer(serializers.ModelSerializer):
@@ -100,25 +145,6 @@ class ProductSerializer(BaseProductSerializer):
     class Meta:
         fields = BaseProductSerializer.Meta.fields + [  # noqa: RUF005
             "purchasable_object",
-        ]
-        model = models.Product
-
-
-class ProductFlexibilePriceSerializer(BaseProductSerializer):
-    product_flexible_price = serializers.SerializerMethodField()
-
-    def get_product_flexible_price(self, instance):
-        if "request" not in self.context:
-            return None
-
-        discount_record = determine_courseware_flexible_price_discount(
-            instance, self.context["request"].user
-        )
-        return DiscountSerializer(discount_record, context=self.context).data
-
-    class Meta:
-        fields = BaseProductSerializer.Meta.fields + [  # noqa: RUF005
-            "product_flexible_price",
         ]
         model = models.Product
 
@@ -147,6 +173,7 @@ class BasketSerializer(serializers.ModelSerializer):
 
     basket_items = serializers.SerializerMethodField()
 
+    @extend_schema_field(BasketItemSerializer(many=True))
     def get_basket_items(self, instance):
         """Get items in the basket"""
         return [
@@ -163,6 +190,7 @@ class BasketSerializer(serializers.ModelSerializer):
         model = models.Basket
 
 
+@extend_schema_serializer(component_name="BasketDiscountDetail")
 class BasketDiscountSerializer(serializers.ModelSerializer):
     """BasketDiscount model serializer"""
 
@@ -194,35 +222,77 @@ class BasketItemWithProductSerializer(serializers.ModelSerializer):
 
 
 class BasketWithProductSerializer(serializers.ModelSerializer):
+    """Serializer for Basket model with product details"""
+
     basket_items = serializers.SerializerMethodField()
     total_price = serializers.SerializerMethodField()
     discounted_price = serializers.SerializerMethodField()
     discounts = serializers.SerializerMethodField()
 
-    def get_basket_items(self, instance):
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "basket": {"type": "integer"},
+                    "product": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "price": {"type": "number"},
+                            "description": {"type": "string"},
+                            "is_active": {"type": "boolean"},
+                            "purchasable_object": {"type": "object"},
+                        },
+                    },
+                    "id": {"type": "integer"},
+                },
+            },
+        }
+    )
+    def get_basket_items(self, instance) -> list[dict[str, any]]:
+        """
+        Get items in the basket with their associated product details
+
+        Args:
+            instance: Basket model instance
+
+        Returns:
+            List of serialized basket items with product details
+        """
         return [
             BasketItemWithProductSerializer(instance=basket, context=self.context).data
             for basket in instance.basket_items.all()
         ]
 
-    def get_total_price(self, instance):
+    @extend_schema_field(Decimal)
+    def get_total_price(self, instance) -> Decimal:
+        """Get total price of all items in basket before discounts"""
         return sum(
             basket_item.base_price for basket_item in instance.basket_items.all()
         )
 
-    def get_discounted_price(self, instance):
+    @extend_schema_field(Decimal)
+    def get_discounted_price(self, instance) -> Decimal:
+        """Get total price after any discounts are applied"""
         discounts = instance.discounts.all()
-
         if discounts.count() == 0:
             return self.get_total_price(instance)
-
         return sum(
             basket_item.discounted_price for basket_item in instance.basket_items.all()
         )
 
-    def get_discounts(self, instance):
+    @extend_schema_field(list[BasketDiscountSerializer])
+    def get_discounts(self, instance) -> list[dict[str, any]]:
         """
         Exclude zero value discounts and return applicable discounts on the basket.
+
+        Args:
+            instance: Basket instance
+
+        Returns:
+            List of serialized basket discount records
         """
         discounts = []
         for discount_record in instance.discounts.all():
@@ -240,6 +310,7 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         return discounts
 
     class Meta:
+        model = models.Basket
         fields = [
             "id",
             "user",
@@ -248,12 +319,18 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
             "discounted_price",
             "discounts",
         ]
-        model = models.Basket
 
 
 class LineSerializer(serializers.ModelSerializer):
     product = serializers.SerializerMethodField()
+    quantity = serializers.IntegerField()
+    item_description = serializers.CharField()
+    content_type = serializers.CharField()
+    unit_price = serializers.DecimalField(max_digits=9, decimal_places=2)
+    total_price = serializers.DecimalField(max_digits=9, decimal_places=2)
+    id = serializers.IntegerField()
 
+    @extend_schema_field(ProductSerializer)
     def get_product(self, instance):
         product = models.Product.all_objects.get(
             pk=instance.product_version.field_dict["id"]
@@ -282,16 +359,30 @@ class OrderSerializer(serializers.ModelSerializer):
     transactions = serializers.SerializerMethodField()
     street_address = serializers.SerializerMethodField()
 
+    @extend_schema_field(LineSerializer(many=True))
     def get_lines(self, instance):
         """Get product information along with applied discounts"""
         return TransactionLineSerializer(instance.lines, many=True).data
 
+    @extend_schema_field(RedeemedDiscountSerializer(many=True))
     def get_discounts(self, instance):
         discounts = []
         for discount in instance.discounts.all():
             discounts.append(RedeemedDiscountSerializer(discount).data)  # noqa: PERF401
         return discounts
 
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "amount": {"type": "number"},
+                    "date": {"type": "string", "format": "date-time"},
+                },
+            },
+        }
+    )
     def get_refunds(self, instance):
         refunds = []
         for transaction in (
@@ -305,6 +396,18 @@ class OrderSerializer(serializers.ModelSerializer):
 
         return refunds
 
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "card_number": {"type": "string"},
+                "card_type": {"type": "string"},
+                "name": {"type": "string"},
+                "bill_to_email": {"type": "string"},
+                "payment_method": {"type": "string"},
+            },
+        }
+    )
     def get_transactions(self, instance):
         """Get transaction information if it exists"""
         transaction = instance.transactions.order_by("-created_on").first()
@@ -340,6 +443,18 @@ class OrderSerializer(serializers.ModelSerializer):
             return data
         return None
 
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "line": {"type": "array", "items": {"type": "string"}},
+                "postal_code": {"type": "string"},
+                "state": {"type": "string"},
+                "city": {"type": "string"},
+                "country": {"type": "string"},
+            },
+        }
+    )
     def get_street_address(self, instance):
         """Get the address information from the transaction"""
         transaction = instance.transactions.order_by("-created_on").first()
@@ -376,6 +491,7 @@ class OrderSerializer(serializers.ModelSerializer):
             return street_address
         return None
 
+    @extend_schema_field(ExtendedLegalAddressSerializer(many=True))
     def get_purchaser(self, instance):
         """Get the purchaser infrmation"""
         return ExtendedLegalAddressSerializer(instance.purchaser.legal_address).data
@@ -401,6 +517,7 @@ class OrderHistorySerializer(serializers.ModelSerializer):
     titles = serializers.SerializerMethodField()
     lines = LineSerializer(many=True)
 
+    @extend_schema_field(serializers.ListField)
     def get_titles(self, instance):
         titles = []
 
@@ -450,6 +567,26 @@ class DiscountSerializer(serializers.ModelSerializer):
             "expiration_date",
         ]
         depth = 2
+
+
+class ProductFlexibilePriceSerializer(BaseProductSerializer):
+    product_flexible_price = serializers.SerializerMethodField()
+
+    @extend_schema_field(DiscountSerializer(allow_null=True))
+    def get_product_flexible_price(self, instance):
+        if "request" not in self.context:
+            return None
+
+        discount_record = determine_courseware_flexible_price_discount(
+            instance, self.context["request"].user
+        )
+        return DiscountSerializer(discount_record, context=self.context).data
+
+    class Meta:
+        fields = BaseProductSerializer.Meta.fields + [  # noqa: RUF005
+            "product_flexible_price",
+        ]
+        model = models.Product
 
 
 class DiscountRedemptionSerializer(serializers.ModelSerializer):

@@ -58,7 +58,7 @@ from openedx.exceptions import (
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
 )
-from openedx.factories import OpenEdxApiAuthFactory, OpenEdxUserFactory
+from openedx.factories import OpenEdxApiAuthFactory
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import SyncResult
 from users.factories import UserFactory
@@ -158,9 +158,9 @@ def test_create_edx_user(user, settings, application, access_token_count):
         "provider": settings.OPENEDX_OAUTH_PROVIDER,
         "access_token": created_access_token.token,
         "country": user.legal_address.country if user.legal_address else None,
-        "year_of_birth": str(user.user_profile.year_of_birth)
-        if user.user_profile
-        else None,
+        "year_of_birth": (
+            str(user.user_profile.year_of_birth) if user.user_profile else None
+        ),
         "gender": user.user_profile.gender if user.user_profile else None,
         "honor_code": "True",
     }
@@ -187,7 +187,9 @@ def test_create_edx_user_conflict(settings, user):
     with pytest.raises(OpenEdxUserCreateError):
         create_edx_user(user)
 
-    assert OpenEdxUser.objects.count() == 0
+    user.refresh_from_db()
+
+    assert user.openedx_users.first().has_been_synced is True
 
 
 @responses.activate
@@ -210,9 +212,8 @@ def test_create_edx_user_for_user_not_synced_with_edx(
         json=dict(success=True),  # noqa: C408
         status=status.HTTP_200_OK,
     )
-    OpenEdxUserFactory.create(
-        user=user, has_been_synced=open_edx_user_record_has_been_synced
-    )
+    user.openedx_users.update(has_been_synced=open_edx_user_record_has_been_synced)
+
     mock_client = mocker.MagicMock()
     mock_client.user_info.get_user_info = mocker.Mock(
         side_effect=Exception if not open_edx_user_record_exists else None,
@@ -259,6 +260,7 @@ def test_create_edx_auth_token(settings, user):
     refresh_token = "abc123"  # noqa: S105
     access_token = "def456"  # noqa: S105
     code = "ghi789"
+
     responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}{settings.OPENEDX_SOCIAL_LOGIN_PATH}",
@@ -303,7 +305,6 @@ def test_create_edx_auth_token(settings, user):
 
     assert auth.refresh_token == refresh_token
     assert auth.access_token == access_token
-    # plus expires_in, minutes 10 seconds
     assert auth.access_token_expires_on == now_in_utc() + timedelta(
         minutes=59, seconds=50
     )
@@ -575,7 +576,6 @@ def test_repair_faulty_edx_user(mocker, user, no_openedx_user, no_edx_auth):
     returns flags that indicate what was created
     """
     patched_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
-    OpenEdxUserFactory.create(user=user)
     mocker.patch(
         "openedx.api.create_edx_user",
         return_value=True if no_openedx_user else False,  # noqa: SIM210

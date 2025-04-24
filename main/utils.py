@@ -12,6 +12,7 @@ import pytz
 from django.conf import settings
 from django.core.serializers import serialize
 from django.http import HttpRequest, HttpResponseRedirect
+from django.urls import reverse
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
 from rest_framework.response import Response
@@ -41,6 +42,8 @@ def get_js_settings(request: HttpRequest):  # noqa: ARG001
     Returns:
         dict: the settings object
     """
+    oidc_login_url = reverse("social:begin", kwargs={"backend": "ol-oidc"})
+
     return {
         "gaTrackingID": settings.GA_TRACKING_ID,
         "environment": settings.ENVIRONMENT,
@@ -52,6 +55,8 @@ def get_js_settings(request: HttpRequest):  # noqa: ARG001
         "features": {},
         "posthog_api_token": settings.POSTHOG_PROJECT_API_KEY,
         "posthog_api_host": settings.POSTHOG_API_HOST,
+        "unified_ecommerce_url": settings.UNIFIED_ECOMMERCE_URL,
+        "oidc_login_url": oidc_login_url if settings.EXPOSE_OIDC_LOGIN else None,
     }
 
 

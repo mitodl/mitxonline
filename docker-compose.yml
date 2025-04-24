@@ -14,6 +14,9 @@ x-environment:
   CELERY_TASK_ALWAYS_EAGER: 'False'
   REDIS_URL: redis://redis:6379/4
   DOCKER_HOST: ${DOCKER_HOST:-missing}
+  APISIX_PORT: ${APISIX_PORT:-9080}
+  KEYCLOAK_PORT: ${KEYCLOAK_PORT:-7080}
+  KEYCLOAK_SSL_PORT: ${KEYCLOAK_SSL_PORT:-7443}
 
 x-extra-hosts:
   &default-extra-hosts # pragma: allowlist secret
@@ -30,9 +33,10 @@ services:
       POSTGRES_PASSWORD: postgres # pragma: allowlist secret
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./config/db:/docker-entrypoint-initdb.d
 
   redis:
-    image: redis:6.2.16
+    image: redis:6.2.17
     ports:
       - "6379"
 
@@ -66,6 +70,9 @@ services:
     environment:
       << : *py-environment
       PORT: 8011
+      # these are necessary to get the hostname from the varnish proxy
+      USE_X_FORWARDED_HOST: true
+      USE_X_FORWARDED_PORT: true
     env_file: .env
     links:
       - db
@@ -86,7 +93,7 @@ services:
     ports:
       - "8012:8012"
     environment:
-      PUBLIC_PATH: http://${MITX_ONLINE_HOSTNAME:-mitxonline.odl.local}:8012/
+      PUBLIC_PATH: ${MITX_ONLINE_WATCH_BASE_URL:-http://mitxonline.odl.local:8012/}
       NODE_ENV: ${NODE_ENV:-development}
       DOCKER_HOST: ${DOCKER_HOST:-missing}
       CONTAINER_NAME: 'watch'
@@ -128,7 +135,7 @@ services:
     ports:
        - "8016:8016"
     environment:
-      PUBLIC_PATH: http://${MITX_ONLINE_HOSTNAME:-mitxonline.odl.local}:8016/
+      PUBLIC_PATH: ${MITX_ONLINE_REFINE_BASE_URL:-http://mitxonline.odl.local:8016/}
       PORT: 8016
       NODE_ENV: ${NODE_ENV:-development}
     volumes:
@@ -174,8 +181,53 @@ services:
     depends_on:
       - nginx
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    profiles:
+      - keycloak
+    depends_on:
+      - db
+    environment:
+      - KEYCLOAK_SVC_KEYSTORE_PASSWORD=${KEYCLOAK_SVC_KEYSTORE_PASSWORD:-supersecret123456}
+      - KEYCLOAK_SVC_HOSTNAME=${KEYCLOAK_SVC_HOSTNAME:-kc.odl.local}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_SVC_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_SVC_ADMIN_PASSWORD:-admin}
+      - KEYCLOAK_PORT=${KEYCLOAK_PORT:-7080}
+      - KEYCLOAK_SSL_PORT=${KEYCLOAK_SSL_PORT:-7443}
+    ports:
+      - ${KEYCLOAK_PORT}:${KEYCLOAK_PORT:-7080}
+      - ${KEYCLOAK_SSL_PORT}:${KEYCLOAK_SSL_PORT:-7443}
+    networks:
+      default:
+        aliases:
+          - ${KEYCLOAK_SVC_HOSTNAME:-kc.odl.local}
+    command: start --verbose --features scripts --import-realm --hostname=${KEYCLOAK_SVC_HOSTNAME:-kc.odl.local} --hostname-strict=false --hostname-debug=true --https-port=${KEYCLOAK_SSL_PORT} --https-certificate-file=/etc/x509/https/tls.crt --https-certificate-key-file=/etc/x509/https/tls.key --http-enabled=true --http-port=${KEYCLOAK_PORT} --config-keystore=/etc/keycloak-store --config-keystore-password=${KEYCLOAK_SVC_KEYSTORE_PASSWORD} --db=postgres --db-url-database=keycloak --db-url-host=db --db-schema=public --db-password=${POSTGRES_PASSWORD:-postgres} --db-username=postgres
+    volumes:
+      - keycloak-store:/etc/keycloak-store
+      - ./config/keycloak/tls:/etc/x509/https
+      - ./config/keycloak/realms:/opt/keycloak/data/import
+
+  api:
+    image: apache/apisix:latest
+    environment:
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-ol-local}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apisix}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - KEYCLOAK_DISCOVERY_URL=${KEYCLOAK_DISCOVERY_URL:-https://kc.odl.local:7443/realms/ol-local/.well-known/openid-configuration}
+      - APISIX_PORT=${APISIX_PORT:-9080}
+      - APISIX_SESSION_SECRET_KEY=${APISIX_SESSION_SECRET_KEY:-something_at_least_16_characters}
+      - APP_LOGOUT_URL=${APP_LOGOUT_URL:-http://ue.odl.local:9080/auth/logout/}
+    ports:
+      - ${APISIX_PORT}:${APISIX_PORT}
+    volumes:
+      - ./config/apisix/config.yaml:/usr/local/apisix/conf/config.yaml
+      - ./config/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml
+      - ./config/apisix/debug.yaml:/usr/local/apisix/conf/debug.yaml
+
+
 volumes:
   npm-cache: {}
   django_media: {}
   yarn-cache: {}
   db-data: {}
+  keycloak-store: {}

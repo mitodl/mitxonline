@@ -315,22 +315,32 @@ def get_test_order_data(order, receipt_data):
             "street_address": [],
         },
         "receipt": {
-            "card_number": receipt_data["req_card_number"]  # noqa: SIM401
-            if "req_card_number" in receipt_data
-            else None,
-            "card_type": CYBERSOURCE_CARD_TYPES[receipt_data["req_card_type"]]
-            if "req_card_type" in receipt_data
-            else None,
-            "payment_method": receipt_data["req_payment_method"]  # noqa: SIM401
-            if "req_payment_method" in receipt_data
-            else None,
-            "bill_to_email": receipt_data["req_bill_to_email"]  # noqa: SIM401
-            if "req_bill_to_email" in receipt_data
-            else None,
-            "name": f"{receipt_data['req_bill_to_forename']} {receipt_data['req_bill_to_surname']}"
-            if "req_bill_to_forename" in receipt_data
-            or "req_bill_to_surname" in receipt_data
-            else None,
+            "card_number": (
+                receipt_data["req_card_number"]  # noqa: SIM401
+                if "req_card_number" in receipt_data
+                else None
+            ),
+            "card_type": (
+                CYBERSOURCE_CARD_TYPES[receipt_data["req_card_type"]]
+                if "req_card_type" in receipt_data
+                else None
+            ),
+            "payment_method": (
+                receipt_data["req_payment_method"]  # noqa: SIM401
+                if "req_payment_method" in receipt_data
+                else None
+            ),
+            "bill_to_email": (
+                receipt_data["req_bill_to_email"]  # noqa: SIM401
+                if "req_bill_to_email" in receipt_data
+                else None
+            ),
+            "name": (
+                f"{receipt_data['req_bill_to_forename']} {receipt_data['req_bill_to_surname']}"
+                if "req_bill_to_forename" in receipt_data
+                or "req_bill_to_surname" in receipt_data
+                else None
+            ),
         },
     }
 

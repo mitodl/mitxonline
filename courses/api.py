@@ -105,7 +105,13 @@ def create_run_enrollments(  # noqa: C901
 ):
     """
     Creates local records of a user's enrollment in course runs, and attempts to enroll them
-    in edX via API
+    in edX via API.
+    Updates the enrollment mode and change_status if the user is already enrolled in the course run
+    and now is changing the enrollment mode, (e.g. pays or re-enrolls again or getting deferred)
+    Possible cases are:
+    1. Downgrade: Verified to Audit via a deferral
+    2. Upgrade: Audit to Verified via a payment
+    3. Reactivation: Audit to Audit or Verified to Verified via a re-enrollment
 
     Args:
         user (User): The user to enroll
@@ -144,30 +150,32 @@ def create_run_enrollments(  # noqa: C901
             if program_enrollment.change_status is not None:
                 program_enrollment.reactivate_and_save()
 
-    try:
-        enroll_in_edx_course_runs(
-            user,
-            runs,
-            mode=mode,
-        )
-    except (
-        UnknownEdxApiEnrollException,
-        NoEdxApiAuthError,
-        RequestsConnectionError,
-        EdxApiEnrollErrorException,
-        HTTPError,
-    ):
-        log.exception(
-            "edX enrollment failure for user: %s, runs: %s",
-            user,
-            [run.courseware_id for run in runs],
-        )
-        edx_request_success = False
-        if not keep_failed_enrollments:
-            return successful_enrollments, edx_request_success
-    else:
-        edx_request_success = True
+    edx_request_success = True
+    if not runs[0].is_fake_course_run:
+        # Make the API call to enroll the user in edX only if the run is not a fake course run
+        try:
+            enroll_in_edx_course_runs(
+                user,
+                runs,
+                mode=mode,
+            )
+        except (
+            UnknownEdxApiEnrollException,
+            NoEdxApiAuthError,
+            RequestsConnectionError,
+            EdxApiEnrollErrorException,
+            HTTPError,
+        ):
+            log.exception(
+                "edX enrollment failure for user: %s, runs: %s",
+                user,
+                [run.courseware_id for run in runs],
+            )
+            edx_request_success = False
+            if not keep_failed_enrollments:
+                return successful_enrollments, edx_request_success
 
+    is_enrollment_downgraded = False
     for run in runs:
         try:
             enrollment, created = CourseRunEnrollment.all_objects.get_or_create(
@@ -185,12 +193,20 @@ def create_run_enrollments(  # noqa: C901
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
                 enrollment.edx_enrolled = edx_request_success
-                if change_status is not None:
-                    enrollment.change_status = change_status
-                    enrollment.save_and_log()
+                # This resets the change_status if the enrollment was reactivated or Upgraded/Downgraded
+                enrollment.change_status = change_status
+                enrollment.save_and_log(None)
                 # Case (Upgrade): When user was enrolled in free mode and now enrolls in paid mode (e.g. Verified)
+                # Case (Downgrade): When user was enrolled in paid mode and downgrades to a free mode in case
+                # of deferral(e.g. Audit)
                 # So, User has an active enrollment and the only changing thing is going to be enrollment mode
                 if enrollment.active and enrollment_mode_changed:
+                    if (
+                        mode == EDX_ENROLLMENT_AUDIT_MODE
+                        and enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+                    ):
+                        # Downgrade the enrollment
+                        is_enrollment_downgraded = True
                     enrollment.update_mode_and_save(mode=mode)
 
                 elif not enrollment.active:
@@ -207,7 +223,8 @@ def create_run_enrollments(  # noqa: C901
             )
         else:
             successful_enrollments.append(enrollment)
-            if enrollment.edx_enrolled:
+            if enrollment.edx_enrolled and not is_enrollment_downgraded:
+                # Do not send enrollment email if the user was downgraded.
                 mail_api.send_course_run_enrollment_email(enrollment)
     return successful_enrollments, edx_request_success
 
@@ -299,42 +316,6 @@ def deactivate_run_enrollment(
     return run_enrollment
 
 
-def deactivate_program_enrollment(
-    program_enrollment,
-    change_status,
-    keep_failed_enrollments=False,  # noqa: FBT002
-):
-    """
-    Helper method to deactivate a ProgramEnrollment
-
-    Args:
-        program_enrollment (ProgramEnrollment): The program enrollment to deactivate
-        change_status (str): The change status to set on the enrollment when deactivating
-        keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
-            in the database even if the enrollment fails in edX.
-
-    Returns:
-        tuple of ProgramEnrollment, list(CourseRunEnrollment): The deactivated enrollments
-    """
-    program_run_enrollments = program_enrollment.get_run_enrollments()
-
-    deactivated_course_runs = []
-    for run_enrollment in program_run_enrollments:
-        if deactivate_run_enrollment(
-            run_enrollment,
-            change_status=change_status,
-            keep_failed_enrollments=keep_failed_enrollments,
-        ):
-            deactivated_course_runs.append(run_enrollment)  # noqa: PERF401
-
-    if deactivated_course_runs:
-        program_enrollment.deactivate_and_save(change_status, no_user=True)
-    else:
-        return None, None
-
-    return program_enrollment, deactivated_course_runs
-
-
 def defer_enrollment(  # noqa: C901
     user,
     from_courseware_id,
@@ -379,7 +360,7 @@ def defer_enrollment(  # noqa: C901
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
-        return downgraded_enrollments, None
+        return first_or_none(downgraded_enrollments), None
 
     if not force and not from_enrollment.active:
         raise ValidationError(

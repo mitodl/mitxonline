@@ -34,7 +34,6 @@ class Command(EnrollmentChangeCommand):
             "--to-run",
             type=str,
             help="The 'courseware_id' value for the CourseRun that you are deferring to",
-            required=True,
         )
         parser.add_argument(
             "-k",
@@ -71,16 +70,11 @@ class Command(EnrollmentChangeCommand):
             raise CommandError(f"Invalid enrollment deferral - {exc}")  # noqa: B904, EM102
         except Exception as exc:  # noqa: BLE001
             raise CommandError(f"{exc}")  # noqa: B904, EM102
-        else:
-            if not to_enrollment:
-                raise CommandError(
-                    f"Failed to create/update the target enrollment ({to_courseware_id})"  # noqa: EM102
-                )
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"Deferred enrollment for user: {user}\n"
                 f"Enrollment deactivated: {enrollment_summary(from_enrollment)}\n"
-                f"Enrollment created/updated: {enrollment_summary(to_enrollment)}"
+                f"Enrollment created/updated: {enrollment_summary(to_enrollment) if to_enrollment else 'N/A'}"
             )
         )

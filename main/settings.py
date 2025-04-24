@@ -13,6 +13,7 @@ import cssutils
 import dj_database_url
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
+from mitol.apigateway.settings import *  # noqa: F403  # noqa: F403
 from mitol.common.envs import (
     get_bool,
     get_delimited_list,
@@ -28,8 +29,9 @@ from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
+from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.110.0"
+VERSION = "0.114.1"
 
 log = logging.getLogger()
 
@@ -201,7 +203,7 @@ INSTALLED_APPS = (
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
-    # ol-dango apps, must be after this project's apps for template precedence
+    # ol-django apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
     "mitol.google_sheets.apps.GoogleSheetsApp",
     "mitol.google_sheets_refunds.apps.GoogleSheetsRefundsApp",
@@ -214,6 +216,9 @@ INSTALLED_APPS = (
     "mitol.olposthog.apps.OlPosthog",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
     "viewflow",
+    "openapi",
+    "drf_spectacular",
+    "mitol.apigateway.apps.ApigatewayApp",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
@@ -234,6 +239,7 @@ MIDDLEWARE = (
     "hijack.middleware.HijackUserMiddleware",
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
+    "mitol.apigateway.middleware.ApisixUserMiddleware",
 )
 
 # enable the nplusone profiler only in debug mode
@@ -245,7 +251,6 @@ SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/signin"
-LOGIN_ERROR_URL = "/signin"
 LOGOUT_REDIRECT_URL = get_string(
     name="LOGOUT_REDIRECT_URL",
     default="/",
@@ -332,10 +337,23 @@ ROBOTS_CACHE_TIMEOUT = get_int(
     description="How long the robots.txt file should be cached",
 )
 
+# Social Auth Configuration
+
+AUTHENTICATION_BACKENDS = (
+    "mitol.apigateway.backends.ApisixRemoteUserBackend",
+    "social_core.backends.email.EmailAuth",
+    "oauth2_provider.backends.OAuth2Backend",
+    "django.contrib.auth.backends.ModelBackend",
+)
+
 SOCIAL_AUTH_LOGIN_ERROR_URL = "login"
 SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [urlparse(SITE_BASE_URL).netloc]
+SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = [
+    "global_id",
+]
 
 # Email backend settings
+
 SOCIAL_AUTH_EMAIL_FORM_URL = "login"
 SOCIAL_AUTH_EMAIL_FORM_HTML = "login.html"
 
@@ -383,6 +401,8 @@ SOCIAL_AUTH_PIPELINE = (
     "authentication.pipeline.user.get_username",
     # Create a user if one doesn't exist, and require a password and name
     "authentication.pipeline.user.create_user_via_email",
+    # If we're using the OIDC backend, create the user from the OIDC response
+    "authentication.pipeline.user.create_ol_oidc_user",
     # verify the user against export compliance
     # "authentication.pipeline.compliance.verify_exports_compliance",
     # Create the record that associates the social account with the user.
@@ -396,11 +416,59 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.user.user_details",
 )
 
+
+# Social Auth OIDC configuration
+
+SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT = get_string(
+    name="SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT",
+    default=None,
+    description="The configuration endpoint for the OIDC provider",
+)
+
+SOCIAL_AUTH_OL_OIDC_KEY = get_string(
+    name="SOCIAL_AUTH_OL_OIDC_KEY",
+    default="some available client id",
+    description="The client id for the OIDC provider",
+)
+
+SOCIAL_AUTH_OL_OIDC_SECRET = get_string(
+    name="SOCIAL_AUTH_OL_OIDC_SECRET",
+    default="some super secret key",
+    description="The client secret for the OIDC provider",
+)
+
+SOCIAL_AUTH_OL_OIDC_SCOPE = ["ol-profile"]
+
 AUTH_CHANGE_EMAIL_TTL_IN_MINUTES = get_int(
     name="AUTH_CHANGE_EMAIL_TTL_IN_MINUTES",
     default=60 * 24,
     description="Expiry time for a change email request, default is 1440 minutes(1 day)",
 )
+
+# Disable the OIDC button on the signin screen.
+# Doesn't actually disable OIDC login - you can still go to /login/ol-oidc/
+# (assuming OIDC is set up).
+EXPOSE_OIDC_LOGIN = get_bool(
+    name="EXPOSE_OIDC_LOGIN",
+    default=False,
+    description="Expose the OIDC login functionality.",
+)
+
+# These are used for logout.
+KEYCLOAK_BASE_URL = get_string(
+    name="KEYCLOAK_BASE_URL",
+    default="http://mit-keycloak-base-url.edu",
+    description="Base URL for the Keycloak instance.",
+)
+
+KEYCLOAK_REALM_NAME = get_string(
+    name="KEYCLOAK_REALM_NAME",
+    default="olapps",
+    description="Name of the realm the app uses in Keycloak.",
+)
+
+
+# Social Auth Configuration end
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.8/howto/static-files/
@@ -470,18 +538,19 @@ EMAIL_USE_TLS = get_bool(
     description="Outgoing e-mail TLS setting",
 )
 
-MITX_ONLINE_REPLY_TO_ADDRESS = get_string(
-    name="MITX_ONLINE_REPLY_TO_ADDRESS",
-    default="webmaster@localhost",
-    description="E-mail to use for reply-to address of emails",
-)
-
 DEFAULT_FROM_EMAIL = get_string(
     name="MITX_ONLINE_FROM_EMAIL",
     default="webmaster@localhost",
     description="E-mail to use for the from field",
 )
 
+MITX_ONLINE_REPLY_TO_ADDRESS = get_string(
+    name="MITX_ONLINE_REPLY_TO_ADDRESS",
+    default=DEFAULT_FROM_EMAIL,
+    description="E-mail to use for reply-to address of emails",
+)
+
+MAILGUN_FROM_EMAIL = DEFAULT_FROM_EMAIL
 MAILGUN_SENDER_DOMAIN = get_string(
     name="MAILGUN_SENDER_DOMAIN",
     default=None,
@@ -505,16 +574,11 @@ MAILGUN_RECIPIENT_OVERRIDE = get_string(
     dev_only=True,
     description="Override the recipient for outgoing email, development only",
 )
-MAILGUN_FROM_EMAIL = get_string(
-    name="MAILGUN_FROM_EMAIL",
-    default="no-reply@localhost",
-    description="Email which mail comes from",
-)
 
 EMAIL_SUPPORT = get_string(
     name="MITX_ONLINE_SUPPORT_EMAIL",
     default=MAILGUN_RECIPIENT_OVERRIDE or "support@localhost",
-    description="Email address listed for customer support",
+    description="Email address listed for customer support in the frontend. Not used for sending email.",
 )
 
 NOTIFICATION_EMAIL_BACKEND = get_string(
@@ -898,13 +962,6 @@ CACHES = {
     },
 }
 
-AUTHENTICATION_BACKENDS = (
-    "social_core.backends.email.EmailAuth",
-    "oauth2_provider.backends.OAuth2Backend",
-    "django.contrib.auth.backends.ModelBackend",
-)
-
-
 # required for migrations
 OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"  # noqa: S105
 OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
@@ -947,6 +1004,8 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "main.exceptions.exception_handler",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "ALLOWED_VERSIONS": ["v0"],
 }
 
 # Relative URL to be used by Djoser for the link in the password reset email
@@ -1199,3 +1258,88 @@ HUBSPOT_PORTAL_ID = get_string(
     default="",
     description="Hubspot Portal ID",
 )
+
+# Unified Ecommerce integration
+
+UNIFIED_ECOMMERCE_URL = get_string(
+    name="UNIFIED_ECOMMERCE_URL",
+    default="http://ue.odl.local:9080/",
+    description="The base URL for Unified Ecommerce.",
+)
+
+UNIFIED_ECOMMERCE_API_KEY = get_string(
+    name="UNIFIED_ECOMMERCE_API_KEY",
+    default="",
+    description="The API key for Unified Ecommerce.",
+)
+
+SPECTACULAR_SETTINGS = open_spectacular_settings
+
+
+# apigateway configuration
+
+# Disable middleware. For local testing - you can have the middleware in place
+# but not use it and use Django's built-in users instead.
+MITOL_APIGATEWAY_DISABLE_MIDDLEWARE = get_bool(
+    name="MITOL_APIGATEWAY_DISABLE_MIDDLEWARE",
+    default=True,
+    description="Disable middleware",
+)
+
+# Maps user data from the upstream API gateway to the user model(s)
+MITOL_APIGATEWAY_USERINFO_MODEL_MAP = {
+    # Mappings to the user model.
+    "user_fields": {
+        # Keys are data returned from the API gateway.
+        # Values are tuple of model name (from above) and field name.
+        # The base model is "user".
+        "preferred_username": "username",
+        "email": "email",
+        "sub": "global_id",
+        "name": "name",
+    },
+    # Additional models to map in.
+    # Key is the model name, then a list of tuples of header field name, model
+    # field name, and default. The FK for the related user should be "user".
+    "additional_models": {
+        # ..then add additional ones here if needed
+    },
+}
+
+MITOL_APIGATEWAY_USERINFO_ID_SEARCH_FIELD = "global_id"
+
+# Set to True to create users that we see but aren't aware of.
+# Set to False if you're managing that elsewhere (like with social-auth).
+MITOL_APIGATEWAY_USERINFO_CREATE = get_bool(
+    name="MITOL_APIGATEWAY_USERINFO_CREATE",
+    default=True,
+    description="Create users that we see but aren't aware of",
+)
+
+# Set to True to update users we've seen before. If you set this to False, make
+# sure there's a backchannel way to update the user data (SCIM, etc) or user
+# info will fall out of sync with the IdP pretty quickly.
+MITOL_APIGATEWAY_USERINFO_UPDATE = get_bool(
+    name="MITOL_APIGATEWAY_USERINFO_UPDATE",
+    default=True,
+    description="Update users we've seen before",
+)
+
+# URL configuation
+
+# Set to the URL that APISIX uses for logout.
+MITOL_APIGATEWAY_LOGOUT_URL = "/logout"
+
+# Set to the default URL the user should be sent to when logging out.
+# If there's no redirect URL specified otherwise, the user gets sent here.
+MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST = get_string(
+    name="MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST",
+    default="/",
+    description="The URL to redirect to after logging out",
+)
+
+# Set to the list of hosts the app is allowed to redirect to.
+MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = [
+    "localhost",
+    "mitxonline.odl.local",
+]

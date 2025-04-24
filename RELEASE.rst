@@ -1,6 +1,132 @@
 Release Notes
 =============
 
+Version 0.114.1 (Released April 09, 2025)
+---------------
+
+- Small fix for the fake test course runs (#2591)
+- adding GTM code to header (#2579)
+- add more scenarios (#2588)
+- Add edx username field to OpenEdxUser (#2589)
+- Successfully enroll in test course runs without calling edX (#2584)
+
+Version 0.114.0 (Released April 07, 2025)
+---------------
+
+- Add xdist so tests can be run faster (#2585)
+- A few small schema fixes (optional fields) (#2583)
+
+Version 0.113.3 (Released April 02, 2025)
+---------------
+
+- Revert "Prevent linking existing user if uid is different" (#2581)
+- Fix API path (#2578)
+- Improve openapi schema for enrollments API (#2577)
+- Prevent linking existing user if uid is different (#2546)
+
+Version 0.113.2 (Released March 31, 2025)
+---------------
+
+- Seed data for testing courses locally and RC (#2571)
+- automatically create cache table (#2568)
+- Add OIDC login via social-auth (#2550)
+
+Version 0.113.1 (Released March 26, 2025)
+---------------
+
+- Fix API issue caused by non-versioned API (#2574)
+- Fix varnish config for arbitrary hostnames (#2573)
+- Reset change_status on all requests to create_run_enrollment (#2566)
+- Open api (#2549)
+
+Version 0.113.0 (Released March 17, 2025)
+---------------
+
+- Remove duplicated course topics (#2565)
+- Selecting course topics in the cms admin (#2563)
+- Update dependency django to v4.2.20 [SECURITY] (#2562)
+
+Version 0.112.4 (Released March 05, 2025)
+---------------
+
+- making downgrade not send email (#2558)
+- No emails for downgrading enrollment (#2556)
+
+Version 0.112.3 (Released March 03, 2025)
+---------------
+
+- Allow to defer enrollment without to_run (#2554)
+
+Version 0.112.2 (Released February 27, 2025)
+---------------
+
+- Bump mitold-django-authentication (#2552)
+
+Version 0.112.1 (Released February 24, 2025)
+---------------
+
+- Fix deferral error (#2544)
+
+Version 0.112.0 (Released February 20, 2025)
+---------------
+
+- docs yml correct python version (#2541)
+- Upgrade Python 3.10.16 (#2540)
+
+Version 0.111.7 (Released February 14, 2025)
+---------------
+
+- Match email with iexact filter for a change request (#2537)
+
+Version 0.111.6 (Released February 11, 2025)
+---------------
+
+- Order courses for selection in cms CoursePage (#2535)
+- Adding cart items info to the header (#2517)
+
+Version 0.111.5 (Released February 10, 2025)
+---------------
+
+- Removing deactivate enrollment and tranfer enrollment (#2533)
+- fix(deps): update dependency postcss to v8.5.1 (#2530)
+- fix(deps): update dependency oidc-client-ts to v2.4.1 (#2529)
+- fix(deps): update dependency @sentry/browser to v8.53.0 (#2527)
+- fix(deps): update babel monorepo (#2526)
+- chore(deps): update dependency ruff to ^0.9 (#2525)
+- chore(deps): update dependency bpython to ^0.25 (#2524)
+- fix(deps): update react monorepo (#2523)
+- fix(deps): update dependency express to v4.21.2 (#2522)
+
+Version 0.111.4 (Released February 04, 2025)
+---------------
+
+- removing order from InstructorPageLink (#2520)
+
+Version 0.111.3 (Released January 30, 2025)
+---------------
+
+- fix(deps): update dependency moment to v2.30.1 (#2477)
+- chore(deps): update redis docker tag to v6.2.17 (#2507)
+- Add support for round-tripping the user through Unified Ecommerce on login (#2515)
+
+Version 0.111.2 (Released January 24, 2025)
+---------------
+
+- Enrolled Course Item dropdown menu accessibility  (#2514)
+
+Version 0.111.1 (Released January 21, 2025)
+---------------
+
+- Added to Cart Confirmation Dialog (#2512)
+- fix(deps): update dependency django to v4.2.18 [security] (#2511)
+
+Version 0.111.0 (Released January 16, 2025)
+---------------
+
+- Adding new cart designs (#2505)
+- chore(deps): update yarn to v3.8.7 (#2506)
+- Re-orders the title and start time of the course to be read in the proper order by the reader (#2503)
+
 Version 0.110.0 (Released January 06, 2025)
 ---------------
 

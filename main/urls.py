@@ -18,6 +18,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path
+from mitol.apigateway.views import ApiGatewayLogoutView
 from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
@@ -39,6 +40,7 @@ urlpatterns = [
     path("hijack/", include("hijack.urls")),
     path("robots.txt", include("robots.urls")),
     path("", include("authentication.urls")),
+    path("", include("authentication.new_urls")),
     path("", include("openedx.urls")),
     path("", include("mail.urls")),
     path("", include("users.urls")),
@@ -61,6 +63,8 @@ urlpatterns = [
     path("create-account/", index, name="signup"),
     path("create-account/confirm-sent/", index, name="confirm-sent"),
     path("create-account/details/", index, name="signup-details"),
+    path("create-profile/", index, name="profile-details"),
+    path("create-profile-extra/", index, name="profile-details-extra"),
     path("create-account/additional-details/", index, name="signup-addl-details"),
     path("create-account/denied/", index, name="signup-denied"),
     path("create-account/error/", index, name="signup-error"),
@@ -86,6 +90,7 @@ urlpatterns = [
     path("", include("cms.urls")),
     # Example view
     path("", index, name="main-index"),
+    path("logout/", ApiGatewayLogoutView.as_view(), name="logout"),
 ] + (
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

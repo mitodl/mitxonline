@@ -15,6 +15,7 @@ from django.db import transaction
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from openedx.factories import OpenEdxApiAuthFactory, OpenEdxUserFactory
+from openedx.models import OpenEdxUser
 from users.factories import UserFactory
 from users.models import (
     HIGHEST_EDUCATION_CHOICES,
@@ -29,7 +30,7 @@ pytestmark = pytest.mark.django_db
 @pytest.mark.parametrize(
     "create_func,exp_staff,exp_superuser,exp_is_active",  # noqa: PT006
     [
-        [User.objects.create_user, False, False, False],  # noqa: PT007
+        [User.objects.create_user, False, False, True],  # noqa: PT007
         [User.objects.create_superuser, True, True, True],  # noqa: PT007
     ],
 )
@@ -53,6 +54,7 @@ def test_create_user(create_func, exp_staff, exp_superuser, exp_is_active, passw
         assert user.check_password(password)
 
     assert LegalAddress.objects.filter(user=user).exists()
+    assert OpenEdxUser.objects.filter(user=user, edx_username=username).exists()
 
 
 @pytest.mark.parametrize(
@@ -100,9 +102,9 @@ def test_legal_address_validation(field, value, is_valid):
 @pytest.mark.django_db
 def test_faulty_user_qset():
     """User.faulty_openedx_users should return a User queryset that contains incorrectly configured active Users"""
-    users = UserFactory.create_batch(5)
+    users = UserFactory.create_batch(5, no_openedx_user=True)
     # An inactive user should not be returned even if they lack auth and openedx user records
-    UserFactory.create(is_active=False)
+    UserFactory.create(is_active=False, no_openedx_user=True)
     good_users = users[0:2]
     expected_faulty_users = users[2:]
     OpenEdxApiAuthFactory.create_batch(
