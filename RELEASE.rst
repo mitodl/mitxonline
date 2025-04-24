@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.114.2
+Version 0.114.2 (Released April 24, 2025)
 ---------------
 
 - Make Preview certificate work in the CMS (#2597)
