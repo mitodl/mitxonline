@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("courses", "0024_add_record_share_model"),
-        ("wagtailcore", "0066_collection_management_permissions"),
+        ("wagtailcore", "0070_rename_pagerevision_revision"),
         ("micromasters_import", "0003_course_certificate_id_mapping"),
     ]
 
