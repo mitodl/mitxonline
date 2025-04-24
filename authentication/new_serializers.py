@@ -9,7 +9,8 @@ from rest_framework import serializers
 from hubspot_sync.task_helpers import sync_hubspot_user
 from users.serializers import (
     LegalAddressSerializer,
-    UserProfileSerializer, OpenEdxUserSerializer,
+    OpenEdxUserSerializer,
+    UserProfileSerializer,
 )
 
 log = logging.getLogger()
