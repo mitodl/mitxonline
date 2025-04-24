@@ -2,14 +2,21 @@
 import React from "react"
 import { Formik, Form } from "formik"
 import { ConnectedFocusError } from "focus-formik-error"
+import { ErrorMessage, Field } from "formik"
+import FormError from "./elements/FormError"
 import * as yup from "yup"
+
 
 import {
   GenderAndDOBProfileFields,
   AddlProfileFields,
   profileValidation,
-  addlProfileFieldsValidation
+  addlProfileFieldsValidation,
+  LegalAddressCountryFields,
+  legalAddressCountryValidation,
 } from "./ProfileFormFields"
+
+import CardLabel from "../input/CardLabel"
 
 import type { User } from "../../flow/authTypes"
 
@@ -46,17 +53,19 @@ const getInitialValues = (user: User) => ({
     type_is_educator:
       (user.user_profile && user.user_profile.type_is_educator) || false,
     type_is_other:
-      (user.user_profile && user.user_profile.type_is_other) || false
+      (user.user_profile && user.user_profile.type_is_other) || false,
+    country: (user.user_profile && user.user_profile.country) || "",
   }
 })
 
 const AddlProfileFieldsForm = ({
   onSubmit,
   user,
-  requireTypeFields
+  requireTypeFields,
+  countries,
 }: Props) => {
   let validation = profileValidation.concat(addlProfileFieldsValidation)
-
+  validation = validation.concat(legalAddressCountryValidation)
   if (requireTypeFields) {
     const occupationField = yup
       .boolean()
@@ -107,6 +116,12 @@ const AddlProfileFieldsForm = ({
               values={values}
               requireAddlFields={requireTypeFields}
               errors={errors}
+            />
+            <LegalAddressCountryFields
+              errors={errors}
+              countries={countries}
+              values={values}
+              isNewAccount={false}
             />
             <div className="row submit-row no-gutters">
               <div className="col d-flex justify-content-end">
