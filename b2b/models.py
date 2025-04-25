@@ -3,11 +3,12 @@
 from django.db import models
 from django.http import Http404
 from django.utils.text import slugify
+from mitol.common.utils import now_in_utc
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page
 
-from b2b.constants import ORG_INDEX_SLUG
+from b2b.constants import CONTRACT_INTEGRATION_CHOICES, ORG_INDEX_SLUG
 
 
 class OrganizationObjectIndexPage(Page):
@@ -49,6 +50,9 @@ class OrganizationIndexPage(OrganizationObjectIndexPage):
 class OrganizationPage(Page):
     """Stores information about an organization we have a relationship with."""
 
+    parent_page_types = ["b2b.OrganizationIndexPage"]
+    subpage_types = ["b2b.ContractPage"]
+
     name = models.CharField(max_length=255, help_text="The name of the organization")
     description = RichTextField(
         blank=True, help_text="Any useful extra information about the organization"
@@ -74,3 +78,59 @@ class OrganizationPage(Page):
 
         self.slug = slugify(f"org-{self.get_parent().id}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+
+class ContractPage(Page):
+    """Stores information about a contract with an organization."""
+
+    parent_page_types = ["b2b.OrganizationPage"]
+
+    name = models.CharField(max_length=255, help_text="The name of the contract")
+    description = RichTextField(
+        blank=True, help_text="Any useful extra information about the contract"
+    )
+    integration_type = models.CharField(
+        max_length=255,
+        choices=CONTRACT_INTEGRATION_CHOICES,
+        help_text="The type of integration for this contract",
+    )
+    organization = models.ForeignKey(
+        OrganizationPage,
+        on_delete=models.CASCADE,
+        related_name="contracts",
+        help_text="The organization this contract is with",
+    )
+    contract_start = models.DateField(
+        blank=True,
+        null=True,
+        help_text="The start date of the contract.",
+    )
+    contract_end = models.DateField(
+        blank=True,
+        null=True,
+        help_text="The end date of the contract.",
+    )
+    active = models.BooleanField(
+        default=True,
+        help_text="Whether this contract is active or not. Date rules still apply.",
+    )
+
+    content_panels = [
+        FieldPanel("name"),
+        FieldPanel("description"),
+        FieldPanel("logo"),
+    ]
+
+    promote_panels = []
+
+    @property
+    def is_active(self):
+        """
+        Check if the contract is active based on the dates and the active flag.
+        """
+        if not self.active:
+            return False
+        if self.contract_start and self.contract_start > now_in_utc():
+            return False
+
+        return self.contract_end and self.contract_end < now_in_utc()
