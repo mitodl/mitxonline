@@ -32,7 +32,7 @@ import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import { isFinancialAssistanceAvailable } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
-import type { User } from "../flow/authTypes"
+import type { User, Country } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import ProgramInfoBox from "./ProgramInfoBox"
@@ -51,7 +51,8 @@ type Props = {
   currentUser: User,
   updateAddlFields: (currentUser: User) => Promise<any>,
   programEnrollments: ?Array<ProgramEnrollment>,
-  programEnrollmentsLoading: ?boolean
+  programEnrollmentsLoading: ?boolean,
+  countries: Array<Country>
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,

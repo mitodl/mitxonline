@@ -36,7 +36,7 @@ import {
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
 
-import type { User } from "../flow/authTypes"
+import type { User, Country } from "../flow/authTypes"
 import type { Product } from "../flow/cartTypes"
 import { addUserNotification } from "../actions"
 import { applyCartMutation } from "../lib/queries/cart"
@@ -56,7 +56,8 @@ type Props = {
   addToCart: (productId: string) => Promise<any>,
   deactivateEnrollment: (runId: number) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>,
-  forceRequest: () => any
+  forceRequest: () => any,
+  countries: Array<Country>,
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,

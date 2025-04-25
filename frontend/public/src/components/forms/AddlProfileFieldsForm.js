@@ -13,12 +13,13 @@ import {
   legalAddressCountryValidation
 } from "./ProfileFormFields"
 
-import type { User } from "../../flow/authTypes"
+import type { User, Country } from "../../flow/authTypes"
 
 type Props = {
   onSubmit: Function,
   user: User,
-  requireTypeFields: ?boolean
+  requireTypeFields: ?boolean,
+  countries: Array<Country>
 }
 
 const getInitialValues = (user: User) => ({
