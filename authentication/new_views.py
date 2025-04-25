@@ -177,11 +177,15 @@ class CustomLoginView(View):
         """
         redirect_url = get_redirect_url(request)
         if not request.user.is_anonymous:
-            profile = getattr(request.user, "user_profile", None)
-            if not profile:
-                # If user is authenticated but has no profile, redirect to create profile
+            profile = request.user.profile
+            if (
+                not profile.completed_onboarding
+                and request.GET.get("skip_onboarding", "0") == "0"
+            ):
                 params = urlencode({"next": redirect_url})
-                redirect_url = f"{reverse('profile-details')}?{params}"
+                redirect_url = f"{settings.MITOL_NEW_USER_LOGIN_URL}?{params}"
+                profile.completed_onboarding = True
+                profile.save()
         return redirect(redirect_url)
 
 
