@@ -441,6 +441,11 @@ class UserProfile(TimestampedModel):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="user_profile"
     )
+    completed_onboarding = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text="Flags if user has completed filling out required onboarding information",
+    )
 
     gender = models.CharField(  # noqa: DJ001
         max_length=128, blank=True, null=True, choices=GENDER_CHOICES

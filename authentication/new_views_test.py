@@ -1,4 +1,7 @@
+from unittest.mock import MagicMock
+
 import pytest
+from django.test import RequestFactory
 from django.urls import reverse
 from rest_framework import status
 
@@ -70,20 +73,20 @@ def test_post_user_extra_detail(mocker, client, user):
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
-@pytest.mark.django_db
-@pytest.mark.parametrize(
-    ("has_profile", "expected_url"),
-    [
-        (True, "/dashboard"),
-        (False, f"{reverse('profile-details')}?next=%2Fdashboard"),
-    ],
-)
-def test_login_view(client, user, has_profile, expected_url):
-    """Test that the login endpoint redirects the user properly based on profile existence"""
-    if not has_profile:
-        user.user_profile.delete()
-    client.force_login(user)
-    url = reverse("gateway-login")
-    resp = client.get(url)
-    assert resp.url == expected_url
-    assert resp.status_code == status.HTTP_302_FOUND
+def test_custom_login_view_authenticated_user_with_onboarding(mocker):
+    """Test CustomLoginView for an authenticated user with incomplete onboarding"""
+    factory = RequestFactory()
+    request = factory.get(reverse("login"), {"next": "/dashboard"})
+    request.user = MagicMock(is_anonymous=False)
+    request.user.profile = MagicMock(completed_onboarding=False)
+    mocker.patch("authentication.views.get_redirect_url", return_value="/dashboard")
+    mocker.patch("authentication.views.urlencode", return_value="next=/dashboard")
+    mocker.patch(
+        "authentication.views.settings.MITOL_NEW_USER_LOGIN_URL", "/onboarding"
+    )
+
+    response = CustomLoginView().get(request)
+
+    assert response.status_code == 302
+    assert response.url == "/onboarding?next=/dashboard"
+
