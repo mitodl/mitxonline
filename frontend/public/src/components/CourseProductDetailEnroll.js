@@ -57,7 +57,7 @@ type Props = {
   deactivateEnrollment: (runId: number) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>,
   forceRequest: () => any,
-  countries: Array<Country>,
+  countries: Array<Country>
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
