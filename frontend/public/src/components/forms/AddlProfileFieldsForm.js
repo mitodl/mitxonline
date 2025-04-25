@@ -50,7 +50,6 @@ const getInitialValues = (user: User) => ({
       (user.user_profile && user.user_profile.type_is_educator) || false,
     type_is_other:
       (user.user_profile && user.user_profile.type_is_other) || false,
-    country: (user.user_profile && user.user_profile.country) || ""
   }
 })
 
