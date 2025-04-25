@@ -313,7 +313,7 @@ const mapStateToProps = createStructuredSelector({
   programEnrollments: programEnrollmentsSelector,
   currentUser:        currentUserSelector,
   isLoading:          pathOr(true, ["queries", enrollmentsQueryKey, "isPending"]),
-  countries:   queries.users.countriesSelector
+  countries:          queries.users.countriesSelector
 })
 
 const mapPropsToConfig = () => [enrollmentsQuery(), programEnrollmentsQuery(), queries.users.countriesQuery()]
