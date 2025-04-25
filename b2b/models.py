@@ -150,3 +150,59 @@ class ContractPage(Page):
 
         self.slug = slugify(f"contract-{self.organization.id}-{self.id}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+
+class ContractPage(Page):
+    """Stores information about a contract with an organization."""
+
+    parent_page_types = ["b2b.OrganizationPage"]
+
+    name = models.CharField(max_length=255, help_text="The name of the contract")
+    description = RichTextField(
+        blank=True, help_text="Any useful extra information about the contract"
+    )
+    integration_type = models.CharField(
+        max_length=255,
+        choices=CONTRACT_INTEGRATION_CHOICES,
+        help_text="The type of integration for this contract",
+    )
+    organization = models.ForeignKey(
+        OrganizationPage,
+        on_delete=models.CASCADE,
+        related_name="contracts",
+        help_text="The organization this contract is with",
+    )
+    contract_start = models.DateField(
+        blank=True,
+        null=True,
+        help_text="The start date of the contract.",
+    )
+    contract_end = models.DateField(
+        blank=True,
+        null=True,
+        help_text="The end date of the contract.",
+    )
+    active = models.BooleanField(
+        default=True,
+        help_text="Whether this contract is active or not. Date rules still apply.",
+    )
+
+    content_panels = [
+        FieldPanel("name"),
+        FieldPanel("description"),
+        FieldPanel("logo"),
+    ]
+
+    promote_panels = []
+
+    @property
+    def is_active(self):
+        """
+        Check if the contract is active based on the dates and the active flag.
+        """
+        if not self.active:
+            return False
+        if self.contract_start and self.contract_start > now_in_utc():
+            return False
+
+        return self.contract_end and self.contract_end < now_in_utc()
