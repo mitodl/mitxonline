@@ -67,10 +67,6 @@ type DashboardPageState = {
   destinationUrl: string
 }
 
-type StateProps = {|
-  countries: ?Array<Country>,
-|}
-
 export class DashboardPage extends React.Component<
   DashboardPageProps,
   DashboardPageState
