@@ -76,6 +76,7 @@ export type UserProfile = {
   type_is_professional: ?boolean,
   type_is_educator: ?boolean,
   type_is_other: ?boolean,
+  country: ?string,
 }
 
 export type User = {
