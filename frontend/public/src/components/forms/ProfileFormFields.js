@@ -182,7 +182,6 @@ const renderYearOfBirthField = errors => {
 export const LegalAddressCountryFields = ({
   errors,
   countries,
-  isNewAccount,
   values
 }: LegalAddressProps) => {
   const addressErrors = errors && errors.legal_address

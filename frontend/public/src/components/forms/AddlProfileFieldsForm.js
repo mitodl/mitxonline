@@ -2,8 +2,6 @@
 import React from "react"
 import { Formik, Form } from "formik"
 import { ConnectedFocusError } from "focus-formik-error"
-import { ErrorMessage, Field } from "formik"
-import FormError from "./elements/FormError"
 import * as yup from "yup"
 
 
@@ -15,8 +13,6 @@ import {
   LegalAddressCountryFields,
   legalAddressCountryValidation,
 } from "./ProfileFormFields"
-
-import CardLabel from "../input/CardLabel"
 
 import type { User } from "../../flow/authTypes"
 

@@ -54,11 +54,6 @@ type DashboardPageProps = {
   countries: Array<Country>
 }
 
-type Props = {|
-  ...StateProps,
-  ...DispatchProps,
-|}
-
 const DashboardTab = {
   courses:  "courses",
   programs: "programs"
@@ -238,7 +233,7 @@ export class DashboardPage extends React.Component<
   }
 
   render() {
-    const { isLoading, programEnrollments, forceRequest, countries } = this.props
+    const { isLoading, programEnrollments, forceRequest } = this.props
 
     const myCourseClasses = `dash-tab${
       this.state.currentTab === DashboardTab.courses ? " active" : ""
