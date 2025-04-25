@@ -4,14 +4,13 @@ import { Formik, Form } from "formik"
 import { ConnectedFocusError } from "focus-formik-error"
 import * as yup from "yup"
 
-
 import {
   GenderAndDOBProfileFields,
   AddlProfileFields,
   profileValidation,
   addlProfileFieldsValidation,
   LegalAddressCountryFields,
-  legalAddressCountryValidation,
+  legalAddressCountryValidation
 } from "./ProfileFormFields"
 
 import type { User } from "../../flow/authTypes"
@@ -50,7 +49,7 @@ const getInitialValues = (user: User) => ({
       (user.user_profile && user.user_profile.type_is_educator) || false,
     type_is_other:
       (user.user_profile && user.user_profile.type_is_other) || false,
-    country: (user.user_profile && user.user_profile.country) || "",
+    country: (user.user_profile && user.user_profile.country) || ""
   }
 })
 
@@ -58,7 +57,7 @@ const AddlProfileFieldsForm = ({
   onSubmit,
   user,
   requireTypeFields,
-  countries,
+  countries
 }: Props) => {
   let validation = profileValidation.concat(addlProfileFieldsValidation)
   validation = validation.concat(legalAddressCountryValidation)

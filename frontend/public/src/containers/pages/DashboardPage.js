@@ -307,7 +307,11 @@ const mapStateToProps = createStructuredSelector({
   countries:          queries.users.countriesSelector
 })
 
-const mapPropsToConfig = () => [enrollmentsQuery(), programEnrollmentsQuery(), queries.users.countriesQuery()]
+const mapPropsToConfig = () => [
+  enrollmentsQuery(),
+  programEnrollmentsQuery(),
+  queries.users.countriesQuery()
+]
 
 const deactivateEnrollment = (enrollmentId: number) =>
   mutateAsync(deactivateEnrollmentMutation(enrollmentId))

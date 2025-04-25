@@ -476,7 +476,7 @@ const mapStateToProps = createStructuredSelector({
     programEnrollmentsQueryKey,
     "isPending"
   ]),
-  countries: queries.users.countriesSelector,
+  countries: queries.users.countriesSelector
 })
 
 const mapPropsToConfig = props => [
