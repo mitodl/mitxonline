@@ -90,4 +90,3 @@ def test_custom_login_view_authenticated_user_with_onboarding(mocker):
 
     assert response.status_code == 302
     assert response.url == "/onboarding?next=/dashboard"
-

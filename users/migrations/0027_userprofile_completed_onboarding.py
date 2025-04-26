@@ -4,15 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0026_alter_user_is_active'),
+        ("users", "0026_alter_user_is_active"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='userprofile',
-            name='completed_onboarding',
-            field=models.BooleanField(blank=True, default=False, help_text='Flags if user has completed filling out required onboarding information'),
+            model_name="userprofile",
+            name="completed_onboarding",
+            field=models.BooleanField(
+                blank=True,
+                default=False,
+                help_text="Flags if user has completed filling out required onboarding information",
+            ),
         ),
     ]
