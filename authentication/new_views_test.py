@@ -5,6 +5,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 from rest_framework import status
 
+from authentication.new_views import CustomLoginView
 from users.api import User
 from users.models import MALE, UserProfile
 
@@ -82,7 +83,7 @@ def test_custom_login_view_authenticated_user_with_onboarding(mocker):
     mocker.patch("authentication.views.get_redirect_url", return_value="/dashboard")
     mocker.patch("authentication.views.urlencode", return_value="next=/dashboard")
     mocker.patch(
-        "authentication.views.settings.MITOL_NEW_USER_LOGIN_URL", "/onboarding"
+        "authentication.views.settings.MITXONLINE_NEW_USER_LOGIN_URL", "/onboarding"
     )
 
     response = CustomLoginView().get(request)
