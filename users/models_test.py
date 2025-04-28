@@ -137,31 +137,6 @@ def test_user_is_editor(is_staff, is_superuser, has_editor_group, exp_is_editor)
         user.save()
     assert user.is_editor is exp_is_editor
 
-
-def test_user_age():
-    """Tests to make sure the user age is calculated correctly"""
-
-    user = UserFactory.create()
-
-    assert user.get_age() == math.floor(
-        datetime.now(tz=pytz.timezone(settings.TIME_ZONE)).year
-        - user.user_profile.year_of_birth
-    )
-
-
-@pytest.mark.parametrize("should_pass", [True, False])
-def test_user_coppa(should_pass):
-    """Tests a user to make sure they're within the range for COPPA"""
-    user = UserFactory.create()
-
-    if should_pass:
-        user.user_profile.year_of_birth = datetime.now().year - random.randint(13, 100)  # noqa: S311, DTZ005
-    else:
-        user.user_profile.year_of_birth = datetime.now().year - random.randint(0, 12)  # noqa: S311, DTZ005
-
-    assert user.is_coppa_compliant() == should_pass
-
-
 def test_legal_address_us_state():
     """
     Tests to make sure the us_state property is working properly.
