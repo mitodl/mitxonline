@@ -7,8 +7,8 @@ def update_usernames_to_email(apps, schema_editor):
 
     # Update usernames to match emails but truncate at max length
     # Get max_length from username field
-    max_length = User._meta.get_field('username').max_length  # noqa: SLF001
-    
+    max_length = User._meta.get_field("username").max_length  # noqa: SLF001
+
     users = User.objects.all()
     for user in users:
         new_username = user.email[:max_length]
