@@ -242,7 +242,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     """Primary user class"""
 
     EMAIL_FIELD = "email"
-    USERNAME_FIELD = "global_id"
+    USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["email", "name"]
 
     # NOTE: Username max length was set to 50 before we lowered it. We're hardcoding this
