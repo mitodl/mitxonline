@@ -35,7 +35,9 @@ def ensure_b2b_organization_index() -> OrganizationIndexPage:
     return org_index_page
 
 
-def create_contract_run(contract: ContractPage, course: Course) -> tuple[CourseRun, Product]:
+def create_contract_run(
+    contract: ContractPage, course: Course
+) -> tuple[CourseRun, Product]:
     """
     Create a run for the specified contract.
 
@@ -85,7 +87,9 @@ def create_contract_run(contract: ContractPage, course: Course) -> tuple[CourseR
     )
     course_run.save()
 
-    log.debug("Created run %s for course %s in contract %s", course_run, course, contract)
+    log.debug(
+        "Created run %s for course %s in contract %s", course_run, course, contract
+    )
 
     content_type = ContentType.objects.filter(
         app_label="courses", model="courserun"
