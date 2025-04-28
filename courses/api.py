@@ -938,7 +938,9 @@ def manage_program_certificate_access(user, program, revoke_state):
     return True
 
 
-def resolve_courseware_object_from_id(courseware_id: str) -> Program | Course | CourseRun | None:
+def resolve_courseware_object_from_id(
+    courseware_id: str,
+) -> Program | Course | CourseRun | None:
     """
     Resolves a courseware_id to a CourseRun, Course, or Program.
 
@@ -950,6 +952,7 @@ def resolve_courseware_object_from_id(courseware_id: str) -> Program | Course | 
     """
     if is_program_text_id(courseware_id):
         return Program.objects.filter(text_id=courseware_id).first()
-    return CourseRun.objects.filter(courseware_id=courseware_id).first() or Course.objects.filter(
-        courseware_id=courseware_id
-    ).first()
+    return (
+        CourseRun.objects.filter(courseware_id=courseware_id).first()
+        or Course.objects.filter(courseware_id=courseware_id).first()
+    )
