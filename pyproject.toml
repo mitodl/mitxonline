@@ -67,7 +67,7 @@ django-reversion = "^5.1.0"
 django-filter = "^24.3"
 drf-spectacular = "^0.28.0"
 wagtail = "6.3"
-mitol-django-apigateway = "^2025.4.4.1"
+mitol-django-apigateway = "^2025.4.25.1"
 
 
 [tool.poetry.group.dev.dependencies]
