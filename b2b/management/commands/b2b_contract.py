@@ -1,12 +1,12 @@
 """Management command for B2B contracts."""
 
 import logging
-from argparse import ArgumentError
 
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
 
+from b2b.api import create_contract_run
 from b2b.constants import CONTRACT_INTEGRATION_NONSSO
-from b2b.models import ContractPage, OrganizationPage
+from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from courses.api import resolve_courseware_object_from_id
 
 log = logging.getLogger(__name__)
@@ -115,9 +115,9 @@ class Command(BaseCommand):
             dest="remove",
         )
         courseware_parser.add_argument(
-            "--create-runs",
-            action="store_true",
-            help="Create runs if applicable (i.e., not for programs or existing runs).",
+            "--no-create-runs",
+            action="store_false",
+            help="Don't create new runs for this contract.",
             dest="create_runs",
         )
         courseware_parser.add_argument(
@@ -144,13 +144,18 @@ class Command(BaseCommand):
         )
 
         org = OrganizationPage.objects.filter(name=organization_name).first()
+
+        log.info("Got organization %s", org)
+
         if not org and create_organization:
+            parent = OrganizationIndexPage.objects.first()
             org = OrganizationPage(name=organization_name)
+            parent.add_child(instance=org)
             org.save()
             self.stdout.write(f"Created organization '{organization_name}'")
         elif not org:
             msg = f"Organization '{organization_name}' does not exist. Use --create to create it."
-            raise ArgumentError(msg)
+            raise CommandError(msg)
 
         contract = ContractPage(
             name=contract_name,
@@ -160,6 +165,7 @@ class Command(BaseCommand):
             contract_start=start_date,
             contract_end=end_date,
         )
+        org.add_child(instance=contract)
         contract.save()
         self.stdout.write(
             f"Created contract '{contract_name}' for organization '{organization_name}'"
@@ -176,7 +182,7 @@ class Command(BaseCommand):
         contract = ContractPage.objects.filter(id=contract_id).first()
         if not contract:
             msg = f"Contract with ID '{contract_id}' does not exist."
-            raise ArgumentError(msg)
+            raise CommandError(msg)
 
         if start_date:
             contract.contract_start = start_date
@@ -190,7 +196,7 @@ class Command(BaseCommand):
         contract.save()
         self.stdout.write(f"Modified contract with ID '{contract_id}'")
 
-    def handle_courseware(self, *args, **kwargs):  # noqa: ARG002
+    def handle_courseware(self, *args, **kwargs):  # noqa: ARG002, C901
         """Add/remove courseware in a contract."""
         contract_id = kwargs.pop("contract_id")
         remove = kwargs.pop("remove")
@@ -200,7 +206,7 @@ class Command(BaseCommand):
         contract = ContractPage.objects.filter(id=contract_id).first()
         if not contract:
             msg = f"Contract with ID '{contract_id}' does not exist."
-            raise ArgumentError(msg)
+            raise CommandError(msg)
 
         managed = skipped = 0
 
@@ -213,9 +219,7 @@ class Command(BaseCommand):
                     )
                 )
                 skipped += 1
-                continue
-
-            if courseware.is_program:
+            elif courseware.is_program:
                 # TODO: we should grab the associated courses and add runs
                 # skipping for now to make sure course adding is OK
                 self.stdout.write(
@@ -224,9 +228,7 @@ class Command(BaseCommand):
                     )
                 )
                 skipped += 1
-                continue
-
-            if courseware.is_run:
+            elif courseware.is_run:
                 # This run already exists, so just add/remove it.
                 # - If the run is owned by a different contract, skip it.
                 # - If remove is True, remove the run from the contract.
@@ -260,14 +262,38 @@ class Command(BaseCommand):
                     courseware.b2b_contract = contract
                     courseware.save()
                     managed += 1
-            else:
-                # Create the run and attach it to the contract.
-                # This should also create the run in edX.
+            elif create_runs:
+                # This is a course, so create a run (unless we've been told not to).
+
+                run_objs = create_contract_run(contract=contract, course=courseware)
+
+                if not run_objs:
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Failed to create run for course {courseware} for contract {contract}."
+                        )
+                    )
+                    skipped += 1
+                    continue
+
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Created run {run_objs[0]} and product {run_objs[1]} for course {courseware} for contract {contract}."
+                    )
+                )
+
                 managed += 1
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Skipped run creation for for course {courseware} for contract {contract}."
+                    )
+                )
+                skipped += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Managed {managed} courseware items and skipped {skipped} courseware items."
+                f"Managed {managed} courseware items and skipped {skipped} courseware items out of {len(courseware)}."
             )
         )
 
@@ -277,9 +303,9 @@ class Command(BaseCommand):
         if subcommand == "create":
             self.handle_create(**kwargs)
         elif subcommand == "modify":
-            self.stdout.write("self.modify_contract(**kwargs)")
+            self.handle_modify(**kwargs)
         elif subcommand == "courseware":
-            self.stdout.write("self.courseware_courseware(**kwargs)")
+            self.handle_courseware(**kwargs)
         else:
             log.error("Unknown subcommand: %s", subcommand)
             return 1

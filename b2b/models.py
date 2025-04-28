@@ -76,7 +76,7 @@ class OrganizationPage(Page):
 
         self.title = str(self.name)
 
-        self.slug = slugify(f"org-{self.get_parent().id}")
+        self.slug = slugify(f"org-{self.name}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
 
 
@@ -148,5 +148,5 @@ class ContractPage(Page):
 
         self.title = str(self.name)
 
-        self.slug = slugify(f"contract-{self.get_parent().id}-{self.id}")
+        self.slug = slugify(f"contract-{self.organization.id}-{self.id}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
