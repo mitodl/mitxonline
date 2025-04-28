@@ -190,7 +190,11 @@ class ContractPage(Page):
     content_panels = [
         FieldPanel("name"),
         FieldPanel("description"),
-        FieldPanel("logo"),
+        FieldPanel("integration_type"),
+        FieldPanel("organization"),
+        FieldPanel("active"),
+        FieldPanel("contract_start"),
+        FieldPanel("contract_end"),
     ]
 
     promote_panels = []
@@ -200,9 +204,21 @@ class ContractPage(Page):
         """
         Check if the contract is active based on the dates and the active flag.
         """
-        if not self.active:
-            return False
         if self.contract_start and self.contract_start > now_in_utc():
             return False
+        if self.contract_end and self.contract_end < now_in_utc():
+            return False
 
-        return self.contract_end and self.contract_end < now_in_utc()
+        return self.active
+
+    def __str__(self):
+        """Return a string representation of the contract."""
+        return f"{self.id} - {self.name} ({self.organization.name})"
+
+    def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
+        """Save the page, and update the slug and title appropriately."""
+
+        self.title = str(self.name)
+
+        self.slug = slugify(f"contract-{self.get_parent().id}-{self.id}")
+        Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
