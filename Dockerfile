@@ -59,18 +59,27 @@ FROM poetry as code
 COPY . /src
 WORKDIR /src
 
-USER root
 
 # Set pip cache folder, as it is breaking pip when it is on a shared volume
 ENV XDG_CACHE_HOME /tmp/.cache
 
+FROM node:17.9 as node
 
-USER mitodl
+COPY --from=code /src /src
+WORKDIR /src
+
+RUN yarn workspace mitx-online-public install --immutable && \ 
+    yarn workspace mitx-online-public run build
+
 FROM code as django-server
 
 EXPOSE 8013
 ENV PORT 8013
 CMD uwsgi uwsgi.ini
+
+FROM django-server as production
+
+copy --from=node /src /src
 
 FROM code as jupyter-notebook
 
