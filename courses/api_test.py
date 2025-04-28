@@ -348,7 +348,7 @@ def test_create_run_enrollments_creation_fail(mocker, user):
     creation of local enrollment records
     """
     runs = CourseRunFactory.create_batch(2)
-    enrollment = CourseRunEnrollmentFactory.build(run=runs[1])
+    enrollment = CourseRunEnrollmentFactory.create(run=runs[1])
     mocker.patch(
         "courses.api.CourseRunEnrollment.all_objects.get_or_create",
         side_effect=[Exception(), (enrollment, True)],

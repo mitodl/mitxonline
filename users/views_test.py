@@ -39,7 +39,7 @@ def test_get_user_by_id(user_client, user):
     assert resp.status_code == status.HTTP_200_OK
     assert resp.json() == {
         "id": user.id,
-        "username": user.username,
+        "username": user.edx_username,
         "name": user.name,
         "created_on": drf_datetime(user.created_on),
         "updated_on": drf_datetime(user.updated_on),
@@ -74,7 +74,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
     elif not is_anonymous and show_enrollment_codes:
         assert resp.json() == {
             "id": user.id,
-            "username": user.username,
+            "username": user.edx_username,
             "email": user.email,
             "name": user.name,
             "legal_address": {

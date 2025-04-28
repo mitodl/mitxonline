@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import timedelta
+from functools import cached_property
 
 import pycountry
 from django.conf import settings
@@ -279,6 +280,14 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         """Returns the user's fullname"""
         return self.name
 
+    @cached_property
+    def edx_username(self) -> str:
+        """Returns the edx username"""
+        if self.pk is None:
+            return None
+        openedx_user = self.openedx_users.first()
+        return getattr(openedx_user, "edx_username", None)
+
     @property
     def is_editor(self) -> bool:
         """Returns True if the user has editor permissions for the CMS"""
@@ -303,7 +312,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
 
     def __str__(self):
         """Str representation for the user"""
-        return f"User username={self.username} email={self.email}"
+        return f"User edx_username={self.edx_username} email={self.email}"
 
 
 def generate_change_email_code():

@@ -112,7 +112,7 @@ def get_username(strategy, backend, user=None, details=None, *args, **kwargs):  
     """
 
     if backend and backend.name == OlOpenIdConnectAuth.name:
-        return {"username": details["username"] if not user else user.username}
+        return {"username": details["username"] if not user else user.edx_username}
 
     return {"username": None if not user else strategy.storage.user.get_username(user)}
 
@@ -189,7 +189,7 @@ def create_user_via_email(
     except Exception as exc:
         raise UserCreationFailedException(backend, current_partial) from exc
 
-    return {"is_new": True, "user": created_user, "username": created_user.username}
+    return {"is_new": True, "user": created_user, "username": created_user.edx_username}
 
 
 @partial

@@ -938,7 +938,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         return self.course_run.start_date, self.created_on
 
     def __str__(self):  # noqa: DJ012
-        return f'CourseRunCertificate for user={self.user.username}, run={self.course_run.text_id} ({self.uuid})"'
+        return f'CourseRunCertificate for user={self.user.edx_username}, run={self.course_run.text_id} ({self.uuid})"'
 
     def clean(self):
         from cms.models import CertificatePage, CoursePage
@@ -1031,7 +1031,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         return dates["start_date"], self.created_on
 
     def __str__(self):  # noqa: DJ012
-        return f'ProgramCertificate for user={self.user.username}, program={self.program.text_id} ({self.uuid})"'
+        return f'ProgramCertificate for user={self.user.edx_username}, program={self.program.text_id} ({self.uuid})"'
 
     def clean(self):
         from cms.models import CertificatePage, ProgramPage
@@ -1120,7 +1120,7 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
     def to_dict(self):
         return {
             **serialize_model_object(self),
-            "username": self.user.username,
+            "username": self.user.edx_username,
             "full_name": self.user.name,
             "email": self.user.email,
         }
@@ -1340,7 +1340,7 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
         )
 
     def __str__(self):
-        return f"CourseRunGrade for run '{self.course_run.courseware_id}', user '{self.user.username}' ({self.grade})"
+        return f"CourseRunGrade for run '{self.course_run.courseware_id}', user '{self.user.edx_username}' ({self.grade})"
 
 
 class CourseRunGradeAudit(AuditModel):
@@ -1597,9 +1597,9 @@ class LearnerProgramRecordShare(TimestampedModel):
 
     def __str__(self):
         if self.partner_school:
-            return f"Learner Program Record for {self.user.username} shared with partner school {self.partner_school.name} on {self.created_on} - {self.share_uuid}"
+            return f"Learner Program Record for {self.user.edx_username} shared with partner school {self.partner_school.name} on {self.created_on} - {self.share_uuid}"
         else:
-            return f"Learner Program record for {self.user.username} shared with the public on {self.created_on} - {self.share_uuid}"
+            return f"Learner Program record for {self.user.edx_username} shared with the public on {self.created_on} - {self.share_uuid}"
 
     class Meta:
         constraints = [
