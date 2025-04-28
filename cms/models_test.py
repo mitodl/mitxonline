@@ -339,9 +339,9 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
     elif submission_status == FlexiblePriceStatus.DENIED:
         assert "Application Denied" in response.rendered_content
     elif submission_status == FlexiblePriceStatus.RESET:
-        assert (
-            "csrfmiddlewaretoken" in response.rendered_content
-        ), response.rendered_content
+        assert "csrfmiddlewaretoken" in response.rendered_content, (
+            response.rendered_content
+        )
 
 
 @pytest.mark.parametrize("course_or_program", [True, False])

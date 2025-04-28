@@ -164,7 +164,7 @@ class Command(BaseCommand):
                         {
                             "tier": {"threshold": row["threshold"]},
                             "discount": {
-                                "discount_code": f"{discount_abbrev}-fa-tier{idx+1}-{current_year}",
+                                "discount_code": f"{discount_abbrev}-fa-tier{idx + 1}-{current_year}",
                                 "discount_type": row["type"],
                                 "amount": row["value"],
                             },

@@ -137,13 +137,13 @@ def user_profile_dict():
 
 
 @pytest.fixture
-def nplusone_fail(settings):  # noqa: PT004
+def nplusone_fail(settings):
     """Configures the nplusone app to raise errors"""
     settings.NPLUSONE_RAISE = True
 
 
 @pytest.fixture(autouse=True)
-def webpack_stats(settings):  # noqa: PT004
+def webpack_stats(settings):
     """Mocks out webpack stats"""
 
     directory = "scripts/test/data/webpack-stats/"
@@ -157,7 +157,7 @@ def webpack_stats(settings):  # noqa: PT004
 
 
 @pytest.fixture
-def raise_nplusone(request):  # noqa: PT004
+def raise_nplusone(request):
     if request.node.get_closest_marker("skip_nplusone"):
         yield
     else:
