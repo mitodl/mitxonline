@@ -9,7 +9,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("wagtailcore", "0066_collection_management_permissions"),
+        ("wagtailcore", "0070_rename_pagerevision_revision"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("courses", "0020_courseruncertificate_certificate_page_revision"),
     ]
@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         null=True,
                         on_delete=django.db.models.deletion.CASCADE,
-                        to="wagtailcore.pagerevision",
+                        to="wagtailcore.revision",
                     ),
                 ),
                 (
