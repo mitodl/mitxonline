@@ -10,7 +10,7 @@ from main import features
 
 
 @pytest.fixture(autouse=True)
-def default_settings(monkeypatch, settings):  # noqa: PT004
+def default_settings(monkeypatch, settings):
     """Set default settings for all tests"""
     monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "main.settings")
 
@@ -19,19 +19,19 @@ def default_settings(monkeypatch, settings):  # noqa: PT004
 
 
 @pytest.fixture(autouse=True)
-def mocked_product_signal(mocker):  # noqa: PT004
+def mocked_product_signal(mocker):
     """Mock hubspot_sync signals"""
     mocker.patch("ecommerce.signals.sync_hubspot_product")
 
 
 @pytest.fixture(autouse=True)
-def mocked_flexibleprice_signal(mocker):  # noqa: PT004
+def mocked_flexibleprice_signal(mocker):
     """Mock FlexiblePrice signals"""
     mocker.patch("flexiblepricing.tasks.get_ecommerce_products_by_courseware_name")
 
 
 @pytest.fixture(autouse=True)
-def payment_gateway_settings(settings):  # noqa: PT004
+def payment_gateway_settings(settings):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()

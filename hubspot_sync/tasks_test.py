@@ -363,7 +363,7 @@ def test_batch_upsert_associations_chunked(mocker):
     mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
     orders = OrderFactory.create_batch(5)
     with reversion.create_revision():
-        product = ProductFactory.create(price=Decimal(200.00))
+        product = ProductFactory.create(price=Decimal("200.00"))
     for order in orders:
         LineFactory.create(
             order=order, product_version=Version.objects.get_for_object(product).first()

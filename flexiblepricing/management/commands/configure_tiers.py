@@ -94,11 +94,7 @@ class Command(BaseCommand):
                 f"Couldn't find the program {kwargs['program']}, stopping."  # noqa: EM102
             ) from exc
 
-        discount_abbrev = (
-            (program.readable_id if "program_abbrev" in kwargs else program.readable_id)
-            if not course
-            else course.readable_id
-        )
+        discount_abbrev = program.readable_id if not course else course.readable_id
 
         current_year = date.today().year  # noqa: DTZ011
         last_year = datetime(
@@ -164,7 +160,7 @@ class Command(BaseCommand):
                         {
                             "tier": {"threshold": row["threshold"]},
                             "discount": {
-                                "discount_code": f"{discount_abbrev}-fa-tier{idx+1}-{current_year}",
+                                "discount_code": f"{discount_abbrev}-fa-tier{idx + 1}-{current_year}",
                                 "discount_type": row["type"],
                                 "amount": row["value"],
                             },

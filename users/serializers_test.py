@@ -26,7 +26,7 @@ USERNAME = "my-username"
 
 
 @pytest.fixture
-def application(settings):  # noqa: PT004
+def application(settings):
     """Test data and settings needed for create_edx_user tests"""
     settings.OPENEDX_API_BASE_URL = "http://example.com"
 
