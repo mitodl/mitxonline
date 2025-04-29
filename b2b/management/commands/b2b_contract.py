@@ -3,6 +3,8 @@
 import logging
 
 from django.core.management import BaseCommand, CommandError
+from rich.console import Console
+from rich.table import Table
 
 from b2b.api import create_contract_run
 from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
@@ -44,6 +46,31 @@ class Command(BaseCommand):
             title="Task",
             dest="subcommand",
             required=True,
+        )
+
+        list_parser = subparsers.add_parser(
+            "list",
+            help="List orgs and contracts.",
+        )
+        list_parser.add_argument(
+            "type",
+            type=str,
+            help="The data to list.",
+            choices=["organizations", "contracts", "users"],
+            default="organizations",
+        )
+        list_parser.add_argument(
+            "--org",
+            "--organization",
+            type=int,
+            help="Filter by organization ID.",
+            dest="organization_id",
+        )
+        list_parser.add_argument(
+            "--contract",
+            type=int,
+            help="Filter by contract ID.",
+            dest="contract_id",
         )
 
         create_parser = subparsers.add_parser(
@@ -152,6 +179,65 @@ class Command(BaseCommand):
         )
 
         return super().add_arguments(parser)
+
+    def handle_list(self, *args, **kwargs):  # noqa: ARG002
+        """Handle the list subcommand."""
+        data_type = kwargs.pop("type")
+        org_id = kwargs.pop("organization_id")
+        # contract_id = kwargs.pop("contract_id")
+
+        console = Console()
+
+        if data_type == "organizations":
+            orgs = OrganizationPage.objects.all()
+
+            org_table = Table(title="B2B Organizations")
+            org_table.add_column("ID", justify="right")
+            org_table.add_column("Name", justify="left")
+            org_table.add_column("Contracts", justify="left")
+
+            for org in orgs:
+                org_table.add_row(
+                    str(org.id),
+                    str(org.name),
+                    str(org.get_children().type(ContractPage).count()),
+                )
+
+            console.print(org_table)
+        elif data_type == "contracts":
+            if org_id:
+                org = OrganizationPage.objects.filter(id=org_id).first()
+                if not org:
+                    msg = f"Organization with ID '{org_id}' does not exist."
+                    raise CommandError(msg)
+
+                contracts = org.get_children().type(ContractPage)
+            else:
+                contracts = ContractPage.objects.all()
+
+            contract_table = Table(title="Contracts")
+            contract_table.add_column("ID", justify="right")
+            contract_table.add_column("Name", justify="left")
+            contract_table.add_column("Org Name", justify="left")
+            contract_table.add_column("Integration", justify="left")
+            contract_table.add_column("Start", justify="left")
+            contract_table.add_column("End", justify="left")
+            contract_table.add_column("Active", justify="left")
+
+            for contract in contracts:
+                contract_table.add_row(
+                    str(contract.id),
+                    str(contract.name),
+                    str(contract.organization.name),
+                    str(contract.integration_type),
+                    str(contract.contract_start),
+                    str(contract.contract_end),
+                    str(contract.active),
+                )
+
+            console.print(contract_table)
+        elif data_type == "users":
+            self.stdout.write("Listing users is not implemented yet.")
 
     def handle_create(self, *args, **kwargs):  # noqa: ARG002
         """Handle the create subcommand."""
@@ -324,6 +410,8 @@ class Command(BaseCommand):
             self.handle_modify(**kwargs)
         elif subcommand == "courseware":
             self.handle_courseware(**kwargs)
+        elif subcommand == "list":
+            self.handle_list(**kwargs)
         else:
             log.error("Unknown subcommand: %s", subcommand)
             return 1
