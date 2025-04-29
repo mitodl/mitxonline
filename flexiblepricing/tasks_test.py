@@ -408,12 +408,13 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
             "FlexiblePrice instance with ID %s does not exist", 1
         )
 
+    @patch("flexiblepricing.tasks.process_flexible_price_discount_task.delay")
     @patch("flexiblepricing.tasks._get_valid_product_id")
     @patch("flexiblepricing.tasks._calculate_discount_amount")
     @patch("flexiblepricing.tasks._create_discount_api_call")
     @patch("flexiblepricing.tasks.get_enrollable_courseruns_qs")
     def test_process_course_discounts_success(
-        self, mock_get_runs, mock_create, mock_calculate, mock_get_product
+        self, mock_get_runs, mock_create, mock_calculate, mock_get_product, mocked_flexibleprice_discounttask
     ):
         """Test _process_course_discounts with valid data"""
         mock_course_run = MagicMock()
