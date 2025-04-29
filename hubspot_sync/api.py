@@ -551,9 +551,7 @@ def get_hubspot_id_for_object(  # noqa: C901
         return hubspot_obj.id
     elif raise_error:
         msg = f"Hubspot id could not be found for {content_type.name} for id {obj.id}"
-        raise ValueError(
-            msg
-        )
+        raise ValueError(msg)
 
 
 def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
