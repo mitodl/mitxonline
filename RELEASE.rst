@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.115.1
+---------------
+
+- Switch to using edx_username (#2594)
+- Remove override of User.USERNAME (#2615)
+- chore(deps): update redis docker tag to v7.4.3 (#2614)
+- Change references to wagtailcore.pagerevision to wagtailcore.revision (#2606)
+- Add a compose profile for apisix (#2603)
+
 Version 0.115.0 (Released April 29, 2025)
 ---------------
 
