@@ -94,11 +94,7 @@ class Command(BaseCommand):
                 f"Couldn't find the program {kwargs['program']}, stopping."  # noqa: EM102
             ) from exc
 
-        discount_abbrev = (
-            program.readable_id
-            if not course
-            else course.readable_id
-        )
+        discount_abbrev = program.readable_id if not course else course.readable_id
 
         current_year = date.today().year  # noqa: DTZ011
         last_year = datetime(
