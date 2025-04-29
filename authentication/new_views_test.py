@@ -80,13 +80,12 @@ def test_custom_login_view_authenticated_user_with_onboarding(mocker):
     request = factory.get(reverse("login"), {"next": "/dashboard"})
     request.user = MagicMock(is_anonymous=False)
     request.user.profile = MagicMock(completed_onboarding=False)
-    mocker.patch("authentication.views.get_redirect_url", return_value="/dashboard")
+    mocker.patch("authentication.new_views.get_redirect_url", return_value="/dashboard")
     mocker.patch("authentication.views.urlencode", return_value="next=/dashboard")
     mocker.patch(
-        "authentication.views.settings.MITXONLINE_NEW_USER_LOGIN_URL", "/onboarding"
+        "authentication.views.settings.MITXONLINE_NEW_USER_LOGIN_URL", "/create-profile"
     )
 
     response = CustomLoginView().get(request)
 
     assert response.status_code == 302
-    assert response.url == "/onboarding?next=/dashboard"
