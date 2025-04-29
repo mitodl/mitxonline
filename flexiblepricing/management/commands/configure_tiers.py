@@ -95,7 +95,7 @@ class Command(BaseCommand):
             ) from exc
 
         discount_abbrev = (
-            (program.readable_id if "program_abbrev" in kwargs else program.readable_id)
+            program.readable_id
             if not course
             else course.readable_id
         )
