@@ -92,7 +92,8 @@ def test_create_user(user, mocker):
     mock_create_edx_auth_token.assert_called_with(user)
 
 
-"""
+def edx_username_validation_response_mock(username_exists, settings):
+    """
     Adds a mocked response from the EdX username validation API.
 
     Args:
@@ -101,9 +102,6 @@ def test_create_user(user, mocker):
        user (str): The username being passed to the EdX username validation API.  This is required if username_exists is True.
 
     """
-
-
-def edx_username_validation_response_mock(username_exists, settings):
     if username_exists:
         validation_decisions = {"username": ""}
     else:
@@ -119,19 +117,22 @@ def edx_username_validation_response_mock(username_exists, settings):
 
 
 @responses.activate
+@pytest.mark.parametrize("has_been_synced", [True, False])
 @pytest.mark.parametrize("access_token_count", [0, 1, 3])
-def test_create_edx_user(user, settings, application, access_token_count):
+def test_create_edx_user(settings, application, has_been_synced, access_token_count):
     """Test that create_edx_user makes a request to create an edX user"""
-    responses.add(
+    user = UserFactory.create(openedx_user__has_been_synced=has_been_synced)
+
+    resp1 = responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/mobile/v0.5/my_user_info",
+        json={},
+        status=status.HTTP_200_OK,
+    )
+    resp2 = responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
         json=dict(success=True),  # noqa: C408
-        status=status.HTTP_200_OK,
-    )
-    responses.add(
-        responses.POST,
-        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
-        json={"validation_decisions": {"username": ""}},
         status=status.HTTP_200_OK,
     )
 
@@ -147,23 +148,31 @@ def test_create_edx_user(user, settings, application, access_token_count):
 
     # An AccessToken should be created during execution
     created_access_token = AccessToken.objects.filter(application=application).last()
-    assert (
-        responses.calls[0].request.headers[ACCESS_TOKEN_HEADER_NAME]
-        == settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
-    )
-    assert dict(parse_qsl(responses.calls[0].request.body)) == {
-        "username": user.username,
-        "email": user.email,
-        "name": user.name,
-        "provider": settings.OPENEDX_OAUTH_PROVIDER,
-        "access_token": created_access_token.token,
-        "country": user.legal_address.country if user.legal_address else None,
-        "year_of_birth": (
-            str(user.user_profile.year_of_birth) if user.user_profile else None
-        ),
-        "gender": user.user_profile.gender if user.user_profile else None,
-        "honor_code": "True",
-    }
+
+    if has_been_synced:
+        assert resp1.call_count == 1
+        assert resp2.call_count == 0
+    else:
+        assert resp1.call_count == 0
+        assert resp2.call_count == 1
+
+        assert (
+            resp2.calls[0].request.headers[ACCESS_TOKEN_HEADER_NAME]
+            == settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
+        )
+        assert dict(parse_qsl(resp2.calls[0].request.body)) == {
+            "username": user.edx_username,
+            "email": user.email,
+            "name": user.name,
+            "provider": settings.OPENEDX_OAUTH_PROVIDER,
+            "access_token": created_access_token.token,
+            "country": user.legal_address.country if user.legal_address else None,
+            "year_of_birth": (
+                str(user.user_profile.year_of_birth) if user.user_profile else None
+            ),
+            "gender": user.user_profile.gender if user.user_profile else None,
+            "honor_code": "True",
+        }
     assert (
         OpenEdxUser.objects.filter(
             user=user, platform=PLATFORM_EDX, has_been_synced=True
@@ -233,7 +242,7 @@ def test_validate_edx_username_conflict(settings, user):
     """Test that validate_username_email_with_edx handles a username validation conflict"""
     edx_username_validation_response_mock(True, settings)  # noqa: FBT003
 
-    assert validate_username_email_with_edx(user.username, "example@mit.edu")
+    assert validate_username_email_with_edx(user.edx_username, "example@mit.edu")
 
 
 @responses.activate
@@ -250,16 +259,18 @@ def test_validate_edx_username_conflict(settings, user):  # noqa: F811
         status=status.HTTP_400_BAD_REQUEST,
     )
     with pytest.raises(EdxApiRegistrationValidationException):
-        validate_username_email_with_edx(user.username, "example@mit.edu")
+        validate_username_email_with_edx(user.edx_username, "example@mit.edu")
 
 
 @responses.activate
 @freeze_time("2019-03-24 11:50:36")
-def test_create_edx_auth_token(settings, user):
+def test_create_edx_auth_token(settings):
     """Tests create_edx_auth_token makes the expected incantations to create a OpenEdxApiAuth"""
     refresh_token = "abc123"  # noqa: S105
     access_token = "def456"  # noqa: S105
     code = "ghi789"
+
+    user = UserFactory.create(no_openedx_api_auth=True)
 
     responses.add(
         responses.GET,
@@ -311,8 +322,10 @@ def test_create_edx_auth_token(settings, user):
 
 
 @responses.activate
-def test_update_edx_user_email(settings, user):
+def test_update_edx_user_email(settings):
     """Tests update_edx_user_email makes the expected incantations to update the user"""
+    user = UserFactory.create(openedx_user__has_been_synced=False)
+
     responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
@@ -463,13 +476,13 @@ def test_enroll_in_edx_course_runs(settings, mocker, user):
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[0].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
-        username=user.username,
+        username=user.edx_username,
         force_enrollment=True,
     )
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[1].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
-        username=user.username,
+        username=user.edx_username,
         force_enrollment=True,
     )
     assert enroll_results == [enroll_return_values[0], enroll_return_values[2]]
@@ -570,21 +583,27 @@ def test_retry_failed_enroll_grace_period(mocker):
     "no_openedx_user,no_edx_auth",  # noqa: PT006
     itertools.product([True, False], [True, False]),
 )
-def test_repair_faulty_edx_user(mocker, user, no_openedx_user, no_edx_auth):
+def test_repair_faulty_edx_user(mocker, no_openedx_user, no_edx_auth):
     """
     Tests that repair_faulty_edx_user creates OpenEdxUser/OpenEdxApiAuth objects as necessary and
     returns flags that indicate what was created
     """
+    user = UserFactory.create(
+        no_openedx_user=no_openedx_user, no_openedx_api_auth=no_edx_auth
+    )
+
     patched_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
     mocker.patch(
         "openedx.api.create_edx_user",
         return_value=True if no_openedx_user else False,  # noqa: SIM210
     )
-    openedx_api_auth = None if no_edx_auth else OpenEdxApiAuthFactory.build()
-    user.openedx_api_auth = openedx_api_auth
 
     created_user, created_auth_token = repair_faulty_edx_user(user)
-    assert patched_create_edx_auth_token.called is no_edx_auth
+
+    if no_edx_auth:
+        patched_create_edx_auth_token.assert_called_once_with(user)
+    else:
+        patched_create_edx_auth_token.assert_not_called()
     assert created_user is no_openedx_user
     assert created_auth_token is no_edx_auth
 
@@ -652,7 +671,7 @@ def test_unenroll_edx_course_run(mocker):
     mock_client = mocker.MagicMock()
     run_enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
     courseware_id = run_enrollment.run.courseware_id
-    username = run_enrollment.user.username
+    username = run_enrollment.user.edx_username
     enroll_return_value = mocker.Mock(
         json={"course_id": courseware_id, "user": username}
     )
@@ -673,7 +692,7 @@ def test_update_user_edx_name(mocker, user):
     user.name = "Test Name"
     mock_client = mocker.MagicMock()
     update_name_return_value = mocker.Mock(
-        json={"name": user.name, "username": user.username, "email": user.email}
+        json={"name": user.name, "username": user.edx_username, "email": user.email}
     )
     mock_client.user_info.update_user_name = mocker.Mock(
         return_value=update_name_return_value
@@ -681,7 +700,7 @@ def test_update_user_edx_name(mocker, user):
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     updated_user = update_edx_user_name(user)
     mock_client.user_info.update_user_name.assert_called_once_with(
-        user.username, user.name
+        user.edx_username, user.name
     )
     assert update_name_return_value == updated_user
 

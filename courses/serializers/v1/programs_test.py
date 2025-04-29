@@ -321,7 +321,7 @@ def test_learner_record_serializer(
     user_info_payload = {
         "email": user.email,
         "name": user.name,
-        "username": user.username,
+        "username": user.edx_username,
     }
     course_0_payload = {
         "certificate": None,

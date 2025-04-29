@@ -4,6 +4,48 @@ info:
   version: 0.0.1 (v0)
   description: MIT public API
 paths:
+  /api/profile/details/:
+    post:
+      operationId: api_profile_details_create
+      description: Processes a request
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDetailsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterDetailsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterDetailsRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+  /api/profile/extra/:
+    post:
+      operationId: api_profile_extra_create
+      description: Processes a request
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterExtraDetailsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterExtraDetailsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterExtraDetailsRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
   /api/records/program/{id}/:
     get:
       operationId: learner_record_retrieve_by_id
@@ -657,6 +699,35 @@ components:
       x-enum-descriptions:
       - anytime
       - dated
+    BlankEnum:
+      enum:
+      - ''
+    CompanySizeEnum:
+      enum:
+      - 1
+      - 9
+      - 99
+      - 999
+      - 9999
+      - 10000
+      - 0
+      description: |-
+        * `None` - ----
+        * `1` - Small/Start-up (1+ employees)
+        * `9` - Small/Home office (1-9 employees)
+        * `99` - Small (10-99 employees)
+        * `999` - Small to medium-sized (100-999 employees)
+        * `9999` - Medium-sized (1000-9999 employees)
+        * `10000` - Large Enterprise (10,000+ employees)
+        * `0` - Other (N/A or Don't know)
+      x-enum-descriptions:
+      - Small/Start-up (1+ employees)
+      - Small/Home office (1-9 employees)
+      - Small (10-99 employees)
+      - Small to medium-sized (100-999 employees)
+      - Medium-sized (1000-9999 employees)
+      - Large Enterprise (10,000+ employees)
+      - Other (N/A or Don't know)
     Course:
       type: object
       description: Course model serializer
@@ -1106,6 +1177,58 @@ components:
       x-enum-descriptions:
       - audit
       - verified
+    GenderEnum:
+      enum:
+      - m
+      - f
+      - t
+      - nb
+      - o
+      type: string
+      description: |-
+        * `m` - Male
+        * `f` - Female
+        * `t` - Transgender
+        * `nb` - Non-binary/non-conforming
+        * `o` - Other/Prefer Not to Say
+      x-enum-descriptions:
+      - Male
+      - Female
+      - Transgender
+      - Non-binary/non-conforming
+      - Other/Prefer Not to Say
+    HighestEducationEnum:
+      enum:
+      - Doctorate
+      - Master's or professional degree
+      - Bachelor's degree
+      - Associate degree
+      - Secondary/high school
+      - Junior secondary/junior high/middle school
+      - Elementary/primary school
+      - No formal education
+      - Other education
+      description: |-
+        * `None` - ----
+        * `Doctorate` - Doctorate
+        * `Master's or professional degree` - Master's or professional degree
+        * `Bachelor's degree` - Bachelor's degree
+        * `Associate degree` - Associate degree
+        * `Secondary/high school` - Secondary/high school
+        * `Junior secondary/junior high/middle school` - Junior secondary/junior high/middle school
+        * `Elementary/primary school` - Elementary/primary school
+        * `No formal education` - No formal education
+        * `Other education` - Other education
+      x-enum-descriptions:
+      - Doctorate
+      - Master's or professional degree
+      - Bachelor's degree
+      - Associate degree
+      - Secondary/high school
+      - Junior secondary/junior high/middle school
+      - Elementary/primary school
+      - No formal education
+      - Other education
     LearnerProgramRecordShare:
       type: object
       properties:
@@ -1171,6 +1294,51 @@ components:
       - program
       - sharing
       - user
+    LegalAddress:
+      type: object
+      description: Serializer for legal address
+      properties:
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        country:
+          type: string
+          maxLength: 2
+        state:
+          type: string
+          nullable: true
+          maxLength: 10
+      required:
+      - country
+      - first_name
+      - last_name
+    LegalAddressRequest:
+      type: object
+      description: Serializer for legal address
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        country:
+          type: string
+          minLength: 1
+          maxLength: 2
+        state:
+          type: string
+          nullable: true
+          maxLength: 10
+      required:
+      - country
+      - first_name
+      - last_name
     NodeTypeEnum:
       enum:
       - operator
@@ -1478,6 +1646,216 @@ components:
       - one-time
       - one-time-per-user
       - unlimited
+    RegisterDetailsRequest:
+      type: object
+      description: Serializer for registration details
+      properties:
+        name:
+          type: string
+          writeOnly: true
+          minLength: 1
+        username:
+          type: string
+          writeOnly: true
+          minLength: 1
+        legal_address:
+          allOf:
+          - $ref: '#/components/schemas/LegalAddressRequest'
+          writeOnly: true
+        user_profile:
+          allOf:
+          - $ref: '#/components/schemas/UserProfileRequest'
+          writeOnly: true
+      required:
+      - legal_address
+      - name
+      - user_profile
+      - username
+    RegisterExtraDetailsRequest:
+      type: object
+      description: Serializer for extra registration details
+      properties:
+        gender:
+          type: string
+          writeOnly: true
+          minLength: 1
+        birth_year:
+          type: string
+          writeOnly: true
+          minLength: 1
+        company:
+          type: string
+          writeOnly: true
+          minLength: 1
+        job_title:
+          type: string
+          writeOnly: true
+          minLength: 1
+        industry:
+          type: string
+          writeOnly: true
+        job_function:
+          type: string
+          writeOnly: true
+        years_experience:
+          type: string
+          writeOnly: true
+        company_size:
+          type: string
+          writeOnly: true
+        leadership_level:
+          type: string
+          writeOnly: true
+        highest_education:
+          type: string
+          writeOnly: true
+      required:
+      - birth_year
+      - company
+      - gender
+      - job_title
+    UserProfile:
+      type: object
+      description: Serializer for profile
+      properties:
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/GenderEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        year_of_birth:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        addl_field_flag:
+          type: boolean
+          description: Flags if we've asked the user for additional information
+        company:
+          type: string
+          nullable: true
+          maxLength: 128
+        job_title:
+          type: string
+          nullable: true
+          maxLength: 128
+        industry:
+          type: string
+          nullable: true
+          maxLength: 60
+        job_function:
+          type: string
+          nullable: true
+          maxLength: 60
+        company_size:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CompanySizeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        years_experience:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/YearsExperienceEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        leadership_level:
+          type: string
+          nullable: true
+          maxLength: 60
+        highest_education:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/HighestEducationEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        type_is_student:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Student
+        type_is_professional:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Professional
+        type_is_educator:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Educator
+        type_is_other:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Other (not professional, student,
+            or educator)
+    UserProfileRequest:
+      type: object
+      description: Serializer for profile
+      properties:
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/GenderEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        year_of_birth:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        addl_field_flag:
+          type: boolean
+          description: Flags if we've asked the user for additional information
+        company:
+          type: string
+          nullable: true
+          maxLength: 128
+        job_title:
+          type: string
+          nullable: true
+          maxLength: 128
+        industry:
+          type: string
+          nullable: true
+          maxLength: 60
+        job_function:
+          type: string
+          nullable: true
+          maxLength: 60
+        company_size:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CompanySizeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        years_experience:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/YearsExperienceEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        leadership_level:
+          type: string
+          nullable: true
+          maxLength: 60
+        highest_education:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/HighestEducationEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        type_is_student:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Student
+        type_is_professional:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Professional
+        type_is_educator:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Educator
+        type_is_other:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Other (not professional, student,
+            or educator)
     UserProgramEnrollmentDetail:
       type: object
       properties:
@@ -2230,3 +2608,29 @@ components:
           default: false
       required:
       - node_type
+    YearsExperienceEnum:
+      enum:
+      - 2
+      - 5
+      - 10
+      - 15
+      - 20
+      - 21
+      - 0
+      description: |-
+        * `None` - ----
+        * `2` - Less than 2 years
+        * `5` - 2-5 years
+        * `10` - 6 - 10 years
+        * `15` - 11 - 15 years
+        * `20` - 16 - 20 years
+        * `21` - More than 20 years
+        * `0` - Prefer not to say
+      x-enum-descriptions:
+      - Less than 2 years
+      - 2-5 years
+      - 6 - 10 years
+      - 11 - 15 years
+      - 16 - 20 years
+      - More than 20 years
+      - Prefer not to say

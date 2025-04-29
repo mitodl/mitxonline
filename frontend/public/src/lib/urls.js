@@ -8,6 +8,8 @@ export const routes = {
   root:                   "/",
   dashboard:              "/dashboard/",
   profile:                "/profile/",
+  create_profile:         "/create-profile/",
+  create_profile_extra:   "/create-profile-extra/",
   accountSettings:        "/account-settings/",
   logout:                 "/logout/",
   orderHistory:           "/orders/history",

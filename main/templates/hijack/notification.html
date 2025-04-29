@@ -6,7 +6,7 @@
 <div class="djhj" id="djhj">
   <div class="djhj-notification">
     <div class="djhj-message">
-        You are currently working on behalf of <em>{{ request.user.username }}</em>.
+        You are currently working on behalf of <em>{{ request.user.edx_username }}</em>.
     </div>
     <form action="{% url 'hijack:release' %}" method="POST" class="djhj-actions">
       {% csrf_token %}

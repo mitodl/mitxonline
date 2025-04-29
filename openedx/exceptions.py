@@ -37,7 +37,7 @@ class EdxApiEnrollErrorException(Exception):  # noqa: N818
         self.http_error = http_error
         if msg is None:
             # Set some default useful error message
-            msg = f"EdX API error enrolling user {self.user.username} ({self.user.email}) in course run '{self.course_run.courseware_id}'.\n{get_error_response_summary(self.http_error.response)}"
+            msg = f"EdX API error enrolling user {self.user.edx_username} ({self.user.email}) in course run '{self.course_run.courseware_id}'.\n{get_error_response_summary(self.http_error.response)}"
         super().__init__(msg)
 
 
@@ -57,7 +57,7 @@ class UnknownEdxApiEnrollException(Exception):  # noqa: N818
         self.course_run = course_run
         self.base_exc = base_exc
         if msg is None:
-            msg = f"Unexpected error enrolling user {self.user.username} ({self.user.email}) in course run '{self.course_run.courseware_id}' ({type(base_exc).__name__}: {base_exc!s})"
+            msg = f"Unexpected error enrolling user {self.user.edx_username} ({self.user.email}) in course run '{self.course_run.courseware_id}' ({type(base_exc).__name__}: {base_exc!s})"
         super().__init__(msg)
 
 
@@ -83,7 +83,7 @@ class EdxApiEmailSettingsErrorException(Exception):  # noqa: N818
         self.course_run = course_run
         self.http_error = http_error
         if msg is None:
-            msg = f"EdX API error for user {self.user.username} ({self.user.email}) course email subscription in course run '{self.course_run.courseware_id}'.\n{get_error_response_summary(self.http_error.response)}"
+            msg = f"EdX API error for user {self.user.edx_username} ({self.user.email}) course email subscription in course run '{self.course_run.courseware_id}'.\n{get_error_response_summary(self.http_error.response)}"
         super().__init__(msg)
 
 
@@ -103,7 +103,7 @@ class UnknownEdxApiEmailSettingsException(Exception):  # noqa: N818
         self.course_run = course_run
         self.base_exc = base_exc
         if msg is None:
-            msg = f"Unexpected error for user {self.user.username} ({self.user.email}) email subscription in course run '{self.course_run.courseware_id}' ({type(base_exc).__name__}: {base_exc!s})"
+            msg = f"Unexpected error for user {self.user.edx_username} ({self.user.email}) email subscription in course run '{self.course_run.courseware_id}' ({type(base_exc).__name__}: {base_exc!s})"
         super().__init__(msg)
 
 
@@ -118,9 +118,9 @@ class EdxApiRegistrationValidationException(Exception):  # noqa: N818
             username (str): The username being compared for uniqueness
             response (requests.Response): edX response for username validation
         """
-        self.username = username
+        self.edx_username = username
         self.response = response
         if msg is None:
             # Set some default useful error message
-            msg = f"EdX API error validating registration username {self.username}.\n{get_error_response_summary(self.response)}"
+            msg = f"EdX API error validating registration username {self.edx_username}.\n{get_error_response_summary(self.response)}"
         super().__init__(msg)

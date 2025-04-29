@@ -8,6 +8,8 @@ USER_MSG_TYPE_ENROLL_DUPLICATED = "enroll-duplicated"
 USER_MSG_TYPE_COMPLETED_AUTH = "completed-auth"
 USER_MSG_TYPE_COURSE_NON_UPGRADABLE = "course-non-upgradable"
 USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
+USER_MSG_TYPE_PROFILE_CREATED = "profile-created"
+
 
 USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"
 USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"

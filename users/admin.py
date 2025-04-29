@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from hijack.contrib.admin import HijackUserAdminMixin
 from mitol.common.admin import TimestampedModelAdmin
 
+from openedx.models import OpenEdxUser
 from users.models import BlockList, LegalAddress, User, UserProfile
 
 
@@ -51,6 +52,31 @@ _username_warning = """
 """
 
 
+class OpenEdxUserInline(admin.StackedInline):
+    """Admin view for OpenedxUser"""
+
+    model = OpenEdxUser
+
+    readonly_fields = ("has_been_synced", "platform")
+
+    can_delete = False
+    max_num = 1
+    extra = 0
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "edx_username",
+                    "has_been_synced",
+                ),
+                "description": _username_warning,
+            },
+        ),
+    )
+
+
 @admin.register(User)
 class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
     """Admin views for user"""
@@ -68,7 +94,6 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
                 )
             },
         ),
-        (_("Username"), {"fields": ("username",), "description": _username_warning}),
         (_("Personal Info"), {"fields": ("name", "email")}),
         (
             _("Permissions"),
@@ -85,17 +110,21 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
         ),
     )
     list_display = (
-        "username",
+        "edx_username",
         "email",
         "name",
         "is_staff",
         "last_login",
     )
     list_filter = ("is_staff", "is_superuser", "is_active", "groups")
-    search_fields = ("username", "name", "email")
+    search_fields = ("openedx_users__edx_username", "name", "email")
     ordering = ("email",)
     readonly_fields = ("last_login", "hubspot_sync_datetime")
-    inlines = [UserLegalAddressInline, UserProfileInline]
+    inlines = [OpenEdxUserInline, UserLegalAddressInline, UserProfileInline]
+
+    @admin.display(description="OpenedX Username")
+    def edx_username(self, obj):
+        return obj.edx_username
 
 
 @admin.register(BlockList)

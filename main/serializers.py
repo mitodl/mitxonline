@@ -1,37 +1,6 @@
 """MITx Online serializers"""
 
-from django.conf import settings
 from rest_framework import serializers
-
-
-class AppContextSerializer(serializers.Serializer):
-    """Serializer for the application context"""
-
-    gtm_tracking_id = serializers.SerializerMethodField()
-    ga_tracking_id = serializers.SerializerMethodField()
-    environment = serializers.SerializerMethodField()
-    release_version = serializers.SerializerMethodField()
-    features = serializers.SerializerMethodField()
-
-    def get_features(self, request):  # noqa: ARG002
-        """Returns a dictionary of features"""
-        return {}
-
-    def get_release_version(self, request):  # noqa: ARG002
-        """Returns a dictionary of features"""
-        return settings.VERSION
-
-    def get_gtm_tracking_id(self, request):  # noqa: ARG002
-        """Returns the GTM container ID"""
-        return settings.GTM_TRACKING_ID
-
-    def get_ga_tracking_id(self, request):  # noqa: ARG002
-        """Returns a dictionary of features"""
-        return settings.GA_TRACKING_ID
-
-    def get_environment(self, request):  # noqa: ARG002
-        """Returns a dictionary of features"""
-        return settings.ENVIRONMENT
 
 
 class WriteableSerializerMethodField(serializers.SerializerMethodField):

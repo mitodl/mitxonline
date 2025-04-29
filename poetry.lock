@@ -2272,13 +2272,13 @@ traitlets = "*"
 
 [[package]]
 name = "mitol-django-apigateway"
-version = "2025.4.15"
+version = "2025.4.25.1"
 description = "MIT Open Learning Django app for API Gateway support"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "mitol_django_apigateway-2025.4.15-py3-none-any.whl", hash = "sha256:f32008761c326661853c57a5d8ec6aea740d7002ddeb5612eb16d3870fd9d81e"},
-    {file = "mitol_django_apigateway-2025.4.15.tar.gz", hash = "sha256:741094ef5205cadaca02c6f4f9d7c0340b70f27d17e43c982ca1ffa5eac00268"},
+    {file = "mitol_django_apigateway-2025.4.25.1-py3-none-any.whl", hash = "sha256:639cadb4a7b29ace53e8d84fa3b8339c301539c567e780bc5f073a9dd971d1e0"},
+    {file = "mitol_django_apigateway-2025.4.25.1.tar.gz", hash = "sha256:1f61b9223cf78c9d1cb9b8c952ac6906f4370ed3a6d839a99f07b912b6605f20"},
 ]
 
 [package.dependencies]
@@ -3553,21 +3553,21 @@ files = [
 
 [[package]]
 name = "redis"
-version = "4.6.0"
+version = "5.2.1"
 description = "Python client for Redis database and key-value store"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "redis-4.6.0-py3-none-any.whl", hash = "sha256:e2b03db868160ee4591de3cb90d40ebb50a90dd302138775937f6a42b7ed183c"},
-    {file = "redis-4.6.0.tar.gz", hash = "sha256:585dc516b9eb042a619ef0a39c3d7d55fe81bdb4df09a52c9cdde0d07bf1aa7d"},
+    {file = "redis-5.2.1-py3-none-any.whl", hash = "sha256:ee7e1056b9aea0f04c6c2ed59452947f34c4940ee025f5dd83e6a6418b6989e4"},
+    {file = "redis-5.2.1.tar.gz", hash = "sha256:16f2e22dff21d5125e8481515e386711a34cbec50f0e44413dd7d9c060a54e0f"},
 ]
 
 [package.dependencies]
-async-timeout = {version = ">=4.0.2", markers = "python_full_version <= \"3.11.2\""}
+async-timeout = {version = ">=4.0.3", markers = "python_full_version < \"3.11.3\""}
 
 [package.extras]
-hiredis = ["hiredis (>=1.0.0)"]
-ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==20.0.1)", "requests (>=2.26.0)"]
+hiredis = ["hiredis (>=3.0.0)"]
+ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==23.2.1)", "requests (>=2.31.0)"]
 
 [[package]]
 name = "referencing"
@@ -4496,4 +4496,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.10.16"
-content-hash = "fe8380067d8c2b8e65d0f3a22197eea93b3d15d366653911ac30118165dac751"
+content-hash = "86da0162fcbf1ce300bf351d6bd2a81dfcdfeb2cf1fbf1140fcf161b1f2d4567"

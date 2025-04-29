@@ -1,4 +1,5 @@
 FROM python:3.10.16-slim AS base
+
 LABEL maintainer "ODL DevOps <mitx-devops@mit.edu>"
 
 # Add package files, install updated node and pip
@@ -58,7 +59,6 @@ FROM poetry as code
 
 COPY . /src
 WORKDIR /src
-
 
 # Set pip cache folder, as it is breaking pip when it is on a shared volume
 ENV XDG_CACHE_HOME /tmp/.cache
