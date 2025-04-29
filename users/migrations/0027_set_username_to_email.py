@@ -13,7 +13,7 @@ def update_usernames_to_email(apps, schema_editor):
     total_users = users.count()
 
     for start in range(0, total_users, batch_size):
-        batch = users[start:start + batch_size]
+        batch = users[start : start + batch_size]
         updates = []
         for user in batch:
             new_username = user.email[:max_length]
