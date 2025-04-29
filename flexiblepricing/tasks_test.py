@@ -419,7 +419,7 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         mock_create,
         mock_calculate,
         mock_get_product,
-        mocked_flexibleprice_discounttask, # noqa: ARG002
+        mocked_flexibleprice_discounttask,  # noqa: ARG002
     ):
         """Test _process_course_discounts with valid data"""
         mock_course_run = MagicMock()
