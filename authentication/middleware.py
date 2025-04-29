@@ -31,6 +31,6 @@ class SocialAuthExceptionRedirectMiddleware(SocialAuthExceptionMiddleware):
 
             if url:  # noqa: RET503
                 url += (
-                    "?" in url and "&" or "?"
+                    ("?" in url and "&") or "?"
                 ) + f"message={quote(message)}&backend={backend_name}"
                 return redirect(url)

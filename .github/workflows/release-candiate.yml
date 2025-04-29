@@ -15,7 +15,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: release-candidate
       - uses: akhileshns/heroku-deploy@96f4455bfc127bf16feac4b180aae9ec380c5a20

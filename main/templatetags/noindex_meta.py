@@ -11,7 +11,7 @@ register = template.Library()
 def noindex_meta():
     """Adds in noindex for non-production environments."""
     return (
-        mark_safe("""<meta name="robots" content="noindex">""")  # noqa: S308
+        mark_safe("""<meta name="robots" content="noindex">""")
         if settings.ENVIRONMENT not in ("production", "prod")
         else ""
     )
