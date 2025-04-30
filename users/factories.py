@@ -25,14 +25,25 @@ class UserFactory(DjangoModelFactory):
     is_active = True
 
     legal_address = RelatedFactory("users.factories.LegalAddressFactory", "user")
-    user_profile = RelatedFactory("users.factories.UserProfileFactory", "user")
-    openedx_user = RelatedFactory("openedx.factories.OpenEdxUserFactory", "user")
+    user_profile = RelatedFactory(
+        "users.factories.UserProfileFactory",
+        "user",
+    )
+    openedx_user = RelatedFactory(
+        "openedx.factories.OpenEdxUserFactory",
+        "user",
+    )
+    openedx_api_auth = RelatedFactory(
+        "openedx.factories.OpenEdxApiAuthFactory",
+        "user",
+    )
 
     class Meta:
         model = User
 
     class Params:
         no_openedx_user = Trait(openedx_user=None)
+        no_openedx_api_auth = Trait(openedx_api_auth=None)
 
 
 class UserSocialAuthFactory(DjangoModelFactory):

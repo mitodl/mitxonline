@@ -30,6 +30,6 @@ class StrictFieldsSerializer(serializers.Serializer):
         if hasattr(self, "initial_data"):
             unknown_keys = set(self.initial_data.keys()) - set(self.fields.keys())
             if unknown_keys:
-                raise ValidationError({key: "Invalid field" for key in unknown_keys})  # noqa: F821
+                raise ValidationError(dict.fromkeys(unknown_keys, "Invalid field"))  # noqa: F821
 
         return data

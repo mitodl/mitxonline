@@ -50,6 +50,7 @@ def test_create_user(create_func, exp_staff, exp_superuser, exp_is_active, passw
     assert user.is_staff is exp_staff
     assert user.is_superuser is exp_superuser
     assert user.is_active is exp_is_active
+    assert user.edx_username == username
     if password is not None:
         assert user.check_password(password)
 
@@ -102,9 +103,9 @@ def test_legal_address_validation(field, value, is_valid):
 @pytest.mark.django_db
 def test_faulty_user_qset():
     """User.faulty_openedx_users should return a User queryset that contains incorrectly configured active Users"""
-    users = UserFactory.create_batch(5, no_openedx_user=True)
+    users = UserFactory.create_batch(5, no_openedx_user=True, no_openedx_api_auth=True)
     # An inactive user should not be returned even if they lack auth and openedx user records
-    UserFactory.create(is_active=False, no_openedx_user=True)
+    UserFactory.create(is_active=False, no_openedx_user=True, no_openedx_api_auth=True)
     good_users = users[0:2]
     expected_faulty_users = users[2:]
     OpenEdxApiAuthFactory.create_batch(

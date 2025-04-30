@@ -14,11 +14,11 @@ repos:
       - id: check-toml
       - id: debug-statements
   - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.10.0-1
+    rev: v3.11.0-1
     hooks:
       - id: shfmt
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.35.1
+    rev: v1.37.0
     hooks:
       - id: yamllint
         args: [--format, parsable, -d, relaxed]
@@ -47,7 +47,7 @@ repos:
           - "config/keycloak/*"
         additional_dependencies: ["gibberish-detector"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.7.0"
+    rev: "v0.11.7"
     hooks:
       - id: ruff-format
       - id: ruff
@@ -60,7 +60,7 @@ repos:
       - id: shellcheck
         args: ["--severity=warning"]
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.3
+    rev: v1.7.7
     hooks:
       - id: actionlint
         name: actionlint

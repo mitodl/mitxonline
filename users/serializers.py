@@ -228,7 +228,7 @@ class UserSerializer(serializers.ModelSerializer):
     @extend_schema_field(str)
     def get_username(self, instance):
         """Returns the username or None in the case of AnonymousUser"""
-        return getattr(instance, "username", None)
+        return getattr(instance, "edx_username", None)
 
     @extend_schema_field(list[str])
     def get_grants(self, instance):

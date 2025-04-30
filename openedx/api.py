@@ -91,11 +91,11 @@ def create_edx_user(user):
     )
 
     with transaction.atomic():
-        open_edx_user, created = OpenEdxUser.objects.select_for_update().get_or_create(
+        open_edx_user, _ = OpenEdxUser.objects.select_for_update().get_or_create(
             user=user, platform=PLATFORM_EDX
         )
 
-        if not created and open_edx_user.has_been_synced:
+        if open_edx_user.has_been_synced:
             # Here we should check with edx that the user exists on that end.
             try:
                 client = get_edx_api_client(user)
@@ -118,7 +118,7 @@ def create_edx_user(user):
         resp = req_session.post(
             edx_url(OPENEDX_REGISTER_USER_PATH),
             data=dict(
-                username=user.username,
+                username=user.edx_username,
                 email=user.email,
                 name=user.name,
                 country=user.legal_address.country if user.legal_address else None,
@@ -239,7 +239,7 @@ def update_edx_user_profile(user):
     auth = get_valid_edx_api_auth(user)
     req_session = requests.Session()
     resp = req_session.patch(
-        edx_url(urljoin(OPENEDX_UPDATE_USER_PATH, user.username)),
+        edx_url(urljoin(OPENEDX_UPDATE_USER_PATH, user.edx_username)),
         json=dict(  # noqa: C408
             name=user.name,
             country=user.legal_address.country if user.legal_address else None,
@@ -393,13 +393,13 @@ def repair_faulty_openedx_users():
         except HTTPError as exc:  # noqa: PERF203
             log.exception(
                 "Failed to repair faulty user %s (%s). %s",
-                user.username,
+                user.edx_username,
                 user.email,
                 get_error_response_summary(exc.response),
             )
         except Exception:  # pylint: disable=broad-except
             log.exception(
-                "Failed to repair faulty user %s (%s)", user.username, user.email
+                "Failed to repair faulty user %s (%s)", user.edx_username, user.email
             )
         else:
             if created_user or created_auth_token:
@@ -586,7 +586,7 @@ def get_edx_grades_with_users(course_run, user=None):
     grades_client = get_edx_api_grades_client()
     if user:
         edx_grade = grades_client.get_student_current_grade(
-            user.username, course_run.courseware_id
+            user.edx_username, course_run.courseware_id
         )
         yield edx_grade, user
     else:
@@ -596,9 +596,11 @@ def get_edx_grades_with_users(course_run, user=None):
         all_grades = list(edx_course_grades.all_current_grades)
         for edx_grade in all_grades:
             try:
-                user = User.objects.get(username=edx_grade.username)
+                user = User.objects.get(
+                    openedx_users__edx_username=edx_grade.edx_username
+                )
             except User.DoesNotExist:  # noqa: PERF203
-                log.warning("User with username %s not found", edx_grade.username)
+                log.warning("User with username %s not found", edx_grade.edx_username)
             else:
                 yield edx_grade, user
 
@@ -619,7 +621,7 @@ def existing_edx_enrollment(user, course_id, mode, is_active=True):  # noqa: FBT
     """
     edx_client = get_edx_api_service_client()
     edx_enrollments = edx_client.enrollments.get_enrollments(
-        course_id=course_id, usernames=[user.username]
+        course_id=course_id, usernames=[user.edx_username]
     )
     for enrollment in edx_enrollments:
         if enrollment.mode == mode and enrollment.is_active == is_active:
@@ -654,7 +656,7 @@ def enroll_in_edx_course_runs(
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
     edx_client = get_edx_api_service_client()
-    username = user.username
+    username = user.edx_username
 
     results = []
     for course_run in course_runs:
@@ -736,7 +738,7 @@ def unenroll_edx_course_run(run_enrollment):
     edx_client = get_edx_api_service_client()
     try:
         deactivated_enrollment = edx_client.enrollments.deactivate_enrollment(
-            run_enrollment.run.courseware_id, username=run_enrollment.user.username
+            run_enrollment.run.courseware_id, username=run_enrollment.user.edx_username
         )
     except HTTPError as exc:
         raise EdxApiEnrollErrorException(run_enrollment.user, run_enrollment.run, exc)  # noqa: B904
@@ -762,7 +764,7 @@ def update_edx_user_name(user):
 
     edx_client = get_edx_api_client(user)
     try:
-        return edx_client.user_info.update_user_name(user.username, user.name)
+        return edx_client.user_info.update_user_name(user.edx_username, user.name)
     except Exception as exc:  # noqa: BLE001
         raise UserNameUpdateFailedException(  # noqa: B904
             "Error updating user's full name in edX.",  # noqa: EM101
@@ -828,7 +830,7 @@ def sync_enrollments_with_edx(
     if local_only_active_ids:
         log.error(
             "Found local enrollments with no equivalent enrollment in edX for User - %s (CourseRunEnrollment ids: %s)",
-            user.username,
+            user.edx_username,
             str(local_only_active_ids),
         )
     return results
@@ -886,12 +888,12 @@ def unsubscribe_from_edx_course_emails(user, course_run):
     return result
 
 
-def validate_username_email_with_edx(username, email):
+def validate_username_email_with_edx(edx_username, email):
     """
     Returns validation message after validating it with edX.
 
     Args:
-        username (str): the username
+        edx_username (str): the username in edx
         email (str): the email
 
     Raises:
@@ -905,17 +907,17 @@ def validate_username_email_with_edx(username, email):
     resp = req_session.post(
         edx_url(OPENEDX_REGISTRATION_VALIDATION_PATH),
         data=dict(  # noqa: C408
-            username=username,
+            username=edx_username,
             email=email,
         ),
     )
     if resp.status_code != status.HTTP_200_OK:
-        raise EdxApiRegistrationValidationException(username, resp)
+        raise EdxApiRegistrationValidationException(edx_username, resp)
     result = resp.json()
     return result["validation_decisions"]
 
 
-def bulk_retire_edx_users(usernames):
+def bulk_retire_edx_users(edx_usernames):
     """
     Bulk retires edX users.
 
@@ -924,8 +926,10 @@ def bulk_retire_edx_users(usernames):
     tubular concourse pipeline.
 
     Args:
-        usernames (str): Comma separated usernames
+        edx_usernames (str): Comma separated usernames
     """
     edx_client = get_edx_retirement_service_client()
-    response = edx_client.bulk_user_retirement.retire_users({"usernames": usernames})
+    response = edx_client.bulk_user_retirement.retire_users(
+        {"usernames": edx_usernames}
+    )
     return response  # noqa: RET504

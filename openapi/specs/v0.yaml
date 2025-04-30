@@ -1255,7 +1255,6 @@ components:
           nullable: true
       required:
       - created_on
-      - partner_school
       - program
       - share_uuid
       - updated_on

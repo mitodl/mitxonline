@@ -26,7 +26,7 @@ USERNAME = "my-username"
 
 
 @pytest.fixture
-def application(settings):  # noqa: PT004
+def application(settings):
     """Test data and settings needed for create_edx_user tests"""
     settings.OPENEDX_API_BASE_URL = "http://example.com"
 
@@ -219,7 +219,7 @@ def test_username_validation(
     assert is_valid is expect_valid
     if expect_valid:
         instance = serializer.save()
-        assert instance.username == expect_saved_username
+        assert instance.edx_username == expect_saved_username
 
 
 @responses.activate
@@ -233,7 +233,7 @@ def test_username_validation_exception(user, settings):
         settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
         json={
             "validation_decisions": {
-                "username": f"It looks like {user.username} belongs to an existing account. Try again with a different username."
+                "username": f"It looks like {user.edx_username} belongs to an existing account. Try again with a different username."
             }
         },
         status=status.HTTP_200_OK,
@@ -242,7 +242,7 @@ def test_username_validation_exception(user, settings):
     UserFactory.create(username=USERNAME)
     serializer = UserSerializer(
         data={
-            "username": user.username,
+            "username": user.edx_username,
             "email": "email@example.com",
             "password": "abcdefghi123",
             "legal_address": valid_address_dict,

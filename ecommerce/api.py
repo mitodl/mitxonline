@@ -105,7 +105,7 @@ def generate_checkout_payload(request):
     ip = get_client_ip(request)[0]
 
     gateway_order = GatewayOrder(
-        username=request.user.username,
+        username=request.user.edx_username,
         ip_address=ip,
         reference=order.reference_number,
         items=[],

@@ -37,7 +37,7 @@ class Command(BaseCommand):
             sys.exit(1)
 
         self.stdout.write(
-            f"Syncing enrollments for user '{user.username}' ({user.email})"
+            f"Syncing enrollments for user '{user.edx_username}' ({user.email})"
         )
         result = sync_enrollments_with_edx(user)
         if result.no_changes:

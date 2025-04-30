@@ -9,6 +9,7 @@ import pytest
 import pytz
 from django.conf import settings
 
+from users.factories import UserFactory
 from users.utils import (
     determine_approx_age,
     format_recipient,

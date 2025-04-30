@@ -113,7 +113,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: django
+      target: django-server
     environment: *py-environment
     env_file: .env
     command: >

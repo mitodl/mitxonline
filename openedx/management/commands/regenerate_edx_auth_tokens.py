@@ -21,7 +21,7 @@ class Command(BaseCommand):
 
     def create_parser(self, prog_name, subcommand):  # pylint: disable=arguments-differ
         """
-        create parser to add new line in help text.
+        Create parser to add new line in help text.
         """
         parser = super().create_parser(prog_name, subcommand)
         parser.formatter_class = RawTextHelpFormatter
@@ -51,13 +51,13 @@ class Command(BaseCommand):
             if user.openedx_users.filter(platform=PLATFORM_EDX).count() == 0:
                 self.stderr.write(
                     self.style.ERROR(
-                        f"No OpenEdxUser for {user.username}. Run repair instead."
+                        f"No OpenEdxUser for {user.edx_username}. Run repair instead."
                     )
                 )
                 return
 
             self.stdout.write(
-                f"Regenerating Open edX auth tokens for {user.username}..."
+                f"Regenerating Open edX auth tokens for {user.edx_username}..."
             )
 
             OpenEdxApiAuth.objects.filter(user=user).delete()

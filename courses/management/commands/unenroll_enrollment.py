@@ -79,14 +79,14 @@ class Command(EnrollmentChangeCommand):
         )
 
         if run_enrollment:
-            success_msg = f"Unenrolled enrollment for user: {enrollment.user.username} ({enrollment.user.email})\nEnrollment affected: {enrollment_summary(run_enrollment)}"
+            success_msg = f"Unenrolled enrollment for user: {enrollment.user.edx_username} ({enrollment.user.email})\nEnrollment affected: {enrollment_summary(run_enrollment)}"
 
             self.stdout.write(self.style.SUCCESS(success_msg))
         else:
             self.stdout.write(
                 self.style.ERROR(
                     "Failed to unenroll the enrollment - 'for' user: {} ({}) from course ({})\n".format(
-                        user.username, user.email, options["run"]
+                        user.edx_username, user.email, options["run"]
                     )
                 )
             )

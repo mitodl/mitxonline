@@ -49,7 +49,7 @@ class Command(BaseCommand):
 
     def create_parser(self, prog_name, subcommand):  # pylint: disable=arguments-differ
         """
-        create parser to add new line in help text.
+        Create parser to add new line in help text.
         """
         parser = super().create_parser(prog_name, subcommand)
         parser.formatter_class = RawTextHelpFormatter
@@ -104,8 +104,8 @@ class Command(BaseCommand):
                 )
                 continue
 
-            resp = bulk_retire_edx_users(user.username)
-            if user.username not in resp["successful_user_retirements"]:
+            resp = bulk_retire_edx_users(user.edx_username)
+            if user.edx_username not in resp["successful_user_retirements"]:
                 self.stderr.write(
                     self.style.ERROR(
                         f"Could not initiate retirement request on edX for user {user}"

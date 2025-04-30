@@ -25,7 +25,7 @@ lazy = pytest.lazy_fixture
 
 
 @pytest.fixture
-def email_settings(settings):  # noqa: PT004
+def email_settings(settings):
     """Default settings for email tests"""
     settings.MAILGUN_RECIPIENT_OVERRIDE = None
 

@@ -305,7 +305,7 @@ class Command(BaseCommand):
         ):
             self.stderr.write(
                 self.style.ERROR(
-                    f"Object ID \"{kwargs['courseware_id']}\" would be named \"{kwargs['title']}\" - you might have your ID and title options swapped. Use --force to force creation anyway."
+                    f'Object ID "{kwargs["courseware_id"]}" would be named "{kwargs["title"]}" - you might have your ID and title options swapped. Use --force to force creation anyway.'
                 )
             )
             exit(-1)  # noqa: PLR1722

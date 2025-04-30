@@ -64,7 +64,7 @@ def hubspot_order():
     """Return an order for testing with hubspot"""
     order = factories.OrderFactory()
     with reversion.create_revision():
-        product = factories.ProductFactory.create(price=Decimal(200.00))
+        product = factories.ProductFactory.create(price=Decimal("200.00"))
 
     factories.LineFactory.create(
         order=order,

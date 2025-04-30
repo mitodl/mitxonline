@@ -152,7 +152,7 @@ class Command(BaseCommand):
 
                 result_summary = f"Certificate: {cert_status}"
 
-                result = f"Processed user {user.username} ({user.email}) in program {program.readable_id}. Result - {result_summary}"
+                result = f"Processed user {user.edx_username} ({user.email}) in program {program.readable_id}. Result - {result_summary}"
                 result_output = self.style.SUCCESS(result)
                 if not success_result:
                     result_output = self.style.ERROR(result)

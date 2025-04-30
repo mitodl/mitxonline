@@ -25,7 +25,8 @@ def sync_hubspot_user(user: User):
             tasks.sync_contact_with_hubspot.delay(user.id)
         except:  # noqa: E722
             log.exception(
-                "Exception calling sync_contact_with_hubspot for user %s", user.username
+                "Exception calling sync_contact_with_hubspot for user %s",
+                user.edx_username,
             )
 
 
