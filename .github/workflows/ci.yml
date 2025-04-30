@@ -125,14 +125,14 @@ jobs:
           file: ./coverage.xml
 
   javascript-tests:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04 
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup NodeJS
         uses: actions/setup-node@v2-beta
         with:
-          node-version: 16.20.2
+          node-version: "20.18"
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path

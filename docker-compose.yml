@@ -87,7 +87,7 @@ services:
     extra_hosts: *default-extra-hosts
 
   watch:
-    image: node:17.9
+    image: node:20.18
     working_dir: /app
     command: ./scripts/run-watch-dev.sh
     ports:
@@ -129,7 +129,7 @@ services:
     extra_hosts: *default-extra-hosts
 
   refine:
-    image: node:17.9
+    image: node:20.18
     working_dir: /app
     command: ./scripts/run-refine-dev.sh
     ports:
