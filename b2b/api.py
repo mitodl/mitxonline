@@ -75,6 +75,8 @@ def create_contract_run(
 
     course_run = CourseRun(
         course=course,
+        title=course.title,
+        courseware_id=f"{course.readable_id}+{run_tag}",
         run_tag=run_tag,
         start_date=contract.contract_start,
         end_date=contract.contract_end,

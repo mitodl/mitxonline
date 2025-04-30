@@ -445,10 +445,12 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         return None
 
+    @property
     def is_program(self):
         """Flag to indicate if this is a program"""
         return True
 
+    @property
     def is_run(self):
         """Flag to indicate if this is a run"""
         return False
@@ -506,10 +508,12 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
             [self.program.readable_id, self.run_tag]
         )
 
+    @property
     def is_program(self):
         """Flag to indicate if this is a program"""
         return True
 
+    @property
     def is_run(self):
         """Flag to indicate if this is a run"""
         return True
@@ -662,10 +666,12 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             country=user.legal_address.country
         ).exists()
 
+    @property
     def is_program(self):
         """Flag to indicate if this is a program"""
         return False
 
+    @property
     def is_run(self):
         """Flag to indicate if this is a run"""
         return False
@@ -839,10 +845,12 @@ class CourseRun(TimestampedModel):
         """Alias for the courseware_id so this is consistent with Course and Program"""
         return self.courseware_id
 
+    @property
     def is_program(self):
         """Flag to indicate if this is a program"""
         return False
 
+    @property
     def is_run(self):
         """Flag to indicate if this is a run"""
         return True

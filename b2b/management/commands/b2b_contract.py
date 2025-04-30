@@ -384,7 +384,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Managed {managed} courseware items and skipped {skipped} courseware items out of {len(courseware)}."
+                f"Managed {managed} courseware items and skipped {skipped} courseware items out of {len(courseware_ids)}."
             )
         )
 
