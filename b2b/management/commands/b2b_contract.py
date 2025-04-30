@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from b2b.api import create_contract_run
-from b2b.constants import CONTRACT_INTEGRATION_NONSSO
+from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from courses.api import resolve_courseware_object_from_id
 
@@ -71,6 +71,10 @@ class Command(BaseCommand):
             "integration_type",
             type=str,
             help="The type of integration for this contract.",
+            choices=[
+                CONTRACT_INTEGRATION_SSO,
+                CONTRACT_INTEGRATION_NONSSO,
+            ],
             default=CONTRACT_INTEGRATION_NONSSO,
         )
         create_parser.add_argument(

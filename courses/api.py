@@ -954,5 +954,5 @@ def resolve_courseware_object_from_id(
         return Program.objects.filter(text_id=courseware_id).first()
     return (
         CourseRun.objects.filter(courseware_id=courseware_id).first()
-        or Course.objects.filter(courseware_id=courseware_id).first()
+        or Course.objects.filter(readable_id=courseware_id).first()
     )
