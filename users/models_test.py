@@ -1,14 +1,10 @@
 """Tests for user models"""
 
 # pylint: disable=too-many-arguments, redefined-outer-name
-import math
 import random
-from datetime import datetime
 
 import factory
 import pytest
-import pytz
-from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -137,6 +133,7 @@ def test_user_is_editor(is_staff, is_superuser, has_editor_group, exp_is_editor)
         user.groups.add(Group.objects.get(name=CMS_EDITORS_GROUP_NAME))
         user.save()
     assert user.is_editor is exp_is_editor
+
 
 def test_legal_address_us_state():
     """

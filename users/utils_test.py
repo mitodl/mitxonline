@@ -3,13 +3,11 @@
 import random
 from datetime import datetime
 from email.utils import parseaddr
-from unittest.mock import patch
 
 import pytest
 import pytz
 from django.conf import settings
 
-from users.factories import UserFactory
 from users.utils import (
     determine_approx_age,
     format_recipient,
