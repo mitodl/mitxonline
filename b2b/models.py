@@ -96,7 +96,7 @@ class ContractPage(Page):
     )
     organization = models.ForeignKey(
         OrganizationPage,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="contracts",
         help_text="The organization this contract is with",
     )
