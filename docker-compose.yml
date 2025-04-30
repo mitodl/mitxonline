@@ -124,13 +124,13 @@ services:
       - db
       - redis
     volumes:
-      - .:/app
+      - .:/src
       - django_media:/var/media
     extra_hosts: *default-extra-hosts
 
   refine:
     image: node:17.9
-    working_dir: /app
+    working_dir: /src
     command: ["/bin/bash", "./scripts/run-refine-dev.sh"]
     ports:
        - "8016:8016"
@@ -139,7 +139,7 @@ services:
       PORT: 8016
       NODE_ENV: ${NODE_ENV:-development}
     volumes:
-      - .:/app
+      - .:/src
       - npm-cache:/root/.npm
     depends_on:
       # this doesn't really depend on watch but they step on each other if they start at the same time
@@ -159,7 +159,7 @@ services:
       target: jupyter-notebook
     profiles: ["notebook"]
     volumes:
-      - .:/app
+      - .:/src
     environment:
       << : *py-environment
     env_file: .env
