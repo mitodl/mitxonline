@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("users", "0027_set_username_to_email"),
+        ("users", "0026_alter_user_is_active"),
     ]
 
     operations = [

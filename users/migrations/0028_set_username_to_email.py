@@ -27,7 +27,7 @@ def reverse_migration(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("users", "0026_alter_user_is_active"),
+        ("users", "0027_alter_user_username"),
     ]
 
     operations = [
