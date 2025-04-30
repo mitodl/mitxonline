@@ -62,7 +62,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: django-server
-    command: ./scripts/run-django-dev.sh
+    command: ["/bin/bash", "./scripts/run-django-dev.sh"]
     stdin_open: true
     tty: true
     ports:
@@ -82,14 +82,14 @@ services:
       - watch
       - refine
     volumes:
-      - .:/app
+      - .:/src
       - django_media:/var/media
     extra_hosts: *default-extra-hosts
 
   watch:
     image: node:17.9
-    working_dir: /app
-    command: ./scripts/run-watch-dev.sh
+    working_dir: /src
+    command: ["/bin/bash", "./scripts/run-watch-dev.sh"]
     ports:
       - "8012:8012"
     environment:
@@ -100,7 +100,7 @@ services:
       PORT: 8012
     env_file: .env
     volumes:
-      - .:/app
+      - .:/src
       - yarn-cache:/home/mitodl/.cache/yarn
     healthcheck:
       test: curl -f http://watch:8012/health || exit 1
@@ -124,14 +124,14 @@ services:
       - db
       - redis
     volumes:
-      - .:/app
+      - .:/src
       - django_media:/var/media
     extra_hosts: *default-extra-hosts
 
   refine:
     image: node:17.9
-    working_dir: /app
-    command: ./scripts/run-refine-dev.sh
+    working_dir: /src
+    command: ["/bin/bash", "./scripts/run-refine-dev.sh"]
     ports:
        - "8016:8016"
     environment:
@@ -139,7 +139,7 @@ services:
       PORT: 8016
       NODE_ENV: ${NODE_ENV:-development}
     volumes:
-      - .:/app
+      - .:/src
       - npm-cache:/root/.npm
     depends_on:
       # this doesn't really depend on watch but they step on each other if they start at the same time
@@ -159,7 +159,7 @@ services:
       target: jupyter-notebook
     profiles: ["notebook"]
     volumes:
-      - .:/app
+      - .:/src
     environment:
       << : *py-environment
     env_file: .env
