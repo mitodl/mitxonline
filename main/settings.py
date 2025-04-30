@@ -439,6 +439,12 @@ SOCIAL_AUTH_OL_OIDC_SECRET = get_string(
 
 SOCIAL_AUTH_OL_OIDC_SCOPE = ["ol-profile"]
 
+AUTH_CHANGE_EMAIL_TTL_IN_MINUTES = get_int(
+    name="AUTH_CHANGE_EMAIL_TTL_IN_MINUTES",
+    default=60 * 24,
+    description="Expiry time for a change email request, default is 1440 minutes(1 day)",
+)
+
 # Disable the OIDC button on the signin screen.
 # Doesn't actually disable OIDC login - you can still go to /login/ol-oidc/
 # (assuming OIDC is set up).
