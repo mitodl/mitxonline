@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.115.1
+Version 0.115.1 (Released May 01, 2025)
 ---------------
 
 - Switch to using edx_username (#2594)
