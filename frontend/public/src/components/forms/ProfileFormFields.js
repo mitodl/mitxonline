@@ -225,7 +225,9 @@ export const LegalAddressCountryFields = ({
               component="select"
               name="legal_address.country"
               id="legal_address.country"
-              aria-invalid={addressErrors && addressErrors.country ? "true" : null}
+              aria-invalid={
+                addressErrors && addressErrors.country ? "true" : null
+              }
               aria-describedby={
                 addressErrors && addressErrors.country ? "country-error" : null
               }
@@ -260,7 +262,9 @@ export const LegalAddressCountryFields = ({
                 component="select"
                 name="legal_address.state"
                 id="legal_address.state"
-                aria-invalid={addressErrors && addressErrors.state ? "true" : null}
+                aria-invalid={
+                  addressErrors && addressErrors.state ? "true" : null
+                }
                 aria-describedby={
                   addressErrors && addressErrors.state ? "state-error" : null
                 }

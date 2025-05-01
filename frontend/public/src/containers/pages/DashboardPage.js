@@ -131,7 +131,15 @@ export class DashboardPage extends React.Component<
 
     const { currentUser } = this.props
 
-    if (currentUser && currentUser.legal_address && currentUser.legal_address.country !== "" && currentUser.legal_address.country !== null && currentUser.user_profile && currentUser.user_profile.year_of_birth !== "" && currentUser.user_profile.year_of_birth !== null) {
+    if (
+      currentUser &&
+      currentUser.legal_address &&
+      currentUser.legal_address.country !== "" &&
+      currentUser.legal_address.country !== null &&
+      currentUser.user_profile &&
+      currentUser.user_profile.year_of_birth !== "" &&
+      currentUser.user_profile.year_of_birth !== null
+    ) {
       return
     }
 
@@ -209,9 +217,7 @@ export class DashboardPage extends React.Component<
         <ModalBody>
           <div className="row">
             <div className="col-12">
-              <p>
-                We need more information about you before you can start.
-              </p>
+              <p>We need more information about you before you can start.</p>
             </div>
           </div>
 

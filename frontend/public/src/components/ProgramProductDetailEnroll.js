@@ -97,7 +97,15 @@ export class ProgramProductDetailEnroll extends React.Component<
 
     const { currentUser, updateAddlFields } = this.props
 
-    if (currentUser && currentUser.legal_address && currentUser.legal_address.country !== "" && currentUser.legal_address.country !== null && currentUser.user_profile && currentUser.user_profile.year_of_birth !== "" && currentUser.user_profile.year_of_birth !== null) {
+    if (
+      currentUser &&
+      currentUser.legal_address &&
+      currentUser.legal_address.country !== "" &&
+      currentUser.legal_address.country !== null &&
+      currentUser.user_profile &&
+      currentUser.user_profile.year_of_birth !== "" &&
+      currentUser.user_profile.year_of_birth !== null
+    ) {
       return
     }
 
@@ -354,7 +362,8 @@ export class ProgramProductDetailEnroll extends React.Component<
           <div className="row">
             <div className="col-12">
               <p>
-                We need more information about you before you can start the program.
+                We need more information about you before you can start the
+                program.
               </p>
             </div>
           </div>

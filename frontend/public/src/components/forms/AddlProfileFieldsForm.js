@@ -21,15 +21,11 @@ const getInitialValues = (user: User) => ({
   email:         user.email,
   legal_address: user.legal_address,
   user_profile:  {
-    year_of_birth: (user.user_profile && user.user_profile.year_of_birth) || "",
+    year_of_birth: (user.user_profile && user.user_profile.year_of_birth) || ""
   }
 })
 
-const AddlProfileFieldsForm = ({
-  onSubmit,
-  user,
-  countries
-}: Props) => {
+const AddlProfileFieldsForm = ({ onSubmit, user, countries }: Props) => {
   const validation = legalAddressCountryValidation
 
   return (
