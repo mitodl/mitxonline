@@ -10,6 +10,7 @@ from b2b.api import create_contract_run
 from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from courses.api import resolve_courseware_object_from_id
+from courses.models import CourseRun
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +19,26 @@ class Command(BaseCommand):
     """Manage B2B contracts."""
 
     help = "Manage B2B contracts."
+
+    def create_run(self, contract, courseware):
+        """Create a run for the specified contract."""
+        run_tuple = create_contract_run(contract=contract, course=courseware)
+
+        if not run_tuple:
+            self.stdout.write(
+                self.style.ERROR(
+                    f"Failed to create run for course {courseware} for contract {contract}."
+                )
+            )
+            return False
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Created run {run_tuple[0]} and product {run_tuple[1]} for course {courseware} for contract {contract}."
+            )
+        )
+
+        return True
 
     def add_arguments(self, parser):
         """Add command line arguments."""
@@ -36,7 +57,7 @@ class Command(BaseCommand):
             "type",
             type=str,
             help="The data to list.",
-            choices=["organizations", "contracts", "users"],
+            choices=["organizations", "contracts", "courseware", "users"],
             default="organizations",
         )
         list_parser.add_argument(
@@ -164,7 +185,7 @@ class Command(BaseCommand):
         """Handle the list subcommand."""
         data_type = kwargs.pop("type")
         org_id = kwargs.pop("organization_id")
-        # contract_id = kwargs.pop("contract_id")
+        contract_id = kwargs.pop("contract_id")
 
         console = Console()
 
@@ -216,6 +237,41 @@ class Command(BaseCommand):
                 )
 
             console.print(contract_table)
+        elif data_type == "courseware":
+            # We only link course runs to contracts. This will need to be updated
+            # if we ever have other types (like program runs or something).
+            if contract_id:
+                contract = ContractPage.objects.filter(id=contract_id).first()
+                if not contract:
+                    msg = f"Contract with ID '{contract_id}' does not exist."
+                    raise CommandError(msg)
+
+                courseware = CourseRun.objects.prefetch_related("b2b_contract").filter(b2b_contract=contract).all()
+            else:
+                courseware = CourseRun.objects.prefetch_related("b2b_contract").filter(b2b_contract__isnull=False).all()
+
+            courseware_table = Table(title="Courseware")
+            courseware_table.add_column("ID", justify="right")
+            courseware_table.add_column("Org/Contract", justify="left")
+            courseware_table.add_column("Type", justify="left")
+            courseware_table.add_column("Readable ID", justify="left", no_wrap=True)
+            courseware_table.add_column("Name", justify="left")
+            courseware_table.add_column("Start", justify="left")
+            courseware_table.add_column("End", justify="left")
+
+            for cw in courseware:
+                courseware_table.add_row(
+                    str(cw.id),
+                    f"{cw.b2b_contract.organization.name}\n"
+                    f"{cw.b2b_contract.name}",
+                    "CR",
+                    cw.readable_id,
+                    cw.title,
+                    cw.start_date.strftime("%Y-%m-%d\n%H:%M") if cw.start_date else "",
+                    cw.end_date.strftime("%Y-%m-%d\n%H:%M") if cw.end_date else "",
+                )
+
+            console.print(courseware_table)
         elif data_type == "users":
             self.stdout.write("Listing users is not implemented yet.")
 
@@ -242,6 +298,7 @@ class Command(BaseCommand):
             org = OrganizationPage(name=organization_name)
             parent.add_child(instance=org)
             org.save()
+            parent.save()
             org.refresh_from_db()
             self.stdout.write(f"Created organization '{organization_name}'")
         elif not org:
@@ -311,14 +368,20 @@ class Command(BaseCommand):
                 )
                 skipped += 1
             elif courseware.is_program:
-                # TODO: we should grab the associated courses and add runs
-                # skipping for now to make sure course adding is OK
+                # If you're specifying a program, we will always make new runs
+                # since we won't be able to tell which existing ones to use.
+
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"Courseware with ID '{courseware_id}' is a program, skipping."
+                    self.style.WARNING(
+                        f"'{courseware_id}' is a program, so creating runs for all of its courses."
                     )
                 )
-                skipped += 1
+
+                for course, _ in courseware.courses:
+                    if self.create_run(contract, course):
+                        managed += 1
+                    else:
+                        skipped += 1
             elif courseware.is_run:
                 # This run already exists, so just add/remove it.
                 # - If the run is owned by a different contract, skip it.
@@ -356,24 +419,10 @@ class Command(BaseCommand):
             elif create_runs:
                 # This is a course, so create a run (unless we've been told not to).
 
-                run_objs = create_contract_run(contract=contract, course=courseware)
-
-                if not run_objs:
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Failed to create run for course {courseware} for contract {contract}."
-                        )
-                    )
+                if self.create_run(contract, courseware):
+                    managed += 1
+                else:
                     skipped += 1
-                    continue
-
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Created run {run_objs[0]} and product {run_objs[1]} for course {courseware} for contract {contract}."
-                    )
-                )
-
-                managed += 1
             else:
                 self.stdout.write(
                     self.style.WARNING(
@@ -384,7 +433,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Managed {managed} courseware items and skipped {skipped} courseware items out of {len(courseware_ids)}."
+                f"Managed {managed} courseware items and skipped {skipped} courseware items for {len(courseware_ids)} specified courseware IDs."
             )
         )
 

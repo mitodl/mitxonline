@@ -951,7 +951,7 @@ def resolve_courseware_object_from_id(
         CourseRun | Course | Program | None: The resolved object or None if not found.
     """
     if is_program_text_id(courseware_id):
-        return Program.objects.filter(text_id=courseware_id).first()
+        return Program.objects.filter(readable_id=courseware_id).first()
     return (
         CourseRun.objects.filter(courseware_id=courseware_id).first()
         or Course.objects.filter(readable_id=courseware_id).first()

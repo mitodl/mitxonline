@@ -3,7 +3,9 @@
 import logging
 
 import reversion
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from mitol.common.utils import now_in_utc
 from wagtail.models import Page
 
 from b2b.constants import B2B_RUN_TAG_FORMAT
@@ -43,8 +45,9 @@ def create_contract_run(
 
     Contract runs are always self-paced. Dates align with the contract - start
     and end dates are set to the contract's start and end dates and the
-    certificate available date is set to the start date of the contract. The
-    run tag will be generated according to the contract and org IDs.
+    certificate available date is set to the start date of the contract. If the
+    contract has no dates, then the start dates get set to today. The run tag
+    will be generated according to the contract and org IDs.
 
     This will also create a product for the run. The product will have zero
     value (unless the contract specifies one).
@@ -54,6 +57,8 @@ def create_contract_run(
 
     - For now this won't check the contract for pricing, since we're not doing
     that yet.
+    - This should also create the run in edX, but we also don't do that yet.
+      When we add that, we should backfill the URL into the course run.
 
     Args:
         contract (ContractPage): The contract to create the run for.
@@ -69,7 +74,7 @@ def create_contract_run(
     )
 
     # Check first for an existing run with the same tag.
-    if CourseRun.objects.filter(run_tag=run_tag).exists():
+    if CourseRun.objects.filter(course=course, b2b_contract=contract).exists():
         msg = f"Can't create a run for {course} and contract {contract}: run tag {run_tag} already exists."
         raise ValueError(msg)
 
@@ -78,14 +83,15 @@ def create_contract_run(
         title=course.title,
         courseware_id=f"{course.readable_id}+{run_tag}",
         run_tag=run_tag,
-        start_date=contract.contract_start,
+        start_date=contract.contract_start or now_in_utc(),
         end_date=contract.contract_end,
-        enrollment_start=contract.contract_start,
+        enrollment_start=contract.contract_start or now_in_utc(),
         enrollment_end=contract.contract_end,
         certificate_available_date=contract.contract_start,
         is_self_paced=True,
         live=True,
         b2b_contract=contract,
+        courseware_url_path=settings.SITE_BASE_URL,
     )
     course_run.save()
 
