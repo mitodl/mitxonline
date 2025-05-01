@@ -10,6 +10,7 @@ from b2b.api import create_contract_run
 from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from courses.api import resolve_courseware_object_from_id
+from courses.models import CourseRun
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ class Command(BaseCommand):
             "type",
             type=str,
             help="The data to list.",
-            choices=["organizations", "contracts", "users"],
+            choices=["organizations", "contracts", "courseware", "users"],
             default="organizations",
         )
         list_parser.add_argument(
@@ -184,7 +185,7 @@ class Command(BaseCommand):
         """Handle the list subcommand."""
         data_type = kwargs.pop("type")
         org_id = kwargs.pop("organization_id")
-        # contract_id = kwargs.pop("contract_id")
+        contract_id = kwargs.pop("contract_id")
 
         console = Console()
 
@@ -236,6 +237,41 @@ class Command(BaseCommand):
                 )
 
             console.print(contract_table)
+        elif data_type == "courseware":
+            # We only link course runs to contracts. This will need to be updated
+            # if we ever have other types (like program runs or something).
+            if contract_id:
+                contract = ContractPage.objects.filter(id=contract_id).first()
+                if not contract:
+                    msg = f"Contract with ID '{contract_id}' does not exist."
+                    raise CommandError(msg)
+
+                courseware = CourseRun.objects.prefetch_related("b2b_contract").filter(b2b_contract=contract).all()
+            else:
+                courseware = CourseRun.objects.prefetch_related("b2b_contract").filter(b2b_contract__isnull=False).all()
+
+            courseware_table = Table(title="Courseware")
+            courseware_table.add_column("ID", justify="right")
+            courseware_table.add_column("Org/Contract", justify="left")
+            courseware_table.add_column("Type", justify="left")
+            courseware_table.add_column("Readable ID", justify="left", no_wrap=True)
+            courseware_table.add_column("Name", justify="left")
+            courseware_table.add_column("Start", justify="left")
+            courseware_table.add_column("End", justify="left")
+
+            for cw in courseware:
+                courseware_table.add_row(
+                    str(cw.id),
+                    f"{cw.b2b_contract.organization.name}\n"
+                    f"{cw.b2b_contract.name}",
+                    "CR",
+                    cw.readable_id,
+                    cw.title,
+                    cw.start_date.strftime("%Y-%m-%d\n%H:%M") if cw.start_date else "",
+                    cw.end_date.strftime("%Y-%m-%d\n%H:%M") if cw.end_date else "",
+                )
+
+            console.print(courseware_table)
         elif data_type == "users":
             self.stdout.write("Listing users is not implemented yet.")
 
