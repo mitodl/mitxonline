@@ -246,9 +246,17 @@ class Command(BaseCommand):
                     msg = f"Contract with ID '{contract_id}' does not exist."
                     raise CommandError(msg)
 
-                courseware = CourseRun.objects.prefetch_related("b2b_contract").filter(b2b_contract=contract).all()
+                courseware = (
+                    CourseRun.objects.prefetch_related("b2b_contract")
+                    .filter(b2b_contract=contract)
+                    .all()
+                )
             else:
-                courseware = CourseRun.objects.prefetch_related("b2b_contract").filter(b2b_contract__isnull=False).all()
+                courseware = (
+                    CourseRun.objects.prefetch_related("b2b_contract")
+                    .filter(b2b_contract__isnull=False)
+                    .all()
+                )
 
             courseware_table = Table(title="Courseware")
             courseware_table.add_column("ID", justify="right")
@@ -262,8 +270,7 @@ class Command(BaseCommand):
             for cw in courseware:
                 courseware_table.add_row(
                     str(cw.id),
-                    f"{cw.b2b_contract.organization.name}\n"
-                    f"{cw.b2b_contract.name}",
+                    f"{cw.b2b_contract.organization.name}\n{cw.b2b_contract.name}",
                     "CR",
                     cw.readable_id,
                     cw.title,
