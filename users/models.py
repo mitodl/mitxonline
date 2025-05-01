@@ -297,23 +297,6 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
             or self.groups.filter(name=CMS_EDITORS_GROUP_NAME).exists()
         )
 
-    def get_age(self):
-        """
-        Returns the user's computed age, using the profile year_of_birth field.
-        For COPPA reasons this calculates the year assuming Dec 31 @ 11:59:59.
-        """
-
-        from users.utils import determine_approx_age
-
-        return determine_approx_age(self.user_profile.year_of_birth)
-
-    def is_coppa_compliant(self):
-        return self.get_age() >= 13  # noqa: PLR2004
-
-    def __str__(self):
-        """Str representation for the user"""
-        return f"User edx_username={self.edx_username} email={self.email}"
-
 
 def generate_change_email_code():
     """Generates a new change email code"""
