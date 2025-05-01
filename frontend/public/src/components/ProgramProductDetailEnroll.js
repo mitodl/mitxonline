@@ -363,7 +363,6 @@ export class ProgramProductDetailEnroll extends React.Component<
             onSubmit={this.saveProfile.bind(this)}
             onCancel={() => this.toggleAddlProfileFieldsModal()}
             user={currentUser}
-            requireTypeFields={true}
             countries={countries}
           ></AddlProfileFieldsForm>
         </ModalBody>

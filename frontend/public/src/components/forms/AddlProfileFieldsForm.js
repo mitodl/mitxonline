@@ -2,13 +2,8 @@
 import React from "react"
 import { Formik, Form } from "formik"
 import { ConnectedFocusError } from "focus-formik-error"
-import * as yup from "yup"
 
 import {
-  GenderAndDOBProfileFields,
-  AddlProfileFields,
-  profileValidation,
-  addlProfileFieldsValidation,
   LegalAddressCountryFields,
   legalAddressCountryValidation
 } from "./ProfileFormFields"
@@ -18,7 +13,6 @@ import type { User, Country } from "../../flow/authTypes"
 type Props = {
   onSubmit: Function,
   user: User,
-  requireTypeFields: ?boolean,
   countries: Array<Country>
 }
 
@@ -34,7 +28,6 @@ const getInitialValues = (user: User) => ({
 const AddlProfileFieldsForm = ({
   onSubmit,
   user,
-  requireTypeFields,
   countries
 }: Props) => {
   const validation = legalAddressCountryValidation
