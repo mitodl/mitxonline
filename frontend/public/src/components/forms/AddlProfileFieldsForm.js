@@ -37,7 +37,7 @@ const AddlProfileFieldsForm = ({
   requireTypeFields,
   countries
 }: Props) => {
-  let validation = legalAddressCountryValidation
+  const validation = legalAddressCountryValidation
 
   return (
     <Formik

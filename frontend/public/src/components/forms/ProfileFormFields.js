@@ -194,19 +194,19 @@ export const LegalAddressCountryFields = ({
   const addressErrors = errors && errors.legal_address
   const [showYearOfBirthField, setShowYearOfBirthField] = React.useState(
     values.user_profile.year_of_birth === ""
-  );
+  )
   const [showCountryField, setShowCountryField] = React.useState(
     values.legal_address.country === ""
-  );
+  )
 
   React.useEffect(() => {
     if (values.user_profile.year_of_birth === "") {
-      setShowYearOfBirthField(true);
+      setShowYearOfBirthField(true)
     }
     if (values.legal_address.country === "") {
-      setShowCountryField(true);
+      setShowCountryField(true)
     }
-  }, [values.user_profile.year_of_birth, values.legal_address.country]);
+  }, [values.user_profile.year_of_birth, values.legal_address.country])
 
   return (
     <React.Fragment>
@@ -235,13 +235,13 @@ export const LegalAddressCountryFields = ({
               title="The country where you live."
             >
               <option value="">-----</option>
-              {countries
-                ? countries.map((country, i) => (
-                    <option key={i} value={country.code}>
-                      {country.name}
-                    </option>
-                  ))
-                : null}
+              {countries ?
+                countries.map((country, i) => (
+                  <option key={i} value={country.code}>
+                    {country.name}
+                  </option>
+                )) :
+                null}
             </Field>
             <ErrorMessage
               id="country-error"
@@ -271,15 +271,15 @@ export const LegalAddressCountryFields = ({
                 required
               >
                 <option value="">-----</option>
-                {findStates(values.legal_address.country, countries)
-                  ? findStates(values.legal_address.country, countries).map(
-                      (state, i) => (
-                        <option key={i} value={state.code}>
-                          {state.name}
-                        </option>
-                      )
+                {findStates(values.legal_address.country, countries) ?
+                  findStates(values.legal_address.country, countries).map(
+                    (state, i) => (
+                      <option key={i} value={state.code}>
+                        {state.name}
+                      </option>
                     )
-                  : null}
+                  ) :
+                  null}
               </Field>
               <ErrorMessage
                 id="state-error"
@@ -291,7 +291,7 @@ export const LegalAddressCountryFields = ({
         </div>
       ) : null}
     </React.Fragment>
-  );
+  )
 }
 
 export const LegalAddressFields = ({
