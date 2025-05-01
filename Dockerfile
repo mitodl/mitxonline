@@ -1,6 +1,6 @@
 FROM python:3.10.16-slim AS base
 
-LABEL maintainer "ODL DevOps <mitx-devops@mit.edu>"
+LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
 # Add package files, install updated node and pip
 WORKDIR /tmp
@@ -55,15 +55,15 @@ RUN python3 -m venv $VIRTUAL_ENV
 RUN poetry install
 
 
-FROM poetry as code
+FROM poetry AS code
 
 COPY . /src
 WORKDIR /src
 
 # Set pip cache folder, as it is breaking pip when it is on a shared volume
-ENV XDG_CACHE_HOME /tmp/.cache
+ENV XDG_CACHE_HOME=/tmp/.cache
 
-FROM node:17.9 as node
+FROM node:17.9 AS node
 
 COPY --from=code /src /src
 WORKDIR /src
@@ -71,17 +71,17 @@ WORKDIR /src
 RUN yarn workspace mitx-online-public install --immutable && \
     yarn workspace mitx-online-public run build
 
-FROM code as django-server
+FROM code AS django-server
 
 EXPOSE 8013
-ENV PORT 8013
-CMD uwsgi uwsgi.ini
+ENV PORT=8013
+CMD ["uwsgi", "uwsgi.ini"]
 
-FROM django-server as production
+FROM django-server AS production
 
-copy --from=node /src /src
+COPY --from=node /src /src
 
-FROM code as jupyter-notebook
+FROM code AS jupyter-notebook
 
 RUN pip install --force-reinstall jupyter
 
