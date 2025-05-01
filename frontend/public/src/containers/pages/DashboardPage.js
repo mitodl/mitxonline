@@ -131,7 +131,7 @@ export class DashboardPage extends React.Component<
 
     const { currentUser } = this.props
 
-    if (currentUser.user_profile && currentUser.user_profile.addl_field_flag) {
+    if (currentUser && currentUser.legal_address && currentUser.legal_address.country !== "" && currentUser.legal_address.country !== null && currentUser.user_profile && currentUser.user_profile.year_of_birth !== "" && currentUser.user_profile.year_of_birth !== null) {
       return
     }
 
@@ -210,8 +210,7 @@ export class DashboardPage extends React.Component<
           <div className="row">
             <div className="col-12">
               <p>
-                To help us with our education research missions, please tell us
-                more about yourself.
+                We need more information about you before you can start.
               </p>
             </div>
           </div>
