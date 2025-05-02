@@ -13,6 +13,7 @@ from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.api import get_home_page
 from courses.models import Course, CourseRun
 from ecommerce.models import Product
+from main.utils import date_to_datetime
 
 log = logging.getLogger(__name__)
 
@@ -78,16 +79,27 @@ def create_contract_run(
         msg = f"Can't create a run for {course} and contract {contract}: run tag {run_tag} already exists."
         raise ValueError(msg)
 
+    start_date = (
+        date_to_datetime(contract.contract_start, settings.TIME_ZONE)
+        if contract.contract_start
+        else now_in_utc()
+    )
+    end_date = (
+        date_to_datetime(contract.contract_end, settings.TIME_ZONE)
+        if contract.contract_end
+        else None
+    )
+
     course_run = CourseRun(
         course=course,
         title=course.title,
         courseware_id=f"{course.readable_id}+{run_tag}",
         run_tag=run_tag,
-        start_date=contract.contract_start or now_in_utc(),
-        end_date=contract.contract_end,
-        enrollment_start=contract.contract_start or now_in_utc(),
-        enrollment_end=contract.contract_end,
-        certificate_available_date=contract.contract_start,
+        start_date=start_date,
+        end_date=end_date,
+        enrollment_start=start_date,
+        enrollment_end=end_date,
+        certificate_available_date=start_date,
         is_self_paced=True,
         live=True,
         b2b_contract=contract,
