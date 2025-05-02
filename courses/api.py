@@ -1,16 +1,18 @@
 """API for the Courses app"""
 
+from __future__ import annotations
+
 import logging
 from collections import namedtuple
 from datetime import timedelta
 from traceback import format_exc
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.db.models.query import QuerySet
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
@@ -59,6 +61,10 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+
+if TYPE_CHECKING:
+    from django.db.models.query import QuerySet
+
 
 log = logging.getLogger(__name__)
 UserEnrollments = namedtuple(  # noqa: PYI024
