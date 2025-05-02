@@ -20,9 +20,9 @@ def test_create_single_course_run():
     run, product = create_contract_run(contract, course)
 
     assert run.course == course
-    assert run.start_date == contract.start_date
-    assert run.end_date == contract.end_date
-    assert run.certificate_available_date == contract.start_date
+    assert run.start_date == contract.contract_start
+    assert run.end_date == contract.contract_end
+    assert run.certificate_available_date == contract.contract_start
     assert run.run_tag == B2B_RUN_TAG_FORMAT.format(
         org_id=contract.organization.id, contract_id=contract.id
     )

@@ -1,6 +1,11 @@
 """Tests for CMS management commands"""
 
+import pytest
 from django.core.management import call_command
+
+pytestmark = [
+    pytest.mark.django_db,
+]
 
 
 def test_configure_wagtail(mocker):
@@ -26,6 +31,9 @@ def test_configure_wagtail(mocker):
     patched_ensure_instructors_index = mocker.patch(
         "cms.management.commands.configure_wagtail.ensure_instructors_index"
     )
+    patched_ensure_b2b_organization_index = mocker.patch(
+        "b2b.api.ensure_b2b_organization_index"
+    )
     call_command("configure_wagtail")
     patched_ensure_home_page.assert_called_once()
     patched_ensure_resource_pages.assert_called_once()
@@ -34,3 +42,4 @@ def test_configure_wagtail(mocker):
     patched_ensure_signatory_index.assert_called_once()
     patched_ensure_certificate_index.assert_called_once()
     patched_ensure_instructors_index.assert_called_once()
+    patched_ensure_b2b_organization_index.assert_called_once()
