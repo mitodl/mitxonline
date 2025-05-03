@@ -14821,7 +14821,7 @@ __metadata:
     moment-timezone: ^0.5.43
     named-urls: 1.4.0
     nyc: 15.1.0
-    object.entries: 1.1.8
+    object.entries: 1.1.9
     popper.js: 1.16.1
     postcss: 8.5.1
     postcss-loader: 6.2.1
@@ -15521,18 +15521,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"object.entries@npm:1.1.8":
-  version: 1.1.8
-  resolution: "object.entries@npm:1.1.8"
-  dependencies:
-    call-bind: ^1.0.7
-    define-properties: ^1.2.1
-    es-object-atoms: ^1.0.0
-  checksum: 5314877cb637ef3437a30bba61d9bacdb3ce74bf73ac101518be0633c37840c8cc67407edb341f766e8093b3d7516d5c3358f25adfee4a2c697c0ec4c8491907
-  languageName: node
-  linkType: hard
-
-"object.entries@npm:^1.1.1, object.entries@npm:^1.1.2, object.entries@npm:^1.1.9":
+"object.entries@npm:1.1.9, object.entries@npm:^1.1.1, object.entries@npm:^1.1.2, object.entries@npm:^1.1.9":
   version: 1.1.9
   resolution: "object.entries@npm:1.1.9"
   dependencies:
