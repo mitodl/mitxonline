@@ -7181,7 +7181,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"color-loggers@npm:^0.3.1":
+"color-loggers@npm:^0.3.2":
   version: 0.3.2
   resolution: "color-loggers@npm:0.3.2"
   checksum: cfeadb4eb4888610e34f34f9c86e1b5c13b01617e74765d32a4dc1cc74e4b99a216d19676b3d23efe2c5330e101250a5710d9e70b2ea76e2e6be272eec86c477
@@ -14930,7 +14930,7 @@ __metadata:
     web-vitals: 2.1.4
     webpack-bundle-tracker: 1.6.0
     webpack-merge: 5.8.0
-    yarn-upgrade-all: 0.7.4
+    yarn-upgrade-all: 0.7.5
   languageName: unknown
   linkType: soft
 
@@ -23477,14 +23477,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"yarn-upgrade-all@npm:0.7.4":
-  version: 0.7.4
-  resolution: "yarn-upgrade-all@npm:0.7.4"
+"yarn-upgrade-all@npm:0.7.5":
+  version: 0.7.5
+  resolution: "yarn-upgrade-all@npm:0.7.5"
   dependencies:
-    color-loggers: ^0.3.1
+    color-loggers: ^0.3.2
   bin:
     yarn-upgrade-all: build/index.js
-  checksum: 61a0c4a8647f70d7ec8765c1f284698b3b35e4b3d2d2ef608af4108a2f2493b91e0617e0367fbe19e65147128d35ec1d25ab55053faf35f11dccc1c93657feae
+  checksum: 8f5cbff888a7b89a1e61c50126af582948ca5b2e9aa703d95ae937da1eeae7b6d85d14a883a94baf684ec969f3244c12c989b78e3fcbf65cf67e7d0c3a0772ec
   languageName: node
   linkType: hard
 
