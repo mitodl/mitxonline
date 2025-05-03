@@ -14823,7 +14823,7 @@ __metadata:
     nyc: 15.1.0
     object.entries: 1.1.9
     popper.js: 1.16.1
-    postcss: 8.5.1
+    postcss: 8.5.3
     postcss-loader: 6.2.1
     posthog-js: ^1.75.4
     prettier-eslint: ^16.3.0
@@ -17035,14 +17035,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postcss@npm:8.5.1":
-  version: 8.5.1
-  resolution: "postcss@npm:8.5.1"
+"postcss@npm:8.5.3, postcss@npm:^8.3.5, postcss@npm:^8.4.33, postcss@npm:^8.4.4, postcss@npm:^8.4.47":
+  version: 8.5.3
+  resolution: "postcss@npm:8.5.3"
   dependencies:
     nanoid: ^3.3.8
     picocolors: ^1.1.1
     source-map-js: ^1.2.1
-  checksum: cfdcfcd019fca78160341080ba8986cf80cd6e9ca327ba61b86c03e95043e9bce56ad2e018851858039fd7264781797360bfba718dd216b17b3cd803a5134f2f
+  checksum: da574620eb84ff60e65e1d8fc6bd5ad87a19101a23d0aba113c653434161543918229a0f673d89efb3b6d4906287eb04b957310dbcf4cbebacad9d1312711461
   languageName: node
   linkType: hard
 
@@ -17053,17 +17053,6 @@ __metadata:
     picocolors: ^0.2.1
     source-map: ^0.6.1
   checksum: 4ac793f506c23259189064bdc921260d869a115a82b5e713973c5af8e94fbb5721a5cc3e1e26840500d7e1f1fa42a209747c5b1a151918a9bc11f0d7ed9048e3
-  languageName: node
-  linkType: hard
-
-"postcss@npm:^8.3.5, postcss@npm:^8.4.33, postcss@npm:^8.4.4, postcss@npm:^8.4.47":
-  version: 8.5.3
-  resolution: "postcss@npm:8.5.3"
-  dependencies:
-    nanoid: ^3.3.8
-    picocolors: ^1.1.1
-    source-map-js: ^1.2.1
-  checksum: da574620eb84ff60e65e1d8fc6bd5ad87a19101a23d0aba113c653434161543918229a0f673d89efb3b6d4906287eb04b957310dbcf4cbebacad9d1312711461
   languageName: node
   linkType: hard
 
