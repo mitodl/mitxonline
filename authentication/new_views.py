@@ -177,7 +177,7 @@ class CustomLoginView(View):
         """
         redirect_url = get_redirect_url(request)
         if not request.user.is_anonymous:
-            profile = request.user.profile
+            profile = request.user.user_profile
             if (
                 not profile.completed_onboarding
                 and request.GET.get("skip_onboarding", "0") == "0"
