@@ -26,12 +26,13 @@ import {
   programEnrollmentsQueryKey,
   programEnrollmentsSelector
 } from "../lib/queries/enrollment"
+import queries from "../lib/queries"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import { isFinancialAssistanceAvailable } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
-import type { User } from "../flow/authTypes"
+import type { User, Country } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import ProgramInfoBox from "./ProgramInfoBox"
@@ -50,7 +51,8 @@ type Props = {
   currentUser: User,
   updateAddlFields: (currentUser: User) => Promise<any>,
   programEnrollments: ?Array<ProgramEnrollment>,
-  programEnrollmentsLoading: ?boolean
+  programEnrollmentsLoading: ?boolean,
+  countries: Array<Country>
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
@@ -95,7 +97,15 @@ export class ProgramProductDetailEnroll extends React.Component<
 
     const { currentUser, updateAddlFields } = this.props
 
-    if (currentUser.user_profile && currentUser.user_profile.addl_field_flag) {
+    if (
+      currentUser &&
+      currentUser.legal_address &&
+      currentUser.legal_address.country !== "" &&
+      currentUser.legal_address.country !== null &&
+      currentUser.user_profile &&
+      currentUser.user_profile.year_of_birth !== "" &&
+      currentUser.user_profile.year_of_birth !== null
+    ) {
       return
     }
 
@@ -332,7 +342,7 @@ export class ProgramProductDetailEnroll extends React.Component<
   }
 
   renderAddlProfileFieldsModal() {
-    const { currentUser } = this.props
+    const { currentUser, countries } = this.props
     const { showAddlProfileFieldsModal } = this.state
 
     return (
@@ -352,8 +362,8 @@ export class ProgramProductDetailEnroll extends React.Component<
           <div className="row">
             <div className="col-12">
               <p>
-                To help us with our education research missions, please tell us
-                more about yourself.
+                We need more information about you before you can start the
+                program.
               </p>
             </div>
           </div>
@@ -362,7 +372,7 @@ export class ProgramProductDetailEnroll extends React.Component<
             onSubmit={this.saveProfile.bind(this)}
             onCancel={() => this.toggleAddlProfileFieldsModal()}
             user={currentUser}
-            requireTypeFields={true}
+            countries={countries}
           ></AddlProfileFieldsForm>
         </ModalBody>
       </Modal>
@@ -473,7 +483,8 @@ const mapStateToProps = createStructuredSelector({
     "queries",
     programEnrollmentsQueryKey,
     "isPending"
-  ])
+  ]),
+  countries: queries.users.countriesSelector
 })
 
 const mapPropsToConfig = props => [

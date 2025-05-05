@@ -36,10 +36,11 @@ import {
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
 
-import type { User } from "../flow/authTypes"
+import type { User, Country } from "../flow/authTypes"
 import type { Product } from "../flow/cartTypes"
 import { addUserNotification } from "../actions"
 import { applyCartMutation } from "../lib/queries/cart"
+import queries from "../lib/queries"
 
 type Props = {
   courseId: ?string,
@@ -55,7 +56,8 @@ type Props = {
   addToCart: (productId: string) => Promise<any>,
   deactivateEnrollment: (runId: number) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>,
-  forceRequest: () => any
+  forceRequest: () => any,
+  countries: Array<Country>
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
@@ -125,8 +127,15 @@ export class CourseProductDetailEnroll extends React.Component<
     */
 
     const { currentUser, updateAddlFields } = this.props
-
-    if (currentUser.user_profile && currentUser.user_profile.addl_field_flag) {
+    if (
+      currentUser &&
+      currentUser.legal_address &&
+      currentUser.legal_address.country !== "" &&
+      currentUser.legal_address.country !== null &&
+      currentUser.user_profile &&
+      currentUser.user_profile.year_of_birth !== "" &&
+      currentUser.user_profile.year_of_birth !== null
+    ) {
       return
     }
 
@@ -483,7 +492,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderAddlProfileFieldsModal() {
-    const { currentUser } = this.props
+    const { currentUser, countries } = this.props
     const { showAddlProfileFieldsModal } = this.state
 
     return (
@@ -503,17 +512,16 @@ export class CourseProductDetailEnroll extends React.Component<
           <div className="row">
             <div className="col-12">
               <p>
-                To help us with our education research missions, please tell us
-                more about yourself.
+                We need more information about you before you can start the
+                course.
               </p>
             </div>
           </div>
-
           <AddlProfileFieldsForm
             onSubmit={this.saveProfile.bind(this)}
             onCancel={() => this.toggleAddlProfileFieldsModal()}
             user={currentUser}
-            requireTypeFields={true}
+            countries={countries}
           ></AddlProfileFieldsForm>
         </ModalBody>
       </Modal>
@@ -678,7 +686,8 @@ const mapStateToProps = createStructuredSelector({
   courses:         coursesSelector,
   currentUser:     currentUserSelector,
   courseIsLoading: pathOr(true, ["queries", coursesQueryKey, "isPending"]),
-  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"])
+  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"]),
+  countries:       queries.users.countriesSelector
 })
 
 const mapPropsToConfig = props => [

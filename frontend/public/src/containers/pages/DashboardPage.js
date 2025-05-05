@@ -32,6 +32,8 @@ import AddlProfileFieldsForm from "../../components/forms/AddlProfileFieldsForm"
 
 import type { RunEnrollment, ProgramEnrollment } from "../../flow/courseTypes"
 import type { User } from "../../flow/authTypes"
+import type { Country } from "../../flow/authTypes"
+import queries from "../../lib/queries"
 
 // this needs pretty drastic cleanup but not until the program bits are refactored
 // to not depend on the props coming from here
@@ -48,7 +50,8 @@ type DashboardPageProps = {
   updateAddlFields: (currentUser: User) => Promise<any>,
   addUserNotification: Function,
   closeDrawer: Function,
-  forceRequest: Function | null
+  forceRequest: Function | null,
+  countries: Array<Country>
 }
 
 const DashboardTab = {
@@ -128,7 +131,15 @@ export class DashboardPage extends React.Component<
 
     const { currentUser } = this.props
 
-    if (currentUser.user_profile && currentUser.user_profile.addl_field_flag) {
+    if (
+      currentUser &&
+      currentUser.legal_address &&
+      currentUser.legal_address.country !== "" &&
+      currentUser.legal_address.country !== null &&
+      currentUser.user_profile &&
+      currentUser.user_profile.year_of_birth !== "" &&
+      currentUser.user_profile.year_of_birth !== null
+    ) {
       return
     }
 
@@ -187,7 +198,7 @@ export class DashboardPage extends React.Component<
   }
 
   renderAddlProfileFieldsModal() {
-    const { currentUser } = this.props
+    const { currentUser, countries } = this.props
     const { showAddlProfileFieldsModal } = this.state
 
     return (
@@ -206,10 +217,7 @@ export class DashboardPage extends React.Component<
         <ModalBody>
           <div className="row">
             <div className="col-12">
-              <p>
-                To help us with our education research missions, please tell us
-                more about yourself.
-              </p>
+              <p>We need more information about you before you can start.</p>
             </div>
           </div>
 
@@ -217,7 +225,7 @@ export class DashboardPage extends React.Component<
             onSubmit={this.saveProfile.bind(this)}
             onCancel={() => this.toggleAddlProfileFieldsModal()}
             user={currentUser}
-            requireTypeFields={true}
+            countries={countries}
           ></AddlProfileFieldsForm>
         </ModalBody>
       </Modal>
@@ -299,10 +307,15 @@ const mapStateToProps = createStructuredSelector({
   enrollments:        enrollmentsSelector,
   programEnrollments: programEnrollmentsSelector,
   currentUser:        currentUserSelector,
-  isLoading:          pathOr(true, ["queries", enrollmentsQueryKey, "isPending"])
+  isLoading:          pathOr(true, ["queries", enrollmentsQueryKey, "isPending"]),
+  countries:          queries.users.countriesSelector
 })
 
-const mapPropsToConfig = () => [enrollmentsQuery(), programEnrollmentsQuery()]
+const mapPropsToConfig = () => [
+  enrollmentsQuery(),
+  programEnrollmentsQuery(),
+  queries.users.countriesQuery()
+]
 
 const deactivateEnrollment = (enrollmentId: number) =>
   mutateAsync(deactivateEnrollmentMutation(enrollmentId))

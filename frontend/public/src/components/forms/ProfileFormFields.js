@@ -61,6 +61,33 @@ export const legalAddressValidation = yup.object().shape({
   })
 })
 
+export const legalAddressCountryValidation = yup.object().shape({
+  legal_address: yup.object().shape({
+    country: yup
+      .string()
+      .required()
+      .label("Country")
+      .matches(/^[A-Z]+$/, "Country code must be uppercase letters only")
+      .min(2, "Country code must be exactly 2 letters")
+      .max(2, "Country code must be exactly 2 letters"),
+    state: yup
+      .string()
+      .label("State")
+      .when("country", {
+        is:        value => value === "US" || value === "CA",
+        then:      yup.string().required().typeError("State is a required field"),
+        otherwise: yup.string().nullable()
+      })
+  }),
+  user_profile: yup.object().shape({
+    year_of_birth: yup
+      .number()
+      .min(13 - new Date().getFullYear())
+      .label("Year of Birth")
+      .required()
+  })
+})
+
 export const newAccountValidation = yup.object().shape({
   password: newPasswordField.label("Password"),
   username: usernameField
@@ -156,6 +183,118 @@ const renderYearOfBirthField = errors => {
         component={FormError}
       />
     </div>
+  )
+}
+
+export const LegalAddressCountryFields = ({
+  errors,
+  countries,
+  values
+}: LegalAddressProps) => {
+  const addressErrors = errors && errors.legal_address
+  const [showYearOfBirthField, setShowYearOfBirthField] = React.useState(
+    values.user_profile.year_of_birth === ""
+  )
+  const [showCountryField, setShowCountryField] = React.useState(
+    values.legal_address.country === ""
+  )
+
+  React.useEffect(() => {
+    if (values.user_profile.year_of_birth === "") {
+      setShowYearOfBirthField(true)
+    }
+    if (values.legal_address.country === "") {
+      setShowCountryField(true)
+    }
+  }, [values.user_profile.year_of_birth, values.legal_address.country])
+
+  return (
+    <React.Fragment>
+      {showYearOfBirthField ? (
+        <div className="form-group">{renderYearOfBirthField(errors)}</div>
+      ) : null}
+      {showCountryField ? (
+        <div>
+          <div className="form-group">
+            <CardLabel
+              htmlFor="legal_address.country"
+              isRequired={true}
+              label="Country"
+            />
+            <Field
+              component="select"
+              name="legal_address.country"
+              id="legal_address.country"
+              aria-invalid={
+                addressErrors && addressErrors.country ? "true" : null
+              }
+              aria-describedby={
+                addressErrors && addressErrors.country ? "country-error" : null
+              }
+              className="form-control"
+              autoComplete="country"
+              required
+              title="The country where you live."
+            >
+              <option value="">-----</option>
+              {countries ?
+                countries.map((country, i) => (
+                  <option key={i} value={country.code}>
+                    {country.name}
+                  </option>
+                )) :
+                null}
+            </Field>
+            <ErrorMessage
+              id="country-error"
+              name="legal_address.country"
+              component={FormError}
+            />
+          </div>
+          {findStates(values.legal_address.country, countries) ? (
+            <div className="form-group">
+              <CardLabel
+                htmlFor="legal_address.state"
+                isRequired={true}
+                label="State"
+              />
+              <Field
+                component="select"
+                name="legal_address.state"
+                id="legal_address.state"
+                aria-invalid={
+                  addressErrors && addressErrors.state ? "true" : null
+                }
+                aria-describedby={
+                  addressErrors && addressErrors.state ? "state-error" : null
+                }
+                aria-description="The state, territory, or province where you live."
+                className="form-control"
+                autoComplete="state"
+                title="The state, territory, or province where you live."
+                required
+              >
+                <option value="">-----</option>
+                {findStates(values.legal_address.country, countries) ?
+                  findStates(values.legal_address.country, countries).map(
+                    (state, i) => (
+                      <option key={i} value={state.code}>
+                        {state.name}
+                      </option>
+                    )
+                  ) :
+                  null}
+              </Field>
+              <ErrorMessage
+                id="state-error"
+                name="legal_address.state"
+                component={FormError}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </React.Fragment>
   )
 }
 
