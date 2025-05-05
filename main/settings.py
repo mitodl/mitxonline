@@ -1005,7 +1005,7 @@ REST_FRAMEWORK = {
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "ALLOWED_VERSIONS": ["v0"],
+    "ALLOWED_VERSIONS": ["v0", "v1", "v2"],
 }
 
 # Relative URL to be used by Djoser for the link in the password reset email
