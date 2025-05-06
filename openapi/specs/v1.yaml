@@ -140,6 +140,76 @@ paths:
               schema:
                 $ref: '#/components/schemas/LearnerRecord'
           description: ''
+  /api/v0/b2b/contracts/:
+    get:
+      operationId: b2b_contracts_list
+      description: Viewset for the ContractPage model.
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContractPage'
+          description: ''
+  /api/v0/b2b/contracts/{contract_slug}/:
+    get:
+      operationId: b2b_contracts_retrieve
+      description: Viewset for the ContractPage model.
+      parameters:
+      - in: path
+        name: contract_slug
+        schema:
+          type: string
+          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractPage'
+          description: ''
+  /api/v0/b2b/organizations/:
+    get:
+      operationId: b2b_organizations_list
+      description: Viewset for the OrganizationPage model.
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationPage'
+          description: ''
+  /api/v0/b2b/organizations/{organization_slug}/:
+    get:
+      operationId: b2b_organizations_retrieve
+      description: Viewset for the OrganizationPage model.
+      parameters:
+      - in: path
+        name: organization_slug
+        schema:
+          type: string
+          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationPage'
+          description: ''
   /api/v1/course_runs/:
     get:
       operationId: course_runs_list
@@ -728,6 +798,65 @@ components:
       - Medium-sized (1000-9999 employees)
       - Large Enterprise (10,000+ employees)
       - Other (N/A or Don't know)
+    ContractPage:
+      type: object
+      description: Serializer for the ContractPage model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+          description: The name of the contract
+        description:
+          type: string
+          readOnly: true
+          description: Any useful extra information about the contract
+        integration_type:
+          allOf:
+          - $ref: '#/components/schemas/IntegrationTypeEnum'
+          readOnly: true
+          description: |-
+            The type of integration for this contract
+
+            * `sso` - SSO
+            * `non-sso` - Non-SSO
+        organization:
+          type: integer
+          readOnly: true
+          description: The organization this contract is with
+        contract_start:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+          description: The start date of the contract.
+        contract_end:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+          description: The end date of the contract.
+        active:
+          type: boolean
+          readOnly: true
+          description: Whether this contract is active or not. Date rules still apply.
+        slug:
+          type: string
+          readOnly: true
+          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
+          pattern: ^[-\w]+$
+      required:
+      - active
+      - contract_end
+      - contract_start
+      - description
+      - id
+      - integration_type
+      - name
+      - organization
+      - slug
     Course:
       type: object
       description: Course model serializer
@@ -1229,6 +1358,17 @@ components:
       - Elementary/primary school
       - No formal education
       - Other education
+    IntegrationTypeEnum:
+      enum:
+      - sso
+      - non-sso
+      type: string
+      description: |-
+        * `sso` - SSO
+        * `non-sso` - Non-SSO
+      x-enum-descriptions:
+      - SSO
+      - Non-SSO
     LearnerProgramRecordShare:
       type: object
       properties:
@@ -1352,6 +1492,38 @@ components:
     NullEnum:
       enum:
       - null
+    OrganizationPage:
+      type: object
+      description: Serializer for the OrganizationPage model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+          description: The name of the organization
+        description:
+          type: string
+          readOnly: true
+          description: Any useful extra information about the organization
+        logo:
+          type: string
+          format: uri
+          readOnly: true
+          description: The organization's logo. Will be displayed in the app in various
+            places.
+        slug:
+          type: string
+          readOnly: true
+          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
+          pattern: ^[-\w]+$
+      required:
+      - description
+      - id
+      - logo
+      - name
+      - slug
     PaginatedCourseWithCourseRunsList:
       type: object
       required:
