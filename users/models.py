@@ -271,6 +271,13 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin, AbstractSCIMUse
 
     hubspot_sync_datetime = DateTimeField(null=True)
 
+    b2b_contracts = models.ManyToManyField(
+        "b2b.ContractPage",
+        blank=True,
+        related_name="users",
+        help_text="The contracts the user is associated with.",
+    )
+
     objects = UserManager()
     faulty_openedx_users = FaultyOpenEdxUserManager()
 
@@ -314,6 +321,11 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin, AbstractSCIMUse
             or self.is_staff
             or self.groups.filter(name=CMS_EDITORS_GROUP_NAME).exists()
         )
+
+    @cached_property
+    def b2b_organizations(self):
+        """Return the organizations the user is associated with."""
+        return self.b2b_contracts.values_list("organization", flat=True).distinct()
 
 
 def generate_change_email_code():
