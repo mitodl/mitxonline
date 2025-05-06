@@ -1,0 +1,2635 @@
+openapi: 3.0.3
+info:
+  title: MITx Online API
+  version: 0.0.1 (v2)
+  description: MIT public API
+paths:
+  /api/profile/details/:
+    post:
+      operationId: api_profile_details_create
+      description: Processes a request
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDetailsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterDetailsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterDetailsRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+  /api/profile/extra/:
+    post:
+      operationId: api_profile_extra_create
+      description: Processes a request
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterExtraDetailsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterExtraDetailsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterExtraDetailsRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+  /api/records/program/{id}/:
+    get:
+      operationId: learner_record_retrieve_by_id
+      description: Get learner record using program ID
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerRecord'
+          description: ''
+  /api/records/program/{id}/revoke/:
+    post:
+      operationId: api_records_program_revoke_create
+      description: |-
+        Disables sharing links for the learner's record. This only applies to the
+        anonymous ones; shares sent to partner schools are always allowed once they
+        are sent.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerRecord'
+          description: ''
+  /api/records/program/{id}/share/:
+    post:
+      operationId: api_records_program_share_create
+      description: |-
+        Sets up a sharing link for the learner's record. Returns back the entire
+        learner record.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerSchoolRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerSchoolRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerSchoolRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerRecord'
+          description: ''
+  /api/records/shared/{uuid}/:
+    get:
+      operationId: learner_record_retrieve_by_uuid
+      description: Get learner record using share UUID
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerRecord'
+          description: ''
+  /api/v1/course_runs/:
+    get:
+      operationId: course_runs_list
+      description: API view set for CourseRuns
+      parameters:
+      - in: query
+        name: id
+        schema:
+          type: integer
+      - in: query
+        name: live
+        schema:
+          type: boolean
+      tags:
+      - course_runs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/V1CourseRunWithCourse'
+          description: ''
+  /api/v1/course_runs/{id}/:
+    get:
+      operationId: course_runs_retrieve
+      description: API view set for CourseRuns
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course run.
+        required: true
+      tags:
+      - course_runs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V1CourseRunWithCourse'
+          description: ''
+  /api/v1/courses/:
+    get:
+      operationId: api_v1_courses_list
+      description: List all courses - API v1
+      parameters:
+      - in: query
+        name: courserun_is_enrollable
+        schema:
+          type: boolean
+      - in: query
+        name: id
+        schema:
+          type: integer
+      - in: query
+        name: live
+        schema:
+          type: boolean
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: page__live
+        schema:
+          type: boolean
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: readable_id
+        schema:
+          type: string
+      tags:
+      - courses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedV1CourseWithCourseRunsList'
+          description: ''
+  /api/v1/courses/{id}/:
+    get:
+      operationId: api_v1_courses_retrieve
+      description: Retrieve a specific course - API v1
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - courses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V1CourseWithCourseRuns'
+          description: ''
+  /api/v1/departments/:
+    get:
+      operationId: departments_list_v1
+      description: List departments - v1
+      tags:
+      - departments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DepartmentWithCount'
+          description: ''
+  /api/v1/departments/{id}/:
+    get:
+      operationId: departments_retrieve_v1
+      description: Get department details - v1
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this department.
+        required: true
+      tags:
+      - departments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentWithCount'
+          description: ''
+  /api/v1/enrollments/:
+    get:
+      operationId: enrollments_list
+      description: API view set for user enrollments
+      tags:
+      - enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseRunEnrollment'
+          description: ''
+    post:
+      operationId: enrollments_create
+      description: API view set for user enrollments
+      tags:
+      - enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollment'
+          description: ''
+  /api/v1/enrollments/{id}/:
+    put:
+      operationId: enrollments_update
+      description: API view set for user enrollments
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course run enrollment.
+        required: true
+      tags:
+      - enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollment'
+          description: ''
+    patch:
+      operationId: enrollments_partial_update
+      description: API view set for user enrollments
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course run enrollment.
+        required: true
+      tags:
+      - enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCourseRunEnrollmentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCourseRunEnrollmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCourseRunEnrollmentRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollment'
+          description: ''
+    delete:
+      operationId: enrollments_destroy
+      description: API view set for user enrollments
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course run enrollment.
+        required: true
+      tags:
+      - enrollments
+      responses:
+        '204':
+          description: No response body
+  /api/v1/program_enrollments/:
+    get:
+      operationId: program_enrollments_list
+      description: |-
+        Returns a unified set of program and course enrollments for the current
+        user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Program enrollment ID
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserProgramEnrollmentDetail'
+          description: ''
+  /api/v1/program_enrollments/{id}/:
+    delete:
+      operationId: program_enrollments_destroy
+      description: |-
+        Unenroll the user from this program. This is simpler than the corresponding
+        function for CourseRunEnrollments; edX doesn't really know what programs
+        are so there's nothing to process there.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Program enrollment ID
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProgramEnrollmentDetail'
+          description: ''
+  /api/v1/programs/:
+    get:
+      operationId: programs_list_v1
+      description: List Programs - v1
+      parameters:
+      - in: query
+        name: id
+        schema:
+          type: integer
+      - in: query
+        name: live
+        schema:
+          type: boolean
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: readable_id
+        schema:
+          type: string
+      tags:
+      - programs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedV1ProgramList'
+          description: ''
+  /api/v1/programs/{id}/:
+    get:
+      operationId: programs_retrieve_v1
+      description: API view set for Programs - v1
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this program.
+        required: true
+      tags:
+      - programs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V1Program'
+          description: ''
+  /api/v2/courses/:
+    get:
+      operationId: api_v2_courses_list
+      description: List all courses - API v2
+      parameters:
+      - in: query
+        name: courserun_is_enrollable
+        schema:
+          type: boolean
+        description: Course Run Is Enrollable
+      - in: query
+        name: id
+        schema:
+          type: array
+          items:
+            type: integer
+        description: Multiple values may be separated by commas.
+        explode: false
+        style: form
+      - in: query
+        name: live
+        schema:
+          type: boolean
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: page__live
+        schema:
+          type: boolean
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: readable_id
+        schema:
+          type: string
+      tags:
+      - courses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCourseWithCourseRunsList'
+          description: ''
+  /api/v2/courses/{id}/:
+    get:
+      operationId: api_v2_courses_retrieve
+      description: Retrieve a specific course - API v2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course.
+        required: true
+      tags:
+      - courses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseWithCourseRuns'
+          description: ''
+  /api/v2/departments/:
+    get:
+      operationId: departments_list_v2
+      description: List departments - v2
+      tags:
+      - departments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DepartmentWithCoursesAndPrograms'
+          description: ''
+  /api/v2/departments/{id}/:
+    get:
+      operationId: departments_retrieve_v2
+      description: Get department details - v2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this department.
+        required: true
+      tags:
+      - departments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentWithCoursesAndPrograms'
+          description: ''
+  /api/v2/programs/:
+    get:
+      operationId: programs_list_v2
+      description: List Programs - v2
+      parameters:
+      - in: query
+        name: id
+        schema:
+          type: integer
+      - in: query
+        name: live
+        schema:
+          type: boolean
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: page__live
+        schema:
+          type: boolean
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: readable_id
+        schema:
+          type: string
+      tags:
+      - programs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedV2ProgramList'
+          description: ''
+  /api/v2/programs/{id}/:
+    get:
+      operationId: programs_retrieve_v2
+      description: API view set for Programs - v2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this program.
+        required: true
+      tags:
+      - programs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2Program'
+          description: ''
+  /enrollments/:
+    post:
+      operationId: api_enrollments_create
+      description: View to handle direct POST requests to enroll in a course run.
+      tags:
+      - enrollments
+      responses:
+        '200':
+          description: No response body
+        '302':
+          description: No response body
+components:
+  schemas:
+    AvailabilityEnum:
+      enum:
+      - anytime
+      - dated
+      type: string
+      description: |-
+        * `anytime` - anytime
+        * `dated` - dated
+      x-enum-descriptions:
+      - anytime
+      - dated
+    BlankEnum:
+      enum:
+      - ''
+    CompanySizeEnum:
+      enum:
+      - 1
+      - 9
+      - 99
+      - 999
+      - 9999
+      - 10000
+      - 0
+      description: |-
+        * `None` - ----
+        * `1` - Small/Start-up (1+ employees)
+        * `9` - Small/Home office (1-9 employees)
+        * `99` - Small (10-99 employees)
+        * `999` - Small to medium-sized (100-999 employees)
+        * `9999` - Medium-sized (1000-9999 employees)
+        * `10000` - Large Enterprise (10,000+ employees)
+        * `0` - Other (N/A or Don't know)
+      x-enum-descriptions:
+      - Small/Start-up (1+ employees)
+      - Small/Home office (1-9 employees)
+      - Small (10-99 employees)
+      - Small to medium-sized (100-999 employees)
+      - Medium-sized (1000-9999 employees)
+      - Large Enterprise (10,000+ employees)
+      - Other (N/A or Don't know)
+    Course:
+      type: object
+      description: Course model serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        next_run_id:
+          type: integer
+          nullable: true
+          description: Get next run id
+          readOnly: true
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+          readOnly: true
+        page:
+          allOf:
+          - $ref: '#/components/schemas/CoursePage'
+          readOnly: true
+        programs:
+          allOf:
+          - $ref: '#/components/schemas/Program'
+          nullable: true
+          readOnly: true
+      required:
+      - departments
+      - id
+      - next_run_id
+      - page
+      - programs
+      - readable_id
+      - title
+    CoursePage:
+      type: object
+      description: Course page model serializer
+      properties:
+        feature_image_src:
+          type: string
+          description: Serializes the source of the feature_image
+          readOnly: true
+        page_url:
+          type: string
+          format: uri
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        live:
+          type: boolean
+          readOnly: true
+        length:
+          type: string
+          readOnly: true
+        effort:
+          type: string
+          nullable: true
+          readOnly: true
+        financial_assistance_form_url:
+          type: string
+          format: uri
+          readOnly: true
+        current_price:
+          type: integer
+          nullable: true
+          readOnly: true
+        instructors:
+          type: array
+          items: {}
+          readOnly: true
+      required:
+      - current_price
+      - description
+      - effort
+      - feature_image_src
+      - financial_assistance_form_url
+      - instructors
+      - length
+      - live
+      - page_url
+    CourseRequest:
+      type: object
+      description: Course model serializer
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        readable_id:
+          type: string
+          minLength: 1
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+      required:
+      - readable_id
+      - title
+    CourseRunCertificate:
+      type: object
+      description: CourseRunCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/<uuid>/
+            Example: /certificate/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+          readOnly: true
+      required:
+      - link
+      - uuid
+    CourseRunEnrollment:
+      type: object
+      description: CourseRunEnrollment model serializer
+      properties:
+        run:
+          allOf:
+          - $ref: '#/components/schemas/V1CourseRunWithCourse'
+          readOnly: true
+        id:
+          type: integer
+          readOnly: true
+        edx_emails_subscription:
+          type: boolean
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/CourseRunCertificate'
+          nullable: true
+          readOnly: true
+        enrollment_mode:
+          allOf:
+          - $ref: '#/components/schemas/EnrollmentModeEnum'
+          readOnly: true
+        approved_flexible_price_exists:
+          type: boolean
+          readOnly: true
+        grades:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseRunGrade'
+          readOnly: true
+      required:
+      - approved_flexible_price_exists
+      - certificate
+      - enrollment_mode
+      - grades
+      - id
+      - run
+    CourseRunEnrollmentRequest:
+      type: object
+      description: CourseRunEnrollment model serializer
+      properties:
+        edx_emails_subscription:
+          type: boolean
+        run_id:
+          type: integer
+          writeOnly: true
+      required:
+      - run_id
+    CourseRunGrade:
+      type: object
+      description: CourseRunGrade serializer
+      properties:
+        grade:
+          type: number
+          format: double
+          maximum: 1.0
+          minimum: 0.0
+        letter_grade:
+          type: string
+          nullable: true
+          maxLength: 6
+        passed:
+          type: boolean
+        set_by_admin:
+          type: boolean
+        grade_percent:
+          type: number
+          format: double
+          description: Returns the grade field value as a number out of 100 (or None
+            if the value is None)
+          readOnly: true
+      required:
+      - grade
+      - grade_percent
+    CourseWithCourseRuns:
+      type: object
+      description: Course model serializer - also serializes child course runs
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        next_run_id:
+          type: integer
+          nullable: true
+          description: Get next run id
+          readOnly: true
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+          readOnly: true
+        page:
+          allOf:
+          - $ref: '#/components/schemas/CoursePage'
+          readOnly: true
+        programs:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          nullable: true
+          readOnly: true
+        topics:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: List topics of a course
+          readOnly: true
+        certificate_type:
+          type: string
+          readOnly: true
+        required_prerequisites:
+          type: boolean
+          description: |-
+            Check if the prerequisites field is populated in the course page CMS.
+            Returns:
+                bool: True when the prerequisites field is populated in the course page CMS.  False otherwise.
+          readOnly: true
+        duration:
+          type: string
+          description: Get the duration of the course from the course page CMS.
+          readOnly: true
+        min_weeks:
+          type: integer
+          nullable: true
+          description: Get the min weeks of the course from the CMS page.
+          readOnly: true
+        max_weeks:
+          type: integer
+          nullable: true
+          description: Get the max weeks of the course from the CMS page.
+          readOnly: true
+        time_commitment:
+          type: string
+          nullable: true
+          description: Get the time commitment of the course from the course page
+            CMS.
+          readOnly: true
+        availability:
+          type: string
+          description: Get course availability
+          readOnly: true
+        min_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the min weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+        max_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the max weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+        courseruns:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2CourseRun'
+          readOnly: true
+      required:
+      - availability
+      - certificate_type
+      - courseruns
+      - departments
+      - duration
+      - id
+      - max_weekly_hours
+      - max_weeks
+      - min_weekly_hours
+      - min_weeks
+      - next_run_id
+      - page
+      - programs
+      - readable_id
+      - required_prerequisites
+      - time_commitment
+      - title
+      - topics
+    Department:
+      type: object
+      description: Department model serializer
+      properties:
+        name:
+          type: string
+          maxLength: 128
+      required:
+      - name
+    DepartmentRequest:
+      type: object
+      description: Department model serializer
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+      - name
+    DepartmentWithCount:
+      type: object
+      description: CourseRun model serializer that includes the number of courses
+        and programs associated with each departments
+      properties:
+        name:
+          type: string
+          maxLength: 128
+        courses:
+          type: integer
+        programs:
+          type: integer
+      required:
+      - courses
+      - name
+      - programs
+    DepartmentWithCoursesAndPrograms:
+      type: object
+      description: Department model serializer that includes the number of courses
+        and programs associated with each
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        slug:
+          type: string
+          maxLength: 128
+          pattern: ^[-a-zA-Z0-9_]+$
+        course_ids:
+          type: array
+          items: {}
+          readOnly: true
+        program_ids:
+          type: array
+          items: {}
+          readOnly: true
+      required:
+      - course_ids
+      - id
+      - name
+      - program_ids
+      - slug
+    Discount:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+        automatic:
+          type: boolean
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        redemption_type:
+          $ref: '#/components/schemas/RedemptionTypeEnum'
+        max_redemptions:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+        discount_code:
+          type: string
+          maxLength: 100
+        payment_type:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        is_redeemed:
+          type: boolean
+          description: Returns True if the discount has been redeemed
+          readOnly: true
+        activation_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable before this
+            date.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable after this
+            date.
+      required:
+      - amount
+      - discount_code
+      - discount_type
+      - id
+      - is_redeemed
+      - redemption_type
+    DiscountTypeEnum:
+      enum:
+      - percent-off
+      - dollars-off
+      - fixed-price
+      type: string
+      description: |-
+        * `percent-off` - percent-off
+        * `dollars-off` - dollars-off
+        * `fixed-price` - fixed-price
+      x-enum-descriptions:
+      - percent-off
+      - dollars-off
+      - fixed-price
+    EnrollmentModeEnum:
+      enum:
+      - audit
+      - verified
+      type: string
+      description: |-
+        * `audit` - audit
+        * `verified` - verified
+      x-enum-descriptions:
+      - audit
+      - verified
+    GenderEnum:
+      enum:
+      - m
+      - f
+      - t
+      - nb
+      - o
+      type: string
+      description: |-
+        * `m` - Male
+        * `f` - Female
+        * `t` - Transgender
+        * `nb` - Non-binary/non-conforming
+        * `o` - Other/Prefer Not to Say
+      x-enum-descriptions:
+      - Male
+      - Female
+      - Transgender
+      - Non-binary/non-conforming
+      - Other/Prefer Not to Say
+    HighestEducationEnum:
+      enum:
+      - Doctorate
+      - Master's or professional degree
+      - Bachelor's degree
+      - Associate degree
+      - Secondary/high school
+      - Junior secondary/junior high/middle school
+      - Elementary/primary school
+      - No formal education
+      - Other education
+      description: |-
+        * `None` - ----
+        * `Doctorate` - Doctorate
+        * `Master's or professional degree` - Master's or professional degree
+        * `Bachelor's degree` - Bachelor's degree
+        * `Associate degree` - Associate degree
+        * `Secondary/high school` - Secondary/high school
+        * `Junior secondary/junior high/middle school` - Junior secondary/junior high/middle school
+        * `Elementary/primary school` - Elementary/primary school
+        * `No formal education` - No formal education
+        * `Other education` - Other education
+      x-enum-descriptions:
+      - Doctorate
+      - Master's or professional degree
+      - Bachelor's degree
+      - Associate degree
+      - Secondary/high school
+      - Junior secondary/junior high/middle school
+      - Elementary/primary school
+      - No formal education
+      - Other education
+    LearnerProgramRecordShare:
+      type: object
+      properties:
+        share_uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+        is_active:
+          type: boolean
+        user:
+          type: integer
+        program:
+          type: integer
+        partner_school:
+          type: integer
+          nullable: true
+      required:
+      - created_on
+      - program
+      - share_uuid
+      - updated_on
+      - user
+    LearnerRecord:
+      type: object
+      description: |-
+        Gathers the various data needed to display the learner's program record.
+        Pass the program you want the record for and attach the learner via context
+        object.
+      properties:
+        user:
+          type: object
+          additionalProperties:
+            type: string
+          description: User information including name, email, and username
+        program:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: {}
+          description: Program details including title, readable_id, courses, and
+            requirements
+        sharing:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearnerProgramRecordShare'
+          description: Active program record shares for this user
+        partner_schools:
+          type: array
+          items:
+            $ref: '#/components/schemas/PartnerSchool'
+          description: List of partner schools
+      required:
+      - partner_schools
+      - program
+      - sharing
+      - user
+    LegalAddress:
+      type: object
+      description: Serializer for legal address
+      properties:
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
+        country:
+          type: string
+          maxLength: 2
+        state:
+          type: string
+          nullable: true
+          maxLength: 10
+      required:
+      - country
+      - first_name
+      - last_name
+    LegalAddressRequest:
+      type: object
+      description: Serializer for legal address
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        country:
+          type: string
+          minLength: 1
+          maxLength: 2
+        state:
+          type: string
+          nullable: true
+          maxLength: 10
+      required:
+      - country
+      - first_name
+      - last_name
+    NodeTypeEnum:
+      enum:
+      - operator
+      - course
+      type: string
+      description: |-
+        * `operator` - operator
+        * `course` - course
+      x-enum-descriptions:
+      - operator
+      - course
+    NullEnum:
+      enum:
+      - null
+    PaginatedCourseWithCourseRunsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseWithCourseRuns'
+    PaginatedV1CourseWithCourseRunsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/V1CourseWithCourseRuns'
+    PaginatedV1ProgramList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/V1Program'
+    PaginatedV2ProgramList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2Program'
+    PartnerSchool:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+      required:
+      - created_on
+      - email
+      - id
+      - name
+      - updated_on
+    PartnerSchoolRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          minLength: 1
+      required:
+      - email
+      - name
+    PatchedCourseRunEnrollmentRequest:
+      type: object
+      description: CourseRunEnrollment model serializer
+      properties:
+        edx_emails_subscription:
+          type: boolean
+        run_id:
+          type: integer
+          writeOnly: true
+    PaymentTypeEnum:
+      enum:
+      - marketing
+      - sales
+      - financial-assistance
+      - customer-support
+      - staff
+      - legacy
+      type: string
+      description: |-
+        * `marketing` - marketing
+        * `sales` - sales
+        * `financial-assistance` - financial-assistance
+        * `customer-support` - customer-support
+        * `staff` - staff
+        * `legacy` - legacy
+      x-enum-descriptions:
+      - marketing
+      - sales
+      - financial-assistance
+      - customer-support
+      - staff
+      - legacy
+    ProductFlexibilePrice:
+      type: object
+      description: Simple serializer for Product without related purchasable objects
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+        product_flexible_price:
+          allOf:
+          - $ref: '#/components/schemas/Discount'
+          nullable: true
+          readOnly: true
+      required:
+      - description
+      - id
+      - price
+      - product_flexible_price
+    ProductFlexibilePriceRequest:
+      type: object
+      description: Simple serializer for Product without related purchasable objects
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+      required:
+      - description
+      - price
+    Program:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        readable_id:
+          type: string
+      required:
+      - id
+      - readable_id
+      - title
+    ProgramCertificate:
+      type: object
+      description: ProgramCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/program/<uuid>/
+            Example: /certificate/program/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+          readOnly: true
+      required:
+      - link
+      - uuid
+    ProgramPage:
+      type: object
+      description: Program page model serializer
+      properties:
+        feature_image_src:
+          type: string
+          description: Serializes the source of the feature_image
+          readOnly: true
+        page_url:
+          type: string
+          format: uri
+          readOnly: true
+        financial_assistance_form_url:
+          type: string
+          format: uri
+          readOnly: true
+        description:
+          type: string
+          description: The description shown on the home page and product page.
+        live:
+          type: boolean
+          readOnly: true
+        length:
+          type: string
+          description: A short description indicating how long it takes to complete
+            (e.g. '4 weeks').
+          maxLength: 50
+        effort:
+          type: string
+          nullable: true
+          description: A short description indicating how much effort is required
+            (e.g. 1-3 hours per week).
+          maxLength: 100
+        price:
+          type: string
+          readOnly: true
+      required:
+      - description
+      - feature_image_src
+      - financial_assistance_form_url
+      - live
+      - page_url
+      - price
+    RedemptionTypeEnum:
+      enum:
+      - one-time
+      - one-time-per-user
+      - unlimited
+      type: string
+      description: |-
+        * `one-time` - one-time
+        * `one-time-per-user` - one-time-per-user
+        * `unlimited` - unlimited
+      x-enum-descriptions:
+      - one-time
+      - one-time-per-user
+      - unlimited
+    RegisterDetailsRequest:
+      type: object
+      description: Serializer for registration details
+      properties:
+        name:
+          type: string
+          writeOnly: true
+          minLength: 1
+        username:
+          type: string
+          writeOnly: true
+          minLength: 1
+        legal_address:
+          allOf:
+          - $ref: '#/components/schemas/LegalAddressRequest'
+          writeOnly: true
+        user_profile:
+          allOf:
+          - $ref: '#/components/schemas/UserProfileRequest'
+          writeOnly: true
+      required:
+      - legal_address
+      - name
+      - user_profile
+      - username
+    RegisterExtraDetailsRequest:
+      type: object
+      description: Serializer for extra registration details
+      properties:
+        gender:
+          type: string
+          writeOnly: true
+          minLength: 1
+        birth_year:
+          type: string
+          writeOnly: true
+          minLength: 1
+        company:
+          type: string
+          writeOnly: true
+          minLength: 1
+        job_title:
+          type: string
+          writeOnly: true
+          minLength: 1
+        industry:
+          type: string
+          writeOnly: true
+        job_function:
+          type: string
+          writeOnly: true
+        years_experience:
+          type: string
+          writeOnly: true
+        company_size:
+          type: string
+          writeOnly: true
+        leadership_level:
+          type: string
+          writeOnly: true
+        highest_education:
+          type: string
+          writeOnly: true
+      required:
+      - birth_year
+      - company
+      - gender
+      - job_title
+    UserProfile:
+      type: object
+      description: Serializer for profile
+      properties:
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/GenderEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        year_of_birth:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        addl_field_flag:
+          type: boolean
+          description: Flags if we've asked the user for additional information
+        company:
+          type: string
+          nullable: true
+          maxLength: 128
+        job_title:
+          type: string
+          nullable: true
+          maxLength: 128
+        industry:
+          type: string
+          nullable: true
+          maxLength: 60
+        job_function:
+          type: string
+          nullable: true
+          maxLength: 60
+        company_size:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CompanySizeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        years_experience:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/YearsExperienceEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        leadership_level:
+          type: string
+          nullable: true
+          maxLength: 60
+        highest_education:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/HighestEducationEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        type_is_student:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Student
+        type_is_professional:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Professional
+        type_is_educator:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Educator
+        type_is_other:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Other (not professional, student,
+            or educator)
+    UserProfileRequest:
+      type: object
+      description: Serializer for profile
+      properties:
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/GenderEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        year_of_birth:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        addl_field_flag:
+          type: boolean
+          description: Flags if we've asked the user for additional information
+        company:
+          type: string
+          nullable: true
+          maxLength: 128
+        job_title:
+          type: string
+          nullable: true
+          maxLength: 128
+        industry:
+          type: string
+          nullable: true
+          maxLength: 60
+        job_function:
+          type: string
+          nullable: true
+          maxLength: 60
+        company_size:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CompanySizeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        years_experience:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/YearsExperienceEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        leadership_level:
+          type: string
+          nullable: true
+          maxLength: 60
+        highest_education:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/HighestEducationEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        type_is_student:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Student
+        type_is_professional:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Professional
+        type_is_educator:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Educator
+        type_is_other:
+          type: boolean
+          nullable: true
+          description: The learner identifies as type Other (not professional, student,
+            or educator)
+    UserProgramEnrollmentDetail:
+      type: object
+      properties:
+        program:
+          $ref: '#/components/schemas/V1Program'
+        enrollments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseRunEnrollment'
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/ProgramCertificate'
+          nullable: true
+          readOnly: true
+      required:
+      - certificate
+      - enrollments
+      - program
+    V1BaseCourseRun:
+      type: object
+      description: CourseRun model serializer
+      properties:
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_url:
+          type: string
+          nullable: true
+          description: Get the courseware URL
+          readOnly: true
+        courseware_id:
+          type: string
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_upgradable:
+          type: boolean
+          description: Check if the course run is upgradable
+          readOnly: true
+        is_enrollable:
+          type: boolean
+          description: Check if the course run is enrollable
+          readOnly: true
+        is_archived:
+          type: boolean
+          description: Check if the course run is archived
+          readOnly: true
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        id:
+          type: integer
+          readOnly: true
+        live:
+          type: boolean
+        course_number:
+          type: string
+          description: Get the course number
+          readOnly: true
+        products:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ProductFlexibilePrice'
+          readOnly: true
+        approved_flexible_price_exists:
+          type: boolean
+          readOnly: true
+      required:
+      - approved_flexible_price_exists
+      - course_number
+      - courseware_id
+      - courseware_url
+      - id
+      - is_archived
+      - is_enrollable
+      - is_upgradable
+      - products
+      - run_tag
+      - title
+    V1CourseRunWithCourse:
+      type: object
+      description: CourseRun model serializer - also serializes the parent Course.
+      properties:
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_url:
+          type: string
+          nullable: true
+          description: Get the courseware URL
+          readOnly: true
+        courseware_id:
+          type: string
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_upgradable:
+          type: boolean
+          description: Check if the course run is upgradable
+          readOnly: true
+        is_enrollable:
+          type: boolean
+          description: Check if the course run is enrollable
+          readOnly: true
+        is_archived:
+          type: boolean
+          description: Check if the course run is archived
+          readOnly: true
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        id:
+          type: integer
+          readOnly: true
+        live:
+          type: boolean
+        course_number:
+          type: string
+          description: Get the course number
+          readOnly: true
+        products:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ProductFlexibilePrice'
+          readOnly: true
+          description: List of products associated with this course run
+        approved_flexible_price_exists:
+          type: boolean
+          readOnly: true
+        course:
+          allOf:
+          - $ref: '#/components/schemas/Course'
+          readOnly: true
+      required:
+      - approved_flexible_price_exists
+      - course
+      - course_number
+      - courseware_id
+      - courseware_url
+      - id
+      - is_archived
+      - is_enrollable
+      - is_upgradable
+      - products
+      - run_tag
+      - title
+    V1CourseRunWithCourseRequest:
+      type: object
+      description: CourseRun model serializer - also serializes the parent Course.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          minLength: 1
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        live:
+          type: boolean
+      required:
+      - courseware_id
+      - run_tag
+      - title
+    V1CourseWithCourseRuns:
+      type: object
+      description: Course model serializer - also serializes child course runs
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        next_run_id:
+          type: integer
+          nullable: true
+          description: Get next run id
+          readOnly: true
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+          readOnly: true
+        page:
+          allOf:
+          - $ref: '#/components/schemas/CoursePage'
+          readOnly: true
+        programs:
+          allOf:
+          - $ref: '#/components/schemas/Program'
+          nullable: true
+          readOnly: true
+        courseruns:
+          type: array
+          items:
+            $ref: '#/components/schemas/V1BaseCourseRun'
+          readOnly: true
+      required:
+      - courseruns
+      - departments
+      - id
+      - next_run_id
+      - page
+      - programs
+      - readable_id
+      - title
+    V1Program:
+      type: object
+      description: Program model serializer
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        courses:
+          allOf:
+          - $ref: '#/components/schemas/V1CourseWithCourseRuns'
+          readOnly: true
+        requirements:
+          type: object
+          properties:
+            required:
+              type: array
+              items:
+                oneOf:
+                - type: integer
+              description: List of required course IDs
+            electives:
+              type: array
+              items:
+                oneOf:
+                - type: integer
+              description: List of elective course IDs
+          readOnly: true
+        req_tree:
+          type: array
+          items:
+            $ref: '#/components/schemas/V1ProgramRequirement'
+          readOnly: true
+        page:
+          allOf:
+          - $ref: '#/components/schemas/ProgramPage'
+          readOnly: true
+        program_type:
+          type: string
+          nullable: true
+          maxLength: 255
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+          readOnly: true
+        live:
+          type: boolean
+      required:
+      - courses
+      - departments
+      - id
+      - page
+      - readable_id
+      - req_tree
+      - requirements
+      - title
+    V1ProgramRequirement:
+      type: object
+      description: Serializer for a ProgramRequirement
+      properties:
+        id:
+          type: integer
+          nullable: true
+        data:
+          $ref: '#/components/schemas/V1ProgramRequirementData'
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/V1ProgramRequirement'
+          default: []
+      required:
+      - data
+    V1ProgramRequirementData:
+      type: object
+      description: Serializer for ProgramRequirement data
+      properties:
+        node_type:
+          $ref: '#/components/schemas/NodeTypeEnum'
+        course:
+          type: string
+          nullable: true
+        program:
+          type: string
+        title:
+          type: string
+          nullable: true
+        operator:
+          type: string
+          nullable: true
+        operator_value:
+          type: string
+          nullable: true
+        elective_flag:
+          type: boolean
+          nullable: true
+          default: false
+      required:
+      - node_type
+    V2CourseRun:
+      type: object
+      description: CourseRun model serializer
+      properties:
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_url:
+          type: string
+          nullable: true
+          description: Get the courseware URL
+          readOnly: true
+        courseware_id:
+          type: string
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_upgradable:
+          type: boolean
+          description: Check if the course run is upgradable
+          readOnly: true
+        is_enrollable:
+          type: boolean
+          description: Check if the course run is enrollable
+          readOnly: true
+        is_archived:
+          type: boolean
+          description: Check if the course run is archived
+          readOnly: true
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        id:
+          type: integer
+          readOnly: true
+        live:
+          type: boolean
+        course_number:
+          type: string
+          description: Get the course number
+          readOnly: true
+        products:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ProductFlexibilePrice'
+          readOnly: true
+        approved_flexible_price_exists:
+          type: boolean
+          readOnly: true
+      required:
+      - approved_flexible_price_exists
+      - course_number
+      - courseware_id
+      - courseware_url
+      - id
+      - is_archived
+      - is_enrollable
+      - is_upgradable
+      - products
+      - run_tag
+      - title
+    V2Program:
+      type: object
+      description: Program Model Serializer v2
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        courses:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+        requirements:
+          type: object
+          properties:
+            required:
+              type: array
+              items:
+                oneOf:
+                - type: integer
+              description: List of required course IDs
+            electives:
+              type: array
+              items:
+                oneOf:
+                - type: integer
+              description: List of elective course IDs
+          readOnly: true
+        req_tree:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2ProgramRequirement'
+          readOnly: true
+        page:
+          allOf:
+          - $ref: '#/components/schemas/ProgramPage'
+          readOnly: true
+        program_type:
+          type: string
+          nullable: true
+          maxLength: 255
+        certificate_type:
+          type: string
+          readOnly: true
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+          readOnly: true
+        live:
+          type: boolean
+        topics:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+          readOnly: true
+        availability:
+          $ref: '#/components/schemas/AvailabilityEnum'
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+        required_prerequisites:
+          type: boolean
+          description: Check if the prerequisites field is populated in the program
+            page CMS.
+          readOnly: true
+        duration:
+          type: string
+          nullable: true
+          description: Get the length/duration field from the program page CMS.
+          readOnly: true
+        min_weeks:
+          type: integer
+          nullable: true
+          description: Get the min weeks of the program from the CMS page.
+          readOnly: true
+        max_weeks:
+          type: integer
+          nullable: true
+          description: Get the max weeks of the program from the CMS page.
+          readOnly: true
+        time_commitment:
+          type: string
+          nullable: true
+          description: Get the effort/time_commitment field from the program page
+            CMS.
+          readOnly: true
+        min_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the min weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+        max_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the max weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+      required:
+      - certificate_type
+      - courses
+      - departments
+      - duration
+      - id
+      - max_weekly_hours
+      - max_weeks
+      - min_weekly_hours
+      - min_weeks
+      - page
+      - readable_id
+      - req_tree
+      - required_prerequisites
+      - requirements
+      - time_commitment
+      - title
+      - topics
+    V2ProgramRequirement:
+      type: object
+      description: Serializer for a ProgramRequirement
+      properties:
+        id:
+          type: integer
+          nullable: true
+        data:
+          $ref: '#/components/schemas/V2ProgramRequirementData'
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2ProgramRequirement'
+          default: []
+      required:
+      - data
+    V2ProgramRequirementData:
+      type: object
+      description: Serializer for ProgramRequirement data
+      properties:
+        node_type:
+          $ref: '#/components/schemas/NodeTypeEnum'
+        course:
+          type: string
+          nullable: true
+        program:
+          type: string
+        title:
+          type: string
+          nullable: true
+        operator:
+          type: string
+          nullable: true
+        operator_value:
+          type: string
+          nullable: true
+        elective_flag:
+          type: boolean
+          nullable: true
+          default: false
+      required:
+      - node_type
+    YearsExperienceEnum:
+      enum:
+      - 2
+      - 5
+      - 10
+      - 15
+      - 20
+      - 21
+      - 0
+      description: |-
+        * `None` - ----
+        * `2` - Less than 2 years
+        * `5` - 2-5 years
+        * `10` - 6 - 10 years
+        * `15` - 11 - 15 years
+        * `20` - 16 - 20 years
+        * `21` - More than 20 years
+        * `0` - Prefer not to say
+      x-enum-descriptions:
+      - Less than 2 years
+      - 2-5 years
+      - 6 - 10 years
+      - 11 - 15 years
+      - 16 - 20 years
+      - More than 20 years
+      - Prefer not to say
