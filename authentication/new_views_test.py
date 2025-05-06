@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import pytest
 from django.test import RequestFactory
 from django.urls import reverse
@@ -7,7 +5,7 @@ from rest_framework import status
 
 from authentication.new_views import CustomLoginView
 from users.api import User
-from users.factories import UserFactory, UserProfileFactory
+from users.factories import UserFactory
 from users.models import MALE, UserProfile
 
 
