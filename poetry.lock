@@ -81,6 +81,7 @@ description = "Timeout context manager for asyncio programs"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "python_full_version < \"3.11.3\""
 files = [
     {file = "async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c"},
     {file = "async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3"},
@@ -1593,6 +1594,7 @@ description = "Backport of PEP 654 (exception groups)"
 optional = false
 python-versions = ">=3.7"
 groups = ["main", "dev"]
+markers = "python_version == \"3.10\""
 files = [
     {file = "exceptiongroup-1.2.2-py3-none-any.whl", hash = "sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b"},
     {file = "exceptiongroup-1.2.2.tar.gz", hash = "sha256:47c2edf7c6738fafb49fd34290706d1a1a2f4d1c6df275526b62cbb4aa5393cc"},
@@ -2035,8 +2037,8 @@ files = [
 ]
 
 [package.dependencies]
-decorator = {version = "*", markers = "python_version > \"3.6\" and python_version < \"3.11\""}
-ipython = {version = ">=7.31.1", markers = "python_version > \"3.6\" and python_version < \"3.11\""}
+decorator = {version = "*", markers = "python_version > \"3.6\""}
+ipython = {version = ">=7.31.1", markers = "python_version > \"3.6\""}
 tomli = {version = "*", markers = "python_version > \"3.6\" and python_version < \"3.11\""}
 
 [[package]]
@@ -3503,6 +3505,7 @@ description = "A library for building flexible command line interfaces"
 optional = false
 python-versions = ">=3.8"
 groups = ["dev"]
+markers = "python_version < \"3.13\""
 files = [
     {file = "pyrepl-0.11.3.post1-py3-none-any.whl", hash = "sha256:59fcd67588892731dc6e7aff106c380d303d54324ff028827804a2b056223d92"},
     {file = "pyrepl-0.11.3.post1.tar.gz", hash = "sha256:0ca7568c8be919b69f99644d29d31738a5b1a87750d06dd36564bcfad278d402"},
@@ -4388,6 +4391,7 @@ files = [
     {file = "tomli-2.2.1-py3-none-any.whl", hash = "sha256:cb55c73c5f4408779d0cf3eef9f762b9c9f147a77de7b258bef0a5628adc85cc"},
     {file = "tomli-2.2.1.tar.gz", hash = "sha256:cd45e1dc79c835ce60f7404ec8119f2eb06d38b1deba146f07ced3bbc44505ff"},
 ]
+markers = {main = "python_version == \"3.10\"", dev = "python_full_version <= \"3.11.0a6\""}
 
 [[package]]
 name = "toolz"
@@ -4440,6 +4444,7 @@ files = [
     {file = "typing_extensions-4.13.2-py3-none-any.whl", hash = "sha256:a439e7c04b49fec3e5d3e2beaa21755cadbbdc391694e28ccdd36ca4a1408f8c"},
     {file = "typing_extensions-4.13.2.tar.gz", hash = "sha256:e6c81219bd689f51865d9e372991c540bda33a0379d5573cddb9a3a23f7caaef"},
 ]
+markers = {dev = "python_version < \"3.12\""}
 
 [[package]]
 name = "tzdata"
@@ -4721,7 +4726,10 @@ files = [
 [package.dependencies]
 defusedxml = ">=0.7,<1.0"
 filetype = ">=1.0.10,<1.1.0 || >1.1.0"
-pillow-heif = {version = ">=0.10.0,<0.22.0", optional = true, markers = "extra == \"heif\" and python_version < \"3.12\""}
+pillow-heif = [
+    {version = ">=0.10.0,<0.22.0", optional = true, markers = "extra == \"heif\" and python_version < \"3.12\""},
+    {version = ">=0.13.0,<0.22.0", optional = true, markers = "extra == \"heif\" and python_version >= \"3.12\""},
+]
 
 [package.extras]
 docs = ["Sphinx (>=7.0)", "sphinx-wagtail-theme (>=6.1.1,<7.0)", "sphinx_copybutton (>=0.5)", "sphinxcontrib-spelling (>=8.0,<9.0)"]
@@ -4787,5 +4795,5 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = "3.10.16"
-content-hash = "1d81c5deacefbbfcf3d873da0ef543959fd4e84a6e3bd4ce9ce090f257cc994f"
+python-versions = "^3.10"
+content-hash = "ff50649737c8c5deacae87c166e95148b4bc7089d515c45df9503147a61d7ec7"
