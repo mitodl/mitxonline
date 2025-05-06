@@ -7,6 +7,7 @@ from rest_framework import status
 
 from authentication.new_views import CustomLoginView
 from users.api import User
+from users.factories import UserFactory, UserProfileFactory
 from users.models import MALE, UserProfile
 
 
@@ -73,13 +74,13 @@ def test_post_user_extra_detail(mocker, client, user):
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
-
+@pytest.mark.django_db
 def test_custom_login_view_authenticated_user_with_onboarding(mocker):
     """Test CustomLoginView for an authenticated user with incomplete onboarding"""
     factory = RequestFactory()
     request = factory.get(reverse("login"), {"next": "/dashboard"})
-    request.user = MagicMock(is_anonymous=False)
-    request.user.profile = MagicMock(completed_onboarding=False)
+    user = UserFactory()
+    request.user = user
     mocker.patch("authentication.new_views.get_redirect_url", return_value="/dashboard")
     mocker.patch("authentication.new_views.urlencode", return_value="next=/dashboard")
     mocker.patch(
@@ -92,13 +93,13 @@ def test_custom_login_view_authenticated_user_with_onboarding(mocker):
     assert response.status_code == 302
     assert response.url == "/create-profile?next=/dashboard"
 
-
+@pytest.mark.django_db
 def test_custom_login_view_authenticated_user_with_completed_onboarding(mocker):
     """Test that user who has completed onboarding is redirected to next url"""
     factory = RequestFactory()
     request = factory.get(reverse("login"), {"next": "/dashboard"})
-    request.user = MagicMock(is_anonymous=False)
-    request.user.profile = MagicMock(completed_onboarding=True)
+    user = UserFactory(user_profile__completed_onboarding=True)
+    request.user = user
     mocker.patch("authentication.new_views.get_redirect_url", return_value="/dashboard")
 
     response = CustomLoginView().get(request)
