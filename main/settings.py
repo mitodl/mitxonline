@@ -1041,13 +1041,13 @@ MITOL_AUTHENTICATION_REPLY_TO_EMAIL = MITX_ONLINE_REPLY_TO_ADDRESS
 
 OPENEDX_OAUTH_PROVIDER = get_string(
     name="OPENEDX_OAUTH_PROVIDER",
-    default="mitxpro-oauth2",
+    default="ol-oauth2",
     description="Social auth provider backend name",
 )
 
 OPENEDX_SOCIAL_LOGIN_PATH = get_string(
     name="OPENEDX_SOCIAL_LOGIN_PATH",
-    default="/auth/login/mitxpro-oauth2/?auth_entry=login",
+    default="/auth/login/ol-oauth2/?auth_entry=login",
     description="Open edX social auth login url",
 )
 
