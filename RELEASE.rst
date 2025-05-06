@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.115.2
+Version 0.115.2 (Released May 06, 2025)
 ---------------
 
 - config,fix: Remove patch version specifier for Python runtime
