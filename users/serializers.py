@@ -181,6 +181,31 @@ class StaffDashboardUserSerializer(serializers.ModelSerializer):
         )
 
 
+class UserContractSerializer(serializers.ModelSerializer):
+    """Serializer for user contract data"""
+
+    class Meta:
+        model = "b2b.ContractPage"
+        fields = ("id", "name", "description", "integration_type", "contract_start", "contract_end")
+        read_only_fields = ("id", "name", "description", "integration_type", "contract_start", "contract_end")
+
+
+class UserOrganizationSerializer(serializers.ModelSerializer):
+    """Serializer for user organization data"""
+
+    contracts = serializers.SerializerMethodField()
+
+    def get_contracts(self, instance):
+        """Get the contracts for the organization for the user"""
+        contracts = instance.contracts.filter(pk__in=self.context.user).all()
+        return UserContractSerializer(contracts, many=True).data
+
+    class Meta:
+        model = "b2b.OrganizationPage"
+        fields = ("id", "name", "slug", "logo", "contracts")
+        read_only_fields = ("id", "name", "slug", "logo", "contracts")
+
+
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for users"""
 
@@ -201,6 +226,7 @@ class UserSerializer(serializers.ModelSerializer):
     user_profile = UserProfileSerializer(allow_null=True, required=False)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
     is_active = serializers.BooleanField(default=True)
+    b2b_organizations = serializers.SerializerMethodField()
 
     def validate_email(self, value):
         """Empty validation function, but this is required for WriteableSerializerMethodField"""
@@ -233,6 +259,14 @@ class UserSerializer(serializers.ModelSerializer):
     @extend_schema_field(list[str])
     def get_grants(self, instance):
         return instance.get_all_permissions()
+
+    def get_b2b_organizations(self, instance):
+        """Get the organizations for the user"""
+        if instance.is_anonymous:
+            return []
+
+        organizations = instance.b2b_organizations
+        return UserOrganizationSerializer(organizations, many=True, context={"user": instance}).data
 
     def validate(self, data):
         request = self.context.get("request", None)
@@ -374,6 +408,7 @@ class UserSerializer(serializers.ModelSerializer):
             "updated_on",
             "grants",
             "is_active",
+            "b2b_organizations",
         )
         read_only_fields = (
             "username",
@@ -386,6 +421,7 @@ class UserSerializer(serializers.ModelSerializer):
             "updated_on",
             "grants",
             "global_id",
+            "b2b_organizations",
         )
 
 
