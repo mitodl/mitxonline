@@ -74,6 +74,7 @@ def test_post_user_extra_detail(mocker, client, user):
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
+
 @pytest.mark.django_db
 def test_custom_login_view_authenticated_user_with_onboarding(mocker):
     """Test CustomLoginView for an authenticated user with incomplete onboarding"""
@@ -92,6 +93,7 @@ def test_custom_login_view_authenticated_user_with_onboarding(mocker):
 
     assert response.status_code == 302
     assert response.url == "/create-profile?next=/dashboard"
+
 
 @pytest.mark.django_db
 def test_custom_login_view_authenticated_user_with_completed_onboarding(mocker):
