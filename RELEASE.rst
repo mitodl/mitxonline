@@ -1,6 +1,31 @@
 Release Notes
 =============
 
+Version 0.115.2
+---------------
+
+- Remove the 0028 migration that sets usernames to email addresses (#2640)
+- Add B2B organizations (#2610)
+- Update the extra hosts section to include local.openedx.io (#2635)
+- add v1 and v2 to the openapi spec (#2637)
+- 7092 add country and year of birth to the dashboard modal (#2611)
+- fix(deps): update react monorepo (#2632)
+- fix(deps): update dependency video.js to v7.21.7 (#2631)
+- fix(deps): update dependency social-auth-app-django to v5.4.3 (#2630)
+- fix(deps): update dependency postcss to v8.5.3 (#2629)
+- fix(deps): update dependency object.entries to v1.1.9 (#2628)
+- fix(deps): update dependency bootstrap to v5.3.5 (#2627)
+- chore(deps): update dependency yarn-upgrade-all to v0.7.5 (#2626)
+- chore(deps): lock file maintenance (#2453)
+- Fix JS test failures in CI (#2623)
+- Add a migration to copy existing email addresses into the username field (#2616)
+- Make gemini optional on PRs (#2620)
+- Remove unused username and user methods (#2621)
+- Fix some issues with Docker infra config (#2622)
+- Fixes some test issues (#2618)
+- [pre-commit.ci] pre-commit autoupdate (#2436)
+- dockerfile enhancements (#2604)
+
 Version 0.115.1 (Released May 01, 2025)
 ---------------
 
