@@ -1,0 +1,24 @@
+"""URL routing for v0 of the B2B API."""
+
+from django.urls import include, re_path
+from rest_framework.routers import SimpleRouter
+
+from b2b.views.v0 import ContractPageViewSet, OrganizationPageViewSet
+
+app_name = "b2b"
+
+v0_router = SimpleRouter()
+v0_router.register(
+    r"organizations",
+    OrganizationPageViewSet,
+    basename="b2b-organization",
+)
+v0_router.register(
+    r"contracts",
+    ContractPageViewSet,
+    basename="b2b-contract",
+)
+
+urlpatterns = [
+    re_path(r"^", include(v0_router.urls)),
+]

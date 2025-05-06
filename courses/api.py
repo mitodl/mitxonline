@@ -1,16 +1,18 @@
 """API for the Courses app"""
 
+from __future__ import annotations
+
 import logging
 from collections import namedtuple
 from datetime import timedelta
 from traceback import format_exc
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.db.models.query import QuerySet
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
@@ -59,6 +61,10 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+
+if TYPE_CHECKING:
+    from django.db.models.query import QuerySet
+
 
 log = logging.getLogger(__name__)
 UserEnrollments = namedtuple(  # noqa: PYI024
@@ -936,3 +942,23 @@ def manage_program_certificate_access(user, program, revoke_state):
     program_certificate.save()
 
     return True
+
+
+def resolve_courseware_object_from_id(
+    courseware_id: str,
+) -> Program | Course | CourseRun | None:
+    """
+    Resolves a courseware_id to a CourseRun, Course, or Program.
+
+    Args:
+        courseware_id (str): The courseware_id to resolve.
+
+    Returns:
+        CourseRun | Course | Program | None: The resolved object or None if not found.
+    """
+    if is_program_text_id(courseware_id):
+        return Program.objects.filter(readable_id=courseware_id).first()
+    return (
+        CourseRun.objects.filter(courseware_id=courseware_id).first()
+        or Course.objects.filter(readable_id=courseware_id).first()
+    )

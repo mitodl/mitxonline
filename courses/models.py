@@ -76,13 +76,13 @@ class CourseQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
 class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
     def live(self):
         """Applies a filter for Course runs with live=True"""
-        return self.filter(live=True)
+        return self.filter(live=True, b2b_contract__isnull=True)
 
     def available(self):
         """Applies a filter for Course runs with end_date in future"""
         return self.filter(
             models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
-        )
+        ).filter(b2b_contract__isnull=True)
 
     def with_text_id(self, text_id):
         """Applies a filter for the CourseRun's courseware_id"""
@@ -445,6 +445,16 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         return None
 
+    @property
+    def is_program(self):
+        """Flag to indicate if this is a program"""
+        return True
+
+    @property
+    def is_run(self):
+        """Flag to indicate if this is a run"""
+        return False
+
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
     """
@@ -497,6 +507,16 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
         return ENROLLABLE_ITEM_ID_SEPARATOR.join(
             [self.program.readable_id, self.run_tag]
         )
+
+    @property
+    def is_program(self):
+        """Flag to indicate if this is a program"""
+        return True
+
+    @property
+    def is_run(self):
+        """Flag to indicate if this is a run"""
+        return True
 
     def __str__(self):
         return f"{self.program.readable_id} | {self.program.title}"
@@ -646,6 +666,16 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             country=user.legal_address.country
         ).exists()
 
+    @property
+    def is_program(self):
+        """Flag to indicate if this is a program"""
+        return False
+
+    @property
+    def is_run(self):
+        """Flag to indicate if this is a run"""
+        return False
+
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
@@ -716,6 +746,14 @@ class CourseRun(TimestampedModel):
     is_self_paced = models.BooleanField(default=False)
     products = GenericRelation(
         "ecommerce.Product", related_query_name="courserunproducts"
+    )
+
+    b2b_contract = models.ForeignKey(
+        "b2b.ContractPage",
+        null=True,
+        blank=True,
+        on_delete=models.DO_NOTHING,
+        related_name="course_runs",
     )
 
     class Meta:
@@ -806,6 +844,16 @@ class CourseRun(TimestampedModel):
     def readable_id(self):
         """Alias for the courseware_id so this is consistent with Course and Program"""
         return self.courseware_id
+
+    @property
+    def is_program(self):
+        """Flag to indicate if this is a program"""
+        return False
+
+    @property
+    def is_run(self):
+        """Flag to indicate if this is a run"""
+        return True
 
     def __str__(self):
         title = f"{self.courseware_id} | {self.title}"

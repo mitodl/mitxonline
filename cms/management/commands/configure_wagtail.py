@@ -26,3 +26,7 @@ class Command(BaseCommand):
         ensure_signatory_index()
         ensure_certificate_index()
         ensure_instructors_index()
+
+        from b2b.api import ensure_b2b_organization_index
+
+        ensure_b2b_organization_index()

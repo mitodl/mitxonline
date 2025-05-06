@@ -1,10 +1,11 @@
 """mitx_online utilities"""
 
+from __future__ import annotations
+
 import json
-from datetime import datetime
-from decimal import Decimal
+from datetime import date, datetime
 from enum import Flag, auto
-from typing import Set, Tuple, TypeVar, Union  # noqa: UP035
+from typing import TYPE_CHECKING, Optional, Set, Tuple, TypeVar, Union  # noqa: UP035
 from urllib.parse import quote_plus
 
 import dateutil
@@ -15,10 +16,14 @@ from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import reverse
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
-from rest_framework.response import Response
 
 from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
 from main.settings import TIME_ZONE
+
+if TYPE_CHECKING:
+    from decimal import Decimal
+
+    from rest_framework.response import Response
 
 
 class FeatureFlag(Flag):
@@ -202,3 +207,12 @@ def now_datetime_with_tz():
     """Return now with the configured timezone."""
 
     return datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+
+
+def date_to_datetime(date: date, tzinfo: Optional[str] = None) -> datetime:
+    """Convert a regular date to a datetime with optiona timezone info."""
+
+    ret_date = datetime.fromisocalendar(*date.isocalendar())
+    if tzinfo:
+        ret_date = ret_date.replace(tzinfo=pytz.timezone(tzinfo))
+    return ret_date
