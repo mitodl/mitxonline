@@ -597,10 +597,10 @@ def get_edx_grades_with_users(course_run, user=None):
         for edx_grade in all_grades:
             try:
                 user = User.objects.get(
-                    openedx_users__edx_username=edx_grade.edx_username
+                    openedx_users__edx_username=edx_grade.username
                 )
             except User.DoesNotExist:  # noqa: PERF203
-                log.warning("User with username %s not found", edx_grade.edx_username)
+                log.warning("User with username %s not found", edx_grade.username)
             else:
                 yield edx_grade, user
 
