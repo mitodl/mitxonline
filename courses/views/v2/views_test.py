@@ -8,9 +8,10 @@ import random
 import pytest
 from django.db import connection
 from django.urls import reverse
+from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from rest_framework import status
 
-from courses.factories import DepartmentFactory
+from courses.factories import CourseFactory, CourseRunFactory, DepartmentFactory
 from courses.models import Course, Program
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v2.departments import (
@@ -22,7 +23,7 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import Pagination
+from courses.views.v2 import CourseFilterSet, Pagination
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
@@ -251,3 +252,19 @@ def test_get_course(
         CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
     )
     assert_drf_json_equal(course_data, course_from_fixture, ignore_order=True)
+
+
+def test_filter_with_org_id(user_drf_client):
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org)
+    course = CourseFactory(title="Course A")
+    run = CourseRunFactory(course=course, b2b_contract=contract)
+
+    resp = user_drf_client.get(
+            reverse("v2:courses_api",),
+            {"org_id": str(org.id)},
+        )
+    queryset = Course.objects.all()
+    filtered = CourseFilterSet(data={}, request=resp, queryset=queryset).qs
+
+    assert course in filtered
