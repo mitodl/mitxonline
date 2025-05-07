@@ -14,7 +14,7 @@ from authentication.new_views import (
 urlpatterns = [
     path("api/", include("mitol.authentication.urls.djoser_urls")),
     path("logout/", CustomLogoutView.as_view(), name="logout"),
-    path(r"login/", CustomLoginView.as_view(), name="login"),
+    path(r"login/", CustomLoginView.as_view(), name="gateway-login"),
     path(
         "api/profile/details/",
         RegisterDetailsView.as_view(),
