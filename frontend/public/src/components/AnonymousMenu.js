@@ -57,7 +57,19 @@ const AnonymousMenu = ({ mobileView }: Props) => {
           </MixedLink>
         </li>
       )}
-      {!SETTINGS.oidc_login_url && (
+      {!SETTINGS.oidc_login_url && SETTINGS.api_gateway_enabled && (
+        <li>
+          <MixedLink
+            id={"login".concat(identifierPostfix)}
+            dest={routes.apiGatewayLogin}
+            className="simple"
+            aria-label="Login"
+          >
+            {makeNavLink("Login")}
+          </MixedLink>
+        </li>
+      )}
+      {!SETTINGS.oidc_login_url && !SETTINGS.api_gateway_enabled && (
         <li>
           <MixedLink
             id={"login".concat(identifierPostfix)}
@@ -69,7 +81,7 @@ const AnonymousMenu = ({ mobileView }: Props) => {
           </MixedLink>
         </li>
       )}
-      {!SETTINGS.oidc_login_url && (
+      {!SETTINGS.oidc_login_url && !SETTINGS.api_gateway_enabled && (
         <li>
           <MixedLink
             id={"createAccount".concat(identifierPostfix)}

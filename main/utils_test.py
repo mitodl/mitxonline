@@ -58,6 +58,7 @@ def test_get_js_settings(settings, rf, include_oidc_login):
         "posthog_api_host": settings.POSTHOG_API_HOST,
         "unified_ecommerce_url": settings.UNIFIED_ECOMMERCE_URL,
         "oidc_login_url": oidc_login_url if include_oidc_login else None,
+        "api_gateway_enabled": not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE,
     }
 
 
