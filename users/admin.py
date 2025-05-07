@@ -77,6 +77,13 @@ class OpenEdxUserInline(admin.StackedInline):
     )
 
 
+class UserContractPageInline(admin.TabularInline):
+    """Inline to allow modifying the contracts associated with a user"""
+
+    model = User.b2b_contracts.through
+    extra = 0
+
+
 @admin.register(User)
 class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
     """Admin views for user"""
@@ -120,7 +127,12 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
     search_fields = ("openedx_users__edx_username", "name", "email")
     ordering = ("email",)
     readonly_fields = ("last_login", "hubspot_sync_datetime")
-    inlines = [OpenEdxUserInline, UserLegalAddressInline, UserProfileInline]
+    inlines = [
+        OpenEdxUserInline,
+        UserLegalAddressInline,
+        UserProfileInline,
+        UserContractPageInline,
+    ]
 
     @admin.display(description="OpenedX Username")
     def edx_username(self, obj):

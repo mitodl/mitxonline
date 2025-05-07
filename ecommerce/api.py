@@ -3,7 +3,9 @@
 import logging
 import uuid
 from decimal import Decimal
+from urllib.parse import urljoin
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -141,7 +143,7 @@ def generate_checkout_payload(request):
                 ),
             }
 
-    callback_uri = request.build_absolute_uri(reverse("checkout-result-callback"))
+    callback_uri = urljoin(settings.SITE_BASE_URL, reverse("checkout-result-callback"))
     payload = PaymentGateway.start_payment(
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
         gateway_order,

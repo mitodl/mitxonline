@@ -12,6 +12,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from social_django.models import UserSocialAuth
 
+from b2b.serializers.v0 import ContractPageSerializer, OrganizationPageSerializer
 from hubspot_sync.task_helpers import sync_hubspot_user
 
 # from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
@@ -181,29 +182,30 @@ class StaffDashboardUserSerializer(serializers.ModelSerializer):
         )
 
 
-class UserContractSerializer(serializers.ModelSerializer):
-    """Serializer for user contract data"""
+class UserOrganizationSerializer(OrganizationPageSerializer):
+    """
+    Serializer for user organization data.
 
-    class Meta:
-        model = "b2b.ContractPage"
-        fields = ("id", "name", "description", "integration_type", "contract_start", "contract_end")
-        read_only_fields = ("id", "name", "description", "integration_type", "contract_start", "contract_end")
-
-
-class UserOrganizationSerializer(serializers.ModelSerializer):
-    """Serializer for user organization data"""
+    Slightly different from the OrganizationPageSerializer; we only need
+    the user's orgs and contracts.
+    """
 
     contracts = serializers.SerializerMethodField()
 
     def get_contracts(self, instance):
         """Get the contracts for the organization for the user"""
-        contracts = instance.contracts.filter(pk__in=self.context.user).all()
-        return UserContractSerializer(contracts, many=True).data
+        contracts = (
+            self.context["user"]
+            .b2b_contracts.filter(
+                organization=instance,
+            )
+            .all()
+        )
+        return ContractPageSerializer(contracts, many=True).data
 
-    class Meta:
-        model = "b2b.OrganizationPage"
-        fields = ("id", "name", "slug", "logo", "contracts")
-        read_only_fields = ("id", "name", "slug", "logo", "contracts")
+    class Meta(OrganizationPageSerializer.Meta):
+        fields = (*OrganizationPageSerializer.Meta.fields, "contracts")
+        read_only_fields = (*OrganizationPageSerializer.Meta.fields, "contracts")
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -266,7 +268,9 @@ class UserSerializer(serializers.ModelSerializer):
             return []
 
         organizations = instance.b2b_organizations
-        return UserOrganizationSerializer(organizations, many=True, context={"user": instance}).data
+        return UserOrganizationSerializer(
+            organizations, many=True, context={"user": instance}
+        ).data
 
     def validate(self, data):
         request = self.context.get("request", None)

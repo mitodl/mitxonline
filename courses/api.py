@@ -196,6 +196,12 @@ def create_run_enrollments(  # noqa: C901
 
             _enroll_learner_into_associated_programs()
 
+            # If the run is associated with a B2B contract, add the contract
+            # to the user's contract list
+            if run.b2b_contract:
+                user.b2b_contracts.add(run.b2b_contract)
+                user.save()
+
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
                 enrollment.edx_enrolled = edx_request_success

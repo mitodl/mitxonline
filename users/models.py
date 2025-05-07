@@ -16,6 +16,7 @@ from django_scim.models import AbstractSCIMUserMixin
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 
+from b2b.models import OrganizationPage
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from openedx.models import OpenEdxUser
 
@@ -325,7 +326,9 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin, AbstractSCIMUse
     @cached_property
     def b2b_organizations(self):
         """Return the organizations the user is associated with."""
-        return self.b2b_contracts.values_list("organization", flat=True).distinct()
+        return OrganizationPage.objects.filter(
+            pk__in=self.b2b_contracts.values_list("organization", flat=True).distinct()
+        ).all()
 
 
 def generate_change_email_code():
