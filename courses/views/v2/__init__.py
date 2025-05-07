@@ -71,29 +71,22 @@ class CourseFilterSet(django_filters.FilterSet):
     )
     id = IdInFilter(field_name="id", lookup_expr="in", label="Course ID")
 
-    def __init__(self, *args, **kwargs):
-        request = kwargs.get("request")
-        super().__init__(*args, **kwargs)
-
+    def filter_queryset(self, queryset):
+        request = self.request
         user = request.user if request else None
         org_id = request.query_params.get("org_id") if request else None
 
         if not user or user.is_anonymous:
-            # Anonymous users see only courses with course runs that have NO contracts
-            self.queryset = self.queryset.filter(
-                courseruns__b2b_contract__isnull=True
-            )
+            queryset = queryset.filter(courseruns__b2b_contract__isnull=True)
         elif org_id:
-            # Authenticated user and org_id present: filter by active contracts for the org
-            self.queryset = self.queryset.filter(
+            queryset = queryset.filter(
                 courseruns__b2b_contract__organization__id=org_id,
                 courseruns__b2b_contract__active=True,
             )
         else:
-            # Authenticated user but no org_id: show only courses with course runs without any contracts
-            self.queryset = self.queryset.filter(
-                courseruns__b2b_contract__isnull=True
-            )
+            queryset = queryset.filter(courseruns__b2b_contract__isnull=True)
+
+        return super().filter_queryset(queryset.distinct())
 
     def filter_courserun_is_enrollable(self, queryset, _, value):
         if value:
