@@ -165,7 +165,7 @@ def validate_basket_for_b2b_purchase(request) -> bool:
     # be lifted out and into UE later (which supports >1 item).
 
     for item in (
-        basket.items.filter(product__content_type=course_run_content_type)
+        basket.basket_items.filter(product__content_type=course_run_content_type)
         .prefetch_related(
             "product",
             "product__purchasable_object",
@@ -179,11 +179,13 @@ def validate_basket_for_b2b_purchase(request) -> bool:
             basket_contracts.append(contract)
 
     discounts_with_contracts = (
-        basket.discounts.filter(redeemed_discount__content_type=course_run_content_type)
+        basket.discounts.filter(
+            redeemed_discount__products__product__content_type=course_run_content_type
+        )
         .prefetch_related(
             "redeemed_discount",
-            "redeemed_discount__purchasable_object",
-            "redeemed_discount__purchasable_object__b2b_contract",
+            "redeemed_discount__products__product__purchasable_object",
+            "redeemed_discount__products__product__purchasable_object__b2b_contract",
         )
         .all()
     )
@@ -193,9 +195,10 @@ def validate_basket_for_b2b_purchase(request) -> bool:
         return False
 
     for discount_item in discounts_with_contracts:
-        contract = discount_item.redeemed_discount.purchasable_object.b2b_contract
+        for discount_product in discount_item.redeemed_discount.products:
+            contract = discount_product.product.purchasable_object.b2b_contract
 
-        if contract and not (contract.is_active or contract in basket_contracts):
-            return False
+            if contract and not (contract.is_active or contract in basket_contracts):
+                return False
 
     return True
