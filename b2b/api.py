@@ -178,6 +178,12 @@ def validate_basket_for_b2b_purchase(request) -> bool:
         if contract and contract.is_active:
             basket_contracts.append(contract)
 
+    if len(basket_contracts) == 0:
+        # No contracts in the basket, so we don't need to check further.
+        # The other validity checks that run before will make sure the discount
+        # applies to the basket products.
+        return True
+
     discounts_with_contracts = (
         basket.discounts.filter(
             redeemed_discount__products__product__content_type=course_run_content_type
@@ -195,7 +201,7 @@ def validate_basket_for_b2b_purchase(request) -> bool:
         return False
 
     for discount_item in discounts_with_contracts:
-        for discount_product in discount_item.redeemed_discount.products:
+        for discount_product in discount_item.redeemed_discount.products.all():
             contract = discount_product.product.purchasable_object.b2b_contract
 
             if contract and not (contract.is_active or contract in basket_contracts):
