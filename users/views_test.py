@@ -9,6 +9,7 @@ from mitol.common.utils import now_in_utc
 from rest_framework import status
 from social_django.models import UserSocialAuth
 
+from b2b.factories import ContractPageFactory
 from main.test_utils import drf_datetime
 from users.api import User
 from users.factories import UserFactory
@@ -47,11 +48,40 @@ def test_get_user_by_id(user_client, user):
 
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
-@pytest.mark.parametrize("show_enrollment_codes", [True, False])
-def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_codes):
+@pytest.mark.parametrize("has_orgs", [True, False])
+def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
     """Test that user can request their own user by the 'me' alias"""
+    b2b_orgs = []
+
     if not is_anonymous:
         client.force_login(user)
+
+        if has_orgs:
+            contract = ContractPageFactory.create()
+            user.b2b_contracts.add(contract)
+            user.save()
+            b2b_orgs = [
+                {
+                    "id": contract.organization.id,
+                    "name": contract.organization.name,
+                    "description": contract.organization.description,
+                    "logo": None,
+                    "slug": contract.organization.slug,
+                    "contracts": [
+                        {
+                            "id": contract.id,
+                            "name": contract.name,
+                            "description": contract.description,
+                            "integration_type": contract.integration_type,
+                            "contract_start": None,
+                            "contract_end": None,
+                            "active": True,
+                            "slug": contract.slug,
+                            "organization": contract.organization.id,
+                        }
+                    ],
+                }
+            ]
 
     resp = client.get(reverse("users_api-me"))
 
@@ -70,8 +100,9 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "grants": [],
             "user_profile": None,
             "is_active": False,
+            "b2b_organizations": b2b_orgs,
         }
-    elif not is_anonymous and show_enrollment_codes:
+    else:
         assert resp.json() == {
             "id": user.id,
             "username": user.edx_username,
@@ -109,6 +140,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "is_superuser": user.is_superuser,
             "grants": list(user.get_all_permissions()),
             "is_active": True,
+            "b2b_organizations": b2b_orgs,
         }
 
 
