@@ -190,9 +190,11 @@ def validate_basket_for_b2b_purchase(request) -> bool:
         )
         .prefetch_related(
             "redeemed_discount",
+            "redeemed_discount__products",
             "redeemed_discount__products__product__purchasable_object",
             "redeemed_discount__products__product__purchasable_object__b2b_contract",
         )
+        .distinct()
         .all()
     )
 
@@ -204,7 +206,7 @@ def validate_basket_for_b2b_purchase(request) -> bool:
         for discount_product in discount_item.redeemed_discount.products.all():
             contract = discount_product.product.purchasable_object.b2b_contract
 
-            if contract and not (contract.is_active or contract in basket_contracts):
-                return False
+            if contract and contract.is_active and contract in basket_contracts:
+                return True
 
-    return True
+    return False
