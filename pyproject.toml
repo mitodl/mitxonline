@@ -71,6 +71,8 @@ drf-spectacular = "^0.28.0"
 wagtail = "6.3"
 mitol-django-apigateway = "^2025.4.25.1"
 rich = "^14.0.0"
+pyparsing = "^3.2"
+mitol-django-scim = "^2025.3.31"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -98,7 +100,7 @@ wagtail-factories = "^4.2"
 pytest-xdist = {extras = ["psutil"], version = "^3.6.1"}
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 88
 
 [tool.ruff.lint]

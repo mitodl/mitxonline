@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Count, DateTimeField, Q
 from django.utils.translation import gettext_lazy as _
+from django_scim.models import AbstractSCIMUserMixin
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 
@@ -236,7 +237,7 @@ class FaultyOpenEdxUserManager(BaseUserManager):
         )
 
 
-class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
+class User(AbstractBaseUser, TimestampedModel, PermissionsMixin, AbstractSCIMUserMixin):
     """Primary user class"""
 
     EMAIL_FIELD = "email"
@@ -278,12 +279,32 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         return self.name
 
     @cached_property
-    def edx_username(self) -> str:
+    def openedx_user(self) -> OpenEdxUser | None:
         """Returns the edx username"""
         if self.pk is None:
             return None
-        openedx_user = self.openedx_users.first()
-        return getattr(openedx_user, "edx_username", None)
+        return self.openedx_users.first()
+
+    @property
+    def edx_username(self) -> str | None:
+        """Returns the edx username"""
+        return getattr(self.openedx_user, "edx_username", None)
+
+    @property
+    def first_name(self):
+        return self.legal_address.first_name
+
+    @first_name.setter
+    def first_name(self, value):
+        self.legal_address.first_name = value
+
+    @property
+    def last_name(self):
+        return self.legal_address.last_name
+
+    @last_name.setter
+    def last_name(self, value):
+        self.legal_address.last_name = value
 
     @property
     def is_editor(self) -> bool:

@@ -363,7 +363,7 @@ def update_currency_exchange_rate(rates, currency_descriptions):
 
 
 def create_default_flexible_pricing_page(
-    object: Union[Course, Program],  # noqa: A002, FA100
+    object: Union[Course, Program],  # noqa: A002
     forceCourse: bool = False,  # noqa: FBT001, FBT002
     *args,  # noqa: ARG001
     **kwargs,

@@ -253,7 +253,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
 def _validate_enrollment_post_request(
     request: Request,
-) -> Union[Tuple[Optional[HttpResponse], None, None], Tuple[None, User, CourseRun]]:  # noqa: FA100, UP006
+) -> Union[Tuple[Optional[HttpResponse], None, None], Tuple[None, User, CourseRun]]:  # noqa: UP006
     """
     Validates a request to create an enrollment. Returns a response if validation fails, or a user and course run
     if validation succeeds.
