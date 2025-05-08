@@ -21,7 +21,7 @@ class Command(BaseCommand):
 
     def _check_if_courseware_object_readable_id_exists(
         self,
-        courseware_object: Union[Course, Program],  # noqa: FA100
+        courseware_object: Union[Course, Program],
         courseware_id: str,
     ):
         """
@@ -44,7 +44,7 @@ class Command(BaseCommand):
 
     def _add_departments_to_courseware_object(
         self,
-        courseware_object: Union[Course, Program],  # noqa: FA100
+        courseware_object: Union[Course, Program],
         departments: models.QuerySet,
     ):
         """
@@ -110,7 +110,7 @@ class Command(BaseCommand):
 
     def _successfully_created_courseware_object_message(
         self,
-        courseware_object: Union[Course, Program],  # noqa: FA100
+        courseware_object: Union[Course, Program],
     ):
         """
         Outputs a success message to the console in the format of

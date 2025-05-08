@@ -54,7 +54,7 @@ class MockResponse:
     def __init__(
         self, content, status_code=200, content_type="application/json", url=None
     ):
-        if isinstance(content, (dict, list)):
+        if isinstance(content, dict | list):
             self.content = json.dumps(content)
         else:
             self.content = str(content)

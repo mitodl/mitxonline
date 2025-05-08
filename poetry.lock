@@ -1253,6 +1253,22 @@ files = [
 ]
 
 [[package]]
+name = "django-scim2"
+version = "0.19.1"
+description = "A partial implementation of the SCIM 2.0 provider specification for use with Django."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "django_scim2-0.19.1-py3-none-any.whl", hash = "sha256:845eaa64e72e4ddfe2aa54d21865721f8c1d59ecd9c06e72341eeb03ed6ba94e"},
+    {file = "django_scim2-0.19.1.tar.gz", hash = "sha256:8126111160e76a880f6699babc5259f0345c9316c8018ce5dcc3f7579ccb9e89"},
+]
+
+[package.dependencies]
+django = ">=3.2"
+scim2-filter-parser = ">=0.5.0"
+
+[[package]]
 name = "django-storages"
 version = "1.14.6"
 description = "Support for many storage backends in Django"
@@ -2675,6 +2691,26 @@ mitol-django-common = "*"
 setuptools = "*"
 
 [[package]]
+name = "mitol-django-scim"
+version = "2025.3.31"
+description = "Django application for SCIM integrations"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "mitol_django_scim-2025.3.31-py3-none-any.whl", hash = "sha256:1d682576d730feee7b71df52dddc6ad777742349771b81fea31b367c20d2390e"},
+    {file = "mitol_django_scim-2025.3.31.tar.gz", hash = "sha256:5a4ff521ad9a545be18bf0bd295573445710236384c30ff3a50867e05dd58840"},
+]
+
+[package.dependencies]
+django = ">=3.0"
+django-scim2 = ">=0.19.1"
+django-stubs = ">=1.13.1"
+mitol-django-common = "*"
+pyparsing = ">=3.2"
+strenum = ">=0.4.15"
+
+[[package]]
 name = "monotonic"
 version = "1.6"
 description = "An implementation of time.monotonic() for Python 2 & < 3.3"
@@ -4093,6 +4129,24 @@ botocore = ">=1.37.4,<2.0a.0"
 crt = ["botocore[crt] (>=1.37.4,<2.0a.0)"]
 
 [[package]]
+name = "scim2-filter-parser"
+version = "0.7.0"
+description = "A customizable parser/transpiler for SCIM2.0 filters."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "scim2_filter_parser-0.7.0-py3-none-any.whl", hash = "sha256:a74f90a2d52a77e0f1bc4d77e84b79f88749469f6f7192d64a4f92e4fe50ab69"},
+    {file = "scim2_filter_parser-0.7.0.tar.gz", hash = "sha256:1e11dbe2e186fc1be6d93732b467a3bbaa9deff272dfeb3a0540394cfab7030c"},
+]
+
+[package.dependencies]
+sly = "0.5"
+
+[package.extras]
+django-query = ["django (>=3.2)"]
+
+[[package]]
 name = "semantic-version"
 version = "2.10.0"
 description = "A library implementing the 'SemVer' scheme."
@@ -4196,6 +4250,18 @@ groups = ["main", "dev"]
 files = [
     {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
+]
+
+[[package]]
+name = "sly"
+version = "0.5"
+description = "\"SLY - Sly Lex Yacc\""
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "sly-0.5-py3-none-any.whl", hash = "sha256:20485483259eec7f6ba85ff4d2e96a4e50c6621902667fc2695cc8bc2a3e5133"},
+    {file = "sly-0.5.tar.gz", hash = "sha256:251d42015e8507158aec2164f06035df4a82b0314ce6450f457d7125e7649024"},
 ]
 
 [[package]]
@@ -4310,6 +4376,23 @@ files = [
 
 [package.dependencies]
 pbr = ">=2.0.0"
+
+[[package]]
+name = "strenum"
+version = "0.4.15"
+description = "An Enum that inherits from str."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "StrEnum-0.4.15-py3-none-any.whl", hash = "sha256:a30cda4af7cc6b5bf52c8055bc4bf4b2b6b14a93b574626da33df53cf7740659"},
+    {file = "StrEnum-0.4.15.tar.gz", hash = "sha256:878fb5ab705442070e4dd1929bb5e2249511c0bcf2b0eeacf3bcd80875c82eff"},
+]
+
+[package.extras]
+docs = ["myst-parser[linkify]", "sphinx", "sphinx-rtd-theme"]
+release = ["twine"]
+test = ["pylint", "pytest", "pytest-black", "pytest-cov", "pytest-pylint"]
 
 [[package]]
 name = "telepath"
@@ -4800,4 +4883,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "3381c74426cad65b554fad7c67e1af72796cbcd91613f6acdcc30db8d8781d15"
+content-hash = "8757b88732281c3230af85d02a325a81bbc5f7b4b3253363b6978c5afc02a125"

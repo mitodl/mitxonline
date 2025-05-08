@@ -255,7 +255,7 @@ def get_wagtail_img_src(image_obj) -> str:
 
 
 def create_default_courseware_page(
-    courseware: Union[Course, Program],  # noqa: FA100
+    courseware: Union[Course, Program],
     live: bool = False,  # noqa: FBT001, FBT002
     *args,  # noqa: ARG001
     **kwargs,  # noqa: ARG001

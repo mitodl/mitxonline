@@ -25,6 +25,7 @@ from mitol.common.envs import (
 from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
+from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
@@ -214,6 +215,7 @@ INSTALLED_APPS = (
     "mitol.authentication.apps.TransitionalAuthenticationApp",
     "mitol.payment_gateway.apps.PaymentGatewayApp",
     "mitol.olposthog.apps.OlPosthog",
+    "mitol.scim.apps.ScimApp",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
     "viewflow",
     "openapi",
@@ -495,7 +497,10 @@ STATICFILES_DIRS = [
 ]
 for name, path in [
     ("mitx-online", os.path.join(BASE_DIR, "frontend/public/build")),  # noqa: PTH118
-    ("staff-dashboard", os.path.join(BASE_DIR, "frontend/staff-dashboard/build")),  # noqa: PTH118
+    (
+        "staff-dashboard",
+        os.path.join(BASE_DIR, "frontend/staff-dashboard/build"),  # noqa: PTH118
+    ),
 ]:
     if os.path.exists(path):  # noqa: PTH110
         STATICFILES_DIRS.append((name, path))
@@ -993,6 +998,8 @@ OAUTH2_PROVIDER = {
         description="List of schemes allowed for oauth2 redirect URIs",
     ),
 }
+
+SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
 
 
 # DRF configuration
