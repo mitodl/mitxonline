@@ -68,3 +68,22 @@ def test_post_user_extra_detail(mocker, client, user):
         reverse("profile-extra-api"), data, content_type="application/json"
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("has_profile", "expected_url"),
+    [
+        (True, "/dashboard"),
+        (False, f"{reverse('profile-details')}?next=%2Fdashboard"),
+    ],
+)
+def test_login_view(client, user, has_profile, expected_url):
+    """Test that the login endpoint redirects the user properly based on profile existence"""
+    if not has_profile:
+        user.user_profile.delete()
+    client.force_login(user)
+    url = reverse("gateway-login")
+    resp = client.get(url)
+    assert resp.url == expected_url
+    assert resp.status_code == status.HTTP_302_FOUND

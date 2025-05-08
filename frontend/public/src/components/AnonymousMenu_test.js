@@ -91,3 +91,32 @@ describe("AnonymousMenu component (OIDC version)", () => {
     )
   })
 })
+
+describe("AnonymousMenu component (APISIX version)", () => {
+  // If we've got APISIX enabled, these should *all* point to "/login" URL that
+  // redirects to the appropriate authentication flow.
+
+  beforeEach(() => {
+    SETTINGS.api_gateway_enabled = true
+  })
+
+  it("has a link to login", () => {
+    assert.equal(
+      shallow(<AnonymousMenu mobileView={false} />)
+        .find("MixedLink")
+        .at(1)
+        .prop("dest"),
+      routes.apiGatewayLogin
+    )
+  })
+
+  it("has a link to login that doesn't go to the email login page", () => {
+    assert.notEqual(
+      shallow(<AnonymousMenu mobileView={false} />)
+        .find("MixedLink")
+        .at(1)
+        .prop("dest"),
+      routes.login
+    )
+  })
+})

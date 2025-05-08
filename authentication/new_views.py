@@ -4,9 +4,10 @@ from urllib.parse import urlencode, urljoin, urlparse
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LogoutView
 from django.shortcuts import redirect, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views import View
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
@@ -49,7 +50,7 @@ def get_redirect_url(request):
         and url_has_allowed_host_and_scheme(
             next_url, allowed_hosts=settings.ALLOWED_REDIRECT_HOSTS
         )
-        else "/app"
+        else "/dashboard"
     )
 
 
@@ -160,9 +161,9 @@ class CustomLogoutView(LogoutView):
             return redirect(settings.LOGOUT_REDIRECT_URL)
 
 
-class CustomLoginView(LoginView):
+class CustomLoginView(View):
     """
-    Log in the user
+    Redirect the user to the appropriate url after login
     """
 
     def get(
@@ -172,11 +173,16 @@ class CustomLoginView(LoginView):
         **kwargs,  # noqa: ARG002
     ):
         """
-        GET
-        endpoint
-        for logging a user in.
+        GET endpoint for logging a user in.
         """
-        return redirect(get_redirect_url(request))
+        redirect_url = get_redirect_url(request)
+        if not request.user.is_anonymous:
+            profile = getattr(request.user, "user_profile", None)
+            if not profile:
+                # If user is authenticated but has no profile, redirect to create profile
+                params = urlencode({"next": redirect_url})
+                redirect_url = f"{reverse('profile-details')}?{params}"
+        return redirect(redirect_url)
 
 
 @api_view(["GET"])
