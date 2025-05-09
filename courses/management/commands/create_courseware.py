@@ -77,13 +77,13 @@ class Command(BaseCommand):
             models.QuerySet: Query set containing all of the departments specified
                 in the list of department names.
         """
-        add_depts = Department.objects.filter(name__in=departments.split()).all()
-        for dept in departments.split():
+        add_depts = Department.objects.filter(name__in=departments).all()
+        for dept in departments:
             found = len([db_dept for db_dept in add_depts if db_dept.name == dept]) > 0
             if not found:
                 Department.objects.create(name=dept)
 
-        return Department.objects.filter(name__in=departments.split()).all()
+        return Department.objects.filter(name__in=departments).all()
 
     def _department_must_be_defined_error(self):
         """

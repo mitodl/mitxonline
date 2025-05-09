@@ -12,6 +12,7 @@ from b2b.constants import B2B_RUN_TAG_FORMAT
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.api import get_home_page
 from courses.models import Course, CourseRun
+from ecommerce.api import establish_basket
 from ecommerce.models import Product
 from main.utils import date_to_datetime
 
@@ -133,3 +134,79 @@ def create_contract_run(
         )
 
     return course_run, course_run_product
+
+
+def validate_basket_for_b2b_purchase(request) -> bool:
+    """
+    Validate the basket for a B2B purchase.
+
+    This function checks if the basket is valid for a B2B purchase. It ensures
+    that the basket contains only products that are part of a contract and that
+    the contract is active.
+
+    When SSO integrations are implemented, this will need to be revised since
+    it'll fail those baskets (unless we create orders for those completely
+    differently).
+
+    Args:
+        request: The HTTP request object containing the basket data.
+
+    Returns: bool
+    """
+
+    basket = establish_basket(request)
+    if not basket:
+        return False
+
+    basket_contracts = []
+    course_run_content_type = ContentType.objects.get_for_model(CourseRun)
+
+    # This system only supports one item per basket, but this is done so it can
+    # be lifted out and into UE later (which supports >1 item).
+
+    for item in (
+        basket.basket_items.filter(product__content_type=course_run_content_type)
+        .prefetch_related(
+            "product",
+            "product__purchasable_object",
+            "product__purchasable_object__b2b_contract",
+        )
+        .all()
+    ):
+        contract = item.product.purchasable_object.b2b_contract
+
+        if contract and contract.is_active:
+            basket_contracts.append(contract)
+
+    if len(basket_contracts) == 0:
+        # No contracts in the basket, so we don't need to check further.
+        # The other validity checks that run before will make sure the discount
+        # applies to the basket products.
+        return True
+
+    discounts_with_contracts = (
+        basket.discounts.filter(
+            redeemed_discount__products__product__content_type=course_run_content_type
+        )
+        .prefetch_related(
+            "redeemed_discount",
+            "redeemed_discount__products",
+            "redeemed_discount__products__product__purchasable_object",
+            "redeemed_discount__products__product__purchasable_object__b2b_contract",
+        )
+        .distinct()
+        .all()
+    )
+
+    if len(discounts_with_contracts) != len(basket_contracts):
+        # We should have a code for each contract in the basket.
+        return False
+
+    for discount_item in discounts_with_contracts:
+        for discount_product in discount_item.redeemed_discount.products.all():
+            contract = discount_product.product.purchasable_object.b2b_contract
+
+            if contract and contract.is_active and contract in basket_contracts:
+                return True
+
+    return False

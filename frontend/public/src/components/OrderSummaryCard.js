@@ -158,7 +158,7 @@ export class OrderSummaryCard extends React.Component<Props> {
             />
           ) : null}
 
-          {totalPrice > 0 && !orderFulfilled ? (
+          {(totalPrice > 0 || discounts) && !orderFulfilled ? (
             <div>
               <Button
                 type="link"
@@ -171,7 +171,7 @@ export class OrderSummaryCard extends React.Component<Props> {
             </div>
           ) : null}
 
-          {totalPrice > 0 && !orderFulfilled ? (
+          {(totalPrice > 0 || discounts) && !orderFulfilled ? (
             <div className="cart-text-smaller">
               By placing my order I agree to the{" "}
               <a href="/terms-of-service/" target="_blank" rel="noreferrer">

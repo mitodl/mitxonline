@@ -3,7 +3,9 @@
 import logging
 import uuid
 from decimal import Decimal
+from urllib.parse import urljoin
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -57,7 +59,11 @@ from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 log = logging.getLogger(__name__)
 
 
-def generate_checkout_payload(request):
+def generate_checkout_payload(request):  # noqa: PLR0911
+    """Generate the checkout payload for the current basket."""
+
+    from b2b.api import validate_basket_for_b2b_purchase
+
     basket = establish_basket(request)
 
     if basket.has_user_blocked_products(request.user):
@@ -91,6 +97,15 @@ def generate_checkout_payload(request):
         # We only allow one discount per basket so clear all of them here.
         basket.discounts.all().delete()
         apply_user_discounts(request)
+        return {
+            "invalid_discounts": True,
+            "response": redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
+            ),
+        }
+
+    if not validate_basket_for_b2b_purchase(request):
         return {
             "invalid_discounts": True,
             "response": redirect_with_user_message(
@@ -141,7 +156,7 @@ def generate_checkout_payload(request):
                 ),
             }
 
-    callback_uri = request.build_absolute_uri(reverse("checkout-result-callback"))
+    callback_uri = urljoin(settings.SITE_BASE_URL, reverse("checkout-result-callback"))
     payload = PaymentGateway.start_payment(
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
         gateway_order,

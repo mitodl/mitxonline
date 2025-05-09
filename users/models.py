@@ -16,6 +16,7 @@ from django_scim.models import AbstractSCIMUserMixin
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 
+from b2b.models import OrganizationPage
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from openedx.models import OpenEdxUser
 
@@ -271,6 +272,13 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin, AbstractSCIMUse
 
     hubspot_sync_datetime = DateTimeField(null=True)
 
+    b2b_contracts = models.ManyToManyField(
+        "b2b.ContractPage",
+        blank=True,
+        related_name="users",
+        help_text="The contracts the user is associated with.",
+    )
+
     objects = UserManager()
     faulty_openedx_users = FaultyOpenEdxUserManager()
 
@@ -314,6 +322,13 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin, AbstractSCIMUse
             or self.is_staff
             or self.groups.filter(name=CMS_EDITORS_GROUP_NAME).exists()
         )
+
+    @cached_property
+    def b2b_organizations(self):
+        """Return the organizations the user is associated with."""
+        return OrganizationPage.objects.filter(
+            pk__in=self.b2b_contracts.values_list("organization", flat=True).distinct()
+        ).all()
 
 
 def generate_change_email_code():

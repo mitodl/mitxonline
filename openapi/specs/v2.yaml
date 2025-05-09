@@ -1518,7 +1518,13 @@ components:
           readOnly: true
           description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
           pattern: ^[-\w]+$
+        contracts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractPage'
+          readOnly: true
       required:
+      - contracts
       - description
       - id
       - logo

@@ -11,6 +11,7 @@ from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
 
+from b2b.factories import ContractPageFactory
 from courses.factories import CourseRunFactory, ProgramRunFactory
 from courses.models import PaidCourseRun
 from ecommerce.constants import (
@@ -25,6 +26,7 @@ from ecommerce.factories import (
     BasketItemFactory,
     DiscountFactory,
     ProductFactory,
+    UnlimitedUseDiscountFactory,
 )
 from ecommerce.models import (
     Basket,
@@ -490,6 +492,56 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
     resp = user_client.get(reverse("checkout_interstitial_page"))
 
     assert resp.status_code == 302
+
+
+@pytest.mark.parametrize(
+    "apply_discount",
+    [
+        True,
+        False,
+    ],
+)
+def test_start_checkout_with_discounts_and_b2b(
+    user, user_drf_client, user_client, apply_discount
+):
+    """
+    Create a contract and enrollment code, try to add those to the basket, then
+    try to checkout. (Some of this will be very similar to the b2b api test that
+    checks the logic itself - this makes sure the method gets called.)
+    """
+    contract = ContractPageFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(price=999)
+
+    product.purchasable_object.b2b_contract = contract
+    product.purchasable_object.save()
+    product.refresh_from_db()
+
+    if apply_discount:
+        discount = UnlimitedUseDiscountFactory.create(amount=1)
+        discount_product = DiscountProduct.objects.create(
+            discount=discount, product=product
+        )
+        discount_product.save()
+        discount.products.add(discount_product)
+
+        test_redeem_discount(user, user_drf_client, [product], [discount], False, False)  # noqa: FBT003
+    else:
+        # just create a basket
+        create_basket(user, [product])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    # if there's not a payload in here, something went wrong
+    if apply_discount:
+        assert resp.status_code == 200
+
+        order = Order.objects.filter(purchaser=user).get()
+
+        assert order.state == OrderStatus.PENDING
+    else:
+        # This should error, which means it redirects back to the cart page.
+        assert resp.status_code == 302
 
 
 @pytest.mark.parametrize(

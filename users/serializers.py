@@ -12,6 +12,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from social_django.models import UserSocialAuth
 
+from b2b.serializers.v0 import ContractPageSerializer, OrganizationPageSerializer
 from hubspot_sync.task_helpers import sync_hubspot_user
 
 # from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
@@ -181,6 +182,32 @@ class StaffDashboardUserSerializer(serializers.ModelSerializer):
         )
 
 
+class UserOrganizationSerializer(OrganizationPageSerializer):
+    """
+    Serializer for user organization data.
+
+    Slightly different from the OrganizationPageSerializer; we only need
+    the user's orgs and contracts.
+    """
+
+    contracts = serializers.SerializerMethodField()
+
+    def get_contracts(self, instance):
+        """Get the contracts for the organization for the user"""
+        contracts = (
+            self.context["user"]
+            .b2b_contracts.filter(
+                organization=instance,
+            )
+            .all()
+        )
+        return ContractPageSerializer(contracts, many=True).data
+
+    class Meta(OrganizationPageSerializer.Meta):
+        fields = (*OrganizationPageSerializer.Meta.fields, "contracts")
+        read_only_fields = (*OrganizationPageSerializer.Meta.fields, "contracts")
+
+
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for users"""
 
@@ -201,6 +228,7 @@ class UserSerializer(serializers.ModelSerializer):
     user_profile = UserProfileSerializer(allow_null=True, required=False)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
     is_active = serializers.BooleanField(default=True)
+    b2b_organizations = serializers.SerializerMethodField()
 
     def validate_email(self, value):
         """Empty validation function, but this is required for WriteableSerializerMethodField"""
@@ -233,6 +261,16 @@ class UserSerializer(serializers.ModelSerializer):
     @extend_schema_field(list[str])
     def get_grants(self, instance):
         return instance.get_all_permissions()
+
+    def get_b2b_organizations(self, instance):
+        """Get the organizations for the user"""
+        if instance.is_anonymous:
+            return []
+
+        organizations = instance.b2b_organizations
+        return UserOrganizationSerializer(
+            organizations, many=True, context={"user": instance}
+        ).data
 
     def validate(self, data):
         request = self.context.get("request", None)
@@ -374,6 +412,7 @@ class UserSerializer(serializers.ModelSerializer):
             "updated_on",
             "grants",
             "is_active",
+            "b2b_organizations",
         )
         read_only_fields = (
             "username",
@@ -386,6 +425,7 @@ class UserSerializer(serializers.ModelSerializer):
             "updated_on",
             "grants",
             "global_id",
+            "b2b_organizations",
         )
 
 
