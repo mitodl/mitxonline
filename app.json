@@ -683,7 +683,7 @@
     "USE_X_FORWARDED_HOST": {
       "description": "Set HOST header to original domain accessed by user",
       "required": false
-    },
+    }
   },
   "keywords": [
     "Django",
