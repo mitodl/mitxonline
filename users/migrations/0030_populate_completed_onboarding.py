@@ -11,7 +11,7 @@ def set_completed_onboarding(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("users", "0027_userprofile_completed_onboarding"),
+        ("users", "0029_userprofile_completed_onboarding"),
     ]
 
     operations = [migrations.RunPython(set_completed_onboarding)]
