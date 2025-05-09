@@ -131,6 +131,8 @@ class Command(BaseCommand):
         contract_table.add_column("Start", justify="left")
         contract_table.add_column("End", justify="left")
         contract_table.add_column("Active", justify="left")
+        contract_table.add_column("Max Learners", justify="left")
+        contract_table.add_column("Price", justify="left")
 
         for contract in contracts:
             contract_table.add_row(
@@ -146,6 +148,10 @@ class Command(BaseCommand):
                 if contract.contract_end
                 else "",
                 "Yes" if contract.active else "No",
+                str(contract.max_learners) if contract.max_learners else "Unlim",
+                str(contract.enrollment_fixed_price)
+                if contract.enrollment_fixed_price
+                else "",
             )
 
         self.console.print(contract_table)
