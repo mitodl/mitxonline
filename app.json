@@ -549,6 +549,30 @@
       "description": "The number of hours until an access token for the Open edX API expires",
       "required": false
     },
+    "OPENTELEMETRY_ENABLED": {
+       "description": "Enable collection and shipment of opentelemetry data",
+       "required": false
+    },
+    "OPENTELEMETRY_ENDPOINT": {
+      "description": "Endpoint for opentelemetry",
+      "required": false
+    },
+    "OPENTELEMETRY_EXPORT_TIMEOUT_MS": {
+      "description": "Timeout for opentelemetry export",
+      "required": false
+    },
+    "OPENTELEMETRY_INSECURE": {
+      "description": "Use insecure connection to opentelemetry",
+      "required": false
+    },
+    "OPENTELEMETRY_SERVICE_NAME": {
+      "description": "The name of the service to report to opentelemetry",
+      "required": false
+    },
+    "OPENTELEMETRY_TRACES_BATCH_SIZE": {
+      "description": "Batch size for traces",
+      "required": false
+    },
     "OPEN_EXCHANGE_RATES_APP_ID": {
       "description": "open exchange app id for fetching currency exchange rate",
       "required": false
@@ -659,7 +683,7 @@
     "USE_X_FORWARDED_HOST": {
       "description": "Set HOST header to original domain accessed by user",
       "required": false
-    }
+    },
   },
   "keywords": [
     "Django",
