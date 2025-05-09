@@ -1,5 +1,6 @@
 """Models for B2B data."""
 
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.http import Http404
 from django.utils.text import slugify
@@ -182,3 +183,33 @@ class ContractPage(Page):
 
         self.slug = slugify(f"contract-{self.organization.id}-{self.id}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+    def get_course_runs(self):
+        """Get the runs associated with the contract."""
+
+        from courses.models import CourseRun
+
+        return (
+            CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
+        )
+
+    def get_products(self):
+        """Get the products associated with the contract."""
+
+        from courses.models import CourseRun
+        from ecommerce.models import Product
+
+        content_type = ContentType.objects.get_for_model(CourseRun)
+
+        return Product.objects.filter(
+            is_active=True,
+            content_type=content_type,
+            object_id__in=[cr.id for cr in self.get_course_runs()],
+        ).all()
+
+    def get_discounts(self):
+        """Get the discounts associated with the contract."""
+
+        from ecommerce.models import Discount
+
+        return Discount.objects.filter(products__product__in=self.get_products()).all()
