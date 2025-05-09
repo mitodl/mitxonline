@@ -5,7 +5,7 @@ from django.db import models
 from django.http import Http404
 from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
-from wagtail.admin.panels import FieldPanel
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page
 
@@ -97,20 +97,20 @@ class ContractPage(Page):
 
     parent_page_types = ["b2b.OrganizationPage"]
 
-    name = models.CharField(max_length=255, help_text="The name of the contract")
+    name = models.CharField(max_length=255, help_text="The name of the contract.")
     description = RichTextField(
-        blank=True, help_text="Any useful extra information about the contract"
+        blank=True, help_text="Any useful extra information about the contract."
     )
     integration_type = models.CharField(
         max_length=255,
         choices=CONTRACT_INTEGRATION_CHOICES,
-        help_text="The type of integration for this contract",
+        help_text="The type of integration for this contract.",
     )
     organization = models.ForeignKey(
         OrganizationPage,
         on_delete=models.PROTECT,
         related_name="contracts",
-        help_text="The organization this contract is with",
+        help_text="The organization this contract is with.",
     )
     contract_start = models.DateField(
         blank=True,
@@ -126,15 +126,47 @@ class ContractPage(Page):
         default=True,
         help_text="Whether this contract is active or not. Date rules still apply.",
     )
+    max_learners = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text="The maximum number of learners allowed under this contract. (Set to zero or leave blank for unlimited.)",
+    )
+    enrollment_fixed_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="The fixed price for enrollment under this contract. (Set to zero or leave blank for free.)",
+    )
 
     content_panels = [
         FieldPanel("name"),
-        FieldPanel("description"),
-        FieldPanel("integration_type"),
-        FieldPanel("organization"),
-        FieldPanel("active"),
-        FieldPanel("contract_start"),
-        FieldPanel("contract_end"),
+        MultiFieldPanel(
+            [
+                FieldPanel("description"),
+                FieldPanel("organization"),
+            ],
+            heading="Basic Information",
+            icon="clipboard-list",
+        ),
+        MultiFieldPanel(
+            [
+                FieldPanel("integration_type"),
+                FieldPanel("max_learners"),
+                FieldPanel("enrollment_fixed_price"),
+            ],
+            heading="Learner Provisioning",
+            icon="user",
+        ),
+        MultiFieldPanel(
+            [
+                FieldPanel("active"),
+                FieldPanel("contract_start"),
+                FieldPanel("contract_end"),
+            ],
+            heading="Availability",
+            icon="calendar-alt",
+        ),
     ]
 
     promote_panels = []
