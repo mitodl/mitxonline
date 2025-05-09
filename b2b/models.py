@@ -11,6 +11,7 @@ from wagtail.fields import RichTextField
 from wagtail.models import Page
 
 from b2b.constants import CONTRACT_INTEGRATION_CHOICES, ORG_INDEX_SLUG
+from b2b.tasks import queue_enrollment_code_check
 
 
 class OrganizationObjectIndexPage(Page):
@@ -195,6 +196,7 @@ class ContractPage(Page):
 
         self.slug = slugify(f"contract-{self.organization.id}-{self.id}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+        queue_enrollment_code_check.delay(self.id)
 
     def get_learners(self):
         """Get the learners associated with this organization."""

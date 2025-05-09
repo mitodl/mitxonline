@@ -147,6 +147,26 @@ class Command(BaseCommand):
             help="The fixed price for enrollment under this contract.",
             default=None,
         )
+        modify_parser.add_argument(
+            "--no-price",
+            action="store_true",
+            help="Clear the price for this contract (makes enrollments free).",
+        )
+        modify_parser.add_argument(
+            "--no-learner-cap",
+            action="store_true",
+            help="Clear the learner limit.",
+        )
+        modify_parser.add_argument(
+            "--no-start-date",
+            action="store_true",
+            help="Clear the start date.",
+        )
+        modify_parser.add_argument(
+            "--no-end-date",
+            action="store_true",
+            help="Clear the end date.",
+        )
 
         courseware_parser = subparsers.add_parser(
             "courseware",
@@ -226,7 +246,7 @@ class Command(BaseCommand):
             f"Created contract '{contract_name}' for organization '{organization_name}'"
         )
 
-    def handle_modify(self, *args, **kwargs):  # noqa: ARG002
+    def handle_modify(self, *args, **kwargs):  # noqa: ARG002, C901
         """Handle the modify subcommand."""
         contract_id = kwargs.pop("contract_id")
         start_date = kwargs.pop("start")
@@ -235,6 +255,10 @@ class Command(BaseCommand):
         inactive = kwargs.pop("inactive")
         max_learners = kwargs.pop("max_learners")
         price = kwargs.pop("price")
+        no_price = kwargs.pop("no_price")
+        no_learner_cap = kwargs.pop("no_learner_cap")
+        no_start_date = kwargs.pop("no_start_date")
+        no_end_date = kwargs.pop("no_end_date")
 
         contract = ContractPage.objects.filter(id=contract_id).first()
         if not contract:
@@ -253,6 +277,15 @@ class Command(BaseCommand):
             contract.max_learners = max_learners
         if price is not None:
             contract.enrollment_fixed_price = price
+
+        if no_price:
+            contract.enrollment_fixed_price = None
+        if no_learner_cap:
+            contract.max_learners = None
+        if no_start_date:
+            contract.contract_start = None
+        if no_end_date:
+            contract.contract_end = None
 
         contract.save()
         self.stdout.write(f"Modified contract with ID '{contract_id}'")

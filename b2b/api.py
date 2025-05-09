@@ -21,7 +21,6 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_UNLIMITED,
 )
 from ecommerce.models import Discount, DiscountProduct, Product
-from main.celery import app
 from main.utils import date_to_datetime
 
 log = logging.getLogger(__name__)
@@ -236,6 +235,13 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901
     - If there are discounts, make sure they apply to all the products that
       we've created, and create new ones if necessary.
     - If there are too many discounts, log a warning message.
+    - If the contract is SSO and unlimited, but there are discounts for the
+      products, clear those products out. (Also remove the discounts if there
+      was only one product in the discount.)
+
+    Note about SSO contracts: if there's no price, we don't create enrollment
+    codes regardless of whether there's a learner cap or not. We'll limit the
+    attachment when we log the user in.
 
     Returns:
         tuple: A tuple containing the number of created codes, updated codes,
@@ -246,6 +252,26 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901
 
     if contract.integration_type == "sso" and not contract.enrollment_fixed_price:
         # SSO contracts w/out price don't need discounts.
+        discounts = contract.get_discounts()
+        products = contract.get_products()
+
+        for discount in discounts:
+            discount.products.filter(product__in=products).delete()
+            discount.refresh_from_db()
+
+            created += 1
+
+            # Only delete the discount if there's no more products.
+            # Otherwise, we might delete one that's shared for some reason.
+            if discount.products.count() == 0:
+                log.info(
+                    "Contract %s: Existing discount %s no longer has products, removing",
+                    contract,
+                    discount,
+                )
+                discount.delete()
+                updated += 1
+
         return (created, updated, errors)
 
     products = contract.get_products()
