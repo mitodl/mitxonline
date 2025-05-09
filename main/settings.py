@@ -1351,3 +1351,35 @@ MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = [
     "localhost",
     "mitxonline.odl.local",
 ]
+
+
+OPENTELEMETRY_ENABLED = get_bool(
+    name="OPENTELEMETRY_ENABLED",
+    default=False,
+    description="Enable collection and shipment of opentelemetry data",
+)
+OPENTELEMETRY_SERVICE_NAME = get_string(
+    name="OPENTELEMETRY_SERVICE_NAME",
+    default="mitxonline",
+    description="The name of the service to report to opentelemetry",
+)
+OPENTELEMETRY_INSECURE = get_bool(
+    name="OPENTELEMETRY_INSECURE",
+    default=True,
+    description="Use insecure connection to opentelemetry",
+)
+OPENTELEMETRY_ENDPOINT = get_string(
+    name="OPENTELEMETRY_ENDPOINT",
+    default=None,
+    description="Endpoint for opentelemetry",
+)
+OPENTELEMETRY_TRACES_BATCH_SIZE = get_int(
+    name="OPENTELEMETRY_TRACES_BATCH_SIZE",
+    default=512,
+    description="Batch size for traces",
+)
+OPENTELEMETRY_EXPORT_TIMEOUT_MS = get_int(
+    name="OPENTELEMETRY_EXPORT_TIMEOUT_MS",
+    default=5000,
+    description="Timeout for opentelemetry export",
+)
