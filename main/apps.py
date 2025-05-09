@@ -16,3 +16,7 @@ class RootConfig(AppConfig):
 
         envs.validate()
         configure()
+
+        from main.telemetry import configure_opentelemetry
+
+        configure_opentelemetry()
