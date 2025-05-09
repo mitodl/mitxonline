@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("users", "0026_alter_user_is_active"),
+        ("users", "0028_add_user_scim_fields"),
     ]
 
     operations = [
