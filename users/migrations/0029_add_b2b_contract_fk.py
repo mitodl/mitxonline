@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("b2b", "0001_add_orgs_and_contracts_models"),
-        ("users", "0027_alter_user_username"),
+        ("users", "0028_add_user_scim_fields"),
     ]
 
     operations = [
