@@ -252,6 +252,11 @@ if DEBUG:
 
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
+MITXONLINE_NEW_USER_LOGIN_URL = get_string(
+    name="MITXONLINE_NEW_USER_LOGIN_URL",
+    default="http://mitxonline.odl.local:8013/create-profile",
+    description="URL to redirect new users to after login",
+)
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/signin"
 LOGOUT_REDIRECT_URL = get_string(
