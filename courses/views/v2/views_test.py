@@ -6,15 +6,15 @@ import logging
 import random
 
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.db import connection
+from django.test.client import RequestFactory
 from django.urls import reverse
+from rest_framework import status
+from rest_framework.request import Request
+
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from rest_framework import status
-from django.contrib.auth.models import AnonymousUser
-from django.test.client import RequestFactory
-from rest_framework.request import Request
-from rest_framework.test import APIRequestFactory
 from courses.factories import CourseFactory, CourseRunFactory, DepartmentFactory
 from courses.models import Course, Program
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
@@ -29,7 +29,6 @@ from courses.views.test_utils import (
 )
 from courses.views.v2 import CourseFilterSet, Pagination
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
-from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
 
@@ -276,6 +275,7 @@ def test_filter_with_org_id_returns_contracted_course(user_drf_client):
     assert course.title in titles
     assert unrelated_course.title not in titles
 
+
 @pytest.mark.django_db
 def test_filter_without_org_id_authenticated_user(user_drf_client):
     course_with_contract = CourseFactory(title="Contract Course")
@@ -293,6 +293,7 @@ def test_filter_without_org_id_authenticated_user(user_drf_client):
     assert course_no_contract.title in titles
     assert course_with_contract.title in titles
 
+
 def test_filter_anonymous_user_sees_no_contracted_runs():
     course_with_contract = CourseFactory(title="Hidden Course")
     contract = ContractPageFactory(active=True)
@@ -305,7 +306,9 @@ def test_filter_anonymous_user_sees_no_contracted_runs():
     request.user = AnonymousUser()
     drf_request = Request(request)
     queryset = Course.objects.all()
-    filtered = CourseFilterSet(data=drf_request.query_params, request=drf_request, queryset=queryset).qs
+    filtered = CourseFilterSet(
+        data=drf_request.query_params, request=drf_request, queryset=queryset
+    ).qs
 
     assert course_no_contract in filtered
     assert course_with_contract not in filtered
