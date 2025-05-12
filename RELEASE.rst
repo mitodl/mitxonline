@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.115.3 (Released May 12, 2025)
+---------------
+
+- Fix username regression in openedx grade api (#2644)
+- Add management command to copy email into username field (#2643)
+- fix: Show only Login and update login view for proper redirection with APISIX (#2624)
+
 Version 0.115.2 (Released May 06, 2025)
 ---------------
 

@@ -32,7 +32,7 @@ from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.115.2"
+VERSION = "0.115.3"
 
 log = logging.getLogger()
 
