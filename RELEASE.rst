@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.116.0
+Version 0.116.0 (Released May 12, 2025)
 ---------------
 
 - 7278 b2b provisioning add course runcontract filtering (#2651)
