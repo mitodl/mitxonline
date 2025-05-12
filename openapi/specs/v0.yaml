@@ -1096,24 +1096,24 @@ components:
         name:
           type: string
           readOnly: true
-          description: The name of the contract
+          description: The name of the contract.
         description:
           type: string
           readOnly: true
-          description: Any useful extra information about the contract
+          description: Any useful extra information about the contract.
         integration_type:
           allOf:
           - $ref: '#/components/schemas/IntegrationTypeEnum'
           readOnly: true
           description: |-
-            The type of integration for this contract
+            The type of integration for this contract.
 
             * `sso` - SSO
             * `non-sso` - Non-SSO
         organization:
           type: integer
           readOnly: true
-          description: The organization this contract is with
+          description: The organization this contract is with.
         contract_start:
           type: string
           format: date
