@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.116.0
+---------------
+
+- 7278 b2b provisioning add course runcontract filtering (#2651)
+- fix: Add build for staff dashboard
+- Create profile and legal address on apisix auth (#2650)
+- B2B Provisioning: Add user/contract FKs, user provisioning on purchase (#2645)
+- Adding OTEL metric shipping to mitxonline  (#2649)
+- Add SCIM endpoints (#2619)
+- Newer poetry version and force a required version (#2648)
+- fix(deps): update dependency django to v4.2.21 [security] (#2647)
+
 Version 0.115.3 (Released May 12, 2025)
 ---------------
 
