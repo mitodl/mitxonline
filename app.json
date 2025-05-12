@@ -374,6 +374,10 @@
       "description": "CyberSource security key",
       "required": false
     },
+    "MITXONLINE_NEW_USER_LOGIN_URL": {
+      "description": "URL to redirect new users to after login",
+      "required": false
+    },
     "MITX_ONLINE_ADMIN_EMAIL": {
       "description": "E-mail to send 500 reports to.",
       "required": true

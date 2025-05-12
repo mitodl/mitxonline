@@ -1,8 +1,11 @@
 import pytest
+from django.test import RequestFactory
 from django.urls import reverse
 from rest_framework import status
 
+from authentication.new_views import CustomLoginView
 from users.api import User
+from users.factories import UserFactory
 from users.models import MALE, UserProfile
 
 
@@ -71,19 +74,35 @@ def test_post_user_extra_detail(mocker, client, user):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(
-    ("has_profile", "expected_url"),
-    [
-        (True, "/dashboard"),
-        (False, f"{reverse('profile-details')}?next=%2Fdashboard"),
-    ],
-)
-def test_login_view(client, user, has_profile, expected_url):
-    """Test that the login endpoint redirects the user properly based on profile existence"""
-    if not has_profile:
-        user.user_profile.delete()
-    client.force_login(user)
-    url = reverse("gateway-login")
-    resp = client.get(url)
-    assert resp.url == expected_url
-    assert resp.status_code == status.HTTP_302_FOUND
+def test_custom_login_view_authenticated_user_with_onboarding(mocker):
+    """Test CustomLoginView for an authenticated user with incomplete onboarding"""
+    factory = RequestFactory()
+    request = factory.get(reverse("login"), {"next": "/dashboard"})
+    user = UserFactory()
+    request.user = user
+    mocker.patch("authentication.new_views.get_redirect_url", return_value="/dashboard")
+    mocker.patch("authentication.new_views.urlencode", return_value="next=/dashboard")
+    mocker.patch(
+        "authentication.new_views.settings.MITXONLINE_NEW_USER_LOGIN_URL",
+        "/create-profile",
+    )
+
+    response = CustomLoginView().get(request)
+
+    assert response.status_code == 302
+    assert response.url == "/create-profile?next=/dashboard"
+
+
+@pytest.mark.django_db
+def test_custom_login_view_authenticated_user_with_completed_onboarding(mocker):
+    """Test that user who has completed onboarding is redirected to next url"""
+    factory = RequestFactory()
+    request = factory.get(reverse("login"), {"next": "/dashboard"})
+    user = UserFactory(user_profile__completed_onboarding=True)
+    request.user = user
+    mocker.patch("authentication.new_views.get_redirect_url", return_value="/dashboard")
+
+    response = CustomLoginView().get(request)
+
+    assert response.status_code == 302
+    assert response.url == "/dashboard"
