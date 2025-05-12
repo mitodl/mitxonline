@@ -13,7 +13,6 @@ from b2b.constants import B2B_RUN_TAG_FORMAT
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.api import get_home_page
 from courses.models import Course, CourseRun
-from ecommerce.api import establish_basket
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     PAYMENT_TYPE_SALES,
@@ -21,6 +20,7 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_UNLIMITED,
 )
 from ecommerce.models import Discount, DiscountProduct, Product
+from main.celery import app
 from main.utils import date_to_datetime
 
 log = logging.getLogger(__name__)
@@ -160,6 +160,7 @@ def validate_basket_for_b2b_purchase(request) -> bool:
 
     Returns: bool
     """
+    from ecommerce.api import establish_basket
 
     basket = establish_basket(request)
     if not basket:
@@ -217,8 +218,10 @@ def validate_basket_for_b2b_purchase(request) -> bool:
                 return True
 
     return False
+
+
 @app.task()
-def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901
+def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR0915
     """
     Ensure that enrollment codes exist for the given contract.
 
@@ -439,48 +442,3 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901
             )
 
     return (created, updated, errors)
-
-
-def check_basket_for_product_and_code(basket):
-    """
-    Check if the basket contains a B2B product and a matching discount code.
-
-    Args:
-        basket (Basket): The basket to check.
-    Returns:
-        bool: True if the basket contains the product and discount code, False otherwise.
-    """
-    course_run_contenttype = ContentType.objects.get_for_model(CourseRun)
-
-    basket_items = basket.basket_items.all()
-
-    if basket_items.count() == 0:
-        return True
-
-    b2b_items = [
-        item.product.id
-        for item in basket_items
-        if item.product.content_type == course_run_contenttype
-        and item.product.purchasable_object.b2b_contract
-    ]
-
-    if len(b2b_items) == 0:
-        return True
-
-    b2b_discounts = (
-        basket.discounts.filter(redeemed_discount__products__product_id__in=b2b_items)
-        .distinct()
-        .all()
-    )
-
-    for discount in b2b_discounts:
-        found = False
-
-        for product in discount.redeemed_discount.products.all():
-            if product.product.id in b2b_items:
-                found = True
-                break
-        if not found:
-            return False
-
-    return True

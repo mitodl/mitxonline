@@ -9,27 +9,25 @@ from django.conf import settings
 from mitol.common.utils import now_in_utc
 
 from b2b import factories
-from b2b.api import create_contract_run, validate_basket_for_b2b_purchase
-from b2b.constants import B2B_RUN_TAG_FORMAT
-from b2b.factories import ContractPageFactory
-from courses.factories import CourseFactory
-from ecommerce.api_test import create_basket
-from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
-from ecommerce.models import BasketDiscount, DiscountProduct
 from b2b.api import (
-    check_basket_for_product_and_code,
     create_contract_run,
     ensure_enrollment_codes_exist,
+    validate_basket_for_b2b_purchase,
 )
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
     CONTRACT_INTEGRATION_NONSSO,
     CONTRACT_INTEGRATION_SSO,
 )
+from b2b.factories import ContractPageFactory
 from courses.factories import CourseFactory
+from ecommerce.api_test import create_basket
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
-from ecommerce.factories import BasketItemFactory
-from ecommerce.models import BasketDiscount
+from ecommerce.factories import (
+    ProductFactory,
+    UnlimitedUseDiscountFactory,
+)
+from ecommerce.models import BasketDiscount, DiscountProduct
 from main.utils import date_to_datetime
 
 FAKE = faker.Factory.create()
@@ -296,54 +294,3 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
             for code in contract.get_discounts():
                 assert code.amount == assert_price
                 assert code.products.filter(product=product).exists()
-
-
-@pytest.mark.parametrize(
-    "code_applied",
-    [
-        (True,),
-        (False,),
-    ],
-)
-def test_check_basket_for_product_and_code(mocker, code_applied):
-    """
-    Make sure the check for product and code works.
-
-    If the learner is checking out with a product that's for a B2B course run,
-    we should stop them if they don't have the discount code applied. (This doesn't
-    check the alternate state because that's tested elsewhere.)
-    """
-
-    mocked_ensure_call = mocker.patch("b2b.tasks.queue_enrollment_code_check.delay")
-
-    contract = factories.ContractPageFactory(
-        integration_type=CONTRACT_INTEGRATION_NONSSO,
-        enrollment_fixed_price=Decimal(100),
-    )
-    course = CourseFactory()
-    run, product = create_contract_run(contract, course)
-    ensure_enrollment_codes_exist(contract)
-    assert mocked_ensure_call.called
-
-    basket = BasketItemFactory(product=product).basket
-
-    if code_applied:
-        discount = contract.get_discounts().first()
-        assert discount
-
-        BasketDiscount.objects.create(
-            redeemed_discount=discount,
-            redeemed_basket=basket,
-            redeemed_by=basket.user,
-            redemption_date=now_in_utc(),
-        )
-
-        basket.refresh_from_db()
-        assert basket.discounts.count() == 1
-
-    payload = check_basket_for_product_and_code(basket)
-
-    if code_applied:
-        assert payload
-    else:
-        assert not payload
