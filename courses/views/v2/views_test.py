@@ -6,11 +6,16 @@ import logging
 import random
 
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.db import connection
+from django.test.client import RequestFactory
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.request import Request
 
-from courses.factories import DepartmentFactory
+from b2b.api import create_contract_run
+from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from courses.factories import CourseFactory, CourseRunFactory, DepartmentFactory
 from courses.models import Course, Program
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v2.departments import (
@@ -22,7 +27,7 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import Pagination
+from courses.views.v2 import CourseFilterSet, Pagination
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
@@ -251,3 +256,59 @@ def test_get_course(
         CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
     )
     assert_drf_json_equal(course_data, course_from_fixture, ignore_order=True)
+
+
+@pytest.mark.django_db
+def test_filter_with_org_id_returns_contracted_course(user_drf_client):
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    course = CourseFactory(title="Contracted Course")
+    create_contract_run(contract, course)
+
+    unrelated_course = Course.objects.create(title="Other Course")
+    CourseRunFactory(course=unrelated_course)
+
+    url = reverse("v2:courses_api-list")
+    response = user_drf_client.get(url, {"org_id": org.id})
+
+    titles = [result["title"] for result in response.data["results"]]
+    assert course.title in titles
+    assert unrelated_course.title not in titles
+
+
+@pytest.mark.django_db
+def test_filter_without_org_id_authenticated_user(user_drf_client):
+    course_with_contract = CourseFactory(title="Contract Course")
+    contract = ContractPageFactory(active=True)
+    CourseRunFactory(course=course_with_contract, b2b_contract=contract)
+
+    course_no_contract = CourseFactory(title="No Contract Course")
+    CourseRunFactory(course=course_no_contract, b2b_contract=None)
+
+    url = reverse("v2:courses_api-list")
+    response = user_drf_client.get(url)
+
+    titles = [result["title"] for result in response.data["results"]]
+
+    assert course_no_contract.title in titles
+    assert course_with_contract.title in titles
+
+
+def test_filter_anonymous_user_sees_no_contracted_runs():
+    course_with_contract = CourseFactory(title="Hidden Course")
+    contract = ContractPageFactory(active=True)
+    CourseRunFactory(course=course_with_contract, b2b_contract=contract)
+
+    course_no_contract = CourseFactory(title="Visible Course")
+    CourseRunFactory(course=course_no_contract)
+    rf = RequestFactory()
+    request = rf.get(reverse("v2:courses_api-list"))
+    request.user = AnonymousUser()
+    drf_request = Request(request)
+    queryset = Course.objects.all()
+    filtered = CourseFilterSet(
+        data=drf_request.query_params, request=drf_request, queryset=queryset
+    ).qs
+
+    assert course_no_contract in filtered
+    assert course_with_contract not in filtered
