@@ -82,6 +82,7 @@ urlpatterns = [
     re_path(r"^records/.*", index, name="learner-records"),
     re_path(r"^catalog/", index, name="catalog"),
     path("api/instructor/<int:id>/", instructor_page, name="cms_instructor_page"),
+    re_path(r"^health/", include("health_check.urls")),
     # Wagtail
     re_path(
         r"^cms/login", cms_signin_redirect_to_site_signin, name="wagtailadmin_login"

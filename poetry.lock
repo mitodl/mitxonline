@@ -1139,6 +1139,29 @@ files = [
 Django = ">=4.2"
 
 [[package]]
+name = "django-health-check"
+version = "3.18.4.dev18+g9cfe2ea"
+description = "Run checks on services like databases, queue servers, celery processes, etc."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = []
+develop = false
+
+[package.dependencies]
+django = ">=2.2"
+
+[package.extras]
+docs = ["sphinx"]
+test = ["boto3", "celery", "django-storages", "pytest", "pytest-cov", "pytest-django", "redis"]
+
+[package.source]
+type = "git"
+url = "https://github.com/revsys/django-health-check"
+reference = "HEAD"
+resolved_reference = "9cfe2eaec5a15219513a36210b34875c03c64fe4"
+
+[[package]]
 name = "django-hijack"
 version = "3.7.2"
 description = "Enable users to hijack (=login as) and work on behalf of another user."
@@ -5468,4 +5491,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "28d4e40cccde4d4f204b01eb9fb6e6603825aad856cd730d98c194ed54db7156"
+content-hash = "3ea9698fe1df0210eda038478602c586fb1cbe23c852e341f1862ea5d55b7924"
