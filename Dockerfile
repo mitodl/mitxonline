@@ -68,8 +68,11 @@ FROM node:17.9 AS node
 COPY --from=code /src /src
 WORKDIR /src
 
+ENV NODE_ENV=production
 RUN yarn workspace mitx-online-public install --immutable && \
-    yarn workspace mitx-online-public run build
+    yarn workspace mitx-online-public run build && \
+    yarn workspace mitx-online-staff-dashboard install --immutable && \
+    yarn workspace mitx-online-staff-dashboard run build
 
 FROM code AS django-server
 
