@@ -1311,6 +1311,8 @@ MITOL_APIGATEWAY_USERINFO_MODEL_MAP = {
     # field name, and default. The FK for the related user should be "user".
     "additional_models": {
         # ..then add additional ones here if needed
+        "users.UserProfile": [],
+        "users.LegalAddress": [],
     },
 }
 
