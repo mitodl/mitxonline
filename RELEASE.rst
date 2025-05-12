@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.115.3
+Version 0.115.3 (Released May 12, 2025)
 ---------------
 
 - Fix username regression in openedx grade api (#2644)
