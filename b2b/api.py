@@ -439,3 +439,48 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901
             )
 
     return (created, updated, errors)
+
+
+def check_basket_for_product_and_code(basket):
+    """
+    Check if the basket contains a B2B product and a matching discount code.
+
+    Args:
+        basket (Basket): The basket to check.
+    Returns:
+        bool: True if the basket contains the product and discount code, False otherwise.
+    """
+    course_run_contenttype = ContentType.objects.get_for_model(CourseRun)
+
+    basket_items = basket.basket_items.all()
+
+    if basket_items.count() == 0:
+        return True
+
+    b2b_items = [
+        item.product.id
+        for item in basket_items
+        if item.product.content_type == course_run_contenttype
+        and item.product.purchasable_object.b2b_contract
+    ]
+
+    if len(b2b_items) == 0:
+        return True
+
+    b2b_discounts = (
+        basket.discounts.filter(redeemed_discount__products__product_id__in=b2b_items)
+        .distinct()
+        .all()
+    )
+
+    for discount in b2b_discounts:
+        found = False
+
+        for product in discount.redeemed_discount.products.all():
+            if product.product.id in b2b_items:
+                found = True
+                break
+        if not found:
+            return False
+
+    return True

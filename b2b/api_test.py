@@ -1,5 +1,7 @@
 """Tests for B2B API functions."""
 
+from decimal import Decimal
+
 import faker
 import pytest
 import pytz
@@ -14,6 +16,20 @@ from courses.factories import CourseFactory
 from ecommerce.api_test import create_basket
 from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
 from ecommerce.models import BasketDiscount, DiscountProduct
+from b2b.api import (
+    check_basket_for_product_and_code,
+    create_contract_run,
+    ensure_enrollment_codes_exist,
+)
+from b2b.constants import (
+    B2B_RUN_TAG_FORMAT,
+    CONTRACT_INTEGRATION_NONSSO,
+    CONTRACT_INTEGRATION_SSO,
+)
+from courses.factories import CourseFactory
+from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
+from ecommerce.factories import BasketItemFactory
+from ecommerce.models import BasketDiscount
 from main.utils import date_to_datetime
 
 FAKE = faker.Factory.create()
@@ -145,3 +161,189 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
         assert check_result is False
     else:
         assert check_result is True
+
+
+@pytest.mark.parametrize(
+    (
+        "is_sso",
+        "has_price",
+        "has_learner_cap",
+        "update_change_price",
+        "update_no_price",
+        "update_sso",
+    ),
+    [
+        (False, False, False, False, False, False),
+        (False, False, True, False, False, False),
+        (False, True, False, False, False, False),
+        (False, True, True, False, False, False),
+        (True, False, False, False, False, False),
+        (True, False, True, False, False, False),
+        (True, True, False, False, False, False),
+        (True, True, True, False, False, False),
+        (False, False, False, True, False, False),
+        (False, False, True, True, False, False),
+        (False, True, False, True, False, False),
+        (False, True, True, True, False, False),
+        (False, False, False, False, True, False),
+        (False, False, True, False, True, False),
+        (True, False, False, True, False, False),
+        (True, False, True, True, False, False),
+        (True, True, False, True, False, False),
+        (True, True, True, True, False, False),
+        (True, True, False, False, False, True),
+        (True, True, True, False, False, True),
+        (False, False, False, False, False, True),
+        (False, False, True, False, False, True),
+        (False, True, False, False, False, True),
+        (False, True, True, False, False, True),
+    ],
+)
+def test_ensure_enrollment_codes(  # noqa: PLR0913
+    mocker,
+    is_sso,
+    has_price,
+    has_learner_cap,
+    update_change_price,
+    update_no_price,
+    update_sso,
+):
+    """
+    Test that the enrollment codes are created correctly for a contract.
+
+    This tests scenarios where contract data changes, which should also change
+    the discounts that are created.
+
+    These are the scenarios in order (run each with a learner cap and without):
+    - Just create fixed-price $0 discounts for non-sso contract
+    - Just create discounts for contract price for non-sso contract
+    - Just create fixed-price $0 discounts for sso contract
+    - Just create discounts for contract price for sso contract
+    - fixed-price $0 discount to random new price
+    - priced discount to new price discount
+    - fixed-price $0 discount to no price - this should be a no-op
+    - sso fixed-price $0 discount to random new price
+    - sso price discount to new price discount
+    - sso price discount to non-sso - should also no-op
+    - non-sso fixed-price $0 discount to sso - should remove all discounts
+    - non-sso price to sso - should no-op
+    """
+
+    mocked_ensure_call = mocker.patch("b2b.tasks.queue_enrollment_code_check.delay")
+    max_learners = FAKE.random_int(min=1, max=15) if has_learner_cap else None
+    price = FAKE.random_int(min=0, max=100) if has_price else None
+    assert_price = price if price else Decimal(0)
+
+    contract = factories.ContractPageFactory(
+        integration_type=CONTRACT_INTEGRATION_SSO
+        if is_sso
+        else CONTRACT_INTEGRATION_NONSSO,
+        enrollment_fixed_price=price,
+        max_learners=max_learners,
+    )
+    course = CourseFactory()
+
+    assert contract.get_discounts().count() == 0
+
+    _, product = create_contract_run(contract, course)
+    assert mocked_ensure_call.called
+
+    ensure_enrollment_codes_exist(contract)
+
+    if is_sso and not has_price:
+        assert contract.get_discounts().count() == 0
+    else:
+        assert (
+            contract.get_discounts().count() == max_learners if has_learner_cap else 1
+        )
+
+    for code in contract.get_discounts():
+        assert code.amount == assert_price
+        assert code.products.filter(product=product).exists()
+        if has_learner_cap:
+            assert code.redemption_type == REDEMPTION_TYPE_ONE_TIME
+        else:
+            assert code.redemption_type == REDEMPTION_TYPE_UNLIMITED
+
+    # If the contract is updated later, the codes should also be updated accordingly.
+    # Specifically:
+    # - If we've changed the price, the discounts should also change amounts.
+    # - If we've removed the price, the discounts should be set to 0.
+    # - If we've set the price to zero and changed to SSO integration, we should
+    #   no longer have discounts.
+    if update_no_price or update_sso or update_change_price:
+        if update_change_price:
+            price = FAKE.random_int(min=0, max=100)
+            assert_price = price if price else Decimal(0)
+            contract.enrollment_fixed_price = price
+        if update_no_price:
+            contract.enrolment_fixed_price = None
+        if update_sso:
+            contract.integration_type = (
+                CONTRACT_INTEGRATION_NONSSO if is_sso else CONTRACT_INTEGRATION_SSO
+            )
+
+        contract.save()
+        ensure_enrollment_codes_exist(contract)
+
+        if update_no_price and update_sso and not is_sso:
+            # This is the last case, so we shouldn't have discounts now.
+            # Test on our flags, not the contract, so we can make sure the contract
+            # is also correct.
+            assert contract.get_discounts().count() == 0
+        else:
+            # Otherwise we're really just making sure the price is updated.
+            for code in contract.get_discounts():
+                assert code.amount == assert_price
+                assert code.products.filter(product=product).exists()
+
+
+@pytest.mark.parametrize(
+    "code_applied",
+    [
+        (True,),
+        (False,),
+    ],
+)
+def test_check_basket_for_product_and_code(mocker, code_applied):
+    """
+    Make sure the check for product and code works.
+
+    If the learner is checking out with a product that's for a B2B course run,
+    we should stop them if they don't have the discount code applied. (This doesn't
+    check the alternate state because that's tested elsewhere.)
+    """
+
+    mocked_ensure_call = mocker.patch("b2b.tasks.queue_enrollment_code_check.delay")
+
+    contract = factories.ContractPageFactory(
+        integration_type=CONTRACT_INTEGRATION_NONSSO,
+        enrollment_fixed_price=Decimal(100),
+    )
+    course = CourseFactory()
+    run, product = create_contract_run(contract, course)
+    ensure_enrollment_codes_exist(contract)
+    assert mocked_ensure_call.called
+
+    basket = BasketItemFactory(product=product).basket
+
+    if code_applied:
+        discount = contract.get_discounts().first()
+        assert discount
+
+        BasketDiscount.objects.create(
+            redeemed_discount=discount,
+            redeemed_basket=basket,
+            redeemed_by=basket.user,
+            redemption_date=now_in_utc(),
+        )
+
+        basket.refresh_from_db()
+        assert basket.discounts.count() == 1
+
+    payload = check_basket_for_product_and_code(basket)
+
+    if code_applied:
+        assert payload
+    else:
+        assert not payload
