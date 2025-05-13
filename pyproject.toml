@@ -83,6 +83,7 @@ uwsgi = "^2.0.19"
 uwsgitop = "^0.12"
 wagtail = "6.3"
 wagtail-metadata = "^5.0.0"
+djangorestframework-api-key = "^3.1.0"
 
 
 [tool.poetry.group.dev.dependencies]
