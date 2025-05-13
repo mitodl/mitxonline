@@ -73,12 +73,14 @@ class CourseFilterSet(django_filters.FilterSet):
 
     def filter_queryset(self, queryset):
         request = self.request
-        user = request.user if request else None
+        user = getattr(request, "user", None)
         org_id = request.query_params.get("org_id") if request else None
 
-        if not user or user.is_anonymous:
-            queryset = queryset.filter(courseruns__b2b_contract__isnull=True)
-        elif org_id:
+        show_contracted = (
+            user and user.is_authenticated and org_id and user.b2b_organizations.filter(id=org_id).exists()
+        )
+
+        if show_contracted:
             queryset = queryset.filter(
                 courseruns__b2b_contract__organization__id=org_id,
                 courseruns__b2b_contract__active=True,

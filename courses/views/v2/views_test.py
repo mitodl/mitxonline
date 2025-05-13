@@ -12,6 +12,7 @@ from django.test.client import RequestFactory
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.request import Request
+from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
@@ -29,6 +30,7 @@ from courses.views.test_utils import (
 )
 from courses.views.v2 import CourseFilterSet, Pagination
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
 
@@ -259,21 +261,48 @@ def test_get_course(
 
 
 @pytest.mark.django_db
-def test_filter_with_org_id_returns_contracted_course(user_drf_client):
+def test_filter_with_org_id_returns_contracted_course():
     org = OrganizationPageFactory(name="Test Org")
     contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_contracts.add(contract)
     course = CourseFactory(title="Contracted Course")
     create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
 
     unrelated_course = Course.objects.create(title="Other Course")
     CourseRunFactory(course=unrelated_course)
 
     url = reverse("v2:courses_api-list")
-    response = user_drf_client.get(url, {"org_id": org.id})
+    response = client.get(url, {"org_id": org.id})
 
     titles = [result["title"] for result in response.data["results"]]
     assert course.title in titles
     assert unrelated_course.title not in titles
+
+
+@pytest.mark.django_db
+def test_filter_with_org_id_user_not_associated_with_org_return_courses_with_no_contract():
+    org = OrganizationPageFactory(name="Test Org")
+    user = UserFactory()
+    contract = ContractPageFactory(organization=org, active=True)
+    course = CourseFactory(title="Contracted Course")
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    unrelated_course = Course.objects.create(title="Other Course")
+    CourseRunFactory(course=unrelated_course)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    titles = [result["title"] for result in response.data["results"]]
+    assert course.title not in titles
+    assert unrelated_course.title in titles
 
 
 @pytest.mark.django_db
