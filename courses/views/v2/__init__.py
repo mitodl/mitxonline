@@ -77,7 +77,11 @@ class CourseFilterSet(django_filters.FilterSet):
         org_id = request.query_params.get("org_id") if request else None
 
         if org_id:
-            if user and user.is_authenticated and user.b2b_organizations.filter(id=org_id).exists():
+            if (
+                user
+                and user.is_authenticated
+                and user.b2b_organizations.filter(id=org_id).exists()
+            ):
                 queryset = queryset.filter(
                     courseruns__b2b_contract__organization_id=org_id,
                     courseruns__b2b_contract__active=True,
