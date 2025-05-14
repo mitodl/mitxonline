@@ -20,7 +20,6 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_UNLIMITED,
 )
 from ecommerce.models import Discount, DiscountProduct, Product
-from main.celery import app
 from main.utils import date_to_datetime
 
 log = logging.getLogger(__name__)
@@ -64,9 +63,7 @@ def create_contract_run(
     This won't create pages for either the run or the products, since they're
     not supposed to be accessed by the public.
 
-    - For now this won't check the contract for pricing, since we're not doing
-    that yet.
-    - This should also create the run in edX, but we also don't do that yet.
+    - This should also create the run in edX, but we don't do that yet.
       When we add that, we should backfill the URL into the course run.
 
     Args:
@@ -139,6 +136,8 @@ def create_contract_run(
             course_run,
             contract,
         )
+
+    contract.save()
 
     return course_run, course_run_product
 
@@ -220,7 +219,6 @@ def validate_basket_for_b2b_purchase(request) -> bool:
     return False
 
 
-@app.task()
 def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR0915
     """
     Ensure that enrollment codes exist for the given contract.
@@ -253,10 +251,14 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR091
 
     created = updated = errors = 0
 
+    log.info("Checking enrollment codes for contract %s", contract)
+
     if contract.integration_type == "sso" and not contract.enrollment_fixed_price:
         # SSO contracts w/out price don't need discounts.
         discounts = contract.get_discounts()
         products = contract.get_products()
+
+        log.info("Removing any existing discounts for SSO/free contract %s", contract)
 
         for discount in discounts:
             discount.products.filter(product__in=products).delete()
@@ -278,6 +280,8 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR091
         return (created, updated, errors)
 
     products = contract.get_products()
+
+    log.info("Checking %s products for contract %s", len(products), contract)
 
     for product in products:
         # Check these things:
@@ -369,6 +373,10 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR091
 
             continue
 
+        log.info(
+            "Updating %s discount codes for product %s", len(product_discounts), product
+        )
+
         for discount in product_discounts:
             Discount.objects.filter(pk=discount.id).update(
                 **{
@@ -405,6 +413,8 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR091
             updated += 1
 
         create_count = contract.max_learners - len(product_discounts)
+
+        log.info("Creating %s new discount codes for product %s", create_count, product)
 
         if create_count < 0:
             log.warning(
