@@ -18,6 +18,7 @@ from mitol.common.utils import now_in_utc
 
 from b2b.models import OrganizationPage
 from cms.constants import CMS_EDITORS_GROUP_NAME
+from openedx.constants import OPENEDX_USERNAME_MAX_LEN
 from openedx.models import OpenEdxUser
 
 MALE = "m"
@@ -171,7 +172,9 @@ def _post_create_user(user, username):
     """
     LegalAddress.objects.create(user=user)
     UserProfile.objects.create(user=user)
-    OpenEdxUser.objects.create(user=user, edx_username=username)
+    OpenEdxUser.objects.create(
+        user=user, edx_username=username[:OPENEDX_USERNAME_MAX_LEN]
+    )
 
 
 class UserManager(BaseUserManager):
