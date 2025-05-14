@@ -1,5 +1,6 @@
 """Models for B2B data."""
 
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.http import Http404
 from django.utils.text import slugify
@@ -79,6 +80,17 @@ class OrganizationPage(Page):
         self.slug = slugify(f"org-{self.name}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
 
+    def get_learners(self):
+        """Get the learners associated with this organization."""
+
+        return (
+            get_user_model()
+            .objects.filter(
+                b2b_contracts__organization=self,
+            )
+            .distinct()
+        )
+
 
 class ContractPage(Page):
     """Stores information about a contract with an organization."""
@@ -150,3 +162,14 @@ class ContractPage(Page):
 
         self.slug = slugify(f"contract-{self.organization.id}-{self.id}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+    def get_learners(self):
+        """Get the learners associated with this organization."""
+
+        return (
+            get_user_model()
+            .objects.filter(
+                b2b_contracts=self,
+            )
+            .distinct()
+        )

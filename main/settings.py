@@ -228,6 +228,7 @@ INSTALLED_APPS = (
     "health_check.contrib.celery_ping",
     "health_check.contrib.redis",
     "health_check.contrib.db_heartbeat",
+    "rest_framework_api_key",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):

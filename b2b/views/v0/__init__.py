@@ -2,6 +2,7 @@
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAdminUser
+from rest_framework_api_key.permissions import HasAPIKey
 
 from b2b.models import ContractPage, OrganizationPage
 from b2b.serializers.v0 import ContractPageSerializer, OrganizationPageSerializer
@@ -14,7 +15,7 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = OrganizationPage.objects.all()
     serializer_class = OrganizationPageSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "organization_slug"
 
@@ -26,6 +27,6 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = ContractPage.objects.all()
     serializer_class = ContractPageSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUser | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "contract_slug"
