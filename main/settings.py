@@ -23,6 +23,7 @@ from mitol.common.envs import (
     get_string,
     import_settings_modules,
 )
+from mitol.common.settings.celery import *  # noqa: F403
 from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
@@ -189,6 +190,7 @@ INSTALLED_APPS = (
     "django_filters",
     "corsheaders",
     "webpack_loader",
+    "django_scim",
     # WAGTAIL
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -293,7 +295,6 @@ HEALTH_CHECK = {
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "oauth2_provider.middleware.OAuth2TokenMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -306,6 +307,8 @@ MIDDLEWARE = (
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
+    "oauth2_provider.middleware.OAuth2TokenMiddleware",
+    "django_scim.middleware.SCIMAuthCheckMiddleware",
 )
 
 # enable the nplusone profiler only in debug mode

@@ -22,6 +22,10 @@ RUN mkdir /src && \
 
 FROM system AS poetry
 
+# copy in trusted certs
+COPY --chmod=644 certs/*.crt /usr/local/share/ca-certificates/
+RUN update-ca-certificates
+
 # Poetry env configuration
 ENV  \
   # poetry:

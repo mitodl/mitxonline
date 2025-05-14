@@ -1,6 +1,7 @@
 # Core requirements
 git
 curl
+dnsutils
 libjpeg-dev
 zlib1g-dev
 net-tools
