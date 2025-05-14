@@ -284,7 +284,7 @@ def test_filter_with_org_id_returns_contracted_course():
 
 
 @pytest.mark.django_db
-def test_filter_with_org_id_user_not_associated_with_org_return_courses_with_no_contract():
+def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses():
     org = OrganizationPageFactory(name="Test Org")
     user = UserFactory()
     contract = ContractPageFactory(organization=org, active=True)
@@ -302,7 +302,7 @@ def test_filter_with_org_id_user_not_associated_with_org_return_courses_with_no_
 
     titles = [result["title"] for result in response.data["results"]]
     assert course.title not in titles
-    assert unrelated_course.title in titles
+    assert unrelated_course.title not in titles
 
 
 @pytest.mark.django_db
