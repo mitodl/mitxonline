@@ -38,4 +38,19 @@ urlpatterns = [
         name="users_api-current_user",
     ),
     path("api/", include(router.urls)),
+    path(
+        "api/v0/users/me",
+        CurrentUserRetrieveUpdateViewSet.as_view(
+            {"patch": "update", "get": "retrieve"}
+        ),
+        name="users_api-me",
+    ),
+    path(
+        "api/v0/users/current_user/",
+        NewCurrentUserRetrieveUpdateViewSet.as_view(
+            {"patch": "update", "get": "retrieve"}
+        ),
+        name="users_api-current_user",
+    ),
+    path("api/v0/", include(router.urls)),
 ]

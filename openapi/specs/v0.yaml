@@ -210,6 +210,254 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
           description: ''
+  /api/v0/change-emails/:
+    post:
+      operationId: change_emails_create
+      description: Viewset for creating and updating email change requests
+      tags:
+      - change-emails
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequestCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequestCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequestCreateRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeEmailRequestCreate'
+          description: ''
+  /api/v0/change-emails/{code}/:
+    put:
+      operationId: change_emails_update
+      description: Viewset for creating and updating email change requests
+      parameters:
+      - in: path
+        name: code
+        schema:
+          type: string
+        required: true
+      tags:
+      - change-emails
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequestUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequestUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequestUpdateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeEmailRequestUpdate'
+          description: ''
+    patch:
+      operationId: change_emails_partial_update
+      description: Viewset for creating and updating email change requests
+      parameters:
+      - in: path
+        name: code
+        schema:
+          type: string
+        required: true
+      tags:
+      - change-emails
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedChangeEmailRequestUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedChangeEmailRequestUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedChangeEmailRequestUpdateRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeEmailRequestUpdate'
+          description: ''
+  /api/v0/countries/:
+    get:
+      operationId: countries_list
+      description: Get generator for countries/states list
+      tags:
+      - countries
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Country'
+          description: ''
+  /api/v0/user_search/:
+    get:
+      operationId: user_search_list
+      description: |-
+        Provides an API for listing system users. This is for the staff
+        dashboard.
+      parameters:
+      - name: l
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: o
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - user_search
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStaffDashboardUserList'
+          description: ''
+  /api/v0/user_search/{id}/:
+    get:
+      operationId: user_search_retrieve
+      description: |-
+        Provides an API for listing system users. This is for the staff
+        dashboard.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - user_search
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffDashboardUser'
+          description: ''
+  /api/v0/users/{id}/:
+    get:
+      operationId: users_retrieve
+      description: User retrieve viewsets
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUser'
+          description: ''
+  /api/v0/users/current_user/:
+    get:
+      operationId: users_current_user_retrieve
+      description: User retrieve and update viewsets for the current user
+      tags:
+      - users
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: users_current_user_partial_update
+      description: User retrieve and update viewsets for the current user
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/v0/users/me:
+    get:
+      operationId: users_me_retrieve
+      description: User retrieve and update viewsets for the current user
+      tags:
+      - users
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: users_me_partial_update
+      description: User retrieve and update viewsets for the current user
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
   /api/v1/course_runs/:
     get:
       operationId: course_runs_list
@@ -772,6 +1020,46 @@ components:
     BlankEnum:
       enum:
       - ''
+    ChangeEmailRequestCreate:
+      type: object
+      description: Serializer for starting a user email change
+      properties:
+        new_email:
+          type: string
+          format: email
+      required:
+      - new_email
+    ChangeEmailRequestCreateRequest:
+      type: object
+      description: Serializer for starting a user email change
+      properties:
+        new_email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - new_email
+      - password
+    ChangeEmailRequestUpdate:
+      type: object
+      description: Serializer for confirming a user email change
+      properties:
+        confirmed:
+          type: boolean
+      required:
+      - confirmed
+    ChangeEmailRequestUpdateRequest:
+      type: object
+      description: Serializer for confirming a user email change
+      properties:
+        confirmed:
+          type: boolean
+      required:
+      - confirmed
     CompanySizeEnum:
       enum:
       - 1
@@ -857,6 +1145,29 @@ components:
       - name
       - organization
       - slug
+    Country:
+      type: object
+      description: Serializer for pycountry countries, with states for US/CA
+      properties:
+        code:
+          type: string
+          description: Get the country alpha_2 code
+          readOnly: true
+        name:
+          type: string
+          description: Get the country name (common name preferred if available)
+          readOnly: true
+        states:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: Get a list of states/provinces if USA or Canada
+          readOnly: true
+      required:
+      - code
+      - name
+      - states
     Course:
       type: object
       description: Course model serializer
@@ -1553,6 +1864,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CourseWithCourseRuns'
+    PaginatedStaffDashboardUserList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?o=400&l=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?o=200&l=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffDashboardUser'
     PaginatedV1CourseWithCourseRunsList:
       type: object
       required:
@@ -1660,6 +1994,12 @@ components:
       required:
       - email
       - name
+    PatchedChangeEmailRequestUpdateRequest:
+      type: object
+      description: Serializer for confirming a user email change
+      properties:
+        confirmed:
+          type: boolean
     PatchedCourseRunEnrollmentRequest:
       type: object
       description: CourseRunEnrollment model serializer
@@ -1669,6 +2009,34 @@ components:
         run_id:
           type: integer
           writeOnly: true
+    PatchedUserRequest:
+      type: object
+      description: Serializer for users
+      properties:
+        username:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          description: Returns the email or None in the case of AnonymousUser
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        legal_address:
+          allOf:
+          - $ref: '#/components/schemas/LegalAddressRequest'
+          nullable: true
+        user_profile:
+          allOf:
+          - $ref: '#/components/schemas/UserProfileRequest'
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
     PaymentTypeEnum:
       enum:
       - marketing
@@ -1809,6 +2177,32 @@ components:
       - live
       - page_url
       - price
+    PublicUser:
+      type: object
+      description: Serializer for public user data
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          maxLength: 500
+        name:
+          type: string
+          maxLength: 255
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_on
+      - id
+      - updated_on
+      - username
     RedemptionTypeEnum:
       enum:
       - one-time
@@ -1891,6 +2285,118 @@ components:
       - company
       - gender
       - job_title
+    StaffDashboardUser:
+      type: object
+      description: Serializer for data we care about in the staff dashboard
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          maxLength: 500
+        name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        legal_address:
+          allOf:
+          - $ref: '#/components/schemas/LegalAddress'
+          nullable: true
+        is_staff:
+          type: boolean
+          description: The user can access the admin site
+        is_superuser:
+          type: boolean
+          title: Superuser status
+          description: Designates that this user has all permissions without explicitly
+            assigning them.
+      required:
+      - email
+      - id
+      - legal_address
+      - username
+    User:
+      type: object
+      description: Serializer for users
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+        name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          description: Returns the email or None in the case of AnonymousUser
+        legal_address:
+          allOf:
+          - $ref: '#/components/schemas/LegalAddress'
+          nullable: true
+        user_profile:
+          allOf:
+          - $ref: '#/components/schemas/UserProfile'
+          nullable: true
+        is_anonymous:
+          type: boolean
+          readOnly: true
+        is_authenticated:
+          type: boolean
+          readOnly: true
+        is_editor:
+          type: boolean
+          description: Returns True if the user has editor permissions for the CMS
+          readOnly: true
+        is_staff:
+          type: boolean
+          readOnly: true
+          description: The user can access the admin site
+        is_superuser:
+          type: boolean
+          readOnly: true
+          title: Superuser status
+          description: Designates that this user has all permissions without explicitly
+            assigning them.
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+        grants:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          default: true
+        b2b_organizations:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: Get the organizations for the user
+          readOnly: true
+      required:
+      - b2b_organizations
+      - created_on
+      - grants
+      - id
+      - is_anonymous
+      - is_authenticated
+      - is_editor
+      - is_staff
+      - is_superuser
+      - legal_address
+      - updated_on
     UserProfile:
       type: object
       description: Serializer for profile
