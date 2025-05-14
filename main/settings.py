@@ -662,18 +662,6 @@ DJANGO_LOG_LEVEL = get_string(
     name="DJANGO_LOG_LEVEL", default="INFO", description="The log level for django"
 )
 
-# For logging to a remote syslog host
-LOG_HOST = get_string(
-    name="MITX_ONLINE_LOG_HOST",
-    default="localhost",
-    description="Remote syslog server hostname",
-)
-LOG_HOST_PORT = get_int(
-    name="MITX_ONLINE_LOG_HOST_PORT",
-    default=514,
-    description="Remote syslog server port",
-)
-
 HOSTNAME = platform.node().split(".")[0]
 
 # nplusone profiler logger configuration
@@ -700,13 +688,6 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
-        "syslog": {
-            "level": LOG_LEVEL,
-            "class": "logging.handlers.SysLogHandler",
-            "facility": "local7",
-            "formatter": "verbose",
-            "address": (LOG_HOST, LOG_HOST_PORT),
-        },
         "mail_admins": {
             "level": "ERROR",
             "filters": ["require_debug_false"],
@@ -717,7 +698,7 @@ LOGGING = {
         "django": {
             "propagate": True,
             "level": DJANGO_LOG_LEVEL,
-            "handlers": ["console", "syslog"],
+            "handlers": ["console"],
         },
         "django.request": {
             "handlers": ["mail_admins"],
@@ -726,7 +707,7 @@ LOGGING = {
         },
         "nplusone": {"handlers": ["console"], "level": "ERROR"},
     },
-    "root": {"handlers": ["console", "syslog"], "level": LOG_LEVEL},
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }
 
 # server-status
