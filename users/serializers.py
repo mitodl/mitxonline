@@ -229,6 +229,8 @@ class UserSerializer(serializers.ModelSerializer):
     grants = serializers.SerializerMethodField(read_only=True, required=False)
     is_active = serializers.BooleanField(default=True)
     b2b_organizations = serializers.SerializerMethodField()
+    is_anonymous = serializers.BooleanField(read_only=True)
+    is_authenticated = serializers.BooleanField(read_only=True)
 
     def validate_email(self, value):
         """Empty validation function, but this is required for WriteableSerializerMethodField"""
@@ -262,6 +264,7 @@ class UserSerializer(serializers.ModelSerializer):
     def get_grants(self, instance):
         return instance.get_all_permissions()
 
+    @extend_schema_field(list[dict])
     def get_b2b_organizations(self, instance):
         """Get the organizations for the user"""
         if instance.is_anonymous:

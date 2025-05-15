@@ -222,10 +222,50 @@ INSTALLED_APPS = (
     "drf_spectacular",
     "mitol.apigateway.apps.ApigatewayApp",
     "b2b",
+    "health_check",
+    "health_check.cache",
+    "health_check.contrib.migrations",
+    "health_check.contrib.celery_ping",
+    "health_check.contrib.redis",
+    "health_check.contrib.db_heartbeat",
+    "rest_framework_api_key",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
 #     INSTALLED_APPS += ("localdev.seed",)  # noqa: ERA001
+
+HEALTH_CHECK = {
+    "SUBSETS": {
+        # The 'startup' subset includes checks that must pass before the application can
+        # start.
+        "startup": [
+            "MigrationsHealthCheck",  # Ensures database migrations are applied.
+            "CacheBackend",  # Verifies the cache backend is operational.
+            "RedisHealthCheck",  # Confirms Redis is reachable and functional.
+            "DatabaseHeartBeatCheck",  # Checks the database connection is alive.
+        ],
+        # The 'liveness' subset includes checks to determine if the application is
+        # running.
+        "liveness": ["DatabaseHeartBeatCheck"],  # Minimal check to ensure the app is
+        # alive.
+        # The 'readiness' subset includes checks to determine if the application is
+        # ready to serve requests.
+        "readiness": [
+            "CacheBackend",  # Ensures the cache is ready for use.
+            "RedisHealthCheck",  # Confirms Redis is ready for use.
+            "DatabaseHeartBeatCheck",  # Verifies the database is ready for queries.
+        ],
+        # The 'full' subset includes all available health checks for a comprehensive
+        # status report.
+        "full": [
+            "MigrationsHealthCheck",  # Ensures database migrations are applied.
+            "CacheBackend",  # Verifies the cache backend is operational.
+            "RedisHealthCheck",  # Confirms Redis is reachable and functional.
+            "DatabaseHeartBeatCheck",  # Checks the database connection is alive.
+            "CeleryPingHealthCheck",  # Verifies Celery workers are responsive.
+        ],
+    }
+}
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
@@ -623,18 +663,6 @@ DJANGO_LOG_LEVEL = get_string(
     name="DJANGO_LOG_LEVEL", default="INFO", description="The log level for django"
 )
 
-# For logging to a remote syslog host
-LOG_HOST = get_string(
-    name="MITX_ONLINE_LOG_HOST",
-    default="localhost",
-    description="Remote syslog server hostname",
-)
-LOG_HOST_PORT = get_int(
-    name="MITX_ONLINE_LOG_HOST_PORT",
-    default=514,
-    description="Remote syslog server port",
-)
-
 HOSTNAME = platform.node().split(".")[0]
 
 # nplusone profiler logger configuration
@@ -661,13 +689,6 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
-        "syslog": {
-            "level": LOG_LEVEL,
-            "class": "logging.handlers.SysLogHandler",
-            "facility": "local7",
-            "formatter": "verbose",
-            "address": (LOG_HOST, LOG_HOST_PORT),
-        },
         "mail_admins": {
             "level": "ERROR",
             "filters": ["require_debug_false"],
@@ -678,7 +699,7 @@ LOGGING = {
         "django": {
             "propagate": True,
             "level": DJANGO_LOG_LEVEL,
-            "handlers": ["console", "syslog"],
+            "handlers": ["console"],
         },
         "django.request": {
             "handlers": ["mail_admins"],
@@ -687,14 +708,13 @@ LOGGING = {
         },
         "nplusone": {"handlers": ["console"], "level": "ERROR"},
     },
-    "root": {"handlers": ["console", "syslog"], "level": LOG_LEVEL},
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }
 
 # server-status
 STATUS_TOKEN = get_string(
     name="STATUS_TOKEN", default="", description="Token to access the status API."
 )
-HEALTH_CHECK = ["CELERY", "REDIS", "POSTGRES"]
 
 GTM_TRACKING_ID = get_string(
     name="GTM_TRACKING_ID", default="", description="Google Tag Manager container ID"
@@ -807,6 +827,8 @@ else:
     _redis_url = get_string(
         name="REDIS_URL", default=None, description="Redis URL for non-production use"
     )
+# Use the more consistently looked-for name to support healthchecks package
+REDIS_URL = _redis_url
 
 # Celery
 USE_CELERY = True

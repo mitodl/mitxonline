@@ -2,7 +2,7 @@
 
 import logging
 
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
 from rich.console import Console
 from rich.table import Table
 
@@ -62,6 +62,24 @@ class Command(BaseCommand):
             dest="organization_id",
         )
         courseware_parser.add_argument(
+            "--contract",
+            type=int,
+            help="Filter by contract ID.",
+            dest="contract_id",
+        )
+
+        learners_parser = subparsers.add_parser(
+            "learners",
+            help="List learners associated with an org or contract.",
+        )
+        learners_parser.add_argument(
+            "--org",
+            "--organization",
+            type=int,
+            help="Filter by organization ID.",
+            dest="organization_id",
+        )
+        learners_parser.add_argument(
             "--contract",
             type=int,
             help="Filter by contract ID.",
@@ -180,6 +198,33 @@ class Command(BaseCommand):
 
         self.console.print(courseware_table)
 
+    def handle_list_learners(self, *args, **kwargs):  # noqa: ARG002
+        """List learners associated with an org or contract."""
+
+        org_id = kwargs.pop("organization_id")
+        contract_id = kwargs.pop("contract_id")
+
+        if org_id:
+            obj = OrganizationPage.objects.get(id=org_id)
+        elif contract_id:
+            obj = ContractPage.objects.get(id=contract_id)
+        else:
+            msg = "Must provide either org or contract ID."
+            raise CommandError(msg)
+
+        learners = obj.get_learners()
+
+        learners_table = Table(title=f"Learners for {obj}")
+        learners_table.add_column("Email", justify="right")
+        learners_table.add_column("Name", justify="left")
+
+        for learner in learners:
+            learners_table.add_row(
+                learner.email,
+                f"{learner.first_name} {learner.last_name}",
+            )
+        self.console.print(learners_table)
+
     def handle(self, *args, **kwargs):  # noqa: ARG002
         """Handle the command."""
         self.console = Console()
@@ -190,7 +235,10 @@ class Command(BaseCommand):
             self.handle_list_contracts(**kwargs)
         elif subcommand == "courseware":
             self.handle_list_courseware(**kwargs)
+        elif subcommand == "learners":
+            self.handle_list_learners(**kwargs)
         else:
-            log.error("Unknown subcommand: %s", subcommand)
-            return 1
+            msg = f"Unknown subcommand: {subcommand}"
+            raise CommandError(msg)
+
         return 0
