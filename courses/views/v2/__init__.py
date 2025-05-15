@@ -8,11 +8,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
-from django.db.models import Exists, OuterRef, Subquery, Q
+from django.db.models import Exists, OuterRef, Subquery
 
 from courses.models import (
     Course,
-    CourseRun,
     CoursesTopic,
     Department,
     Program,
@@ -46,7 +45,7 @@ class ProgramFilterSet(django_filters.FilterSet):
         model = Program
         fields = ["id", "live", "readable_id", "page__live", "org_id"]
 
-    def filter_by_org_id(self, queryset, name, org_id):
+    def filter_by_org_id(self, queryset, _, org_id):
         # Subquery for active contracts belonging to the org
         request = self.request
         user = getattr(request, "user", None)
