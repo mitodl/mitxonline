@@ -8,7 +8,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
-from django.db.models import Exists, OuterRef, Subquery
 
 from b2b.models import ContractPage
 from courses.models import (
