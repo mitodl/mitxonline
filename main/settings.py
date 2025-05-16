@@ -114,6 +114,12 @@ SECURE_SSL_REDIRECT = get_bool(
     default=True,
     description="Application-level SSL redirect setting.",
 )
+SECURE_REDIRECT_EXEMPT = [
+    "^health/startup/$",
+    "^health/liveness/$",
+    "^health/readiness/$",
+    "^health/full/$",
+]
 
 SECURE_SSL_HOST = get_string(
     name="MITX_ONLINE_SECURE_SSL_HOST",
