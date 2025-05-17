@@ -523,12 +523,15 @@ class TestDeactivateEnrollments:
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
 @pytest.mark.parametrize("edx_enroll_succeeds", [True, False])
 @pytest.mark.parametrize("edx_downgrade_succeeds", [True, False])
+@pytest.mark.parametrize("has_audit_enrollment_already", [True, False])
+
 def test_defer_enrollment(
     mocker,
     course,
     keep_failed_enrollments,
     edx_enroll_succeeds,
     edx_downgrade_succeeds,
+    has_audit_enrollment_already
 ):
     """
     defer_enrollment should downgrade current enrollment to audit and create a verified enrollment in another
@@ -542,6 +545,13 @@ def test_defer_enrollment(
     )
 
     new_enrollment = CourseRunEnrollmentFactory.create(run=course_runs[1])
+    audit_enrollment = None
+    if has_audit_enrollment_already:
+        audit_enrollment = CourseRunEnrollmentFactory.create(
+            user=existing_enrollment.user,
+            run=course_runs[1],
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        )
     return_values = [
         ([new_enrollment] if edx_enroll_succeeds else [], edx_enroll_succeeds),
         (
@@ -549,7 +559,10 @@ def test_defer_enrollment(
             edx_downgrade_succeeds,
         ),
     ]
-
+    patched_deactivate_run_enrollment = mocker.patch(
+        "courses.api.deactivate_run_enrollment",
+        return_value=audit_enrollment,
+    )
     with patch(
         "courses.api.create_run_enrollments", autospec=True
     ) as patched_create_enrollments:
@@ -619,7 +632,7 @@ def test_defer_enrollment_validation(mocker, user):
     )
     mocker.patch(
         "courses.api.deactivate_run_enrollment",
-        return_value=[enrollments[1].run.courseware_id],
+        return_value=enrollments[1],
     )
 
     with pytest.raises(ValidationError):
