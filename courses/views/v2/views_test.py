@@ -16,7 +16,12 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from courses.factories import CourseFactory, CourseRunFactory, DepartmentFactory, ProgramFactory
+from courses.factories import (
+    CourseFactory,
+    CourseRunFactory,
+    DepartmentFactory,
+    ProgramFactory,
+)
 from courses.models import Course, Program
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v2.departments import (
@@ -358,7 +363,7 @@ def test_filter_by_org_id_with_contracted_user():
 
     # Unrelated program (should not be included)
     ProgramFactory()
-    
+
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -374,6 +379,7 @@ def test_filter_by_org_id_with_contracted_user():
     filtered = filterset.qs
     assert program_with_contract in filtered
     assert filtered.count() == 1
+
 
 @pytest.mark.django_db
 def test_filter_by_org_id_without_contract_access():
@@ -403,6 +409,7 @@ def test_filter_by_org_id_without_contract_access():
     assert public_program in filtered
     assert program_with_contract not in filtered
     assert filtered.count() == 1
+
 
 @pytest.mark.django_db
 def test_filter_by_org_id_unauthenticated_user():
