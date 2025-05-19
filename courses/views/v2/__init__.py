@@ -37,6 +37,10 @@ class Pagination(PageNumberPagination):
     max_page_size = 100
     ordering = "-created_on"
 
+def user_has_org_access(user, org_id):
+    return (
+        user and user.is_authenticated and org_id and user.b2b_organizations.filter(id=org_id).exists()
+    )
 
 class ProgramFilterSet(django_filters.FilterSet):
     org_id = django_filters.NumberFilter(method="filter_by_org_id")
@@ -45,42 +49,28 @@ class ProgramFilterSet(django_filters.FilterSet):
         model = Program
         fields = ["id", "live", "readable_id", "page__live", "org_id"]
 
-    def filter_by_org_id(self, queryset, _, org_id):
-        # Subquery for active contracts belonging to the org
-        request = self.request
-        user = getattr(request, "user", None)
-        org_id = request.query_params.get("org_id") if request else None
-        show_contracted = (
-            user
-            and user.is_authenticated
-            and org_id
-            and user.b2b_organizations.filter(id=org_id).exists()
-        )
+    def __init__(self, *args, request_user=None, **kwargs):
+        self.user = request_user
+        super().__init__(*args, **kwargs)
 
-        if show_contracted:
-            active_contracts = ContractPage.objects.filter(
-                organization__id=org_id, active=True
-            )
-            # Subquery to find ProgramRequirements with courses that have runs in active contracts
+    def filter_by_org_id(self, queryset, name, org_id):
+
+        if user_has_org_access(self.user, org_id):
             program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
                 node_type=ProgramRequirementNodeType.COURSE,
-                course__courseruns__b2b_contract__in=Subquery(
-                    active_contracts.values("id")
-                ),
+                course__courseruns__b2b_contract__organization_id=org_id,
+                course__courseruns__b2b_contract__active=True,
                 program_id=OuterRef("pk"),
             )
-
             return queryset.annotate(
                 has_contracted_courses=Exists(program_requirements_with_contract_runs)
             ).filter(has_contracted_courses=True)
         else:
-            # If not showing contracted, filter out programs with any courses that have runs in active contracts
             program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
                 node_type=ProgramRequirementNodeType.COURSE,
                 course__courseruns__b2b_contract__isnull=False,
                 program_id=OuterRef("pk"),
             )
-
             return queryset.annotate(
                 has_contracted_courses=Exists(program_requirements_with_contract_runs)
             ).filter(has_contracted_courses=False)
@@ -95,9 +85,13 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProgramFilterSet
 
-    queryset = (
-        Program.objects.filter().order_by("title").prefetch_related("departments")
-    )
+    def get_queryset(self):
+        return Program.objects.order_by("title").prefetch_related("departments")
+
+    def get_filterset_kwargs(self):
+        kwargs = super().get_filterset_kwargs()
+        kwargs["request_user"] = self.request.user
+        return kwargs
 
     @extend_schema(
         operation_id="programs_retrieve_v2",
@@ -117,42 +111,22 @@ class IdInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
 
 class CourseFilterSet(django_filters.FilterSet):
     courserun_is_enrollable = django_filters.BooleanFilter(
-        field_name="courserun_is_enrollable",
         method="filter_courserun_is_enrollable",
         label="Course Run Is Enrollable",
+        field_name="courserun_is_enrollable",
     )
     id = IdInFilter(field_name="id", lookup_expr="in", label="Course ID")
-
-    def filter_queryset(self, queryset):
-        request = self.request
-        user = getattr(request, "user", None)
-        org_id = request.query_params.get("org_id") if request else None
-
-        if org_id:
-            if (
-                user
-                and user.is_authenticated
-                and user.b2b_organizations.filter(id=org_id).exists()
-            ):
-                queryset = queryset.filter(
-                    courseruns__b2b_contract__organization_id=org_id,
-                    courseruns__b2b_contract__active=True,
-                )
-            else:
-                return queryset.none()
-        else:
-            queryset = queryset.filter(courseruns__b2b_contract__isnull=True)
-
-        return super().filter_queryset(queryset.distinct())
-
-    def filter_courserun_is_enrollable(self, queryset, _, value):
-        if value:
-            return get_enrollable_courses(queryset)
-        return get_unenrollable_courses(queryset)
 
     class Meta:
         model = Course
         fields = ["id", "live", "readable_id", "page__live", "courserun_is_enrollable"]
+
+    def filter_courserun_is_enrollable(self, queryset, name, value):
+        return (
+            get_enrollable_courses(queryset)
+            if value
+            else get_unenrollable_courses(queryset)
+        )
 
 
 class CourseViewSet(viewsets.ReadOnlyModelViewSet):
@@ -165,21 +139,28 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        return (
-            Course.objects.filter()
-            .select_related("page")
-            .prefetch_related("departments")
-            .all()
-            .order_by("title")
-        )
+        user = self.request.user
+        org_id = self.request.query_params.get("org_id")
+
+        qs = Course.objects.select_related("page").prefetch_related("departments").order_by("title")
+
+        if org_id:
+            if user_has_org_access(user, org_id):
+                return qs.filter(
+                    courseruns__b2b_contract__organization_id=org_id,
+                    courseruns__b2b_contract__active=True,
+                )
+            return Course.objects.none()
+        else:
+            return qs.filter(courseruns__b2b_contract__isnull=True)
 
     def get_serializer_context(self):
         added_context = {}
-        if self.request.query_params.get("readable_id", None):
+        qp = self.request.query_params
+        if qp.get("readable_id"):
             added_context["all_runs"] = True
-        if self.request.query_params.get("include_approved_financial_aid", None):
+        if qp.get("include_approved_financial_aid"):
             added_context["include_approved_financial_aid"] = True
-
         return {**super().get_serializer_context(), **added_context}
 
     @extend_schema(

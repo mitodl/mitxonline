@@ -28,7 +28,7 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import CourseFilterSet, Pagination
+from courses.views.v2 import CourseFilterSet, CourseViewSet, Pagination
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from users.factories import UserFactory
 
@@ -330,14 +330,14 @@ def test_filter_anonymous_user_sees_no_contracted_runs():
 
     course_no_contract = CourseFactory(title="Visible Course")
     CourseRunFactory(course=course_no_contract)
+
     rf = RequestFactory()
     request = rf.get(reverse("v2:courses_api-list"))
     request.user = AnonymousUser()
-    drf_request = Request(request)
-    queryset = Course.objects.all()
-    filtered = CourseFilterSet(
-        data=drf_request.query_params, request=drf_request, queryset=queryset
-    ).qs
 
-    assert course_no_contract in filtered
-    assert course_with_contract not in filtered
+    view = CourseViewSet()
+    view.request = Request(request)
+
+    queryset = view.get_queryset()
+    assert course_no_contract in queryset
+    assert course_with_contract not in queryset
