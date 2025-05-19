@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.116.1 (Released May 19, 2025)
+---------------
+
+- Update Users API to be versioned (at v0), so it shows up in the OpenAPI spec (#2659)
+- Update edx user profile asynchronously (#2658)
+- feat: Add health check endpoint (#2652)
+- fix(deps): update dependency @sentry/browser to v8.55.0 (#2655)
+- add redirect for user onboarding (#2612)
+
 Version 0.116.0 (Released May 12, 2025)
 ---------------
 
