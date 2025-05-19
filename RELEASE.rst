@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.116.1
+Version 0.116.1 (Released May 19, 2025)
 ---------------
 
 - Update Users API to be versioned (at v0), so it shows up in the OpenAPI spec (#2659)
