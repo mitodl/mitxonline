@@ -19,6 +19,7 @@ from mitol.common.envs import (
     get_delimited_list,
     get_features,
     get_int,
+    get_list_literal,
     get_string,
     import_settings_modules,
 )
@@ -90,6 +91,11 @@ DEBUG = get_bool(
 )
 
 ALLOWED_HOSTS = ["*"]
+ALLOWED_REDIRECT_HOSTS = get_list_literal(
+    name="ALLOWED_REDIRECT_HOSTS",
+    default=[],
+    description="List of hosts allowed to redirect to after login",
+)
 
 CSRF_TRUSTED_ORIGINS = get_delimited_list(
     name="CSRF_TRUSTED_ORIGINS",
