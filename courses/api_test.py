@@ -525,7 +525,7 @@ class TestDeactivateEnrollments:
 @pytest.mark.parametrize("edx_downgrade_succeeds", [True, False])
 @pytest.mark.parametrize("has_audit_enrollment_already", [True, False])
 
-def test_defer_enrollment(
+def test_defer_enrollment( # noqa: PLR0913
     mocker,
     course,
     keep_failed_enrollments,
@@ -610,6 +610,9 @@ def test_defer_enrollment(
                     course_runs[1].courseware_id,
                     keep_failed_enrollments=keep_failed_enrollments,
                 )
+
+        if has_audit_enrollment_already:
+            assert patched_deactivate_run_enrollment.call_count == 1
 
 
 def test_defer_enrollment_validation(mocker, user):
