@@ -152,7 +152,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 )
             return Course.objects.none()
         else:
-            return qs.filter(courseruns__b2b_contract__isnull=True)
+            return qs.filter(courseruns__b2b_contract__isnull=True).distinct()
 
     def get_serializer_context(self):
         added_context = {}
