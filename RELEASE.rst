@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.117.0
+Version 0.117.0 (Released May 20, 2025)
 ---------------
 
 - Remove configure hubspot command (#2667)
