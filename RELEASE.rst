@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.117.0 (Released May 20, 2025)
+---------------
+
+- Remove configure hubspot command (#2667)
+- Add missing ALLOWED_REDIRECT_HOSTS variable (#2666)
+- config: Allow bypassing SSL redirect for health checks
+- B2B Provisioning: Create enrollment codes when contracts are in place (#2654)
+- refactor: Remove syslog logging handler (#2663)
+- Filter courses based on orgs for user (#2657)
+- Add API key for B2B data (#2660)
+
 Version 0.116.1 (Released May 19, 2025)
 ---------------
 
