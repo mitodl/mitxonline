@@ -3,16 +3,20 @@ Course API Views version 2
 """
 
 import django_filters
+from django.db.models import Exists, OuterRef, Subquery
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 
+from b2b.models import ContractPage
 from courses.models import (
     Course,
     CoursesTopic,
     Department,
     Program,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
 )
 from courses.serializers.v2.courses import (
     CourseTopicSerializer,
@@ -34,15 +38,63 @@ class Pagination(PageNumberPagination):
     ordering = "-created_on"
 
 
+class ProgramFilterSet(django_filters.FilterSet):
+    org_id = django_filters.NumberFilter(method="filter_by_org_id")
+
+    class Meta:
+        model = Program
+        fields = ["id", "live", "readable_id", "page__live", "org_id"]
+
+    def filter_by_org_id(self, queryset, _, org_id):
+        # Subquery for active contracts belonging to the org
+        request = self.request
+        user = getattr(request, "user", None)
+        org_id = request.query_params.get("org_id") if request else None
+        show_contracted = (
+            user
+            and user.is_authenticated
+            and org_id
+            and user.b2b_organizations.filter(id=org_id).exists()
+        )
+
+        if show_contracted:
+            active_contracts = ContractPage.objects.filter(
+                organization__id=org_id, active=True
+            )
+            # Subquery to find ProgramRequirements with courses that have runs in active contracts
+            program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
+                node_type=ProgramRequirementNodeType.COURSE,
+                course__courseruns__b2b_contract__in=Subquery(
+                    active_contracts.values("id")
+                ),
+                program_id=OuterRef("pk"),
+            )
+
+            return queryset.annotate(
+                has_contracted_courses=Exists(program_requirements_with_contract_runs)
+            ).filter(has_contracted_courses=True)
+        else:
+            # If not showing contracted, filter out programs with any courses that have runs in active contracts
+            program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
+                node_type=ProgramRequirementNodeType.COURSE,
+                course__courseruns__b2b_contract__isnull=False,
+                program_id=OuterRef("pk"),
+            )
+
+            return queryset.annotate(
+                has_contracted_courses=Exists(program_requirements_with_contract_runs)
+            ).filter(has_contracted_courses=False)
+
+
 class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     """API viewset for Programs"""
 
     permission_classes = []
-
     serializer_class = ProgramSerializer
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["id", "live", "readable_id", "page__live"]
+    filterset_class = ProgramFilterSet
+
     queryset = (
         Program.objects.filter().order_by("title").prefetch_related("departments")
     )

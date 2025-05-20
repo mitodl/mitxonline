@@ -16,7 +16,12 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from courses.factories import CourseFactory, CourseRunFactory, DepartmentFactory
+from courses.factories import (
+    CourseFactory,
+    CourseRunFactory,
+    DepartmentFactory,
+    ProgramFactory,
+)
 from courses.models import Course, Program
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v2.departments import (
@@ -28,7 +33,7 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import CourseFilterSet, Pagination
+from courses.views.v2 import CourseFilterSet, Pagination, ProgramFilterSet
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from users.factories import UserFactory
 
@@ -341,3 +346,94 @@ def test_filter_anonymous_user_sees_no_contracted_runs():
 
     assert course_no_contract in filtered
     assert course_with_contract not in filtered
+
+
+@pytest.mark.django_db
+def test_filter_by_org_id_with_contracted_user():
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_contracts.add(contract)
+
+    program_with_contract = ProgramFactory.create()
+    course = CourseFactory()
+    create_contract_run(contract, course)
+
+    program_with_contract.add_requirement(course)
+
+    # Unrelated program (should not be included)
+    ProgramFactory()
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    request = Request(RequestFactory().get("v2:programs_api-list", {"org_id": org.id}))
+    request.user = user
+
+    filterset = ProgramFilterSet(
+        data={"org_id": org.id},
+        queryset=Program.objects.all(),
+        request=request,
+    )
+
+    filtered = filterset.qs
+    assert program_with_contract in filtered
+    assert filtered.count() == 1
+
+
+@pytest.mark.django_db
+def test_filter_by_org_id_without_contract_access():
+    org = OrganizationPageFactory()
+    user = UserFactory()
+
+    program_with_contract = ProgramFactory()
+    course = CourseFactory()
+    contract = ContractPageFactory(active=True, organization=org)
+    create_contract_run(contract, course)
+
+    program_with_contract.add_requirement(course)
+
+    # Another program without contract (should be included)
+    public_program = ProgramFactory()
+
+    request = Request(RequestFactory().get("v2:programs_api-list", {"org_id": org.id}))
+    request.user = user  # Not associated with org
+
+    filterset = ProgramFilterSet(
+        data={"org_id": org.id},
+        queryset=Program.objects.all(),
+        request=request,
+    )
+
+    filtered = filterset.qs
+    assert public_program in filtered
+    assert program_with_contract not in filtered
+    assert filtered.count() == 1
+
+
+@pytest.mark.django_db
+def test_filter_by_org_id_unauthenticated_user():
+    org = OrganizationPageFactory()
+
+    program_with_contract = ProgramFactory()
+    course = CourseFactory()
+    contract = ContractPageFactory(active=True, organization=org)
+    create_contract_run(contract, course)
+
+    program_with_contract.add_requirement(course)
+
+    public_program = ProgramFactory()
+
+    request = Request(RequestFactory().get("v2:programs_api-list", {"org_id": org.id}))
+    request.user = AnonymousUser()
+
+    filterset = ProgramFilterSet(
+        data={"org_id": org.id},
+        queryset=Program.objects.all(),
+        request=request,
+    )
+
+    filtered = filterset.qs
+    assert public_program in filtered
+    assert program_with_contract not in filtered
+    assert filtered.count() == 1
