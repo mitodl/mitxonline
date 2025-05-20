@@ -478,6 +478,10 @@
       "description": "Application-level SSL redirect setting.",
       "required": false
     },
+    "MITX_ONLINE_SECURE_REDIRECT_EXEMPT": {
+      "description": "Application-level SSL redirect  exemption setting.",
+      "required": false
+    },
     "MITX_ONLINE_SITE_ID": {
       "description": "The default site id for django sites framework",
       "required": false

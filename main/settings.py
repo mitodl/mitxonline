@@ -115,6 +115,12 @@ SECURE_SSL_REDIRECT = get_bool(
     description="Application-level SSL redirect setting.",
 )
 
+SECURE_REDIRECT_EXEMPT = get_bool(
+    name="MITX_ONLINE_SECURE_REDIRECT_EXEMPT",
+    default=[r"cms/pages/.*",],
+    description="Application-level SSL redirect setting.",
+)
+
 SECURE_SSL_HOST = get_string(
     name="MITX_ONLINE_SECURE_SSL_HOST",
     default=None,
