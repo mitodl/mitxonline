@@ -36,10 +36,15 @@ class Pagination(PageNumberPagination):
     max_page_size = 100
     ordering = "-created_on"
 
+
 def user_has_org_access(user, org_id):
     return (
-        user and user.is_authenticated and org_id and user.b2b_organizations.filter(id=org_id).exists()
+        user
+        and user.is_authenticated
+        and org_id
+        and user.b2b_organizations.filter(id=org_id).exists()
     )
+
 
 class ProgramFilterSet(django_filters.FilterSet):
     org_id = django_filters.NumberFilter(method="filter_by_org_id")
@@ -53,7 +58,6 @@ class ProgramFilterSet(django_filters.FilterSet):
         super().__init__(*args, **kwargs)
 
     def filter_by_org_id(self, queryset, name, org_id):
-
         if user_has_org_access(self.user, org_id):
             program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
                 node_type=ProgramRequirementNodeType.COURSE,
@@ -141,7 +145,11 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         user = self.request.user
         org_id = self.request.query_params.get("org_id")
 
-        qs = Course.objects.select_related("page").prefetch_related("departments").order_by("title")
+        qs = (
+            Course.objects.select_related("page")
+            .prefetch_related("departments")
+            .order_by("title")
+        )
 
         if org_id:
             if user_has_org_access(user, org_id):
