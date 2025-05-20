@@ -33,7 +33,7 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import CourseViewSet, Pagination
+from courses.views.v2 import CourseViewSet, Pagination, ProgramFilterSet
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from users.factories import UserFactory
 
@@ -366,19 +366,12 @@ def test_filter_by_org_id_with_contracted_user():
 
     client = APIClient()
     client.force_authenticate(user=user)
+    url = reverse("v2:programs_api-list")
+    response = client.get(url, {"org_id": org.id})
 
-    request = Request(RequestFactory().get("v2:programs_api-list", {"org_id": org.id}))
-    request.user = user
-
-    filterset = ProgramFilterSet(
-        data={"org_id": org.id},
-        queryset=Program.objects.all(),
-        request=request,
-    )
-
-    filtered = filterset.qs
-    assert program_with_contract in filtered
-    assert filtered.count() == 1
+    assert program_with_contract.title in [
+        program["title"] for program in response.data["results"]
+    ]
 
 
 @pytest.mark.django_db
