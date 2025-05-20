@@ -19,6 +19,7 @@ from mitol.common.envs import (
     get_delimited_list,
     get_features,
     get_int,
+    get_list_literal,
     get_string,
     import_settings_modules,
 )
@@ -32,7 +33,7 @@ from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.116.0"
+VERSION = "0.116.1"
 
 log = logging.getLogger()
 
@@ -90,6 +91,11 @@ DEBUG = get_bool(
 )
 
 ALLOWED_HOSTS = ["*"]
+ALLOWED_REDIRECT_HOSTS = get_list_literal(
+    name="ALLOWED_REDIRECT_HOSTS",
+    default=[],
+    description="List of hosts allowed to redirect to after login",
+)
 
 CSRF_TRUSTED_ORIGINS = get_delimited_list(
     name="CSRF_TRUSTED_ORIGINS",
@@ -114,6 +120,12 @@ SECURE_SSL_REDIRECT = get_bool(
     default=True,
     description="Application-level SSL redirect setting.",
 )
+SECURE_REDIRECT_EXEMPT = [
+    "^health/startup/$",
+    "^health/liveness/$",
+    "^health/readiness/$",
+    "^health/full/$",
+]
 
 SECURE_SSL_HOST = get_string(
     name="MITX_ONLINE_SECURE_SSL_HOST",

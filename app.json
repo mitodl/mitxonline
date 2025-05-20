@@ -26,6 +26,10 @@
   ],
   "description": "MITx Online",
   "env": {
+    "ALLOWED_REDIRECT_HOSTS": {
+      "description": "List of hosts allowed to redirect to after login",
+      "required": false
+    },
     "AUTH_CHANGE_EMAIL_TTL_IN_MINUTES": {
       "description": "Expiry time for a change email request, default is 1440 minutes(1 day)",
       "required": false
@@ -546,8 +550,8 @@
       "required": false
     },
     "OPENTELEMETRY_ENABLED": {
-       "description": "Enable collection and shipment of opentelemetry data",
-       "required": false
+      "description": "Enable collection and shipment of opentelemetry data",
+      "required": false
     },
     "OPENTELEMETRY_ENDPOINT": {
       "description": "Endpoint for opentelemetry",

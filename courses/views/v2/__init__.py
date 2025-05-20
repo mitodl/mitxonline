@@ -3,13 +3,12 @@ Course API Views version 2
 """
 
 import django_filters
-from django.db.models import Exists, OuterRef, Subquery
+from django.db.models import Exists, OuterRef
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 
-from b2b.models import ContractPage
 from courses.models import (
     Course,
     CoursesTopic,

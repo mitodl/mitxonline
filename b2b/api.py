@@ -1,6 +1,7 @@
 """API functions for B2B operations."""
 
 import logging
+from uuid import uuid4
 
 import reversion
 from django.conf import settings
@@ -12,8 +13,13 @@ from b2b.constants import B2B_RUN_TAG_FORMAT
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.api import get_home_page
 from courses.models import Course, CourseRun
-from ecommerce.api import establish_basket
-from ecommerce.models import Product
+from ecommerce.constants import (
+    DISCOUNT_TYPE_FIXED_PRICE,
+    PAYMENT_TYPE_SALES,
+    REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_UNLIMITED,
+)
+from ecommerce.models import Discount, DiscountProduct, Product
 from main.utils import date_to_datetime
 
 log = logging.getLogger(__name__)
@@ -57,9 +63,7 @@ def create_contract_run(
     This won't create pages for either the run or the products, since they're
     not supposed to be accessed by the public.
 
-    - For now this won't check the contract for pricing, since we're not doing
-    that yet.
-    - This should also create the run in edX, but we also don't do that yet.
+    - This should also create the run in edX, but we don't do that yet.
       When we add that, we should backfill the URL into the course run.
 
     Args:
@@ -133,6 +137,8 @@ def create_contract_run(
             contract,
         )
 
+    contract.save()
+
     return course_run, course_run_product
 
 
@@ -153,6 +159,7 @@ def validate_basket_for_b2b_purchase(request) -> bool:
 
     Returns: bool
     """
+    from ecommerce.api import establish_basket
 
     basket = establish_basket(request)
     if not basket:
@@ -210,3 +217,238 @@ def validate_basket_for_b2b_purchase(request) -> bool:
                 return True
 
     return False
+
+
+def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR0915
+    """
+    Ensure that enrollment codes exist for the given contract.
+
+    If the contract is non-SSO or if it specifies a price, we need to create
+    enrollment codes so the learners can enroll in the attached resources.
+
+    Enrollment codes are discounts. When the contract is seat-limited, we create
+    one discount code per learner per product. When the contract is unlimited,
+    we create one discount code per product, and set it to unlimited redemptions.
+
+    When the contract is created or modified, we'll need to shore up the discount
+    codes appropriately:
+    - If there's no discounts for any of the products, create them.
+    - If there are discounts, make sure they apply to all the products that
+      we've created, and create new ones if necessary.
+    - If there are too many discounts, log a warning message.
+    - If the contract is SSO and unlimited, but there are discounts for the
+      products, clear those products out. (Also remove the discounts if there
+      was only one product in the discount.)
+
+    Note about SSO contracts: if there's no price, we don't create enrollment
+    codes regardless of whether there's a learner cap or not. We'll limit the
+    attachment when we log the user in.
+
+    Returns:
+        tuple: A tuple containing the number of created codes, updated codes,
+        and codes with errors.
+    """
+
+    created = updated = errors = 0
+
+    log.info("Checking enrollment codes for contract %s", contract)
+
+    if contract.integration_type == "sso" and not contract.enrollment_fixed_price:
+        # SSO contracts w/out price don't need discounts.
+        discounts = contract.get_discounts()
+        products = contract.get_products()
+
+        log.info("Removing any existing discounts for SSO/free contract %s", contract)
+
+        for discount in discounts:
+            discount.products.filter(product__in=products).delete()
+            discount.refresh_from_db()
+
+            created += 1
+
+            # Only delete the discount if there's no more products.
+            # Otherwise, we might delete one that's shared for some reason.
+            if discount.products.count() == 0:
+                log.info(
+                    "Contract %s: Existing discount %s no longer has products, removing",
+                    contract,
+                    discount,
+                )
+                discount.delete()
+                updated += 1
+
+        return (created, updated, errors)
+
+    products = contract.get_products()
+
+    log.info("Checking %s products for contract %s", len(products), contract)
+
+    for product in products:
+        # Check these things:
+        # - Are there any discount codes?
+        # - Are there enough discount codes (total, including redeemed ones)?
+
+        discount_amount = contract.enrollment_fixed_price or 0
+        product_discounts = (
+            Discount.objects.filter(products__product=product).distinct().all()
+        )
+
+        if not contract.max_learners:
+            # If we're doing unlimited seats, then we just need one discount per
+            # product, set to Unlimited.
+
+            if len(product_discounts) == 0:
+                # Quick note: these are unlimited and not one-time-per-user because
+                # there may be any number of courses the learner will want to
+                # enroll in. That does mean that these codes need to be
+                # protected. It's unlikely we'll have many unlimited-seat but
+                # also not-SSO contracts, though.
+                discount = Discount(
+                    discount_code=uuid4(),
+                    amount=discount_amount,
+                    redemption_type=REDEMPTION_TYPE_UNLIMITED,
+                    discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+                    payment_type=PAYMENT_TYPE_SALES,
+                    is_bulk=True,
+                )
+                discount.save()
+
+                discount_product = DiscountProduct(
+                    discount=discount,
+                    product=product,
+                )
+                discount_product.save()
+
+                log.info(
+                    "Contract %s: Created unlimited discount %s for product %s",
+                    contract,
+                    discount,
+                    product,
+                )
+
+                created += 1
+            elif len(product_discounts) == 1:
+                Discount.objects.filter(pk=product_discounts[0].id).update(
+                    **{
+                        "amount": discount_amount,
+                        "redemption_type": REDEMPTION_TYPE_UNLIMITED,
+                        "discount_type": DISCOUNT_TYPE_FIXED_PRICE,
+                        "payment_type": PAYMENT_TYPE_SALES,
+                        "is_bulk": True,
+                    }
+                )
+
+                product_discounts[0].refresh_from_db()
+
+                log.info(
+                    "Contract %s: updated discount %s for product %s",
+                    contract,
+                    product_discounts[0],
+                    product,
+                )
+
+                if not product_discounts[0].products.filter(product=product).exists():
+                    discount_product = DiscountProduct(
+                        discount=product_discounts[0],
+                        product=product,
+                    )
+                    discount_product.save()
+                    log.debug(
+                        "Contract %s: Added product %s to discount %s",
+                        contract,
+                        product,
+                        product_discounts[0],
+                    )
+
+                updated += 1
+            else:
+                log.warning(
+                    "ensure_enrollment_codes_exist: Unlimited-seat contract %s product %s has too many discount codes: %s - skipping validation.",
+                    contract,
+                    product,
+                    len(product_discounts),
+                )
+
+                errors += 1
+
+            continue
+
+        log.info(
+            "Updating %s discount codes for product %s", len(product_discounts), product
+        )
+
+        for discount in product_discounts:
+            Discount.objects.filter(pk=discount.id).update(
+                **{
+                    "amount": discount_amount,
+                    "redemption_type": REDEMPTION_TYPE_ONE_TIME,
+                    "discount_type": DISCOUNT_TYPE_FIXED_PRICE,
+                    "payment_type": PAYMENT_TYPE_SALES,
+                    "is_bulk": True,
+                }
+            )
+
+            discount.refresh_from_db()
+
+            log.info(
+                "Contract %s: updated discount %s for product %s",
+                contract,
+                discount,
+                product,
+            )
+
+            if not discount.products.filter(product=product).exists():
+                discount_product = DiscountProduct(
+                    discount=discount,
+                    product=product,
+                )
+                discount_product.save()
+                log.debug(
+                    "Contract %s: Added product %s to discount %s",
+                    contract,
+                    product,
+                    discount,
+                )
+
+            updated += 1
+
+        create_count = contract.max_learners - len(product_discounts)
+
+        log.info("Creating %s new discount codes for product %s", create_count, product)
+
+        if create_count < 0:
+            log.warning(
+                "ensure_enrollment_codes_exist: Seat limited contract %s product %s has too many discount codes: %s - skipping create",
+                contract,
+                product,
+                len(product_discounts),
+            )
+            continue
+
+        for _ in range(create_count):
+            discount = Discount(
+                discount_code=uuid4(),
+                amount=discount_amount,
+                redemption_type=REDEMPTION_TYPE_ONE_TIME,
+                discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+                payment_type=PAYMENT_TYPE_SALES,
+                is_bulk=True,
+            )
+            discount.save()
+
+            discount_product = DiscountProduct(
+                discount=discount,
+                product=product,
+            )
+            discount_product.save()
+
+            created += 1
+
+            log.info(
+                "Contract %s: Created discount %s for product %s",
+                contract,
+                discount,
+                product,
+            )
+
+    return (created, updated, errors)
