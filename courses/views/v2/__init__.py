@@ -57,7 +57,7 @@ class ProgramFilterSet(django_filters.FilterSet):
         self.user = request_user
         super().__init__(*args, **kwargs)
 
-    def filter_by_org_id(self, queryset, name, org_id):
+    def filter_by_org_id(self, queryset, _, org_id):
         if user_has_org_access(self.user, org_id):
             program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
                 node_type=ProgramRequirementNodeType.COURSE,
@@ -124,7 +124,7 @@ class CourseFilterSet(django_filters.FilterSet):
         model = Course
         fields = ["id", "live", "readable_id", "page__live", "courserun_is_enrollable"]
 
-    def filter_courserun_is_enrollable(self, queryset, name, value):
+    def filter_courserun_is_enrollable(self, queryset, _, value):
         return (
             get_enrollable_courses(queryset)
             if value
