@@ -192,6 +192,7 @@ class UserOrganizationSerializer(OrganizationPageSerializer):
 
     contracts = serializers.SerializerMethodField()
 
+    @extend_schema_field(ContractPageSerializer(many=True))
     def get_contracts(self, instance):
         """Get the contracts for the organization for the user"""
         contracts = (
@@ -264,7 +265,7 @@ class UserSerializer(serializers.ModelSerializer):
     def get_grants(self, instance):
         return instance.get_all_permissions()
 
-    @extend_schema_field(list[dict])
+    @extend_schema_field(UserOrganizationSerializer(many=True))
     def get_b2b_organizations(self, instance):
         """Get the organizations for the user"""
         if instance.is_anonymous:

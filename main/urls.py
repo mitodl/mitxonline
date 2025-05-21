@@ -18,6 +18,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from mitol.apigateway.views import ApiGatewayLogoutView
 from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
 from wagtail import urls as wagtail_urls
@@ -39,6 +40,12 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("hijack/", include("hijack.urls")),
     path("robots.txt", include("robots.urls")),
+    re_path(r"^api/schema/$", SpectacularAPIView.as_view(), name="schema"),
+    re_path(
+        r"^api/schema/swagger-ui/$",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger",
+    ),
     path("", include("authentication.urls")),
     path("", include("authentication.new_urls")),
     path("", include("openedx.urls")),
