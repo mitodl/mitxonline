@@ -613,6 +613,8 @@ def test_defer_enrollment( # noqa: PLR0913
 
         if has_audit_enrollment_already:
             assert patched_deactivate_run_enrollment.call_count == 1
+        else:
+            assert patched_deactivate_run_enrollment.call_count == 0
 
 
 def test_defer_enrollment_validation(mocker, user):
