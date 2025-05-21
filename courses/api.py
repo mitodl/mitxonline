@@ -23,7 +23,11 @@ from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
 from courses import mail_api
-from courses.constants import ENROLL_CHANGE_STATUS_DEFERRED, PROGRAM_TEXT_ID_PREFIX
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_DEFERRED,
+    ENROLL_CHANGE_STATUS_UNENROLLED,
+    PROGRAM_TEXT_ID_PREFIX,
+)
 from courses.models import (
     Course,
     CourseRun,
@@ -400,6 +404,22 @@ def defer_enrollment(  # noqa: C901
         ).first()
         if to_enrollments:
             return from_enrollment, to_enrollments
+
+    # Deactivate an existing audit enrollment before enrolling in verified
+    # this way we enroll in verified even if the upgrade deadline is in the past
+    to_enrollments = CourseRunEnrollment.objects.filter(
+        user=user, run=to_run, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    ).first()
+    if to_enrollments:
+        to_enrollments = deactivate_run_enrollment(
+            to_enrollments,
+            change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+            keep_failed_enrollments=keep_failed_enrollments,
+        )
+        if to_enrollments is None or to_enrollments.edx_enrolled is True:
+            raise Exception(  # noqa: TRY002
+                f"Failed to deactivate audit enrollment for course run '{to_run}'"  # noqa: EM102
+            )
 
     to_enrollments, enroll_success = create_run_enrollments(
         user=user,
