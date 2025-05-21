@@ -23,7 +23,11 @@ from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
 from courses import mail_api
-from courses.constants import ENROLL_CHANGE_STATUS_DEFERRED, PROGRAM_TEXT_ID_PREFIX, ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_DEFERRED,
+    ENROLL_CHANGE_STATUS_UNENROLLED,
+    PROGRAM_TEXT_ID_PREFIX,
+)
 from courses.models import (
     Course,
     CourseRun,
