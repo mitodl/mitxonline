@@ -470,16 +470,16 @@
       "description": "E-mail to use for reply-to address of emails",
       "required": false
     },
+    "MITX_ONLINE_SECURE_REDIRECT_EXEMPT": {
+      "description": "Application-level SSL redirect  exemption setting.",
+      "required": false
+    },
     "MITX_ONLINE_SECURE_SSL_HOST": {
       "description": "Hostame to redirect non-secure requests to. Overrides value from HOST header.",
       "required": false
     },
     "MITX_ONLINE_SECURE_SSL_REDIRECT": {
       "description": "Application-level SSL redirect setting.",
-      "required": false
-    },
-    "MITX_ONLINE_SECURE_REDIRECT_EXEMPT": {
-      "description": "Application-level SSL redirect  exemption setting.",
       "required": false
     },
     "MITX_ONLINE_SITE_ID": {
@@ -558,8 +558,8 @@
       "required": false
     },
     "OPENTELEMETRY_ENABLED": {
-       "description": "Enable collection and shipment of opentelemetry data",
-       "required": false
+      "description": "Enable collection and shipment of opentelemetry data",
+      "required": false
     },
     "OPENTELEMETRY_ENDPOINT": {
       "description": "Endpoint for opentelemetry",
