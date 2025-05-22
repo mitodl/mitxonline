@@ -2,9 +2,15 @@
 mitx_online views
 """
 
+from urllib.parse import urljoin
+
 from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
-from django.http import HttpResponseNotFound, HttpResponseServerError
+from django.http import (
+    HttpResponseNotFound,
+    HttpResponseRedirect,
+    HttpResponseServerError,
+)
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -31,6 +37,16 @@ def index(request, **kwargs):  # noqa: ARG001
     """
     The index view. Display available programs
     """
+
+    # If we're getting sent here, and the APISIX middleware is enabled, we should
+    # punt them to its login page instead.
+
+    if (
+        request.path.startswith("/signin")
+        and not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE
+    ):
+        return HttpResponseRedirect(urljoin(settings.SITE_BASE_URL, "/login"))
+
     context = get_base_context(request)
     return render(request, "index.html", context=context)
 

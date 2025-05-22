@@ -19,6 +19,7 @@ import Header from "../components/Header"
 import PrivateRoute from "../components/PrivateRoute"
 
 import LoginPages from "./pages/login/LoginPages"
+import LoginSso from "./pages/login/LoginSso"
 import RegisterPages from "./pages/register/RegisterPages"
 import EditProfilePage from "./pages/profile/EditProfilePage"
 import AccountSettingsPage from "./pages/settings/AccountSettingsPage"
@@ -84,6 +85,10 @@ export class App extends React.Component<Props, void> {
             <Route
               path={urljoin(match.url, String(routes.login))}
               component={LoginPages}
+            />
+            <Route
+              path={urljoin(match.url, String(routes.apiGatewayLogin))}
+              component={LoginSso}
             />
             <Route
               path={urljoin(match.url, String(routes.register))}

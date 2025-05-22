@@ -115,6 +115,17 @@ CORS_ALLOW_CREDENTIALS = get_bool(
     description="Allow cookies to be sent in cross-site HTTP requests",
 )
 
+SESSION_COOKIE_DOMAIN = get_string(
+    name="SESSION_COOKIE_DOMAIN",
+    default=None,
+    description="Domain to set the session cookie to.",
+)
+SESSION_COOKIE_NAME = get_string(
+    name="SESSION_COOKIE_NAME",
+    default="mitxonline_sessionid",
+    description="Name of the session cookie.",
+)
+
 SECURE_SSL_REDIRECT = get_bool(
     name="MITX_ONLINE_SECURE_SSL_REDIRECT",
     default=True,
