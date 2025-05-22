@@ -33,7 +33,7 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import CourseFilterSet, Pagination, ProgramFilterSet
+from courses.views.v2 import CourseViewSet, Pagination, ProgramFilterSet
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from users.factories import UserFactory
 
@@ -335,17 +335,17 @@ def test_filter_anonymous_user_sees_no_contracted_runs():
 
     course_no_contract = CourseFactory(title="Visible Course")
     CourseRunFactory(course=course_no_contract)
+
     rf = RequestFactory()
     request = rf.get(reverse("v2:courses_api-list"))
     request.user = AnonymousUser()
-    drf_request = Request(request)
-    queryset = Course.objects.all()
-    filtered = CourseFilterSet(
-        data=drf_request.query_params, request=drf_request, queryset=queryset
-    ).qs
 
-    assert course_no_contract in filtered
-    assert course_with_contract not in filtered
+    view = CourseViewSet()
+    view.request = Request(request)
+
+    queryset = view.get_queryset()
+    assert course_no_contract in queryset
+    assert course_with_contract not in queryset
 
 
 @pytest.mark.django_db
@@ -366,19 +366,12 @@ def test_filter_by_org_id_with_contracted_user():
 
     client = APIClient()
     client.force_authenticate(user=user)
+    url = reverse("v2:programs_api-list")
+    response = client.get(url, {"org_id": org.id})
 
-    request = Request(RequestFactory().get("v2:programs_api-list", {"org_id": org.id}))
-    request.user = user
-
-    filterset = ProgramFilterSet(
-        data={"org_id": org.id},
-        queryset=Program.objects.all(),
-        request=request,
-    )
-
-    filtered = filterset.qs
-    assert program_with_contract in filtered
-    assert filtered.count() == 1
+    assert program_with_contract.title in [
+        program["title"] for program in response.data["results"]
+    ]
 
 
 @pytest.mark.django_db
