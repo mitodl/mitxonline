@@ -20,6 +20,10 @@ See MITx Online integration with edx:
 - [Using Tutor](https://github.com/mitodl/handbook/tree/master/openedx/MITx-edx-integration-tutor.md) (Recommended)
 - [Using Devstack](https://github.com/mitodl/handbook/tree/master/openedx/MITx-edx-integration-devstack.md) (Deprecated)
 
+### B2B Provisioning
+
+If you need to get the B2B system set up, see the docs here: [docs/source/configuration/b2b.rst](docs/source/configuration/b2b.rst) (or find them in the build Sphinx docs).
+
 # Running, testing, and administering the app
 
 Running, testing, and administering this app follows the same patterns as our other web apps.
