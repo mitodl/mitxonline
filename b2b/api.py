@@ -6,6 +6,7 @@ from uuid import uuid4
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Count
 from mitol.common.utils import now_in_utc
 from wagtail.models import Page
 
@@ -19,7 +20,14 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_UNLIMITED,
 )
-from ecommerce.models import Discount, DiscountProduct, Product
+from ecommerce.models import (
+    BasketDiscount,
+    BasketItem,
+    Discount,
+    DiscountProduct,
+    Product,
+)
+from main import constants as main_constants
 from main.utils import date_to_datetime
 
 log = logging.getLogger(__name__)
@@ -452,3 +460,56 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR091
             )
 
     return (created, updated, errors)
+
+
+def create_b2b_enrollment(request, product: Product):
+    """
+    Create a B2B enrollment for the given product for the current user.
+
+    If the contract doesn't specify a price and the user is associated with the
+    contract, we should create an order and an enrollment for the user. Otherwise,
+    we should redirect the user to the basket add API, so they can use an
+    enrollment code that they already have.
+    """
+    from ecommerce.api import establish_basket, generate_checkout_payload
+
+    user = request.user
+    if not user.is_authenticated:
+        return { main_constants.USER_MSG_TYPE_B2B_DISALLOWED: True }
+
+    purchasable_object = product.purchasable_object
+    if not purchasable_object or not purchasable_object.b2b_contract:
+        return { main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT: True }
+
+    if user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
+        return { main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT: True }
+
+    basket = establish_basket(request)
+    item = BasketItem.objects.create(
+        product=product,
+        basket=basket,
+        quantity=1
+    )
+    item.save()
+
+    applicable_discounts_qs = product.discounts.annotate(redemptions=Count("order_redemptions")).filter(is_bulk=True, redemptions=0, products__product=product)
+    if applicable_discounts_qs.count() > 0:
+        # We have unused codes for this product, so we should apply one.
+        # (If the contract isn't SSO, we'd have made a bunch of enrollment codes,
+        # but we should still not make the user round-trip through ecommerce.)
+        discount = applicable_discounts_qs.first()
+        basket_discount = BasketDiscount.objects.create(
+            redemption_date=now_in_utc(),
+            redeemed_by=request.user,
+            redeemed_discount=discount,
+            redeemed_basket=basket,
+        )
+        basket_discount.save()
+
+    response = generate_checkout_payload(request)
+
+
+
+    print("some stuff to make the damned auto linter shut up")
+
+    return True
