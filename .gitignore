@@ -127,3 +127,6 @@ docker-compose.*.yml
 
 .python-version
 /locustfile.py
+
+
+certs/*
