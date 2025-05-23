@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.117.1
+Version 0.117.1 (Released May 23, 2025)
 ---------------
 
 - Changes to shore up a few minor issues around login (#2673)
