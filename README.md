@@ -51,3 +51,24 @@ docker compose run --rm web poetry add <dependency>
 ```
 This will update the `pyproject.toml` and `poetry.lock` files.  Then run `docker-compose build web celery` to make the change permanent in your docker images.
 Refer to the [poetry documentation](https://python-poetry.org/docs/cli/) for particulars about specifying versions, removing dependencies, etc.
+
+
+# Generating documentation
+
+Detailed documentation for the project is available in the `docs/` folder. The files within are reStructuredText and can be built into an HTML version using Sphinx. The project uses Pants to manage this build process.
+
+You will need `scie-pants` to build the docs. You can get this by:
+
+- Running the included `get-pants.sh` script
+- Installing using the [instructions in the official docs](https://www.pantsbuild.org/stable/docs/getting-started/installing-pants)
+- Installing via your package manager (`brew` fo macOS, etc.)
+
+Once you have it installed, you can build the docs:
+
+```bash
+pants docs ::
+```
+
+The HTML version of the docs starts at `dist/sphinx/index.html`.
+
+If you're adding new docs, remember that this uses reStructuredText - you may find a tool like [m2r](https://github.com/miyakogi/m2r) handy (so you can write in Markdown instead). Don't forget to add links to your new content in the appropriate `index.rst` files.
