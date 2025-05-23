@@ -6,6 +6,9 @@ Configuration
 
    ecommerce
    quickstart
+   b2b
+   hubspot
+   uwsgi_tuning
 
 Configure Open edX (External Links)
 -----------------------------------
