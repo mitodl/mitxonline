@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.117.1 (Released May 23, 2025)
+---------------
+
+- Changes to shore up a few minor issues around login (#2673)
+- Update urlconf to add accessible schema/Swagger URLs, add better typing for B2B data, update OpenAPI spec (#2672)
+- Deactivate audit enrollment before deferral (#2664)
+- Rename the realm import file (#2669)
+- B2 b provisioning limit programs with org id specified (#2665)
+
 Version 0.117.0 (Released May 20, 2025)
 ---------------
 
