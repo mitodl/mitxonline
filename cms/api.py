@@ -13,6 +13,7 @@ from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
 from wagtail.models import Site
 from wagtail.rich_text import RichText
+from django.db.models import When, Case, IntegerField
 
 from cms import models as cms_models
 from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
@@ -324,7 +325,7 @@ def create_featured_items():
     redis_cache = caches["redis"]
 
     # Clear cache if already present
-    if redis_cache.get("CMS_homepage_featured_courses") is not None:
+    if redis_cache.get("CMS_homepage_featured_courses"):
         redis_cache.delete("CMS_homepage_featured_courses")
 
     now = now_in_utc()
@@ -343,7 +344,7 @@ def create_featured_items():
 
     # Pick 2 random self-paced course runs
     self_paced_courseruns = enrollable_courseruns.filter(is_self_paced=True).order_by("?")[:2]
-    self_paced_course_ids = self_paced_courseruns.values_list("course_id", flat=True)
+    self_paced_course_ids = list(self_paced_courseruns.values_list("course_id", flat=True))
 
     # Pick 20 random non-self-paced course runs
     random_courseruns = (
@@ -351,27 +352,34 @@ def create_featured_items():
         .order_by("?")[:20]
     )
 
-    # Sort random course runs into future and started groups
-    future_ids = []
+    # Split random course runs into future and started, and collect IDs
+    future_runs = []
     started_ids = []
     for courserun in random_courseruns:
         if courserun.start_date >= now:
-            future_ids.append(courserun.course.id)
+            future_runs.append(courserun)
         else:
             started_ids.append(courserun.course.id)
 
-    # Sort future course IDs by start date (requires mapping start_date → course.id)
-    future_runs = sorted(
-        (cr for cr in random_courseruns if cr.course.id in future_ids),
-        key=lambda cr: cr.start_date,
-    )
-    future_ids_sorted = [cr.course.id for cr in future_runs]
+    # Sort future course runs by start_date ascending
+    future_ids = [cr.course.id for cr in sorted(future_runs, key=lambda cr: cr.start_date)]
 
     # Combine all course IDs
-    all_course_ids = list(self_paced_course_ids) + future_ids_sorted + started_ids
+    all_course_ids = self_paced_course_ids + future_ids + started_ids
 
-    # Fetch all featured courses in one query
-    featured_courses = list(Course.objects.filter(id__in=all_course_ids))
+    # Fetch featured courses preserving order
+    featured_courses = list(
+        Course.objects.filter(id__in=all_course_ids)
+        .only("id", "feature_image", "program_type", "is_program", "url_path", "start_date", "is_self_paced", "title")
+        .select_related("page")  # only if homepage template uses course.page.*
+        .prefetch_related("courserun_set")  # only if homepage template loops over related courseruns
+        .order_by(
+            Case(
+                *[When(id=cid, then=pos) for pos, cid in enumerate(all_course_ids)],
+                output_field=IntegerField(),
+            )
+        )
+    )
 
     # Cache the result for homepage
     redis_cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
