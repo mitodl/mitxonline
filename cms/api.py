@@ -9,11 +9,11 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
+from django.db.models import Case, IntegerField, When
 from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
 from wagtail.models import Site
 from wagtail.rich_text import RichText
-from django.db.models import When, Case, IntegerField
 
 from cms import models as cms_models
 from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
@@ -332,25 +332,30 @@ def create_featured_items():
     end_of_day = now + timedelta(days=1)
 
     # Get valid CoursePage-linked course IDs
-    valid_course_ids = cms_models.CoursePage.objects.filter(
-        live=True
-    ).values_list("course_id", flat=True)
+    valid_course_ids = cms_models.CoursePage.objects.filter(live=True).values_list(
+        "course_id", flat=True
+    )
 
     # Fetch enrollable course runs
     enrollable_courses_qs = Course.objects.select_related("page").filter(
         id__in=valid_course_ids, live=True
     )
-    enrollable_courseruns = get_enrollable_courseruns_qs(end_of_day, enrollable_courses_qs)
+    enrollable_courseruns = get_enrollable_courseruns_qs(
+        end_of_day, enrollable_courses_qs
+    )
 
     # Pick 2 random self-paced course runs
-    self_paced_courseruns = enrollable_courseruns.filter(is_self_paced=True).order_by("?")[:2]
-    self_paced_course_ids = list(self_paced_courseruns.values_list("course_id", flat=True))
+    self_paced_courseruns = enrollable_courseruns.filter(is_self_paced=True).order_by(
+        "?"
+    )[:2]
+    self_paced_course_ids = list(
+        self_paced_courseruns.values_list("course_id", flat=True)
+    )
 
     # Pick 20 random non-self-paced course runs
-    random_courseruns = (
-        enrollable_courseruns.exclude(id__in=self_paced_courseruns.values_list("id", flat=True))
-        .order_by("?")[:20]
-    )
+    random_courseruns = enrollable_courseruns.exclude(
+        id__in=self_paced_courseruns.values_list("id", flat=True)
+    ).order_by("?")[:20]
 
     # Split random course runs into future and started, and collect IDs
     future_runs = []
@@ -362,7 +367,9 @@ def create_featured_items():
             started_ids.append(courserun.course.id)
 
     # Sort future course runs by start_date ascending
-    future_ids = [cr.course.id for cr in sorted(future_runs, key=lambda cr: cr.start_date)]
+    future_ids = [
+        cr.course.id for cr in sorted(future_runs, key=lambda cr: cr.start_date)
+    ]
 
     # Combine all course IDs
     all_course_ids = self_paced_course_ids + future_ids + started_ids
@@ -370,9 +377,20 @@ def create_featured_items():
     # Fetch featured courses preserving order
     featured_courses = list(
         Course.objects.filter(id__in=all_course_ids)
-        .only("id", "feature_image", "program_type", "is_program", "url_path", "start_date", "is_self_paced", "title")
+        .only(
+            "id",
+            "feature_image",
+            "program_type",
+            "is_program",
+            "url_path",
+            "start_date",
+            "is_self_paced",
+            "title",
+        )
         .select_related("page")  # only if homepage template uses course.page.*
-        .prefetch_related("courserun_set")  # only if homepage template loops over related courseruns
+        .prefetch_related(
+            "courserun_set"
+        )  # only if homepage template loops over related courseruns
         .order_by(
             Case(
                 *[When(id=cid, then=pos) for pos, cid in enumerate(all_course_ids)],
@@ -382,6 +400,8 @@ def create_featured_items():
     )
 
     # Cache the result for homepage
-    redis_cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
+    redis_cache.set(
+        "CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE
+    )
 
     return featured_courses
