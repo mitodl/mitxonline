@@ -375,17 +375,18 @@ def create_featured_items():
     all_course_ids = self_paced_course_ids + future_ids + started_ids
 
     # Fetch featured courses preserving order
+    ordering = Case(
+        *[When(id=cid, then=pos) for pos, cid in enumerate(all_course_ids)],
+        output_field=IntegerField(),
+    )
+
+    # Query courses
     featured_courses = list(
         Course.objects.filter(id__in=all_course_ids)
         .only("id")
         .select_related("page")
         .prefetch_related("courseruns")
-        .order_by(
-            Case(
-                *[When(id=cid, then=pos) for pos, cid in enumerate(all_course_ids)],
-                output_field=IntegerField(),
-            )
-        )
+        .order_by(ordering)
     )
 
     # Cache the result for homepage
