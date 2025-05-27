@@ -370,9 +370,9 @@ def create_featured_items():
     # Fetch featured courses preserving order
     featured_courses = list(
         Course.objects.filter(id__in=all_course_ids)
-        .only("id", "feature_image", "program_type", "is_program", "url_path", "start_date", "is_self_paced", "title")
-        .select_related("page")  # only if homepage template uses course.page.*
-        .prefetch_related("courserun_set")  # only if homepage template loops over related courseruns
+        .only("id")
+        .select_related("page")
+        .prefetch_related("courseruns")
         .order_by(
             Case(
                 *[When(id=cid, then=pos) for pos, cid in enumerate(all_course_ids)],

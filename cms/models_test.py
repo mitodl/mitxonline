@@ -651,7 +651,7 @@ def test_flexible_pricing_request_form_context(flex_form_for_course):
     assert context["product_page"] == course_page.url
 
 
-def test_homepage__featured_products(settings, mocker):
+def test_homepage_featured_products(settings, mocker):
     now = now_in_utc()
     future_date = now + timedelta(days=1)
     past_date = now - timedelta(days=1)
