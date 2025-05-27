@@ -4,10 +4,7 @@ from importlib import import_module
 
 from django.conf import settings
 from django.contrib.auth import BACKEND_SESSION_KEY, HASH_SESSION_KEY, SESSION_KEY
-from django.db import IntegrityError
 
-from users.api import find_available_username
-from users.utils import is_duplicate_username_error
 
 USERNAME_COLLISION_ATTEMPTS = 10
 
