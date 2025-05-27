@@ -2678,13 +2678,15 @@ touchstone = ["python3-saml (>=1.10.1) ; python_version < \"3.13\""]
 
 [[package]]
 name = "mitol-django-common"
-version = "2025.4.2"
+version = "2025.5.23"
 description = "MIT Open Learning django app extensions for common utilities"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
-files = []
-develop = false
+files = [
+    {file = "mitol_django_common-2025.5.23-py3-none-any.whl", hash = "sha256:3ec46487146473293e3918c29ef92412ffd9f3ca1ce442ddc06c4a80ae0afe09"},
+    {file = "mitol_django_common-2025.5.23.tar.gz", hash = "sha256:5b56dfc1b5ad6d843bf19c2a3b529a1e8f69f466a8c548f796f0ab193882b2e9"},
+]
 
 [package.dependencies]
 django = ">=3.0"
@@ -2699,13 +2701,6 @@ typing-extensions = "*"
 
 [package.extras]
 celery = ["celery (>=5.5.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/mitodl/ol-django.git"
-reference = "nl/scim-push"
-resolved_reference = "68c409b9078c372d8581bc18f7e9dfef6158f199"
-subdirectory = "src/common"
 
 [[package]]
 name = "mitol-django-google-sheets"
@@ -2865,32 +2860,27 @@ setuptools = "*"
 
 [[package]]
 name = "mitol-django-scim"
-version = "2025.3.31"
+version = "2025.5.23"
 description = "Django application for SCIM integrations"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
-files = []
-develop = false
+files = [
+    {file = "mitol_django_scim-2025.5.23-py3-none-any.whl", hash = "sha256:ae2702b00fd4980e5bcbf2d9ec41498e213d438393a657d99a2aeb91cafcae73"},
+    {file = "mitol_django_scim-2025.5.23.tar.gz", hash = "sha256:4358014106b0dea2d76c3f9de2962a4370d5eede0cf3cc42b0df869d583c8da2"},
+]
 
 [package.dependencies]
 django = ">=3.0"
-django_scim2 = ">=0.19.1"
+django-scim2 = ">=0.19.1"
 django-stubs = ">=1.13.1"
 mitol-django-common = "*"
 pyparsing = ">=3.2"
 requests = ">=2.32.0"
-StrEnum = ">=0.4.15"
+strenum = ">=0.4.15"
 
 [package.extras]
 celery = ["mitol-django-common[celery]"]
-
-[package.source]
-type = "git"
-url = "https://github.com/mitodl/ol-django.git"
-reference = "nl/scim-push"
-resolved_reference = "68c409b9078c372d8581bc18f7e9dfef6158f199"
-subdirectory = "src/scim"
 
 [[package]]
 name = "monotonic"
@@ -5530,4 +5520,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "961e6e32d7b6b56bee04fdcc31cc9b2dabb8ec0c8b7c2c3ecb24479e99f6ac2e"
+content-hash = "1fd4281a7053b8215028cb34d0ab757e67b2dcadf8e0412b2d878f247ba33d02"
