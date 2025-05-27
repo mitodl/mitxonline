@@ -101,7 +101,7 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
                 )
             },
         ),
-        (_("Personal Info"), {"fields": ("name", "email")}),
+        (_("Personal Info"), {"fields": ("name", "email", "global_id")}),
         (
             _("Permissions"),
             {
@@ -117,16 +117,18 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
         ),
     )
     list_display = (
-        "edx_username",
+        "id",
+        "global_id",
         "email",
         "name",
+        "edx_username",
         "is_staff",
         "last_login",
     )
     list_filter = ("is_staff", "is_superuser", "is_active", "groups")
     search_fields = ("openedx_users__edx_username", "name", "email")
     ordering = ("email",)
-    readonly_fields = ("last_login", "hubspot_sync_datetime")
+    readonly_fields = ("last_login", "hubspot_sync_datetime", "global_id")
     inlines = [
         OpenEdxUserInline,
         UserLegalAddressInline,

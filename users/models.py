@@ -13,7 +13,7 @@ from django.db import models, transaction
 from django.db.models import Count, DateTimeField, Q
 from django.utils.translation import gettext_lazy as _
 from django_scim.models import AbstractSCIMUserMixin
-from mitol.common.models import TimestampedModel
+from mitol.common.models import TimestampedModel, UserGlobalIdMixin
 from mitol.common.utils import now_in_utc
 
 from b2b.models import OrganizationPage
@@ -241,7 +241,13 @@ class FaultyOpenEdxUserManager(BaseUserManager):
         )
 
 
-class User(AbstractBaseUser, TimestampedModel, PermissionsMixin, AbstractSCIMUserMixin):
+class User(
+    AbstractBaseUser,
+    TimestampedModel,
+    PermissionsMixin,
+    AbstractSCIMUserMixin,
+    UserGlobalIdMixin,
+):
     """Primary user class"""
 
     EMAIL_FIELD = "email"
