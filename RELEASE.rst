@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.118.0
+---------------
+
+- Disallow broken `click` version to fix celery-beat (#2677)
+- Add scim remote push functionality (#2661)
+- Adding docs for B2B provisioning (#2674)
+- Optimize course api filtering (#2670)
+
 Version 0.117.1 (Released May 23, 2025)
 ---------------
 
