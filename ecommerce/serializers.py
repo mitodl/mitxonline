@@ -325,7 +325,6 @@ class LineSerializer(serializers.ModelSerializer):
     product = serializers.SerializerMethodField()
     quantity = serializers.IntegerField()
     item_description = serializers.CharField()
-    content_type = serializers.CharField()
     unit_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     total_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     id = serializers.IntegerField()
