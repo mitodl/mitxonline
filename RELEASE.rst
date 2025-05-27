@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.118.0
+Version 0.118.0 (Released May 27, 2025)
 ---------------
 
 - Disallow broken `click` version to fix celery-beat (#2677)
