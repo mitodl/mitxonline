@@ -35,13 +35,12 @@ class LearnUserAdapter(UserAdapter):
             self.obj, "user_profile", UserProfile()
         )
 
-        self.legal_address = self.obj.legal_address = getattr(
-            self.obj, "legal_address", LegalAddress()
-        )
+        try:
+            self.legal_address = self.obj.legal_address  # triggers DB fetch if needed
+        except LegalAddress.DoesNotExist:
+            self.legal_address = LegalAddress()
 
-        self.b2b_contracts = self.obj.b2b_contracts = getattr(
-            self.obj, "b2b_contracts", ContractPage()
-        )
+        self.b2b_contracts = self.obj.b2b_contracts
 
         self.openedx_user = self.obj.openedx_user
         if self.openedx_user is None:
@@ -68,8 +67,10 @@ class LearnUserAdapter(UserAdapter):
         self.obj.name = d.get("fullName", "")
 
         name_data = d.get("name", {})
-        self.legal_address.first_name = name_data.get("given_name", "") or self.legal_address.first_name
-        self.legal_address.last_name = name_data.get("last_name", "") or self.legal_address.last_name
+
+        self.legal_address.first_name = name_data.get("given_name") or self.legal_address.first_name
+        self.legal_address.last_name = name_data.get("last_name") or self.legal_address.last_name
+
 
         organization_name = d.get("organization")
         if organization_name:
