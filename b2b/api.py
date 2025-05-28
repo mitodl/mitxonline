@@ -131,7 +131,9 @@ def create_contract_run(
 
     with reversion.create_revision():
         course_run_product = Product(
-            price=0,
+            price=contract.enrollment_fixed_price
+            if contract.enrollment_fixed_price
+            else Decimal(0),
             is_active=True,
             description=f"{contract.organization.name} - {course.title} {course.readable_id}",
             object_id=course_run.id,
@@ -536,7 +538,7 @@ def create_b2b_enrollment(request, product: Product):
         # We have unused codes for this product, so we should apply one.
         # (If the contract isn't SSO, we'll have made a bunch of enrollment codes,
         # but we should still not make the user round-trip through ecommerce.)
-        discount = applicable_discounts_qs.first()
+        discount = applicable_discounts_qs.first().discount
         basket_discount = BasketDiscount.objects.create(
             redemption_date=now_in_utc(),
             redeemed_by=request.user,

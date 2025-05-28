@@ -37,6 +37,7 @@ from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
+    USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
@@ -311,8 +312,9 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 @pytest.mark.parametrize("user_authenticated", [True, False])
 @pytest.mark.parametrize("user_in_contract", [True, False])
 @pytest.mark.parametrize("product_in_contract", [True, False])
+@pytest.mark.parametrize("price_is_zero", [True, False])
 def test_create_b2b_enrollment(
-    user_authenticated, user_in_contract, product_in_contract
+    user_authenticated, user_in_contract, product_in_contract, price_is_zero
 ):
     """
     Test B2B enrollment generation.
@@ -325,7 +327,9 @@ def test_create_b2b_enrollment(
 
     contract = ContractPageFactory.create(
         integration_type=CONTRACT_INTEGRATION_SSO,
-        enrollment_fixed_price=Decimal(0),
+        enrollment_fixed_price=Decimal(0)
+        if price_is_zero
+        else FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
     )
     course = CourseFactory.create()
     run, product = create_contract_run(contract, course)
@@ -352,7 +356,33 @@ def test_create_b2b_enrollment(
 
     assert "result" in result
 
-    if user_authenticated and user_in_contract and product_in_contract:
+    if user_authenticated:
+        # For these tests, we shouldn't have a basket. It should find the issue and
+        # stop before it makes the basket. (Except for the unauth - we won't have a
+        # basket there either but we can't check for that.)
+        if not user_in_contract or not product_in_contract:
+            assert Basket.objects.filter(user=user).count() == 0
+
+        if not product_in_contract:
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT
+            return
+
+        if not user_in_contract:
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
+            return
+
+        if not price_is_zero:
+            # Success, other than the price. We should bounce the user to the cart
+            # page if the price isn't zero.
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT
+            assert Basket.objects.filter(user=user).count() == 1
+            my_run_qs = CourseRunEnrollment.objects.filter(
+                user=user, run=run, active=True
+            )
+            assert my_run_qs.count() == 0
+            return
+
+        # This is the success state.
         assert result["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
         assert Basket.objects.filter(user=user).count() == 0
 
@@ -361,16 +391,5 @@ def test_create_b2b_enrollment(
         my_run = my_run_qs.first()
         assert my_run
         assert my_run.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-
-    # For these tests, we shouldn't have a basket. It should find the issue and
-    # stop before it makes the basket. (Except for the unauth - we won't have a
-    # basket there either but we can't check for that.)
-    if user_authenticated and (not user_in_contract or not product_in_contract):
-        assert Basket.objects.filter(user=user).count() == 0
-
-    if not user_authenticated:
+    else:
         assert result["result"] == USER_MSG_TYPE_B2B_DISALLOWED
-    elif not product_in_contract:
-        assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT
-    elif not user_in_contract:
-        assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
