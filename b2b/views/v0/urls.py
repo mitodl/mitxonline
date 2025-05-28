@@ -3,7 +3,7 @@
 from django.urls import include, re_path
 from rest_framework.routers import SimpleRouter
 
-from b2b.views.v0 import ContractPageViewSet, OrganizationPageViewSet
+from b2b.views.v0 import ContractPageViewSet, Enroll, OrganizationPageViewSet
 
 app_name = "b2b"
 
@@ -21,4 +21,5 @@ v0_router.register(
 
 urlpatterns = [
     re_path(r"^", include(v0_router.urls)),
+    re_path(r"^/enroll/<str:readable_id>/", Enroll.as_view()),
 ]

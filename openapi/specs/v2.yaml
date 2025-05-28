@@ -140,6 +140,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/LearnerRecord'
           description: ''
+  /api/v0/b2b//enroll/{readable_id}/:
+    post:
+      operationId: b2b_enroll_create
+      description: Create an enrollment for the given course run.
+      parameters:
+      - in: path
+        name: readable_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          description: No response body
   /api/v0/b2b/contracts/:
     get:
       operationId: b2b_contracts_list
