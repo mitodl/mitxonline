@@ -314,7 +314,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 @pytest.mark.parametrize("product_in_contract", [True, False])
 @pytest.mark.parametrize("price_is_zero", [True, False])
 def test_create_b2b_enrollment(
-    user_authenticated, user_in_contract, product_in_contract, price_is_zero
+    mocker, user_authenticated, user_in_contract, product_in_contract, price_is_zero
 ):
     """
     Test B2B enrollment generation.
@@ -324,6 +324,8 @@ def test_create_b2b_enrollment(
     enrollment code, it should use one. If the price specified is non-zero, that
     should be caught by the enrollment code.
     """
+
+    mocker.patch("openedx.api.enroll_in_edx_course_runs")
 
     contract = ContractPageFactory.create(
         integration_type=CONTRACT_INTEGRATION_SSO,
