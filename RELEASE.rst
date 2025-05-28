@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.118.1
+Version 0.118.1 (Released May 28, 2025)
 ---------------
 
 - Remove content_type form LineSerializer (#2676)
