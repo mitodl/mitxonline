@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from b2b.models import ContractPage
 from mitol.scim.adapters import UserAdapter
 
 from openedx.models import OpenEdxUser
@@ -25,6 +26,7 @@ class LearnUserAdapter(UserAdapter):
     user_profile: UserProfile
     legal_address: LegalAddress
     openedx_user: OpenEdxUser
+    b2b_contracts: ContractPage
 
     def __init__(self, obj, request=None):
         super().__init__(obj, request=request)
@@ -35,6 +37,10 @@ class LearnUserAdapter(UserAdapter):
 
         self.legal_address = self.obj.legal_address = getattr(
             self.obj, "legal_address", LegalAddress()
+        )
+
+        self.b2b_contracts = self.obj.b2b_contracts = getattr(
+            self.obj, "b2b_contracts", ContractPage()
         )
 
         self.openedx_user = self.obj.openedx_user
@@ -54,24 +60,21 @@ class LearnUserAdapter(UserAdapter):
         Consume a ``dict`` conforming to the SCIM User Schema, updating the
         internal user object with data from the ``dict``.
 
-        Please note, the user object is not saved within this method. To
-        persist the changes made by this method, please call ``.save()`` on the
-        adapter. Eg::
-
-            scim_user.from_dict(d)
-            scim_user.save()
+        Note: This method does NOT save the user object. To persist changes,
+        call ``.save()`` on the adapter.
         """
         super().from_dict(d)
 
         self.obj.name = d.get("fullName", "")
 
-        first_name = d.get("name", {}).get("given_name", "")
-        if first_name:
-            self.legal_address.first_name = first_name
+        name_data = d.get("name", {})
+        self.legal_address.first_name = name_data.get("given_name", "") or self.legal_address.first_name
+        self.legal_address.last_name = name_data.get("last_name", "") or self.legal_address.last_name
 
-        last_name = d.get("name", {}).get("last_name", "")
-        if last_name:
-            self.legal_address.last_name = last_name
+        organization_name = d.get("organization")
+        if organization_name:
+            contract_pages = ContractPage.objects.filter(organization__name=organization_name)
+            self.obj.b2b_contracts.add(*contract_pages)
 
     def _save_related(self):
         self.user_profile.user = self.obj
