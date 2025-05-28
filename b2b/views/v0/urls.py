@@ -21,5 +21,5 @@ v0_router.register(
 
 urlpatterns = [
     re_path(r"^", include(v0_router.urls)),
-    re_path(r"^/enroll/<str:readable_id>/", Enroll.as_view()),
+    re_path(r"^enroll/<str:readable_id>/", Enroll.as_view()),
 ]

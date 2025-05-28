@@ -77,13 +77,21 @@ class GenerateCheckoutPayloadSerializer(serializers.Serializer):
     purposes.
     """
 
-    country_blocked = serializers.BooleanField(allow_null=True, required=False)
-    purchased_same_courserun = serializers.BooleanField(allow_null=True, required=False)
-    purchased_non_upgradeable_courserun = serializers.BooleanField(
-        allow_null=True, required=False
+    country_blocked = serializers.BooleanField(
+        default=False, allow_null=True, required=False
     )
-    invalid_discounts = serializers.BooleanField(allow_null=True, required=False)
-    no_checkout = serializers.BooleanField(allow_null=True, required=False)
+    purchased_same_courserun = serializers.BooleanField(
+        default=False, allow_null=True, required=False
+    )
+    purchased_non_upgradeable_courserun = serializers.BooleanField(
+        default=False, allow_null=True, required=False
+    )
+    invalid_discounts = serializers.BooleanField(
+        default=False, allow_null=True, required=False
+    )
+    no_checkout = serializers.BooleanField(
+        default=False, allow_null=True, required=False
+    )
 
 
 class CreateB2BEnrollmentSerializer(serializers.Serializer):
@@ -95,9 +103,7 @@ class CreateB2BEnrollmentSerializer(serializers.Serializer):
     result type.
     """
 
-    result = serializers.ChoiceField(
-        choices=USER_MSG_TYPE_B2B_CHOICES, allow_blank=False, read_only=True
-    )
+    result = serializers.ChoiceField(choices=USER_MSG_TYPE_B2B_CHOICES, read_only=True)
     order = serializers.IntegerField(read_only=True, required=False)
     price = serializers.DecimalField(
         max_digits=None, decimal_places=2, read_only=True, required=False
