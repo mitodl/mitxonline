@@ -313,8 +313,13 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 @pytest.mark.parametrize("user_in_contract", [True, False])
 @pytest.mark.parametrize("product_in_contract", [True, False])
 @pytest.mark.parametrize("price_is_zero", [True, False])
-def test_create_b2b_enrollment(
-    mocker, user_authenticated, user_in_contract, product_in_contract, price_is_zero
+def test_create_b2b_enrollment(  # noqa: PLR0913
+    mocker,
+    settings,
+    user_authenticated,
+    user_in_contract,
+    product_in_contract,
+    price_is_zero,
 ):
     """
     Test B2B enrollment generation.
@@ -326,6 +331,8 @@ def test_create_b2b_enrollment(
     """
 
     mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
+    settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 
     contract = ContractPageFactory.create(
         integration_type=CONTRACT_INTEGRATION_SSO,
