@@ -40,7 +40,7 @@ def test_from_dict_updates_user_and_related():
     }
 
     adapter.from_dict(data)
-    adapter._save_related()
+    adapter._save_related()  # noqa: SLF001
     adapter.legal_address.refresh_from_db()
     assert adapter.obj.name == "New Name"
     assert adapter.legal_address.first_name == "NewFirst"
@@ -72,7 +72,7 @@ def test_save_related_saves_all():
     adapter.legal_address = mock.MagicMock()
     adapter.openedx_user = mock.MagicMock()
 
-    adapter._save_related()
+    adapter._save_related()  # noqa: SLF001
 
     adapter.user_profile.save.assert_called_once()
     adapter.legal_address.save.assert_called_once()
