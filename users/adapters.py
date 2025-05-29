@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 
-from b2b.models import ContractPage
 from mitol.scim.adapters import UserAdapter
 
+from b2b.models import ContractPage
 from openedx.models import OpenEdxUser
 from users.models import LegalAddress, UserProfile
 
@@ -68,13 +68,18 @@ class LearnUserAdapter(UserAdapter):
 
         name_data = d.get("name", {})
 
-        self.legal_address.first_name = name_data.get("given_name") or self.legal_address.first_name
-        self.legal_address.last_name = name_data.get("last_name") or self.legal_address.last_name
-
+        self.legal_address.first_name = (
+            name_data.get("given_name") or self.legal_address.first_name
+        )
+        self.legal_address.last_name = (
+            name_data.get("last_name") or self.legal_address.last_name
+        )
 
         organization_name = d.get("organization")
         if organization_name:
-            contract_pages = ContractPage.objects.filter(organization__name=organization_name)
+            contract_pages = ContractPage.objects.filter(
+                organization__name=organization_name
+            )
             self.obj.b2b_contracts.add(*contract_pages)
 
     def _save_related(self):

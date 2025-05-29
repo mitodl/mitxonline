@@ -1,12 +1,13 @@
-import pytest
 from unittest import mock
 
+import pytest
+
 from b2b.factories import ContractPageFactory
+from openedx.models import OpenEdxUser
 from users.adapters import LearnUserAdapter
 from users.factories import UserFactory
-from users.models import UserProfile, LegalAddress
-from openedx.models import OpenEdxUser
-from b2b.models import ContractPage
+from users.models import LegalAddress, UserProfile
+
 
 @pytest.mark.django_db
 def test_init_sets_related_objects():
@@ -17,12 +18,14 @@ def test_init_sets_related_objects():
     assert isinstance(adapter.legal_address, LegalAddress)
     assert isinstance(adapter.openedx_user, OpenEdxUser)
 
+
 @pytest.mark.django_db
 def test_display_name_returns_name():
     user = UserFactory(name="John Doe")
     adapter = LearnUserAdapter(user)
 
     assert adapter.display_name == "John Doe"
+
 
 @pytest.mark.django_db
 def test_from_dict_updates_user_and_related():
@@ -36,7 +39,7 @@ def test_from_dict_updates_user_and_related():
     data = {
         "fullName": "New Name",
         "name": {"given_name": "NewFirst", "last_name": "NewLast"},
-        "organization": "Acme Corp"
+        "organization": "Acme Corp",
     }
 
     adapter.from_dict(data)
@@ -46,6 +49,7 @@ def test_from_dict_updates_user_and_related():
     assert adapter.legal_address.first_name == "NewFirst"
     assert adapter.legal_address.last_name == "NewLast"
     assert user.b2b_contracts.filter(id=contract_page.id).exists()
+
 
 @pytest.mark.django_db
 def test_from_dict_keeps_existing_names_if_missing():
@@ -57,11 +61,12 @@ def test_from_dict_keeps_existing_names_if_missing():
 
     data = {"fullName": "Another Name", "name": {}}
     adapter.from_dict(data)
-    
+
     adapter.legal_address.refresh_from_db()
 
     assert adapter.legal_address.first_name == "OldFirst"
     assert adapter.legal_address.last_name == "OldLast"
+
 
 @pytest.mark.django_db
 def test_save_related_saves_all():
