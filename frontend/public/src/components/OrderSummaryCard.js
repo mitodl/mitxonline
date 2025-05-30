@@ -44,7 +44,7 @@ export class OrderSummaryCard extends React.Component<Props> {
 
     return (
       <div className="d-flex justify-content-between">
-        <div className="flex-grow-1">
+        <div className="flex-grow-1 w-75">
           Coupon applied (
           <em className="fw-bold text-primary">{discounts[0].discount_code}</em>{" "}
           )
