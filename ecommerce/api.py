@@ -154,6 +154,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
                         "run": order.lines.first().purchased_object.course.title,
                     },
                 ),
+                "order_id": order.id,
             }
 
     callback_uri = urljoin(settings.SITE_BASE_URL, reverse("checkout-result-callback"))
@@ -377,7 +378,7 @@ def establish_basket(request):
     Gets or creates the user's basket. (This may get some more logic later.)
     """
     user = request.user
-    (basket, is_new) = Basket.objects.filter(user=user).get_or_create()
+    (basket, is_new) = Basket.objects.get_or_create(user=user)
 
     if is_new:
         basket.save()
