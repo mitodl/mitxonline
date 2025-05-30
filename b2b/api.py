@@ -72,8 +72,8 @@ def create_contract_run(
     This won't create pages for either the run or the products, since they're
     not supposed to be accessed by the public.
 
-    - This should also create the run in edX, but we don't do that yet.
-      When we add that, we should backfill the URL into the course run.
+    This will clone the course specified in edX for the contract, if one doesn't
+    already exist. This will auto-generate the course ID for that purpose.
 
     Args:
         contract (ContractPage): The contract to create the run for.
