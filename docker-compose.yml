@@ -24,6 +24,7 @@ x-extra-hosts:
   - "edx.odl.local:${OPENEDX_IP:-172.22.0.1}"
   - "host.docker.internal:host-gateway"
   - "local.openedx.io:host-gateway"
+  - "studio.local.openedx.io:host-gateway"
 
 services:
   db:

@@ -1602,14 +1602,14 @@ sidecar = ["drf-spectacular-sidecar"]
 
 [[package]]
 name = "edx-api-client"
-version = "1.10.0"
+version = "1.11.0"
 description = "Python interface to the edX REST APIs"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "edx-api-client-1.10.0.tar.gz", hash = "sha256:4ef79227182c1b9fddae9e4e494e27b9f1aa39260d274958d6597dafa186ac70"},
-    {file = "edx_api_client-1.10.0-py2.py3-none-any.whl", hash = "sha256:7922468a0bc6db9ef2d64e2449bba3cca6a3dfbd5a1262f640be491550210cb0"},
+    {file = "edx_api_client-1.11.0-py2.py3-none-any.whl", hash = "sha256:e2e2327fb40dba4cd388ffc5b0af6a3f49499f27e5fd8d88378f4af70a285a0a"},
+    {file = "edx_api_client-1.11.0.tar.gz", hash = "sha256:8ee7bce18689a0894082056b6a2b2ee2aa2dea2d0c36fe27738dfc3df2287dcc"},
 ]
 
 [package.dependencies]
@@ -5520,4 +5520,8 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
+<<<<<<< HEAD
 content-hash = "3b045dd4b0494183536b573a746d00b483325d040389b60d1d1a18428a3b8db3"
+=======
+content-hash = "97946a8b2f4573b151f105dcf7c6a7645ee85a0cd04136e69c87d624e8ac9be3"
+>>>>>>> 7aebe333 (Update extra hosts, bump version of edx-api-client, get API call wrappers in)

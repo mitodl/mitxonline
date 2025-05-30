@@ -1,7 +1,7 @@
 """Courseware API functions"""
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urljoin, urlparse
 
 import requests
@@ -11,6 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.shortcuts import reverse
 from edx_api.client import EdxApi
+from edx_api.course_runs.models import CourseRun
 from mitol.common.utils import (
     find_object_with_matching_attr,
     get_error_response_summary,
@@ -505,6 +506,59 @@ def get_edx_api_service_client():
     return edx_client  # noqa: RET504
 
 
+def get_edx_api_jwt_client(
+    client_id: str = settings.OPENEDX_API_CLIENT_ID,
+    client_secret: str = settings.OPENEDX_API_CLIENT_SECRET,
+    *,
+    use_studio: bool = False,
+) -> EdxApi:
+    """
+    Gets a JWT for the specified client ID, then return an edX API client that
+    uses the JWT.
+
+    Some APIs require a JWT, including user retirement and course management.
+    If you need to use a specific client ID for the client, you can specify that.
+    Otherwise, it will use the default OAuth2 client ID and secret, which is
+    usually mitxonline-oauth-app usually.
+
+    The JWT APIs may _require_ that there's an edX user associated with the OAuth2
+    client. If your client doesn't have that, your API calls will likely fail.
+
+    If you need to hit the Studio API (ex. for course creation), make sure you
+    set settings.OPENEDX_STUDIO_API_BASE_URL and set the use_studio flag.
+
+    Args:
+    - client_id (str): the client ID to authenticate as
+    - client_secret (str): the client secret to use for authentication
+    Keyword Args:
+    - use_studio (bool): Use the Studio API after getting the JWT.
+    Returns:
+    - EdxApi, with the JWT token in it for the user specified.
+    """
+
+    data = {
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "token_type": "jwt",
+    }
+    resp = requests.post(edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH), data=data)  # noqa: S113
+    resp.raise_for_status()
+    access_token = resp.json()["access_token"]
+
+    edx_client = EdxApi(
+        {
+            "access_token": access_token,
+        },
+        settings.OPENEDX_API_BASE_URL
+        if not use_studio or not settings.OPENEDX_STUDIO_API_BASE_URL
+        else settings.OPENEDX_STUDIO_API_BASE_URL,
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    )
+
+    return edx_client  # noqa: RET504
+
+
 def get_edx_retirement_service_client():
     """
     Generates a JWT access token for the retirement service worker and returns the edX api client.
@@ -518,25 +572,35 @@ def get_edx_retirement_service_client():
             "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET is not set"  # noqa: EM101
         )
 
-    data = {
-        "grant_type": "client_credentials",
-        "client_id": settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID,
-        "client_secret": settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET,
-        "token_type": "jwt",
-    }
-    resp = requests.post(edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH), data=data)  # noqa: S113
-    resp.raise_for_status()
-    access_token = resp.json()["access_token"]
-
-    edx_client = EdxApi(
-        {
-            "access_token": access_token,
-        },
-        settings.OPENEDX_API_BASE_URL,
-        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    return get_edx_api_jwt_client(
+        settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID,
+        settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET,
     )
 
-    return edx_client  # noqa: RET504
+
+def get_edx_course_management_service_client():
+    """
+    Generate an edX API client for course management.
+
+    Set a specific client ID/secret for this by setting OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID
+    and OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET in settings. Otherwise, this
+    will default to using the OPENEDX_API_CLIENT_ID.
+    """
+
+    if not settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID:
+        raise ImproperlyConfigured(
+            "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID is not set"  # noqa: EM101
+        )
+    elif not settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET:
+        raise ImproperlyConfigured(
+            "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET is not set"  # noqa: EM101
+        )
+
+    return get_edx_api_jwt_client(
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
+        use_studio=True,
+    )
 
 
 def get_edx_api_course_detail_client():
@@ -931,3 +995,112 @@ def bulk_retire_edx_users(edx_usernames):
         {"usernames": edx_usernames}
     )
     return response  # noqa: RET504
+
+
+def get_edx_course(course_id: str) -> CourseRun:
+    """
+    Get information about a course from edX.
+
+    Args:
+    - course_id (str): the readable ID for the course run.
+    Returns:
+    - edx_api.course_runs.models.CourseRun: the course run details
+    """
+
+    edx_client = get_edx_course_management_service_client()
+    return edx_client.course_runs.get_course_run(course_id)
+
+
+def clone_edx_course(existing_course_id: str, new_course_id: str) -> CourseRun | bool:
+    """
+    Clone an edX course run.
+
+    Args:
+    - existing_course_id: the readable ID of the course to use as the base
+    - new_course_id: the readable ID of the new course
+    Returns:
+    - bool or edx_api.course_runs.models.CourseRun: the new course run details, or
+      False if an error occurred
+    """
+
+    edx_client = get_edx_course_management_service_client()
+
+    resp = edx_client.course_runs.clone_course_run(existing_course_id, new_course_id)
+
+    if resp.ok:
+        return get_edx_course(new_course_id)
+
+    return False
+
+
+def create_edx_course(  # noqa: PLR0913
+    org: str,
+    number: str,
+    run: str,
+    title: str,
+    pacing_type: str | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    enrollment_start: datetime | None = None,
+    enrollment_end: datetime | None = None,
+) -> CourseRun:
+    """
+    Create a new, blank edX course run.
+
+    Args:
+    - org (str): Organization for the new course run.
+    - number (str): Course number for the new course run. (Without 'course-v1')
+    - run (str): The run id for the new course run.
+    - title (str): The title of the new course run.
+    - pacing_type (str, optional): The pacing type for the new course run. Defaults to None.
+    - start (datetime, optional): The start date for the new course run. Defaults to None.
+    - end (datetime, optional): The end date for the new course run. Defaults to None.
+    - enrollment_start (datetime, optional): The enrollment start date for the new course run. Defaults to None.
+    - enrollment_end (datetime, optional): The enrollment end date for the new course run. Defaults to None.
+    Returns:
+    - edx_api.course_runs.models.CourseRun: the course run details
+    """
+
+    edx_client = get_edx_course_management_service_client()
+
+    return edx_client.course_runs.create_course_run(
+        org,
+        number,
+        run,
+        title,
+        pacing_type,
+        start,
+        end,
+        enrollment_start,
+        enrollment_end,
+    )
+
+
+def update_edx_course(  # noqa: PLR0913
+    course_id: str,
+    title: str | None = None,
+    pacing_type: str | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    enrollment_start: datetime | None = None,
+    enrollment_end: datetime | None = None,
+) -> CourseRun:
+    """
+    Update an existing edX course run.
+
+    Args:
+    - course_id (str): The readable ID of the course run to edit.
+    - title (str): The title of the new course run.
+    - pacing_type (str, optional): The pacing type for the new course run. Defaults to None.
+    - start (datetime, optional): The start date for the new course run. Defaults to None.
+    - end (datetime, optional): The end date for the new course run. Defaults to None.
+    - enrollment_start (datetime, optional): The enrollment start date for the new course run. Defaults to None.
+    - enrollment_end (datetime, optional): The enrollment end date for the new course run. Defaults to None.
+    Returns:
+    - edx_api.course_runs.models.CourseRun: the course run details
+    """
+    edx_client = get_edx_course_management_service_client()
+
+    return edx_client.course_runs.update_course_run(
+        course_id, title, pacing_type, start, end, enrollment_start, enrollment_end
+    )
