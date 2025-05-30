@@ -32,6 +32,7 @@ from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
+from main.utils import get_float
 from openapi.settings_spectacular import open_spectacular_settings
 
 VERSION = "0.118.1"
@@ -59,6 +60,8 @@ SENTRY_DSN = get_string(
 SENTRY_LOG_LEVEL = get_string(
     name="SENTRY_LOG_LEVEL", default="ERROR", description="The log level for Sentry"
 )
+SENTRY_TRACES_SAMPLE_RATE = get_float("SENTRY_TRACES_SAMPLE_RATE", 0)
+SENTRY_PROFILES_SAMPLE_RATE = get_float("SENTRY_PROFILES_SAMPLE_RATE", 0)
 init_sentry(
     dsn=SENTRY_DSN,
     environment=ENVIRONMENT,
@@ -66,6 +69,8 @@ init_sentry(
     send_default_pii=True,
     log_level=SENTRY_LOG_LEVEL,
     heroku_app_name=HEROKU_APP_NAME,
+    traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+    profiles_sample_rate=SENTRY_PROFILES_SAMPLE_RATE,
 )
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -114,6 +119,18 @@ CORS_ALLOW_CREDENTIALS = get_bool(
     name="CORS_ALLOW_CREDENTIALS",
     default=True,
     description="Allow cookies to be sent in cross-site HTTP requests",
+)
+CORS_ALLOW_HEADERS = (
+    # defaults
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    # sentry tracing
+    "baggage",
+    "sentry-trace",
 )
 
 SESSION_COOKIE_DOMAIN = get_string(
