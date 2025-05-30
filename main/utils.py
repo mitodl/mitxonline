@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import os
 import json
+import os
 from datetime import date, datetime
 from enum import Flag, auto
 from typing import TYPE_CHECKING, Optional, Set, Tuple, TypeVar, Union  # noqa: UP035
@@ -236,7 +236,7 @@ def get_float(name, default):
     Returns:
         float:
             The environment variable value parsed as an float
-    """  # noqa: E501
+    """
     value = os.environ.get(name)
     if value is None:
         return default

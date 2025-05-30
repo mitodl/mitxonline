@@ -35,7 +35,15 @@ def before_send(event, hint):
 
 
 def init_sentry(  # noqa: PLR0913
-    *, dsn, environment, version, send_default_pii, log_level, heroku_app_name, traces_sample_rate, profiles_sample_rate
+    *,
+    dsn,
+    environment,
+    version,
+    send_default_pii,
+    log_level,
+    heroku_app_name,
+    traces_sample_rate,
+    profiles_sample_rate,
 ):
     """
     Initializes sentry
