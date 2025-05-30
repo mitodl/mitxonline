@@ -1,5 +1,7 @@
 """Sentry setup and configuration"""
 
+import logging
+
 import sentry_sdk
 from celery.exceptions import WorkerLostError
 from sentry_sdk.integrations.celery import CeleryIntegration
@@ -9,6 +11,8 @@ from sentry_sdk.integrations.redis import RedisIntegration
 
 # these errors occur when a shutdown is happening (usually caused by a SIGTERM)
 SHUTDOWN_ERRORS = (WorkerLostError, SystemExit)
+
+log = logging.getLogger()
 
 
 def before_send(event, hint):
@@ -31,7 +35,7 @@ def before_send(event, hint):
 
 
 def init_sentry(  # noqa: PLR0913
-    *, dsn, environment, version, send_default_pii, log_level, heroku_app_name
+    *, dsn, environment, version, send_default_pii, log_level, heroku_app_name, traces_sample_rate, profiles_sample_rate
 ):
     """
     Initializes sentry
@@ -43,13 +47,28 @@ def init_sentry(  # noqa: PLR0913
         send_default_pii (bool): enable sending PII data to associate users to errors
         log_level (str): the sentry log level
         heroku_app_name (str or None): the name of the heroku review app
+        traces_sample_rate (int): int between 0 and 100 for the sample rate
+        profiles_sample_rate (int): int between 0 and 100 for the sample rate
     """
+    if not 0 <= traces_sample_rate <= 1:
+        log.error(
+            "SENTRY_TRACES_SAMPLE_RATE should be between 0 <= x <= 1, defaulting to 0"
+        )
+        traces_sample_rate = 0
+
+    if not 0 <= profiles_sample_rate <= 1:
+        log.error(
+            "SENTRY_PROFILES_SAMPLE_RATE should be between 0 <= x <= 1, defaulting to 0"
+        )
+        profiles_sample_rate = 0
     sentry_sdk.init(
         dsn=dsn,
         environment=environment,
         release=version,
         before_send=before_send,
         send_default_pii=send_default_pii,
+        traces_sample_rate=traces_sample_rate,
+        profiles_sample_rate=profiles_sample_rate,
         integrations=[
             DjangoIntegration(),
             CeleryIntegration(),
