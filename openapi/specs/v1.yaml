@@ -970,6 +970,8 @@ paths:
           type: string
       tags:
       - programs
+      security:
+      - {}
       responses:
         '200':
           content:
@@ -990,6 +992,8 @@ paths:
         required: true
       tags:
       - programs
+      security:
+      - {}
       responses:
         '200':
           content:
