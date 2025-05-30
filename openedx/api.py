@@ -997,47 +997,59 @@ def bulk_retire_edx_users(edx_usernames):
     return response  # noqa: RET504
 
 
-def get_edx_course(course_id: str) -> CourseRun:
+def get_edx_course(course_id: str, *, client: EdxApi | None = None) -> CourseRun:
     """
     Get information about a course from edX.
 
     Args:
     - course_id (str): the readable ID for the course run.
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
     Returns:
     - edx_api.course_runs.models.CourseRun: the course run details
     """
 
-    edx_client = get_edx_course_management_service_client()
+    edx_client = client if client else get_edx_course_management_service_client()
+
     return edx_client.course_runs.get_course_run(course_id)
 
 
-def get_edx_course_list(page_url: str | None = None) -> CourseRunList:
+def get_edx_course_list(
+    page_url: str | None = None, *, client: EdxApi | None = None
+) -> CourseRunList:
     """
     Get the paginated list of course runs from edX.
 
     Args:
     - page_url (str): The page to retreive. This is part of the CourseRunList object.
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
     Returns:
     - edx_api.course_runs.models.CourseRunList: paginated list of course runs
     """
 
-    edx_client = get_edx_course_management_service_client()
+    edx_client = client if client else get_edx_course_management_service_client()
+
     return edx_client.course_runs.get_course_runs_list(page_url)
 
 
-def clone_edx_course(existing_course_id: str, new_course_id: str) -> CourseRun | bool:
+def clone_edx_course(
+    existing_course_id: str, new_course_id: str, *, client: EdxApi | None = None
+) -> CourseRun | bool:
     """
     Clone an edX course run.
 
     Args:
     - existing_course_id: the readable ID of the course to use as the base
     - new_course_id: the readable ID of the new course
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
     Returns:
     - bool or edx_api.course_runs.models.CourseRun: the new course run details, or
       False if an error occurred
     """
 
-    edx_client = get_edx_course_management_service_client()
+    edx_client = client if client else get_edx_course_management_service_client()
 
     resp = edx_client.course_runs.clone_course_run(existing_course_id, new_course_id)
 
@@ -1057,6 +1069,8 @@ def create_edx_course(  # noqa: PLR0913
     end: datetime | None = None,
     enrollment_start: datetime | None = None,
     enrollment_end: datetime | None = None,
+    *,
+    client: EdxApi | None = None,
 ) -> CourseRun:
     """
     Create a new, blank edX course run.
@@ -1071,11 +1085,13 @@ def create_edx_course(  # noqa: PLR0913
     - end (datetime, optional): The end date for the new course run. Defaults to None.
     - enrollment_start (datetime, optional): The enrollment start date for the new course run. Defaults to None.
     - enrollment_end (datetime, optional): The enrollment end date for the new course run. Defaults to None.
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
     Returns:
     - edx_api.course_runs.models.CourseRun: the course run details
     """
 
-    edx_client = get_edx_course_management_service_client()
+    edx_client = client if client else get_edx_course_management_service_client()
 
     return edx_client.course_runs.create_course_run(
         org,
@@ -1098,6 +1114,8 @@ def update_edx_course(  # noqa: PLR0913
     end: datetime | None = None,
     enrollment_start: datetime | None = None,
     enrollment_end: datetime | None = None,
+    *,
+    client: EdxApi | None = None,
 ) -> CourseRun:
     """
     Update an existing edX course run.
@@ -1110,10 +1128,12 @@ def update_edx_course(  # noqa: PLR0913
     - end (datetime, optional): The end date for the new course run. Defaults to None.
     - enrollment_start (datetime, optional): The enrollment start date for the new course run. Defaults to None.
     - enrollment_end (datetime, optional): The enrollment end date for the new course run. Defaults to None.
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
     Returns:
     - edx_api.course_runs.models.CourseRun: the course run details
     """
-    edx_client = get_edx_course_management_service_client()
+    edx_client = client if client else get_edx_course_management_service_client()
 
     return edx_client.course_runs.update_course_run(
         course_id, title, pacing_type, start, end, enrollment_start, enrollment_end
