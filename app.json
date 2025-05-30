@@ -494,6 +494,10 @@
       "description": "E-mail to use for reply-to address of emails",
       "required": false
     },
+    "MITX_ONLINE_SECURE_REDIRECT_EXEMPT": {
+      "description": "Application-level SSL redirect  exemption setting.",
+      "required": false
+    },
     "MITX_ONLINE_SECURE_SSL_HOST": {
       "description": "Hostame to redirect non-secure requests to. Overrides value from HOST header.",
       "required": false

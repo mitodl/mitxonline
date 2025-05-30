@@ -34,7 +34,7 @@ from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.118.1"
+VERSION = "0.119.2"
 
 log = logging.getLogger()
 
@@ -138,6 +138,14 @@ SECURE_REDIRECT_EXEMPT = [
     "^health/readiness/$",
     "^health/full/$",
 ]
+
+SECURE_REDIRECT_EXEMPT = get_delimited_list(
+    name="MITX_ONLINE_SECURE_REDIRECT_EXEMPT",
+    default=[
+        r"cms/pages/.*",
+    ],
+    description="Application-level SSL redirect  exemption setting.",
+)
 
 SECURE_SSL_HOST = get_string(
     name="MITX_ONLINE_SECURE_SSL_HOST",

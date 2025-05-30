@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.119.2
+---------------
+
+- Fix global_id update (#2694)
+- Bump scim package version (#2690)
+- Update mitol-django-scim (#2688)
+- Optimize create featured items (#2678)
+- Adds a setting with SECURE_REDIRECT_EXEMPT to enable cms preview (#2671)
+
 Version 0.118.1 (Released May 28, 2025)
 ---------------
 
