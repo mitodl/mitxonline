@@ -11,7 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.shortcuts import reverse
 from edx_api.client import EdxApi
-from edx_api.course_runs.models import CourseRun
+from edx_api.course_runs.models import CourseRun, CourseRunList
 from mitol.common.utils import (
     find_object_with_matching_attr,
     get_error_response_summary,
@@ -1009,6 +1009,20 @@ def get_edx_course(course_id: str) -> CourseRun:
 
     edx_client = get_edx_course_management_service_client()
     return edx_client.course_runs.get_course_run(course_id)
+
+
+def get_edx_course_list(page_url: str | None = None) -> CourseRunList:
+    """
+    Get the paginated list of course runs from edX.
+
+    Args:
+    - page_url (str): The page to retreive. This is part of the CourseRunList object.
+    Returns:
+    - edx_api.course_runs.models.CourseRunList: paginated list of course runs
+    """
+
+    edx_client = get_edx_course_management_service_client()
+    return edx_client.course_runs.get_course_runs_list(page_url)
 
 
 def clone_edx_course(existing_course_id: str, new_course_id: str) -> CourseRun | bool:
