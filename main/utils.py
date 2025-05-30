@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import json
 from datetime import date, datetime
 from enum import Flag, auto
@@ -11,6 +12,7 @@ from urllib.parse import quote_plus
 import dateutil
 import pytz
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.core.serializers import serialize
 from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import reverse
@@ -217,3 +219,32 @@ def date_to_datetime(date: date, tzinfo: Optional[str] = None) -> datetime:
     if tzinfo:
         ret_date = ret_date.replace(tzinfo=pytz.timezone(tzinfo))
     return ret_date
+
+
+class EnvironmentVariableParseException(ImproperlyConfigured):
+    """Environment variable was not parsed correctly"""
+
+
+def get_float(name, default):
+    """
+    Get an environment variable as an int.
+
+    Args:
+        name (str): An environment variable name
+        default (float): The default value to use if the environment variable doesn't exist.
+
+    Returns:
+        float:
+            The environment variable value parsed as an float
+    """  # noqa: E501
+    value = os.environ.get(name)
+    if value is None:
+        return default
+
+    try:
+        parsed_value = float(value)
+    except ValueError as ex:
+        msg = f"Expected value in {name}={value} to be a float"
+        raise EnvironmentVariableParseException(msg) from ex
+
+    return parsed_value

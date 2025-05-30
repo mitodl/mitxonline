@@ -17,7 +17,6 @@ from mitol.apigateway.settings import *  # noqa: F403  # noqa: F403
 from mitol.common.envs import (
     get_bool,
     get_delimited_list,
-    get_float,
     get_features,
     get_int,
     get_list_literal,
@@ -33,6 +32,7 @@ from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
+from main.utils import get_float
 from openapi.settings_spectacular import open_spectacular_settings
 
 VERSION = "0.118.1"
