@@ -23,6 +23,18 @@ describe("auth lib function", () => {
     )
   })
 
+  it("generateLoginRedirectUrl should set window.location to /login/ w/ a redirect url", () => {
+    global.SETTINGS = {
+      api_gateway_enabled: true
+    }
+    window.location = "/protected/route?var=abc"
+    generateLoginRedirectUrl()
+    assert.equal(
+      window.location.toString(),
+      "http://fake/login/?next=%2Fprotected%2Froute%3Fvar%3Dabc"
+    )
+  })
+
   describe("handleAuthResponse", () => {
     let history, sandbox
 
