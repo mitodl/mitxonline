@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+Version 0.119.4
+---------------
+
+- config: Set proper logout URL for API Gateway
+- Remove unused username functionality (#2699)
+- fix: Remove duplicate settings entry and consolidate defaults
+- Coupon code style for very long codes (#2682)
+- Fix redirect urls when api gateway is enabled (#2697)
+- Rework program filtering when an org_id is specified (#2696)
+- Fix global_id update (#2694)
+- Bump scim package version (#2690)
+- Update mitol-django-scim (#2688)
+- Optimize create featured items (#2678)
+- Adds a setting with SECURE_REDIRECT_EXEMPT to enable cms preview (#2671)
+
 Version 0.118.1 (Released May 28, 2025)
 ---------------
 
