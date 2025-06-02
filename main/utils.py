@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import json
 from datetime import date, datetime
 from enum import Flag, auto
@@ -12,7 +11,6 @@ from urllib.parse import quote_plus
 import dateutil
 import pytz
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
 from django.core.serializers import serialize
 from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import reverse

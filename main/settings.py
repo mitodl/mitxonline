@@ -57,7 +57,7 @@ def get_float(name, default):
     Returns:
         float:
             The environment variable value parsed as an float
-    """  # noqa: E501
+    """
     value = os.environ.get(name)
     if value is None:
         return default
