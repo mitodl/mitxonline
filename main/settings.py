@@ -1397,7 +1397,7 @@ MITOL_APIGATEWAY_USERINFO_UPDATE = get_bool(
 # URL configuation
 
 # Set to the URL that APISIX uses for logout.
-MITOL_APIGATEWAY_LOGOUT_URL = "/logout"
+MITOL_APIGATEWAY_LOGOUT_URL = "/logout/oidc"
 
 # Set to the default URL the user should be sent to when logging out.
 # If there's no redirect URL specified otherwise, the user gets sent here.
