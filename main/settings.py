@@ -132,17 +132,15 @@ SECURE_SSL_REDIRECT = get_bool(
     default=True,
     description="Application-level SSL redirect setting.",
 )
-SECURE_REDIRECT_EXEMPT = [
-    "^health/startup/$",
-    "^health/liveness/$",
-    "^health/readiness/$",
-    "^health/full/$",
-]
 
 SECURE_REDIRECT_EXEMPT = get_delimited_list(
     name="MITX_ONLINE_SECURE_REDIRECT_EXEMPT",
     default=[
         r"cms/pages/.*",
+        r"^health/startup/$",
+        r"^health/liveness/$",
+        r"^health/readiness/$",
+        r"^health/full/$",
     ],
     description="Application-level SSL redirect  exemption setting.",
 )
