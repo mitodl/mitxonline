@@ -70,3 +70,10 @@ def update_edx_user_profile(user_id):
     """
     user = User.objects.get(id=user_id)
     api.update_edx_user_profile(user)
+
+
+@app.task
+def clone_courserun(base_id: int, target_id: int):
+    """Clone a course run."""
+
+    api.process_course_run_clone(base_id)

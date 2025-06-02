@@ -1138,3 +1138,19 @@ def update_edx_course(  # noqa: PLR0913
     return edx_client.course_runs.update_course_run(
         course_id, title, pacing_type, start, end, enrollment_start, enrollment_end
     )
+
+
+def process_course_run_clone(target_id: int, *, base_id: int|str|None = None):
+    """
+    Clone a course run, using details from CourseRun objects in MITx Online.
+
+    When we need a new course run (as a re-run or a special B2B course run), we
+    create the CourseRun object in the system, and then we need to make the run
+    in edX. This will assume there's a base course run that uses the readable ID
+    of the underlying _Course_ record, and will clone that. Some of the data from
+    the CourseRun will then be copied over into the newly cloned edX run (dates,
+    etc.) and the URL will be backfilled into the CourseRun.
+
+    If a different course run needs to be used as the base course, you can
+    set that.
+    """
