@@ -58,6 +58,11 @@ export const generateLoginRedirectUrl = () => {
   const { pathname, search, hash } = window.location
 
   const next = `${pathname}${search}${hash}`
+
+  if (SETTINGS.api_gateway_enabled) {
+    window.location = `/login/?${qs.stringify({ next })}`
+    return
+  }
   return `${routes.login.begin}?${qs.stringify({ next })}`
 }
 
