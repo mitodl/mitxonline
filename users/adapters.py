@@ -80,7 +80,7 @@ class LearnUserAdapter(UserAdapter):
             contract_pages = ContractPage.objects.filter(
                 organization__name=organization_name
             )
-            self.obj.b2b_contracts.add(*contract_pages)
+            self.b2b_contracts.add(*contract_pages)
 
     def _save_related(self):
         self.user_profile.user = self.obj
@@ -91,3 +91,5 @@ class LearnUserAdapter(UserAdapter):
 
         self.openedx_user.user = self.obj
         self.openedx_user.save()
+
+        self.obj.b2b_contracts.add(*self.b2b_contracts)
