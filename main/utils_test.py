@@ -125,7 +125,7 @@ def test_get_float():
     """
     get_float should get the float from the environment variable, or raise an exception if it's not parseable as an float
     """
-    with patch("main.utils.os", environ=FAKE_ENVIRONS):
+    with patch("main.settings.os", environ=FAKE_ENVIRONS):
         assert get_float("positive", 1234) == 123
         assert get_float("negative", 1234) == -456
         assert get_float("zero", 1234) == 0
