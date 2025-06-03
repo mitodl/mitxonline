@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.119.5
+Version 0.119.5 (Released June 03, 2025)
 ---------------
 
 - Some fixups for B2B course filtering (#2701)
