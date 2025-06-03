@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.119.4
+Version 0.119.4 (Released June 03, 2025)
 ---------------
 
 - config: Set proper logout URL for API Gateway
