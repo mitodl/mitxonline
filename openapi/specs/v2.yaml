@@ -844,9 +844,19 @@ paths:
         explode: false
         style: form
       - in: query
+        name: include_approved_financial_aid
+        schema:
+          type: boolean
+        description: Include approved financial assistance information
+      - in: query
         name: live
         schema:
           type: boolean
+      - in: query
+        name: org_id
+        schema:
+          type: number
+        description: Only show courses beloning to this B2B/UAI organization
       - name: page
         required: false
         in: query
@@ -3145,6 +3155,9 @@ components:
         approved_flexible_price_exists:
           type: boolean
           readOnly: true
+        b2b_contract:
+          type: integer
+          nullable: true
       required:
       - approved_flexible_price_exists
       - course_number
