@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.119.5
+---------------
+
+- Some fixups for B2B course filtering (#2701)
+- fix: Enable HTTP export for OpenTelemetry
+
 Version 0.119.4 (Released June 03, 2025)
 ---------------
 
