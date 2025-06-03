@@ -11,6 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.shortcuts import reverse
 from edx_api.client import EdxApi
+from edx_api.course_runs.exceptions import CourseRunAPIError
 from edx_api.course_runs.models import CourseRun, CourseRunList
 from mitol.common.utils import (
     find_object_with_matching_attr,
@@ -1140,7 +1141,7 @@ def update_edx_course(  # noqa: PLR0913
     )
 
 
-def process_course_run_clone(target_id: int, *, base_id: int|str|None = None):
+def process_course_run_clone(target_id: int, *, base_id: int | str | None = None):
     """
     Clone a course run, using details from CourseRun objects in MITx Online.
 
@@ -1152,5 +1153,66 @@ def process_course_run_clone(target_id: int, *, base_id: int|str|None = None):
     etc.) and the URL will be backfilled into the CourseRun.
 
     If a different course run needs to be used as the base course, you can
-    set that.
+    set that. Pass either the PK of the course or the readable ID. If a readable
+    ID is passed, it will be supplied verbatim to the clone API. (In other words,
+    it can be a course that MITx Online doesn't know about.)
+
+    Args:
+    - target_id (int): The PK of the target course (i.e. the one we're creating)
+    - base_id (int|str): The PK or readable ID of the base course to clone.
+    Returns:
+    bool, whether or not it worked
     """
+    edx_client = get_edx_api_jwt_client(
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
+        use_studio=True,
+    )
+
+    target_course = courses.models.CourseRun.objects.get(pk=target_id)
+    base_course = target_course.course.readable_id
+
+    if base_id:
+        if base_id is int:
+            if courses.models.Course.objects.filter(pk=base_id).exists():
+                base_course = courses.models.Course.objects.get(pk=base_id).readable_id
+            elif courses.models.CourseRun.objects.filter(pk=base_id).exists():
+                base_course = courses.models.CourseRun.objects.get(
+                    pk=base_id
+                ).readable_id
+            else:
+                msg = f"Specified base course {base_id} doesn't exist."
+                raise ValueError(msg)
+        else:
+            base_course = str(base_id)
+
+    get_edx_course(base_course, client=edx_client)
+
+    try:
+        get_edx_course(target_course.readable_id, client=edx_client)
+
+        msg = f"Course ID {target_course.readable_id} was found in edX. Can't continue."
+        raise ValueError(msg)
+    except CourseRunAPIError:
+        # An HTTP error is good in this case. We don't want the target course to exist.
+        pass
+
+    resp = clone_edx_course(base_course, target_course.readable_id, client=edx_client)
+
+    if not resp:
+        msg = f"Couldn't clone {base_course} to {target_course.readable_id}."
+        raise ValueError(msg)
+
+    # We should have the target course in edX now. We need to update it with the
+    # data from our course run.
+
+    resp = update_edx_course(
+        target_course.readable_id,
+        target_course.title,
+        "self_paced" if target_course.is_self_paced else "instructor_paced",
+        target_course.start_date,
+        target_course.end_date,
+        target_course.enrollment_start,
+        target_course.enrollment_end,
+        client=edx_client,
+    )
