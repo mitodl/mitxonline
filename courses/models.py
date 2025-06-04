@@ -757,7 +757,7 @@ class CourseRun(TimestampedModel):
     )
 
     class Meta:
-        unique_together = ("course", "run_tag")
+        unique_together = ("course", "courseware_id", "run_tag")
 
     @property
     def is_past(self):
@@ -886,7 +886,7 @@ class CourseRun(TimestampedModel):
         update_fields=None,
     ):
         """
-        Overriding the save method to inject clean into it
+        Overriding the save method to inject clean into it.
         """
         self.clean()
         super().save(

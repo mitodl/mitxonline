@@ -57,6 +57,11 @@ class OrganizationPage(Page):
     subpage_types = ["b2b.ContractPage"]
 
     name = models.CharField(max_length=255, help_text="The name of the organization")
+    org_key = models.CharField(
+        max_length=10,
+        help_text="The short key used for the organization (for edX).",
+        unique=True,
+    )
     description = RichTextField(
         blank=True, help_text="Any useful extra information about the organization"
     )

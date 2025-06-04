@@ -73,7 +73,7 @@ def update_edx_user_profile(user_id):
 
 
 @app.task
-def clone_courserun(base_id: int, target_id: int):
-    """Clone a course run."""
+def clone_courserun(target_id: int, *, base_id: int | str | None = None):
+    """Queue call to clone an existing course run."""
 
-    api.process_course_run_clone(base_id)
+    api.process_course_run_clone(target_id, base_id=base_id)
