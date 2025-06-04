@@ -1206,13 +1206,25 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
     # We should have the target course in edX now. We need to update it with the
     # data from our course run.
 
-    resp = update_edx_course(
+    course_params = [
         target_course.readable_id,
         target_course.title,
         "self_paced" if target_course.is_self_paced else "instructor_paced",
-        target_course.start_date,
-        target_course.end_date,
-        target_course.enrollment_start,
-        target_course.enrollment_end,
+    ]
+
+    # We can only specify the start and end dates if there are both of them.
+    # And, we can only specify enrollment start/stop if there are both of them
+    # and the course has start/end dates.
+
+    if target_course.start_date and target_course.end_date:
+        course_params.append(target_course.start_date)
+        course_params.append(target_course.end_date)
+
+        if target_course.enrollment_start and target_course.enrollment_end:
+            course_params.append(target_course.enrollment_start)
+            course_params.append(target_course.enrollment_end)
+
+    resp = update_edx_course(
+        *course_params,
         client=edx_client,
     )
