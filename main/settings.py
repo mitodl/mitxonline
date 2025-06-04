@@ -1154,6 +1154,11 @@ OPENEDX_STUDIO_API_BASE_URL = get_string(
     description="The base URL for the Open edX Studio CMS API",
     required=True,
 )
+OPENEDX_COURSE_BASE_URL = get_string(
+    name="OPENEDX_COURSE_BASE_URL",
+    default="http://edx.odl.local:18000/learn/course/",
+    description="The base URL to use to construct URLs to a course",
+)
 
 OPENEDX_BASE_REDIRECT_URL = get_string(
     name="OPENEDX_BASE_REDIRECT_URL",

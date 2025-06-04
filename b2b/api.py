@@ -99,7 +99,8 @@ def create_contract_run(
         year=now_in_utc().year,
         contract_id=contract.id,
     )
-    source_id = CourseKey.from_string(f"{Course.readable_id}+SOURCE")
+    source_id_str = f"{course.readable_id}+SOURCE"
+    source_id = CourseKey.from_string(source_id_str)
     readable_id = (
         f"course-v1:{contract.organization.org_key}+{source_id.course}+{run_tag}"
     )
@@ -136,7 +137,7 @@ def create_contract_run(
         courseware_url_path=urljoin(settings.OPENEDX_COURSE_BASE_URL, readable_id),
     )
     course_run.save()
-    clone_courserun.delay(course_run.id, base_id=source_id)
+    clone_courserun.delay(course_run.id, base_id=source_id_str)
 
     log.debug(
         "Created run %s for course %s in contract %s", course_run, course, contract
