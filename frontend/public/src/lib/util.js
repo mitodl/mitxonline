@@ -347,6 +347,10 @@ export const reverseCompareCourseRunStartDates = (
 export const getStartDateText = (
   courseware: BaseCourseRun | CourseDetailWithRuns
 ) => {
+  if (courseware.courseruns && courseware.courseruns.length === 0) {
+    return ""
+  }
+
   const courseRun = courseware.courseruns ?
     courseware.courseruns.sort(compareCourseRunStartDates)[0] :
     courseware
