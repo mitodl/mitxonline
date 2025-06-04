@@ -1,6 +1,6 @@
 import pytest
 
-from authentication.new_serializers import (
+from authentication.api_gateway.serializers import (
     RegisterDetailsSerializer,
     RegisterExtraDetailsSerializer,
 )
