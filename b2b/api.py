@@ -106,7 +106,7 @@ def create_contract_run(
     )
 
     # Check first for an existing run with the same tag.
-    if CourseRun.objects.filter(course=course, b2b_contract=contract).exists():
+    if CourseRun.objects.filter(course=course, courseware_id=readable_id).exists():
         msg = f"Can't create a run for {course} and contract {contract}: run tag {run_tag} already exists."
         raise ValueError(msg)
 

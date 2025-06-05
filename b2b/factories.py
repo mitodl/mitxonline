@@ -28,6 +28,7 @@ class OrganizationPageFactory(wagtail_factories.PageFactory):
     """OrganizationPage factory class"""
 
     name = FAKE.company()
+    org_key = FAKE.text(max_nb_chars=5)
     description = FAKE.text()
     logo = None
     parent = LazyAttribute(

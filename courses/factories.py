@@ -74,7 +74,7 @@ class CourseFactory(DjangoModelFactory):
     """Factory for Courses"""
 
     title = fuzzy.FuzzyText(prefix="Course ")
-    readable_id = factory.Sequence("course-{0}".format)
+    readable_id = factory.Sequence("course-v1:PyT+Course{0}".format)
     live = True
     departments = factory.SubFactory(DepartmentFactory)
 
@@ -95,7 +95,9 @@ class CourseRunFactory(DjangoModelFactory):
 
     course = factory.SubFactory(CourseFactory)
     title = factory.LazyAttribute(lambda x: "CourseRun " + FAKE.sentence())  # noqa: ARG005
-    courseware_id = factory.Sequence(lambda number: f"course:/v{number}/{FAKE.slug()}")
+    courseware_id = factory.Sequence(
+        lambda number: f"course-v1:PyT+CR{FAKE.slug()}+R{number}"
+    )
     run_tag = factory.Sequence("R{0}".format)
     courseware_url_path = factory.Faker("uri")
     start_date = factory.Faker(
