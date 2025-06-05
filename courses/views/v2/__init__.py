@@ -3,7 +3,7 @@ Course API Views version 2
 """
 
 import django_filters
-from django.db.models import Count, Exists, F, OuterRef
+from django.db.models import Count, Exists, OuterRef
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
@@ -164,10 +164,8 @@ class CourseFilterSet(django_filters.FilterSet):
 
     def filter_org_id(self, queryset, _, value):
         """
-        No-op filter for org_id.
-
-        This gets done in the get_queryset, but the filter needs to know about
-        the field so the API spec is generated correctly.
+        Filter just courses that have course runs that have B2B courses in them
+        that match the specified org_id, if we're in that org.
         """
         user = self.request.user
 
@@ -207,7 +205,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Get the queryset for the viewset."""
 
-        qs = (
+        return (
             Course.objects.select_related("page")
             .prefetch_related("departments")
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
@@ -215,11 +213,6 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by("title")
             .distinct()
         )
-
-        if not self.request.query_params.get("org_id"):
-            return qs.filter(count_courseruns__gt=F("count_b2b_courseruns"))
-
-        return qs
 
     def get_serializer_context(self):
         added_context = {}
