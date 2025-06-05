@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.119.6
+---------------
+
+- If getStartDateText gets a course with no runs, output empty string (#2703)
+- Adds "one-click" enroll API (#2684)
+
 Version 0.119.5 (Released June 03, 2025)
 ---------------
 
