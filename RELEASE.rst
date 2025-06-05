@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.119.6
+---------------
+
+- Don't strip out B2B courses from the API (#2710)
+- Setup sentry tracing (#2687)
+- If getStartDateText gets a course with no runs, output empty string (#2703)
+- Adds "one-click" enroll API (#2684)
+
 Version 0.119.5 (Released June 03, 2025)
 ---------------
 
