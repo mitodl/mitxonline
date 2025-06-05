@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.119.6
+Version 0.119.6 (Released June 05, 2025)
 ---------------
 
 - Don't strip out B2B courses from the API (#2710)
