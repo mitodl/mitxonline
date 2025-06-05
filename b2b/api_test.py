@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
+from opaque_keys.edx.keys import CourseKey
 
 from b2b import factories
 from b2b.api import (
@@ -23,7 +24,7 @@ from b2b.constants import (
     CONTRACT_INTEGRATION_SSO,
 )
 from b2b.factories import ContractPageFactory
-from courses.factories import CourseFactory
+from courses.factories import CourseFactory, CourseRunFactory
 from courses.models import CourseRunEnrollment
 from ecommerce.api_test import create_basket
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
@@ -66,6 +67,7 @@ def test_create_single_course_run(mocker, has_start, has_end):
 
     now_time = now_in_utc()
     mocker.patch("b2b.api.now_in_utc", return_value=now_time)
+    mocker.patch("openedx.tasks.clone_courserun.delay")
 
     contract = factories.ContractPageFactory(
         contract_start=FAKE.past_datetime(tzinfo=pytz.timezone(settings.TIME_ZONE))
@@ -80,7 +82,7 @@ def test_create_single_course_run(mocker, has_start, has_end):
 
     assert run.course == course
     assert run.run_tag == B2B_RUN_TAG_FORMAT.format(
-        org_id=contract.organization.id, contract_id=contract.id
+        year=now_time.year, contract_id=contract.id
     )
     assert run.b2b_contract == contract
 
@@ -240,6 +242,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
     - non-sso price to sso - should no-op
     """
 
+    mocker.patch("openedx.tasks.clone_courserun.delay")
     mocked_ensure_call = mocker.patch("b2b.tasks.queue_enrollment_code_check.delay")
     max_learners = FAKE.random_int(min=1, max=15) if has_learner_cap else None
     price = FAKE.random_int(min=0, max=100) if has_price else None
@@ -330,6 +333,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913
     should be caught by the enrollment code.
     """
 
+    mocker.patch("openedx.tasks.clone_courserun.delay")
     mocker.patch("openedx.api.enroll_in_edx_course_runs")
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
@@ -402,3 +406,52 @@ def test_create_b2b_enrollment(  # noqa: PLR0913
         assert my_run.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     else:
         assert result["result"] == USER_MSG_TYPE_B2B_DISALLOWED
+
+
+@pytest.mark.parametrize(
+    "run_exists",
+    [
+        True,
+        False,
+    ],
+)
+def test_create_contract_run(mocker, run_exists):
+    """
+    Test creating runs for a contract.
+
+    When we add courseware to a contract, we should check and create a run for
+    the course. The run should have a readable ID in a known format. This should
+    also queue up a course clone in edX.
+    """
+
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+
+    mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
+
+    source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
+    this_year = now_in_utc().year
+
+    target_course_id = f"course-v1:{contract.organization.org_key}+{source_course_key.course}+{this_year}_C{contract.id}"
+
+    if run_exists:
+        collision_run = CourseRunFactory.create(
+            course=course, courseware_id=target_course_id
+        )
+
+        with pytest.raises(ValueError) as exc:  # noqa: PT011
+            create_contract_run(contract, course)
+
+        target_course_key = CourseKey.from_string(collision_run.courseware_id)
+        assert f"run tag {target_course_key.run} already exists" in str(exc)
+        return
+
+    assert not course.courseruns.filter(courseware_id=target_course_id).exists()
+
+    created_run, created_product = create_contract_run(contract, course)
+
+    assert course.courseruns.filter(courseware_id=target_course_id).exists()
+    assert created_run.courseware_id == target_course_id
+    assert created_product.object_id == created_run.id
+
+    mocked_clone_run.assert_called()
