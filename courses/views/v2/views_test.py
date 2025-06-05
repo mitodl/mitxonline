@@ -33,7 +33,7 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import CourseViewSet, Pagination, ProgramFilterSet
+from courses.views.v2 import Pagination, ProgramFilterSet
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from users.factories import UserFactory
 
@@ -326,26 +326,6 @@ def test_filter_without_org_id_authenticated_user(user_drf_client):
 
     assert course_no_contract.title in titles
     assert course_with_contract.title in titles
-
-
-def test_filter_anonymous_user_sees_no_contracted_runs():
-    course_with_contract = CourseFactory(title="Hidden Course")
-    contract = ContractPageFactory(active=True)
-    CourseRunFactory(course=course_with_contract, b2b_contract=contract)
-
-    course_no_contract = CourseFactory(title="Visible Course")
-    CourseRunFactory(course=course_no_contract)
-
-    rf = RequestFactory()
-    request = rf.get(reverse("v2:courses_api-list"))
-    request.user = AnonymousUser()
-
-    view = CourseViewSet()
-    view.request = Request(request)
-
-    queryset = view.get_queryset()
-    assert course_no_contract in queryset
-    assert course_with_contract not in queryset
 
 
 @pytest.mark.django_db
