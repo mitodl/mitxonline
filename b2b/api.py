@@ -2,6 +2,7 @@
 
 import logging
 from decimal import Decimal
+from urllib.parse import urljoin
 from uuid import uuid4
 
 import reversion
@@ -9,6 +10,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count
 from mitol.common.utils import now_in_utc
+from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
 
 from b2b.constants import B2B_RUN_TAG_FORMAT
@@ -30,6 +32,7 @@ from ecommerce.models import (
 )
 from main import constants as main_constants
 from main.utils import date_to_datetime
+from openedx.tasks import clone_courserun
 
 log = logging.getLogger(__name__)
 
@@ -72,8 +75,7 @@ def create_contract_run(
     This won't create pages for either the run or the products, since they're
     not supposed to be accessed by the public.
 
-    - This should also create the run in edX, but we don't do that yet.
-      When we add that, we should backfill the URL into the course run.
+    This will queue a task to create course runs in edX as appropriate.
 
     Args:
         contract (ContractPage): The contract to create the run for.
@@ -83,13 +85,28 @@ def create_contract_run(
         Product: The created Product object.
     """
 
+    # This probably needs some redefinition.
+    # The courses we'll create these under are all going to be named something
+    # like course-v1:UAI+CourseName+SOURCE (sometimes the org may be B2B or
+    # something else).
+    # We won't keep tabs on that particular course run. We will clone it, though.
+    # The new course runs will be named this:
+    # course-v1:ORGKEY+CourseName+yyyy_Cid
+    # where ORGKEY is the key from the org record, CourseName comes from the
+    # base course, yyyy is the current year, and id is the contract ID.
+
     run_tag = B2B_RUN_TAG_FORMAT.format(
+        year=now_in_utc().year,
         contract_id=contract.id,
-        org_id=contract.get_parent().id,
+    )
+    source_id_str = f"{course.readable_id}+SOURCE"
+    source_id = CourseKey.from_string(source_id_str)
+    readable_id = (
+        f"course-v1:{contract.organization.org_key}+{source_id.course}+{run_tag}"
     )
 
     # Check first for an existing run with the same tag.
-    if CourseRun.objects.filter(course=course, b2b_contract=contract).exists():
+    if CourseRun.objects.filter(course=course, courseware_id=readable_id).exists():
         msg = f"Can't create a run for {course} and contract {contract}: run tag {run_tag} already exists."
         raise ValueError(msg)
 
@@ -107,7 +124,7 @@ def create_contract_run(
     course_run = CourseRun(
         course=course,
         title=course.title,
-        courseware_id=f"{course.readable_id}+{run_tag}",
+        courseware_id=readable_id,
         run_tag=run_tag,
         start_date=start_date,
         end_date=end_date,
@@ -117,9 +134,10 @@ def create_contract_run(
         is_self_paced=True,
         live=True,
         b2b_contract=contract,
-        courseware_url_path=settings.SITE_BASE_URL,
+        courseware_url_path=urljoin(settings.OPENEDX_COURSE_BASE_URL, readable_id),
     )
     course_run.save()
+    clone_courserun.delay(course_run.id, base_id=source_id_str)
 
     log.debug(
         "Created run %s for course %s in contract %s", course_run, course, contract
