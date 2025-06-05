@@ -246,7 +246,7 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
                 b2b_contract__organization_id=self.context["org_id"]
             ).all()
         else:
-            courseruns = instance.courseruns.filter(b2b_contract__isnull=True).all()
+            courseruns = instance.courseruns.all()
 
         return CourseRunSerializer(courseruns, many=True, read_only=True).data
 
