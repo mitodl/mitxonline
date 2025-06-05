@@ -3,7 +3,7 @@ Course API Views version 2
 """
 
 import django_filters
-from django.db.models import Exists, OuterRef
+from django.db.models import Count, Exists, F, OuterRef
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
@@ -139,10 +139,53 @@ class CourseFilterSet(django_filters.FilterSet):
         field_name="courserun_is_enrollable",
     )
     id = IdInFilter(field_name="id", lookup_expr="in", label="Course ID")
+    org_id = django_filters.NumberFilter(
+        method="filter_org_id",
+        label="Only show courses beloning to this B2B/UAI organization",
+        field_name="org_id",
+    )
+    include_approved_financial_aid = django_filters.BooleanFilter(
+        method="filter_include_approved_financial_aid",
+        label="Include approved financial assistance information",
+        field_name="include_approved_financial_aid",
+    )
 
     class Meta:
         model = Course
-        fields = ["id", "live", "readable_id", "page__live", "courserun_is_enrollable"]
+        fields = [
+            "id",
+            "live",
+            "readable_id",
+            "page__live",
+            "courserun_is_enrollable",
+            "org_id",
+            "include_approved_financial_aid",
+        ]
+
+    def filter_org_id(self, queryset, _, value):
+        """
+        No-op filter for org_id.
+
+        This gets done in the get_queryset, but the filter needs to know about
+        the field so the API spec is generated correctly.
+        """
+        user = self.request.user
+
+        if user_has_org_access(user, value):
+            return queryset.filter(
+                courseruns__b2b_contract__organization_id=value,
+                courseruns__b2b_contract__active=True,
+            )
+        return Course.objects.none()
+
+    def filter_include_approved_financial_aid(self, queryset, *_):
+        """
+        No-op filter for include_approved_financial_aid.
+
+        This is a serializer context flag, but the filter needs to know about
+        the field so the API spec is generated correctly.
+        """
+        return queryset
 
     def filter_courserun_is_enrollable(self, queryset, _, value):
         return (
@@ -162,24 +205,21 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        user = self.request.user
-        org_id = self.request.query_params.get("org_id")
+        """Get the queryset for the viewset."""
 
         qs = (
             Course.objects.select_related("page")
             .prefetch_related("departments")
+            .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
+            .annotate(count_courseruns=Count("courseruns"))
             .order_by("title")
+            .distinct()
         )
 
-        if org_id:
-            if user_has_org_access(user, org_id):
-                return qs.filter(
-                    courseruns__b2b_contract__organization_id=org_id,
-                    courseruns__b2b_contract__active=True,
-                )
-            return Course.objects.none()
-        else:
-            return qs.filter(courseruns__b2b_contract__isnull=True).distinct()
+        if not self.request.query_params.get("org_id"):
+            return qs.filter(count_courseruns__gt=F("count_b2b_courseruns"))
+
+        return qs
 
     def get_serializer_context(self):
         added_context = {}
@@ -188,6 +228,8 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             added_context["all_runs"] = True
         if qp.get("include_approved_financial_aid"):
             added_context["include_approved_financial_aid"] = True
+        if qp.get("org_id"):
+            added_context["org_id"] = qp.get("org_id")
         return {**super().get_serializer_context(), **added_context}
 
     @extend_schema(

@@ -6,10 +6,13 @@ import faker
 import pytest
 import pytz
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
+from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 
 from b2b import factories
 from b2b.api import (
+    create_b2b_enrollment,
     create_contract_run,
     ensure_enrollment_codes_exist,
     validate_basket_for_b2b_purchase,
@@ -21,14 +24,24 @@ from b2b.constants import (
 )
 from b2b.factories import ContractPageFactory
 from courses.factories import CourseFactory
+from courses.models import CourseRunEnrollment
 from ecommerce.api_test import create_basket
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
 from ecommerce.factories import (
     ProductFactory,
     UnlimitedUseDiscountFactory,
 )
-from ecommerce.models import BasketDiscount, DiscountProduct
+from ecommerce.models import Basket, BasketDiscount, DiscountProduct
+from main.constants import (
+    USER_MSG_TYPE_B2B_DISALLOWED,
+    USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
+    USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
+    USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
+)
 from main.utils import date_to_datetime
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from users.factories import UserFactory
 
 FAKE = faker.Factory.create()
 pytestmark = [
@@ -294,3 +307,98 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
             for code in contract.get_discounts():
                 assert code.amount == assert_price
                 assert code.products.filter(product=product).exists()
+
+
+@pytest.mark.parametrize("user_authenticated", [True, False])
+@pytest.mark.parametrize("user_in_contract", [True, False])
+@pytest.mark.parametrize("product_in_contract", [True, False])
+@pytest.mark.parametrize("price_is_zero", [True, False])
+def test_create_b2b_enrollment(  # noqa: PLR0913
+    mocker,
+    settings,
+    user_authenticated,
+    user_in_contract,
+    product_in_contract,
+    price_is_zero,
+):
+    """
+    Test B2B enrollment generation.
+
+    create_b2b_enrollment should check that we're allowed to enroll in the B2B
+    courserun, and then create and process a basket for the user. If there's an
+    enrollment code, it should use one. If the price specified is non-zero, that
+    should be caught by the enrollment code.
+    """
+
+    mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
+    settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
+
+    contract = ContractPageFactory.create(
+        integration_type=CONTRACT_INTEGRATION_SSO,
+        enrollment_fixed_price=Decimal(0)
+        if price_is_zero
+        else FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
+    )
+    course = CourseFactory.create()
+    run, product = create_contract_run(contract, course)
+
+    if not product_in_contract:
+        # just create something random - this is like someone fuzzing the API
+        product = ProductFactory.create()
+
+    if user_authenticated:
+        user = UserFactory.create()
+        if user_in_contract:
+            user.b2b_contracts.add(contract)
+            user.save()
+
+        assert Basket.objects.filter(user=user).count() == 0
+    else:
+        user = AnonymousUser()
+
+    # the request itself doesn't matter - we just need an object with a user in it
+    request = RequestFactory().get("/")
+    request.user = user
+
+    result = create_b2b_enrollment(request, product)
+
+    assert "result" in result
+
+    if user_authenticated:
+        # For these tests, we shouldn't have a basket. It should find the issue and
+        # stop before it makes the basket. (Except for the unauth - we won't have a
+        # basket there either but we can't check for that.)
+        if not user_in_contract or not product_in_contract:
+            assert Basket.objects.filter(user=user).count() == 0
+
+        if not product_in_contract:
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT
+            return
+
+        if not user_in_contract:
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
+            return
+
+        if not price_is_zero:
+            # Success, other than the price. We should bounce the user to the cart
+            # page if the price isn't zero.
+            assert result["result"] == USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT
+            assert Basket.objects.filter(user=user).count() == 1
+            my_run_qs = CourseRunEnrollment.objects.filter(
+                user=user, run=run, active=True
+            )
+            assert my_run_qs.count() == 0
+            return
+
+        # This is the success state.
+        assert result["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+        assert Basket.objects.filter(user=user).count() == 0
+
+        my_run_qs = CourseRunEnrollment.objects.filter(user=user, run=run, active=True)
+        assert my_run_qs.count() == 1
+        my_run = my_run_qs.first()
+        assert my_run
+        assert my_run.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    else:
+        assert result["result"] == USER_MSG_TYPE_B2B_DISALLOWED
