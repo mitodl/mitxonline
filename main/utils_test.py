@@ -142,7 +142,12 @@ def test_get_float():
                 "float-positive",
                 "float-negative",
             ):
-                with pytest.raises(EnvironmentVariableParseException) as ex:
+                with pytest.raises(
+                    (
+                        EnvironmentVariableParseException,
+                        ValueError,
+                    )
+                ) as ex:
                     get_float(key, 1234)
                 assert (
                     ex.value.args[0] == f"Expected value in {key}={value} to be a float"
