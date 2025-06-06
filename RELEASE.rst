@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.119.7
+Version 0.119.7 (Released June 06, 2025)
 ---------------
 
 - Capture more than one exception type when testing get_float (#2713)
