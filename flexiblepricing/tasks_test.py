@@ -462,7 +462,7 @@ def test_process_flexible_price_discount_task_skips(mocker, settings, key_set):
         "flexiblepricing.tasks._process_flexible_price_discount"
     )
     settings.UNIFIED_ECOMMERCE_API_KEY = "abc123" if key_set else ""
-    flex_price_id = FlexiblePriceFactory.create().id if key_set else -1
+    flex_price_id = FlexiblePriceFactory().id if key_set else -1
 
     process_flexible_price_discount_task(flex_price_id)
 
