@@ -465,7 +465,7 @@ def test_process_flexible_price_discount_task_skips(mocker, settings, key_set):
 
     if key_set:
         settings.UNIFIED_ECOMMERCE_API_KEY = "abc123"
-        flex_price = FlexiblePriceFactory()
+        flex_price = FlexiblePriceFactory.create()
         flex_price.save()
         flex_price_id = flex_price.id
     else:
@@ -475,6 +475,6 @@ def test_process_flexible_price_discount_task_skips(mocker, settings, key_set):
     process_flexible_price_discount_task(flex_price_id)
 
     if key_set:
-        assert patched_task_logic.called
+        patched_task_logic.assert_called()
     else:
-        assert not patched_task_logic.called
+        patched_task_logic.assert_not_called()
