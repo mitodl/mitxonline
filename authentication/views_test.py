@@ -347,7 +347,7 @@ class AuthStateMachine(RuleBasedStateMachine):
             {
                 "flow": SocialAuthState.FLOW_LOGIN,
                 "state": SocialAuthState.STATE_LOGIN_PASSWORD,
-                "extra_data": {"name": self.user.name},
+                "extra_data": {},
             },
         )
 

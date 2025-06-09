@@ -54,7 +54,7 @@ class SocialAuthSerializer(serializers.Serializer):
     extra_data = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.DictField())
-    def get_extra_data(self):
+    def get_extra_data(self, instance):  # noqa: ARG002
         """Serialize extra_data"""
         return {}
 
