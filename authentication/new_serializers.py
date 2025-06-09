@@ -33,7 +33,7 @@ class RegisterDetailsSerializer(serializers.Serializer):
         legal_address_data = validated_data.pop("legal_address")
         user_profile_data = validated_data.pop("user_profile", None)
         with transaction.atomic():
-            user.username = username
+            user.openedx_user.edx_username = username
             user.name = name
             user.save()
             if legal_address_data:
