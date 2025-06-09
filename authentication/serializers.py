@@ -54,10 +54,8 @@ class SocialAuthSerializer(serializers.Serializer):
     extra_data = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.DictField())
-    def get_extra_data(self, instance):
+    def get_extra_data(self):
         """Serialize extra_data"""
-        if instance.user is not None:
-            return {"name": instance.user.name}
         return {}
 
     def _save_next(self, data):
