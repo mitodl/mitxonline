@@ -31,7 +31,7 @@ def test_register_details_serializer_create(
     assert user.edx_username == "johndoe"
     validated_data = serializer.validated_data
     assert validated_data["user_profile"]["gender"] is None
-    assert validated_data["user_profile"]["birth_year"] == "1980"
+    assert validated_data["user_profile"]["year_of_birth"] == 1980
     assert validated_data["legal_address"]["country"] == "US"
 
 
