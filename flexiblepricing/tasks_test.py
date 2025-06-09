@@ -452,3 +452,23 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         self.logger_mock.assert_called_with(
             "No unexpired runs found for course %s", self.course.id
         )
+
+
+@pytest.mark.parametrize("key_set", [(True,), (False,)])
+def test_process_flexible_price_discount_task_skips(mocker, settings, caplog, key_set):
+    """Test that the sync skips if there's no API key."""
+
+    patched_task_logic = mocker.patch(
+        "flexiblepricing.tasks._process_flexible_price_discount"
+    )
+    settings.UNIFIED_ECOMMERCE_API_KEY = "abc123" if key_set else ""
+    flex_price_id = FlexiblePriceFactory.create().id if key_set else 5
+
+    with caplog.at_level(logging.WARNING):
+        process_flexible_price_discount_task(flex_price_id)
+
+    if key_set:
+        assert patched_task_logic.called
+    else:
+        assert not patched_task_logic.called
+        assert "skipping, no API key set" in caplog.records[-1].message

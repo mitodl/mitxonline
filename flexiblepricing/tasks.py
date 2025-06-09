@@ -249,6 +249,11 @@ def process_flexible_price_discount_task(instance_id):
     Process the flexible price discount for the given instance.
     """
     log = logging.getLogger()
+
+    if not settings.UNIFIED_ECOMMERCE_API_KEY:
+        log.warning("process_flexible_price_discount_task: skipping, no API key set")
+        return
+
     try:
         instance = FlexiblePrice.objects.get(id=instance_id)
     except ObjectDoesNotExist:
