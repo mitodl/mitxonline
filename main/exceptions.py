@@ -1,7 +1,6 @@
 """Exception related classes and functions"""
 
 from django.core.exceptions import ImproperlyConfigured
-
 from rest_framework import exceptions, views
 
 

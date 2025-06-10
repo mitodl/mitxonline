@@ -42,7 +42,6 @@ log = logging.getLogger()
 cssutils.log.setLevel(logging.CRITICAL)
 
 
-
 def get_float(name, default):
     """
     Get an environment variable as an int.
