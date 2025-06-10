@@ -1,6 +1,53 @@
 Release Notes
 =============
 
+Version 0.119.7 (Released June 06, 2025)
+---------------
+
+- Capture more than one exception type when testing get_float (#2713)
+
+Version 0.119.6 (Released June 05, 2025)
+---------------
+
+- Don't strip out B2B courses from the API (#2710)
+- Setup sentry tracing (#2687)
+- If getStartDateText gets a course with no runs, output empty string (#2703)
+- Adds "one-click" enroll API (#2684)
+
+Version 0.119.5 (Released June 03, 2025)
+---------------
+
+- Some fixups for B2B course filtering (#2701)
+- fix: Enable HTTP export for OpenTelemetry
+
+Version 0.119.4 (Released June 03, 2025)
+---------------
+
+- config: Set proper logout URL for API Gateway
+- Remove unused username functionality (#2699)
+- fix: Remove duplicate settings entry and consolidate defaults
+- Coupon code style for very long codes (#2682)
+- Fix redirect urls when api gateway is enabled (#2697)
+- Rework program filtering when an org_id is specified (#2696)
+- Fix global_id update (#2694)
+- Bump scim package version (#2690)
+- Update mitol-django-scim (#2688)
+- Optimize create featured items (#2678)
+- Adds a setting with SECURE_REDIRECT_EXEMPT to enable cms preview (#2671)
+
+Version 0.118.1 (Released May 28, 2025)
+---------------
+
+- Remove content_type form LineSerializer (#2676)
+
+Version 0.118.0 (Released May 27, 2025)
+---------------
+
+- Disallow broken `click` version to fix celery-beat (#2677)
+- Add scim remote push functionality (#2661)
+- Adding docs for B2B provisioning (#2674)
+- Optimize course api filtering (#2670)
+
 Version 0.117.1 (Released May 23, 2025)
 ---------------
 

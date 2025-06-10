@@ -175,6 +175,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContractPage'
           description: ''
+  /api/v0/b2b/enroll/{readable_id}/:
+    post:
+      operationId: b2b_enroll_create
+      description: Create an enrollment for the given course run.
+      parameters:
+      - in: path
+        name: readable_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateB2BEnrollment'
+          description: ''
   /api/v0/b2b/organizations/:
     get:
       operationId: b2b_organizations_list
@@ -844,9 +863,19 @@ paths:
         explode: false
         style: form
       - in: query
+        name: include_approved_financial_aid
+        schema:
+          type: boolean
+        description: Include approved financial assistance information
+      - in: query
         name: live
         schema:
           type: boolean
+      - in: query
+        name: org_id
+        schema:
+          type: number
+        description: Only show courses beloning to this B2B/UAI organization
       - name: page
         required: false
         in: query
@@ -970,6 +999,8 @@ paths:
           type: string
       tags:
       - programs
+      security:
+      - {}
       responses:
         '200':
           content:
@@ -990,6 +1021,8 @@ paths:
         required: true
       tags:
       - programs
+      security:
+      - {}
       responses:
         '200':
           content:
@@ -1480,6 +1513,32 @@ components:
       - time_commitment
       - title
       - topics
+    CreateB2BEnrollment:
+      type: object
+      description: |-
+        Serializer for the result from create_b2b_enrollment.
+
+        There's always a result, and it should be one of the B2B messages that are
+        defined in main.constants. The other fields appear or not depending on the
+        result type.
+      properties:
+        result:
+          allOf:
+          - $ref: '#/components/schemas/ResultEnum'
+          readOnly: true
+        order:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          readOnly: true
+        checkout_result:
+          $ref: '#/components/schemas/GenerateCheckoutPayload'
+      required:
+      - order
+      - price
+      - result
     Department:
       type: object
       description: Department model serializer
@@ -1641,6 +1700,37 @@ components:
       - Transgender
       - Non-binary/non-conforming
       - Other/Prefer Not to Say
+    GenerateCheckoutPayload:
+      type: object
+      description: |-
+        Serializer for the result from ecommerce.api.generate_checkout_payload.
+
+        The B2B enrollment API will return the result of the checkout call if the
+        user needs to pay for the cart because of an error creating the checkout
+        payload. In that case, we really just need the error states; it will also
+        include a HttpResponseRedirect that we don't really care about for the API's
+        purposes.
+      properties:
+        country_blocked:
+          type: boolean
+          nullable: true
+          default: false
+        purchased_same_courserun:
+          type: boolean
+          nullable: true
+          default: false
+        purchased_non_upgradeable_courserun:
+          type: boolean
+          nullable: true
+          default: false
+        invalid_discounts:
+          type: boolean
+          nullable: true
+          default: false
+        no_checkout:
+          type: boolean
+          nullable: true
+          default: false
     HighestEducationEnum:
       enum:
       - Doctorate
@@ -2289,6 +2379,32 @@ components:
       - company
       - gender
       - job_title
+    ResultEnum:
+      enum:
+      - b2b-disallowed
+      - b2b-error-no-contract
+      - b2b-error-no-product
+      - b2b-error-missing-enrollment-code
+      - b2b-error-invalid-enrollment-code
+      - b2b-error-requires-checkout
+      - b2b-enroll-success
+      type: string
+      description: |-
+        * `b2b-disallowed` - b2b-disallowed
+        * `b2b-error-no-contract` - b2b-error-no-contract
+        * `b2b-error-no-product` - b2b-error-no-product
+        * `b2b-error-missing-enrollment-code` - b2b-error-missing-enrollment-code
+        * `b2b-error-invalid-enrollment-code` - b2b-error-invalid-enrollment-code
+        * `b2b-error-requires-checkout` - b2b-error-requires-checkout
+        * `b2b-enroll-success` - b2b-enroll-success
+      x-enum-descriptions:
+      - b2b-disallowed
+      - b2b-error-no-contract
+      - b2b-error-no-product
+      - b2b-error-missing-enrollment-code
+      - b2b-error-invalid-enrollment-code
+      - b2b-error-requires-checkout
+      - b2b-enroll-success
     StaffDashboardUser:
       type: object
       description: Serializer for data we care about in the staff dashboard
@@ -3141,6 +3257,9 @@ components:
         approved_flexible_price_exists:
           type: boolean
           readOnly: true
+        b2b_contract:
+          type: integer
+          nullable: true
       required:
       - approved_flexible_price_exists
       - course_number

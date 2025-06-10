@@ -198,6 +198,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         fields = BaseCourseRunSerializer.Meta.fields + [  # noqa: RUF005
             "products",
             "approved_flexible_price_exists",
+            "b2b_contract",
         ]
 
     def to_representation(self, instance):
@@ -234,7 +235,20 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
-    courseruns = CourseRunSerializer(many=True, read_only=True)
+    courseruns = serializers.SerializerMethodField()
+
+    @extend_schema_field(CourseRunSerializer(many=True))
+    def get_courseruns(self, instance):
+        """Get the course runs for the given instance."""
+
+        if "org_id" in self.context:
+            courseruns = instance.courseruns.filter(
+                b2b_contract__organization_id=self.context["org_id"]
+            ).all()
+        else:
+            courseruns = instance.courseruns.all()
+
+        return CourseRunSerializer(courseruns, many=True, read_only=True).data
 
     class Meta:
         model = models.Course

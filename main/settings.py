@@ -23,6 +23,7 @@ from mitol.common.envs import (
     get_string,
     import_settings_modules,
 )
+from mitol.common.settings.celery import *  # noqa: F403
 from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
@@ -33,12 +34,42 @@ from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.117.1"
+VERSION = "0.119.7"
 
 log = logging.getLogger()
 
 # set log level on cssutils - should be fairly high or it will log messages for Outlook-specific styling
 cssutils.log.setLevel(logging.CRITICAL)
+
+
+class EnvironmentVariableParseException(ImproperlyConfigured):
+    """Environment variable was not parsed correctly"""
+
+
+def get_float(name, default):
+    """
+    Get an environment variable as an int.
+
+    Args:
+        name (str): An environment variable name
+        default (float): The default value to use if the environment variable doesn't exist.
+
+    Returns:
+        float:
+            The environment variable value parsed as an float
+    """
+    value = os.environ.get(name)
+    if value is None:
+        return default
+
+    try:
+        parsed_value = float(value)
+    except ValueError as ex:
+        msg = f"Expected value in {name}={value} to be a float"
+        raise EnvironmentVariableParseException(msg) from ex
+
+    return parsed_value
+
 
 ENVIRONMENT = get_string(
     name="MITX_ONLINE_ENVIRONMENT",
@@ -58,6 +89,8 @@ SENTRY_DSN = get_string(
 SENTRY_LOG_LEVEL = get_string(
     name="SENTRY_LOG_LEVEL", default="ERROR", description="The log level for Sentry"
 )
+SENTRY_TRACES_SAMPLE_RATE = get_float("SENTRY_TRACES_SAMPLE_RATE", 0)
+SENTRY_PROFILES_SAMPLE_RATE = get_float("SENTRY_PROFILES_SAMPLE_RATE", 0)
 init_sentry(
     dsn=SENTRY_DSN,
     environment=ENVIRONMENT,
@@ -65,6 +98,8 @@ init_sentry(
     send_default_pii=True,
     log_level=SENTRY_LOG_LEVEL,
     heroku_app_name=HEROKU_APP_NAME,
+    traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+    profiles_sample_rate=SENTRY_PROFILES_SAMPLE_RATE,
 )
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -114,6 +149,18 @@ CORS_ALLOW_CREDENTIALS = get_bool(
     default=True,
     description="Allow cookies to be sent in cross-site HTTP requests",
 )
+CORS_ALLOW_HEADERS = (
+    # defaults
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    # sentry tracing
+    "baggage",
+    "sentry-trace",
+)
 
 SESSION_COOKIE_DOMAIN = get_string(
     name="SESSION_COOKIE_DOMAIN",
@@ -131,12 +178,18 @@ SECURE_SSL_REDIRECT = get_bool(
     default=True,
     description="Application-level SSL redirect setting.",
 )
-SECURE_REDIRECT_EXEMPT = [
-    "^health/startup/$",
-    "^health/liveness/$",
-    "^health/readiness/$",
-    "^health/full/$",
-]
+
+SECURE_REDIRECT_EXEMPT = get_delimited_list(
+    name="MITX_ONLINE_SECURE_REDIRECT_EXEMPT",
+    default=[
+        r"cms/pages/.*",
+        r"^health/startup/$",
+        r"^health/liveness/$",
+        r"^health/readiness/$",
+        r"^health/full/$",
+    ],
+    description="Application-level SSL redirect  exemption setting.",
+)
 
 SECURE_SSL_HOST = get_string(
     name="MITX_ONLINE_SECURE_SSL_HOST",
@@ -189,6 +242,7 @@ INSTALLED_APPS = (
     "django_filters",
     "corsheaders",
     "webpack_loader",
+    "django_scim",
     # WAGTAIL
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -293,7 +347,6 @@ HEALTH_CHECK = {
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "oauth2_provider.middleware.OAuth2TokenMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -306,6 +359,8 @@ MIDDLEWARE = (
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
+    "oauth2_provider.middleware.OAuth2TokenMiddleware",
+    "django_scim.middleware.SCIMAuthCheckMiddleware",
 )
 
 # enable the nplusone profiler only in debug mode
@@ -1321,7 +1376,7 @@ HUBSPOT_PORTAL_ID = get_string(
 
 UNIFIED_ECOMMERCE_URL = get_string(
     name="UNIFIED_ECOMMERCE_URL",
-    default="http://ue.odl.local:9080/",
+    default="",
     description="The base URL for Unified Ecommerce.",
 )
 
@@ -1388,7 +1443,7 @@ MITOL_APIGATEWAY_USERINFO_UPDATE = get_bool(
 # URL configuation
 
 # Set to the URL that APISIX uses for logout.
-MITOL_APIGATEWAY_LOGOUT_URL = "/logout"
+MITOL_APIGATEWAY_LOGOUT_URL = "/logout/oidc"
 
 # Set to the default URL the user should be sent to when logging out.
 # If there's no redirect URL specified otherwise, the user gets sent here.

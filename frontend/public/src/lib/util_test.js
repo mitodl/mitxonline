@@ -435,5 +435,11 @@ describe("utility functions", () => {
         getStartDateText(course).includes(formatPrettyDate(startDates[0]))
       )
     })
+    it("displays an empty string if it's a course and there's no course runs", () => {
+      const course = {
+        courseruns: []
+      }
+      assert.equal(getStartDateText(course), "")
+    })
   })
 })

@@ -583,14 +583,14 @@ files = [
 
 [[package]]
 name = "click"
-version = "8.2.0"
+version = "8.2.1"
 description = "Composable command line interface toolkit"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "click-8.2.0-py3-none-any.whl", hash = "sha256:6b303f0b2aa85f1cb4e5303078fadcbcd4e476f114fab9b5007005711839325c"},
-    {file = "click-8.2.0.tar.gz", hash = "sha256:f5452aeddd9988eefa20f90f05ab66f17fce1ee2a36907fd30b05bbb5953814d"},
+    {file = "click-8.2.1-py3-none-any.whl", hash = "sha256:61a3265b914e850b85317d0b3109c7f8cd35a670f963866005d6ef1d5175a12b"},
+    {file = "click-8.2.1.tar.gz", hash = "sha256:27c491cc05d968d271d5a1db13e3b5a184636d9d930f148c50b038f0d0646202"},
 ]
 
 [package.dependencies]
@@ -2518,8 +2518,11 @@ files = [
     {file = "lxml-5.4.0-cp36-cp36m-win_amd64.whl", hash = "sha256:7ce1a171ec325192c6a636b64c94418e71a1964f56d002cc28122fceff0b6121"},
     {file = "lxml-5.4.0-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:795f61bcaf8770e1b37eec24edf9771b307df3af74d1d6f27d812e15a9ff3872"},
     {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:29f451a4b614a7b5b6c2e043d7b64a15bd8304d7e767055e8ab68387a8cacf4e"},
+    {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:891f7f991a68d20c75cb13c5c9142b2a3f9eb161f1f12a9489c82172d1f133c0"},
     {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4aa412a82e460571fad592d0f93ce9935a20090029ba08eca05c614f99b0cc92"},
+    {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_28_aarch64.whl", hash = "sha256:ac7ba71f9561cd7d7b55e1ea5511543c0282e2b6450f122672a2694621d63b7e"},
     {file = "lxml-5.4.0-cp37-cp37m-manylinux_2_28_x86_64.whl", hash = "sha256:c5d32f5284012deaccd37da1e2cd42f081feaa76981f0eaa474351b68df813c5"},
+    {file = "lxml-5.4.0-cp37-cp37m-musllinux_1_2_aarch64.whl", hash = "sha256:ce31158630a6ac85bddd6b830cffd46085ff90498b397bd0a259f59d27a12188"},
     {file = "lxml-5.4.0-cp37-cp37m-musllinux_1_2_x86_64.whl", hash = "sha256:31e63621e073e04697c1b2d23fcb89991790eef370ec37ce4d5d469f40924ed6"},
     {file = "lxml-5.4.0-cp37-cp37m-win32.whl", hash = "sha256:be2ba4c3c5b7900246a8f866580700ef0d538f2ca32535e991027bdaba944063"},
     {file = "lxml-5.4.0-cp37-cp37m-win_amd64.whl", hash = "sha256:09846782b1ef650b321484ad429217f5154da4d6e786636c38e434fa32e94e49"},
@@ -2675,26 +2678,29 @@ touchstone = ["python3-saml (>=1.10.1) ; python_version < \"3.13\""]
 
 [[package]]
 name = "mitol-django-common"
-version = "2023.12.19"
+version = "2025.5.23"
 description = "MIT Open Learning django app extensions for common utilities"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol-django-common-2023.12.19.tar.gz", hash = "sha256:b7df5f57fcc06d822e7465470e2279ff4ee5c3b9a108513dc10a6979dd92fdda"},
-    {file = "mitol_django_common-2023.12.19-py3-none-any.whl", hash = "sha256:5dd54a632dfdb5391287ac573758e19fa55e73e2c853eaaf60e5c8a4143e7776"},
+    {file = "mitol_django_common-2025.5.23-py3-none-any.whl", hash = "sha256:3ec46487146473293e3918c29ef92412ffd9f3ca1ce442ddc06c4a80ae0afe09"},
+    {file = "mitol_django_common-2025.5.23.tar.gz", hash = "sha256:5b56dfc1b5ad6d843bf19c2a3b529a1e8f69f466a8c548f796f0ab193882b2e9"},
 ]
 
 [package.dependencies]
 django = ">=3.0"
-django-redis = ">=5.0.0,<5.1.0"
+django-redis = ">=5.0,<6.0"
+django-stubs = ">=1.13.1"
 django-webpack-loader = ">=0.7.0"
 factory-boy = ">=3.2,<4.0"
-pytest = ">=7.0.0"
+pytest = ">=7,<9"
 pytz = ">=2020.4"
 requests = ">=2.20.0"
-setuptools = "*"
 typing-extensions = "*"
+
+[package.extras]
+celery = ["celery (>=5.5.0)"]
 
 [[package]]
 name = "mitol-django-google-sheets"
@@ -2854,14 +2860,14 @@ setuptools = "*"
 
 [[package]]
 name = "mitol-django-scim"
-version = "2025.3.31"
+version = "2025.5.30.2"
 description = "Django application for SCIM integrations"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol_django_scim-2025.3.31-py3-none-any.whl", hash = "sha256:1d682576d730feee7b71df52dddc6ad777742349771b81fea31b367c20d2390e"},
-    {file = "mitol_django_scim-2025.3.31.tar.gz", hash = "sha256:5a4ff521ad9a545be18bf0bd295573445710236384c30ff3a50867e05dd58840"},
+    {file = "mitol_django_scim-2025.5.30.2-py3-none-any.whl", hash = "sha256:14277ac3b387f4f47cf338395bea3613d595f8d9a5a6051d6c3181f4f88e7be4"},
+    {file = "mitol_django_scim-2025.5.30.2.tar.gz", hash = "sha256:6698413507846d197c3e2874e6b6fe23157026921240c39574ffff1143a15b8b"},
 ]
 
 [package.dependencies]
@@ -2870,7 +2876,11 @@ django-scim2 = ">=0.19.1"
 django-stubs = ">=1.13.1"
 mitol-django-common = "*"
 pyparsing = ">=3.2"
+requests = ">=2.32.0"
 strenum = ">=0.4.15"
+
+[package.extras]
+celery = ["mitol-django-common[celery]"]
 
 [[package]]
 name = "monotonic"
@@ -3749,6 +3759,7 @@ files = [
     {file = "psycopg2-2.9.10-cp311-cp311-win_amd64.whl", hash = "sha256:0435034157049f6846e95103bd8f5a668788dd913a7c30162ca9503fdf542cb4"},
     {file = "psycopg2-2.9.10-cp312-cp312-win32.whl", hash = "sha256:65a63d7ab0e067e2cdb3cf266de39663203d38d6a8ed97f5ca0cb315c73fe067"},
     {file = "psycopg2-2.9.10-cp312-cp312-win_amd64.whl", hash = "sha256:4a579d6243da40a7b3182e0430493dbd55950c493d8c68f4eec0b302f6bbf20e"},
+    {file = "psycopg2-2.9.10-cp313-cp313-win_amd64.whl", hash = "sha256:91fd603a2155da8d0cfcdbf8ab24a2d54bca72795b90d2a3ed2b6da8d979dee2"},
     {file = "psycopg2-2.9.10-cp39-cp39-win32.whl", hash = "sha256:9d5b3b94b79a844a986d029eee38998232451119ad653aea42bb9220a8c5066b"},
     {file = "psycopg2-2.9.10-cp39-cp39-win_amd64.whl", hash = "sha256:88138c8dedcbfa96408023ea2b0c369eda40fe5d75002c0964c78f46f11fa442"},
     {file = "psycopg2-2.9.10.tar.gz", hash = "sha256:12ec0b40b0273f95296233e8750441339298e6a572f7039da5b260e3c8b60e11"},
@@ -4681,14 +4692,14 @@ doc = ["Sphinx", "sphinx-rtd-theme"]
 
 [[package]]
 name = "sentry-sdk"
-version = "2.28.0"
+version = "2.29.1"
 description = "Python client for Sentry (https://sentry.io)"
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
 files = [
-    {file = "sentry_sdk-2.28.0-py2.py3-none-any.whl", hash = "sha256:51496e6cb3cb625b99c8e08907c67a9112360259b0ef08470e532c3ab184a232"},
-    {file = "sentry_sdk-2.28.0.tar.gz", hash = "sha256:14d2b73bc93afaf2a9412490329099e6217761cbab13b6ee8bc0e82927e1504e"},
+    {file = "sentry_sdk-2.29.1-py2.py3-none-any.whl", hash = "sha256:90862fe0616ded4572da6c9dadb363121a1ae49a49e21c418f0634e9d10b4c19"},
+    {file = "sentry_sdk-2.29.1.tar.gz", hash = "sha256:8d4a0206b95fa5fe85e5e7517ed662e3888374bdc342c00e435e10e6d831aa6d"},
 ]
 
 [package.dependencies]
@@ -5509,4 +5520,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "30ed507e75df59ef6f3ffee47143ee84f689748d9162e7db0b915141e489612b"
+content-hash = "3b045dd4b0494183536b573a746d00b483325d040389b60d1d1a18428a3b8db3"

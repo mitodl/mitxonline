@@ -3,11 +3,12 @@ Course API Views version 2
 """
 
 import django_filters
-from django.db.models import Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from courses.models import (
     Course,
@@ -53,12 +54,33 @@ class ProgramFilterSet(django_filters.FilterSet):
         model = Program
         fields = ["id", "live", "readable_id", "page__live", "org_id"]
 
-    def __init__(self, *args, request_user=None, **kwargs):
-        self.user = request_user
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    @property
+    def qs(self):
+        """If the request isn't explicitly filtering on org_id, exclude contracted courses."""
+
+        if "org_id" not in getattr(self.request, "GET", {}):
+            program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
+                node_type=ProgramRequirementNodeType.COURSE,
+                course__courseruns__b2b_contract__isnull=False,
+                program_id=OuterRef("pk"),
+            )
+            return (
+                super()
+                .qs.annotate(
+                    has_contracted_courses=Exists(
+                        program_requirements_with_contract_runs
+                    )
+                )
+                .filter(has_contracted_courses=False)
+            )
+
+        return super().qs
+
     def filter_by_org_id(self, queryset, _, org_id):
-        if user_has_org_access(self.user, org_id):
+        if self.request and user_has_org_access(self.request.user, org_id):
             program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
                 node_type=ProgramRequirementNodeType.COURSE,
                 course__courseruns__b2b_contract__organization_id=org_id,
@@ -82,29 +104,27 @@ class ProgramFilterSet(django_filters.FilterSet):
 class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     """API viewset for Programs"""
 
-    permission_classes = []
+    permission_classes = [IsAuthenticatedOrReadOnly]
     serializer_class = ProgramSerializer
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProgramFilterSet
 
     def get_queryset(self):
+        """Get the queryset"""
         return Program.objects.order_by("title").prefetch_related("departments")
-
-    def get_filterset_kwargs(self):
-        kwargs = super().get_filterset_kwargs()
-        kwargs["request_user"] = self.request.user
-        return kwargs
 
     @extend_schema(
         operation_id="programs_retrieve_v2",
         description="API view set for Programs - v2",
     )
     def retrieve(self, request, *args, **kwargs):
+        """Retrieve a specific program."""
         return super().retrieve(request, *args, **kwargs)
 
     @extend_schema(operation_id="programs_list_v2", description="List Programs - v2")
     def list(self, request, *args, **kwargs):
+        """List the available programs."""
         return super().list(request, *args, **kwargs)
 
 
@@ -119,10 +139,51 @@ class CourseFilterSet(django_filters.FilterSet):
         field_name="courserun_is_enrollable",
     )
     id = IdInFilter(field_name="id", lookup_expr="in", label="Course ID")
+    org_id = django_filters.NumberFilter(
+        method="filter_org_id",
+        label="Only show courses beloning to this B2B/UAI organization",
+        field_name="org_id",
+    )
+    include_approved_financial_aid = django_filters.BooleanFilter(
+        method="filter_include_approved_financial_aid",
+        label="Include approved financial assistance information",
+        field_name="include_approved_financial_aid",
+    )
 
     class Meta:
         model = Course
-        fields = ["id", "live", "readable_id", "page__live", "courserun_is_enrollable"]
+        fields = [
+            "id",
+            "live",
+            "readable_id",
+            "page__live",
+            "courserun_is_enrollable",
+            "org_id",
+            "include_approved_financial_aid",
+        ]
+
+    def filter_org_id(self, queryset, _, value):
+        """
+        Filter just courses that have course runs that have B2B courses in them
+        that match the specified org_id, if we're in that org.
+        """
+        user = self.request.user
+
+        if user_has_org_access(user, value):
+            return queryset.filter(
+                courseruns__b2b_contract__organization_id=value,
+                courseruns__b2b_contract__active=True,
+            )
+        return Course.objects.none()
+
+    def filter_include_approved_financial_aid(self, queryset, *_):
+        """
+        No-op filter for include_approved_financial_aid.
+
+        This is a serializer context flag, but the filter needs to know about
+        the field so the API spec is generated correctly.
+        """
+        return queryset
 
     def filter_courserun_is_enrollable(self, queryset, _, value):
         return (
@@ -142,24 +203,16 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        user = self.request.user
-        org_id = self.request.query_params.get("org_id")
+        """Get the queryset for the viewset."""
 
-        qs = (
+        return (
             Course.objects.select_related("page")
             .prefetch_related("departments")
+            .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
+            .annotate(count_courseruns=Count("courseruns"))
             .order_by("title")
+            .distinct()
         )
-
-        if org_id:
-            if user_has_org_access(user, org_id):
-                return qs.filter(
-                    courseruns__b2b_contract__organization_id=org_id,
-                    courseruns__b2b_contract__active=True,
-                )
-            return Course.objects.none()
-        else:
-            return qs.filter(courseruns__b2b_contract__isnull=True).distinct()
 
     def get_serializer_context(self):
         added_context = {}
@@ -168,6 +221,8 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             added_context["all_runs"] = True
         if qp.get("include_approved_financial_aid"):
             added_context["include_approved_financial_aid"] = True
+        if qp.get("org_id"):
+            added_context["org_id"] = qp.get("org_id")
         return {**super().get_serializer_context(), **added_context}
 
     @extend_schema(

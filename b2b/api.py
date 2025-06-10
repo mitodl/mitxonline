@@ -1,11 +1,13 @@
 """API functions for B2B operations."""
 
 import logging
+from decimal import Decimal
 from uuid import uuid4
 
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Count
 from mitol.common.utils import now_in_utc
 from wagtail.models import Page
 
@@ -19,7 +21,14 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_UNLIMITED,
 )
-from ecommerce.models import Discount, DiscountProduct, Product
+from ecommerce.models import (
+    BasketDiscount,
+    BasketItem,
+    Discount,
+    DiscountProduct,
+    Product,
+)
+from main import constants as main_constants
 from main.utils import date_to_datetime
 
 log = logging.getLogger(__name__)
@@ -122,7 +131,9 @@ def create_contract_run(
 
     with reversion.create_revision():
         course_run_product = Product(
-            price=0,
+            price=contract.enrollment_fixed_price
+            if contract.enrollment_fixed_price
+            else Decimal(0),
             is_active=True,
             description=f"{contract.organization.name} - {course.title} {course.readable_id}",
             object_id=course_run.id,
@@ -150,9 +161,10 @@ def validate_basket_for_b2b_purchase(request) -> bool:
     that the basket contains only products that are part of a contract and that
     the contract is active.
 
-    When SSO integrations are implemented, this will need to be revised since
-    it'll fail those baskets (unless we create orders for those completely
-    differently).
+    If the integration is SSO, and there's no price, there won't be any
+    applicable discounts and the basket shouldn't have any applied. In that case,
+    we need to make sure the basket items all are either not B2B, or they are
+    linked to contracts the user's also associated with.
 
     Args:
         request: The HTTP request object containing the basket data.
@@ -165,11 +177,11 @@ def validate_basket_for_b2b_purchase(request) -> bool:
     if not basket:
         return False
 
-    basket_contracts = []
+    nonfree_contracts = []
+    free_contracts = []
     course_run_content_type = ContentType.objects.get_for_model(CourseRun)
 
-    # This system only supports one item per basket, but this is done so it can
-    # be lifted out and into UE later (which supports >1 item).
+    # Determine what contracts are linked to items in the basket.
 
     for item in (
         basket.basket_items.filter(product__content_type=course_run_content_type)
@@ -183,40 +195,52 @@ def validate_basket_for_b2b_purchase(request) -> bool:
         contract = item.product.purchasable_object.b2b_contract
 
         if contract and contract.is_active:
-            basket_contracts.append(contract)
+            if contract.enrollment_fixed_price in (
+                None,
+                Decimal(0),
+            ):
+                free_contracts.append(contract)
+            else:
+                nonfree_contracts.append(contract)
 
-    if len(basket_contracts) == 0:
-        # No contracts in the basket, so we don't need to check further.
-        # The other validity checks that run before will make sure the discount
-        # applies to the basket products.
+    if len(nonfree_contracts) + len(free_contracts) == 0:
+        # There aren't any, so we have nothing to validate.
         return True
 
-    discounts_with_contracts = (
-        basket.discounts.filter(
-            redeemed_discount__products__product__content_type=course_run_content_type
-        )
-        .prefetch_related(
-            "redeemed_discount",
-            "redeemed_discount__products",
-            "redeemed_discount__products__product__purchasable_object",
-            "redeemed_discount__products__product__purchasable_object__b2b_contract",
-        )
-        .distinct()
-        .all()
-    )
+    # Determine what free-to-attend contracts are in the cart, and also already
+    # linked to the user. (We've pulled free-to-attend ones out above so just
+    # use that list.)
 
-    if len(discounts_with_contracts) != len(basket_contracts):
-        # We should have a code for each contract in the basket.
-        return False
+    remaining_free_contract_qset = ContractPage.objects.filter(
+        pk__in=free_contracts
+    ).exclude(pk__in=request.user.b2b_contracts.all())
 
-    for discount_item in discounts_with_contracts:
-        for discount_product in discount_item.redeemed_discount.products.all():
-            contract = discount_product.product.purchasable_object.b2b_contract
+    if remaining_free_contract_qset.count() == 0 and len(nonfree_contracts) == 0:
+        # The user's in all of the free ones, and there's no non-free ones,
+        # so the basket is OK.
+        return True
 
-            if contract and contract.is_active and contract in basket_contracts:
-                return True
+    # The basket includes products for free and/or non-free contracts. Check to
+    # make sure we've got enrollment codes for these.
 
-    return False
+    check_contracts = [
+        *remaining_free_contract_qset.all(),
+        *nonfree_contracts,
+    ]
+
+    for check_contract in check_contracts:
+        # Do the applied discounts in this basket apply to any of the products
+        # in the basket? If not, then the basket is invalid.
+
+        if (
+            basket.discounts.filter(
+                redeemed_discount__products__product__in=check_contract.get_products()
+            ).count()
+            == 0
+        ):
+            return False
+
+    return True
 
 
 def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR0915
@@ -452,3 +476,98 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR091
             )
 
     return (created, updated, errors)
+
+
+def create_b2b_enrollment(request, product: Product):
+    """
+    Create a B2B enrollment for the given product for the current user.
+
+    If the contract doesn't specify a price and the user is associated with the
+    contract, we should create an order and an enrollment for the user. Otherwise,
+    we should redirect the user to the basket add API, so they can use an
+    enrollment code that they already have.
+
+    If the result is unsuccessful for a B2B-related reason, the "result" key in
+    the dict will contain one of the USER_MSG_TYPE_B2B_ERROR constants. If the
+    result instead would require payment, the "result" key will contain some
+    additional information.
+    - The basket price. The code will total the basket; if it's not zero, it will
+      skip trying to check out and will instead return an error.
+    - The result from generate_checkout_payload. This may contain a further error
+      (if, say, the user fails the blocked country check, or they're in the course
+      already). If the order instead just requires checkout, this will include the
+      redirect for that - the frontend should send the user to the cart page in this
+      case, though, so the user can see what's going on before they proceed.
+
+    Args:
+    - request: The HTTP request object containing the user and basket data.
+    - product: The Product object representing the B2B product to enroll in.
+    Returns: a dict containing
+    - "result": the result of the attempt; one of the USER_MSG_TYPE_B2B constants.
+    - "order": the order ID if the enrollment was successful and no checkout is needed.
+    - "price": the total for the basket, if enrollment did not succeed
+    - "checkout_result": the result of the checkout attempt, if applicable.
+    """
+    from ecommerce.api import establish_basket, generate_checkout_payload
+
+    user = request.user
+    if not user.is_authenticated:
+        return {
+            "result": main_constants.USER_MSG_TYPE_B2B_DISALLOWED,
+        }
+
+    purchasable_object = product.purchasable_object
+    if not purchasable_object or not purchasable_object.b2b_contract:
+        return {
+            "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
+        }
+
+    if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
+        return {
+            "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
+        }
+
+    basket = establish_basket(request)
+    item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
+    item.save()
+
+    applicable_discounts_qs = product.discounts.annotate(
+        redemptions=Count("discount__order_redemptions")
+    ).filter(discount__is_bulk=True, redemptions=0, discount__products__product=product)
+    if applicable_discounts_qs.count() > 0:
+        # We have unused codes for this product, so we should apply one.
+        # (If the contract isn't SSO, we'll have made a bunch of enrollment codes,
+        # but we should still not make the user round-trip through ecommerce.)
+        discount = applicable_discounts_qs.first().discount
+        basket_discount = BasketDiscount.objects.create(
+            redemption_date=now_in_utc(),
+            redeemed_by=request.user,
+            redeemed_discount=discount,
+            redeemed_basket=basket,
+        )
+        basket_discount.save()
+
+    basket_price = 0
+    for basket_item in basket.basket_items.all():
+        basket_price += basket_item.discounted_price
+
+    if basket_price == 0:
+        # This call should go ahead and fulfill the order.
+        response = generate_checkout_payload(request)
+
+        if "no_checkout" in response:
+            return {
+                "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+                "order": response["order_id"],
+            }
+        else:
+            return {
+                "result": main_constants.USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
+                "price": basket_price,
+                "checkout_result": response,
+            }
+
+    return {
+        "result": main_constants.USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
+        "price": basket_price,
+    }
