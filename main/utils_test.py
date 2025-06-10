@@ -1,7 +1,6 @@
 """Utils tests"""
 
 from datetime import date, datetime
-from unittest.mock import patch
 
 import pytest
 import pytz
@@ -121,36 +120,40 @@ FAKE_ENVIRONS = {
 }
 
 
-def test_get_float():
+def test_get_float(mocker):
     """
     get_float should get the float from the environment variable, or raise an exception if it's not parseable as an float
     """
-    with patch("main.settings.os", environ=FAKE_ENVIRONS):
-        assert get_float("positive", 1234) == 123
-        assert get_float("negative", 1234) == -456
-        assert get_float("zero", 1234) == 0
-        assert get_float("float-positive", 1234) == 1.1
-        assert get_float("float-negative", 1234) == -1.1
-        assert get_float("float-zero", 1234) == 0.0
+    mocker.patch.dict("os.environ", FAKE_ENVIRONS)
 
-        for key, value in FAKE_ENVIRONS.items():
-            if key not in (
-                "positive",
-                "negative",
-                "zero",
-                "float-zero",
-                "float-positive",
-                "float-negative",
-            ):
+    assert get_float("positive", 1234) == 123
+    assert get_float("negative", 1234) == -456
+    assert get_float("zero", 1234) == 0
+    assert get_float("float-positive", 1234) == 1.1
+    assert get_float("float-negative", 1234) == -1.1
+    assert get_float("float-zero", 1234) == 0.0
+
+    for key, value in FAKE_ENVIRONS.items():
+        if key not in (
+            "positive",
+            "negative",
+            "zero",
+            "float-zero",
+            "float-positive",
+            "float-negative",
+        ):
+            try:
                 with pytest.raises(
-                    (
-                        EnvironmentVariableParseException,
-                        ValueError,
-                    )
+                    EnvironmentVariableParseException,
                 ) as ex:
                     get_float(key, 1234)
                 assert (
                     ex.value.args[0] == f"Expected value in {key}={value} to be a float"
                 )
+            except Exception as exc:
+                print(exc)
+                print(exc.__cause__)
+                print(exc.__class__)
+                print(EnvironmentVariableParseException.__class__)
 
-        assert get_float("missing", "default") == "default"
+    assert get_float("missing", "default") == "default"

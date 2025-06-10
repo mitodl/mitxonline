@@ -69,12 +69,15 @@ services:
     ports:
       - "8011:8011"
     environment:
-      << : *py-environment
-      PORT: 8011
-      # these are necessary to get the hostname from the varnish proxy
-      USE_X_FORWARDED_HOST: true
-      USE_X_FORWARDED_PORT: true
-    env_file: .env
+      SECRET_KEY: asdfb
+      MITX_ONLINE_ADMIN_EMAIL: admin@localhost
+      
+    #   << : *py-environment
+    #   PORT: 8011
+    #   # these are necessary to get the hostname from the varnish proxy
+    #   USE_X_FORWARDED_HOST: true
+    #   USE_X_FORWARDED_PORT: true
+    # env_file: .env
     links:
       - db
       - redis
