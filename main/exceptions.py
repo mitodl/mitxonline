@@ -1,6 +1,12 @@
 """Exception related classes and functions"""
 
+from django.core.exceptions import ImproperlyConfigured
+
 from rest_framework import exceptions, views
+
+
+class EnvironmentVariableParseException(ImproperlyConfigured):
+    """Environment variable was not parsed correctly"""
 
 
 def exception_handler(exc, context):

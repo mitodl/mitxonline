@@ -12,7 +12,6 @@ from urllib.parse import urljoin, urlparse
 import cssutils
 import dj_database_url
 from celery.schedules import crontab
-from django.core.exceptions import ImproperlyConfigured
 from mitol.apigateway.settings import *  # noqa: F403  # noqa: F403
 from mitol.common.envs import (
     get_bool,
@@ -31,6 +30,7 @@ from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
+from main.exceptions import EnvironmentVariableParseException
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
@@ -41,9 +41,6 @@ log = logging.getLogger()
 # set log level on cssutils - should be fairly high or it will log messages for Outlook-specific styling
 cssutils.log.setLevel(logging.CRITICAL)
 
-
-class EnvironmentVariableParseException(ImproperlyConfigured):
-    """Environment variable was not parsed correctly"""
 
 
 def get_float(name, default):
