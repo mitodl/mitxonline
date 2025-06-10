@@ -101,20 +101,3 @@ def test_date_to_datetime():
 
     with pytest.raises(AttributeError):
         date_to_datetime("this date isn't a date at all", TIME_ZONE)
-
-
-FAKE_ENVIRONS = {
-    "true": "True",
-    "false": "False",
-    "positive": "123",
-    "negative": "-456",
-    "zero": "0",
-    "float-positive": "1.1",
-    "float-negative": "-1.1",
-    "float-zero": "0.0",
-    "expression": "123-456",
-    "none": "None",
-    "string": "a b c d e f g",
-    "list_of_int": "[3,4,5]",
-    "list_of_str": '["x", "y", \'z\']',
-}

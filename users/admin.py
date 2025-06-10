@@ -125,8 +125,14 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
         "is_staff",
         "last_login",
     )
-    list_filter = ("is_staff", "is_superuser", "is_active", "groups")
-    search_fields = ("openedx_users__edx_username", "name", "email")
+    list_filter = (
+        "is_staff",
+        "is_superuser",
+        "is_active",
+        "groups",
+        ("global_id", admin.EmptyFieldListFilter),
+    )
+    search_fields = ("openedx_users__edx_username", "name", "email", "global_id")
     ordering = ("email",)
     readonly_fields = ("last_login", "hubspot_sync_datetime", "global_id")
     inlines = [
