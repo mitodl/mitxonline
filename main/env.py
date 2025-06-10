@@ -9,7 +9,7 @@ class EnvironmentVariableParseException(ImproperlyConfigured):
 
 def get_float(name, default):
     """
-    Get an environment variable as an int.
+    Get an environment variable as an float.
 
     Args:
         name (str): An environment variable name
