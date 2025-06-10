@@ -1376,7 +1376,7 @@ HUBSPOT_PORTAL_ID = get_string(
 
 UNIFIED_ECOMMERCE_URL = get_string(
     name="UNIFIED_ECOMMERCE_URL",
-    default="http://ue.odl.local:9080/",
+    default="",
     description="The base URL for Unified Ecommerce.",
 )
 

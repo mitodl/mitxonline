@@ -17,6 +17,7 @@ x-environment:
   APISIX_PORT: ${APISIX_PORT:-9080}
   KEYCLOAK_PORT: ${KEYCLOAK_PORT:-7080}
   KEYCLOAK_SSL_PORT: ${KEYCLOAK_SSL_PORT:-7443}
+  UNIFIED_ECOMMERCE_URL: ${UNIFIED_ECOMMERCE_URL:-http://ue.odl.local:9080}
 
 x-extra-hosts:
   &default-extra-hosts # pragma: allowlist secret
