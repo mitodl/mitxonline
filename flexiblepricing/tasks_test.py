@@ -455,12 +455,10 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
 
 
 @pytest.mark.django_db
-def test_process_flexible_price_discount_task_skips(mocker, settings):
+def test_process_flexible_price_discount_skips(mocker, settings):
     """Test that the sync skips if there's no API key."""
 
-    patched_task_logic = mocker.patch(
-        "flexiblepricing.tasks._process_flexible_price_discount"
-    )
+    patched_task_logic = mocker.patch("flexiblepricing.tasks._process_course_discounts")
 
     flex_price_id = -1
     settings.UNIFIED_ECOMMERCE_API_KEY = ""
