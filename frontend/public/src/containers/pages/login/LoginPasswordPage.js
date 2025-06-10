@@ -86,8 +86,6 @@ export class LoginPasswordPage extends React.Component<Props> {
       )
     }
 
-    const name = auth.extra_data.name
-
     return (
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${LOGIN_PASSWORD_PAGE_TITLE}`}
@@ -96,11 +94,6 @@ export class LoginPasswordPage extends React.Component<Props> {
           <div className="std-card std-card-auth">
             <div className="std-card-body">
               <h1>Sign in</h1>
-              {name && (
-                <p>
-                  Signing in as <b>{name}</b>
-                </p>
-              )}
               <LoginPasswordForm onSubmit={this.onSubmit.bind(this)} />
             </div>
           </div>
