@@ -465,6 +465,6 @@ def test_process_flexible_price_discount_skips(mocker, settings):
 
     assert settings.UNIFIED_ECOMMERCE_API_KEY == ""
 
-    process_flexible_price_discount_task(flex_price_id)
+    _process_flexible_price_discount(flex_price_id)
 
     patched_task_logic.assert_not_called()
