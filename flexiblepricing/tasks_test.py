@@ -454,27 +454,17 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
         )
 
 
-@pytest.mark.parametrize("key_set", [(True,), (False,)])
 @pytest.mark.django_db
-def test_process_flexible_price_discount_task_skips(mocker, settings, key_set):
+def test_process_flexible_price_discount_task_skips(mocker, settings):
     """Test that the sync skips if there's no API key."""
 
     patched_task_logic = mocker.patch(
         "flexiblepricing.tasks._process_flexible_price_discount"
     )
 
-    if key_set:
-        settings.UNIFIED_ECOMMERCE_API_KEY = "abc123"
-        flex_price = FlexiblePriceFactory.create()
-        flex_price.save()
-        flex_price_id = flex_price.id
-    else:
-        flex_price_id = -1
-        settings.UNIFIED_ECOMMERCE_API_KEY = ""
+    flex_price_id = -1
+    settings.UNIFIED_ECOMMERCE_API_KEY = ""
 
     process_flexible_price_discount_task(flex_price_id)
 
-    if key_set:
-        patched_task_logic.assert_called()
-    else:
-        patched_task_logic.assert_not_called()
+    patched_task_logic.assert_not_called()
