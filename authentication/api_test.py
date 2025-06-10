@@ -12,4 +12,3 @@ def test_create_user_session(user):
     session = api.create_user_session(user)
     assert session is not None
     assert session.session_key is not None
-
