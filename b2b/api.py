@@ -14,6 +14,7 @@ from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
 
 from b2b.constants import B2B_RUN_TAG_FORMAT
+from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.api import get_home_page
 from courses.models import Course, CourseRun
@@ -63,19 +64,35 @@ def create_contract_run(
     """
     Create a run for the specified contract.
 
-    Contract runs are always self-paced. Dates align with the contract - start
-    and end dates are set to the contract's start and end dates and the
-    certificate available date is set to the start date of the contract. If the
-    contract has no dates, then the start dates get set to today. The run tag
-    will be generated according to the contract and org IDs.
+    This does 3 main things:
+    - Grab and identify the source course run, and create a new course key for
+      the contract course run.
+    - Create the contract course run in MITx Online, and queue a clone of the
+      source course run in edX.
+    - Create a product for the run.
 
-    This will also create a product for the run. The product will have zero
-    value (unless the contract specifies one).
+    Source course runs are identified by looking for the most recent course run
+    for the given course. This code expects you to pass in an MITx Online course
+    that has a readable ID like 'course-v1:UAI_SOURCE+number` and that it has a
+    run of some sort. This should just be a single run. If there's multiple runs,
+    this code will grab the last one in the database.
 
-    This won't create pages for either the run or the products, since they're
-    not supposed to be accessed by the public.
+    The MITx Online course run will belong to the source course. They will get a
+    course key that is modified to represent the organization they belong to,
+    the current year, and the contract ID. This means that the source course will
+    have runs that have readable IDs that do not match the course ID.
 
-    This will queue a task to create course runs in edX as appropriate.
+    The course key is changed according to a set algorithm. For more information,
+    see this discussion post: https://github.com/mitodl/hq/discussions/7525
+    In general, this expects a course run that is in org `UAI_SOURCE` and then
+    will create a new run that is `UAI_orgkey`, with a run tag that reflects
+    the year we're creating the run in and the contract ID (`2025_C19` for
+    instance).
+
+    A product will be created for the new contract course run, and its price will
+    either be zero or the amount specified by the contract. (Free courses still
+    require either an association with the contract or an enrollment code for
+    access.)
 
     Args:
         contract (ContractPage): The contract to create the run for.
@@ -85,30 +102,25 @@ def create_contract_run(
         Product: The created Product object.
     """
 
-    # This probably needs some redefinition.
-    # The courses we'll create these under are all going to be named something
-    # like course-v1:UAI+CourseName+SOURCE (sometimes the org may be B2B or
-    # something else).
-    # We won't keep tabs on that particular course run. We will clone it, though.
-    # The new course runs will be named this:
-    # course-v1:ORGKEY+CourseName+yyyy_Cid
-    # where ORGKEY is the key from the org record, CourseName comes from the
-    # base course, yyyy is the current year, and id is the contract ID.
+    clone_course_run = course.courseruns.last()
 
-    run_tag = B2B_RUN_TAG_FORMAT.format(
+    if not clone_course_run:
+        msg = f"No course runs available for {course}."
+        raise SourceCourseIncompleteError(msg)
+
+    new_run_tag = B2B_RUN_TAG_FORMAT.format(
         year=now_in_utc().year,
         contract_id=contract.id,
     )
-    source_id_str = f"{course.readable_id}+SOURCE"
-    source_id = CourseKey.from_string(source_id_str)
-    readable_id = (
-        f"course-v1:{contract.organization.org_key}+{source_id.course}+{run_tag}"
+    source_id = CourseKey.from_string(clone_course_run.courseware_id)
+    new_readable_id = (
+        f"course-v1:{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
     )
 
-    # Check first for an existing run with the same tag.
-    if CourseRun.objects.filter(course=course, courseware_id=readable_id).exists():
-        msg = f"Can't create a run for {course} and contract {contract}: run tag {run_tag} already exists."
-        raise ValueError(msg)
+    # Check first for an existing run with the same readable ID.
+    if CourseRun.objects.filter(course=course, courseware_id=new_readable_id).exists():
+        msg = f"Can't create a run for {course} and contract {contract}: courseware ID {new_readable_id} already exists."
+        raise TargetCourseRunExistsError(msg)
 
     start_date = (
         date_to_datetime(contract.contract_start, settings.TIME_ZONE)
@@ -124,8 +136,8 @@ def create_contract_run(
     course_run = CourseRun(
         course=course,
         title=course.title,
-        courseware_id=readable_id,
-        run_tag=run_tag,
+        courseware_id=new_readable_id,
+        run_tag=new_run_tag,
         start_date=start_date,
         end_date=end_date,
         enrollment_start=start_date,
@@ -134,13 +146,17 @@ def create_contract_run(
         is_self_paced=True,
         live=True,
         b2b_contract=contract,
-        courseware_url_path=urljoin(settings.OPENEDX_COURSE_BASE_URL, readable_id),
+        courseware_url_path=urljoin(settings.OPENEDX_COURSE_BASE_URL, new_readable_id),
     )
     course_run.save()
-    clone_courserun.delay(course_run.id, base_id=source_id_str)
+    clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)
 
     log.debug(
-        "Created run %s for course %s in contract %s", course_run, course, contract
+        "Created run %s for course %s in contract %s from course run %s",
+        course_run,
+        course,
+        contract,
+        clone_course_run,
     )
 
     content_type = ContentType.objects.filter(
@@ -153,7 +169,7 @@ def create_contract_run(
             if contract.enrollment_fixed_price
             else Decimal(0),
             is_active=True,
-            description=f"{contract.organization.name} - {course.title} {course.readable_id}",
+            description=f"{contract.organization.name} #{contract.id} - {course.title} {course.readable_id}",
             object_id=course_run.id,
             content_type=content_type,
         )
@@ -166,6 +182,8 @@ def create_contract_run(
             contract,
         )
 
+    # Saving the contract here triggers any shoring up of related data that we
+    # need to do, like generating enrollment codes.
     contract.save()
 
     return course_run, course_run_product

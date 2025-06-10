@@ -688,7 +688,6 @@ class CourseRun(TimestampedModel):
     course = models.ForeignKey(
         Course, on_delete=models.CASCADE, related_name="courseruns", db_index=True
     )
-    # product = GenericRelation(Product, related_query_name="course_run")  # noqa: ERA001
     title = models.CharField(
         max_length=255,
         help_text=f"The title of the course. {SYNCED_COURSE_RUN_FIELD_MSG}",

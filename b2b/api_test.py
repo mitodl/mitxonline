@@ -23,6 +23,7 @@ from b2b.constants import (
     CONTRACT_INTEGRATION_NONSSO,
     CONTRACT_INTEGRATION_SSO,
 )
+from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.factories import ContractPageFactory
 from courses.factories import CourseFactory, CourseRunFactory
 from courses.models import CourseRunEnrollment
@@ -50,6 +51,26 @@ pytestmark = [
 ]
 
 
+@pytest.fixture
+def contract_ready_course():
+    """
+    Creates a contract-ready course - i.e. a course with a SOURCE run
+
+    Returns: tuple, course and course run
+    """
+
+    course = CourseFactory.create()
+    source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
+    source_course_run_key = (
+        f"course-v1:{source_course_key.org}+{source_course_key.course}+SOURCE"
+    )
+    source_course_run = CourseRunFactory.create(
+        course=course, courseware_id=source_course_run_key, run_tag="SOURCE"
+    )
+
+    return (course, source_course_run)
+
+
 @pytest.mark.parametrize(
     (
         "has_start",
@@ -62,7 +83,7 @@ pytestmark = [
         (False, False),
     ],
 )
-def test_create_single_course_run(mocker, has_start, has_end):
+def test_create_single_course_run(mocker, contract_ready_course, has_start, has_end):
     """Test that a single course run is created correctly for a contract."""
 
     now_time = now_in_utc()
@@ -77,10 +98,10 @@ def test_create_single_course_run(mocker, has_start, has_end):
         if has_end
         else None,
     )
-    course = CourseFactory()
-    run, product = create_contract_run(contract, course)
+    (source_course, _) = contract_ready_course
+    run, product = create_contract_run(contract, source_course)
 
-    assert run.course == course
+    assert run.course == source_course
     assert run.run_tag == B2B_RUN_TAG_FORMAT.format(
         year=now_time.year, contract_id=contract.id
     )
@@ -214,6 +235,7 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
 )
 def test_ensure_enrollment_codes(  # noqa: PLR0913
     mocker,
+    contract_ready_course,
     is_sso,
     has_price,
     has_learner_cap,
@@ -255,7 +277,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
         enrollment_fixed_price=price,
         max_learners=max_learners,
     )
-    course = CourseFactory()
+    (course, _) = contract_ready_course
 
     assert contract.get_discounts().count() == 0
 
@@ -318,6 +340,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 @pytest.mark.parametrize("price_is_zero", [True, False])
 def test_create_b2b_enrollment(  # noqa: PLR0913
     mocker,
+    contract_ready_course,
     settings,
     user_authenticated,
     user_in_contract,
@@ -344,7 +367,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913
         if price_is_zero
         else FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
     )
-    course = CourseFactory.create()
+    (course, _) = contract_ready_course
     run, product = create_contract_run(contract, course)
 
     if not product_in_contract:
@@ -415,7 +438,8 @@ def test_create_b2b_enrollment(  # noqa: PLR0913
         False,
     ],
 )
-def test_create_contract_run(mocker, run_exists):
+@pytest.mark.parametrize("source_run_exists", [True, False])
+def test_create_contract_run(mocker, source_run_exists, run_exists):
     """
     Test creating runs for a contract.
 
@@ -426,24 +450,39 @@ def test_create_contract_run(mocker, run_exists):
 
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
-
-    mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
-
     source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
+    mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
     this_year = now_in_utc().year
 
+    if source_run_exists:
+        # This should be the default, but need to test the case in which the
+        # source run isn't configured.
+        source_course_run_key = (
+            f"course-v1:{source_course_key.org}+{source_course_key.course}+SOURCE"
+        )
+        CourseRunFactory.create(
+            course=course, courseware_id=source_course_run_key, run_tag="SOURCE"
+        )
+
     target_course_id = f"course-v1:{contract.organization.org_key}+{source_course_key.course}+{this_year}_C{contract.id}"
+
+    if not source_run_exists:
+        with pytest.raises(SourceCourseIncompleteError) as exc:
+            create_contract_run(contract, course)
+
+        assert "No course runs available" in str(exc)
+        return
 
     if run_exists:
         collision_run = CourseRunFactory.create(
             course=course, courseware_id=target_course_id
         )
 
-        with pytest.raises(ValueError) as exc:  # noqa: PT011
+        with pytest.raises(TargetCourseRunExistsError) as exc:
             create_contract_run(contract, course)
 
         target_course_key = CourseKey.from_string(collision_run.courseware_id)
-        assert f"run tag {target_course_key.run} already exists" in str(exc)
+        assert f"courseware ID {target_course_key} already exists" in str(exc)
         return
 
     assert not course.courseruns.filter(courseware_id=target_course_id).exists()
