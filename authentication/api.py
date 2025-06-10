@@ -5,7 +5,6 @@ from importlib import import_module
 from django.conf import settings
 from django.contrib.auth import BACKEND_SESSION_KEY, HASH_SESSION_KEY, SESSION_KEY
 
-
 USERNAME_COLLISION_ATTEMPTS = 10
 
 
@@ -29,4 +28,3 @@ def create_user_session(user):
     session.save()
 
     return session
-
