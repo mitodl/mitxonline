@@ -12,6 +12,7 @@ from urllib.parse import urljoin, urlparse
 import cssutils
 import dj_database_url
 from celery.schedules import crontab
+from django.core.exceptions import ImproperlyConfigured
 from mitol.apigateway.settings import *  # noqa: F403  # noqa: F403
 from mitol.common.envs import (
     get_bool,
