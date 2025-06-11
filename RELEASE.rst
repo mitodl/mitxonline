@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.120.0
+---------------
+
+- Fix logout redirects (#2704)
+- Update scim package and admin improvements (#2723)
+- fix(deps): update dependency django to v4.2.22 [security] (#2716)
+- Fix failing tests (#2726)
+- When creating user profile save edx_username (#2720)
+- Skip the flexible price discount create task if there's no UE API key set (#2719)
+- Remove full name on the password prompt (#2707)
+
 Version 0.119.7 (Released June 06, 2025)
 ---------------
 
