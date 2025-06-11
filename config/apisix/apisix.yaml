@@ -4,6 +4,7 @@ upstreams:
       "nginx:8013": 1
     type: roundrobin
 
+global_rules:
 routes:
   - id: 1
     name: "app-wildcard"
@@ -22,9 +23,13 @@ routes:
         ssl_verify: false
         session:
           secret: ${{APISIX_SESSION_SECRET_KEY}}
-        logout_path: "/logout"
+        logout_path: "/logout/oidc"
         post_logout_redirect_uri: ${{APP_LOGOUT_URL}}
         unauth_action: "pass"
+      response-rewrite:
+        headers:
+          set:
+            Content-Security-Policy: frame-ancestors 'self' ${{OPENEDX_API_BASE_URL}}
     uris:
       - "/*"
   - id: 2
@@ -44,11 +49,15 @@ routes:
         ssl_verify: false
         session:
           secret: ${{APISIX_SESSION_SECRET_KEY}}
-        logout_path: "/logout"
+        logout_path: "/logout/oidc"
         post_logout_redirect_uri: ${{APP_LOGOUT_URL}}
         unauth_action: "auth"
       redirect:
         uri: "/dashboard"
+      response-rewrite:
+        headers:
+          set:
+            Content-Security-Policy: frame-ancestors 'self' ${{OPENEDX_API_BASE_URL}}
     uris:
       - "/login*"
   - id: 3
@@ -56,7 +65,7 @@ routes:
     desc: "Strip trailing slash from logout redirect."
     priority: 10
     upstream_id: 1
-    uri: "/logout/*"
+    uri: "/logout/"
     plugins:
       redirect:
         uri: "/logout"

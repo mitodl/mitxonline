@@ -19,7 +19,6 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from mitol.apigateway.views import ApiGatewayLogoutView
 from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
@@ -47,7 +46,6 @@ urlpatterns = [
         name="swagger",
     ),
     path("", include("authentication.urls")),
-    path("", include("authentication.new_urls")),
     path("", include("openedx.urls")),
     path("", include("mail.urls")),
     path("", include("users.urls")),
@@ -100,7 +98,6 @@ urlpatterns = [
     path("", include("cms.urls")),
     # Example view
     path("", index, name="main-index"),
-    path("logout/", ApiGatewayLogoutView.as_view(), name="logout"),
 ] + (
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

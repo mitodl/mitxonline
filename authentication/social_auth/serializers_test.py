@@ -5,7 +5,10 @@ from rest_framework.exceptions import ValidationError
 from social_core.backends.email import EmailAuth
 from social_core.exceptions import AuthException, InvalidEmail
 
-from authentication.serializers import LoginEmailSerializer, RegisterEmailSerializer
+from authentication.social_auth.serializers import (
+    LoginEmailSerializer,
+    RegisterEmailSerializer,
+)
 from authentication.utils import SocialAuthState
 from users.factories import UserFactory, UserSocialAuthFactory
 
@@ -28,7 +31,7 @@ pytestmark = [pytest.mark.django_db]
 def test_social_auth_serializer_error(mocker, side_effect, result):
     """Tests that an AuthException exception is converted correctly"""
     mocked_authenticate = mocker.patch(
-        "authentication.serializers.SocialAuthSerializer._authenticate"
+        "authentication.social_auth.serializers.SocialAuthSerializer._authenticate"
     )
     mocked_authenticate.side_effect = side_effect
 
@@ -87,7 +90,7 @@ def test_login_email_validation(mocker, is_active, force_caps):
     """Tests class-level validation of LoginEmailSerializer"""
 
     mocked_authenticate = mocker.patch(  # noqa: F841
-        "authentication.serializers.SocialAuthSerializer._authenticate"
+        "authentication.social_auth.serializers.SocialAuthSerializer._authenticate"
     )
 
     user = UserFactory.create(is_active=is_active)
@@ -139,7 +142,7 @@ def test_login_email_validation_email_changed(mocker):
     # No social auth record exists for the user after they have updated their email address
 
     mocked_authenticate = mocker.patch(  # noqa: F841
-        "authentication.serializers.SocialAuthSerializer._authenticate"
+        "authentication.social_auth.serializers.SocialAuthSerializer._authenticate"
     )
 
     user = UserFactory.create()
@@ -166,7 +169,7 @@ def test_login_email_validation_email_different_case(mocker):
     """Tests class-level validation of LoginEmailSerializer to handle different case of email entry."""
 
     mocked_authenticate = mocker.patch(  # noqa: F841
-        "authentication.serializers.SocialAuthSerializer._authenticate"
+        "authentication.social_auth.serializers.SocialAuthSerializer._authenticate"
     )
 
     user = UserFactory.create()

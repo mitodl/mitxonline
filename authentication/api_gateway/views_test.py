@@ -3,7 +3,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 from rest_framework import status
 
-from authentication.new_views import CustomLoginView
+from authentication.api_gateway.views import GatewayLoginView
 from users.api import User
 from users.factories import UserFactory
 from users.models import MALE, UserProfile
@@ -75,22 +75,20 @@ def test_post_user_extra_detail(mocker, client, user):
 
 @pytest.mark.django_db
 def test_custom_login_view_authenticated_user_with_onboarding(mocker):
-    """Test CustomLoginView for an authenticated user with incomplete onboarding"""
+    """Test GatewayLoginView for an authenticated user with incomplete onboarding"""
     factory = RequestFactory()
     request = factory.get(reverse("login"), {"next": "/dashboard"})
     user = UserFactory()
     request.user = user
-    mocker.patch("authentication.new_views.get_redirect_url", return_value="/dashboard")
-    mocker.patch("authentication.new_views.urlencode", return_value="next=/dashboard")
     mocker.patch(
-        "authentication.new_views.settings.MITXONLINE_NEW_USER_LOGIN_URL",
+        "authentication.social_auth.views.settings.MITXONLINE_NEW_USER_LOGIN_URL",
         "/create-profile",
     )
 
-    response = CustomLoginView().get(request)
+    response = GatewayLoginView().get(request)
 
     assert response.status_code == 302
-    assert response.url == "/create-profile?next=/dashboard"
+    assert response.url == "/create-profile?next=%2Fdashboard"
 
 
 @pytest.mark.django_db
@@ -100,9 +98,8 @@ def test_custom_login_view_authenticated_user_with_completed_onboarding(mocker):
     request = factory.get(reverse("login"), {"next": "/dashboard"})
     user = UserFactory(user_profile__completed_onboarding=True)
     request.user = user
-    mocker.patch("authentication.new_views.get_redirect_url", return_value="/dashboard")
 
-    response = CustomLoginView().get(request)
+    response = GatewayLoginView().get(request)
 
     assert response.status_code == 302
     assert response.url == "/dashboard"
