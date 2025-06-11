@@ -85,6 +85,7 @@ uwsgitop = "^0.12"
 wagtail = "6.3"
 wagtail-metadata = "^5.0.0"
 djangorestframework-api-key = "^3.1.0"
+setuptools = "<81"
 
 
 [tool.poetry.group.dev.dependencies]
