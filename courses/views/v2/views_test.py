@@ -266,12 +266,14 @@ def test_get_course(
 
 
 @pytest.mark.django_db
-def test_filter_with_org_id_returns_contracted_course():
+def test_filter_with_org_id_returns_contracted_course(
+    mocker, contract_ready_course, mock_course_run_clone
+):
     org = OrganizationPageFactory(name="Test Org")
     contract = ContractPageFactory(organization=org, active=True)
     user = UserFactory()
     user.b2b_contracts.add(contract)
-    course = CourseFactory(title="Contracted Course")
+    (course, _) = contract_ready_course
     create_contract_run(contract, course)
 
     client = APIClient()
@@ -289,11 +291,13 @@ def test_filter_with_org_id_returns_contracted_course():
 
 
 @pytest.mark.django_db
-def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses():
+def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses(
+    contract_ready_course, mock_course_run_clone
+):
     org = OrganizationPageFactory(name="Test Org")
     user = UserFactory()
     contract = ContractPageFactory(organization=org, active=True)
-    course = CourseFactory(title="Contracted Course")
+    (course, _) = contract_ready_course
     create_contract_run(contract, course)
 
     client = APIClient()
@@ -329,14 +333,16 @@ def test_filter_without_org_id_authenticated_user(user_drf_client):
 
 
 @pytest.mark.django_db
-def test_filter_by_org_id_with_contracted_user():
+def test_filter_by_org_id_with_contracted_user(
+    contract_ready_course, mock_course_run_clone
+):
     org = OrganizationPageFactory(name="Test Org")
     contract = ContractPageFactory(organization=org, active=True)
     user = UserFactory()
     user.b2b_contracts.add(contract)
 
     program_with_contract = ProgramFactory.create()
-    course = CourseFactory()
+    (course, _) = contract_ready_course
     create_contract_run(contract, course)
 
     program_with_contract.add_requirement(course)
@@ -355,12 +361,14 @@ def test_filter_by_org_id_with_contracted_user():
 
 
 @pytest.mark.django_db
-def test_filter_by_org_id_without_contract_access():
+def test_filter_by_org_id_without_contract_access(
+    contract_ready_course, mock_course_run_clone
+):
     org = OrganizationPageFactory()
     user = UserFactory()
 
     program_with_contract = ProgramFactory()
-    course = CourseFactory()
+    (course, _) = contract_ready_course
     contract = ContractPageFactory(active=True, organization=org)
     create_contract_run(contract, course)
 
@@ -385,11 +393,13 @@ def test_filter_by_org_id_without_contract_access():
 
 
 @pytest.mark.django_db
-def test_filter_by_org_id_unauthenticated_user():
+def test_filter_by_org_id_unauthenticated_user(
+    contract_ready_course, mock_course_run_clone
+):
     org = OrganizationPageFactory()
 
     program_with_contract = ProgramFactory()
-    course = CourseFactory()
+    (course, _) = contract_ready_course
     contract = ContractPageFactory(active=True, organization=org)
     create_contract_run(contract, course)
 

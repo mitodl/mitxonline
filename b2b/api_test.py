@@ -51,26 +51,6 @@ pytestmark = [
 ]
 
 
-@pytest.fixture
-def contract_ready_course():
-    """
-    Creates a contract-ready course - i.e. a course with a SOURCE run
-
-    Returns: tuple, course and course run
-    """
-
-    course = CourseFactory.create()
-    source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
-    source_course_run_key = (
-        f"course-v1:{source_course_key.org}+{source_course_key.course}+SOURCE"
-    )
-    source_course_run = CourseRunFactory.create(
-        course=course, courseware_id=source_course_run_key, run_tag="SOURCE"
-    )
-
-    return (course, source_course_run)
-
-
 @pytest.mark.parametrize(
     (
         "has_start",
