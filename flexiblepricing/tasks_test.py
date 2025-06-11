@@ -345,6 +345,9 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
     @patch("flexiblepricing.tasks._process_course_discounts")
     @patch("flexiblepricing.tasks._validate_courseware_object")
     @patch("flexiblepricing.tasks.logging.getLogger")
+    @override_settings(
+        UNIFIED_ECOMMERCE_URL="http://test.com", UNIFIED_ECOMMERCE_API_KEY="test-key"
+    )
     def test_process_flexible_price_discount_course(
         self, mock_get_logger, mock_validate, mock_process
     ):
@@ -366,6 +369,9 @@ class TestFlexiblePriceDiscountProcessing(TestCase):
     @patch("flexiblepricing.tasks._process_course_discounts")
     @patch("flexiblepricing.tasks._validate_courseware_object")
     @patch("flexiblepricing.tasks.logging.getLogger")
+    @override_settings(
+        UNIFIED_ECOMMERCE_URL="http://test.com", UNIFIED_ECOMMERCE_API_KEY="test-key"
+    )
     def test_process_flexible_price_discount_program(
         self, mock_get_logger, mock_validate, mock_process
     ):
