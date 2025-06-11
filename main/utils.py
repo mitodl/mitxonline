@@ -26,17 +26,6 @@ if TYPE_CHECKING:
     from rest_framework.response import Response
 
 
-class FeatureFlag(Flag):
-    """
-    FeatureFlag enum
-
-    Members should have values of increasing powers of 2 (1, 2, 4, 8, ...)
-
-    """
-
-    EXAMPLE_FEATURE = auto()
-
-
 def get_js_settings(request: HttpRequest):  # noqa: ARG001
     """
     Get the set of JS settings
