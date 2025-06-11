@@ -113,9 +113,7 @@ def create_contract_run(
         contract_id=contract.id,
     )
     source_id = CourseKey.from_string(clone_course_run.courseware_id)
-    new_readable_id = (
-        f"course-v1:{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
-    )
+    new_readable_id = f"course-v1:UAI_{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
 
     # Check first for an existing run with the same readable ID.
     if CourseRun.objects.filter(course=course, courseware_id=new_readable_id).exists():

@@ -444,7 +444,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
             course=course, courseware_id=source_course_run_key, run_tag="SOURCE"
         )
 
-    target_course_id = f"course-v1:{contract.organization.org_key}+{source_course_key.course}+{this_year}_C{contract.id}"
+    target_course_id = f"course-v1:UAI_{contract.organization.org_key}+{source_course_key.course}+{this_year}_C{contract.id}"
 
     if not source_run_exists:
         with pytest.raises(SourceCourseIncompleteError) as exc:
