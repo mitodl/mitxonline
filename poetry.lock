@@ -1028,14 +1028,14 @@ files = [
 
 [[package]]
 name = "django"
-version = "4.2.21"
+version = "4.2.22"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
 optional = false
 python-versions = ">=3.8"
 groups = ["main", "dev"]
 files = [
-    {file = "django-4.2.21-py3-none-any.whl", hash = "sha256:1d658c7bf5d31c7d0cac1cab58bc1f822df89255080fec81909256c30e6180b3"},
-    {file = "django-4.2.21.tar.gz", hash = "sha256:b54ac28d6aa964fc7c2f7335138a54d78980232011e0cd2231d04eed393dcb0d"},
+    {file = "django-4.2.22-py3-none-any.whl", hash = "sha256:0a32773b5b7f4e774a155ee253ab24a841fed7e9e9061db08bf2ce9711da404d"},
+    {file = "django-4.2.22.tar.gz", hash = "sha256:e726764b094407c313adba5e2e866ab88f00436cad85c540a5bf76dc0a912c9e"},
 ]
 
 [package.dependencies]
@@ -2727,41 +2727,41 @@ setuptools = "*"
 
 [[package]]
 name = "mitol-django-google-sheets-deferrals"
-version = "2023.12.19"
+version = "2025.3.17"
 description = "Library to handle Deferral requests using Google Sheets integrations in Django"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol-django-google-sheets-deferrals-2023.12.19.tar.gz", hash = "sha256:26225aca252f3967b7429fee74089e4658ab539f64b168d07b221b9e74fdc3e7"},
-    {file = "mitol_django_google_sheets_deferrals-2023.12.19-py3-none-any.whl", hash = "sha256:c41a7f607f555eecf145f9187a19d0c93340d990d2cb8d13e0718270737c4828"},
+    {file = "mitol_django_google_sheets_deferrals-2025.3.17-py3-none-any.whl", hash = "sha256:5256a43ae606d72c1c5a90c230af3e55b5fb4c7c6184de9a68f597d6ea7c2f28"},
+    {file = "mitol_django_google_sheets_deferrals-2025.3.17.tar.gz", hash = "sha256:cffd148437c4290b9115965d195a5b9eded48b8d424d14b51a7cfcfbe0cedc02"},
 ]
 
 [package.dependencies]
 django = ">=3.0"
+django-stubs = ">=1.13.1"
 mitol-django-common = "*"
 mitol-django-google-sheets = "*"
-pluggy = "0.13.1"
-setuptools = "*"
+pluggy = ">0.13.1"
 
 [[package]]
 name = "mitol-django-google-sheets-refunds"
-version = "2023.12.19"
+version = "2025.3.17"
 description = "Library to handle Refund requests using Google Sheets integrations in Django"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol-django-google-sheets-refunds-2023.12.19.tar.gz", hash = "sha256:c62fd7a6076130cfb1b436345133e9a909b678b1706f048512097280a911d90a"},
-    {file = "mitol_django_google_sheets_refunds-2023.12.19-py3-none-any.whl", hash = "sha256:97e04903a0f2dbb722905c3ba5a9efb92197d7c041783b471fad11ee2a6ebfe0"},
+    {file = "mitol_django_google_sheets_refunds-2025.3.17-py3-none-any.whl", hash = "sha256:f356f68113a69321816cff95ce17d1f94d3d2be0a671c479197fab5f57cf0c5b"},
+    {file = "mitol_django_google_sheets_refunds-2025.3.17.tar.gz", hash = "sha256:f95de5574a49c70a9b0d69c3cf4d0b8597e0fa50990441d50ea03e986f9e8e49"},
 ]
 
 [package.dependencies]
 django = ">=3.0"
+django-stubs = ">=1.13.1"
 mitol-django-common = "*"
 mitol-django-google-sheets = "*"
-pluggy = "0.13.1"
-setuptools = "*"
+pluggy = ">0.13.1"
 
 [[package]]
 name = "mitol-django-hubspot-api"
@@ -3580,18 +3580,19 @@ type = ["mypy (>=1.14.1)"]
 
 [[package]]
 name = "pluggy"
-version = "0.13.1"
+version = "1.6.0"
 description = "plugin and hook calling mechanisms for python"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "pluggy-0.13.1-py2.py3-none-any.whl", hash = "sha256:966c145cd83c96502c3c3868f50408687b38434af77734af1e9ca461a4081d2d"},
-    {file = "pluggy-0.13.1.tar.gz", hash = "sha256:15b2acde666561e1298d71b523007ed7364de07029219b604cf808bfa1c765b0"},
+    {file = "pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746"},
+    {file = "pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3"},
 ]
 
 [package.extras]
 dev = ["pre-commit", "tox"]
+testing = ["coverage", "pytest", "pytest-benchmark"]
 
 [[package]]
 name = "posthog"
@@ -5520,4 +5521,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "3b045dd4b0494183536b573a746d00b483325d040389b60d1d1a18428a3b8db3"
+content-hash = "776c2a317187665de8ca7372a38c299a4745e078ba5c4680ec2eb1e69ea6b823"
