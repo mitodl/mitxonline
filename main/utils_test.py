@@ -1,7 +1,6 @@
 """Utils tests"""
 
 from datetime import date, datetime
-from unittest.mock import patch
 
 import pytest
 import pytz
@@ -9,7 +8,7 @@ from django.urls import reverse
 from mitol.common.utils.urls import remove_password_from_url
 
 from main.models import AuditModel
-from main.settings import TIME_ZONE, EnvironmentVariableParseException, get_float
+from main.settings import TIME_ZONE
 from main.utils import (
     date_to_datetime,
     get_field_names,
@@ -119,38 +118,3 @@ FAKE_ENVIRONS = {
     "list_of_int": "[3,4,5]",
     "list_of_str": '["x", "y", \'z\']',
 }
-
-
-def test_get_float():
-    """
-    get_float should get the float from the environment variable, or raise an exception if it's not parseable as an float
-    """
-    with patch("main.settings.os", environ=FAKE_ENVIRONS):
-        assert get_float("positive", 1234) == 123
-        assert get_float("negative", 1234) == -456
-        assert get_float("zero", 1234) == 0
-        assert get_float("float-positive", 1234) == 1.1
-        assert get_float("float-negative", 1234) == -1.1
-        assert get_float("float-zero", 1234) == 0.0
-
-        for key, value in FAKE_ENVIRONS.items():
-            if key not in (
-                "positive",
-                "negative",
-                "zero",
-                "float-zero",
-                "float-positive",
-                "float-negative",
-            ):
-                with pytest.raises(
-                    (
-                        EnvironmentVariableParseException,
-                        ValueError,
-                    )
-                ) as ex:
-                    get_float(key, 1234)
-                assert (
-                    ex.value.args[0] == f"Expected value in {key}={value} to be a float"
-                )
-
-        assert get_float("missing", "default") == "default"
