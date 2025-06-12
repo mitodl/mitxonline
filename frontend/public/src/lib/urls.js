@@ -17,6 +17,7 @@ export const routes = {
   catalogTab:             "/catalog/:tab",
   catalog:                "/catalog/",
   apiGatewayLogin:        "/login/",
+  apiGatewayLogout:       "/logout/oidc",
 
   // authentication related routes
   login: include("/signin/", {
