@@ -114,6 +114,11 @@ def notify_financial_assistance_request_denied_email(
 def _process_flexible_price_discount(instance):
     """Handle the core discount creation logic."""
     logger = logging.getLogger()
+
+    if not settings.UNIFIED_ECOMMERCE_API_KEY:
+        logger.warning("_process_flexible_price_discount: skipping, no API key set")
+        return
+
     courseware_object = _validate_courseware_object(instance)
     if not courseware_object:
         return
@@ -249,6 +254,7 @@ def process_flexible_price_discount_task(instance_id):
     Process the flexible price discount for the given instance.
     """
     log = logging.getLogger()
+
     try:
         instance = FlexiblePrice.objects.get(id=instance_id)
     except ObjectDoesNotExist:

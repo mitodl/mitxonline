@@ -31,44 +31,16 @@ from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
+from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.119.7"
+VERSION = "0.120.2"
 
 log = logging.getLogger()
 
 # set log level on cssutils - should be fairly high or it will log messages for Outlook-specific styling
 cssutils.log.setLevel(logging.CRITICAL)
-
-
-class EnvironmentVariableParseException(ImproperlyConfigured):
-    """Environment variable was not parsed correctly"""
-
-
-def get_float(name, default):
-    """
-    Get an environment variable as an int.
-
-    Args:
-        name (str): An environment variable name
-        default (float): The default value to use if the environment variable doesn't exist.
-
-    Returns:
-        float:
-            The environment variable value parsed as an float
-    """
-    value = os.environ.get(name)
-    if value is None:
-        return default
-
-    try:
-        parsed_value = float(value)
-    except ValueError as ex:
-        msg = f"Expected value in {name}={value} to be a float"
-        raise EnvironmentVariableParseException(msg) from ex
-
-    return parsed_value
 
 
 ENVIRONMENT = get_string(
@@ -1376,7 +1348,7 @@ HUBSPOT_PORTAL_ID = get_string(
 
 UNIFIED_ECOMMERCE_URL = get_string(
     name="UNIFIED_ECOMMERCE_URL",
-    default="http://ue.odl.local:9080/",
+    default="",
     description="The base URL for Unified Ecommerce.",
 )
 
