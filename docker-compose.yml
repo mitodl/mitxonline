@@ -215,6 +215,7 @@ services:
     profiles:
       - apisix
     environment:
+      - OPENEDX_API_BASE_URL={OPENEDX_API_BASE_URL:-http://local.openedx.io:8000}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-ol-local}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apisix}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
