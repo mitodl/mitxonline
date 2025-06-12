@@ -1,6 +1,6 @@
 """URL configurations for authentication"""
 
-from django.urls import path
+from django.urls import path, re_path
 from django.urls.conf import include
 
 from authentication.views import (
@@ -11,7 +11,7 @@ from authentication.views import (
 urlpatterns = [
     path("", include("authentication.social_auth.urls")),
     path("", include("authentication.api_gateway.urls")),
-    path("logout", LogoutView.as_view(), name="logout"),
+    re_path(r"^logout\/?$", LogoutView.as_view(), name="logout"),
     path(
         ".well-known/openid-configuration",
         well_known_openid_configuration,
