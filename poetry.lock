@@ -1820,41 +1820,78 @@ files = [
 python-dateutil = ">=2.7"
 
 [[package]]
-name = "google-api-python-client"
-version = "1.7.11"
-description = "Google API Client Library for Python"
+name = "google-api-core"
+version = "2.25.0"
+description = "Google API client core library"
 optional = false
-python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
+python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "google-api-python-client-1.7.11.tar.gz", hash = "sha256:a8a88174f66d92aed7ebbd73744c2c319b4b1ce828e565f9ec721352d2e2fb8c"},
-    {file = "google_api_python_client-1.7.11-py2-none-any.whl", hash = "sha256:3121d55d106ef1a2756e8074239512055bd99eb44da417b3dd680f9a1385adec"},
+    {file = "google_api_core-2.25.0-py3-none-any.whl", hash = "sha256:1db79d1281dcf9f3d10023283299ba38f3dc9f639ec41085968fd23e5bcf512e"},
+    {file = "google_api_core-2.25.0.tar.gz", hash = "sha256:9b548e688702f82a34ed8409fb8a6961166f0b7795032f0be8f48308dff4333a"},
 ]
 
 [package.dependencies]
-google-auth = ">=1.4.1"
-google-auth-httplib2 = ">=0.0.3"
-httplib2 = ">=0.9.2,<1dev"
-six = ">=1.6.1,<2dev"
-uritemplate = ">=3.0.0,<4dev"
+google-auth = ">=2.14.1,<3.0.0"
+googleapis-common-protos = ">=1.56.2,<2.0.0"
+proto-plus = [
+    {version = ">=1.22.3,<2.0.0"},
+    {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
+]
+protobuf = ">=3.19.5,<3.20.0 || >3.20.0,<3.20.1 || >3.20.1,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
+requests = ">=2.18.0,<3.0.0"
+
+[package.extras]
+async-rest = ["google-auth[aiohttp] (>=2.35.0,<3.0.0)"]
+grpc = ["grpcio (>=1.33.2,<2.0.0)", "grpcio (>=1.49.1,<2.0.0) ; python_version >= \"3.11\"", "grpcio-status (>=1.33.2,<2.0.0)", "grpcio-status (>=1.49.1,<2.0.0) ; python_version >= \"3.11\""]
+grpcgcp = ["grpcio-gcp (>=0.2.2,<1.0.0)"]
+grpcio-gcp = ["grpcio-gcp (>=0.2.2,<1.0.0)"]
+
+[[package]]
+name = "google-api-python-client"
+version = "2.172.0"
+description = "Google API Client Library for Python"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "google_api_python_client-2.172.0-py3-none-any.whl", hash = "sha256:9f1b9a268d5dc1228207d246c673d3a09ee211b41a11521d38d9212aeaa43af7"},
+    {file = "google_api_python_client-2.172.0.tar.gz", hash = "sha256:dcb3b7e067154b2aa41f1776cf86584a5739c0ac74e6ff46fc665790dca0e6a6"},
+]
+
+[package.dependencies]
+google-api-core = ">=1.31.5,<2.0.dev0 || >2.3.0,<3.0.0"
+google-auth = ">=1.32.0,<2.24.0 || >2.24.0,<2.25.0 || >2.25.0,<3.0.0"
+google-auth-httplib2 = ">=0.2.0,<1.0.0"
+httplib2 = ">=0.19.0,<1.0.0"
+uritemplate = ">=3.0.1,<5"
 
 [[package]]
 name = "google-auth"
-version = "1.6.3"
+version = "2.40.3"
 description = "Google Authentication Library"
 optional = false
-python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
+python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "google-auth-1.6.3.tar.gz", hash = "sha256:0f7c6a64927d34c1a474da92cfc59e552a5d3b940d3266606c6a28b72888b9e4"},
-    {file = "google_auth-1.6.3-py2.py3-none-any.whl", hash = "sha256:20705f6803fd2c4d1cc2dcb0df09d4dfcb9a7d51fd59e94a3a28231fd93119ed"},
+    {file = "google_auth-2.40.3-py2.py3-none-any.whl", hash = "sha256:1370d4593e86213563547f97a92752fc658456fe4514c809544f330fed45a7ca"},
+    {file = "google_auth-2.40.3.tar.gz", hash = "sha256:500c3a29adedeb36ea9cf24b8d10858e152f2412e3ca37829b3fa18e33d63b77"},
 ]
 
 [package.dependencies]
-cachetools = ">=2.0.0"
+cachetools = ">=2.0.0,<6.0"
 pyasn1-modules = ">=0.2.1"
-rsa = ">=3.1.4"
-six = ">=1.9.0"
+rsa = ">=3.1.4,<5"
+
+[package.extras]
+aiohttp = ["aiohttp (>=3.6.2,<4.0.0)", "requests (>=2.20.0,<3.0.0)"]
+enterprise-cert = ["cryptography", "pyopenssl"]
+pyjwt = ["cryptography (<39.0.0) ; python_version < \"3.8\"", "cryptography (>=38.0.3)", "pyjwt (>=2.0)"]
+pyopenssl = ["cryptography (<39.0.0) ; python_version < \"3.8\"", "cryptography (>=38.0.3)", "pyopenssl (>=20.0.0)"]
+reauth = ["pyu2f (>=0.1.5)"]
+requests = ["requests (>=2.20.0,<3.0.0)"]
+testing = ["aiohttp (<3.10.0)", "aiohttp (>=3.6.2,<4.0.0)", "aioresponses", "cryptography (<39.0.0) ; python_version < \"3.8\"", "cryptography (>=38.0.3)", "flask", "freezegun", "grpcio", "mock", "oauth2client", "packaging", "pyjwt (>=2.0)", "pyopenssl (<24.3.0)", "pyopenssl (>=20.0.0)", "pytest", "pytest-asyncio", "pytest-cov", "pytest-localserver", "pyu2f (>=0.1.5)", "requests (>=2.20.0,<3.0.0)", "responses", "urllib3"]
+urllib3 = ["packaging", "urllib3"]
 
 [[package]]
 name = "google-auth-httplib2"
@@ -2704,64 +2741,64 @@ celery = ["celery (>=5.5.0)"]
 
 [[package]]
 name = "mitol-django-google-sheets"
-version = "2024.7.3"
+version = "2025.3.17"
 description = "Core library to handle Google Sheets integrations in Django"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol-django-google-sheets-2024.7.3.tar.gz", hash = "sha256:7f68d5f7cdad37972803536786145a253525ab1fc72596b46ed173252262245e"},
-    {file = "mitol_django_google_sheets-2024.7.3-py3-none-any.whl", hash = "sha256:58f7cac6f7b9ecf4110842084cbb2ede37cd4e30b6d73d9121a09dafe3c080c2"},
+    {file = "mitol_django_google_sheets-2025.3.17-py3-none-any.whl", hash = "sha256:b6c49635113b80257694f6cd665c0889b65fe85d829347cd83f8b22fb080b0bc"},
+    {file = "mitol_django_google_sheets-2025.3.17.tar.gz", hash = "sha256:653871a12adcc8498d96ab88f66dddfa6ff9c2b23d202d8c7162574ba5258bcd"},
 ]
 
 [package.dependencies]
 django = ">=3.0"
+django-stubs = ">=1.13.1"
 factory-boy = ">=3.2,<4.0"
-google-api-python-client = "1.7.11"
-google-auth = "1.6.3"
+google-api-python-client = ">=2.0"
+google-auth = ">=2.0"
 google-auth-oauthlib = ">=0.5.2"
 mitol-django-common = "*"
 pygsheets = "2.0.2"
 pytz = ">=2020.4"
-setuptools = "*"
 
 [[package]]
 name = "mitol-django-google-sheets-deferrals"
-version = "2023.12.19"
+version = "2025.3.17"
 description = "Library to handle Deferral requests using Google Sheets integrations in Django"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol-django-google-sheets-deferrals-2023.12.19.tar.gz", hash = "sha256:26225aca252f3967b7429fee74089e4658ab539f64b168d07b221b9e74fdc3e7"},
-    {file = "mitol_django_google_sheets_deferrals-2023.12.19-py3-none-any.whl", hash = "sha256:c41a7f607f555eecf145f9187a19d0c93340d990d2cb8d13e0718270737c4828"},
+    {file = "mitol_django_google_sheets_deferrals-2025.3.17-py3-none-any.whl", hash = "sha256:5256a43ae606d72c1c5a90c230af3e55b5fb4c7c6184de9a68f597d6ea7c2f28"},
+    {file = "mitol_django_google_sheets_deferrals-2025.3.17.tar.gz", hash = "sha256:cffd148437c4290b9115965d195a5b9eded48b8d424d14b51a7cfcfbe0cedc02"},
 ]
 
 [package.dependencies]
 django = ">=3.0"
+django-stubs = ">=1.13.1"
 mitol-django-common = "*"
 mitol-django-google-sheets = "*"
-pluggy = "0.13.1"
-setuptools = "*"
+pluggy = ">0.13.1"
 
 [[package]]
 name = "mitol-django-google-sheets-refunds"
-version = "2023.12.19"
+version = "2025.3.17"
 description = "Library to handle Refund requests using Google Sheets integrations in Django"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol-django-google-sheets-refunds-2023.12.19.tar.gz", hash = "sha256:c62fd7a6076130cfb1b436345133e9a909b678b1706f048512097280a911d90a"},
-    {file = "mitol_django_google_sheets_refunds-2023.12.19-py3-none-any.whl", hash = "sha256:97e04903a0f2dbb722905c3ba5a9efb92197d7c041783b471fad11ee2a6ebfe0"},
+    {file = "mitol_django_google_sheets_refunds-2025.3.17-py3-none-any.whl", hash = "sha256:f356f68113a69321816cff95ce17d1f94d3d2be0a671c479197fab5f57cf0c5b"},
+    {file = "mitol_django_google_sheets_refunds-2025.3.17.tar.gz", hash = "sha256:f95de5574a49c70a9b0d69c3cf4d0b8597e0fa50990441d50ea03e986f9e8e49"},
 ]
 
 [package.dependencies]
 django = ">=3.0"
+django-stubs = ">=1.13.1"
 mitol-django-common = "*"
 mitol-django-google-sheets = "*"
-pluggy = "0.13.1"
-setuptools = "*"
+pluggy = ">0.13.1"
 
 [[package]]
 name = "mitol-django-hubspot-api"
@@ -3580,18 +3617,19 @@ type = ["mypy (>=1.14.1)"]
 
 [[package]]
 name = "pluggy"
-version = "0.13.1"
+version = "1.6.0"
 description = "plugin and hook calling mechanisms for python"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "pluggy-0.13.1-py2.py3-none-any.whl", hash = "sha256:966c145cd83c96502c3c3868f50408687b38434af77734af1e9ca461a4081d2d"},
-    {file = "pluggy-0.13.1.tar.gz", hash = "sha256:15b2acde666561e1298d71b523007ed7364de07029219b604cf808bfa1c765b0"},
+    {file = "pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746"},
+    {file = "pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3"},
 ]
 
 [package.extras]
 dev = ["pre-commit", "tox"]
+testing = ["coverage", "pytest", "pytest-benchmark"]
 
 [[package]]
 name = "posthog"
@@ -3675,6 +3713,24 @@ files = [
 
 [package.dependencies]
 wcwidth = "*"
+
+[[package]]
+name = "proto-plus"
+version = "1.26.1"
+description = "Beautiful, Pythonic protocol buffers"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "proto_plus-1.26.1-py3-none-any.whl", hash = "sha256:13285478c2dcf2abb829db158e1047e2f1e8d63a077d94263c2b88b043c75a66"},
+    {file = "proto_plus-1.26.1.tar.gz", hash = "sha256:21a515a4c4c0088a773899e23c7bbade3d18f9c66c73edd4c7ee3816bc96a012"},
+]
+
+[package.dependencies]
+protobuf = ">=3.19.0,<7.0.0"
+
+[package.extras]
+testing = ["google-api-core (>=1.31.5)"]
 
 [[package]]
 name = "protobuf"
@@ -5520,4 +5576,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "7c2b528f59723989319978ddaa7d21a09cb7994e67697e88db47712d0af6269c"
+content-hash = "990d3b5b99c81a67088166059b3584f74c4f200c0a0485f025cbb635fbf9d199"
