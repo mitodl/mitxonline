@@ -60,14 +60,5 @@ routes:
             Content-Security-Policy: frame-ancestors 'self' ${{OPENEDX_API_BASE_URL}}
     uris:
       - "/login*"
-  - id: 3
-    name: "logout-redirect"
-    desc: "Strip trailing slash from logout redirect."
-    priority: 10
-    upstream_id: 1
-    uri: "/logout/"
-    plugins:
-      redirect:
-        uri: "/logout"
 
 #END
