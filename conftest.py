@@ -5,6 +5,7 @@ from types import SimpleNamespace  # noqa: F401
 
 import pytest
 
+from fixtures.b2b import *  # noqa: F403
 from fixtures.common import *  # noqa: F403
 from main import features
 

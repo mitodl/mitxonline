@@ -4,6 +4,7 @@ Tests for course views
 
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
 import operator as op
+from urllib.parse import quote
 
 import pytest
 import reversion
@@ -343,7 +344,7 @@ def test_get_course_runs_relevant(  # noqa: PLR0913
 
     with django_assert_max_num_queries(20) as context:
         resp = user_drf_client.get(
-            f"{reverse('v1:course_runs_api-list')}?relevant_to={course_run.course.readable_id}"
+            f"{reverse('v1:course_runs_api-list')}?relevant_to={quote(course_run.course.readable_id)}"
         )
     duplicate_queries_check(context)
     patched_run_qset.assert_called_once_with(course_run.course)

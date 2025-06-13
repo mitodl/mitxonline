@@ -1148,6 +1148,18 @@ OPENEDX_API_BASE_URL = get_string(
     description="The base URL for the Open edX API",
     required=True,
 )
+OPENEDX_STUDIO_API_BASE_URL = get_string(
+    name="OPENEDX_STUDIO_API_BASE_URL",
+    default="http://studio.edx.odl.local:18001",
+    description="The base URL for the Open edX Studio CMS API",
+    required=True,
+)
+OPENEDX_COURSE_BASE_URL = get_string(
+    name="OPENEDX_COURSE_BASE_URL",
+    default="http://edx.odl.local:18000/learn/course/",
+    description="The base URL to use to construct URLs to a course",
+)
+
 OPENEDX_BASE_REDIRECT_URL = get_string(
     name="OPENEDX_BASE_REDIRECT_URL",
     default=OPENEDX_API_BASE_URL,
@@ -1196,6 +1208,17 @@ OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID = get_string(
 OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET = get_string(
     name="OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET",
     default=None,
+    description="OAuth2 client secret for retirement service worker",
+)
+
+OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID = get_string(
+    name="OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID",
+    default=OPENEDX_API_CLIENT_ID,
+    description="OAuth2 client id for retirement service worker",
+)
+OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = get_string(
+    name="OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET",
+    default=OPENEDX_API_CLIENT_SECRET,
     description="OAuth2 client secret for retirement service worker",
 )
 

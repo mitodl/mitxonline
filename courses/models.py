@@ -688,7 +688,6 @@ class CourseRun(TimestampedModel):
     course = models.ForeignKey(
         Course, on_delete=models.CASCADE, related_name="courseruns", db_index=True
     )
-    # product = GenericRelation(Product, related_query_name="course_run")  # noqa: ERA001
     title = models.CharField(
         max_length=255,
         help_text=f"The title of the course. {SYNCED_COURSE_RUN_FIELD_MSG}",
@@ -757,7 +756,7 @@ class CourseRun(TimestampedModel):
     )
 
     class Meta:
-        unique_together = ("course", "run_tag")
+        unique_together = ("course", "courseware_id", "run_tag")
 
     @property
     def is_past(self):
@@ -886,7 +885,7 @@ class CourseRun(TimestampedModel):
         update_fields=None,
     ):
         """
-        Overriding the save method to inject clean into it
+        Overriding the save method to inject clean into it.
         """
         self.clean()
         super().save(

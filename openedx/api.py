@@ -1,7 +1,7 @@
 """Courseware API functions"""
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urljoin, urlparse
 
 import requests
@@ -11,6 +11,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.shortcuts import reverse
 from edx_api.client import EdxApi
+from edx_api.course_runs.exceptions import CourseRunAPIError
+from edx_api.course_runs.models import CourseRun, CourseRunList
 from mitol.common.utils import (
     find_object_with_matching_attr,
     get_error_response_summary,
@@ -505,6 +507,59 @@ def get_edx_api_service_client():
     return edx_client  # noqa: RET504
 
 
+def get_edx_api_jwt_client(
+    client_id: str = settings.OPENEDX_API_CLIENT_ID,
+    client_secret: str = settings.OPENEDX_API_CLIENT_SECRET,
+    *,
+    use_studio: bool = False,
+) -> EdxApi:
+    """
+    Gets a JWT for the specified client ID, then return an edX API client that
+    uses the JWT.
+
+    Some APIs require a JWT, including user retirement and course management.
+    If you need to use a specific client ID for the client, you can specify that.
+    Otherwise, it will use the default OAuth2 client ID and secret, which is
+    usually mitxonline-oauth-app usually.
+
+    The JWT APIs may _require_ that there's an edX user associated with the OAuth2
+    client. If your client doesn't have that, your API calls will likely fail.
+
+    If you need to hit the Studio API (ex. for course creation), make sure you
+    set settings.OPENEDX_STUDIO_API_BASE_URL and set the use_studio flag.
+
+    Args:
+    - client_id (str): the client ID to authenticate as
+    - client_secret (str): the client secret to use for authentication
+    Keyword Args:
+    - use_studio (bool): Use the Studio API after getting the JWT.
+    Returns:
+    - EdxApi, with the JWT token in it for the user specified.
+    """
+
+    data = {
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "token_type": "jwt",
+    }
+    resp = requests.post(edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH), data=data)  # noqa: S113
+    resp.raise_for_status()
+    access_token = resp.json()["access_token"]
+
+    edx_client = EdxApi(
+        {
+            "access_token": access_token,
+        },
+        settings.OPENEDX_API_BASE_URL
+        if not use_studio or not settings.OPENEDX_STUDIO_API_BASE_URL
+        else settings.OPENEDX_STUDIO_API_BASE_URL,
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    )
+
+    return edx_client  # noqa: RET504
+
+
 def get_edx_retirement_service_client():
     """
     Generates a JWT access token for the retirement service worker and returns the edX api client.
@@ -518,25 +573,35 @@ def get_edx_retirement_service_client():
             "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET is not set"  # noqa: EM101
         )
 
-    data = {
-        "grant_type": "client_credentials",
-        "client_id": settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID,
-        "client_secret": settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET,
-        "token_type": "jwt",
-    }
-    resp = requests.post(edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH), data=data)  # noqa: S113
-    resp.raise_for_status()
-    access_token = resp.json()["access_token"]
-
-    edx_client = EdxApi(
-        {
-            "access_token": access_token,
-        },
-        settings.OPENEDX_API_BASE_URL,
-        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    return get_edx_api_jwt_client(
+        settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID,
+        settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET,
     )
 
-    return edx_client  # noqa: RET504
+
+def get_edx_course_management_service_client():
+    """
+    Generate an edX API client for course management.
+
+    Set a specific client ID/secret for this by setting OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID
+    and OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET in settings. Otherwise, this
+    will default to using the OPENEDX_API_CLIENT_ID.
+    """
+
+    if not settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID:
+        raise ImproperlyConfigured(
+            "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID is not set"  # noqa: EM101
+        )
+    elif not settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET:
+        raise ImproperlyConfigured(
+            "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET is not set"  # noqa: EM101
+        )
+
+    return get_edx_api_jwt_client(
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
+        use_studio=True,
+    )
 
 
 def get_edx_api_course_detail_client():
@@ -931,3 +996,235 @@ def bulk_retire_edx_users(edx_usernames):
         {"usernames": edx_usernames}
     )
     return response  # noqa: RET504
+
+
+def get_edx_course(course_id: str, *, client: EdxApi | None = None) -> CourseRun:
+    """
+    Get information about a course from edX.
+
+    Args:
+    - course_id (str): the readable ID for the course run.
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - edx_api.course_runs.models.CourseRun: the course run details
+    """
+
+    edx_client = client if client else get_edx_course_management_service_client()
+
+    return edx_client.course_runs.get_course_run(course_id)
+
+
+def get_edx_course_list(
+    page_url: str | None = None, *, client: EdxApi | None = None
+) -> CourseRunList:
+    """
+    Get the paginated list of course runs from edX.
+
+    Args:
+    - page_url (str): The page to retreive. This is part of the CourseRunList object.
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - edx_api.course_runs.models.CourseRunList: paginated list of course runs
+    """
+
+    edx_client = client if client else get_edx_course_management_service_client()
+
+    return edx_client.course_runs.get_course_runs_list(page_url)
+
+
+def clone_edx_course(
+    existing_course_id: str, new_course_id: str, *, client: EdxApi | None = None
+) -> CourseRun | bool:
+    """
+    Clone an edX course run.
+
+    Args:
+    - existing_course_id: the readable ID of the course to use as the base
+    - new_course_id: the readable ID of the new course
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - bool or edx_api.course_runs.models.CourseRun: the new course run details, or
+      False if an error occurred
+    """
+
+    edx_client = client if client else get_edx_course_management_service_client()
+
+    resp = edx_client.course_runs.clone_course_run(existing_course_id, new_course_id)
+
+    if resp.ok:
+        return get_edx_course(new_course_id)
+
+    return False
+
+
+def create_edx_course(  # noqa: PLR0913
+    org: str,
+    number: str,
+    run: str,
+    title: str,
+    pacing_type: str | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    enrollment_start: datetime | None = None,
+    enrollment_end: datetime | None = None,
+    *,
+    client: EdxApi | None = None,
+) -> CourseRun:
+    """
+    Create a new, blank edX course run.
+
+    Args:
+    - org (str): Organization for the new course run.
+    - number (str): Course number for the new course run. (Without 'course-v1')
+    - run (str): The run id for the new course run.
+    - title (str): The title of the new course run.
+    - pacing_type (str, optional): The pacing type for the new course run. Defaults to None.
+    - start (datetime, optional): The start date for the new course run. Defaults to None.
+    - end (datetime, optional): The end date for the new course run. Defaults to None.
+    - enrollment_start (datetime, optional): The enrollment start date for the new course run. Defaults to None.
+    - enrollment_end (datetime, optional): The enrollment end date for the new course run. Defaults to None.
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - edx_api.course_runs.models.CourseRun: the course run details
+    """
+
+    edx_client = client if client else get_edx_course_management_service_client()
+
+    return edx_client.course_runs.create_course_run(
+        org,
+        number,
+        run,
+        title,
+        pacing_type,
+        start,
+        end,
+        enrollment_start,
+        enrollment_end,
+    )
+
+
+def update_edx_course(  # noqa: PLR0913
+    course_id: str,
+    title: str | None = None,
+    pacing_type: str | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    enrollment_start: datetime | None = None,
+    enrollment_end: datetime | None = None,
+    *,
+    client: EdxApi | None = None,
+) -> CourseRun:
+    """
+    Update an existing edX course run.
+
+    Args:
+    - course_id (str): The readable ID of the course run to edit.
+    - title (str): The title of the new course run.
+    - pacing_type (str, optional): The pacing type for the new course run. Defaults to None.
+    - start (datetime, optional): The start date for the new course run. Defaults to None.
+    - end (datetime, optional): The end date for the new course run. Defaults to None.
+    - enrollment_start (datetime, optional): The enrollment start date for the new course run. Defaults to None.
+    - enrollment_end (datetime, optional): The enrollment end date for the new course run. Defaults to None.
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - edx_api.course_runs.models.CourseRun: the course run details
+    """
+    edx_client = client if client else get_edx_course_management_service_client()
+
+    return edx_client.course_runs.update_course_run(
+        course_id, title, pacing_type, start, end, enrollment_start, enrollment_end
+    )
+
+
+def process_course_run_clone(target_id: int, *, base_id: int | str | None = None):
+    """
+    Clone a course run, using details from CourseRun objects in MITx Online.
+
+    When we need a new course run (as a re-run or a special B2B course run), we
+    create the CourseRun object in the system, and then we need to make the run
+    in edX. This will assume there's a base course run that uses the readable ID
+    of the underlying _Course_ record, and will clone that. Some of the data from
+    the CourseRun will then be copied over into the newly cloned edX run (dates,
+    etc.) and the URL will be backfilled into the CourseRun.
+
+    If a different course run needs to be used as the base course, you can
+    set that. Pass either the PK of the course or the readable ID. If a readable
+    ID is passed, it will be supplied verbatim to the clone API. (In other words,
+    it can be a course that MITx Online doesn't know about.)
+
+    Args:
+    - target_id (int): The PK of the target course (i.e. the one we're creating)
+    - base_id (int|str): The PK or readable ID of the base course to clone.
+    Returns:
+    bool, whether or not it worked
+    """
+    edx_client = get_edx_api_jwt_client(
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
+        settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
+        use_studio=True,
+    )
+
+    target_course = courses.models.CourseRun.objects.get(pk=target_id)
+    base_course = target_course.course.readable_id
+
+    if base_id:
+        if base_id is int:
+            if courses.models.Course.objects.filter(pk=base_id).exists():
+                base_course = courses.models.Course.objects.get(pk=base_id).readable_id
+            elif courses.models.CourseRun.objects.filter(pk=base_id).exists():
+                base_course = courses.models.CourseRun.objects.get(
+                    pk=base_id
+                ).readable_id
+            else:
+                msg = f"Specified base course {base_id} doesn't exist."
+                raise ValueError(msg)
+        else:
+            base_course = str(base_id)
+
+    get_edx_course(base_course, client=edx_client)
+
+    try:
+        get_edx_course(target_course.readable_id, client=edx_client)
+
+        msg = f"Course ID {target_course.readable_id} was found in edX. Can't continue."
+        raise ValueError(msg)
+    except CourseRunAPIError:
+        # An HTTP error is good in this case. We don't want the target course to exist.
+        pass
+
+    resp = clone_edx_course(base_course, target_course.readable_id, client=edx_client)
+
+    if not resp:
+        msg = f"Couldn't clone {base_course} to {target_course.readable_id}."
+        raise ValueError(msg)
+
+    # We should have the target course in edX now. We need to update it with the
+    # data from our course run.
+
+    course_params = [
+        target_course.readable_id,
+        target_course.title,
+        "self_paced" if target_course.is_self_paced else "instructor_paced",
+    ]
+
+    # We can only specify the start and end dates if there are both of them.
+    # And, we can only specify enrollment start/stop if there are both of them
+    # and the course has start/end dates.
+
+    if target_course.start_date and target_course.end_date:
+        course_params.append(target_course.start_date)
+        course_params.append(target_course.end_date)
+
+        if target_course.enrollment_start and target_course.enrollment_end:
+            course_params.append(target_course.enrollment_start)
+            course_params.append(target_course.enrollment_end)
+
+    resp = update_edx_course(
+        *course_params,
+        client=edx_client,
+    )
