@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from enum import Flag, auto
 from typing import TYPE_CHECKING, Optional, Set, Tuple, TypeVar, Union  # noqa: UP035
 from urllib.parse import quote_plus
 
@@ -24,17 +23,6 @@ if TYPE_CHECKING:
     from decimal import Decimal
 
     from rest_framework.response import Response
-
-
-class FeatureFlag(Flag):
-    """
-    FeatureFlag enum
-
-    Members should have values of increasing powers of 2 (1, 2, 4, 8, ...)
-
-    """
-
-    EXAMPLE_FEATURE = auto()
 
 
 def get_js_settings(request: HttpRequest):  # noqa: ARG001
