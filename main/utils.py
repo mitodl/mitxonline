@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from enum import Flag, auto
 from typing import TYPE_CHECKING, Optional, Set, Tuple, TypeVar, Union  # noqa: UP035
 from urllib.parse import quote_plus
 
