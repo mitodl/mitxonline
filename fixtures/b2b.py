@@ -20,7 +20,13 @@ def contract_ready_course():
         f"course-v1:{source_course_key.org}+{source_course_key.course}+SOURCE"
     )
     source_course_run = CourseRunFactory.create(
-        course=course, courseware_id=source_course_run_key, run_tag="SOURCE"
+        course=course,
+        courseware_id=source_course_run_key,
+        run_tag="SOURCE",
+        start_date=None,
+        end_date=None,
+        enrollment_start=None,
+        enrollment_end=None,
     )
 
     return (course, source_course_run)
