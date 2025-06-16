@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth.views import LogoutView as DjangoLogoutView
 from django.shortcuts import reverse
 from django.views.generic.base import RedirectView
+from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -63,6 +64,7 @@ class OpenedxAndApiGatewayLogoutView(RedirectView):
 @api_view(["GET"])
 @renderer_classes([JSONRenderer])
 @permission_classes([])
+@extend_schema(exclude=True)
 def logout_complete(request):  # noqa: ARG001
     """Simple response for openedx logout being complete"""
     return Response({"message": "Logout complete"}, content_type="application/json")
