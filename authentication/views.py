@@ -61,10 +61,10 @@ class OpenedxAndApiGatewayLogoutView(RedirectView):
             return f"{settings.LOGOUT_REDIRECT_URL}?{urlencode(params)}"
 
 
+@extend_schema(exclude=True)
 @api_view(["GET"])
 @renderer_classes([JSONRenderer])
 @permission_classes([])
-@extend_schema(exclude=True)
 def logout_complete(request):  # noqa: ARG001
     """Simple response for openedx logout being complete"""
     return Response({"message": "Logout complete"}, content_type="application/json")
