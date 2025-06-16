@@ -4,12 +4,14 @@ Tests for courses api views v2
 
 import logging
 import random
+from datetime import timedelta
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.db import connection
 from django.test.client import RequestFactory
 from django.urls import reverse
+from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.test import APIClient
@@ -420,3 +422,39 @@ def test_filter_by_org_id_unauthenticated_user(
     assert public_program in filtered
     assert program_with_contract not in filtered
     assert filtered.count() == 1
+
+
+@pytest.mark.django_db
+def test_next_run_id_with_org_filter(
+    mock_course_run_clone,
+    user,
+    api_client,
+    contract_ready_course,
+):
+    """
+    Test that next_run_id returns the correct value according to the org filter.
+
+    If the org filter is not specified, we should get a next_run_id that only
+    considers non-B2B course runs.
+    If the org filter _is_ specified, we should get the next valid run for the
+    current user.
+    """
+
+    one_month_prior = now_in_utc() - timedelta(days=31)
+    one_month_ahead = now_in_utc() + timedelta(days=31)
+    two_months_prior = now_in_utc() - timedelta(days=62)
+
+    b2b_course, b2b_run = contract_ready_course
+    regular_course_run = CourseRunFactory(
+        start_date=one_month_prior,
+        enrollment_start=one_month_prior,
+        course=b2b_course,
+    )
+
+    resp = api_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": regular_course_run.course.id}),
+    )
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert resp_course["next_run_id"] == regular_course_run.id
