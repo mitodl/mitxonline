@@ -104,11 +104,7 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
         </li>
         <li {...(menuChildProps.li || {})}>
           <a
-            href={
-              SETTINGS.api_gateway_enabled ?
-                routes.apiGatewayLogout :
-                routes.logout
-            }
+            href={routes.logout}
             aria-label="Sign Out"
           >
             Sign Out
