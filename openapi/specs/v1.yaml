@@ -709,13 +709,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedUpdateEnrollmentRequest'
+              $ref: '#/components/schemas/PatchedUpdateCourseRunEnrollmentRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedUpdateEnrollmentRequest'
+              $ref: '#/components/schemas/PatchedUpdateCourseRunEnrollmentRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedUpdateEnrollmentRequest'
+              $ref: '#/components/schemas/PatchedUpdateCourseRunEnrollmentRequest'
       responses:
         '200':
           content:
@@ -2094,15 +2094,12 @@ components:
       properties:
         confirmed:
           type: boolean
-    PatchedUpdateEnrollmentRequest:
+    PatchedUpdateCourseRunEnrollmentRequest:
       type: object
       properties:
         receive_emails:
           type: boolean
           description: Whether to receive course emails
-        run_id:
-          type: integer
-          description: The ID of the course run for which to update email preferences
     PatchedUserRequest:
       type: object
       description: Serializer for users

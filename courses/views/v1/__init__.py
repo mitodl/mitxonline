@@ -89,7 +89,7 @@ from openedx.exceptions import (
 log = logging.getLogger(__name__)
 
 
-class UpdateEnrollmentSerializer(serializers.Serializer):
+class UpdateCourseRunEnrollmentSerializer(serializers.Serializer):
     receive_emails = serializers.BooleanField(
         required=False, help_text="Whether to receive course emails"
     )
@@ -434,7 +434,7 @@ class UserEnrollmentsApiViewSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
-        request=UpdateEnrollmentSerializer,
+        request=UpdateCourseRunEnrollmentSerializer,
         operation_id="enrollments_partial_update",
         description="Update enrollment email preferences",
     )
