@@ -15,7 +15,7 @@ from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from mitol.olposthog.features import is_enabled
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
-from rest_framework import mixins, status, viewsets
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import permission_classes
 from rest_framework.generics import GenericAPIView
 from rest_framework.pagination import PageNumberPagination
@@ -87,6 +87,12 @@ from openedx.exceptions import (
 )
 
 log = logging.getLogger(__name__)
+
+
+class UpdateEnrollmentSerializer(serializers.Serializer):
+    receive_emails = serializers.BooleanField(
+        required=False, help_text="Whether to receive course emails"
+    )
 
 
 class Pagination(PageNumberPagination):
@@ -427,6 +433,11 @@ class UserEnrollmentsApiViewSet(
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(
+        request=UpdateEnrollmentSerializer,
+        operation_id="enrollments_partial_update",
+        description="Update enrollment email preferences",
+    )
     def partial_update(self, request, *args, **kwargs):  # noqa: ARG002
         enrollment = self.get_object()
         receive_emails = request.data.get("receive_emails")
