@@ -6,8 +6,8 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import serializers
 
-from openedx.api import create_user
 from hubspot_sync.task_helpers import sync_hubspot_user
+from openedx.api import create_user
 from users.serializers import (
     LegalAddressSerializer,
     UserProfileSerializer,

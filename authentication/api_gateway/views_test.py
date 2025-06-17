@@ -15,7 +15,9 @@ def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
     """Test that user can save profile details"""
     client.force_login(user)
     mock_client = mocker.MagicMock()
-    edx_api_mock = mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    edx_api_mock = mocker.patch(
+        "openedx.api.get_edx_api_client", return_value=mock_client
+    )
     data = {
         "name": "John Doe",
         "username": "johndoe",
