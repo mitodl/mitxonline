@@ -25,6 +25,7 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_UNLIMITED,
 )
 from ecommerce.models import (
+    Basket,
     BasketDiscount,
     BasketItem,
     Discount,
@@ -186,6 +187,40 @@ def create_contract_run(
 
     return course_run, course_run_product
 
+def is_discount_supplied_for_b2b_purchase(request) -> bool:
+    """
+    Check if a discount is supplied when the basket contains B2B products.
+    """
+    from ecommerce.api import establish_basket
+    basket = establish_basket(request)
+    if not basket:
+        return False
+
+    if get_active_contracts_from_basket_items(basket):
+        # If there are active contracts, we expect a discount to be applied.
+        return basket.discounts.exists()
+    else:
+        return True
+
+
+def get_active_contracts_from_basket_items(basket: Basket) -> None:
+    active_contracts = []
+    course_run_content_type = ContentType.objects.get_for_model(CourseRun)
+    for item in (
+        basket.basket_items.filter(product__content_type=course_run_content_type)
+        .prefetch_related(
+            "product",
+            "product__purchasable_object",
+            "product__purchasable_object__b2b_contract",
+        )
+        .all()
+    ):
+        contract = item.product.purchasable_object.b2b_contract
+        if contract and contract.is_active:
+            active_contracts.append(contract)
+
+    return active_contracts
+
 
 def validate_basket_for_b2b_purchase(request) -> bool:
     """
@@ -203,7 +238,7 @@ def validate_basket_for_b2b_purchase(request) -> bool:
     Args:
         request: The HTTP request object containing the basket data.
 
-    Returns: bool
+    Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
     from ecommerce.api import establish_basket
 
@@ -213,29 +248,19 @@ def validate_basket_for_b2b_purchase(request) -> bool:
 
     nonfree_contracts = []
     free_contracts = []
-    course_run_content_type = ContentType.objects.get_for_model(CourseRun)
 
     # Determine what contracts are linked to items in the basket.
 
-    for item in (
-        basket.basket_items.filter(product__content_type=course_run_content_type)
-        .prefetch_related(
-            "product",
-            "product__purchasable_object",
-            "product__purchasable_object__b2b_contract",
-        )
-        .all()
-    ):
-        contract = item.product.purchasable_object.b2b_contract
+    active_contracts = get_active_contracts_from_basket_items(basket)
 
-        if contract and contract.is_active:
-            if contract.enrollment_fixed_price in (
-                None,
-                Decimal(0),
-            ):
-                free_contracts.append(contract)
-            else:
-                nonfree_contracts.append(contract)
+    for contract in active_contracts:
+        if contract.enrollment_fixed_price in (
+            None,
+            Decimal(0),
+        ):
+            free_contracts.append(contract)
+        else:
+            nonfree_contracts.append(contract)
 
     if len(nonfree_contracts) + len(free_contracts) == 0:
         # There aren't any, so we have nothing to validate.

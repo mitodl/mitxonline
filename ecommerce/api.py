@@ -10,6 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, Validat
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
+from b2b.api import is_discount_supplied_for_b2b_purchase
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
@@ -51,6 +52,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY,
 )
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import parse_supplied_date, redirect_with_user_message
@@ -102,6 +104,15 @@ def generate_checkout_payload(request):  # noqa: PLR0911
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
+            ),
+        }
+
+    if not is_discount_supplied_for_b2b_purchase(request):
+        return {
+            "invalid_discounts": True,
+            "response": redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY},
             ),
         }
 
@@ -192,6 +203,13 @@ def check_discount_for_products(discount, basket):
 
 
 def check_basket_discounts_for_validity(request):
+    """
+    Checks the validity of the discounts in the basket against the user and
+    the products in the basket.
+
+    Returns:
+        boolean: True if all discounts are valid, False otherwise.
+    """
     basket = establish_basket(request)
 
     for basket_discount in basket.discounts.all():
