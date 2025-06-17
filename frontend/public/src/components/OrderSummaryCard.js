@@ -1,6 +1,6 @@
 // @flow
 import React from "react"
-import { Formik } from "formik"
+import { Formik, FormikProps } from "formik"
 // $FlowFixMe
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
@@ -18,7 +18,16 @@ type Props = {
   cardTitle?: string
 }
 
-export class OrderSummaryCard extends React.Component<Props> {
+type FormValues = {
+  couponCode: string
+}
+
+type State = {
+  submittingPlaceOrder: boolean
+}
+
+export class OrderSummaryCard extends React.Component<Props, State> {
+  formikRef: { current: null | FormikProps<FormValues> } = React.createRef()
   formikRef = React.createRef()
 
   state = {
@@ -86,13 +95,15 @@ export class OrderSummaryCard extends React.Component<Props> {
   handlePlaceOrder = async () => {
     const formik = this.formikRef.current
 
-    // If coupon is entered, submit the form
-    if (formik && formik.values.couponCode?.trim()) {
+    // Check if formik exists and couponCode has a value
+    if (formik && formik.values.couponCode && formik.values.couponCode.trim()) {
       // Flag this is from Place Order button
       this.setState({ submittingPlaceOrder: true })
       await formik.submitForm()
+    } else {
+      // No coupon code, proceed directly to payment
+      window.location = "/checkout/to_payment"
     }
-    window.location = "/checkout/to_payment"
   }
 
   render() {
