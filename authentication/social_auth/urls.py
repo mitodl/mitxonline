@@ -15,7 +15,6 @@ from authentication.social_auth.views import (
 )
 
 urlpatterns = [
-    path("", include("social_django.urls", namespace="social")),
     path("api/login/email/", LoginEmailView.as_view(), name="psa-login-email"),
     path("api/login/password/", LoginPasswordView.as_view(), name="psa-login-password"),
     path("api/register/email/", RegisterEmailView.as_view(), name="psa-register-email"),
