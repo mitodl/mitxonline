@@ -611,7 +611,39 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         #   optimization. You can get the desired course_run with a filter, but
         #   that would run a new query even if prefetch_related was used.
         """
-        course_runs = self.courseruns.all()
+        course_runs = self.courseruns.filter(b2b_contract__isnull=True).all()
+        eligible_course_runs = [
+            course_run
+            for course_run in course_runs
+            if (course_run.is_enrollable and not course_run.is_past)
+        ]
+        if len(eligible_course_runs) < 1:
+            # check for archived courses
+            eligible_course_runs = [
+                course_run for course_run in course_runs if course_run.is_enrollable
+            ]
+        return first_matching_item(
+            sorted(eligible_course_runs, key=lambda course_run: course_run.start_date),
+            lambda course_run: True,  # noqa: ARG005
+        )
+
+    def get_first_unexpired_org_run(self, user_contracts):
+        """
+        Gets the first unexpired/enrollable CourseRun associated with both this
+        Course and the organization ID specified, according to the user's
+        contracts.
+
+        Args:
+        - user_contracts (list of int): the current user's contracts
+
+        Returns:
+            CourseRun or None: An unexpired/enrollable course run
+
+        # NOTE: This is implemented with sorted() and courseruns.all() to allow for prefetch_related
+        #   optimization. You can get the desired course_run with a filter, but
+        #   that would run a new query even if prefetch_related was used.
+        """
+        course_runs = self.courseruns.filter(b2b_contract__in=user_contracts).all()
         eligible_course_runs = [
             course_run
             for course_run in course_runs

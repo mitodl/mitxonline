@@ -98,7 +98,12 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_next_run_id(self, instance) -> int | None:
         """Get next run id"""
-        run = instance.first_unexpired_run
+        if self.context.get("org_id"):
+            run = instance.get_first_unexpired_org_run(
+                self.context.get("user_contracts")
+            )
+        else:
+            run = instance.first_unexpired_run
         return run.id if run is not None else None
 
     def get_programs(self, instance) -> list[dict] | None:

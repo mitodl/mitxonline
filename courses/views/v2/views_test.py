@@ -4,12 +4,15 @@ Tests for courses api views v2
 
 import logging
 import random
+from datetime import timedelta
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.db import connection
 from django.test.client import RequestFactory
 from django.urls import reverse
+from faker import Faker
+from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.test import APIClient
@@ -38,9 +41,8 @@ from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
-
-
 logger = logging.getLogger(__name__)
+faker = Faker()
 
 
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
@@ -420,3 +422,112 @@ def test_filter_by_org_id_unauthenticated_user(
     assert public_program in filtered
     assert program_with_contract not in filtered
     assert filtered.count() == 1
+
+
+@pytest.mark.django_db
+def test_next_run_id_with_org_filter(  # noqa: PLR0915
+    mock_course_run_clone,
+    contract_ready_course,
+):
+    """
+    Test that next_run_id returns the correct value according to the org filter.
+
+    If the org filter is not specified, we should get a next_run_id that only
+    considers non-B2B course runs.
+    If the org filter _is_ specified, we should get the next valid run for the
+    current user.
+    """
+
+    api_client = APIClient()
+    orgs = []
+
+    org = OrganizationPageFactory.create()
+    org.org_key = "Org1"
+    org.name = "Test Org 1"
+    org.save()
+    orgs.append(org)
+    org = OrganizationPageFactory.create()
+    org.org_key = "Org2"
+    org.name = "Test Org 2"
+    org.save()
+    orgs.append(org)
+
+    contract = ContractPageFactory.create(organization=orgs[0])
+    second_contract = ContractPageFactory.create(organization=orgs[1])
+    test_user = UserFactory()
+    test_user.b2b_contracts.add(contract)
+    auth_api_client = APIClient()
+    auth_api_client.force_authenticate(user=test_user)
+
+    one_month_prior = now_in_utc() - timedelta(days=31)
+    one_month_ahead = now_in_utc() + timedelta(days=31)
+
+    b2b_course, _ = contract_ready_course
+    regular_course_run = CourseRunFactory(
+        start_date=one_month_prior,
+        enrollment_start=one_month_prior,
+        course=b2b_course,
+    )
+
+    # make the B2B run start a day further away from now than the regular run
+    # if this weren't a B2B run, then that would give it precedence
+    b2b_run, _ = create_contract_run(contract, b2b_course)
+    b2b_run.start_date = one_month_prior - timedelta(days=1)
+    b2b_run.enrollment_start = one_month_prior - timedelta(days=1)
+    b2b_run.save()
+
+    # first, test to make sure we get the regular run's ID
+    resp = api_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": b2b_course.id}),
+    )
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert resp_course["next_run_id"] == regular_course_run.id
+
+    # if the regular run is in the future, we shouldn't get anything
+    regular_course_run.enrollment_start = one_month_ahead
+    regular_course_run.save()
+
+    resp = api_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": b2b_course.id}),
+    )
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert not resp_course["next_run_id"]
+    assert b2b_run.enrollment_start < regular_course_run.enrollment_start
+
+    # now, test with the org filter
+    # we should get the B2B run
+    url = reverse(
+        "v2:courses_api-detail",
+        kwargs={"pk": b2b_course.id},
+    )
+
+    resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert resp_course["next_run_id"] == b2b_run.id
+
+    # kick the B2B run into the future and now we should get nothing again
+    b2b_run.enrollment_start = one_month_ahead
+    b2b_run.save()
+
+    resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert not resp_course["next_run_id"]
+
+    # finally, make a new contract and don't assign the user to it.
+    # we should get a 404, since we're filtering on an org we're not in.
+
+    second_b2b_run, _ = create_contract_run(second_contract, b2b_course)
+    second_b2b_run.enrollment_start = one_month_prior
+    second_b2b_run.save()
+
+    resp = auth_api_client.get(f"{url}?org_id={second_contract.organization.id}")
+
+    assert resp.status_code == 404
