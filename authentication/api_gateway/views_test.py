@@ -4,6 +4,7 @@ from django.urls import reverse
 from rest_framework import status
 
 from authentication.api_gateway.views import GatewayLoginView
+from openedx.models import OpenEdxUser
 from users.api import User
 from users.factories import UserFactory
 from users.models import MALE, UserProfile
@@ -13,6 +14,8 @@ from users.models import MALE, UserProfile
 def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
     """Test that user can save profile details"""
     client.force_login(user)
+    mock_client = mocker.MagicMock()
+    edx_api_mock = mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     data = {
         "name": "John Doe",
         "username": "johndoe",
@@ -26,6 +29,9 @@ def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
     assert resp.status_code == status.HTTP_200_OK
     # Checks that user's name in database is also updated
     assert User.objects.get(pk=user.pk).name == data["name"]
+    assert OpenEdxUser.objects.get(user=user).has_been_synced is True
+
+    assert edx_api_mock.called is True
 
     data = {
         "name": "John Doe",

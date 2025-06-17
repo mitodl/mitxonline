@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import serializers
 
+from openedx.api import create_user
 from hubspot_sync.task_helpers import sync_hubspot_user
 from users.serializers import (
     LegalAddressSerializer,
@@ -49,7 +50,7 @@ class RegisterDetailsSerializer(serializers.Serializer):
                 )
                 if user_profile.is_valid():
                     user_profile.save()
-
+        create_user(user)
         sync_hubspot_user(user)
         return user
 
