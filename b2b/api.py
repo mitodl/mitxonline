@@ -4,12 +4,11 @@ import logging
 from decimal import Decimal
 from urllib.parse import urljoin
 from uuid import uuid4
-from django.db.models import Q
 
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count
+from django.db.models import Count, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
@@ -188,12 +187,14 @@ def create_contract_run(
 
     return course_run, course_run_product
 
+
 def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
     if not active_contracts:
         # No contracts = nothing to validate
         return True
 
     from ecommerce.api import establish_basket
+
     basket = establish_basket(request)
     if not basket:
         return False
@@ -239,6 +240,7 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
     from ecommerce.api import establish_basket
+
     basket = establish_basket(request)
     if not basket:
         return False
@@ -249,18 +251,20 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
 
     # Separate free and non-free contracts
     free_contracts = [
-        c for c in active_contracts
+        c
+        for c in active_contracts
         if not c.enrollment_fixed_price or c.enrollment_fixed_price == Decimal(0)
     ]
     nonfree_contracts = [
-        c for c in active_contracts
+        c
+        for c in active_contracts
         if c.enrollment_fixed_price and c.enrollment_fixed_price != Decimal(0)
     ]
 
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
-        Q(pk__in=[c.pk for c in free_contracts]) &
-        ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+        Q(pk__in=[c.pk for c in free_contracts])
+        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
     )
 
     if not remaining_free_contract_qset.exists() and not nonfree_contracts:

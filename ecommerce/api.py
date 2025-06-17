@@ -10,13 +10,16 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, Validat
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
-from b2b.api import get_active_contracts_from_basket_items, is_discount_supplied_for_b2b_purchase
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
 from mitol.payment_gateway.api import Order as GatewayOrder
 from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
 
+from b2b.api import (
+    get_active_contracts_from_basket_items,
+    is_discount_supplied_for_b2b_purchase,
+)
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from ecommerce.constants import (
