@@ -18,11 +18,6 @@ type Props = {
   cardTitle?: string
 }
 
-type State = {
-  submittingPlaceOrder: boolean
-}
-
-
 export class OrderSummaryCard extends React.Component<Props> {
   formikRef = React.createRef()
 
@@ -49,7 +44,6 @@ export class OrderSummaryCard extends React.Component<Props> {
         </div>
       </div>
     )
-    window.location = "/checkout/to_payment"
   }
 
   renderAppliedCoupons() {
@@ -146,29 +140,29 @@ export class OrderSummaryCard extends React.Component<Props> {
           </div>
 
           {!orderFulfilled ? (
-          <Formik
-            innerRef={this.formikRef}
-            initialValues={{ couponCode: discountCode }}
-            enableReinitialize={false}
-            onSubmit={async (values, formikHelpers) => {
-              if (addDiscount) {
-                await addDiscount(values, formikHelpers)
+            <Formik
+              innerRef={this.formikRef}
+              initialValues={{ couponCode: discountCode }}
+              enableReinitialize={false}
+              onSubmit={async (values, formikHelpers) => {
+                if (addDiscount) {
+                  await addDiscount(values, formikHelpers)
 
-                const hasErrors =
+                  const hasErrors =
                   Object.keys(formikHelpers.errors).length > 0 || formikHelpers.status?.error
 
-                if (this.state.submittingPlaceOrder && !hasErrors) {
+                  if (this.state.submittingPlaceOrder && !hasErrors) {
                   // Redirect only if there were no errors
-                  window.location = "/checkout/to_payment"
-                }
+                    window.location = "/checkout/to_payment"
+                  }
 
-                // Reset flag
-                this.setState({ submittingPlaceOrder: false })
-              }
-            }}
-          >
-            <ApplyCouponForm discounts={discounts} />
-          </Formik>
+                  // Reset flag
+                  this.setState({ submittingPlaceOrder: false })
+                }
+              }}
+            >
+              <ApplyCouponForm discounts={discounts} />
+            </Formik>
           ) : null}
 
           {(totalPrice > 0 || discounts) && !orderFulfilled ? (
