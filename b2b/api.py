@@ -2,6 +2,7 @@
 
 import logging
 from decimal import Decimal
+from typing import Iterable, List, Tuple
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -187,6 +188,21 @@ def create_contract_run(
 
     return course_run, course_run_product
 
+def get_free_and_nonfree_contracts(
+        contracts: Iterable
+    ) -> Tuple[List, List]:
+        """
+        Split contracts into free and non-free based on enrollment_fixed_price.
+
+        Returns:
+            (free_contracts, nonfree_contracts)
+        """
+        free, nonfree = [], []
+        for c in contracts:
+            price = c.enrollment_fixed_price
+            (free if not price or price == 0 else nonfree).append(c)
+        return free, nonfree
+
 
 def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
     if not active_contracts:
@@ -199,17 +215,7 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
     if not basket:
         return False
 
-    # Separate free and non-free contracts
-    free_contracts = [
-        c
-        for c in active_contracts
-        if not c.enrollment_fixed_price or c.enrollment_fixed_price == Decimal(0)
-    ]
-    nonfree_contracts = [
-        c
-        for c in active_contracts
-        if c.enrollment_fixed_price and c.enrollment_fixed_price != Decimal(0)
-    ]
+    free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
@@ -224,23 +230,23 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
     return basket.discounts.exists()
 
 
-def get_active_contracts_from_basket_items(basket: Basket) -> None:
-    active_contracts = []
-    course_run_content_type = ContentType.objects.get_for_model(CourseRun)
-    for item in (
-        basket.basket_items.filter(product__content_type=course_run_content_type)
-        .prefetch_related(
-            "product",
-            "product__purchasable_object",
-            "product__purchasable_object__b2b_contract",
-        )
-        .all()
-    ):
-        contract = item.product.purchasable_object.b2b_contract
-        if contract and contract.is_active:
-            active_contracts.append(contract)
+def get_active_contracts_from_basket_items(basket: Basket):
+    course_run_ct = ContentType.objects.get_for_model(CourseRun)
 
-    return active_contracts
+    items = (
+        basket.basket_items
+        .filter(product__content_type=course_run_ct)
+        .select_related("product")
+    )
+
+    contracts = []
+    for item in items:
+        purchasable = item.product.purchasable_object  # GenericForeignKey access
+        contract = getattr(purchasable, "b2b_contract", None)
+        if contract and contract.is_active:
+            contracts.append(contract)
+
+    return contracts
 
 
 def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
@@ -267,17 +273,7 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     if not basket:
         return False
 
-    # Separate free and non-free contracts
-    free_contracts = [
-        c
-        for c in active_contracts
-        if not c.enrollment_fixed_price or c.enrollment_fixed_price == Decimal(0)
-    ]
-    nonfree_contracts = [
-        c
-        for c in active_contracts
-        if c.enrollment_fixed_price and c.enrollment_fixed_price != Decimal(0)
-    ]
+    free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
