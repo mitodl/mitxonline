@@ -33,6 +33,22 @@ export class OrderSummaryCard extends React.Component<Props, State> {
     submittingPlaceOrder: true
   }
 
+  renderRefunds() {
+    const { refunds } = this.props
+
+    if (refunds === null || refunds.length === 0) {
+      return null
+    }
+
+    const refundList = []
+
+    for (let refund = 0; refund < refunds.length; refund++) {
+      refundList.push(this.renderIndividualRefund(refunds[refund]))
+    }
+
+    return refundList
+  }
+
   renderFulfilledTag() {
     const { orderFulfilled } = this.props
 
@@ -158,7 +174,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
 
                   const hasErrors =
                     Object.keys(formikHelpers.errors).length > 0 ||
-                    formikHelpers.status?.error
+                    (formikHelpers.status && formikHelpers.status.error)
 
                   if (this.state.submittingPlaceOrder && !hasErrors) {
                     // Redirect only if there were no errors
