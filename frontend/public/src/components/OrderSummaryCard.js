@@ -28,7 +28,6 @@ type State = {
 
 export class OrderSummaryCard extends React.Component<Props, State> {
   formikRef: { current: null | FormikProps<FormValues> } = React.createRef()
-  formikRef = React.createRef()
 
   state = {
     submittingPlaceOrder: true
