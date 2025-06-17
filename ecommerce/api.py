@@ -109,6 +109,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
                 {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
             ),
         }
+
     active_contracts = get_active_contracts_from_basket_items(basket)
 
     if not is_discount_supplied_for_b2b_purchase(request, active_contracts):

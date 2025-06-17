@@ -187,7 +187,6 @@ def create_contract_run(
 
     return course_run, course_run_product
 
-
 def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
     if not active_contracts:
         # No contracts = nothing to validate
@@ -198,6 +197,28 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
     basket = establish_basket(request)
     if not basket:
         return False
+
+    # Separate free and non-free contracts
+    free_contracts = [
+        c
+        for c in active_contracts
+        if not c.enrollment_fixed_price or c.enrollment_fixed_price == Decimal(0)
+    ]
+    nonfree_contracts = [
+        c
+        for c in active_contracts
+        if c.enrollment_fixed_price and c.enrollment_fixed_price != Decimal(0)
+    ]
+
+    # Find free contracts the user is NOT associated with
+    remaining_free_contract_qset = ContractPage.objects.filter(
+        Q(pk__in=[c.pk for c in free_contracts])
+        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+    )
+
+    if not remaining_free_contract_qset.exists() and not nonfree_contracts:
+        # Basket only has free contracts the user is part of — valid.
+        return True
 
     return basket.discounts.exists()
 
@@ -219,7 +240,6 @@ def get_active_contracts_from_basket_items(basket: Basket) -> None:
             active_contracts.append(contract)
 
     return active_contracts
-
 
 def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     """
@@ -244,10 +264,6 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     basket = establish_basket(request)
     if not basket:
         return False
-
-    if not active_contracts:
-        # No contracts = nothing to validate
-        return True
 
     # Separate free and non-free contracts
     free_contracts = [
@@ -277,7 +293,6 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     # Gather all product IDs for these contracts
     product_ids = set()
     for contract in check_contracts:
-        # Assumes get_products() returns a queryset
         product_ids.update(contract.get_products().values_list("pk", flat=True))
 
     # Validate that at least one discount applies to these products
@@ -598,21 +613,25 @@ def create_b2b_enrollment(request, product: Product):
         basket_price += basket_item.discounted_price
 
     if basket_price == 0:
+        print("collin")
         # This call should go ahead and fulfill the order.
         response = generate_checkout_payload(request)
 
         if "no_checkout" in response:
+            print("collin2")
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
                 "order": response["order_id"],
             }
         else:
+            print("collin3")
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
                 "price": basket_price,
                 "checkout_result": response,
             }
 
+    print("collin4")
     return {
         "result": main_constants.USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
         "price": basket_price,
