@@ -1,16 +1,19 @@
 """Authentication views"""
 
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
+from django.views.generic.base import RedirectView
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.decorators import api_view, permission_classes, renderer_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -140,3 +143,40 @@ class GatewayLoginView(View):
                 profile.completed_onboarding = True
                 profile.save()
         return redirect(redirect_url)
+
+
+class OpenedxAndApiGatewayLogoutView(RedirectView):
+    """
+    Custom view to support logout under APISIX
+
+    The logical flow is:
+    - http://mitxonline/logout
+      - if `?no_redirect=1` is not passed:
+        - redirect to http://openedx/logout?redirect_url=http://mitxonline/
+          - this page makes iframe requests to http://mitxonline/logout?no_redirect=1
+      - if `?no_redirect=1` is passed:
+        - redirect to http://mitxonline/logout/oidc
+    """
+
+    def get_redirect_url(self, *args, **kwargs):  # noqa: ARG002
+        no_redirect = self.request.GET.get("no_redirect")
+
+        if no_redirect and no_redirect[0] == "1":
+            # This is openedx's /logout interstitial page calling us in an iframe
+            # so we redirect into the API gatewat logout but ONLY if the user is authenticated
+            if self.request.user.is_authenticated:
+                return urljoin(settings.SITE_BASE_URL, "/logout/oidc")
+            return settings.SITE_BASE_URL
+        else:
+            # Otherwise we need to send them to openedx first
+            params = {"redirect_url": settings.SITE_BASE_URL}
+            return f"{settings.LOGOUT_REDIRECT_URL}?{urlencode(params)}"
+
+
+@extend_schema(exclude=True)
+@api_view(["GET"])
+@renderer_classes([JSONRenderer])
+@permission_classes([])
+def logout_complete(request):  # noqa: ARG001
+    """Simple response for openedx logout being complete"""
+    return Response({"message": "Logout complete"}, content_type="application/json")

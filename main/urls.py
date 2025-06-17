@@ -37,7 +37,6 @@ urlpatterns = [
         ),
     ),
     path("admin/", admin.site.urls),
-    path("hijack/", include("hijack.urls")),
     path("robots.txt", include("robots.urls")),
     re_path(r"^api/schema/$", SpectacularAPIView.as_view(), name="schema"),
     re_path(
@@ -56,8 +55,6 @@ urlpatterns = [
     path("", include("b2b.urls")),
     re_path(r"", include("mitol.scim.urls")),
     re_path(r"^dashboard/", index, name="user-dashboard"),
-    # social django needs to be here to preempt the login
-    path("", include("social_django.urls", namespace="social")),
     re_path(r"^staff-dashboard/.*", refine, name="staff-dashboard"),
     path("signin/", index, name="login"),
     path("signin/password/", index, name="login-password"),

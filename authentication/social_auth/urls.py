@@ -1,11 +1,12 @@
 """URL configurations for authentication"""
 
-from django.urls import path
+from django.urls import path, re_path
 from django.urls.conf import include
 
 from authentication.social_auth.views import (
     LoginEmailView,
     LoginPasswordView,
+    LogoutView,
     RegisterConfirmView,
     RegisterDetailsView,
     RegisterEmailView,
@@ -14,6 +15,7 @@ from authentication.social_auth.views import (
 )
 
 urlpatterns = [
+    path("", include("social_django.urls", namespace="social")),
     path("api/login/email/", LoginEmailView.as_view(), name="psa-login-email"),
     path("api/login/password/", LoginPasswordView.as_view(), name="psa-login-password"),
     path("api/register/email/", RegisterEmailView.as_view(), name="psa-register-email"),
@@ -34,4 +36,9 @@ urlpatterns = [
     ),
     path("api/", include("mitol.authentication.urls.djoser_urls")),
     path("api/auths/", get_social_auth_types, name="get-auth-types-api"),
+    re_path(
+        r"^logout\/?$",
+        LogoutView.as_view(),
+        name="logout",
+    ),
 ]
