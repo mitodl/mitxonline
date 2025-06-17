@@ -49,6 +49,23 @@ export class OrderSummaryCard extends React.Component<Props, State> {
     return refundList
   }
 
+  renderIndividualRefund(refund: Refund) {
+    if (refund === null) {
+      return null
+    }
+
+    const refundAmount = formatLocalePrice(Number(refund.amount))
+
+    return (
+      <div className="d-flex justify-content-between">
+        <div className="flex-grow-1">
+          <Badge className="bg-danger">Refund applied</Badge>
+        </div>
+        <div className="ml-auto text-primary text-end">{refundAmount}</div>
+      </div>
+    )
+  }
+
   renderFulfilledTag() {
     const { orderFulfilled } = this.props
 
