@@ -22,9 +22,8 @@ export class OrderSummaryCard extends React.Component<Props> {
   formikRef = React.createRef()
 
   state = {
-    submittingPlaceOrder: true,
+    submittingPlaceOrder: true
   }
-
 
   renderFulfilledTag() {
     const { orderFulfilled } = this.props
@@ -83,7 +82,6 @@ export class OrderSummaryCard extends React.Component<Props> {
       </div>
     )
   }
-
 
   handlePlaceOrder = async () => {
     const formik = this.formikRef.current
@@ -149,10 +147,11 @@ export class OrderSummaryCard extends React.Component<Props> {
                   await addDiscount(values, formikHelpers)
 
                   const hasErrors =
-                  Object.keys(formikHelpers.errors).length > 0 || formikHelpers.status?.error
+                    Object.keys(formikHelpers.errors).length > 0 ||
+                    formikHelpers.status?.error
 
                   if (this.state.submittingPlaceOrder && !hasErrors) {
-                  // Redirect only if there were no errors
+                    // Redirect only if there were no errors
                     window.location = "/checkout/to_payment"
                   }
 
