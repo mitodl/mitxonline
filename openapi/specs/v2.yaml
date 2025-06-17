@@ -695,7 +695,7 @@ paths:
           description: ''
     patch:
       operationId: enrollments_partial_update
-      description: API view set for user enrollments
+      description: Update enrollment email preferences
       parameters:
       - in: path
         name: id
@@ -709,13 +709,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedCourseRunEnrollmentRequest'
+              $ref: '#/components/schemas/PatchedUpdateCourseRunEnrollmentRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedCourseRunEnrollmentRequest'
+              $ref: '#/components/schemas/PatchedUpdateCourseRunEnrollmentRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedCourseRunEnrollmentRequest'
+              $ref: '#/components/schemas/PatchedUpdateCourseRunEnrollmentRequest'
       responses:
         '200':
           content:
@@ -2094,15 +2094,12 @@ components:
       properties:
         confirmed:
           type: boolean
-    PatchedCourseRunEnrollmentRequest:
+    PatchedUpdateCourseRunEnrollmentRequest:
       type: object
-      description: CourseRunEnrollment model serializer
       properties:
-        edx_emails_subscription:
+        receive_emails:
           type: boolean
-        run_id:
-          type: integer
-          writeOnly: true
+          description: Whether to receive course emails
     PatchedUserRequest:
       type: object
       description: Serializer for users
