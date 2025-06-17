@@ -7,13 +7,15 @@ from authentication.api_gateway.serializers import (
 
 
 @pytest.mark.django_db
-def test_register_details_serializer_create(
+def test_register_details_serializer_create(mocker,
     user, valid_address_dict, user_profile_dict, rf
 ):
     """Test the create method of RegisterDetailsSerializer"""
 
     request = rf.post("/api/profile/details/")
     request.user = user
+    mock_client = mocker.MagicMock()
+    edx_api_mock = mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
 
     data = {
         "name": "John Doe",
@@ -26,6 +28,7 @@ def test_register_details_serializer_create(
     assert serializer.is_valid(), serializer.errors
 
     assert serializer.is_valid()
+    assert edx_api_mock.called is True
     user = serializer.save()
     assert user.name == "John Doe"
     assert user.edx_username == "johndoe"
