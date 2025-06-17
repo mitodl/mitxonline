@@ -24,7 +24,7 @@ class RegisterDetailsSerializer(serializers.Serializer):
     legal_address = LegalAddressSerializer(write_only=True)
     user_profile = UserProfileSerializer(write_only=True)
 
-    def create(self, validated_data):
+    def save(self, validated_data):
         """Save user legal address and user profile"""
         request = self.context["request"]
         user = request.user
