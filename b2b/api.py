@@ -187,6 +187,7 @@ def create_contract_run(
 
     return course_run, course_run_product
 
+
 def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
     if not active_contracts:
         # No contracts = nothing to validate
@@ -240,6 +241,7 @@ def get_active_contracts_from_basket_items(basket: Basket) -> None:
             active_contracts.append(contract)
 
     return active_contracts
+
 
 def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     """
