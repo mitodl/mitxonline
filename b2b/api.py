@@ -4,6 +4,7 @@ import logging
 from decimal import Decimal
 from urllib.parse import urljoin
 from uuid import uuid4
+from django.db.models import Q
 
 import reversion
 from django.conf import settings
@@ -187,20 +188,17 @@ def create_contract_run(
 
     return course_run, course_run_product
 
-def is_discount_supplied_for_b2b_purchase(request) -> bool:
-    """
-    Check if a discount is supplied when the basket contains B2B products.
-    """
+def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
+    if not active_contracts:
+        # No contracts = nothing to validate
+        return True
+
     from ecommerce.api import establish_basket
     basket = establish_basket(request)
     if not basket:
         return False
 
-    if get_active_contracts_from_basket_items(basket):
-        # If there are active contracts, we expect a discount to be applied.
-        return basket.discounts.exists()
-    else:
-        return True
+    return basket.discounts.exists()
 
 
 def get_active_contracts_from_basket_items(basket: Basket) -> None:
@@ -222,7 +220,7 @@ def get_active_contracts_from_basket_items(basket: Basket) -> None:
     return active_contracts
 
 
-def validate_basket_for_b2b_purchase(request) -> bool:
+def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     """
     Validate the basket for a B2B purchase.
 
@@ -241,63 +239,48 @@ def validate_basket_for_b2b_purchase(request) -> bool:
     Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
     from ecommerce.api import establish_basket
-
     basket = establish_basket(request)
     if not basket:
         return False
 
-    nonfree_contracts = []
-    free_contracts = []
-
-    # Determine what contracts are linked to items in the basket.
-
-    active_contracts = get_active_contracts_from_basket_items(basket)
-
-    for contract in active_contracts:
-        if contract.enrollment_fixed_price in (
-            None,
-            Decimal(0),
-        ):
-            free_contracts.append(contract)
-        else:
-            nonfree_contracts.append(contract)
-
-    if len(nonfree_contracts) + len(free_contracts) == 0:
-        # There aren't any, so we have nothing to validate.
+    if not active_contracts:
+        # No contracts = nothing to validate
         return True
 
-    # Determine what free-to-attend contracts are in the cart, and also already
-    # linked to the user. (We've pulled free-to-attend ones out above so just
-    # use that list.)
-
-    remaining_free_contract_qset = ContractPage.objects.filter(
-        pk__in=free_contracts
-    ).exclude(pk__in=request.user.b2b_contracts.all())
-
-    if remaining_free_contract_qset.count() == 0 and len(nonfree_contracts) == 0:
-        # The user's in all of the free ones, and there's no non-free ones,
-        # so the basket is OK.
-        return True
-
-    # The basket includes products for free and/or non-free contracts. Check to
-    # make sure we've got enrollment codes for these.
-
-    check_contracts = [
-        *remaining_free_contract_qset.all(),
-        *nonfree_contracts,
+    # Separate free and non-free contracts
+    free_contracts = [
+        c for c in active_contracts
+        if not c.enrollment_fixed_price or c.enrollment_fixed_price == Decimal(0)
+    ]
+    nonfree_contracts = [
+        c for c in active_contracts
+        if c.enrollment_fixed_price and c.enrollment_fixed_price != Decimal(0)
     ]
 
-    for check_contract in check_contracts:
-        # Do the applied discounts in this basket apply to any of the products
-        # in the basket? If not, then the basket is invalid.
+    # Find free contracts the user is NOT associated with
+    remaining_free_contract_qset = ContractPage.objects.filter(
+        Q(pk__in=[c.pk for c in free_contracts]) &
+        ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+    )
 
-        if (
-            basket.discounts.filter(
-                redeemed_discount__products__product__in=check_contract.get_products()
-            ).count()
-            == 0
-        ):
-            return False
+    if not remaining_free_contract_qset.exists() and not nonfree_contracts:
+        # Basket only has free contracts the user is part of — valid.
+        return True
+
+    # Contracts that require validation via discount (user not in them, or not free)
+    check_contracts = list(remaining_free_contract_qset) + nonfree_contracts
+
+    # Gather all product IDs for these contracts
+    product_ids = set()
+    for contract in check_contracts:
+        # Assumes get_products() returns a queryset
+        product_ids.update(contract.get_products().values_list("pk", flat=True))
+
+    # Validate that at least one discount applies to these products
+    if not basket.discounts.filter(
+        redeemed_discount__products__product__in=product_ids
+    ).exists():
+        return False
 
     return True
 

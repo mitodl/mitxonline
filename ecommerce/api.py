@@ -10,7 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, Validat
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
-from b2b.api import is_discount_supplied_for_b2b_purchase
+from b2b.api import get_active_contracts_from_basket_items, is_discount_supplied_for_b2b_purchase
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
@@ -106,8 +106,9 @@ def generate_checkout_payload(request):  # noqa: PLR0911
                 {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
             ),
         }
+    active_contracts = get_active_contracts_from_basket_items(basket)
 
-    if not is_discount_supplied_for_b2b_purchase(request):
+    if not is_discount_supplied_for_b2b_purchase(request, active_contracts):
         return {
             "invalid_discounts": True,
             "response": redirect_with_user_message(
@@ -116,7 +117,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
             ),
         }
 
-    if not validate_basket_for_b2b_purchase(request):
+    if not validate_basket_for_b2b_purchase(request, active_contracts):
         return {
             "invalid_discounts": True,
             "response": redirect_with_user_message(
