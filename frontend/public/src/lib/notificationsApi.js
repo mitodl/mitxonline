@@ -112,7 +112,7 @@ export function parseStoredUserMessage(
     break
   case USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY:
     alertType = ALERT_TYPE_DANGER
-    msgText = "You must enter a coupon code to enroll in this course."
+    msgText = "You must enter a valid coupon code to enroll in this course."
     break
   default:
     return null
