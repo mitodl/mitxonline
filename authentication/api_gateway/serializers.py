@@ -7,6 +7,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from hubspot_sync.task_helpers import sync_hubspot_user
+from openedx.api import create_user
 from users.serializers import (
     LegalAddressSerializer,
     UserProfileSerializer,
@@ -24,7 +25,7 @@ class RegisterDetailsSerializer(serializers.Serializer):
     legal_address = LegalAddressSerializer(write_only=True)
     user_profile = UserProfileSerializer(write_only=True)
 
-    def save(self, validated_data):
+    def create(self, validated_data):
         """Save user legal address and user profile"""
         request = self.context["request"]
         user = request.user
@@ -33,9 +34,14 @@ class RegisterDetailsSerializer(serializers.Serializer):
         legal_address_data = validated_data.pop("legal_address")
         user_profile_data = validated_data.pop("user_profile", None)
         with transaction.atomic():
-            user.openedx_user.edx_username = username
             user.name = name
             user.save()
+            if user.openedx_user is None:
+                create_user(user)
+            else:
+                user.openedx_user.edx_username = username
+                user.openedx_user.save()
+
             if legal_address_data:
                 legal_address = LegalAddressSerializer(
                     user.legal_address, data=legal_address_data
@@ -49,7 +55,6 @@ class RegisterDetailsSerializer(serializers.Serializer):
                 )
                 if user_profile.is_valid():
                     user_profile.save()
-
         sync_hubspot_user(user)
         return user
 

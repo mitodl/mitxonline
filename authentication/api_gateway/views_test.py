@@ -31,6 +31,7 @@ def test_post_user_profile_detail(valid_address_dict, client, user):
     assert resp.status_code == status.HTTP_200_OK
     # Checks that user's name in database is also updated
     assert User.objects.get(pk=user.pk).name == data["name"]
+    assert User.objects.get(pk=user.pk).edx_username == data["username"]
 
     data = {
         "name": "John Doe",
