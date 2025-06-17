@@ -613,25 +613,21 @@ def create_b2b_enrollment(request, product: Product):
         basket_price += basket_item.discounted_price
 
     if basket_price == 0:
-        print("collin")
         # This call should go ahead and fulfill the order.
         response = generate_checkout_payload(request)
 
         if "no_checkout" in response:
-            print("collin2")
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
                 "order": response["order_id"],
             }
         else:
-            print("collin3")
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
                 "price": basket_price,
                 "checkout_result": response,
             }
 
-    print("collin4")
     return {
         "result": main_constants.USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
         "price": basket_price,
