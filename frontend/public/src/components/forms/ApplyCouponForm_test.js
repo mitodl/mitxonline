@@ -18,10 +18,19 @@ describe("ApplyCouponForm", () => {
       .dive()
       .dive()
 
-  it("does not render the error", () => {
-    const wrapper = renderForm()
-    const form = wrapper.find("Formik").dive()
-    assert.ok(!form.find("div#couponCodeError").exists())
+  it("renders the error if couponCode has an error", () => {
+    const wrapper = mount(
+      <Formik
+        initialValues={{ couponCode: "" }}
+        initialErrors={{ couponCode: "Invalid code" }}
+        initialTouched={{ couponCode: true }}
+        onSubmit={() => {}}
+      >
+        <ApplyCouponForm discounts={[]} />
+      </Formik>
+    )
+
+    expect(wrapper.find("#couponCodeError")).to.have.lengthOf(1)
   })
 
   it("does not render the overwrite warning text when there aren't discounts", () => {
