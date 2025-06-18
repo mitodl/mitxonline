@@ -5,11 +5,9 @@ import { assert } from "chai"
 import { shallow } from "enzyme"
 
 import ApplyCouponForm from "./ApplyCouponForm"
-
-import { findFormikFieldByName } from "../../lib/test_utils"
+import { Formik } from "formik"
 
 describe("ApplyCouponForm", () => {
-  let sandbox, onSubmitStub, couponCode
   const discounts = []
 
   const renderForm = (props = {}) =>
@@ -20,11 +18,6 @@ describe("ApplyCouponForm", () => {
     )
       .dive()
       .dive()
-
-  beforeEach(() => {
-    sandbox = sinon.createSandbox()
-    onSubmitStub = sandbox.stub()
-  })
 
   it("does not render the error", () => {
     const wrapper = renderForm()
