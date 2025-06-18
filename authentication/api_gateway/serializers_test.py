@@ -2,12 +2,10 @@ import pytest
 import responses
 from rest_framework import status
 
-
 from authentication.api_gateway.serializers import (
     RegisterDetailsSerializer,
     RegisterExtraDetailsSerializer,
 )
-from openedx.constants import PLATFORM_EDX
 from openedx.models import OpenEdxUser
 from users.factories import UserFactory
 
@@ -41,7 +39,6 @@ def test_register_details_serializer_create(
     assert validated_data["legal_address"]["country"] == "US"
 
 
-
 @pytest.mark.django_db
 @responses.activate
 def test_register_no_edx_user(  # noqa: PLR0913
@@ -51,9 +48,7 @@ def test_register_no_edx_user(  # noqa: PLR0913
 
     request = rf.post("/api/profile/details/")
 
-    user = UserFactory.create(
-        no_openedx_user=True, no_openedx_api_auth=True
-    )
+    user = UserFactory.create(no_openedx_user=True, no_openedx_api_auth=True)
     request.user = user
 
     responses.add(
@@ -79,12 +74,7 @@ def test_register_no_edx_user(  # noqa: PLR0913
     assert serializer.is_valid()
     user = serializer.save()
 
-    assert (
-        OpenEdxUser.objects.filter(
-            user=user, has_been_synced=True
-        ).exists()
-        is True
-    )
+    assert OpenEdxUser.objects.filter(user=user, has_been_synced=True).exists() is True
     assert patched_create_edx_auth_token.call_count == 1
     assert user.name == "John Doe"
     assert user.openedx_users.exists() is True
