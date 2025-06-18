@@ -16,6 +16,7 @@ from b2b.api import (
     create_b2b_enrollment,
     create_contract_run,
     ensure_enrollment_codes_exist,
+    get_active_contracts_from_basket_items,
     validate_basket_for_b2b_purchase,
 )
 from b2b.constants import (
@@ -167,7 +168,8 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
         redemption.save()
         basket.refresh_from_db()
 
-    check_result = validate_basket_for_b2b_purchase(basket)
+    active_contracts = get_active_contracts_from_basket_items(basket)
+    check_result = validate_basket_for_b2b_purchase(basket, active_contracts)
 
     if run_contract and not apply_code:
         # User is trying to buy something that's linked to a contract but hasn't
