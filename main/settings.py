@@ -104,6 +104,12 @@ ALLOWED_REDIRECT_HOSTS = get_list_literal(
     description="List of hosts allowed to redirect to after login",
 )
 
+CSRF_COOKIE_DOMAIN = get_string(
+    name="CSRF_COOKIE_DOMAIN",
+    default=None,
+    description="Domain to set the CSRF cookie to.",
+)
+
 CSRF_TRUSTED_ORIGINS = get_delimited_list(
     name="CSRF_TRUSTED_ORIGINS",
     default=[],
@@ -1452,6 +1458,8 @@ MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST = get_string(
 MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = [
     "localhost",
     "mitxonline.odl.local",
+    "mitxonline.learn.c4103.com",
+    "courses.c4103.com",
 ]
 
 

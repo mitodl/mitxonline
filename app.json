@@ -110,6 +110,10 @@
       "description": "minute value for scheduled task to process refund requests",
       "required": false
     },
+    "CSRF_COOKIE_DOMAIN": {
+      "description": "Domain to set the CSRF cookie to.",
+      "required": false
+    },
     "CSRF_TRUSTED_ORIGINS": {
       "description": "Comma separated string of trusted domains that should be CSRF exempt",
       "required": false
@@ -549,6 +553,18 @@
       "description": "The base redirect URL for an OAuth Application for the Open edX API",
       "required": false
     },
+    "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID": {
+      "description": "OAuth2 client id for retirement service worker",
+      "required": false
+    },
+    "OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET": {
+      "description": "OAuth2 client secret for retirement service worker",
+      "required": false
+    },
+    "OPENEDX_COURSE_BASE_URL": {
+      "description": "The base URL to use to construct URLs to a course",
+      "required": false
+    },
     "OPENEDX_OAUTH_APP_NAME": {
       "description": "The 'name' value for the Open edX OAuth Application",
       "required": true
@@ -576,6 +592,10 @@
     "OPENEDX_SOCIAL_LOGIN_PATH": {
       "description": "Open edX social auth login url",
       "required": false
+    },
+    "OPENEDX_STUDIO_API_BASE_URL": {
+      "description": "The base URL for the Open edX Studio CMS API",
+      "required": true
     },
     "OPENEDX_TOKEN_EXPIRES_HOURS": {
       "description": "The number of hours until an access token for the Open edX API expires",
@@ -682,6 +702,14 @@
     },
     "SENTRY_LOG_LEVEL": {
       "description": "The log level for Sentry",
+      "required": false
+    },
+    "SESSION_COOKIE_DOMAIN": {
+      "description": "Domain to set the session cookie to.",
+      "required": false
+    },
+    "SESSION_COOKIE_NAME": {
+      "description": "Name of the session cookie.",
       "required": false
     },
     "SITE_NAME": {
