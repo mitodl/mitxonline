@@ -129,7 +129,10 @@ def test_mitol_apigateway_allowed_redirect_hosts(settings_sandbox):
     """Verify that we can configure MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS with a var"""
     # Test the default
     settings_vars = settings_sandbox.get()
-    assert settings_vars.get("MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS") == []
+    assert settings_vars.get("MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS") == [
+        "localhost",
+        "mitxonline.odl.local",
+    ]
 
     # Verify the env var works
     settings_vars = settings_sandbox.patch(
