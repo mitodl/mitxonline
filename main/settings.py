@@ -104,6 +104,12 @@ ALLOWED_REDIRECT_HOSTS = get_list_literal(
     description="List of hosts allowed to redirect to after login",
 )
 
+CSRF_COOKIE_DOMAIN = get_string(
+    name="CSRF_COOKIE_DOMAIN",
+    default=None,
+    description="Domain to set the CSRF cookie to.",
+)
+
 CSRF_TRUSTED_ORIGINS = get_delimited_list(
     name="CSRF_TRUSTED_ORIGINS",
     default=[],
@@ -1449,11 +1455,11 @@ MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST = get_string(
 )
 
 # Set to the list of hosts the app is allowed to redirect to.
-MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = [
-    "localhost",
-    "mitxonline.odl.local",
-]
-
+MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = get_delimited_list(
+    name="MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS",
+    default=["localhost", "mitxonline.odl.local"],
+    description="The list of hosts the app is allowed to redirect to",
+)
 
 OPENTELEMETRY_ENABLED = get_bool(
     name="OPENTELEMETRY_ENABLED",
