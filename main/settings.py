@@ -1455,13 +1455,11 @@ MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST = get_string(
 )
 
 # Set to the list of hosts the app is allowed to redirect to.
-MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = [
-    "localhost",
-    "mitxonline.odl.local",
-    "mitxonline.learn.c4103.com",
-    "courses.c4103.com",
-]
-
+MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = get_delimited_list(
+    name="MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS",
+    default="localhost,mitxonline.odl.local",
+    description="The list of hosts the app is allowed to redirect to",
+)
 
 OPENTELEMETRY_ENABLED = get_bool(
     name="OPENTELEMETRY_ENABLED",

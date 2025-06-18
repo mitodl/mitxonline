@@ -210,6 +210,10 @@
       "description": "The root directory for locally stored media. Typically not used.",
       "required": false
     },
+    "MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS": {
+      "description": "The list of hosts the app is allowed to redirect to",
+      "required": false
+    },
     "MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST": {
       "description": "The URL to redirect to after logging out",
       "required": false

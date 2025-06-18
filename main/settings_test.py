@@ -125,6 +125,24 @@ def test_csrf_trusted_origins(settings_sandbox):
     ]
 
 
+def test_mitol_apigateway_allowed_redirect_hosts(settings_sandbox):
+    """Verify that we can configure MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS with a var"""
+    # Test the default
+    settings_vars = settings_sandbox.get()
+    assert settings_vars.get("MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS") == []
+
+    # Verify the env var works
+    settings_vars = settings_sandbox.patch(
+        {
+            "MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS": "some.domain.com, some.other.domain.org",
+        }
+    )
+    assert settings_vars.get("MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS") == [
+        "some.domain.com",
+        "some.other.domain.org",
+    ]
+
+
 def test_db_ssl_enable(monkeypatch, settings_sandbox):
     """Verify that we can enable/disable database SSL with a var"""
     # Check default state is SSL on
