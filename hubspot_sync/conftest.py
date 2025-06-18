@@ -87,6 +87,33 @@ def hubspot_order():
 
 
 @pytest.fixture
+def hubspot_b2b_order():
+    """Return an order for testing with hubspot - this is a B2B order, so zero-value"""
+    order = factories.OrderFactory()
+    with reversion.create_revision():
+        product = factories.ProductFactory.create(price=Decimal("0"))
+
+    factories.LineFactory.create(
+        order=order,
+        product_version=Version.objects.get_for_object(product).first(),
+        purchased_object=product.purchasable_object,
+    )
+
+    HubspotObjectFactory.create(
+        content_object=order.purchaser,
+        content_type=ContentType.objects.get_for_model(User),
+        object_id=order.purchaser.id,
+    )
+    HubspotObjectFactory.create(
+        content_object=product,
+        content_type=ContentType.objects.get_for_model(Product),
+        object_id=product.id,
+    )
+
+    return order
+
+
+@pytest.fixture
 def hubspot_order_id(hubspot_order):
     """Create a HubspotObject for hubspot_order"""
     return HubspotObjectFactory.create(
