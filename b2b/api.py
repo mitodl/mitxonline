@@ -298,12 +298,9 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
         product_ids.update(contract.get_products().values_list("pk", flat=True))
 
     # Validate that at least one discount applies to these products
-    if not basket.discounts.filter(
+    return basket.discounts.filter(
         redeemed_discount__products__product__in=product_ids
-    ).exists():
-        return False
-
-    return True
+    ).exists()
 
 
 def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR0915
