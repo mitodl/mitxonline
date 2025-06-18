@@ -25,21 +25,14 @@ describe("UserMenu component", () => {
       6
     )
   })
-  ;[
-    [true, routes.apiGatewayLogout],
-    [false, routes.logout]
-  ].forEach(([enabled, expectedUrl]) => {
-    it(`has a link to ${expectedUrl} to logout if api_gateway_enabled=${enabled.toString()}`, () => {
-      global.SETTINGS = {
-        api_gateway_enabled: enabled
-      }
-      assert.equal(
-        shallow(<UserMenu currentUser={user} useScreenOverlay={false} />)
-          .find("a")
-          .at(0)
-          .prop("href"),
-        expectedUrl
-      )
-    })
+
+  it("has a link to logout", () => {
+    assert.equal(
+      shallow(<UserMenu currentUser={user} useScreenOverlay={false} />)
+        .find("a")
+        .at(0)
+        .prop("href"),
+      routes.logout
+    )
   })
 })

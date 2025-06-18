@@ -25,6 +25,7 @@ from hypothesis.stateful import (
     rule,
 )
 from mitol.common.pytest_utils import any_instance_of
+from pytest_lazyfixture import lazy_fixture
 from rest_framework import status
 from social_core.backends.email import EmailAuth
 
@@ -37,7 +38,10 @@ from main.test_utils import MockResponse
 from main.utils import encode_json_cookie_value
 from users.factories import UserFactory, UserSocialAuthFactory
 
-pytestmark = [pytest.mark.django_db]
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.urls("authentication.social_auth.pytest_urls"),
+]
 
 NEW_EMAIL = "test@example.com"
 NEXT_URL = "/next/url"
@@ -622,12 +626,22 @@ def test_get_social_auth_types(client, user):
     assert resp.json() == [{"provider": provider} for provider in social_auth_providers]
 
 
-def test_well_known_openid_configuration(client, settings):
-    """Test that .well-known/openid-configuration returns the right data"""
-    settings.SITE_BASE_URL = "http://mitx-online.local"
-    resp = client.get("/.well-known/openid-configuration")
-    assert resp.json() == {
-        "issuer": "http://mitx-online.local",
-        "authorization_endpoint": "http://mitx-online.local/oauth2/authorize/",
-        "token_endpoint": "http://mitx-online.local/oauth2/token/",
-    }
+@pytest.mark.parametrize(
+    ("auth_user", "url"),
+    [
+        (lazy_fixture("user"), "/logout?no_redirect=1"),
+        (None, "/logout?no_redirect=1"),
+        (lazy_fixture("user"), "/logout"),
+        (None, "/logout"),
+    ],
+)
+def test_logout(client, auth_user, url):
+    """Test that the legacy logout url works"""
+
+    if auth_user is not None:
+        client.force_login(auth_user)
+
+    resp = client.get(url)
+
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.headers["Location"] == "https://openedx.odl.local/logout"
