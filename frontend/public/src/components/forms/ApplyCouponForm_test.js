@@ -30,7 +30,7 @@ describe("ApplyCouponForm", () => {
       </Formik>
     )
 
-    expect(wrapper.find("#couponCodeError")).to.have.lengthOf(1)
+    expect(wrapper.find("div#couponCodeError").text()).to.equal("Invalid code")
   })
 
   it("does not render the overwrite warning text when there aren't discounts", () => {
