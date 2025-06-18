@@ -1,6 +1,5 @@
 // @flow
 import React from "react"
-import sinon from "sinon"
 import { assert } from "chai"
 import { shallow } from "enzyme"
 
