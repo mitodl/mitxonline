@@ -1,7 +1,7 @@
 // @flow
 import React from "react"
-import { assert } from "chai"
-import { shallow } from "enzyme"
+import { assert, expect } from "chai"
+import { shallow, mount } from "enzyme"
 
 import ApplyCouponForm from "./ApplyCouponForm"
 import { Formik } from "formik"
