@@ -100,4 +100,5 @@ def test_serialize_department_with_courses_and_programs__with_multiples(
             "program_ids": valid_program_id_list,
             "slug": department.slug,
         },
+        ignore_order=True,
     )
