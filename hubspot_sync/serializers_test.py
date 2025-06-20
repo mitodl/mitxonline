@@ -135,17 +135,31 @@ def test_serialize_order(settings, hubspot_order, status):
 
 
 @pytest.mark.parametrize(
-    "discount_type, amount, percent_off, amount_off",  # noqa: PT006
+    "discount_type, amount, percent_off, amount_off, zero_value_product",  # noqa: PT006
     [
-        [DISCOUNT_TYPE_PERCENT_OFF, Decimal(75), "75.00", "150.00"],  # noqa: PT007
-        [DISCOUNT_TYPE_DOLLARS_OFF, Decimal(75), "37.50", "75.00"],  # noqa: PT007
-        [DISCOUNT_TYPE_FIXED_PRICE, Decimal(75), "62.50", "125.00"],  # noqa: PT007
+        [DISCOUNT_TYPE_PERCENT_OFF, Decimal(75), "75.00", "150.00", False],  # noqa: PT007
+        [DISCOUNT_TYPE_DOLLARS_OFF, Decimal(75), "37.50", "75.00", False],  # noqa: PT007
+        [DISCOUNT_TYPE_FIXED_PRICE, Decimal(75), "62.50", "125.00", False],  # noqa: PT007
+        [DISCOUNT_TYPE_FIXED_PRICE, Decimal(0), "100.00", "200.00", False],  # noqa: PT007
+        [DISCOUNT_TYPE_FIXED_PRICE, Decimal(0), "100.00", "0.00", True],  # noqa: PT007
     ],
 )
 def test_serialize_order_with_coupon(  # noqa: PLR0913
-    settings, hubspot_order, discount_type, amount, percent_off, amount_off
+    settings,
+    hubspot_order,
+    hubspot_b2b_order,
+    discount_type,
+    amount,
+    percent_off,
+    amount_off,
+    zero_value_product,
 ):
     """Test that OrderToDealSerializer produces the correct serialized data for an order with coupon"""
+
+    # This uses a zero-value order - B2B products are often $0, and require a discount code.
+    if zero_value_product:
+        hubspot_order = hubspot_b2b_order
+
     discount = DiscountFactory.create(
         amount=amount,
         discount_type=discount_type,
@@ -156,6 +170,7 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
         redeemed_by=hubspot_order.purchaser,
         redemption_date=now_in_utc(),
     )
+
     serialized_data = OrderToDealSerializer(instance=hubspot_order).data
     assert serialized_data == {
         "dealname": f"MITXONLINE-ORDER-{hubspot_order.id}",
