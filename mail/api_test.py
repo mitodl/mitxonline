@@ -3,8 +3,8 @@
 from email.utils import formataddr
 
 import pytest
-from pytest_lazy_fixtures import lf
 from mitol.common.pytest_utils import any_instance_of
+from pytest_lazy_fixtures import lf
 
 from mail.api import (
     EmailMetadata,
