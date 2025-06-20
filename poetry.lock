@@ -4207,19 +4207,19 @@ pytest = ">=7.3.1"
 test = ["coverage (>=7.2.7)", "pytest-mock (>=3.10)"]
 
 [[package]]
-name = "pytest-lazy-fixture"
-version = "0.6.3"
-description = "It helps to use fixtures in pytest.mark.parametrize"
+name = "pytest-lazy-fixtures"
+version = "1.1.4"
+description = "Allows you to use fixtures in @pytest.mark.parametrize."
 optional = false
-python-versions = "*"
-groups = ["dev"]
+python-versions = "<4.0,>=3.8"
+groups = ["main"]
 files = [
-    {file = "pytest-lazy-fixture-0.6.3.tar.gz", hash = "sha256:0e7d0c7f74ba33e6e80905e9bfd81f9d15ef9a790de97993e34213deb5ad10ac"},
-    {file = "pytest_lazy_fixture-0.6.3-py3-none-any.whl", hash = "sha256:e0b379f38299ff27a653f03eaa69b08a6fd4484e46fd1c9907d984b9f9daeda6"},
+    {file = "pytest_lazy_fixtures-1.1.4-py3-none-any.whl", hash = "sha256:1504b6e267657d70d34829fce2580cedd4d3f8558491d6c03fab9b525ec77f2b"},
+    {file = "pytest_lazy_fixtures-1.1.4.tar.gz", hash = "sha256:c494b52d798890033d64b28687a4d52807c8b0f606d56316e139df0cbe116c57"},
 ]
 
 [package.dependencies]
-pytest = ">=3.2.5"
+pytest = ">=7"
 
 [[package]]
 name = "pytest-mock"
@@ -5567,4 +5567,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "f36e88ec9b516335214ec0282ea3f5b57a155dd44fc5fd6242fc5f961358d265"
+content-hash = "1a37604578ab6e9b46419bd486b30f932955c5a92cc6cc5b886f0237d0132153"
