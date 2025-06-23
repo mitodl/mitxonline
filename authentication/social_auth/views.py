@@ -9,7 +9,11 @@ from django.contrib.auth.views import LogoutView as DjangoLogoutView
 from django.shortcuts import render, reverse
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes, renderer_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    renderer_classes,
+)
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
@@ -48,6 +52,7 @@ class SocialAuthAPIView(APIView):
         """Return the serializer cls"""
         raise NotImplementedError("get_serializer_cls must be implemented")  # noqa: EM101
 
+    @extend_schema(exclude=True)
     def post(self, request):
         """Processes a request"""
         if bool(request.session.get("hijack_history")):
@@ -83,10 +88,6 @@ class LoginPasswordView(SocialAuthAPIView):
         return LoginPasswordSerializer
 
 
-@extend_schema(
-    request=RegisterEmailSerializer,
-    responses={200: RegisterEmailSerializer},
-)
 class RegisterEmailView(SocialAuthAPIView):
     """Email register view"""
 
@@ -143,10 +144,6 @@ class RegisterConfirmView(SocialAuthAPIView, GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(
-    request=RegisterDetailsSerializer,
-    responses={200: RegisterDetailsSerializer},
-)
 class RegisterDetailsView(SocialAuthAPIView):
     """Email registration details view"""
 
@@ -169,10 +166,6 @@ class RegisterDetailsView(SocialAuthAPIView):
         return resp
 
 
-@extend_schema(
-    request=RegisterExtraDetailsSerializer,
-    responses={200: RegisterExtraDetailsSerializer},
-)
 class RegisterExtraDetailsView(SocialAuthAPIView):
     """Email registration extra details view"""
 
@@ -181,6 +174,7 @@ class RegisterExtraDetailsView(SocialAuthAPIView):
         return RegisterExtraDetailsSerializer
 
 
+@extend_schema(exclude=True)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_social_auth_types(request):

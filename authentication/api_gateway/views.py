@@ -41,6 +41,7 @@ class ProfileDetailsAPIView(APIView):
         """Return the serializer cls"""
         raise NotImplementedError("get_serializer_cls must be implemented")  # noqa: EM101
 
+    @extend_schema(exclude=True)
     def post(self, request):
         """Processes a request"""
         if bool(request.session.get("hijack_history")):
@@ -58,10 +59,6 @@ class ProfileDetailsAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(
-    request=RegisterDetailsSerializer,
-    responses={200: RegisterDetailsSerializer},
-)
 class RegisterDetailsView(ProfileDetailsAPIView):
     """Email registration details view"""
 
@@ -84,10 +81,6 @@ class RegisterDetailsView(ProfileDetailsAPIView):
         return resp
 
 
-@extend_schema(
-    request=RegisterExtraDetailsSerializer,
-    responses={200: RegisterExtraDetailsSerializer},
-)
 class RegisterExtraDetailsView(ProfileDetailsAPIView):
     """Extra profile details view"""
 
