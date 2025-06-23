@@ -68,23 +68,25 @@ OPENEDX_AUTH_MAX_TTL_IN_SECONDS = 60 * 60
 ACCESS_TOKEN_HEADER_NAME = "X-Access-Token"  # noqa: S105
 
 
-def create_user(user):
+def create_user(user, edx_username=None):
     """
     Creates a user and any related artifacts in the openedx
 
     Args:
         user (user.models.User): the application user
     """
-    create_edx_user(user)
+
+    create_edx_user(user, edx_username)
     create_edx_auth_token(user)
 
 
-def create_edx_user(user):
+def create_edx_user(user, edx_username=None):
     """
     Makes a request to create an equivalent user in Open edX
 
     Args:
         user (user.models.User): the application user
+        edx_username (str): the username to use in Open edX
     """
     application = Application.objects.get(name=settings.OPENEDX_OAUTH_APP_NAME)
     expiry_date = now_in_utc() + timedelta(hours=settings.OPENEDX_TOKEN_EXPIRES_HOURS)
@@ -96,6 +98,13 @@ def create_edx_user(user):
         open_edx_user, _ = OpenEdxUser.objects.select_for_update().get_or_create(
             user=user, platform=PLATFORM_EDX
         )
+
+        if open_edx_user.edx_username is None:
+            if edx_username is None:
+                # If we don't have an edx username provided, generate one from the user's email
+                edx_username = user.email
+            open_edx_user.edx_username = edx_username
+            open_edx_user.save()
 
         if open_edx_user.has_been_synced:
             # Here we should check with edx that the user exists on that end.

@@ -37,7 +37,7 @@ class RegisterDetailsSerializer(serializers.Serializer):
             user.name = name
             user.save()
             if user.openedx_user is None:
-                create_user(user)
+                create_user(user, username)
             else:
                 user.openedx_user.edx_username = username
                 user.openedx_user.save()
