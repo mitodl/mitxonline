@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.120.2
+Version 0.120.2 (Released June 23, 2025)
 ---------------
 
 - Added logic to send user to the gateway logout url (#2732)
