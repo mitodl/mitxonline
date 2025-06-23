@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.121.1
+---------------
+
+- Fix logout redirects (#2736)
+- Fix divide-by-zero error if there is a full-value discount (#2743)
+- Make CSRF_COOKIE_DOMAIN configurable by env variable (#2742)
+- Remove unused feature flag class (#2734)
+- Update next_run_id to add B2B course run awareness (#2738)
+- fix update enrollment serializer (#2737)
+- Update google sheets and pluggy (#2715)
+- B2B Provisioning: create edX course runs when courseware is added to a contract (#2705)
+
 Version 0.120.2 (Released June 23, 2025)
 ---------------
 
