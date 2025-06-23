@@ -67,6 +67,7 @@ class RegisterDetailsView(ProfileDetailsAPIView):
 
     serializer_class = RegisterDetailsSerializer
 
+    @extend_schema(exclude=True)
     def post(self, request):
         resp = super().post(request)
         if is_success_response(resp):

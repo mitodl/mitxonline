@@ -4,27 +4,6 @@ info:
   version: 0.0.1 (v2)
   description: MIT public API
 paths:
-  /api/profile/details/:
-    post:
-      operationId: api_profile_details_create
-      description: Processes a request
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RegisterDetailsRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/RegisterDetailsRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/RegisterDetailsRequest'
-        required: true
-      responses:
-        '200':
-          description: No response body
   /api/records/program/{id}/:
     get:
       operationId: learner_record_retrieve_by_id
@@ -2287,31 +2266,6 @@ components:
       - one-time
       - one-time-per-user
       - unlimited
-    RegisterDetailsRequest:
-      type: object
-      description: Serializer for registration details
-      properties:
-        name:
-          type: string
-          writeOnly: true
-          minLength: 1
-        username:
-          type: string
-          writeOnly: true
-          minLength: 1
-        legal_address:
-          allOf:
-          - $ref: '#/components/schemas/LegalAddressRequest'
-          writeOnly: true
-        user_profile:
-          allOf:
-          - $ref: '#/components/schemas/UserProfileRequest'
-          writeOnly: true
-      required:
-      - legal_address
-      - name
-      - user_profile
-      - username
     ResultEnum:
       enum:
       - b2b-disallowed
