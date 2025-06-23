@@ -88,7 +88,7 @@ def test_create_user(user, mocker):
     mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
     mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
     create_user(user)
-    mock_create_edx_user.assert_called_with(user)
+    mock_create_edx_user.assert_called_with(user, None)
     mock_create_edx_auth_token.assert_called_with(user)
 
 
