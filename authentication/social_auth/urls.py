@@ -1,11 +1,12 @@
 """URL configurations for authentication"""
 
-from django.urls import path
+from django.urls import path, re_path
 from django.urls.conf import include
 
 from authentication.social_auth.views import (
     LoginEmailView,
     LoginPasswordView,
+    LogoutView,
     RegisterConfirmView,
     RegisterDetailsView,
     RegisterEmailView,
@@ -34,4 +35,9 @@ urlpatterns = [
     ),
     path("api/", include("mitol.authentication.urls.djoser_urls")),
     path("api/auths/", get_social_auth_types, name="get-auth-types-api"),
+    re_path(
+        r"^logout\/?$",
+        LogoutView.as_view(),
+        name="logout",
+    ),
 ]

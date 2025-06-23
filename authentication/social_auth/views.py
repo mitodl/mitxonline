@@ -1,14 +1,19 @@
 """Authentication views"""
 
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urlencode, urljoin, urlparse
 
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.views import LogoutView as DjangoLogoutView
 from django.shortcuts import render, reverse
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes, renderer_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    renderer_classes,
+)
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
@@ -47,6 +52,7 @@ class SocialAuthAPIView(APIView):
         """Return the serializer cls"""
         raise NotImplementedError("get_serializer_cls must be implemented")  # noqa: EM101
 
+    @extend_schema(exclude=True)
     def post(self, request):
         """Processes a request"""
         if bool(request.session.get("hijack_history")):
@@ -82,10 +88,6 @@ class LoginPasswordView(SocialAuthAPIView):
         return LoginPasswordSerializer
 
 
-@extend_schema(
-    request=RegisterEmailSerializer,
-    responses={200: RegisterEmailSerializer},
-)
 class RegisterEmailView(SocialAuthAPIView):
     """Email register view"""
 
@@ -93,6 +95,7 @@ class RegisterEmailView(SocialAuthAPIView):
         """Return the serializer cls"""
         return RegisterEmailSerializer
 
+    @extend_schema(exclude=True)
     def post(self, request):
         """Verify recaptcha response before proceeding"""
         if bool(request.session.get("hijack_history")):
@@ -121,6 +124,7 @@ class RegisterConfirmView(SocialAuthAPIView, GenericAPIView):
         """Return the serializer class"""
         return RegisterConfirmSerializer
 
+    @extend_schema(exclude=True)
     def post(self, request):
         """
         Handle POST requests to confirm email registration
@@ -142,10 +146,6 @@ class RegisterConfirmView(SocialAuthAPIView, GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(
-    request=RegisterDetailsSerializer,
-    responses={200: RegisterDetailsSerializer},
-)
 class RegisterDetailsView(SocialAuthAPIView):
     """Email registration details view"""
 
@@ -153,6 +153,7 @@ class RegisterDetailsView(SocialAuthAPIView):
         """Return the serializer cls"""
         return RegisterDetailsSerializer
 
+    @extend_schema(exclude=True)
     def post(self, request):
         resp = super().post(request)
         if is_success_response(resp):
@@ -168,10 +169,6 @@ class RegisterDetailsView(SocialAuthAPIView):
         return resp
 
 
-@extend_schema(
-    request=RegisterExtraDetailsSerializer,
-    responses={200: RegisterExtraDetailsSerializer},
-)
 class RegisterExtraDetailsView(SocialAuthAPIView):
     """Email registration extra details view"""
 
@@ -180,6 +177,7 @@ class RegisterExtraDetailsView(SocialAuthAPIView):
         return RegisterExtraDetailsSerializer
 
 
+@extend_schema(exclude=True)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_social_auth_types(request):
@@ -217,3 +215,17 @@ def well_known_openid_configuration(request):  # noqa: ARG001
         },
         content_type="application/json",
     )
+
+
+class LogoutView(DjangoLogoutView):
+    """Custom view to modify base functionality in django.contrib.auth.views.LogoutView"""
+
+    def get_next_page(self):
+        next_page = super().get_next_page()
+
+        if next_page in (self.next_page, self.request.path):
+            return next_page
+        else:
+            params = {"redirect_url": settings.SITE_BASE_URL}
+            next_page += ("&" if urlparse(next_page).query else "?") + urlencode(params)
+            return next_page
