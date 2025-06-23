@@ -95,6 +95,7 @@ class RegisterEmailView(SocialAuthAPIView):
         """Return the serializer cls"""
         return RegisterEmailSerializer
 
+    @extend_schema(exclude=True)
     def post(self, request):
         """Verify recaptcha response before proceeding"""
         if bool(request.session.get("hijack_history")):
@@ -123,6 +124,7 @@ class RegisterConfirmView(SocialAuthAPIView, GenericAPIView):
         """Return the serializer class"""
         return RegisterConfirmSerializer
 
+    @extend_schema(exclude=True)
     def post(self, request):
         """
         Handle POST requests to confirm email registration
@@ -151,6 +153,7 @@ class RegisterDetailsView(SocialAuthAPIView):
         """Return the serializer cls"""
         return RegisterDetailsSerializer
 
+    @extend_schema(exclude=True)
     def post(self, request):
         resp = super().post(request)
         if is_success_response(resp):

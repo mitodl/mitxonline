@@ -34,12 +34,15 @@ User = get_user_model()
 class ProfileDetailsAPIView(APIView):
     """API view for profile update endpoints"""
 
+    serializer_class = None
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = [IsAuthenticated]
 
     def get_serializer_cls(self):  # pragma: no cover
         """Return the serializer cls"""
-        raise NotImplementedError("get_serializer_cls must be implemented")  # noqa: EM101
+        if self.serializer_class is None:
+            raise NotImplementedError("get_serializer_cls must be implemented")  # noqa: EM101
+        return self.serializer_class
 
     @extend_schema(exclude=True)
     def post(self, request):
@@ -62,9 +65,7 @@ class ProfileDetailsAPIView(APIView):
 class RegisterDetailsView(ProfileDetailsAPIView):
     """Email registration details view"""
 
-    def get_serializer_cls(self):
-        """Return the serializer cls"""
-        return RegisterDetailsSerializer
+    serializer_class = RegisterDetailsSerializer
 
     def post(self, request):
         resp = super().post(request)
@@ -84,9 +85,7 @@ class RegisterDetailsView(ProfileDetailsAPIView):
 class RegisterExtraDetailsView(ProfileDetailsAPIView):
     """Extra profile details view"""
 
-    def get_serializer_cls(self):
-        """Return the serializer cls"""
-        return RegisterExtraDetailsSerializer
+    serializer_class = RegisterExtraDetailsSerializer
 
 
 def get_redirect_url(request):
