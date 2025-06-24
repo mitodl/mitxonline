@@ -92,6 +92,20 @@ jobs:
           OPENEDX_API_CLIENT_ID: fake_client_id
           OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
 
+      - name: Django system checks
+        run: poetry run ./manage.py check --fail-level WARNING
+        env:
+          CELERY_TASK_ALWAYS_EAGER: 'True'
+          CELERY_BROKER_URL: redis://localhost:6379/4
+          CELERY_RESULT_BACKEND: redis://localhost:6379/4
+          SECRET_KEY: local_unsafe_key   # pragma: allowlist secret
+          MITX_ONLINE_BASE_URL: http://localhost:8013
+          MAILGUN_SENDER_DOMAIN: other.fake.site
+          MAILGUN_KEY: fake_mailgun_key
+          MITX_ONLINE_ADMIN_EMAIL: example@localhost
+          OPENEDX_API_CLIENT_ID: fake_client_id
+          OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
+
       - name: Tests
         run: |
           export MEDIA_ROOT="$(mktemp -d)"
