@@ -25,7 +25,7 @@ from hypothesis.stateful import (
     rule,
 )
 from mitol.common.pytest_utils import any_instance_of
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf
 from rest_framework import status
 from social_core.backends.email import EmailAuth
 
@@ -629,9 +629,9 @@ def test_get_social_auth_types(client, user):
 @pytest.mark.parametrize(
     ("auth_user", "url"),
     [
-        (lazy_fixture("user"), "/logout?no_redirect=1"),
+        (lf("user"), "/logout?no_redirect=1"),
         (None, "/logout?no_redirect=1"),
-        (lazy_fixture("user"), "/logout"),
+        (lf("user"), "/logout"),
         (None, "/logout"),
     ],
 )
