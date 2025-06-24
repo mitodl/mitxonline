@@ -4,6 +4,7 @@ from email.utils import formataddr
 
 import pytest
 from mitol.common.pytest_utils import any_instance_of
+from pytest_lazy_fixtures import lf
 
 from mail.api import (
     EmailMetadata,
@@ -21,7 +22,6 @@ from mail.exceptions import EmailSendFailureException
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("email_settings")]
-lazy = pytest.lazy_fixture
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def test_safe_format_recipients_override(user, settings):
     assert safe_format_recipients([user]) == [("admin@localhost", user)]
 
 
-@pytest.mark.parametrize("test_user", [None, lazy("user")])
+@pytest.mark.parametrize("test_user", [None, lf("user")])
 @pytest.mark.parametrize("extra_context", [None, {}, {"other": "value"}])
 def test_context_for_user(settings, test_user, extra_context):
     """Tests that context_for_user returns the expected values"""
