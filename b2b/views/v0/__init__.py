@@ -3,7 +3,7 @@
 from django.contrib.contenttypes.models import ContentType
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
-from rest_framework import viewsets
+from rest_framework import status, viewsets
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,6 +18,7 @@ from b2b.serializers.v0 import (
 )
 from courses.models import CourseRun
 from ecommerce.models import Product
+from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 
 
 class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -65,6 +66,11 @@ class Enroll(APIView):
             content_type=course_run_content_type, object_id=courserun.id
         ).get()
 
+        response = create_b2b_enrollment(request, product)
+
         return Response(
-            CreateB2BEnrollmentSerializer(create_b2b_enrollment(request, product)).data
+            CreateB2BEnrollmentSerializer(response).data,
+            status=status.HTTP_201_CREATED
+            if response["response"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+            else status.HTTP_406_NOT_ACCEPTABLE,
         )
