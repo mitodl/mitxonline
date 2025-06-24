@@ -100,9 +100,6 @@ def create_edx_user(user, edx_username=None):
         )
 
         if open_edx_user.edx_username is None:
-            if edx_username is None:
-                # If we don't have an edx username provided, generate one from the user's email
-                edx_username = user.email
             open_edx_user.edx_username = edx_username
             open_edx_user.save()
 
@@ -129,7 +126,7 @@ def create_edx_user(user, edx_username=None):
         resp = req_session.post(
             edx_url(OPENEDX_REGISTER_USER_PATH),
             data=dict(
-                username=user.edx_username,
+                username=open_edx_user.edx_username,
                 email=user.email,
                 name=user.name,
                 country=user.legal_address.country if user.legal_address else None,
