@@ -119,10 +119,16 @@ def edx_username_validation_response_mock(username_exists, settings):
 @responses.activate
 @pytest.mark.parametrize("has_been_synced", [True, False])
 @pytest.mark.parametrize("access_token_count", [0, 1, 3])
-def test_create_edx_user(settings, application, has_been_synced, access_token_count):
+@pytest.mark.parametrize("provided_username, missing_username", [["test_username", True], ["test_username", False], [None, False]])
+def test_create_edx_user(settings, application, has_been_synced, access_token_count, provided_username, missing_username):
     """Test that create_edx_user makes a request to create an edX user"""
     user = UserFactory.create(openedx_user__has_been_synced=has_been_synced)
+    openedx_user = user.openedx_users.first()
+    if missing_username:
+        openedx_user.edx_username = None
+        openedx_user.save()
 
+    original_username = user.edx_username
     resp1 = responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}/api/mobile/v0.5/my_user_info",
@@ -144,7 +150,10 @@ def test_create_edx_user(settings, application, has_been_synced, access_token_co
             expires=now_in_utc() + timedelta(hours=1),
         )
 
-    create_edx_user(user)
+    if provided_username:
+        create_edx_user(user, provided_username)
+    else:
+        create_edx_user(user)
 
     # An AccessToken should be created during execution
     created_access_token = AccessToken.objects.filter(application=application).last()
@@ -160,8 +169,9 @@ def test_create_edx_user(settings, application, has_been_synced, access_token_co
             resp2.calls[0].request.headers[ACCESS_TOKEN_HEADER_NAME]
             == settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
         )
+        openedx_user = user.openedx_users.first()
         assert dict(parse_qsl(resp2.calls[0].request.body)) == {
-            "username": user.edx_username,
+            "username": openedx_user.edx_username,
             "email": user.email,
             "name": user.name,
             "provider": settings.OPENEDX_OAUTH_PROVIDER,
@@ -179,6 +189,10 @@ def test_create_edx_user(settings, application, has_been_synced, access_token_co
         ).exists()
         is True
     )
+    if provided_username and missing_username:
+        assert user.openedx_users.first().edx_username == provided_username
+    elif provided_username and not missing_username:
+        assert user.openedx_users.first().edx_username == original_username
 
 
 @responses.activate
