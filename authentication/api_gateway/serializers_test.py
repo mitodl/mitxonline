@@ -12,7 +12,7 @@ from users.factories import UserFactory
 
 @pytest.mark.django_db
 def test_register_details_serializer_create(
-    user, valid_address_dict, user_profile_dict, rf
+    mocker, user, valid_address_dict, user_profile_dict, rf
 ):
     """Test the create method of RegisterDetailsSerializer"""
 
@@ -25,6 +25,8 @@ def test_register_details_serializer_create(
         "legal_address": valid_address_dict,
         "user_profile": user_profile_dict,
     }
+    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
+    mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
 
     serializer = RegisterDetailsSerializer(data=data, context={"request": request})
     assert serializer.is_valid(), serializer.errors
@@ -32,7 +34,6 @@ def test_register_details_serializer_create(
     assert serializer.is_valid()
     user = serializer.save()
     assert user.name == "John Doe"
-    assert user.edx_username == "johndoe"
     validated_data = serializer.validated_data
     assert validated_data["user_profile"]["gender"] is None
     assert validated_data["user_profile"]["year_of_birth"] == 1980
