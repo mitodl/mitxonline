@@ -59,8 +59,8 @@ def test_serialize_course(
             "readable_id": course.readable_id,
             "id": course.id,
             "courseruns": [
-                CourseRunSerializer(courseRun1).data,
-                CourseRunSerializer(courseRun2).data,
+                CourseRunSerializer(run).data
+                for run in sorted([courseRun1, courseRun2], key=lambda run: run.id)
             ],
             "next_run_id": course.first_unexpired_run.id,
             "max_weekly_hours": course.page.max_weekly_hours,
@@ -75,9 +75,11 @@ def test_serialize_course(
             "max_weeks": course.page.max_weeks,
             "min_weeks": course.page.min_weeks,
             "time_commitment": course.page.effort,
-            "programs": BaseProgramSerializer(course.programs, many=True).data
-            if all_runs
-            else None,
+            "programs": (
+                BaseProgramSerializer(course.programs, many=True).data
+                if all_runs
+                else None
+            ),
         },
     )
 
