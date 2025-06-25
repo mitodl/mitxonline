@@ -846,7 +846,7 @@ def _has_earned_program_cert(user, program):
     root = ProgramRequirement.get_root_nodes().get(program=program)
 
     def _has_earned(node):
-        if node.is_root or node.is_all_of_operator:  # noqa: RET503
+        if node.is_root or node.is_all_of_operator:
             # has passed all of the child requirements
             return all(_has_earned(child) for child in node.get_children())
         elif node.is_min_number_of_operator:

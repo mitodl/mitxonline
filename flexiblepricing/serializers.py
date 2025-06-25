@@ -207,7 +207,7 @@ class FlexiblePriceCoursewareAdminSerializer(serializers.ModelSerializer):
         program_content_type = ContentType.objects.get(
             app_label="courses", model="program"
         ).id
-        if instance["courseware_content_type"] == course_content_type:  # noqa: RET503
+        if instance["courseware_content_type"] == course_content_type:
             return BaseCourseSerializer(
                 Course.objects.filter(id=instance["courseware_object_id"]).first()
             ).data
