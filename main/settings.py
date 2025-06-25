@@ -109,7 +109,6 @@ CSRF_COOKIE_DOMAIN = get_string(
     default=None,
     description="Domain to set the CSRF cookie to.",
 )
-
 CSRF_TRUSTED_ORIGINS = get_delimited_list(
     name="CSRF_TRUSTED_ORIGINS",
     default=[],
