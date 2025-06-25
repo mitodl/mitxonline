@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 from mitol.scim.adapters import UserAdapter
 
+from b2b.models import ContractPage
 from openedx.models import OpenEdxUser
 from users.models import LegalAddress, UserProfile
 
@@ -25,6 +26,7 @@ class LearnUserAdapter(UserAdapter):
     user_profile: UserProfile
     legal_address: LegalAddress
     openedx_user: OpenEdxUser
+    b2b_contracts: ContractPage
 
     def __init__(self, obj, request=None):
         super().__init__(obj, request=request)
@@ -33,9 +35,12 @@ class LearnUserAdapter(UserAdapter):
             self.obj, "user_profile", UserProfile()
         )
 
-        self.legal_address = self.obj.legal_address = getattr(
-            self.obj, "legal_address", LegalAddress()
-        )
+        try:
+            self.legal_address = self.obj.legal_address  # triggers DB fetch if needed
+        except LegalAddress.DoesNotExist:
+            self.legal_address = LegalAddress()
+
+        self.b2b_contracts = self.obj.b2b_contracts
 
         self.openedx_user = self.obj.openedx_user
         if self.openedx_user is None:
@@ -54,24 +59,28 @@ class LearnUserAdapter(UserAdapter):
         Consume a ``dict`` conforming to the SCIM User Schema, updating the
         internal user object with data from the ``dict``.
 
-        Please note, the user object is not saved within this method. To
-        persist the changes made by this method, please call ``.save()`` on the
-        adapter. Eg::
-
-            scim_user.from_dict(d)
-            scim_user.save()
+        Note: This method does NOT save the user object. To persist changes,
+        call ``.save()`` on the adapter.
         """
         super().from_dict(d)
 
         self.obj.name = d.get("fullName", "")
 
-        first_name = d.get("name", {}).get("given_name", "")
-        if first_name:
-            self.legal_address.first_name = first_name
+        name_data = d.get("name", {})
 
-        last_name = d.get("name", {}).get("last_name", "")
-        if last_name:
-            self.legal_address.last_name = last_name
+        self.legal_address.first_name = (
+            name_data.get("given_name") or self.legal_address.first_name
+        )
+        self.legal_address.last_name = (
+            name_data.get("last_name") or self.legal_address.last_name
+        )
+
+        organization_name = d.get("organization")
+        if organization_name:
+            contract_pages = ContractPage.objects.filter(
+                organization__name=organization_name
+            )
+            self.b2b_contracts.add(*contract_pages)
 
     def _save_related(self):
         self.user_profile.user = self.obj
@@ -82,3 +91,5 @@ class LearnUserAdapter(UserAdapter):
 
         self.openedx_user.user = self.obj
         self.openedx_user.save()
+
+        self.obj.b2b_contracts.add(*self.b2b_contracts)
