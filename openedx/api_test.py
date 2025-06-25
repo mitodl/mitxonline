@@ -120,9 +120,9 @@ def edx_username_validation_response_mock(username_exists, settings):
 @pytest.mark.parametrize("has_been_synced", [True, False])
 @pytest.mark.parametrize("access_token_count", [0, 1, 3])
 @pytest.mark.parametrize(
-    "provided_username,missing_username",
-    [["test_username", True], ["test_username", False], [None, False]],
+    "provided_username", ["test_username", None]  # noqa: PT006
 )
+@pytest.mark.parametrize("missing_username", [True, False])
 def test_create_edx_user(
     settings,
     application,
@@ -179,9 +179,7 @@ def test_create_edx_user(
             resp2.calls[0].request.headers[ACCESS_TOKEN_HEADER_NAME]
             == settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
         )
-        openedx_user = user.openedx_users.first()
-        assert dict(parse_qsl(resp2.calls[0].request.body)) == {
-            "username": openedx_user.edx_username,
+        expected_request_body = {
             "email": user.email,
             "name": user.name,
             "provider": settings.OPENEDX_OAUTH_PROVIDER,
@@ -193,6 +191,11 @@ def test_create_edx_user(
             "gender": user.user_profile.gender if user.user_profile else None,
             "honor_code": "True",
         }
+        if provided_username:
+            expected_request_body["username"] = provided_username
+        if not missing_username:
+            expected_request_body["username"] = original_username
+        assert dict(parse_qsl(resp2.calls[0].request.body)) == expected_request_body
     assert (
         OpenEdxUser.objects.filter(
             user=user, platform=PLATFORM_EDX, has_been_synced=True
