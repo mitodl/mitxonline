@@ -123,7 +123,7 @@ def edx_username_validation_response_mock(username_exists, settings):
     "provided_username", ["test_username", None]  # noqa: PT006
 )
 @pytest.mark.parametrize("missing_username", [True, False])
-def test_create_edx_user(
+def test_create_edx_user(  # noqa: PLR0913
     settings,
     application,
     has_been_synced,
