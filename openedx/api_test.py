@@ -119,8 +119,18 @@ def edx_username_validation_response_mock(username_exists, settings):
 @responses.activate
 @pytest.mark.parametrize("has_been_synced", [True, False])
 @pytest.mark.parametrize("access_token_count", [0, 1, 3])
-@pytest.mark.parametrize("provided_username, missing_username", [["test_username", True], ["test_username", False], [None, False]])
-def test_create_edx_user(settings, application, has_been_synced, access_token_count, provided_username, missing_username):
+@pytest.mark.parametrize(
+    "provided_username,missing_username",
+    [["test_username", True], ["test_username", False], [None, False]],
+)
+def test_create_edx_user(
+    settings,
+    application,
+    has_been_synced,
+    access_token_count,
+    provided_username,
+    missing_username
+):
     """Test that create_edx_user makes a request to create an edX user"""
     user = UserFactory.create(openedx_user__has_been_synced=has_been_synced)
     openedx_user = user.openedx_users.first()
