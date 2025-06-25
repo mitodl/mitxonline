@@ -2691,14 +2691,14 @@ touchstone = ["python3-saml (>=1.10.1) ; python_version < \"3.13\""]
 
 [[package]]
 name = "mitol-django-common"
-version = "2025.5.23"
+version = "2025.6.20"
 description = "MIT Open Learning django app extensions for common utilities"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol_django_common-2025.5.23-py3-none-any.whl", hash = "sha256:3ec46487146473293e3918c29ef92412ffd9f3ca1ce442ddc06c4a80ae0afe09"},
-    {file = "mitol_django_common-2025.5.23.tar.gz", hash = "sha256:5b56dfc1b5ad6d843bf19c2a3b529a1e8f69f466a8c548f796f0ab193882b2e9"},
+    {file = "mitol_django_common-2025.6.20-py3-none-any.whl", hash = "sha256:a3a1d2ed1570cf905132651ab1338cf30924904c6f4d98af62e80cf9a25d4f54"},
+    {file = "mitol_django_common-2025.6.20.tar.gz", hash = "sha256:5060a99537a571ec8e5b94a3972161a318ae60dc7df4154ebcc8cb5f29cfbdbb"},
 ]
 
 [package.dependencies]
