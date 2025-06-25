@@ -36,11 +36,7 @@ class RegisterDetailsSerializer(serializers.Serializer):
         with transaction.atomic():
             user.name = name
             user.save()
-            if user.openedx_user is None:
-                create_user(user, username)
-            else:
-                user.openedx_user.edx_username = username
-                user.openedx_user.save()
+            create_user(user, username)
 
             if legal_address_data:
                 legal_address = LegalAddressSerializer(
