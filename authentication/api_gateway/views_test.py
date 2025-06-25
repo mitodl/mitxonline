@@ -2,7 +2,7 @@ from urllib.parse import urlencode
 
 import pytest
 from django.urls import reverse
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf
 from rest_framework import status
 
 from users.api import User
@@ -106,13 +106,13 @@ def test_custom_login_view_authenticated_user_with_completed_onboarding(client):
     ("auth_user", "url", "expected_redirect_url"),
     [
         (
-            lazy_fixture("user"),
+            lf("user"),
             "/logout?no_redirect=1",
             "http://mitxonline.odl.local/logout/oidc",
         ),
         (None, "/logout?no_redirect=1", "http://mitxonline.odl.local"),
         (
-            lazy_fixture("user"),
+            lf("user"),
             "/logout",
             "https://openedx.odl.local/logout?redirect_url=http%3A%2F%2Fmitxonline.odl.local",
         ),
