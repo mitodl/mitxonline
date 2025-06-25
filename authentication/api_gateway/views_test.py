@@ -15,7 +15,7 @@ pytestmark = [
 ]
 
 
-def test_post_user_profile_detail(valid_address_dict, client, user):
+def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
     """Test that user can save profile details"""
     client.force_login(user)
     data = {
@@ -24,6 +24,8 @@ def test_post_user_profile_detail(valid_address_dict, client, user):
         "legal_address": valid_address_dict,
         "user_profile": {},
     }
+    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
+    mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
     resp = client.post(
         reverse("profile-details-api"), data, content_type="application/json"
     )
@@ -31,6 +33,8 @@ def test_post_user_profile_detail(valid_address_dict, client, user):
     assert resp.status_code == status.HTTP_200_OK
     # Checks that user's name in database is also updated
     assert User.objects.get(pk=user.pk).name == data["name"]
+    assert mock_create_edx_user.called is True
+    assert mock_create_edx_auth_token.called is True
 
     data = {
         "name": "John Doe",
