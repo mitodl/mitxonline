@@ -38,6 +38,8 @@ def test_register_details_serializer_create(
     assert validated_data["user_profile"]["gender"] is None
     assert validated_data["user_profile"]["year_of_birth"] == 1980
     assert validated_data["legal_address"]["country"] == "US"
+    assert mock_create_edx_user.call_count == 1
+    assert mock_create_edx_auth_token.call_count == 1
 
 
 @pytest.mark.django_db
