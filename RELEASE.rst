@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.121.1
+Version 0.121.1 (Released June 26, 2025)
 ---------------
 
 - Fix logout redirects (#2736)
