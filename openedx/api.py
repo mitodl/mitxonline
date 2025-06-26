@@ -17,6 +17,7 @@ from mitol.common.utils import (
     find_object_with_matching_attr,
     get_error_response_summary,
     now_in_utc,
+    usernameify,
 )
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
@@ -30,6 +31,7 @@ from main.utils import get_partitioned_set_difference
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
+    OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
 )
 from openedx.exceptions import (
@@ -151,6 +153,44 @@ def create_edx_user(user, edx_username=None):
         open_edx_user.has_been_synced = True
         open_edx_user.save()
         return True
+
+
+def reconcile_edx_username(user):
+    """
+    Reconcile the user's edX username.
+
+    If the user doesn't have an edX username, then we should use the user's
+    supplied username if it exists. If they don't have a username either, then
+    we should generate it.
+
+    Args:
+    - user: the user to reconcile
+    Returns:
+    - boolean, true if we created a username
+    """
+
+    if not user.openedx_users.filter(edx_username__isnull=False).exists():
+        edx_user, _ = OpenEdxUser.objects.filter(
+            edx_username__isnull=True, user=user
+        ).get_or_create(defaults={"user": user})
+
+        # skip the user's username if it's an email address or has a @ in it
+        # @ is disallowed in edx usernames so instead force it through usernameify
+        user_username = (
+            None
+            if "@" in user.username or user.username == user.email
+            else user.username
+        )
+
+        edx_user.edx_username = (
+            user_username[:OPENEDX_USERNAME_MAX_LEN]
+            if user_username
+            else usernameify(user.name, user.email, OPENEDX_USERNAME_MAX_LEN)
+        )
+        edx_user.save()
+        return True
+
+    return False
 
 
 @transaction.atomic
@@ -725,6 +765,10 @@ def enroll_in_edx_course_runs(
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
     edx_client = get_edx_api_service_client()
+
+    if reconcile_edx_username(user):
+        user.reload_from_db()
+
     username = user.edx_username
 
     results = []

@@ -11,6 +11,7 @@ import responses
 from django.contrib.auth import get_user_model
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
+from mitol.common.utils.user import _reformat_for_username
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
@@ -31,6 +32,7 @@ from openedx.api import (
     get_edx_api_client,
     get_edx_retirement_service_client,
     get_valid_edx_api_auth,
+    reconcile_edx_username,
     repair_faulty_edx_user,
     repair_faulty_openedx_users,
     retry_failed_edx_enrollments,
@@ -1005,3 +1007,41 @@ def test_bulk_retire_edx_users(mocker):
     mock_client.bulk_user_retirement.retire_users.assert_called_with(
         {"usernames": test_usernames}
     )
+
+
+@pytest.mark.parametrize("username_is_email", [True, False])
+@pytest.mark.parametrize("name_is_empty", [True, False])
+def test_reconcile_edx_username(username_is_email, name_is_empty):
+    """Ensure the edX username reconciliation works properly."""
+
+    user = UserFactory.create(openedx_user=None)
+
+    if username_is_email:
+        user.username = user.email
+
+        if name_is_empty:
+            user.name = ""
+
+        user.save()
+        user.refresh_from_db()
+
+    assert reconcile_edx_username(user)
+
+    user.refresh_from_db()
+
+    assert user.openedx_users.count() == 1
+
+    if username_is_email:
+        # If the username is explicitly an email address (or contains @),
+        # it should use the usernameify function, with one of a couple of outcomes.
+
+        if name_is_empty:
+            assert user.openedx_users.get().edx_username == _reformat_for_username(
+                user.email.split("@")[0]
+            )
+        else:
+            assert user.openedx_users.get().edx_username == _reformat_for_username(
+                user.name
+            )
+    else:
+        assert user.openedx_users.get().edx_username == user.username
