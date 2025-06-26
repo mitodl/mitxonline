@@ -245,13 +245,12 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
         """Get the course runs for the given instance."""
+        courseruns = instance.courseruns.order_by("id")
 
         if "org_id" in self.context:
-            courseruns = instance.courseruns.filter(
+            courseruns = courseruns.filter(
                 b2b_contract__organization_id=self.context["org_id"]
-            ).all()
-        else:
-            courseruns = instance.courseruns.all()
+            )
 
         return CourseRunSerializer(courseruns, many=True, read_only=True).data
 
