@@ -49,6 +49,7 @@ from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
+    OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
 )
 from openedx.exceptions import (
@@ -1011,7 +1012,8 @@ def test_bulk_retire_edx_users(mocker):
 
 @pytest.mark.parametrize("username_is_email", [True, False])
 @pytest.mark.parametrize("name_is_empty", [True, False])
-def test_reconcile_edx_username(username_is_email, name_is_empty):
+@pytest.mark.parametrize("username_is_long", [True, False])
+def test_reconcile_edx_username(username_is_email, name_is_empty, username_is_long):
     """Ensure the edX username reconciliation works properly."""
 
     user = UserFactory.create(openedx_user=None)
@@ -1024,6 +1026,11 @@ def test_reconcile_edx_username(username_is_email, name_is_empty):
 
         user.save()
         user.refresh_from_db()
+    elif username_is_long:
+        user.username = str(
+            factory.Faker("pystr", max_characters=(OPENEDX_USERNAME_MAX_LEN + 2))
+        )
+        user.save()
 
     assert reconcile_edx_username(user)
 
@@ -1044,4 +1051,9 @@ def test_reconcile_edx_username(username_is_email, name_is_empty):
                 user.name
             )
     else:
-        assert user.openedx_users.get().edx_username == user.username
+        if username_is_long:
+            assert len(user.username) > OPENEDX_USERNAME_MAX_LEN
+        assert (
+            user.openedx_users.get().edx_username
+            == user.username[:OPENEDX_USERNAME_MAX_LEN]
+        )
