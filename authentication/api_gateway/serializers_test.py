@@ -1,14 +1,18 @@
 import pytest
+import responses
+from rest_framework import status
 
 from authentication.api_gateway.serializers import (
     RegisterDetailsSerializer,
     RegisterExtraDetailsSerializer,
 )
+from openedx.models import OpenEdxUser
+from users.factories import UserFactory
 
 
 @pytest.mark.django_db
 def test_register_details_serializer_create(
-    user, valid_address_dict, user_profile_dict, rf
+    mocker, user, valid_address_dict, user_profile_dict, rf
 ):
     """Test the create method of RegisterDetailsSerializer"""
 
@@ -21,6 +25,8 @@ def test_register_details_serializer_create(
         "legal_address": valid_address_dict,
         "user_profile": user_profile_dict,
     }
+    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
+    mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
 
     serializer = RegisterDetailsSerializer(data=data, context={"request": request})
     assert serializer.is_valid(), serializer.errors
@@ -28,7 +34,54 @@ def test_register_details_serializer_create(
     assert serializer.is_valid()
     user = serializer.save()
     assert user.name == "John Doe"
-    assert user.edx_username == "johndoe"
+    validated_data = serializer.validated_data
+    assert validated_data["user_profile"]["gender"] is None
+    assert validated_data["user_profile"]["year_of_birth"] == 1980
+    assert validated_data["legal_address"]["country"] == "US"
+    assert mock_create_edx_user.call_count == 1
+    assert mock_create_edx_auth_token.call_count == 1
+
+
+@pytest.mark.django_db
+@responses.activate
+def test_register_no_edx_user(  # noqa: PLR0913
+    mocker, settings, user, valid_address_dict, user_profile_dict, rf
+):
+    """Test the create method of RegisterDetailsSerializer"""
+
+    request = rf.post("/api/profile/details/")
+
+    user = UserFactory.create(no_openedx_user=True, no_openedx_api_auth=True)
+    request.user = user
+
+    responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
+        json=dict(success=True),  # noqa: C408
+        status=status.HTTP_200_OK,
+    )
+
+    patched_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
+
+    data = {
+        "name": "John Doe",
+        "username": "johndoe",
+        "legal_address": valid_address_dict,
+        "user_profile": user_profile_dict,
+    }
+    assert user.openedx_user is None
+
+    serializer = RegisterDetailsSerializer(data=data, context={"request": request})
+    assert serializer.is_valid(), serializer.errors
+
+    assert serializer.is_valid()
+    user = serializer.save()
+
+    assert OpenEdxUser.objects.filter(user=user, has_been_synced=True).exists() is True
+    assert patched_create_edx_auth_token.call_count == 1
+    assert user.name == "John Doe"
+    assert user.openedx_users.exists() is True
+    assert user.openedx_users.first().has_been_synced is True
     validated_data = serializer.validated_data
     assert validated_data["user_profile"]["gender"] is None
     assert validated_data["user_profile"]["year_of_birth"] == 1980

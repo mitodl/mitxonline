@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 0.121.2
+---------------
+
+- Add a command to fix missing edx_username values (#2754)
+- save edx_username when creating profile (#2739)
+- Fix course api courserun ordering (#2757)
+- Update dependency django to v4.2.22 [SECURITY] (#2735)
+- Fix lazy_fixture error (#2752)
+- Add org key support to b2b management commands (#2745)
+- Couple small fixes for the one-click enroll API (#2749)
+- Fix a warning for an unnecessary null=True (#2747)
+- Update pytest to 8.4.1 (#2744)
+
 Version 0.121.1 (Released June 26, 2025)
 ---------------
 

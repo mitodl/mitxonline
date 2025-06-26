@@ -7,6 +7,7 @@ from urllib.parse import urlencode, urljoin
 
 from django.conf import settings
 from django.core.management import BaseCommand, CommandError
+from django.db.models import Q
 from django.urls import reverse
 from rich.console import Console
 from rich.table import Table
@@ -63,11 +64,17 @@ class Command(BaseCommand):
             help="List organization data.",
         )
         org_parser.add_argument(
-            "--org",
-            "--organization",
+            "--org-id",
             type=int,
             help="Filter by organization ID.",
             dest="organization_id",
+        )
+        org_parser.add_argument(
+            "--org",
+            "--organization",
+            type=str,
+            help="Filter by organization name, slug, or key.",
+            dest="org_text",
         )
 
         contract_parser = subparsers.add_parser(
@@ -75,11 +82,17 @@ class Command(BaseCommand):
             help="List contract data.",
         )
         contract_parser.add_argument(
-            "--org",
-            "--organization",
+            "--org-id",
             type=int,
             help="Filter by organization ID.",
             dest="organization_id",
+        )
+        contract_parser.add_argument(
+            "--org",
+            "--organization",
+            type=str,
+            help="Filter by organization name, slug, or key.",
+            dest="org_text",
         )
         contract_parser.add_argument(
             "--codes",
@@ -98,11 +111,17 @@ class Command(BaseCommand):
             help="List associated courseware data.",
         )
         courseware_parser.add_argument(
-            "--org",
-            "--organization",
+            "--org-id",
             type=int,
             help="Filter by organization ID.",
             dest="organization_id",
+        )
+        courseware_parser.add_argument(
+            "--org",
+            "--organization",
+            type=str,
+            help="Filter by organization name, slug, or key.",
+            dest="org_text",
         )
         courseware_parser.add_argument(
             "--contract",
@@ -116,11 +135,17 @@ class Command(BaseCommand):
             help="List learners associated with an org or contract.",
         )
         learners_parser.add_argument(
-            "--org",
-            "--organization",
+            "--org-id",
             type=int,
             help="Filter by organization ID.",
             dest="organization_id",
+        )
+        learners_parser.add_argument(
+            "--org",
+            "--organization",
+            type=str,
+            help="Filter by organization name, slug, or key.",
+            dest="org_text",
         )
         learners_parser.add_argument(
             "--contract",
@@ -134,9 +159,14 @@ class Command(BaseCommand):
     def handle_list_orgs(self, *args, **kwargs):  # noqa: ARG002
         """Handle the list subcommand."""
         org_id = kwargs.pop("organization_id")
+        org_text = kwargs.pop("org_text")
 
         if org_id:
             orgs = OrganizationPage.objects.filter(id=org_id).all()
+        elif org_text:
+            orgs = OrganizationPage.objects.filter(
+                Q(org_key=org_text) | Q(name=org_text) | Q(slug=org_text)
+            ).all()
         else:
             orgs = OrganizationPage.objects.all()
 
@@ -144,6 +174,7 @@ class Command(BaseCommand):
         org_table.add_column("ID", justify="right")
         org_table.add_column("Name", justify="left")
         org_table.add_column("Slug", justify="left")
+        org_table.add_column("Key", justify="left")
         org_table.add_column("Contracts", justify="left")
 
         for org in orgs:
@@ -151,6 +182,7 @@ class Command(BaseCommand):
                 str(org.id),
                 org.name,
                 org.slug,
+                org.org_key,
                 str(org.get_children().type(ContractPage).count()),
             )
 
@@ -159,6 +191,7 @@ class Command(BaseCommand):
     def handle_list_contracts(self, *args, **kwargs):  # noqa: ARG002
         """Handle the list subcommand."""
         org_id = kwargs.pop("organization_id")
+        org_text = kwargs.pop("org_text")
         codes_contract_id = kwargs.pop("codes")
 
         if codes_contract_id:
@@ -193,6 +226,12 @@ class Command(BaseCommand):
 
         if org_id:
             contracts = ContractPage.objects.filter(organization__id=org_id).all()
+        elif org_text:
+            contracts = ContractPage.objects.filter(
+                Q(organization__org_key=org_text)
+                | Q(organization__name=org_text)
+                | Q(organization__slug=org_text)
+            ).all()
         else:
             contracts = ContractPage.objects.all()
 
@@ -233,6 +272,7 @@ class Command(BaseCommand):
     def handle_list_courseware(self, *args, **kwargs):  # noqa: ARG002
         """Handle the list subcommand."""
         org_id = kwargs.pop("organization_id")
+        org_text = kwargs.pop("org_text")
         contract_id = kwargs.pop("contract_id")
 
         # We only link course runs to contracts. This will need to be updated
@@ -243,6 +283,13 @@ class Command(BaseCommand):
         if org_id:
             contract_page_qs = contract_page_qs.filter(
                 organization__id=org_id,
+            )
+
+        if org_text:
+            contract_page_qs = contract_page_qs.filter(
+                Q(organization__org_key=org_text)
+                | Q(organization__name=org_text)
+                | Q(organization__slug=org_text)
             )
 
         if contract_id:
@@ -282,10 +329,19 @@ class Command(BaseCommand):
         """List learners associated with an org or contract."""
 
         org_id = kwargs.pop("organization_id")
+        org_text = kwargs.pop("org_text")
         contract_id = kwargs.pop("contract_id")
 
         if org_id:
             obj = OrganizationPage.objects.get(id=org_id)
+        elif org_text:
+            obj = OrganizationPage.objects.filter(
+                Q(org_key=org_text) | Q(name=org_text) | Q(slug=org_text)
+            ).first()
+
+            if not obj:
+                msg = f"Org {org_text} not found."
+                raise CommandError(msg)
         elif contract_id:
             obj = ContractPage.objects.get(id=contract_id)
         else:

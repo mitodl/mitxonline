@@ -1177,7 +1177,6 @@ class CoursePage(ProductPage):
     )
     topics = ParentalManyToManyField(
         "courses.CoursesTopic",
-        null=True,
         blank=True,
         help_text="Select topic pairs (primary -> secondary) for this course page.",
         limit_choices_to=~models.Q(parent=None),

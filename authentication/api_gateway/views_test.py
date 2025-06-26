@@ -2,7 +2,7 @@ from urllib.parse import urlencode
 
 import pytest
 from django.urls import reverse
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf
 from rest_framework import status
 
 from users.api import User
@@ -15,7 +15,7 @@ pytestmark = [
 ]
 
 
-def test_post_user_profile_detail(valid_address_dict, client, user):
+def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
     """Test that user can save profile details"""
     client.force_login(user)
     data = {
@@ -24,6 +24,8 @@ def test_post_user_profile_detail(valid_address_dict, client, user):
         "legal_address": valid_address_dict,
         "user_profile": {},
     }
+    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
+    mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
     resp = client.post(
         reverse("profile-details-api"), data, content_type="application/json"
     )
@@ -31,6 +33,8 @@ def test_post_user_profile_detail(valid_address_dict, client, user):
     assert resp.status_code == status.HTTP_200_OK
     # Checks that user's name in database is also updated
     assert User.objects.get(pk=user.pk).name == data["name"]
+    assert mock_create_edx_user.called is True
+    assert mock_create_edx_auth_token.called is True
 
     data = {
         "name": "John Doe",
@@ -106,13 +110,13 @@ def test_custom_login_view_authenticated_user_with_completed_onboarding(client):
     ("auth_user", "url", "expected_redirect_url"),
     [
         (
-            lazy_fixture("user"),
+            lf("user"),
             "/logout?no_redirect=1",
             "http://mitxonline.odl.local/logout/oidc",
         ),
         (None, "/logout?no_redirect=1", "http://mitxonline.odl.local"),
         (
-            lazy_fixture("user"),
+            lf("user"),
             "/logout",
             "https://openedx.odl.local/logout?redirect_url=http%3A%2F%2Fmitxonline.odl.local",
         ),

@@ -3,7 +3,7 @@ Course API Views version 2
 """
 
 import django_filters
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef, Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
@@ -12,6 +12,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from courses.models import (
     Course,
+    CourseRun,
     CoursesTopic,
     Department,
     Program,
@@ -207,7 +208,10 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
         return (
             Course.objects.select_related("page")
-            .prefetch_related("departments")
+            .prefetch_related(
+                "departments",
+                Prefetch("courseruns", queryset=CourseRun.objects.order_by("id")),
+            )
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
             .annotate(count_courseruns=Count("courseruns"))
             .order_by("title")
