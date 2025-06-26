@@ -767,7 +767,7 @@ def enroll_in_edx_course_runs(
     edx_client = get_edx_api_service_client()
 
     if reconcile_edx_username(user):
-        user.reload_from_db()
+        user.refresh_from_db()
 
     username = user.edx_username
 

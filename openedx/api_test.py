@@ -488,7 +488,8 @@ def test_get_edx_retirement_service_client(mocker, settings):
     assert client.base_url == settings.OPENEDX_API_BASE_URL
 
 
-def test_enroll_in_edx_course_runs(settings, mocker, user):
+@pytest.mark.parametrize("has_edx_username", [True, False])
+def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
     """Tests that enroll_in_edx_course_runs uses the EdxApi client to enroll in course runs"""
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_client = mocker.MagicMock()
@@ -503,7 +504,18 @@ def test_enroll_in_edx_course_runs(settings, mocker, user):
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
     course_runs = CourseRunFactory.build_batch(2)
+
+    # Test to make sure reconcile_edx_username runs as expected.
+    if not has_edx_username:
+        user.openedx_users.all().delete()
+        user.refresh_from_db()
+
     enroll_results = enroll_in_edx_course_runs(user, course_runs)
+
+    if not has_edx_username:
+        assert user.openedx_users.count() == 1
+        assert user.openedx_users.first().edx_username
+
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[0].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
