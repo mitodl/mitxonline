@@ -29,9 +29,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
-        users = User.objects.filter(
-            Q(openedx_users=None) | Q(openedx_users__edx_username=None)
-        ).exclude(Q(username=F("email")) | Q(username__icontains="@"))
+        users = (
+            User.objects.filter(is_active=True)
+            .filter(Q(openedx_users=None) | Q(openedx_users__edx_username=None))
+            .exclude(Q(username=F("email")) | Q(username__icontains="@"))
+        )
 
         if kwargs["user_id"]:
             users = users.filter(id__in=kwargs["user_id"])
