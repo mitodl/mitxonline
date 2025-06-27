@@ -8,6 +8,7 @@ USER_MSG_TYPE_ENROLL_DUPLICATED = "enroll-duplicated"
 USER_MSG_TYPE_COMPLETED_AUTH = "completed-auth"
 USER_MSG_TYPE_COURSE_NON_UPGRADABLE = "course-non-upgradable"
 USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
+USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY = "required-enrollment-code-empty"
 USER_MSG_TYPE_PROFILE_CREATED = "profile-created"
 
 

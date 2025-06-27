@@ -8,7 +8,7 @@ from uuid import uuid4
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count
+from django.db.models import Count, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
@@ -25,6 +25,7 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_UNLIMITED,
 )
 from ecommerce.models import (
+    Basket,
     BasketDiscount,
     BasketItem,
     Discount,
@@ -187,7 +188,62 @@ def create_contract_run(
     return course_run, course_run_product
 
 
-def validate_basket_for_b2b_purchase(request) -> bool:
+def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
+    if not active_contracts:
+        # No contracts = nothing to validate
+        return True
+
+    from ecommerce.api import establish_basket
+
+    basket = establish_basket(request)
+    if not basket:
+        return False
+
+    # Separate free and non-free contracts
+    free_contracts = [
+        c
+        for c in active_contracts
+        if not c.enrollment_fixed_price or c.enrollment_fixed_price == Decimal(0)
+    ]
+    nonfree_contracts = [
+        c
+        for c in active_contracts
+        if c.enrollment_fixed_price and c.enrollment_fixed_price != Decimal(0)
+    ]
+
+    # Find free contracts the user is NOT associated with
+    remaining_free_contract_qset = ContractPage.objects.filter(
+        Q(pk__in=[c.pk for c in free_contracts])
+        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+    )
+
+    if not remaining_free_contract_qset.exists() and not nonfree_contracts:
+        # Basket only has free contracts the user is part of — valid.
+        return True
+
+    return basket.discounts.exists()
+
+
+def get_active_contracts_from_basket_items(basket: Basket) -> None:
+    active_contracts = []
+    course_run_content_type = ContentType.objects.get_for_model(CourseRun)
+    for item in (
+        basket.basket_items.filter(product__content_type=course_run_content_type)
+        .prefetch_related(
+            "product",
+            "product__purchasable_object",
+            "product__purchasable_object__b2b_contract",
+        )
+        .all()
+    ):
+        contract = item.product.purchasable_object.b2b_contract
+        if contract and contract.is_active:
+            active_contracts.append(contract)
+
+    return active_contracts
+
+
+def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     """
     Validate the basket for a B2B purchase.
 
@@ -203,7 +259,7 @@ def validate_basket_for_b2b_purchase(request) -> bool:
     Args:
         request: The HTTP request object containing the basket data.
 
-    Returns: bool
+    Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
     from ecommerce.api import establish_basket
 
@@ -211,70 +267,40 @@ def validate_basket_for_b2b_purchase(request) -> bool:
     if not basket:
         return False
 
-    nonfree_contracts = []
-    free_contracts = []
-    course_run_content_type = ContentType.objects.get_for_model(CourseRun)
-
-    # Determine what contracts are linked to items in the basket.
-
-    for item in (
-        basket.basket_items.filter(product__content_type=course_run_content_type)
-        .prefetch_related(
-            "product",
-            "product__purchasable_object",
-            "product__purchasable_object__b2b_contract",
-        )
-        .all()
-    ):
-        contract = item.product.purchasable_object.b2b_contract
-
-        if contract and contract.is_active:
-            if contract.enrollment_fixed_price in (
-                None,
-                Decimal(0),
-            ):
-                free_contracts.append(contract)
-            else:
-                nonfree_contracts.append(contract)
-
-    if len(nonfree_contracts) + len(free_contracts) == 0:
-        # There aren't any, so we have nothing to validate.
-        return True
-
-    # Determine what free-to-attend contracts are in the cart, and also already
-    # linked to the user. (We've pulled free-to-attend ones out above so just
-    # use that list.)
-
-    remaining_free_contract_qset = ContractPage.objects.filter(
-        pk__in=free_contracts
-    ).exclude(pk__in=request.user.b2b_contracts.all())
-
-    if remaining_free_contract_qset.count() == 0 and len(nonfree_contracts) == 0:
-        # The user's in all of the free ones, and there's no non-free ones,
-        # so the basket is OK.
-        return True
-
-    # The basket includes products for free and/or non-free contracts. Check to
-    # make sure we've got enrollment codes for these.
-
-    check_contracts = [
-        *remaining_free_contract_qset.all(),
-        *nonfree_contracts,
+    # Separate free and non-free contracts
+    free_contracts = [
+        c
+        for c in active_contracts
+        if not c.enrollment_fixed_price or c.enrollment_fixed_price == Decimal(0)
+    ]
+    nonfree_contracts = [
+        c
+        for c in active_contracts
+        if c.enrollment_fixed_price and c.enrollment_fixed_price != Decimal(0)
     ]
 
-    for check_contract in check_contracts:
-        # Do the applied discounts in this basket apply to any of the products
-        # in the basket? If not, then the basket is invalid.
+    # Find free contracts the user is NOT associated with
+    remaining_free_contract_qset = ContractPage.objects.filter(
+        Q(pk__in=[c.pk for c in free_contracts])
+        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+    )
 
-        if (
-            basket.discounts.filter(
-                redeemed_discount__products__product__in=check_contract.get_products()
-            ).count()
-            == 0
-        ):
-            return False
+    if not remaining_free_contract_qset.exists() and not nonfree_contracts:
+        # Basket only has free contracts the user is part of — valid.
+        return True
 
-    return True
+    # Contracts that require validation via discount (user not in them, or not free)
+    check_contracts = list(remaining_free_contract_qset) + nonfree_contracts
+
+    # Gather all product IDs for these contracts
+    product_ids = set()
+    for contract in check_contracts:
+        product_ids.update(contract.get_products().values_list("pk", flat=True))
+
+    # Validate that at least one discount applies to these products
+    return basket.discounts.filter(
+        redeemed_discount__products__product__in=product_ids
+    ).exists()
 
 
 def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR0915
