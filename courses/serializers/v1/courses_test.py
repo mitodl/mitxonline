@@ -1,15 +1,18 @@
 import bleach
+import faker
 import pytest
 from django.contrib.auth.models import AnonymousUser
+from django.db.models import Prefetch
 
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
 from cms.serializers import CoursePageSerializer
 from courses.factories import (
+    CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
 )
-from courses.models import Department
+from courses.models import Course, CourseRun, Department
 from courses.serializers.v1.base import BaseCourseSerializer, CourseRunGradeSerializer
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
@@ -26,6 +29,8 @@ from main.test_utils import assert_drf_json_equal, drf_datetime
 
 pytestmark = [pytest.mark.django_db]
 
+FAKE = faker.Faker()
+
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
 @pytest.mark.parametrize("all_runs", [True, False])
@@ -36,15 +41,21 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings
     if all_runs:
         mock_context["all_runs"] = True
     user = mock_context["request"].user
-    courseRun1 = CourseRunFactory.create()
-    courseRun2 = CourseRunFactory.create(course=courseRun1.course)
-    course = courseRun1.course
+    course = CourseFactory.create()
+    course_runs = CourseRunFactory.create_batch(10, course=course)
     department = "a course departments"
     course.departments.set([Department.objects.create(name=department)])
 
-    CourseRunEnrollmentFactory.create(
-        run=courseRun1, **({} if is_anonymous else {"user": user})
-    )
+    for run in course_runs:
+        if FAKE.pybool():
+            CourseRunEnrollmentFactory.create(
+                run=run, **({} if is_anonymous else {"user": user})
+            )
+
+    # the view will run a query like this
+    course = Course.objects.prefetch_related(
+        Prefetch("courseruns", queryset=CourseRun.objects.order_by("id"))
+    ).get(id=course.id)
 
     data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 
@@ -54,16 +65,13 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings
             "title": course.title,
             "readable_id": course.readable_id,
             "id": course.id,
-            "courseruns": [
-                CourseRunSerializer(courseRun1).data,
-                CourseRunSerializer(courseRun2).data,
-            ],
+            "courseruns": [CourseRunSerializer(run).data for run in course_runs],
             "next_run_id": course.first_unexpired_run.id,
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
-            "programs": ProgramSerializer(course.programs, many=True).data
-            if all_runs
-            else None,
+            "programs": (
+                ProgramSerializer(course.programs, many=True).data if all_runs else None
+            ),
         },
     )
 
