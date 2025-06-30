@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.121.2 (Released June 30, 2025)
+---------------
+
+- fix: Set custom CSRF cookie name (#2762)
+
 Version 0.121.1 (Released June 26, 2025)
 ---------------
 
