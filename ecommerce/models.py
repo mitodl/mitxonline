@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional  # noqa: UP035
+from typing import List  # noqa: UP035
 
 import pytz
 import reversion
@@ -391,7 +391,7 @@ class Discount(TimestampedModel):
         """
         from ecommerce.discounts import DiscountType
 
-        if (user is None and self.valid_now()) or self.check_validity(user):  # noqa: RET503
+        if (user is None and self.valid_now()) or self.check_validity(user):
             return DiscountType.get_discounted_price([self], product).quantize(
                 Decimal("0.01")
             )
@@ -775,7 +775,7 @@ class PendingOrder(Order):
 
     @classmethod
     def create_from_product(
-        cls, product: Product, user: User, discount: Optional[Discount] = None
+        cls, product: Product, user: User, discount: Discount | None = None
     ):
         """
         Creates a new pending order from a product
