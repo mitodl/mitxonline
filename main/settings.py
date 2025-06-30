@@ -110,6 +110,12 @@ CSRF_COOKIE_DOMAIN = get_string(
     description="Domain to set the CSRF cookie to.",
 )
 
+CSRF_COOKIE_NAME = get_string(
+    name="CSRF_COOKIE_NAME",
+    default="csrf_mitxonline",
+    description="Cookie name to use for the CSRF token.",
+)
+
 CSRF_TRUSTED_ORIGINS = get_delimited_list(
     name="CSRF_TRUSTED_ORIGINS",
     default=[],
