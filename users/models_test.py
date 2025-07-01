@@ -104,6 +104,10 @@ def test_faulty_user_qset():
     UserFactory.create(is_active=False, no_openedx_user=True, no_openedx_api_auth=True)
     good_users = users[0:2]
     expected_faulty_users = users[2:]
+    # Create OpenEdxUser for one of the faulty users
+    OpenEdxUserFactory.create(user=expected_faulty_users[0], has_been_synced=False)
+    # Create OpenEdxApiAuth for the same faulty user
+    OpenEdxApiAuthFactory.create(user=expected_faulty_users[0])
     OpenEdxApiAuthFactory.create_batch(
         3,
         user=factory.Iterator(good_users + [users[3]]),  # noqa: RUF005

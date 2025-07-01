@@ -31,6 +31,8 @@ from courses.models import CourseRunEnrollment
 from ecommerce.api_test import create_basket
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
 from ecommerce.factories import (
+    BasketFactory,
+    BasketItemFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
 )
@@ -320,7 +322,9 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 @pytest.mark.parametrize("user_in_contract", [True, False])
 @pytest.mark.parametrize("product_in_contract", [True, False])
 @pytest.mark.parametrize("price_is_zero", [True, False])
-def test_create_b2b_enrollment(  # noqa: PLR0913
+@pytest.mark.parametrize("cart_has_products", [True, False])
+@pytest.mark.parametrize("cart_has_discounts", [True, False])
+def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     mocker,
     contract_ready_course,
     settings,
@@ -328,6 +332,8 @@ def test_create_b2b_enrollment(  # noqa: PLR0913
     user_in_contract,
     product_in_contract,
     price_is_zero,
+    cart_has_products,
+    cart_has_discounts,
 ):
     """
     Test B2B enrollment generation.
@@ -363,6 +369,22 @@ def test_create_b2b_enrollment(  # noqa: PLR0913
             user.save()
 
         assert Basket.objects.filter(user=user).count() == 0
+
+        if cart_has_products:
+            # create a basket - we should clear it out
+            existing_basket = BasketFactory.create(user=user)
+            BasketItemFactory(basket=existing_basket)
+
+            if cart_has_discounts:
+                # also put discounts in it!
+                random_discount = UnlimitedUseDiscountFactory.create()
+                BasketDiscount.objects.create(
+                    redemption_date=now_in_utc(),
+                    redeemed_by=user,
+                    redeemed_discount=random_discount,
+                    redeemed_basket=existing_basket,
+                )
+
     else:
         user = AnonymousUser()
 
@@ -375,11 +397,11 @@ def test_create_b2b_enrollment(  # noqa: PLR0913
     assert "result" in result
 
     if user_authenticated:
-        # For these tests, we shouldn't have a basket. It should find the issue and
-        # stop before it makes the basket. (Except for the unauth - we won't have a
-        # basket there either but we can't check for that.)
+        # You should not have a basket by default. If you do, we should clear it
+        # when you hit the enroll API.
         if not user_in_contract or not product_in_contract:
-            assert Basket.objects.filter(user=user).count() == 0
+            assert_test = 1 if cart_has_products else 0
+            assert Basket.objects.filter(user=user).count() == assert_test
 
         if not product_in_contract:
             assert result["result"] == USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT
@@ -394,6 +416,8 @@ def test_create_b2b_enrollment(  # noqa: PLR0913
             # page if the price isn't zero.
             assert result["result"] == USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT
             assert Basket.objects.filter(user=user).count() == 1
+            test_basket = Basket.objects.filter(user=user).get()
+            assert test_basket.basket_items.filter(product=product).exists()
             my_run_qs = CourseRunEnrollment.objects.filter(
                 user=user, run=run, active=True
             )

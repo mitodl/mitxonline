@@ -17,6 +17,7 @@ def settings_sandbox(monkeypatch):
     """Cleanup settings after a test"""
 
     monkeypatch.delenv("MITX_ONLINE_DB_DISABLE_SSL", raising=False)
+    monkeypatch.delenv("CSRF_COOKIE_DOMAIN", raising=False)
     monkeypatch.delenv("CSRF_TRUSTED_ORIGINS", raising=False)
     monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "main.settings")
     monkeypatch.setenv("MAILGUN_SENDER_DOMAIN", "mailgun.fake.domain")
@@ -95,6 +96,17 @@ def test_admin_settings(settings_sandbox, settings):
     assert test_admin_email in mail.outbox[0].to
 
 
+def test_csrf_cookie_domain(settings_sandbox):
+    """Verify that we can configure CSRF_COOKIE_DOMAIN with a var"""
+    # Test the default
+    settings_vars = settings_sandbox.get()
+    assert settings_vars.get("CSRF_COOKIE_DOMAIN") is None
+
+    # Verify the env var works
+    settings_vars = settings_sandbox.patch({"CSRF_COOKIE_DOMAIN": "some.domain.com"})
+    assert settings_vars.get("CSRF_COOKIE_DOMAIN") == "some.domain.com"
+
+
 def test_csrf_trusted_origins(settings_sandbox):
     """Verify that we can configure CSRF_TRUSTED_ORIGINS with a var"""
     # Test the default
@@ -108,6 +120,27 @@ def test_csrf_trusted_origins(settings_sandbox):
         }
     )
     assert settings_vars.get("CSRF_TRUSTED_ORIGINS") == [
+        "some.domain.com",
+        "some.other.domain.org",
+    ]
+
+
+def test_mitol_apigateway_allowed_redirect_hosts(settings_sandbox):
+    """Verify that we can configure MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS with a var"""
+    # Test the default
+    settings_vars = settings_sandbox.get()
+    assert settings_vars.get("MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS") == [
+        "localhost",
+        "mitxonline.odl.local",
+    ]
+
+    # Verify the env var works
+    settings_vars = settings_sandbox.patch(
+        {
+            "MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS": "some.domain.com, some.other.domain.org",
+        }
+    )
+    assert settings_vars.get("MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS") == [
         "some.domain.com",
         "some.other.domain.org",
     ]

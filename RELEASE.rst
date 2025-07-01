@@ -1,6 +1,39 @@
 Release Notes
 =============
 
+Version 0.121.2 (Released June 30, 2025)
+---------------
+
+- fix: Set custom CSRF cookie name (#2762)
+
+Version 0.121.1 (Released June 26, 2025)
+---------------
+
+- Fix logout redirects (#2736)
+- Fix divide-by-zero error if there is a full-value discount (#2743)
+- Make CSRF_COOKIE_DOMAIN configurable by env variable (#2742)
+- Remove unused feature flag class (#2734)
+- Update next_run_id to add B2B course run awareness (#2738)
+- fix update enrollment serializer (#2737)
+- Update google sheets and pluggy (#2715)
+- B2B Provisioning: create edX course runs when courseware is added to a contract (#2705)
+
+Version 0.120.2 (Released June 23, 2025)
+---------------
+
+- Added logic to send user to the gateway logout url (#2732)
+- add "OPENEDX_API_BASE_URL" to api container env (#2730)
+- Fix logout url routing (#2729)
+- Remove create user with generated username (#2722)
+- fix(deps): update dependency requests to v2.32.4 [security] (#2721)
+- Fix logout redirects (#2704)
+- Update scim package and admin improvements (#2723)
+- fix(deps): update dependency django to v4.2.22 [security] (#2716)
+- Fix failing tests (#2726)
+- When creating user profile save edx_username (#2720)
+- Skip the flexible price discount create task if there's no UE API key set (#2719)
+- Remove full name on the password prompt (#2707)
+
 Version 0.119.7 (Released June 06, 2025)
 ---------------
 

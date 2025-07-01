@@ -35,7 +35,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.119.7"
+VERSION = "0.121.2"
 
 log = logging.getLogger()
 
@@ -102,6 +102,18 @@ ALLOWED_REDIRECT_HOSTS = get_list_literal(
     name="ALLOWED_REDIRECT_HOSTS",
     default=[],
     description="List of hosts allowed to redirect to after login",
+)
+
+CSRF_COOKIE_DOMAIN = get_string(
+    name="CSRF_COOKIE_DOMAIN",
+    default=None,
+    description="Domain to set the CSRF cookie to.",
+)
+
+CSRF_COOKIE_NAME = get_string(
+    name="CSRF_COOKIE_NAME",
+    default="csrf_mitxonline",
+    description="Cookie name to use for the CSRF token.",
 )
 
 CSRF_TRUSTED_ORIGINS = get_delimited_list(
@@ -1449,11 +1461,11 @@ MITOL_APIGATEWAY_DEFAULT_POST_LOGOUT_DEST = get_string(
 )
 
 # Set to the list of hosts the app is allowed to redirect to.
-MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = [
-    "localhost",
-    "mitxonline.odl.local",
-]
-
+MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS = get_delimited_list(
+    name="MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS",
+    default=["localhost", "mitxonline.odl.local"],
+    description="The list of hosts the app is allowed to redirect to",
+)
 
 OPENTELEMETRY_ENABLED = get_bool(
     name="OPENTELEMETRY_ENABLED",

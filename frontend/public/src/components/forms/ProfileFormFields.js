@@ -195,15 +195,24 @@ export const LegalAddressCountryFields = ({
   const [showYearOfBirthField, setShowYearOfBirthField] = React.useState(
     values.user_profile.year_of_birth === ""
   )
+  // Show country field if country is not set, or if it's set to US or CA, and no state is selected
   const [showCountryField, setShowCountryField] = React.useState(
-    values.legal_address.country === ""
+    values.legal_address.country === "" ||
+      ((values.legal_address.country === "US" ||
+        values.legal_address.country === "CA") &&
+        !values.legal_address.state)
   )
 
   React.useEffect(() => {
     if (values.user_profile.year_of_birth === "") {
       setShowYearOfBirthField(true)
     }
-    if (values.legal_address.country === "") {
+    if (
+      values.legal_address.country === "" ||
+      ((values.legal_address.country === "US" ||
+        values.legal_address.country === "CA") &&
+        !values.legal_address.state)
+    ) {
       setShowCountryField(true)
     }
   }, [values.user_profile.year_of_birth, values.legal_address.country])

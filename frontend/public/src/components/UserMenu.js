@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import React from "react"
 
 import MixedLink from "./MixedLink"
@@ -103,14 +102,7 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
           </MixedLink>
         </li>
         <li {...(menuChildProps.li || {})}>
-          <a
-            href={
-              SETTINGS.api_gateway_enabled ?
-                routes.apiGatewayLogout :
-                routes.logout
-            }
-            aria-label="Sign Out"
-          >
+          <a href={routes.logout} aria-label="Sign Out">
             Sign Out
           </a>
         </li>

@@ -9,7 +9,7 @@ from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.factories import HomePageFactory
 from cms.models import HomePage
 
-FAKE = faker.Factory.create()
+FAKE = faker.Faker()
 
 
 class OrganizationIndexPageFactory(wagtail_factories.PageFactory):
@@ -27,9 +27,9 @@ class OrganizationIndexPageFactory(wagtail_factories.PageFactory):
 class OrganizationPageFactory(wagtail_factories.PageFactory):
     """OrganizationPage factory class"""
 
-    name = FAKE.company()
-    org_key = FAKE.text(max_nb_chars=5)
-    description = FAKE.text()
+    name = FAKE.unique.company()
+    org_key = FAKE.unique.text(max_nb_chars=5)
+    description = FAKE.unique.text()
     logo = None
     parent = LazyAttribute(
         lambda _: OrganizationIndexPage.objects.first()
@@ -43,8 +43,8 @@ class OrganizationPageFactory(wagtail_factories.PageFactory):
 class ContractPageFactory(wagtail_factories.PageFactory):
     """ContractPage factory class"""
 
-    name = FAKE.bs()
-    description = FAKE.text()
+    name = FAKE.unique.bs()
+    description = FAKE.unique.text()
     organization = SubFactory(OrganizationPageFactory)
     parent = LazyAttribute(lambda o: o.organization)
     integration_type = LazyFunction(

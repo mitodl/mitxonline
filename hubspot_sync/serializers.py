@@ -219,6 +219,8 @@ class OrderToDealSerializer(serializers.ModelSerializer):
             discount_percent = discount.amount
         elif discount.discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
             discount_percent = Decimal(discount.amount / product_price) * 100
+        elif discount.amount == 0 or product_price == 0:
+            discount_percent = Decimal(100)
         else:
             discount_percent = Decimal(
                 ((product_price - discount.amount) / product_price) * 100

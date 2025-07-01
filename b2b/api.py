@@ -587,6 +587,10 @@ def create_b2b_enrollment(request, product: Product):
         }
 
     basket = establish_basket(request)
+    # Clear the basket. For Unified Ecommerce, we may want to change this.
+    # But MITx Online only allows one item per cart and not clearing it is confusing it.
+    basket.basket_items.all().delete()
+    basket.discounts.all().delete()
     item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
     item.save()
 

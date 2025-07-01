@@ -4,7 +4,7 @@ import pytest
 import responses
 from django.contrib.auth.models import AnonymousUser
 from django.test.client import RequestFactory
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
@@ -57,13 +57,13 @@ def test_validate_required_fields(valid_address_dict, field, value, error):
 @pytest.mark.parametrize(
     "address_type,error",  # noqa: PT006
     [
-        [lazy_fixture("valid_address_dict"), None],  # noqa: PT007
-        [lazy_fixture("intl_address_dict"), None],  # noqa: PT007
+        [lf("valid_address_dict"), None],  # noqa: PT007
+        [lf("intl_address_dict"), None],  # noqa: PT007
         (
-            lazy_fixture("invalid_address_dict"),
+            lf("invalid_address_dict"),
             "Invalid state specified",
         ),
-        [lazy_fixture("address_no_state_dict"), None],  # noqa: PT007
+        [lf("address_no_state_dict"), None],  # noqa: PT007
     ],
 )
 def test_legal_address_validate_state_field(address_type, error):

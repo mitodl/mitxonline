@@ -1,15 +1,20 @@
+from urllib.parse import urlencode
+
 import pytest
-from django.test import RequestFactory
 from django.urls import reverse
+from pytest_lazy_fixtures import lf
 from rest_framework import status
 
-from authentication.api_gateway.views import GatewayLoginView
 from users.api import User
 from users.factories import UserFactory
 from users.models import MALE, UserProfile
 
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.urls("authentication.api_gateway.pytest_urls"),
+]
 
-@pytest.mark.django_db
+
 def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
     """Test that user can save profile details"""
     client.force_login(user)
@@ -19,6 +24,8 @@ def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
         "legal_address": valid_address_dict,
         "user_profile": {},
     }
+    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
+    mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
     resp = client.post(
         reverse("profile-details-api"), data, content_type="application/json"
     )
@@ -26,6 +33,8 @@ def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
     assert resp.status_code == status.HTTP_200_OK
     # Checks that user's name in database is also updated
     assert User.objects.get(pk=user.pk).name == data["name"]
+    assert mock_create_edx_user.called is True
+    assert mock_create_edx_auth_token.called is True
 
     data = {
         "name": "John Doe",
@@ -37,8 +46,7 @@ def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
-@pytest.mark.django_db
-def test_post_user_extra_detail(mocker, client, user):
+def test_post_user_extra_detail(client, user):
     """Test that user can save profile extra details"""
     client.force_login(user)
     data = {
@@ -73,33 +81,65 @@ def test_post_user_extra_detail(mocker, client, user):
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
-@pytest.mark.django_db
-def test_custom_login_view_authenticated_user_with_onboarding(mocker):
+def test_custom_login_view_authenticated_user_with_onboarding(settings, client):
     """Test GatewayLoginView for an authenticated user with incomplete onboarding"""
-    factory = RequestFactory()
-    request = factory.get(reverse("login"), {"next": "/dashboard"})
-    user = UserFactory()
-    request.user = user
-    mocker.patch(
-        "authentication.social_auth.views.settings.MITXONLINE_NEW_USER_LOGIN_URL",
-        "/create-profile",
-    )
+    settings.MITXONLINE_NEW_USER_LOGIN_URL = "/create-profile"
 
-    response = GatewayLoginView().get(request)
+    client.force_login(UserFactory.create())
+
+    qs = {"next": "/dashboard"}
+    response = client.get(f"{reverse('gateway-login')}?{urlencode(qs)}")
 
     assert response.status_code == 302
     assert response.url == "/create-profile?next=%2Fdashboard"
 
 
-@pytest.mark.django_db
-def test_custom_login_view_authenticated_user_with_completed_onboarding(mocker):
+def test_custom_login_view_authenticated_user_with_completed_onboarding(client):
     """Test that user who has completed onboarding is redirected to next url"""
-    factory = RequestFactory()
-    request = factory.get(reverse("login"), {"next": "/dashboard"})
-    user = UserFactory(user_profile__completed_onboarding=True)
-    request.user = user
 
-    response = GatewayLoginView().get(request)
+    client.force_login(UserFactory.create(user_profile__completed_onboarding=True))
+
+    qs = {"next": "/dashboard"}
+    response = client.get(f"{reverse('gateway-login')}?{urlencode(qs)}")
 
     assert response.status_code == 302
     assert response.url == "/dashboard"
+
+
+@pytest.mark.parametrize(
+    ("auth_user", "url", "expected_redirect_url"),
+    [
+        (
+            lf("user"),
+            "/logout?no_redirect=1",
+            "http://mitxonline.odl.local/logout/oidc",
+        ),
+        (None, "/logout?no_redirect=1", "http://mitxonline.odl.local"),
+        (
+            lf("user"),
+            "/logout",
+            "https://openedx.odl.local/logout?redirect_url=http%3A%2F%2Fmitxonline.odl.local",
+        ),
+        (
+            None,
+            "/logout",
+            "https://openedx.odl.local/logout?redirect_url=http%3A%2F%2Fmitxonline.odl.local",
+        ),
+    ],
+)
+def test_gateway_logout(client, auth_user, url, expected_redirect_url):
+    """Test that the api gateway logout works"""
+    if auth_user is not None:
+        client.force_login(auth_user)
+
+    resp = client.get(url)
+
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.headers["Location"] == expected_redirect_url
+
+
+def test_logout_complete(client):
+    """Test that logout complete works"""
+    resp = client.get("/logout/complete")
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == {"message": "Logout complete"}
