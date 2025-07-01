@@ -65,6 +65,8 @@ OPENEDX_OAUTH2_ACCESS_TOKEN_EXPIRY_MARGIN_SECONDS = 10
 OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS = 60
 OPENEDX_AUTH_MAX_TTL_IN_SECONDS = 60 * 60
 
+OPENEDX_AUTH_COMPLETE_URL = "openedx-private-oauth-complete-no-apisix"
+
 ACCESS_TOKEN_HEADER_NAME = "X-Access-Token"  # noqa: S105
 
 
@@ -200,7 +202,7 @@ def create_edx_auth_token(user):
 
         # Step 4
         redirect_uri = urljoin(
-            settings.SITE_BASE_URL, reverse("openedx-private-oauth-complete")
+            settings.SITE_BASE_URL, reverse(OPENEDX_AUTH_COMPLETE_URL)
         )
         url = edx_url(OPENEDX_OAUTH2_AUTHORIZE_PATH)
         params = dict(  # noqa: C408
@@ -296,7 +298,7 @@ def update_edx_user_email(user):
         resp.raise_for_status()
 
         redirect_uri = urljoin(
-            settings.SITE_BASE_URL, reverse("openedx-private-oauth-complete")
+            settings.SITE_BASE_URL, reverse(OPENEDX_AUTH_COMPLETE_URL)
         )
         url = edx_url(OPENEDX_OAUTH2_AUTHORIZE_PATH)
         params = dict(  # noqa: C408

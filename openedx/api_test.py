@@ -308,14 +308,12 @@ def test_create_edx_auth_token(settings):
     responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}/oauth2/authorize",
-        headers={
-            "Location": f"{settings.SITE_BASE_URL}/login/_private/complete?code={code}"
-        },
+        headers={"Location": f"{settings.SITE_BASE_URL}/_/auth/complete?code={code}"},
         status=status.HTTP_302_FOUND,
     )
     responses.add(
         responses.GET,
-        f"{settings.SITE_BASE_URL}/login/_private/complete",
+        f"{settings.SITE_BASE_URL}/_/auth/complete",
         status=status.HTTP_200_OK,
     )
     responses.add(
@@ -335,7 +333,7 @@ def test_create_edx_auth_token(settings):
         grant_type="authorization_code",
         client_id=settings.OPENEDX_API_CLIENT_ID,
         client_secret=settings.OPENEDX_API_CLIENT_SECRET,
-        redirect_uri=f"{settings.SITE_BASE_URL}/login/_private/complete",
+        redirect_uri=f"{settings.SITE_BASE_URL}/_/auth/complete",
     )
 
     assert OpenEdxApiAuth.objects.filter(user=user).exists()
@@ -385,14 +383,12 @@ def test_update_edx_user_email(settings):
     responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}/oauth2/authorize",
-        headers={
-            "Location": f"{settings.SITE_BASE_URL}/login/_private/complete?code={code}"
-        },
+        headers={"Location": f"{settings.SITE_BASE_URL}/_/auth/complete?code={code}"},
         status=status.HTTP_302_FOUND,
     )
     responses.add(
         responses.GET,
-        f"{settings.SITE_BASE_URL}/login/_private/complete",
+        f"{settings.SITE_BASE_URL}/_/auth/complete",
         status=status.HTTP_200_OK,
     )
 
