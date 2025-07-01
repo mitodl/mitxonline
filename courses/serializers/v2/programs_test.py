@@ -76,6 +76,13 @@ def test_serialize_program(
     program_department = Department.objects.create(name="Math")
     program_with_empty_requirements.departments.add(program_department)
 
+    first_unexpired_run = program_with_empty_requirements.first_unexpired_run
+
+    if not remove_tree:
+        expected_start_date = first_unexpired_run.start_date
+    else:
+        expected_start_date = program_with_empty_requirements.start_date
+
     data = ProgramSerializer(
         instance=program_with_empty_requirements, context=mock_context
     ).data
@@ -100,7 +107,7 @@ def test_serialize_program(
             "live": True,
             "topics": [{"name": topic.name} for topic in topics],
             "availability": "anytime",
-            "start_date": program_with_empty_requirements.start_date,
+            "start_date": expected_start_date,
             "end_date": program_with_empty_requirements.end_date,
             "enrollment_start": program_with_empty_requirements.enrollment_start,
             "enrollment_end": program_with_empty_requirements.enrollment_end,
