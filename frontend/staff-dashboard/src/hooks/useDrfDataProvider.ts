@@ -10,7 +10,7 @@ import dataProvider from "@pankod/refine-simple-rest";
 import { stringify } from "query-string";
 
 axios.defaults.withCredentials = true;
-axios.defaults.xsrfCookieName = 'csrftoken';
+axios.defaults.xsrfCookieName = 'csrf_mitxonline';
 axios.defaults.xsrfHeaderName = 'X-CSRFToken';
 
 const axiosInterface = axios.create();
