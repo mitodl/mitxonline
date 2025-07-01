@@ -1,8 +1,8 @@
 """API functions for B2B operations."""
 
 import logging
+from collections.abc import Iterable
 from decimal import Decimal
-from typing import Iterable, List, Tuple
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -188,20 +188,19 @@ def create_contract_run(
 
     return course_run, course_run_product
 
-def get_free_and_nonfree_contracts(
-        contracts: Iterable
-    ) -> Tuple[List, List]:
-        """
-        Split contracts into free and non-free based on enrollment_fixed_price.
 
-        Returns:
-            (free_contracts, nonfree_contracts)
-        """
-        free, nonfree = [], []
-        for c in contracts:
-            price = c.enrollment_fixed_price
-            (free if not price or price == 0 else nonfree).append(c)
-        return free, nonfree
+def get_free_and_nonfree_contracts(contracts: Iterable) -> tuple[list, list]:
+    """
+    Split contracts into free and non-free based on enrollment_fixed_price.
+
+    Returns:
+        (free_contracts, nonfree_contracts)
+    """
+    free, nonfree = [], []
+    for c in contracts:
+        price = c.enrollment_fixed_price
+        (free if not price or price == 0 else nonfree).append(c)
+    return free, nonfree
 
 
 def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
@@ -233,11 +232,9 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
 def get_active_contracts_from_basket_items(basket: Basket):
     course_run_ct = ContentType.objects.get_for_model(CourseRun)
 
-    items = (
-        basket.basket_items
-        .filter(product__content_type=course_run_ct)
-        .select_related("product")
-    )
+    items = basket.basket_items.filter(
+        product__content_type=course_run_ct
+    ).select_related("product")
 
     contracts = []
     for item in items:
