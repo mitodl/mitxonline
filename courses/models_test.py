@@ -936,15 +936,15 @@ def test_program_requirement_node_types():
     """Test that the new PROGRAM node type works correctly"""
     parent_program = ProgramFactory.create()
     required_program = ProgramFactory.create()
-    
+
     parent_program.add_program_requirement(required_program)
-    
+
     program_requirement = ProgramRequirement.objects.filter(
         program=parent_program,
         required_program=required_program,
-        node_type=ProgramRequirementNodeType.PROGRAM
+        node_type=ProgramRequirementNodeType.PROGRAM,
     ).first()
-    
+
     assert program_requirement is not None
     assert program_requirement.is_program
     assert not program_requirement.is_course

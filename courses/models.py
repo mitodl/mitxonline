@@ -321,21 +321,29 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
     def add_program_requirement(self, required_program):
         """Makes the specified program a required program"""
-        self.get_requirements_root().get_children().filter(required_program=required_program).delete()
+        self.get_requirements_root().get_children().filter(
+            required_program=required_program
+        ).delete()
 
         new_req = self._add_course_node(ProgramRequirement.Operator.ALL_OF).add_child(
-            required_program=required_program, node_type=ProgramRequirementNodeType.PROGRAM
+            required_program=required_program,
+            node_type=ProgramRequirementNodeType.PROGRAM,
         )
 
         return new_req  # noqa: RET504
 
     def add_program_elective(self, required_program):
         """Makes the specified program an elective program"""
-        self.get_requirements_root().get_children().filter(required_program=required_program).delete()
+        self.get_requirements_root().get_children().filter(
+            required_program=required_program
+        ).delete()
 
         new_req = self._add_course_node(
             ProgramRequirement.Operator.MIN_NUMBER_OF
-        ).add_child(required_program=required_program, node_type=ProgramRequirementNodeType.PROGRAM)
+        ).add_child(
+            required_program=required_program,
+            node_type=ProgramRequirementNodeType.PROGRAM,
+        )
 
         return new_req  # noqa: RET504
 
@@ -437,7 +445,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def required_programs(self):
         """
         Returns the programs that are required by this program.
-        
+
         Returns:
         - list of Program: programs that are requirements
         """
@@ -457,7 +465,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def elective_programs(self):
         """
         Returns the programs that are electives for this program.
-        
+
         Returns:
         - list of Program: programs that are electives
         """
