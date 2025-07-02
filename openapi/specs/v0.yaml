@@ -833,7 +833,7 @@ paths:
         name: org_id
         schema:
           type: number
-        description: Only show courses beloning to this B2B/UAI organization
+        description: Only show courses belonging to this B2B/UAI organization
       - name: page
         required: false
         in: query
