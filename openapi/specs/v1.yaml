@@ -1841,17 +1841,6 @@ components:
       - country
       - first_name
       - last_name
-    NodeTypeEnum:
-      enum:
-      - operator
-      - course
-      type: string
-      description: |-
-        * `operator` - operator
-        * `course` - course
-      x-enum-descriptions:
-      - operator
-      - course
     NullEnum:
       enum:
       - null
@@ -3027,8 +3016,11 @@ components:
       description: Serializer for ProgramRequirement data
       properties:
         node_type:
-          $ref: '#/components/schemas/NodeTypeEnum'
+          $ref: '#/components/schemas/V1ProgramRequirementDataNodeTypeEnum'
         course:
+          type: string
+          nullable: true
+        required_program:
           type: string
           nullable: true
         program:
@@ -3048,6 +3040,20 @@ components:
           default: false
       required:
       - node_type
+    V1ProgramRequirementDataNodeTypeEnum:
+      enum:
+      - operator
+      - course
+      - program
+      type: string
+      description: |-
+        * `operator` - operator
+        * `course` - course
+        * `program` - program
+      x-enum-descriptions:
+      - operator
+      - course
+      - program
     V2CourseRun:
       type: object
       description: CourseRun model serializer
@@ -3320,7 +3326,7 @@ components:
       description: Serializer for ProgramRequirement data
       properties:
         node_type:
-          $ref: '#/components/schemas/NodeTypeEnum'
+          $ref: '#/components/schemas/V2ProgramRequirementDataNodeTypeEnum'
         course:
           type: string
           nullable: true
@@ -3341,6 +3347,17 @@ components:
           default: false
       required:
       - node_type
+    V2ProgramRequirementDataNodeTypeEnum:
+      enum:
+      - operator
+      - course
+      type: string
+      description: |-
+        * `operator` - operator
+        * `course` - course
+      x-enum-descriptions:
+      - operator
+      - course
     YearsExperienceEnum:
       enum:
       - 2
