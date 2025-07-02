@@ -1,5 +1,6 @@
 // @flow
 import React from "react"
+import { Formik, FormikProps } from "formik"
 // $FlowFixMe
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
@@ -17,7 +18,74 @@ type Props = {
   cardTitle?: string
 }
 
-export class OrderSummaryCard extends React.Component<Props> {
+type FormValues = {
+  couponCode: string
+}
+
+type State = {
+  submittingPlaceOrder: boolean
+}
+
+export class OrderSummaryCard extends React.Component<Props, State> {
+  formikRef: { current: null | FormikProps<FormValues> } = React.createRef()
+
+  state = {
+    submittingPlaceOrder: true
+  }
+
+  renderRefunds() {
+    const { refunds } = this.props
+
+    if (refunds === null || refunds.length === 0) {
+      return null
+    }
+
+    const refundList = []
+
+    for (let refund = 0; refund < refunds.length; refund++) {
+      refundList.push(this.renderIndividualRefund(refunds[refund]))
+    }
+
+    return refundList
+  }
+
+  renderIndividualRefund(refund: Refund) {
+    if (refund === null) {
+      return null
+    }
+
+    const refundAmount = formatLocalePrice(Number(refund.amount))
+
+    return (
+      <div className="d-flex justify-content-between">
+        <div className="flex-grow-1">
+          <Badge className="bg-danger">Refund applied</Badge>
+        </div>
+        <div className="ml-auto text-primary text-end">{refundAmount}</div>
+      </div>
+    )
+  }
+
+  renderFulfilledTag() {
+    const { orderFulfilled } = this.props
+
+    if (orderFulfilled !== true) {
+      return null
+    }
+
+    return (
+      <div className="row order-summary-total">
+        <div className="col-12 px-3 py-3 py-md-0">
+          <div className="d-flex justify-content-between">
+            <div className="flex-grow-1">
+              <Badge className="bg-success float-right">Paid</Badge>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   renderAppliedCoupons() {
     const { discounts } = this.props
 
@@ -56,57 +124,18 @@ export class OrderSummaryCard extends React.Component<Props> {
     )
   }
 
-  renderIndividualRefund(refund: Refund) {
-    if (refund === null) {
-      return null
+  handlePlaceOrder = async () => {
+    const formik = this.formikRef.current
+
+    // Check if formik exists and couponCode has a value
+    if (formik && formik.values.couponCode && formik.values.couponCode.trim()) {
+      // Flag this is from Place Order button
+      this.setState({ submittingPlaceOrder: true })
+      await formik.submitForm()
+    } else {
+      // No coupon code, proceed directly to payment
+      window.location = "/checkout/to_payment"
     }
-
-    const refundAmount = formatLocalePrice(Number(refund.amount))
-
-    return (
-      <div className="d-flex justify-content-between">
-        <div className="flex-grow-1">
-          <Badge className="bg-danger">Refund applied</Badge>
-        </div>
-        <div className="ml-auto text-primary text-end">{refundAmount}</div>
-      </div>
-    )
-  }
-
-  renderRefunds() {
-    const { refunds } = this.props
-
-    if (refunds === null || refunds.length === 0) {
-      return null
-    }
-
-    const refundList = []
-
-    for (let refund = 0; refund < refunds.length; refund++) {
-      refundList.push(this.renderIndividualRefund(refunds[refund]))
-    }
-
-    return refundList
-  }
-
-  renderFulfilledTag() {
-    const { orderFulfilled } = this.props
-
-    if (orderFulfilled !== true) {
-      return null
-    }
-
-    return (
-      <div className="row order-summary-total">
-        <div className="col-12 px-3 py-3 py-md-0">
-          <div className="d-flex justify-content-between">
-            <div className="flex-grow-1">
-              <Badge className="bg-success float-right">Paid</Badge>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   render() {
@@ -120,9 +149,11 @@ export class OrderSummaryCard extends React.Component<Props> {
       cardTitle,
       refunds
     } = this.props
+
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     const title = cardTitle ? cardTitle : "Order Summary"
+
     return (
       <div className="order-summary container std-card" key="ordersummarycard">
         <div className="std-card-body checkout-page">
@@ -135,7 +166,6 @@ export class OrderSummaryCard extends React.Component<Props> {
             </div>
 
             {this.renderAppliedCoupons()}
-
             {refunds === null || refunds.length === 0 ?
               this.renderFulfilledTag() :
               this.renderRefunds()}
@@ -151,20 +181,38 @@ export class OrderSummaryCard extends React.Component<Props> {
           </div>
 
           {!orderFulfilled ? (
-            <ApplyCouponForm
-              onSubmit={addDiscount}
-              couponCode={discountCode}
-              discounts={discounts}
-            />
+            <Formik
+              innerRef={this.formikRef}
+              initialValues={{ couponCode: discountCode }}
+              enableReinitialize={false}
+              onSubmit={async (values, formikHelpers) => {
+                if (addDiscount) {
+                  await addDiscount(values, formikHelpers)
+
+                  const hasErrors =
+                    Object.keys(formikHelpers.errors).length > 0 ||
+                    (formikHelpers.status && formikHelpers.status.error)
+
+                  if (this.state.submittingPlaceOrder && !hasErrors) {
+                    // Redirect only if there were no errors
+                    window.location = "/checkout/to_payment"
+                  }
+
+                  // Reset flag
+                  this.setState({ submittingPlaceOrder: false })
+                }
+              }}
+            >
+              <ApplyCouponForm discounts={discounts} />
+            </Formik>
           ) : null}
 
           {(totalPrice > 0 || discounts) && !orderFulfilled ? (
             <div>
               <Button
-                type="link"
                 id="place-order-button"
                 className="btn btn-primary btn-gradient-red-to-blue btn-place-order"
-                onClick={() => (window.location = "/checkout/to_payment")}
+                onClick={this.handlePlaceOrder}
               >
                 Place your order
               </Button>
