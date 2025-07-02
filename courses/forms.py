@@ -18,6 +18,7 @@ def program_requirements_schema():
     # such as read data from database and populate choices
 
     courses = Course.objects.live().order_by("title")
+    programs = Program.objects.live().order_by("title")
 
     return {
         "title": "Requirements",
@@ -105,11 +106,13 @@ def program_requirements_schema():
                                 "enum": [
                                     ProgramRequirementNodeType.COURSE.value,
                                     ProgramRequirementNodeType.OPERATOR.value,
+                                    ProgramRequirementNodeType.PROGRAM.value,
                                 ],
                                 "options": {
                                     "enum_titles": [
                                         ProgramRequirementNodeType.COURSE.label,
                                         ProgramRequirementNodeType.OPERATOR.label,
+                                        ProgramRequirementNodeType.PROGRAM.label,
                                     ],
                                 },
                             },
@@ -167,6 +170,21 @@ def program_requirements_schema():
                                     "enum_titles": [
                                         f"{course.readable_id} | {course.title}"
                                         for course in courses
+                                    ],
+                                },
+                            },
+                            # program fields
+                            "required_program": {
+                                "type": "number",
+                                "title": "Required Program",
+                                "enum": [program.id for program in programs],
+                                "options": {
+                                    "dependencies": {
+                                        "node_type": ProgramRequirementNodeType.PROGRAM.value
+                                    },
+                                    "enum_titles": [
+                                        f"{program.readable_id} | {program.title}"
+                                        for program in programs
                                     ],
                                 },
                             },

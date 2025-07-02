@@ -33,9 +33,11 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
         choices=(
             models.ProgramRequirementNodeType.OPERATOR,
             models.ProgramRequirementNodeType.COURSE,
+            models.ProgramRequirementNodeType.PROGRAM,
         )
     )
     course = serializers.CharField(source="course_id", allow_null=True, default=None)
+    required_program = serializers.CharField(source="required_program_id", allow_null=True, default=None)
     program = serializers.CharField(source="program_id", required=False)
     title = serializers.CharField(allow_null=True, default=None)
     operator = serializers.CharField(allow_null=True, default=None)

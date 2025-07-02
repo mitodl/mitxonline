@@ -781,6 +781,176 @@ def test_program_add_elective():
     add_and_check()
 
 
+def test_program_add_program_requirement():
+    """
+    Tests the add_program_requirement convenience function.
+
+    It should only add the program to the ALL_OF operator node, and not create
+    duplicate nodes. It should create the root node if there isn't one already.
+    """
+    parent_program = ProgramFactory.create()
+    required_program = ProgramFactory.create()
+
+    def add_and_check():
+        parent_program.add_program_requirement(required_program)
+        parent_program.refresh_from_db()
+
+        assert (
+            parent_program.get_requirements_root()
+            .get_descendants()
+            .filter(required_program=required_program)
+            .count()
+            > 0
+        )
+
+        required_root = (
+            parent_program.get_requirements_root()
+            .get_children()
+            .filter(operator=ProgramRequirement.Operator.ALL_OF)
+            .first()
+        )
+
+        assert required_root is not None
+
+        required_program_ids = (
+            required_root.get_children().values_list("required_program", flat=True)
+            if required_root
+            else []
+        )
+
+        elective_root = (
+            parent_program.get_requirements_root()
+            .get_children()
+            .filter(operator=ProgramRequirement.Operator.MIN_NUMBER_OF)
+            .first()
+        )
+
+        elective_program_ids = (
+            elective_root.get_children().values_list("required_program", flat=True)
+            if elective_root
+            else []
+        )
+
+        assert required_program.id in required_program_ids
+        assert required_program.id not in elective_program_ids
+
+    add_and_check()
+    add_and_check()
+
+
+def test_program_add_program_elective():
+    """
+    Tests the add_program_elective convenience function.
+
+    It should only add the program to the MIN_NUMBER_OF operator node, and not create
+    duplicate nodes. It should create the root node if there isn't one already.
+    """
+    parent_program = ProgramFactory.create()
+    elective_program = ProgramFactory.create()
+
+    def add_and_check():
+        parent_program.add_program_elective(elective_program)
+        parent_program.refresh_from_db()
+
+        assert (
+            parent_program.get_requirements_root()
+            .get_descendants()
+            .filter(required_program=elective_program)
+            .count()
+            > 0
+        )
+
+        elective_root = (
+            parent_program.get_requirements_root()
+            .get_children()
+            .filter(operator=ProgramRequirement.Operator.MIN_NUMBER_OF)
+            .first()
+        )
+
+        assert elective_root is not None
+
+        elective_program_ids = (
+            elective_root.get_children().values_list("required_program", flat=True)
+            if elective_root
+            else []
+        )
+
+        required_root = (
+            parent_program.get_requirements_root()
+            .get_children()
+            .filter(operator=ProgramRequirement.Operator.ALL_OF)
+            .first()
+        )
+
+        required_program_ids = (
+            required_root.get_children().values_list("required_program", flat=True)
+            if required_root
+            else []
+        )
+
+        assert elective_program.id not in required_program_ids
+        assert elective_program.id in elective_program_ids
+
+    add_and_check()
+    add_and_check()
+
+
+def test_program_required_programs_property():
+    """Test that the required_programs property returns the correct programs"""
+    parent_program = ProgramFactory.create()
+    required_program1 = ProgramFactory.create()
+    required_program2 = ProgramFactory.create()
+    elective_program = ProgramFactory.create()
+
+    parent_program.add_program_requirement(required_program1)
+    parent_program.add_program_requirement(required_program2)
+    parent_program.add_program_elective(elective_program)
+
+    required_programs = parent_program.required_programs
+    assert len(required_programs) == 2
+    assert required_program1 in required_programs
+    assert required_program2 in required_programs
+    assert elective_program not in required_programs
+
+
+def test_program_elective_programs_property():
+    """Test that the elective_programs property returns the correct programs"""
+    parent_program = ProgramFactory.create()
+    required_program = ProgramFactory.create()
+    elective_program1 = ProgramFactory.create()
+    elective_program2 = ProgramFactory.create()
+
+    parent_program.add_program_requirement(required_program)
+    parent_program.add_program_elective(elective_program1)
+    parent_program.add_program_elective(elective_program2)
+
+    elective_programs = parent_program.elective_programs
+    assert len(elective_programs) == 2
+    assert elective_program1 in elective_programs
+    assert elective_program2 in elective_programs
+    assert required_program not in elective_programs
+
+
+def test_program_requirement_node_types():
+    """Test that the new PROGRAM node type works correctly"""
+    parent_program = ProgramFactory.create()
+    required_program = ProgramFactory.create()
+    
+    parent_program.add_program_requirement(required_program)
+    
+    program_requirement = ProgramRequirement.objects.filter(
+        program=parent_program,
+        required_program=required_program,
+        node_type=ProgramRequirementNodeType.PROGRAM
+    ).first()
+    
+    assert program_requirement is not None
+    assert program_requirement.is_program
+    assert not program_requirement.is_course
+    assert not program_requirement.is_operator
+    assert not program_requirement.is_root
+
+
 def test_certificate_choice_limits():
     """
     The limit_choices_to callable should return just certificate page IDs as
