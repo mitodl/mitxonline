@@ -16,6 +16,10 @@ from mitol.payment_gateway.api import CartItem as GatewayCartItem
 from mitol.payment_gateway.api import Order as GatewayOrder
 from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
 
+from b2b.api import (
+    get_active_contracts_from_basket_items,
+    is_discount_supplied_for_b2b_purchase,
+)
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from ecommerce.constants import (
@@ -51,6 +55,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY,
 )
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import parse_supplied_date, redirect_with_user_message
@@ -105,7 +110,18 @@ def generate_checkout_payload(request):  # noqa: PLR0911
             ),
         }
 
-    if not validate_basket_for_b2b_purchase(request):
+    active_contracts = get_active_contracts_from_basket_items(basket)
+
+    if not is_discount_supplied_for_b2b_purchase(request, active_contracts):
+        return {
+            "invalid_discounts": True,
+            "response": redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY},
+            ),
+        }
+
+    if not validate_basket_for_b2b_purchase(request, active_contracts):
         return {
             "invalid_discounts": True,
             "response": redirect_with_user_message(
@@ -192,6 +208,13 @@ def check_discount_for_products(discount, basket):
 
 
 def check_basket_discounts_for_validity(request):
+    """
+    Checks the validity of the discounts in the basket against the user and
+    the products in the basket.
+
+    Returns:
+        boolean: True if all discounts are valid, False otherwise.
+    """
     basket = establish_basket(request)
 
     for basket_discount in basket.discounts.all():

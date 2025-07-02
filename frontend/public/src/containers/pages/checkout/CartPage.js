@@ -52,27 +52,24 @@ export class CartPage extends React.Component<Props, CartState> {
   }
 
   async addDiscount(ev: Object, { setErrors }: any) {
-    const subbedCode = ev.couponCode
+    const subbedCode = String(ev.couponCode || "").trim()
     const { applyDiscountCode, forceRequest } = this.props
 
-    this.setState({ discountCode: subbedCode })
-
-    if (String(subbedCode).trim().length === 0) {
+    if (!subbedCode) {
       return
     }
 
-    let userMessage
+    this.setState({ discountCode: subbedCode })
 
-    const resp = await applyDiscountCode(this.state.discountCode)
+    const resp = await applyDiscountCode(subbedCode)
+
     if (isSuccessResponse(resp)) {
-      userMessage = "Discount code added."
-
+      // Discount successfully applied, re-fetch cart
       forceRequest()
     } else {
-      userMessage = `Discount code ${this.state.discountCode} is invalid.`
-
+      // Show error in the input field
       setErrors({
-        couponCode: userMessage
+        couponCode: `Discount code ${subbedCode} is invalid.`
       })
     }
   }
