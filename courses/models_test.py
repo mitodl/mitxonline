@@ -475,6 +475,7 @@ def test_program_requirements(program_with_requirements):  # noqa: F811
     """Test for program requirements"""
     node_defaults = {
         "course": None,
+        "required_program": None,
         "operator": None,
         "operator_value": None,
         "title": "",
