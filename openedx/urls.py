@@ -10,4 +10,9 @@ urlpatterns = (
         views.openedx_private_auth_complete,
         name="openedx-private-oauth-complete",
     ),
+    path(
+        "_/auth/complete",
+        views.openedx_private_auth_complete,
+        name="openedx-private-oauth-complete-no-apisix",
+    ),
 )

@@ -73,6 +73,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     time_commitment = serializers.SerializerMethodField()
     min_weekly_hours = serializers.SerializerMethodField()
     max_weekly_hours = serializers.SerializerMethodField()
+    start_date = serializers.SerializerMethodField()
 
     def get_courses(self, instance) -> list[int]:
         return [course[0].id for course in instance.courses if course[0].live]
@@ -216,6 +217,15 @@ class ProgramSerializer(serializers.ModelSerializer):
             return instance.page.max_weeks
 
         return None
+
+    def get_start_date(self, instance) -> str | None:
+        """
+        Get the start date of the program by finding the first available run.
+        """
+        first_unexpired_run = instance.first_unexpired_run
+        if first_unexpired_run and first_unexpired_run.start_date:
+            return first_unexpired_run.start_date
+        return instance.start_date
 
     class Meta:
         model = Program

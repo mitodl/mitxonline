@@ -44,7 +44,6 @@ const AddlProfileFieldsForm = ({ onSubmit, user, countries }: Props) => {
               errors={errors}
               countries={countries}
               values={values}
-              isNewAccount={false}
             />
             <div className="row submit-row no-gutters">
               <div className="col d-flex justify-content-end">

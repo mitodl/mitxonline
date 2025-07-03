@@ -833,7 +833,7 @@ paths:
         name: org_id
         schema:
           type: number
-        description: Only show courses beloning to this B2B/UAI organization
+        description: Only show courses belonging to this B2B/UAI organization
       - name: page
         required: false
         in: query
@@ -3229,8 +3229,10 @@ components:
           $ref: '#/components/schemas/AvailabilityEnum'
         start_date:
           type: string
-          format: date-time
           nullable: true
+          description: Get the start date of the program by finding the first available
+            run.
+          readOnly: true
         end_date:
           type: string
           format: date-time
@@ -3296,6 +3298,7 @@ components:
       - req_tree
       - required_prerequisites
       - requirements
+      - start_date
       - time_commitment
       - title
       - topics

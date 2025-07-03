@@ -225,7 +225,7 @@ class FaultyOpenEdxUserManager(BaseUserManager):
     """User manager that defines a queryset of Users that are incorrectly configured in the openedx"""
 
     def get_queryset(self):  # pylint: disable=missing-docstring
-        return (
+        faulty_users = (
             super()
             .get_queryset()
             .select_related("openedx_api_auth")
@@ -234,11 +234,15 @@ class FaultyOpenEdxUserManager(BaseUserManager):
                 openedx_user_count=Count("openedx_users"),
                 openedx_api_auth_count=Count("openedx_api_auth"),
             )
-            .filter(
-                (Q(openedx_user_count=0) | Q(openedx_api_auth_count=0)),
-                is_active=True,
-            )
+            .filter(is_active=True)
         )
+        return (
+            faulty_users.filter(
+                Q(openedx_user_count=0)
+                | Q(openedx_api_auth_count=0)
+                | Q(openedx_users__has_been_synced=False)
+            )
+        ).distinct()
 
 
 class User(

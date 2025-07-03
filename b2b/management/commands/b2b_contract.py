@@ -4,6 +4,7 @@ import logging
 from decimal import Decimal
 
 from django.core.management import BaseCommand, CommandError
+from django.db.models import Q
 
 from b2b.api import create_contract_run
 from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
@@ -54,7 +55,7 @@ class Command(BaseCommand):
         create_parser.add_argument(
             "organization",
             type=str,
-            help="The name of the organization.",
+            help="The name (or org key) of the organization.",
         )
         create_parser.add_argument(
             "contract_name",
@@ -90,6 +91,11 @@ class Command(BaseCommand):
             "--create",
             action="store_true",
             help="Create an organization if it does not exist.",
+        )
+        create_parser.add_argument(
+            "--org-key",
+            type=str,
+            help="The org key to use for the new organization.",
         )
         create_parser.add_argument(
             "--max-learners",
@@ -209,18 +215,25 @@ class Command(BaseCommand):
         create_organization = kwargs.pop("create")
         max_learners = kwargs.pop("max_learners")
         price = kwargs.pop("price")
+        new_org_key = kwargs.pop("org_key")
 
         self.stdout.write(
             f"Creating contract '{contract_name}' for organization '{organization_name}'"
         )
 
-        org = OrganizationPage.objects.filter(name=organization_name).first()
+        org = OrganizationPage.objects.filter(
+            Q(name=organization_name) | Q(org_key=organization_name)
+        ).first()
 
         log.info("Got organization %s", org)
 
         if not org and create_organization:
+            if not new_org_key:
+                msg = f"To create '{organization_name}', you must supply an org key."
+                raise CommandError(msg)
+
             parent = OrganizationIndexPage.objects.first()
-            org = OrganizationPage(name=organization_name)
+            org = OrganizationPage(name=organization_name, org_key=new_org_key)
             parent.add_child(instance=org)
             org.save()
             parent.save()

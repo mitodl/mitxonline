@@ -3,7 +3,7 @@ Course API Views version 2
 """
 
 import django_filters
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef, Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
@@ -12,6 +12,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from courses.models import (
     Course,
+    CourseRun,
     CoursesTopic,
     Department,
     Program,
@@ -141,7 +142,7 @@ class CourseFilterSet(django_filters.FilterSet):
     id = IdInFilter(field_name="id", lookup_expr="in", label="Course ID")
     org_id = django_filters.NumberFilter(
         method="filter_org_id",
-        label="Only show courses beloning to this B2B/UAI organization",
+        label="Only show courses belonging to this B2B/UAI organization",
         field_name="org_id",
     )
     include_approved_financial_aid = django_filters.BooleanFilter(
@@ -191,6 +192,19 @@ class CourseFilterSet(django_filters.FilterSet):
             if value
             else get_unenrollable_courses(queryset)
         )
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        # perform additional filtering
+
+        filter_keys = self.form.cleaned_data.keys()
+
+        if "courserun_is_enrollable" not in filter_keys:
+            queryset = queryset.prefetch_related(
+                Prefetch("courseruns", queryset=CourseRun.objects.order_by("id")),
+            )
+
+        return queryset
 
 
 class CourseViewSet(viewsets.ReadOnlyModelViewSet):

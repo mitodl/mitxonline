@@ -11,6 +11,7 @@ import responses
 from django.contrib.auth import get_user_model
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
+from mitol.common.utils.user import _reformat_for_username
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
@@ -31,6 +32,7 @@ from openedx.api import (
     get_edx_api_client,
     get_edx_retirement_service_client,
     get_valid_edx_api_auth,
+    reconcile_edx_username,
     repair_faulty_edx_user,
     repair_faulty_openedx_users,
     retry_failed_edx_enrollments,
@@ -47,6 +49,7 @@ from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
+    OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
 )
 from openedx.exceptions import (
@@ -88,7 +91,7 @@ def test_create_user(user, mocker):
     mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
     mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
     create_user(user)
-    mock_create_edx_user.assert_called_with(user)
+    mock_create_edx_user.assert_called_with(user, None)
     mock_create_edx_auth_token.assert_called_with(user)
 
 
@@ -119,10 +122,27 @@ def edx_username_validation_response_mock(username_exists, settings):
 @responses.activate
 @pytest.mark.parametrize("has_been_synced", [True, False])
 @pytest.mark.parametrize("access_token_count", [0, 1, 3])
-def test_create_edx_user(settings, application, has_been_synced, access_token_count):
+@pytest.mark.parametrize(
+    "provided_username",
+    ["test_username", None],
+)
+@pytest.mark.parametrize("missing_username", [True, False])
+def test_create_edx_user(  # noqa: PLR0913
+    settings,
+    application,
+    has_been_synced,
+    access_token_count,
+    provided_username,
+    missing_username,
+):
     """Test that create_edx_user makes a request to create an edX user"""
     user = UserFactory.create(openedx_user__has_been_synced=has_been_synced)
+    openedx_user = user.openedx_users.first()
+    if missing_username:
+        openedx_user.edx_username = None
+        openedx_user.save()
 
+    original_username = user.edx_username
     resp1 = responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}/api/mobile/v0.5/my_user_info",
@@ -144,7 +164,10 @@ def test_create_edx_user(settings, application, has_been_synced, access_token_co
             expires=now_in_utc() + timedelta(hours=1),
         )
 
-    create_edx_user(user)
+    if provided_username:
+        create_edx_user(user, provided_username)
+    else:
+        create_edx_user(user)
 
     # An AccessToken should be created during execution
     created_access_token = AccessToken.objects.filter(application=application).last()
@@ -160,8 +183,7 @@ def test_create_edx_user(settings, application, has_been_synced, access_token_co
             resp2.calls[0].request.headers[ACCESS_TOKEN_HEADER_NAME]
             == settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
         )
-        assert dict(parse_qsl(resp2.calls[0].request.body)) == {
-            "username": user.edx_username,
+        expected_request_body = {
             "email": user.email,
             "name": user.name,
             "provider": settings.OPENEDX_OAUTH_PROVIDER,
@@ -173,12 +195,21 @@ def test_create_edx_user(settings, application, has_been_synced, access_token_co
             "gender": user.user_profile.gender if user.user_profile else None,
             "honor_code": "True",
         }
+        if provided_username:
+            expected_request_body["username"] = provided_username
+        if not missing_username:
+            expected_request_body["username"] = original_username
+        assert dict(parse_qsl(resp2.calls[0].request.body)) == expected_request_body
     assert (
         OpenEdxUser.objects.filter(
             user=user, platform=PLATFORM_EDX, has_been_synced=True
         ).exists()
         is True
     )
+    if provided_username and missing_username:
+        assert user.openedx_users.first().edx_username == provided_username
+    elif provided_username and not missing_username:
+        assert user.openedx_users.first().edx_username == original_username
 
 
 @responses.activate
@@ -280,14 +311,12 @@ def test_create_edx_auth_token(settings):
     responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}/oauth2/authorize",
-        headers={
-            "Location": f"{settings.SITE_BASE_URL}/login/_private/complete?code={code}"
-        },
+        headers={"Location": f"{settings.SITE_BASE_URL}/_/auth/complete?code={code}"},
         status=status.HTTP_302_FOUND,
     )
     responses.add(
         responses.GET,
-        f"{settings.SITE_BASE_URL}/login/_private/complete",
+        f"{settings.SITE_BASE_URL}/_/auth/complete",
         status=status.HTTP_200_OK,
     )
     responses.add(
@@ -307,7 +336,7 @@ def test_create_edx_auth_token(settings):
         grant_type="authorization_code",
         client_id=settings.OPENEDX_API_CLIENT_ID,
         client_secret=settings.OPENEDX_API_CLIENT_SECRET,
-        redirect_uri=f"{settings.SITE_BASE_URL}/login/_private/complete",
+        redirect_uri=f"{settings.SITE_BASE_URL}/_/auth/complete",
     )
 
     assert OpenEdxApiAuth.objects.filter(user=user).exists()
@@ -357,14 +386,12 @@ def test_update_edx_user_email(settings):
     responses.add(
         responses.GET,
         f"{settings.OPENEDX_API_BASE_URL}/oauth2/authorize",
-        headers={
-            "Location": f"{settings.SITE_BASE_URL}/login/_private/complete?code={code}"
-        },
+        headers={"Location": f"{settings.SITE_BASE_URL}/_/auth/complete?code={code}"},
         status=status.HTTP_302_FOUND,
     )
     responses.add(
         responses.GET,
-        f"{settings.SITE_BASE_URL}/login/_private/complete",
+        f"{settings.SITE_BASE_URL}/_/auth/complete",
         status=status.HTTP_200_OK,
     )
 
@@ -457,7 +484,8 @@ def test_get_edx_retirement_service_client(mocker, settings):
     assert client.base_url == settings.OPENEDX_API_BASE_URL
 
 
-def test_enroll_in_edx_course_runs(settings, mocker, user):
+@pytest.mark.parametrize("has_edx_username", [True, False])
+def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
     """Tests that enroll_in_edx_course_runs uses the EdxApi client to enroll in course runs"""
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_client = mocker.MagicMock()
@@ -472,7 +500,18 @@ def test_enroll_in_edx_course_runs(settings, mocker, user):
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
     course_runs = CourseRunFactory.build_batch(2)
+
+    # Test to make sure reconcile_edx_username runs as expected.
+    if not has_edx_username:
+        user.openedx_users.all().delete()
+        user.refresh_from_db()
+
     enroll_results = enroll_in_edx_course_runs(user, course_runs)
+
+    if not has_edx_username:
+        assert user.openedx_users.count() == 1
+        assert user.openedx_users.first().edx_username
+
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[0].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
@@ -977,3 +1016,52 @@ def test_bulk_retire_edx_users(mocker):
     mock_client.bulk_user_retirement.retire_users.assert_called_with(
         {"usernames": test_usernames}
     )
+
+
+@pytest.mark.parametrize("username_is_email", [True, False])
+@pytest.mark.parametrize("name_is_empty", [True, False])
+@pytest.mark.parametrize("username_is_long", [True, False])
+def test_reconcile_edx_username(username_is_email, name_is_empty, username_is_long):
+    """Ensure the edX username reconciliation works properly."""
+
+    user = UserFactory.create(openedx_user=None)
+
+    if username_is_email:
+        user.username = user.email
+
+        if name_is_empty:
+            user.name = ""
+
+        user.save()
+        user.refresh_from_db()
+    elif username_is_long:
+        user.username = str(
+            factory.Faker("pystr", max_characters=(OPENEDX_USERNAME_MAX_LEN + 2))
+        )
+        user.save()
+
+    assert reconcile_edx_username(user)
+
+    user.refresh_from_db()
+
+    assert user.openedx_users.count() == 1
+
+    if username_is_email:
+        # If the username is explicitly an email address (or contains @),
+        # it should use the usernameify function, with one of a couple of outcomes.
+
+        if name_is_empty:
+            assert user.openedx_users.get().edx_username == _reformat_for_username(
+                user.email.split("@")[0]
+            )
+        else:
+            assert user.openedx_users.get().edx_username == _reformat_for_username(
+                user.name
+            )
+    else:
+        if username_is_long:
+            assert len(user.username) > OPENEDX_USERNAME_MAX_LEN
+        assert (
+            user.openedx_users.get().edx_username
+            == user.username[:OPENEDX_USERNAME_MAX_LEN]
+        )

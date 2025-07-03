@@ -1,6 +1,6 @@
 """URL routing for v0 of the B2B API."""
 
-from django.urls import include, re_path
+from django.urls import include, path, re_path
 from rest_framework.routers import SimpleRouter
 
 from b2b.views.v0 import ContractPageViewSet, Enroll, OrganizationPageViewSet
@@ -21,5 +21,5 @@ v0_router.register(
 
 urlpatterns = [
     re_path(r"^", include(v0_router.urls)),
-    re_path(r"^enroll/<str:readable_id>/", Enroll.as_view()),
+    path(r"enroll/<str:readable_id>/", Enroll.as_view()),
 ]
