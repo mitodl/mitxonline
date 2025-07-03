@@ -1022,6 +1022,18 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         use_json_field=True,
     )
 
+    min_price = models.SmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Specify the minimum product price.",
+    )
+
+    max_price = models.SmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Specify the maximum product price.",
+    )
+
     prerequisites = RichTextField(
         null=True,
         blank=True,
@@ -1108,6 +1120,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         FieldPanel("min_weeks"),
         FieldPanel("max_weeks"),
         FieldPanel("price"),
+        FieldPanel("min_price"),
+        FieldPanel("max_price"),
         FieldPanel("prerequisites"),
         FieldPanel("faq_url"),
         FieldPanel("about"),
