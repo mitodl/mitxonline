@@ -35,10 +35,6 @@ export function removeCookie(name: string) {
   document.cookie = `${name}=;path=/;`
 }
 
-export function getCSRFCookie(): string | null {
-  return getCookie("csrf_mitxonline")
-}
-
 export function csrfSafeMethod(method: string): boolean {
   // these HTTP methods do not require CSRF protection
   return /^(GET|HEAD|OPTIONS|TRACE)$/.test(method)
@@ -54,7 +50,7 @@ const setWith = R.curry((path, valFunc, obj) => R.set(path, valFunc(), obj))
 
 const csrfToken = R.unless(
   R.compose(csrfSafeMethod, R.prop("method")),
-  setWith(R.lensPath(["headers", "X-CSRFToken"]), () => getCSRFCookie())
+  setWith(R.lensPath(["headers", "X-CSRFToken"]), () => getCookie("csrftoken"))
 )
 
 const jsonHeaders = R.merge({
