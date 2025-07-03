@@ -4,30 +4,37 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0045_remove_unnecessary_null_true'),
+        ("cms", "0045_remove_unnecessary_null_true"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='coursepage',
-            name='max_price',
-            field=models.SmallIntegerField(blank=True, help_text='Specify the maximum product price.', null=True),
+            model_name="coursepage",
+            name="max_price",
+            field=models.SmallIntegerField(
+                blank=True, help_text="Specify the maximum product price.", null=True
+            ),
         ),
         migrations.AddField(
-            model_name='coursepage',
-            name='min_price',
-            field=models.SmallIntegerField(blank=True, help_text='Specify the minimum product price.', null=True),
+            model_name="coursepage",
+            name="min_price",
+            field=models.SmallIntegerField(
+                blank=True, help_text="Specify the minimum product price.", null=True
+            ),
         ),
         migrations.AddField(
-            model_name='programpage',
-            name='max_price',
-            field=models.SmallIntegerField(blank=True, help_text='Specify the maximum product price.', null=True),
+            model_name="programpage",
+            name="max_price",
+            field=models.SmallIntegerField(
+                blank=True, help_text="Specify the maximum product price.", null=True
+            ),
         ),
         migrations.AddField(
-            model_name='programpage',
-            name='min_price',
-            field=models.SmallIntegerField(blank=True, help_text='Specify the minimum product price.', null=True),
+            model_name="programpage",
+            name="min_price",
+            field=models.SmallIntegerField(
+                blank=True, help_text="Specify the minimum product price.", null=True
+            ),
         ),
     ]
