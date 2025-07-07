@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Optional, Set, Tuple, TypeVar, Union  # noqa: UP035
+from typing import TYPE_CHECKING, Set, Tuple, TypeVar, Union  # noqa: UP035
 from urllib.parse import quote_plus
 
 import dateutil
@@ -198,7 +198,7 @@ def now_datetime_with_tz():
     return datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
 
 
-def date_to_datetime(date: date, tzinfo: Optional[str] = None) -> datetime:
+def date_to_datetime(date: date, tzinfo: str | None = None) -> datetime:
     """Convert a regular date to a datetime with optiona timezone info."""
 
     ret_date = datetime.fromisocalendar(*date.isocalendar())
