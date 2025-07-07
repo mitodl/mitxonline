@@ -5,6 +5,7 @@ import sinon from "sinon"
 import {
   getCookie,
   removeCookie,
+  getCSRFCookie,
   fetchJSONWithCSRF,
   fetchWithCSRF,
   csrfSafeMethod,
@@ -74,7 +75,7 @@ describe("api", function() {
 
     describe("fetchWithCSRF", () => {
       beforeEach(() => {
-        document.cookie = `csrftoken=${CSRF_TOKEN}`
+        document.cookie = `csrf_mitxonline=${CSRF_TOKEN}`
       })
 
       it("fetches and populates appropriate headers for GET", () => {
@@ -140,7 +141,7 @@ describe("api", function() {
 
     describe("fetchJSONWithCSRF", () => {
       it("fetches and populates appropriate headers for JSON", () => {
-        document.cookie = `csrftoken=${CSRF_TOKEN}`
+        document.cookie = `csrf_mitxonline=${CSRF_TOKEN}`
         const expectedJSON = { data: true }
 
         fetchMock.mock("/url", (url, opts) => {
@@ -171,7 +172,7 @@ describe("api", function() {
       })
 
       it("handles responses with no data", () => {
-        document.cookie = `csrftoken=${CSRF_TOKEN}`
+        document.cookie = `csrf_mitxonline=${CSRF_TOKEN}`
         const expectedJSON = { data: true }
 
         fetchMock.mock("/url", (url, opts) => {
@@ -276,6 +277,13 @@ describe("api", function() {
       document.cookie = "key=cookie"
       removeCookie("unknown")
       assert.equal(getCookie("key"), "cookie")
+    })
+  })
+
+  describe("getCSRFCookie", () => {
+    it("gets a cookie", () => {
+      document.cookie = "csrf_mitxonline=cookie"
+      assert.equal("cookie", getCSRFCookie())
     })
   })
 
