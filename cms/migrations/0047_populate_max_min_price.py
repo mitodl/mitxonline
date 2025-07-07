@@ -9,22 +9,24 @@ def populate_max_min_price(apps, schema_editor):
     CoursePage = apps.get_model("cms", "CoursePage")
     for page in CoursePage.objects.all():
         if page.price:
-            price_str = page.price.lower()
-            price_nums = re.findall(r"\d+", price_str)
-            if len(price_nums) > 0:
-                page.min_price = price_nums[0]
-                page.max_price = price_nums[1] if len(price_nums) > 1 else price_nums[0]
-                page.save()
+            for price in page.price:
+                price_str = price.value["text"].lower()
+                price_nums = re.findall(r"\d+", price_str)
+                if len(price_nums) > 0:
+                    page.min_price = price_nums[0]
+                    page.max_price = price_nums[1] if len(price_nums) > 1 else price_nums[0]
+                    page.save()
 
     ProgramPage = apps.get_model("cms", "ProgramPage")
     for page in ProgramPage.objects.all():
-        if page.effort:
-            price_str = page.effort.lower()
-            price_nums = re.findall(r"\d+", price_str)
-            if len(price_nums) > 0:
-                page.min_price = price_nums[0]
-                page.max_price = price_nums[1] if len(price_nums) > 1 else price_nums[0]
-                page.save()
+        if page.price:
+            for price in page.price:
+                price_str = price.value["text"].lower()
+                price_nums = re.findall(r"\d+", price_str)
+                if len(price_nums) > 0:
+                    page.min_price = price_nums[0]
+                    page.max_price = price_nums[1] if len(price_nums) > 1 else price_nums[0]
+                    page.save()
 
 
 class Migration(migrations.Migration):
