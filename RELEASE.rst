@@ -1,6 +1,31 @@
 Release Notes
 =============
 
+Version 0.122.4
+---------------
+
+- shuffle around middleware so CSRF works in Wagtail (#2779)
+- Fix prefetches on courses API (#2775)
+- Revert recent CSRF-related changes (#2776)
+- Get start date for a program based on the next avaialble course run (#2770)
+- Auto-generate edX username on enroll (#2759)
+- Added the private auth complete route for no apisix (#2768)
+- Switch usages of 'csrftoken' to 'csrf_mitxonline' (#2765)
+- fix: Set custom CSRF cookie name (#2762)
+- Only repair users who are active (#2761)
+- Repair faulty users when OpenEdxUser exists already (#2753)
+- Fix another set of flaky course api tests (#2760)
+- additional details modal from dashboard should display country when state is required (#2751)
+- Add a command to fix missing edx_username values (#2754)
+- save edx_username when creating profile (#2739)
+- Fix course api courserun ordering (#2757)
+- Update dependency django to v4.2.22 [SECURITY] (#2735)
+- Fix lazy_fixture error (#2752)
+- Add org key support to b2b management commands (#2745)
+- Couple small fixes for the one-click enroll API (#2749)
+- Fix a warning for an unnecessary null=True (#2747)
+- Update pytest to 8.4.1 (#2744)
+
 Version 0.121.2 (Released June 30, 2025)
 ---------------
 
