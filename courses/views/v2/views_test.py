@@ -31,6 +31,7 @@ from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
 )
 from courses.serializers.v2.programs import ProgramSerializer
+from courses.utils import get_enrollable_courses, get_unenrollable_courses
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_department,
@@ -181,40 +182,46 @@ def test_delete_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.usefixtures("course_catalog_data")
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
-@pytest.mark.parametrize("include_finaid", [True, False])
+@pytest.mark.parametrize("include_finaid", [None, True, False])
+@pytest.mark.parametrize("courserun_is_enrollable", [None, True, False])
 def test_get_courses(
     user_drf_client,
     mock_context,
     django_assert_max_num_queries,
-    course_catalog_data,
     include_finaid,
+    courserun_is_enrollable,
 ):
     """Test the view that handles requests for all Courses"""
-    course_catalog_data  # noqa: B018
     courses_from_fixture = []
-    num_queries = 0
+    num_queries = 2  # django_site + course count as a minimum
+    params = {"page_size": 100}
 
-    courses = Course.objects.order_by("title").prefetch_related("departments").all()
+    courses = Course.objects.order_by("title").prefetch_related("departments")
 
-    if include_finaid:
-        mock_context["include_approved_financial_aid"] = True
+    if include_finaid is not None:
+        mock_context["include_approved_financial_aid"] = include_finaid
+        params["include_approved_financial_aid"] = include_finaid
+
+    if courserun_is_enrollable is not None:
+        params["courserun_is_enrollable"] = courserun_is_enrollable
+
+        if courserun_is_enrollable:
+            courses = get_enrollable_courses(courses)
+        else:
+            courses = get_unenrollable_courses(courses)
 
     for course in courses:
         courses_from_fixture.append(
             CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
         )
         num_queries += num_queries_from_course(course, "v1")
+
     with django_assert_max_num_queries(num_queries) as context:
         query_count_start = len(connection.queries)
-        resp = user_drf_client.get(
-            reverse("v2:courses_api-list"),
-            {
-                "include_approved_financial_aid": include_finaid,
-                "page_size": len(courses_from_fixture),
-            },
-        )
+        resp = user_drf_client.get(reverse("v2:courses_api-list"), params)
         query_count_end = len(connection.queries)
         logger.info(
             f"test_get_course logged {query_count_end - query_count_start} queries"  # noqa: G004

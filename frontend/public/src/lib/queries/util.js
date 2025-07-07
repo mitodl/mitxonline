@@ -1,7 +1,7 @@
 // @flow
 import { nthArg } from "ramda"
 
-import { getCSRFCookie } from "../api"
+import { getCookie } from "../api"
 
 import type { QueryState } from "redux-query-react/src/types.js"
 
@@ -15,7 +15,7 @@ export const hasUnauthorizedResponse = (queryState: ?QueryState) =>
 
 export const getCsrfOptions = () => ({
   headers: {
-    "X-CSRFTOKEN": getCSRFCookie()
+    "X-CSRFTOKEN": getCookie("csrftoken")
   }
 })
 

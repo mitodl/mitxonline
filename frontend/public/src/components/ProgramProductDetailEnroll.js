@@ -31,7 +31,7 @@ import queries from "../lib/queries"
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import { isFinancialAssistanceAvailable } from "../lib/courseApi"
-import { getCSRFCookie } from "../lib/api"
+import { getCookie } from "../lib/api"
 import type { User, Country } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
@@ -317,7 +317,7 @@ export class ProgramProductDetailEnroll extends React.Component<
   }
 
   getEnrollmentForm(run: EnrollmentFlaggedCourseRun) {
-    const csrfToken = getCSRFCookie()
+    const csrfToken = getCookie("csrftoken")
 
     return (
       <form action="/enrollments/" method="post">
