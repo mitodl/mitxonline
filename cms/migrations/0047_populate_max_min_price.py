@@ -14,7 +14,9 @@ def populate_max_min_price(apps, schema_editor):
                 price_nums = re.findall(r"\d+", price_str)
                 if len(price_nums) > 0:
                     page.min_price = price_nums[0]
-                    page.max_price = price_nums[1] if len(price_nums) > 1 else price_nums[0]
+                    page.max_price = (
+                        price_nums[1] if len(price_nums) > 1 else price_nums[0]
+                    )
                     page.save()
 
     ProgramPage = apps.get_model("cms", "ProgramPage")
@@ -25,7 +27,9 @@ def populate_max_min_price(apps, schema_editor):
                 price_nums = re.findall(r"\d+", price_str)
                 if len(price_nums) > 0:
                     page.min_price = price_nums[0]
-                    page.max_price = price_nums[1] if len(price_nums) > 1 else price_nums[0]
+                    page.max_price = (
+                        price_nums[1] if len(price_nums) > 1 else price_nums[0]
+                    )
                     page.save()
 
 
