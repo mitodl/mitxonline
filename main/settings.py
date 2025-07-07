@@ -321,6 +321,8 @@ MIDDLEWARE = (
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "mitol.apigateway.middleware.ApisixUserMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -330,7 +332,6 @@ MIDDLEWARE = (
     "hijack.middleware.HijackUserMiddleware",
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
-    "mitol.apigateway.middleware.ApisixUserMiddleware",
     "oauth2_provider.middleware.OAuth2TokenMiddleware",
     "django_scim.middleware.SCIMAuthCheckMiddleware",
 )
