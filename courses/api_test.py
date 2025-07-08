@@ -1497,3 +1497,115 @@ def test_program_enrollment_unenrollment_re_enrollment(
     assert ProgramEnrollment.objects.filter(
         user=user, program=program_with_empty_requirements, change_status=None
     ).exists()
+
+
+def test_generate_program_certificate_with_subprogram_requirement(user, mocker):
+    """
+    Test that generate_program_certificate considers sub-program (nested program) requirements
+    when determining if a user has earned a program certificate.
+    """
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
+    
+    # Create a sub-program that the user will complete
+    sub_program = ProgramFactory.create()
+    sub_course = CourseFactory.create()
+    ProgramRequirementFactory.add_root(sub_program)
+    sub_program.add_requirement(sub_course)
+    
+    # Create the main program that requires the sub-program
+    main_program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(main_program)
+    main_program.add_program_requirement(sub_program)
+    
+    # User completes the sub-program course and gets a certificate
+    sub_course_run = CourseRunFactory.create(course=sub_course)
+    CourseRunGradeFactory.create(course_run=sub_course_run, user=user, passed=True, grade=1)
+    CourseRunCertificateFactory.create(user=user, course_run=sub_course_run)
+    
+    # Generate sub-program certificate (user has completed sub-program requirements)
+    sub_certificate, sub_created = generate_program_certificate(user=user, program=sub_program)
+    assert sub_created is True
+    assert isinstance(sub_certificate, ProgramCertificate)
+    
+    # Now try to generate main program certificate
+    # It should succeed because the user has a certificate for the required sub-program
+    main_certificate, main_created = generate_program_certificate(user=user, program=main_program)
+    assert main_created is True
+    assert isinstance(main_certificate, ProgramCertificate)
+    assert len(ProgramCertificate.objects.all()) == 2
+    patched_sync_hubspot_user.assert_called()
+
+
+def test_generate_program_certificate_with_subprogram_requirement_missing_certificate(user, mocker):
+    """
+    Test that generate_program_certificate does NOT generate a certificate when the required
+    sub-program certificate is missing.
+    """
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
+    
+    # Create a sub-program
+    sub_program = ProgramFactory.create()
+    sub_course = CourseFactory.create()
+    ProgramRequirementFactory.add_root(sub_program)
+    sub_program.add_requirement(sub_course)
+    
+    # Create the main program that requires the sub-program
+    main_program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(main_program)
+    main_program.add_program_requirement(sub_program)
+    
+    # User does NOT complete the sub-program course (no certificate)
+    # Try to generate main program certificate
+    # It should fail because the user does not have a certificate for the required sub-program
+    main_certificate, main_created = generate_program_certificate(user=user, program=main_program)
+    assert main_created is False
+    assert main_certificate is None
+    assert len(ProgramCertificate.objects.all()) == 0
+
+
+def test_generate_program_certificate_with_revoked_subprogram_certificate(user, mocker):
+    """
+    Test that generate_program_certificate does NOT consider revoked sub-program certificates
+    when determining if a user has earned a program certificate.
+    """
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
+    
+    # Create a sub-program
+    sub_program = ProgramFactory.create()
+    sub_course = CourseFactory.create()
+    ProgramRequirementFactory.add_root(sub_program)
+    sub_program.add_requirement(sub_course)
+    
+    # Create the main program that requires the sub-program
+    main_program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(main_program)
+    main_program.add_program_requirement(sub_program)
+    
+    # User completes the sub-program and gets a certificate, but it gets revoked
+    sub_course_run = CourseRunFactory.create(course=sub_course)
+    CourseRunGradeFactory.create(course_run=sub_course_run, user=user, passed=True, grade=1)
+    CourseRunCertificateFactory.create(user=user, course_run=sub_course_run)
+    
+    # Generate and then revoke sub-program certificate
+    sub_certificate, sub_created = generate_program_certificate(user=user, program=sub_program)
+    assert sub_created is True
+    sub_certificate.is_revoked = True
+    sub_certificate.save()
+    
+    # Try to generate main program certificate
+    # It should fail because the sub-program certificate is revoked
+    main_certificate, main_created = generate_program_certificate(user=user, program=main_program)
+    assert main_created is False
+    assert main_certificate is None
+    # Only the revoked sub-program certificate should exist
+    assert len(ProgramCertificate.objects.filter(is_revoked=False)) == 0
+    assert len(ProgramCertificate.all_objects.all()) == 1
