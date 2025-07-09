@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.123.0
+---------------
+
+- 7509 improve error message when user doesnt enter an enrollment code for a b2b product (#2740)
+- Add max min price for product page (#2773)
+
 Version 0.122.4 (Released July 09, 2025)
 ---------------
 
