@@ -129,8 +129,11 @@ export class OrderSummaryCard extends React.Component<Props, State> {
     const { discounts } = this.props
 
     // If there's already a discount applied and no new coupon code, proceed to payment
-    if (discounts && discounts.length > 0 &&
-        (!formik || !formik.values.couponCode || !formik.values.couponCode.trim())) {
+    if (
+      discounts &&
+      discounts.length > 0 &&
+      (!formik || !formik.values.couponCode || !formik.values.couponCode.trim())
+    ) {
       window.location = "/checkout/to_payment"
       return
     }
@@ -170,7 +173,8 @@ export class OrderSummaryCard extends React.Component<Props, State> {
     const title = cardTitle ? cardTitle : "Order Summary"
 
     // Only show discount code in field if there's no discount already applied
-    const initialCouponCode = (discounts && discounts.length > 0) ? "" : discountCode
+    const initialCouponCode =
+      discounts && discounts.length > 0 ? "" : discountCode
 
     return (
       <div className="order-summary container std-card" key="ordersummarycard">
