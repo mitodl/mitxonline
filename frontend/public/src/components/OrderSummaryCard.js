@@ -1,6 +1,6 @@
 // @flow
 import React from "react"
-import { Formik } from "formik"
+import { Formik, FormikProps } from "formik"
 // $FlowFixMe
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
@@ -18,18 +18,53 @@ type Props = {
   cardTitle?: string
 }
 
+type FormValues = {
+  couponCode: string
+}
+
 type State = {
   submittingPlaceOrder: boolean
 }
 
-
-export class OrderSummaryCard extends React.Component<Props> {
-  formikRef = React.createRef()
+export class OrderSummaryCard extends React.Component<Props, State> {
+  formikRef: { current: null | FormikProps<FormValues> } = React.createRef()
 
   state = {
-    submittingPlaceOrder: true,
+    submittingPlaceOrder: false
   }
 
+  renderRefunds() {
+    const { refunds } = this.props
+
+    if (refunds === null || refunds.length === 0) {
+      return null
+    }
+
+    const refundList = []
+
+    for (let refund = 0; refund < refunds.length; refund++) {
+      refundList.push(this.renderIndividualRefund(refunds[refund]))
+    }
+
+    return refundList
+  }
+
+  renderIndividualRefund(refund: Refund) {
+    if (refund === null) {
+      return null
+    }
+
+    const refundAmount = formatLocalePrice(Number(refund.amount))
+
+    return (
+      <div className="d-flex justify-content-between">
+        <div className="flex-grow-1">
+          <Badge className="bg-danger">Refund applied</Badge>
+        </div>
+        <div className="ml-auto text-primary text-end">{refundAmount}</div>
+      </div>
+    )
+  }
 
   renderFulfilledTag() {
     const { orderFulfilled } = this.props
@@ -49,7 +84,6 @@ export class OrderSummaryCard extends React.Component<Props> {
         </div>
       </div>
     )
-    window.location = "/checkout/to_payment"
   }
 
   renderAppliedCoupons() {
@@ -90,17 +124,37 @@ export class OrderSummaryCard extends React.Component<Props> {
     )
   }
 
-
   handlePlaceOrder = async () => {
     const formik = this.formikRef.current
+    const { discounts } = this.props
 
-    // If coupon is entered, submit the form
-    if (formik && formik.values.couponCode?.trim()) {
+    // If there's already a discount applied and no new coupon code, proceed to payment
+    if (
+      discounts &&
+      discounts.length > 0 &&
+      (!formik || !formik.values.couponCode || !formik.values.couponCode.trim())
+    ) {
+      window.location = "/checkout/to_payment"
+      return
+    }
+
+    // Check if formik exists and couponCode has a value
+    if (formik && formik.values.couponCode && formik.values.couponCode.trim()) {
       // Flag this is from Place Order button
       this.setState({ submittingPlaceOrder: true })
       await formik.submitForm()
+    } else {
+      // No coupon code, proceed directly to payment
+      window.location = "/checkout/to_payment"
     }
-    window.location = "/checkout/to_payment"
+  }
+
+  clearCouponField() {
+    const formik = this.formikRef.current
+    if (formik) {
+      formik.setFieldValue("couponCode", "")
+      formik.resetForm({ values: { couponCode: "" } })
+    }
   }
 
   render() {
@@ -118,6 +172,10 @@ export class OrderSummaryCard extends React.Component<Props> {
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     const title = cardTitle ? cardTitle : "Order Summary"
+
+    // Only show discount code in field if there's no discount already applied
+    const initialCouponCode =
+      discounts && discounts.length > 0 ? "" : discountCode
 
     return (
       <div className="order-summary container std-card" key="ordersummarycard">
@@ -146,29 +204,35 @@ export class OrderSummaryCard extends React.Component<Props> {
           </div>
 
           {!orderFulfilled ? (
-          <Formik
-            innerRef={this.formikRef}
-            initialValues={{ couponCode: discountCode }}
-            enableReinitialize={false}
-            onSubmit={async (values, formikHelpers) => {
-              if (addDiscount) {
-                await addDiscount(values, formikHelpers)
+            <Formik
+              innerRef={this.formikRef}
+              initialValues={{ couponCode: initialCouponCode }}
+              enableReinitialize={true}
+              onSubmit={async (values, formikHelpers) => {
+                if (addDiscount) {
+                  await addDiscount(values, formikHelpers)
 
-                const hasErrors =
-                  Object.keys(formikHelpers.errors).length > 0 || formikHelpers.status?.error
+                  const hasErrors =
+                    Object.keys(formikHelpers.errors).length > 0 ||
+                    (formikHelpers.status && formikHelpers.status.error)
 
-                if (this.state.submittingPlaceOrder && !hasErrors) {
-                  // Redirect only if there were no errors
-                  window.location = "/checkout/to_payment"
+                  if (!hasErrors) {
+                    // Clear the coupon code field after successful application
+                    this.clearCouponField()
+
+                    if (this.state.submittingPlaceOrder) {
+                      // Redirect only if there were no errors and this was from Place Order button
+                      window.location = "/checkout/to_payment"
+                    }
+                  }
+
+                  // Reset flag
+                  this.setState({ submittingPlaceOrder: false })
                 }
-
-                // Reset flag
-                this.setState({ submittingPlaceOrder: false })
-              }
-            }}
-          >
-            <ApplyCouponForm discounts={discounts} />
-          </Formik>
+              }}
+            >
+              <ApplyCouponForm discounts={discounts} />
+            </Formik>
           ) : null}
 
           {(totalPrice > 0 || discounts) && !orderFulfilled ? (

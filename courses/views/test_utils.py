@@ -26,8 +26,8 @@ def num_queries_from_course(course, version="v1"):
     num_programs = len(course.programs)
     num_course_runs = course.courseruns.count()
     if version == "v1":
-        return (9 * num_programs) + (num_course_runs * 6) + 22
-    return num_programs + (num_course_runs * 6) + 22
+        return (9 * num_programs) + (num_course_runs * 6) + 20
+    return num_programs + (num_course_runs * 6) + 20
 
 
 def num_queries_from_programs(programs, version="v1"):
@@ -54,7 +54,7 @@ def num_queries_from_programs(programs, version="v1"):
                 num_queries += num_queries_from_course(course)
             num_queries += 4 + (6 * num_courses) + 1
         if version == "v2":
-            num_queries += 6 + (17 * num_courses) + 1
+            num_queries += 6 + (17 * num_courses) + 2
     return num_queries
 
 
