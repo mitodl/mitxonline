@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.122.4
+Version 0.122.4 (Released July 09, 2025)
 ---------------
 
 - shuffle around middleware so CSRF works in Wagtail (#2779)
