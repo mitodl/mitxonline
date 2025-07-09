@@ -119,6 +119,8 @@ export const USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE =
   "payment-accepted-no-value"
 export const USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN = "payment-error-unknown"
 export const USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
+export const USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY =
+  "required-enrollment-code-empty"
 
 export const ALERT_TYPE_TEXT = "text"
 export const ALERT_TYPE_SUCCESS = "success"

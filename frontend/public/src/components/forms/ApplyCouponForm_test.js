@@ -1,67 +1,45 @@
 // @flow
 import React from "react"
-import sinon from "sinon"
-import { assert } from "chai"
-import { shallow } from "enzyme"
+import { assert, expect } from "chai"
+import { shallow, mount } from "enzyme"
 
 import ApplyCouponForm from "./ApplyCouponForm"
-
-import { findFormikFieldByName } from "../../lib/test_utils"
+import { Formik } from "formik"
 
 describe("ApplyCouponForm", () => {
-  let sandbox, onSubmitStub, couponCode
   const discounts = []
 
-  const renderForm = () =>
+  const renderForm = (props = {}) =>
     shallow(
-      <ApplyCouponForm
-        onSubmit={onSubmitStub}
-        couponCode={couponCode}
-        discounts={discounts}
-      />
+      <Formik initialValues={{ couponCode: "" }} onSubmit={() => {}}>
+        <ApplyCouponForm discounts={discounts} {...props} />
+      </Formik>
+    )
+      .dive()
+      .dive()
+
+  it("renders the error if couponCode has an error", () => {
+    const wrapper = mount(
+      <Formik
+        initialValues={{ couponCode: "" }}
+        initialErrors={{ couponCode: "Invalid code" }}
+        initialTouched={{ couponCode: true }}
+        onSubmit={() => {}}
+      >
+        <ApplyCouponForm discounts={[]} />
+      </Formik>
     )
 
-  beforeEach(() => {
-    sandbox = sinon.createSandbox()
-    onSubmitStub = sandbox.stub()
-  })
-
-  it("passes onSubmit to Formik", () => {
-    const wrapper = renderForm()
-
-    assert.equal(wrapper.find("Formik").props().onSubmit, onSubmitStub)
-  })
-
-  it("renders the form", () => {
-    const wrapper = renderForm()
-
-    const form = wrapper.find("Formik").dive()
-    assert.ok(findFormikFieldByName(form, "couponCode").exists())
-    assert.ok(form.find("button[type='submit']").exists())
-  })
-
-  it("does not render the error", () => {
-    const wrapper = renderForm()
-    const form = wrapper.find("Formik").dive()
-    assert.ok(!form.find("div#couponCodeError").exists())
+    expect(wrapper.find("div#couponCodeError").text()).to.equal("Invalid code")
   })
 
   it("does not render the overwrite warning text when there aren't discounts", () => {
-    while (discounts.length > 0) {
-      discounts.pop()
-    }
-
     const wrapper = renderForm()
-    const form = wrapper.find("Formik").dive()
-    assert.ok(!form.find("div#codeApplicationWarning").exists())
+    assert.ok(!wrapper.find("div#codeApplicationWarning").exists())
   })
 
   it("renders the overwrite warning text if there's a discount applied already", () => {
-    // it just checks for discounts at all; it doesn't actually use this data
-    discounts.push("a discount")
-
-    const wrapper = renderForm()
-    const form = wrapper.find("Formik").dive()
-    assert.ok(form.find("div#codeApplicationWarning").exists())
+    const wrapper = renderForm({ discounts: ["some-discount"] })
+    assert.ok(wrapper.find("div#codeApplicationWarning").exists())
   })
 })
