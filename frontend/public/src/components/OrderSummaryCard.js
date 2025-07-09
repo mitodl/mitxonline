@@ -30,7 +30,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
   formikRef: { current: null | FormikProps<FormValues> } = React.createRef()
 
   state = {
-    submittingPlaceOrder: true
+    submittingPlaceOrder: false
   }
 
   renderRefunds() {
@@ -126,6 +126,14 @@ export class OrderSummaryCard extends React.Component<Props, State> {
 
   handlePlaceOrder = async () => {
     const formik = this.formikRef.current
+    const { discounts } = this.props
+
+    // If there's already a discount applied and no new coupon code, proceed to payment
+    if (discounts && discounts.length > 0 && 
+        (!formik || !formik.values.couponCode || !formik.values.couponCode.trim())) {
+      window.location = "/checkout/to_payment"
+      return
+    }
 
     // Check if formik exists and couponCode has a value
     if (formik && formik.values.couponCode && formik.values.couponCode.trim()) {
@@ -135,6 +143,13 @@ export class OrderSummaryCard extends React.Component<Props, State> {
     } else {
       // No coupon code, proceed directly to payment
       window.location = "/checkout/to_payment"
+    }
+  }
+
+  clearCouponField() {
+    if (this.formikRef.current) {
+      this.formikRef.current.setFieldValue("couponCode", "")
+      this.formikRef.current.resetForm({ values: { couponCode: "" } })
     }
   }
 
@@ -153,6 +168,9 @@ export class OrderSummaryCard extends React.Component<Props, State> {
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     const title = cardTitle ? cardTitle : "Order Summary"
+    
+    // Only show discount code in field if there's no discount already applied
+    const initialCouponCode = (discounts && discounts.length > 0) ? "" : discountCode
 
     return (
       <div className="order-summary container std-card" key="ordersummarycard">
@@ -183,8 +201,8 @@ export class OrderSummaryCard extends React.Component<Props, State> {
           {!orderFulfilled ? (
             <Formik
               innerRef={this.formikRef}
-              initialValues={{ couponCode: discountCode }}
-              enableReinitialize={false}
+              initialValues={{ couponCode: initialCouponCode }}
+              enableReinitialize={true}
               onSubmit={async (values, formikHelpers) => {
                 if (addDiscount) {
                   await addDiscount(values, formikHelpers)
@@ -193,9 +211,14 @@ export class OrderSummaryCard extends React.Component<Props, State> {
                     Object.keys(formikHelpers.errors).length > 0 ||
                     (formikHelpers.status && formikHelpers.status.error)
 
-                  if (this.state.submittingPlaceOrder && !hasErrors) {
-                    // Redirect only if there were no errors
-                    window.location = "/checkout/to_payment"
+                  if (!hasErrors) {
+                    // Clear the coupon code field after successful application
+                    this.clearCouponField()
+                    
+                    if (this.state.submittingPlaceOrder) {
+                      // Redirect only if there were no errors and this was from Place Order button
+                      window.location = "/checkout/to_payment"
+                    }
                   }
 
                   // Reset flag
