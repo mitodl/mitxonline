@@ -1025,13 +1025,13 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     min_price = models.SmallIntegerField(
         null=True,
         blank=True,
-        help_text="Specify the minimum product price.",
+        help_text="Specify the minimum product price. This is used by MIT Learn.",
     )
 
     max_price = models.SmallIntegerField(
         null=True,
         blank=True,
-        help_text="Specify the maximum product price.",
+        help_text="Specify the maximum product price. This is used by MIT Learn.",
     )
 
     prerequisites = RichTextField(
