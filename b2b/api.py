@@ -207,15 +207,16 @@ def get_free_and_nonfree_contracts(contracts: Iterable) -> tuple[list, list]:
 def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
     """
     Check if a discount is supplied for B2B purchase.
-    
+
     Args:
         request: The HTTP request object containing the basket data.
         active_contracts: List of active contracts to check against.
-        
+
     Returns:
         bool: True if discount is supplied or not needed, False otherwise.
     """
     from ecommerce.api import establish_basket
+
     if not active_contracts:
         # No contracts = nothing to validate
         return True
@@ -243,13 +244,9 @@ def get_active_contracts_from_basket_items(basket: Basket):
     """Get active contracts from basket items with optimized queries."""
     course_run_ct = ContentType.objects.get_for_model(CourseRun)
 
-
-    items = basket.basket_items.select_related(
-        "product__content_type"
-    ).filter(
+    items = basket.basket_items.select_related("product__content_type").filter(
         product__content_type=course_run_ct
     )
-
 
     contract_ids = []
     for item in items:
@@ -257,12 +254,8 @@ def get_active_contracts_from_basket_items(basket: Basket):
         if hasattr(purchasable, "b2b_contract") and purchasable.b2b_contract:
             contract_ids.append(purchasable.b2b_contract.id)
 
-
     if contract_ids:
-        return list(ContractPage.objects.filter(
-            id__in=contract_ids,
-            active=True
-        ))
+        return list(ContractPage.objects.filter(id__in=contract_ids, active=True))
 
     return []
 
@@ -286,6 +279,7 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
     from ecommerce.api import establish_basket
+
     basket = establish_basket(request)
     if not basket:
         return False
@@ -308,7 +302,6 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     # Gather all product IDs for these contracts
     product_ids = set()
     if check_contracts:
-
         for contract in check_contracts:
             product_ids.update(contract.get_products().values_list("pk", flat=True))
 
@@ -332,9 +325,7 @@ def _get_discount_defaults(discount_amount: Decimal) -> dict:
 
 
 def _create_discount_with_product(
-    product: Product,
-    discount_amount: Decimal,
-    redemption_type: str
+    product: Product, discount_amount: Decimal, redemption_type: str
 ) -> Discount:
     """Create a discount and associate it with a product."""
     defaults = _get_discount_defaults(discount_amount)
@@ -354,7 +345,9 @@ def _create_discount_with_product(
     return discount
 
 
-def _update_discount(discount: Discount, discount_amount: Decimal, redemption_type: str) -> None:
+def _update_discount(
+    discount: Discount, discount_amount: Decimal, redemption_type: str
+) -> None:
     """Update an existing discount with new parameters."""
     defaults = _get_discount_defaults(discount_amount)
     Discount.objects.filter(pk=discount.id).update(
@@ -402,9 +395,7 @@ def _handle_sso_free_contract(contract: ContractPage) -> tuple[int, int, int]:
 
 
 def _handle_unlimited_seats(
-    contract: ContractPage,
-    product: Product,
-    product_discounts: list[Discount]
+    contract: ContractPage, product: Product, product_discounts: list[Discount]
 ) -> tuple[int, int, int]:
     """Handle unlimited seat contracts by creating/updating one discount per product."""
     created = updated = errors = 0
@@ -416,30 +407,40 @@ def _handle_unlimited_seats(
         )
         log.info(
             "Contract %s: Created unlimited discount %s for product %s",
-            contract, discount, product,
+            contract,
+            discount,
+            product,
         )
         created += 1
 
     elif len(product_discounts) == 1:
-        _update_discount(product_discounts[0], discount_amount, REDEMPTION_TYPE_UNLIMITED)
+        _update_discount(
+            product_discounts[0], discount_amount, REDEMPTION_TYPE_UNLIMITED
+        )
         product_discounts[0].refresh_from_db()
 
         log.info(
             "Contract %s: updated discount %s for product %s",
-            contract, product_discounts[0], product,
+            contract,
+            product_discounts[0],
+            product,
         )
 
         if _ensure_discount_product_association(product_discounts[0], product):
             log.debug(
                 "Contract %s: Added product %s to discount %s",
-                contract, product, product_discounts[0],
+                contract,
+                product,
+                product_discounts[0],
             )
         updated += 1
 
     else:
         log.warning(
             "ensure_enrollment_codes_exist: Unlimited-seat contract %s product %s has too many discount codes: %s - skipping validation.",
-            contract, product, len(product_discounts),
+            contract,
+            product,
+            len(product_discounts),
         )
         errors += 1
 
@@ -447,9 +448,7 @@ def _handle_unlimited_seats(
 
 
 def _handle_limited_seats(
-    contract: ContractPage,
-    product: Product,
-    product_discounts: list[Discount]
+    contract: ContractPage, product: Product, product_discounts: list[Discount]
 ) -> tuple[int, int, int]:
     """Handle limited seat contracts by creating/updating multiple discounts."""
     created = updated = errors = 0
@@ -466,13 +465,17 @@ def _handle_limited_seats(
 
         log.info(
             "Contract %s: updated discount %s for product %s",
-            contract, discount, product,
+            contract,
+            discount,
+            product,
         )
 
         if _ensure_discount_product_association(discount, product):
             log.debug(
                 "Contract %s: Added product %s to discount %s",
-                contract, product, discount,
+                contract,
+                product,
+                discount,
             )
         updated += 1
 
@@ -483,7 +486,9 @@ def _handle_limited_seats(
     if create_count < 0:
         log.warning(
             "ensure_enrollment_codes_exist: Seat limited contract %s product %s has too many discount codes: %s - skipping create",
-            contract, product, len(product_discounts),
+            contract,
+            product,
+            len(product_discounts),
         )
         return (created, updated, errors)
 
@@ -494,7 +499,9 @@ def _handle_limited_seats(
         created += 1
         log.info(
             "Contract %s: Created discount %s for product %s",
-            contract, discount, product,
+            contract,
+            discount,
+            product,
         )
 
     return (created, updated, errors)
@@ -566,7 +573,7 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
 def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict, None]:
     """
     Validate prerequisites for B2B enrollment.
-    
+
     Returns:
         dict with error result if validation fails, None if validation passes.
     """
@@ -586,17 +593,18 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
 def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     """
     Prepare basket for B2B enrollment by clearing it and adding the product.
-    
+
     Returns:
         The prepared basket.
     """
     from ecommerce.api import establish_basket
+
     basket = establish_basket(request)
     # Clear the basket. For Unified Ecommerce, we may want to change this.
     # But MITx Online only allows one item per cart and not clearing it is confusing.
     basket.basket_items.all().delete()
     basket.discounts.all().delete()
-    
+
     item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
     item.save()
 
@@ -607,11 +615,7 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
     """Apply available discount to the basket if one exists."""
     applicable_discounts_qs = product.discounts.annotate(
         redemptions=Count("discount__order_redemptions")
-    ).filter(
-        discount__is_bulk=True,
-        redemptions=0,
-        discount__products__product=product
-    )
+    ).filter(discount__is_bulk=True, redemptions=0, discount__products__product=product)
 
     if applicable_discounts_qs.exists():
         # We have unused codes for this product, so we should apply one.
@@ -656,6 +660,7 @@ def create_b2b_enrollment(request, product: Product):
     - "checkout_result": the result of the checkout attempt, if applicable.
     """
     from ecommerce.api import generate_checkout_payload
+
     user = request.user
 
     # Validate prerequisites for B2B enrollment
@@ -670,9 +675,7 @@ def create_b2b_enrollment(request, product: Product):
     _apply_available_discount(request, product, basket)
 
     # Calculate basket total more efficiently
-    basket_price = sum(
-        item.discounted_price for item in basket.basket_items.all()
-    )
+    basket_price = sum(item.discounted_price for item in basket.basket_items.all())
 
     if basket_price == 0:
         # This call should go ahead and fulfill the order.
