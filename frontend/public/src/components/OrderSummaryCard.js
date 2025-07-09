@@ -129,11 +129,8 @@ export class OrderSummaryCard extends React.Component<Props, State> {
     const { discounts } = this.props
 
     // If there's already a discount applied and no new coupon code, proceed to payment
-    if (
-      discounts &&
-      discounts.length > 0 &&
-      (!formik || !formik.values.couponCode || !formik.values.couponCode.trim())
-    ) {
+    if (discounts && discounts.length > 0 &&
+        (!formik || !formik.values.couponCode || !formik.values.couponCode.trim())) {
       window.location = "/checkout/to_payment"
       return
     }
@@ -150,9 +147,10 @@ export class OrderSummaryCard extends React.Component<Props, State> {
   }
 
   clearCouponField() {
-    if (this.formikRef.current) {
-      this.formikRef.current.setFieldValue("couponCode", "")
-      this.formikRef.current.resetForm({ values: { couponCode: "" } })
+    const formik = this.formikRef.current
+    if (formik) {
+      formik.setFieldValue("couponCode", "")
+      formik.resetForm({ values: { couponCode: "" } })
     }
   }
 
