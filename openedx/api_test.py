@@ -195,10 +195,10 @@ def test_create_edx_user(  # noqa: PLR0913
             "gender": user.user_profile.gender if user.user_profile else None,
             "honor_code": "True",
         }
-        if provided_username:
-            expected_request_body["username"] = provided_username
         if not missing_username:
             expected_request_body["username"] = original_username
+        if provided_username:
+            expected_request_body["username"] = provided_username
         assert dict(parse_qsl(resp2.calls[0].request.body)) == expected_request_body
     assert (
         OpenEdxUser.objects.filter(
@@ -209,7 +209,7 @@ def test_create_edx_user(  # noqa: PLR0913
     if provided_username and missing_username:
         assert user.openedx_users.first().edx_username == provided_username
     elif provided_username and not missing_username:
-        assert user.openedx_users.first().edx_username == original_username
+        assert user.openedx_users.first().edx_username == provided_username
 
 
 @responses.activate
