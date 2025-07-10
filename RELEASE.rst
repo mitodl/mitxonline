@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.123.0
+Version 0.123.0 (Released July 10, 2025)
 ---------------
 
 - 7509 improve error message when user doesnt enter an enrollment code for a b2b product (#2740)
