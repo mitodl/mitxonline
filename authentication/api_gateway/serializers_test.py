@@ -25,7 +25,7 @@ def test_register_details_serializer_create(
         "legal_address": valid_address_dict,
         "user_profile": user_profile_dict,
     }
-    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
+    mock_create_edx_user = mocker.patch("authentication.api_gateway.serializers.create_edx_user")
     mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
 
     serializer = RegisterDetailsSerializer(data=data, context={"request": request})
