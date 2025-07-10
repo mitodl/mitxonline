@@ -206,9 +206,7 @@ def test_create_edx_user(  # noqa: PLR0913
         ).exists()
         is True
     )
-    if provided_username and missing_username:
-        assert user.openedx_users.first().edx_username == provided_username
-    elif provided_username and not missing_username:
+    if (provided_username and missing_username) or (provided_username and not missing_username):
         assert user.openedx_users.first().edx_username == provided_username
 
 
