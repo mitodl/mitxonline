@@ -214,7 +214,7 @@ class UserSerializer(serializers.ModelSerializer):
     # password is explicitly write_only
     password = serializers.CharField(write_only=True, required=False)
     email = WriteableSerializerMethodField()
-    username = serializers.SerializerMethodField()
+    username = WriteableSerializerMethodField()
     legal_address = LegalAddressSerializer(allow_null=True)
     user_profile = UserProfileSerializer(allow_null=True, required=False)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
@@ -238,6 +238,13 @@ class UserSerializer(serializers.ModelSerializer):
         trimmed_value = value.strip()
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
+
+        # Check for duplicate usernames (case-insensitive)
+        if (
+            not self.instance
+            and User.objects.filter(username__iexact=trimmed_value).exists()
+        ):
+            raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
 
         return trimmed_value
 
@@ -294,11 +301,24 @@ class UserSerializer(serializers.ModelSerializer):
                 log.exception("Unable to create user account")
                 raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG) from exc
             if openedx_validation_msg_dict["username"]:
+                # Map known messages, but fallback to a generic duplicate username message
+                # if the message suggests username already exists
+                username_error_msg = OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP.get(
+                    openedx_validation_msg_dict["username"]
+                )
+                if not username_error_msg:
+                    # Check if the message indicates the username already exists
+                    edx_msg = openedx_validation_msg_dict["username"].lower()
+                    if ("belongs to an existing account" in edx_msg or
+                        "already taken" in edx_msg or
+                        "existing account" in edx_msg):
+                        username_error_msg = USERNAME_ALREADY_EXISTS_MSG
+                    else:
+                        username_error_msg = openedx_validation_msg_dict["username"]
+
                 raise serializers.ValidationError(
                     {
-                        "username": OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP.get(
-                            openedx_validation_msg_dict["username"]
-                        )
+                        "username": username_error_msg
                     }
                 )
             if openedx_validation_msg_dict["email"]:
@@ -311,8 +331,11 @@ class UserSerializer(serializers.ModelSerializer):
         legal_address_data = validated_data.pop("legal_address")
         user_profile_data = validated_data.pop("user_profile", None)
 
+        # Handle username from validated_data since it's now a WriteableSerializerMethodField
         username = validated_data.pop("username")
-        email = validated_data.pop("email")
+        # Handle email which comes as a dict from WriteableSerializerMethodField
+        email_data = validated_data.pop("email")
+        email = email_data["email"] if isinstance(email_data, dict) else email_data
         password = validated_data.pop("password")
 
         with transaction.atomic():

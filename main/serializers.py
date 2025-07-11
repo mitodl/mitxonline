@@ -12,6 +12,11 @@ class WriteableSerializerMethodField(serializers.SerializerMethodField):
         super().__init__(**kwargs)
         self.read_only = False
 
+    def bind(self, field_name, parent):
+        super().bind(field_name, parent)
+        # Set source_attrs to the field_name so that the field can be properly handled
+        self.source_attrs = [field_name]
+
     def to_internal_value(self, data):
         return data
 
