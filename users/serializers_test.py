@@ -359,8 +359,6 @@ def test_user_create_required_fields_not_post(valid_address_dict, settings):
         "legal_address": valid_address_dict,
     }
     serializer = UserSerializer(data=base_data)
-    serializer.is_valid()
-    assert serializer.errors == {}
     assert serializer.is_valid() is True
     rf = RequestFactory()
     # Request path does not matter here
