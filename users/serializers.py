@@ -9,7 +9,6 @@ from drf_spectacular.utils import extend_schema_field
 from requests import HTTPError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
 from social_django.models import UserSocialAuth
 
 from b2b.serializers.v0 import ContractPageSerializer, OrganizationPageSerializer
@@ -18,7 +17,6 @@ from hubspot_sync.task_helpers import sync_hubspot_user
 # from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
 from mail import verification_api
 from main.constants import USER_REGISTRATION_FAILED_MSG
-from main.serializers import WriteableSerializerMethodField
 from openedx.api import validate_username_email_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
