@@ -8,9 +8,6 @@ from pytest_lazy_fixtures import lf
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
-from fixtures.common import (
-    valid_address_dict,
-)
 from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
 from users.factories import UserFactory
 from users.models import HIGHEST_EDUCATION_CHOICES, ChangeEmailRequest, LegalAddress
@@ -223,7 +220,7 @@ def test_username_validation(
 
 
 @responses.activate
-def test_username_validation_exception(user, settings):
+def test_username_validation_exception(user, settings, valid_address_dict):
     """
     UserSerializer should raise a EdxApiRegistrationValidationException if the username already exists
     in OpenEdx.
@@ -340,13 +337,21 @@ def test_user_create_required_fields_post(valid_address_dict, settings):
     assert str(serializer.errors["username"][0]) == "This field is required."
 
 
+@responses.activate
 @pytest.mark.django_db
-def test_user_create_required_fields_not_post(valid_address_dict):
+def test_user_create_required_fields_not_post(valid_address_dict, settings):
     """
     If UserSerializer is given no request in the context, or that request is not a POST,
     it should not raise a validation error if certain fields are not included.
     """
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
+        json={"validation_decisions": {"username": "", "email": ""}},
+        status=status.HTTP_200_OK,
+    )
     base_data = {
+        "username": USERNAME,
         "email": "email@example.com",
         "legal_address": valid_address_dict,
     }
