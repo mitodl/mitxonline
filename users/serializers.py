@@ -309,18 +309,16 @@ class UserSerializer(serializers.ModelSerializer):
                 if not username_error_msg:
                     # Check if the message indicates the username already exists
                     edx_msg = openedx_validation_msg_dict["username"].lower()
-                    if ("belongs to an existing account" in edx_msg or
-                        "already taken" in edx_msg or
-                        "existing account" in edx_msg):
+                    if (
+                        "belongs to an existing account" in edx_msg
+                        or "already taken" in edx_msg
+                        or "existing account" in edx_msg
+                    ):
                         username_error_msg = USERNAME_ALREADY_EXISTS_MSG
                     else:
                         username_error_msg = openedx_validation_msg_dict["username"]
 
-                raise serializers.ValidationError(
-                    {
-                        "username": username_error_msg
-                    }
-                )
+                raise serializers.ValidationError({"username": username_error_msg})
             if openedx_validation_msg_dict["email"]:
                 # there is no email form field at this point, but we are still validating the email address
                 raise serializers.ValidationError(openedx_validation_msg_dict["email"])
