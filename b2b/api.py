@@ -1,7 +1,9 @@
 """API functions for B2B operations."""
 
 import logging
+from collections.abc import Iterable
 from decimal import Decimal
+from typing import Union
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -188,28 +190,42 @@ def create_contract_run(
     return course_run, course_run_product
 
 
+def get_free_and_nonfree_contracts(contracts: Iterable) -> tuple[list, list]:
+    """
+    Split contracts into free and non-free based on enrollment_fixed_price.
+
+    Returns:
+        (free_contracts, nonfree_contracts)
+    """
+    free, nonfree = [], []
+    for c in contracts:
+        price = c.enrollment_fixed_price
+        (free if not price or price == 0 else nonfree).append(c)
+    return free, nonfree
+
+
 def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
+    """
+    Check if a discount is supplied for B2B purchase.
+
+    Args:
+        request: The HTTP request object containing the basket data.
+        active_contracts: List of active contracts to check against.
+
+    Returns:
+        bool: True if discount is supplied or not needed, False otherwise.
+    """
+    from ecommerce.api import establish_basket
+
     if not active_contracts:
         # No contracts = nothing to validate
         return True
-
-    from ecommerce.api import establish_basket
 
     basket = establish_basket(request)
     if not basket:
         return False
 
-    # Separate free and non-free contracts
-    free_contracts = [
-        c
-        for c in active_contracts
-        if not c.enrollment_fixed_price or c.enrollment_fixed_price == Decimal(0)
-    ]
-    nonfree_contracts = [
-        c
-        for c in active_contracts
-        if c.enrollment_fixed_price and c.enrollment_fixed_price != Decimal(0)
-    ]
+    free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
@@ -224,23 +240,24 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
     return basket.discounts.exists()
 
 
-def get_active_contracts_from_basket_items(basket: Basket) -> None:
-    active_contracts = []
-    course_run_content_type = ContentType.objects.get_for_model(CourseRun)
-    for item in (
-        basket.basket_items.filter(product__content_type=course_run_content_type)
-        .prefetch_related(
-            "product",
-            "product__purchasable_object",
-            "product__purchasable_object__b2b_contract",
-        )
-        .all()
-    ):
-        contract = item.product.purchasable_object.b2b_contract
-        if contract and contract.is_active:
-            active_contracts.append(contract)
+def get_active_contracts_from_basket_items(basket: Basket):
+    """Get active contracts from basket items with optimized queries."""
+    course_run_ct = ContentType.objects.get_for_model(CourseRun)
 
-    return active_contracts
+    items = basket.basket_items.select_related("product__content_type").filter(
+        product__content_type=course_run_ct
+    )
+
+    contract_ids = []
+    for item in items:
+        purchasable = item.product.purchasable_object
+        if hasattr(purchasable, "b2b_contract") and purchasable.b2b_contract:
+            contract_ids.append(purchasable.b2b_contract.id)
+
+    if contract_ids:
+        return list(ContractPage.objects.filter(id__in=contract_ids, active=True))
+
+    return []
 
 
 def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
@@ -267,17 +284,7 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     if not basket:
         return False
 
-    # Separate free and non-free contracts
-    free_contracts = [
-        c
-        for c in active_contracts
-        if not c.enrollment_fixed_price or c.enrollment_fixed_price == Decimal(0)
-    ]
-    nonfree_contracts = [
-        c
-        for c in active_contracts
-        if c.enrollment_fixed_price and c.enrollment_fixed_price != Decimal(0)
-    ]
+    free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
@@ -294,16 +301,213 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
 
     # Gather all product IDs for these contracts
     product_ids = set()
-    for contract in check_contracts:
-        product_ids.update(contract.get_products().values_list("pk", flat=True))
+    if check_contracts:
+        for contract in check_contracts:
+            product_ids.update(contract.get_products().values_list("pk", flat=True))
 
     # Validate that at least one discount applies to these products
-    return basket.discounts.filter(
-        redeemed_discount__products__product__in=product_ids
-    ).exists()
+    if product_ids:
+        return basket.discounts.filter(
+            redeemed_discount__products__product__in=product_ids
+        ).exists()
+
+    return True  # No products to validate means valid
 
 
-def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR0915
+def _get_discount_defaults(discount_amount: Decimal) -> dict:
+    """Get default discount parameters."""
+    return {
+        "amount": discount_amount,
+        "discount_type": DISCOUNT_TYPE_FIXED_PRICE,
+        "payment_type": PAYMENT_TYPE_SALES,
+        "is_bulk": True,
+    }
+
+
+def _create_discount_with_product(
+    product: Product, discount_amount: Decimal, redemption_type: str
+) -> Discount:
+    """Create a discount and associate it with a product."""
+    defaults = _get_discount_defaults(discount_amount)
+    discount = Discount(
+        discount_code=uuid4(),
+        redemption_type=redemption_type,
+        **defaults,
+    )
+    discount.save()
+
+    discount_product = DiscountProduct(
+        discount=discount,
+        product=product,
+    )
+    discount_product.save()
+
+    return discount
+
+
+def _update_discount(
+    discount: Discount, discount_amount: Decimal, redemption_type: str
+) -> None:
+    """Update an existing discount with new parameters."""
+    defaults = _get_discount_defaults(discount_amount)
+    Discount.objects.filter(pk=discount.id).update(
+        redemption_type=redemption_type,
+        **defaults,
+    )
+
+
+def _ensure_discount_product_association(discount: Discount, product: Product) -> bool:
+    """Ensure a discount is associated with a product. Returns True if created."""
+    if not discount.products.filter(product=product).exists():
+        discount_product = DiscountProduct(
+            discount=discount,
+            product=product,
+        )
+        discount_product.save()
+        return True
+    return False
+
+
+def _handle_sso_free_contract(contract: ContractPage) -> tuple[int, int, int]:
+    """Handle SSO contracts without price by removing existing discounts."""
+    created = updated = errors = 0
+    discounts = contract.get_discounts()
+    products = contract.get_products()
+
+    log.info("Removing any existing discounts for SSO/free contract %s", contract)
+
+    for discount in discounts:
+        discount.products.filter(product__in=products).delete()
+        discount.refresh_from_db()
+        created += 1
+
+        # Only delete the discount if there's no more products
+        if discount.products.count() == 0:
+            log.info(
+                "Contract %s: Existing discount %s no longer has products, removing",
+                contract,
+                discount,
+            )
+            discount.delete()
+            updated += 1
+
+    return (created, updated, errors)
+
+
+def _handle_unlimited_seats(
+    contract: ContractPage, product: Product, product_discounts: list[Discount]
+) -> tuple[int, int, int]:
+    """Handle unlimited seat contracts by creating/updating one discount per product."""
+    created = updated = errors = 0
+    discount_amount = contract.enrollment_fixed_price or 0
+
+    if len(product_discounts) == 0:
+        discount = _create_discount_with_product(
+            product, discount_amount, REDEMPTION_TYPE_UNLIMITED
+        )
+        log.info(
+            "Contract %s: Created unlimited discount %s for product %s",
+            contract,
+            discount,
+            product,
+        )
+        created += 1
+
+    elif len(product_discounts) == 1:
+        _update_discount(
+            product_discounts[0], discount_amount, REDEMPTION_TYPE_UNLIMITED
+        )
+        product_discounts[0].refresh_from_db()
+
+        log.info(
+            "Contract %s: updated discount %s for product %s",
+            contract,
+            product_discounts[0],
+            product,
+        )
+
+        if _ensure_discount_product_association(product_discounts[0], product):
+            log.debug(
+                "Contract %s: Added product %s to discount %s",
+                contract,
+                product,
+                product_discounts[0],
+            )
+        updated += 1
+
+    else:
+        log.warning(
+            "ensure_enrollment_codes_exist: Unlimited-seat contract %s product %s has too many discount codes: %s - skipping validation.",
+            contract,
+            product,
+            len(product_discounts),
+        )
+        errors += 1
+
+    return (created, updated, errors)
+
+
+def _handle_limited_seats(
+    contract: ContractPage, product: Product, product_discounts: list[Discount]
+) -> tuple[int, int, int]:
+    """Handle limited seat contracts by creating/updating multiple discounts."""
+    created = updated = errors = 0
+    discount_amount = contract.enrollment_fixed_price or 0
+
+    log.info(
+        "Updating %s discount codes for product %s", len(product_discounts), product
+    )
+
+    # Update existing discounts
+    for discount in product_discounts:
+        _update_discount(discount, discount_amount, REDEMPTION_TYPE_ONE_TIME)
+        discount.refresh_from_db()
+
+        log.info(
+            "Contract %s: updated discount %s for product %s",
+            contract,
+            discount,
+            product,
+        )
+
+        if _ensure_discount_product_association(discount, product):
+            log.debug(
+                "Contract %s: Added product %s to discount %s",
+                contract,
+                product,
+                discount,
+            )
+        updated += 1
+
+    # Create additional discounts if needed
+    create_count = contract.max_learners - len(product_discounts)
+    log.info("Creating %s new discount codes for product %s", create_count, product)
+
+    if create_count < 0:
+        log.warning(
+            "ensure_enrollment_codes_exist: Seat limited contract %s product %s has too many discount codes: %s - skipping create",
+            contract,
+            product,
+            len(product_discounts),
+        )
+        return (created, updated, errors)
+
+    for _ in range(create_count):
+        discount = _create_discount_with_product(
+            product, discount_amount, REDEMPTION_TYPE_ONE_TIME
+        )
+        created += 1
+        log.info(
+            "Contract %s: Created discount %s for product %s",
+            contract,
+            discount,
+            product,
+        )
+
+    return (created, updated, errors)
+
+
+def ensure_enrollment_codes_exist(contract: ContractPage):
     """
     Ensure that enrollment codes exist for the given contract.
 
@@ -332,210 +536,97 @@ def ensure_enrollment_codes_exist(contract: ContractPage):  # noqa: C901, PLR091
         tuple: A tuple containing the number of created codes, updated codes,
         and codes with errors.
     """
-
-    created = updated = errors = 0
-
     log.info("Checking enrollment codes for contract %s", contract)
 
     if contract.integration_type == "sso" and not contract.enrollment_fixed_price:
         # SSO contracts w/out price don't need discounts.
-        discounts = contract.get_discounts()
-        products = contract.get_products()
-
-        log.info("Removing any existing discounts for SSO/free contract %s", contract)
-
-        for discount in discounts:
-            discount.products.filter(product__in=products).delete()
-            discount.refresh_from_db()
-
-            created += 1
-
-            # Only delete the discount if there's no more products.
-            # Otherwise, we might delete one that's shared for some reason.
-            if discount.products.count() == 0:
-                log.info(
-                    "Contract %s: Existing discount %s no longer has products, removing",
-                    contract,
-                    discount,
-                )
-                discount.delete()
-                updated += 1
-
-        return (created, updated, errors)
+        return _handle_sso_free_contract(contract)
 
     products = contract.get_products()
-
     log.info("Checking %s products for contract %s", len(products), contract)
 
-    for product in products:
-        # Check these things:
-        # - Are there any discount codes?
-        # - Are there enough discount codes (total, including redeemed ones)?
+    total_created = total_updated = total_errors = 0
 
-        discount_amount = contract.enrollment_fixed_price or 0
-        product_discounts = (
-            Discount.objects.filter(products__product=product).distinct().all()
+    for product in products:
+        product_discounts = list(
+            Discount.objects.filter(products__product=product).distinct()
         )
 
         if not contract.max_learners:
-            # If we're doing unlimited seats, then we just need one discount per
-            # product, set to Unlimited.
+            # Unlimited seats - one discount per product
+            created, updated, errors = _handle_unlimited_seats(
+                contract, product, product_discounts
+            )
+        else:
+            # Limited seats - multiple discounts per product
+            created, updated, errors = _handle_limited_seats(
+                contract, product, product_discounts
+            )
 
-            if len(product_discounts) == 0:
-                # Quick note: these are unlimited and not one-time-per-user because
-                # there may be any number of courses the learner will want to
-                # enroll in. That does mean that these codes need to be
-                # protected. It's unlikely we'll have many unlimited-seat but
-                # also not-SSO contracts, though.
-                discount = Discount(
-                    discount_code=uuid4(),
-                    amount=discount_amount,
-                    redemption_type=REDEMPTION_TYPE_UNLIMITED,
-                    discount_type=DISCOUNT_TYPE_FIXED_PRICE,
-                    payment_type=PAYMENT_TYPE_SALES,
-                    is_bulk=True,
-                )
-                discount.save()
+        total_created += created
+        total_updated += updated
+        total_errors += errors
 
-                discount_product = DiscountProduct(
-                    discount=discount,
-                    product=product,
-                )
-                discount_product.save()
+    return (total_created, total_updated, total_errors)
 
-                log.info(
-                    "Contract %s: Created unlimited discount %s for product %s",
-                    contract,
-                    discount,
-                    product,
-                )
 
-                created += 1
-            elif len(product_discounts) == 1:
-                Discount.objects.filter(pk=product_discounts[0].id).update(
-                    **{
-                        "amount": discount_amount,
-                        "redemption_type": REDEMPTION_TYPE_UNLIMITED,
-                        "discount_type": DISCOUNT_TYPE_FIXED_PRICE,
-                        "payment_type": PAYMENT_TYPE_SALES,
-                        "is_bulk": True,
-                    }
-                )
+def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict, None]:
+    """
+    Validate prerequisites for B2B enrollment.
 
-                product_discounts[0].refresh_from_db()
+    Returns:
+        dict with error result if validation fails, None if validation passes.
+    """
+    if not user.is_authenticated:
+        return {"result": main_constants.USER_MSG_TYPE_B2B_DISALLOWED}
 
-                log.info(
-                    "Contract %s: updated discount %s for product %s",
-                    contract,
-                    product_discounts[0],
-                    product,
-                )
+    purchasable_object = product.purchasable_object
+    if not purchasable_object or not purchasable_object.b2b_contract:
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT}
 
-                if not product_discounts[0].products.filter(product=product).exists():
-                    discount_product = DiscountProduct(
-                        discount=product_discounts[0],
-                        product=product,
-                    )
-                    discount_product.save()
-                    log.debug(
-                        "Contract %s: Added product %s to discount %s",
-                        contract,
-                        product,
-                        product_discounts[0],
-                    )
+    if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
 
-                updated += 1
-            else:
-                log.warning(
-                    "ensure_enrollment_codes_exist: Unlimited-seat contract %s product %s has too many discount codes: %s - skipping validation.",
-                    contract,
-                    product,
-                    len(product_discounts),
-                )
+    return None
 
-                errors += 1
 
-            continue
+def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
+    """
+    Prepare basket for B2B enrollment by clearing it and adding the product.
 
-        log.info(
-            "Updating %s discount codes for product %s", len(product_discounts), product
+    Returns:
+        The prepared basket.
+    """
+    from ecommerce.api import establish_basket
+
+    basket = establish_basket(request)
+    # Clear the basket. For Unified Ecommerce, we may want to change this.
+    # But MITx Online only allows one item per cart and not clearing it is confusing.
+    basket.basket_items.all().delete()
+    basket.discounts.all().delete()
+
+    item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
+    item.save()
+
+    return basket
+
+
+def _apply_available_discount(request, product: Product, basket: Basket) -> None:
+    """Apply available discount to the basket if one exists."""
+    applicable_discounts_qs = product.discounts.annotate(
+        redemptions=Count("discount__order_redemptions")
+    ).filter(discount__is_bulk=True, redemptions=0, discount__products__product=product)
+
+    if applicable_discounts_qs.exists():
+        # We have unused codes for this product, so we should apply one.
+        discount = applicable_discounts_qs.first().discount
+        basket_discount = BasketDiscount.objects.create(
+            redemption_date=now_in_utc(),
+            redeemed_by=request.user,
+            redeemed_discount=discount,
+            redeemed_basket=basket,
         )
-
-        for discount in product_discounts:
-            Discount.objects.filter(pk=discount.id).update(
-                **{
-                    "amount": discount_amount,
-                    "redemption_type": REDEMPTION_TYPE_ONE_TIME,
-                    "discount_type": DISCOUNT_TYPE_FIXED_PRICE,
-                    "payment_type": PAYMENT_TYPE_SALES,
-                    "is_bulk": True,
-                }
-            )
-
-            discount.refresh_from_db()
-
-            log.info(
-                "Contract %s: updated discount %s for product %s",
-                contract,
-                discount,
-                product,
-            )
-
-            if not discount.products.filter(product=product).exists():
-                discount_product = DiscountProduct(
-                    discount=discount,
-                    product=product,
-                )
-                discount_product.save()
-                log.debug(
-                    "Contract %s: Added product %s to discount %s",
-                    contract,
-                    product,
-                    discount,
-                )
-
-            updated += 1
-
-        create_count = contract.max_learners - len(product_discounts)
-
-        log.info("Creating %s new discount codes for product %s", create_count, product)
-
-        if create_count < 0:
-            log.warning(
-                "ensure_enrollment_codes_exist: Seat limited contract %s product %s has too many discount codes: %s - skipping create",
-                contract,
-                product,
-                len(product_discounts),
-            )
-            continue
-
-        for _ in range(create_count):
-            discount = Discount(
-                discount_code=uuid4(),
-                amount=discount_amount,
-                redemption_type=REDEMPTION_TYPE_ONE_TIME,
-                discount_type=DISCOUNT_TYPE_FIXED_PRICE,
-                payment_type=PAYMENT_TYPE_SALES,
-                is_bulk=True,
-            )
-            discount.save()
-
-            discount_product = DiscountProduct(
-                discount=discount,
-                product=product,
-            )
-            discount_product.save()
-
-            created += 1
-
-            log.info(
-                "Contract %s: Created discount %s for product %s",
-                contract,
-                discount,
-                product,
-            )
-
-    return (created, updated, errors)
+        basket_discount.save()
 
 
 def create_b2b_enrollment(request, product: Product):
@@ -568,52 +659,23 @@ def create_b2b_enrollment(request, product: Product):
     - "price": the total for the basket, if enrollment did not succeed
     - "checkout_result": the result of the checkout attempt, if applicable.
     """
-    from ecommerce.api import establish_basket, generate_checkout_payload
+    from ecommerce.api import generate_checkout_payload
 
     user = request.user
-    if not user.is_authenticated:
-        return {
-            "result": main_constants.USER_MSG_TYPE_B2B_DISALLOWED,
-        }
 
-    purchasable_object = product.purchasable_object
-    if not purchasable_object or not purchasable_object.b2b_contract:
-        return {
-            "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
-        }
+    # Validate prerequisites for B2B enrollment
+    validation_error = _validate_b2b_enrollment_prerequisites(user, product)
+    if validation_error:
+        return validation_error
 
-    if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
-        return {
-            "result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
-        }
+    # Prepare the basket for enrollment
+    basket = _prepare_basket_for_b2b_enrollment(request, product)
 
-    basket = establish_basket(request)
-    # Clear the basket. For Unified Ecommerce, we may want to change this.
-    # But MITx Online only allows one item per cart and not clearing it is confusing it.
-    basket.basket_items.all().delete()
-    basket.discounts.all().delete()
-    item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
-    item.save()
+    # Apply any available discount to the basket
+    _apply_available_discount(request, product, basket)
 
-    applicable_discounts_qs = product.discounts.annotate(
-        redemptions=Count("discount__order_redemptions")
-    ).filter(discount__is_bulk=True, redemptions=0, discount__products__product=product)
-    if applicable_discounts_qs.count() > 0:
-        # We have unused codes for this product, so we should apply one.
-        # (If the contract isn't SSO, we'll have made a bunch of enrollment codes,
-        # but we should still not make the user round-trip through ecommerce.)
-        discount = applicable_discounts_qs.first().discount
-        basket_discount = BasketDiscount.objects.create(
-            redemption_date=now_in_utc(),
-            redeemed_by=request.user,
-            redeemed_discount=discount,
-            redeemed_basket=basket,
-        )
-        basket_discount.save()
-
-    basket_price = 0
-    for basket_item in basket.basket_items.all():
-        basket_price += basket_item.discounted_price
+    # Calculate basket total more efficiently
+    basket_price = sum(item.discounted_price for item in basket.basket_items.all())
 
     if basket_price == 0:
         # This call should go ahead and fulfill the order.
