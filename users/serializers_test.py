@@ -340,24 +340,33 @@ def test_user_create_required_fields_post(valid_address_dict, settings):
     assert str(serializer.errors["username"][0]) == "This field is required."
 
 
+@responses.activate
 @pytest.mark.django_db
-def test_user_create_required_fields_not_post(valid_address_dict):
+def test_user_create_required_fields_not_post(valid_address_dict, settings):
     """
     If UserSerializer is given no request in the context, or that request is not a POST,
     it should not raise a validation error if certain fields are not included.
     """
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
+        json={"validation_decisions": {"username": "", "email": ""}},
+        status=status.HTTP_200_OK,
+    )
     base_data = {
+        "username": USERNAME,
         "email": "email@example.com",
         "legal_address": valid_address_dict,
     }
     serializer = UserSerializer(data=base_data)
+    serializer.is_valid()
+    assert serializer.errors == {}
     assert serializer.is_valid() is True
     rf = RequestFactory()
     # Request path does not matter here
     request = rf.patch("/")
     request.user = AnonymousUser()
     serializer = UserSerializer(data=base_data, context={"request": request})
-    assert serializer.errors == {}
     assert serializer.is_valid() is True
 
 
