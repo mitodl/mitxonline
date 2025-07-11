@@ -27,7 +27,7 @@ import {
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import { getFirstRelevantRun } from "../lib/courseApi"
-import { getCookie } from "../lib/api"
+import { getCSRFCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
 import {
   enrollmentMutation,
@@ -236,7 +236,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   getEnrollmentForm(run: EnrollmentFlaggedCourseRun) {
-    const csrfToken = getCookie("csrftoken")
+    const csrfToken = getCSRFCookie()
 
     return (
       <form action="/enrollments/" method="post">
@@ -566,7 +566,7 @@ export class CourseProductDetailEnroll extends React.Component<
     hasMultipleEnrollableRuns: boolean,
     product: Product | null
   ) {
-    const csrfToken = getCookie("csrftoken")
+    const csrfToken = getCSRFCookie()
     return run ? (
       <h2>
         {(product && run.is_upgradable) || hasMultipleEnrollableRuns ? (

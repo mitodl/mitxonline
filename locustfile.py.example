@@ -16,7 +16,7 @@ class DjangoAdminUser(HttpUser):
         self.login()
 
     def login(self):
-        csrf_token = self.client.cookies['csrftoken']
+        csrf_token = self.client.cookies['csrf_mitxonline']
         self.client.post(
             "/admin/login/",
             {
