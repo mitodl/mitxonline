@@ -256,9 +256,13 @@ class UserSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
         if request is not None and request.method == "POST":
             if not data.get("password"):
-                raise serializers.ValidationError({"password": "This field is required."})
+                raise serializers.ValidationError(
+                    {"password": "This field is required."}
+                )
             if not data.get("username"):
-                raise serializers.ValidationError({"username": "This field is required."})
+                raise serializers.ValidationError(
+                    {"username": "This field is required."}
+                )
 
         username = data.get("username")
         email = data.get("email")
@@ -270,7 +274,9 @@ class UserSerializer(serializers.ModelSerializer):
                 and User.objects.filter(username__iexact=username).exists()
             ):
                 raise serializers.ValidationError(
-                    {"username": "A user already exists with this username. Please try a different one."}
+                    {
+                        "username": "A user already exists with this username. Please try a different one."
+                    }
                 )
 
             # Open edX username/email validation
@@ -416,6 +422,7 @@ class UserSerializer(serializers.ModelSerializer):
             "global_id",
             "b2b_organizations",
         )
+
 
 class ChangeEmailRequestCreateSerializer(serializers.ModelSerializer):
     """Serializer for starting a user email change"""

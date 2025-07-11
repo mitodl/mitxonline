@@ -90,7 +90,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
     if is_anonymous:
         assert resp.json() == {
             "id": None,
-            "username": '',
+            "username": "",
             "email": None,
             "legal_address": None,
             "is_anonymous": True,
