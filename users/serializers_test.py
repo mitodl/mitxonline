@@ -8,9 +8,6 @@ from pytest_lazy_fixtures import lf
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
-from fixtures.common import (
-    valid_address_dict,
-)
 from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
 from users.factories import UserFactory
 from users.models import HIGHEST_EDUCATION_CHOICES, ChangeEmailRequest, LegalAddress
