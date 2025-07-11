@@ -9,7 +9,6 @@ from drf_spectacular.utils import extend_schema_field
 from requests import HTTPError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
 from social_django.models import UserSocialAuth
 
 from b2b.serializers.v0 import ContractPageSerializer, OrganizationPageSerializer
@@ -215,16 +214,7 @@ class UserSerializer(serializers.ModelSerializer):
     # password is explicitly write_only
     password = serializers.CharField(write_only=True, required=False)
     email = WriteableSerializerMethodField()
-    username = serializers.CharField(
-        validators=[
-            UniqueValidator(
-                queryset=User.objects.all(),
-                message=USERNAME_ALREADY_EXISTS_MSG,
-                lookup="iexact",
-            )
-        ],
-        required=False,
-    )
+    username = serializers.SerializerMethodField()
     legal_address = LegalAddressSerializer(allow_null=True)
     user_profile = UserProfileSerializer(allow_null=True, required=False)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
