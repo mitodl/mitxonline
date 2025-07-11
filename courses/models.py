@@ -319,6 +319,34 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         return new_req  # noqa: RET504
 
+    def add_program_requirement(self, required_program):
+        """Makes the specified program a required program"""
+        self.get_requirements_root().get_children().filter(
+            required_program=required_program
+        ).delete()
+
+        new_req = self._add_course_node(ProgramRequirement.Operator.ALL_OF).add_child(
+            required_program=required_program,
+            node_type=ProgramRequirementNodeType.PROGRAM,
+        )
+
+        return new_req  # noqa: RET504
+
+    def add_program_elective(self, required_program):
+        """Makes the specified program an elective program"""
+        self.get_requirements_root().get_children().filter(
+            required_program=required_program
+        ).delete()
+
+        new_req = self._add_course_node(
+            ProgramRequirement.Operator.MIN_NUMBER_OF
+        ).add_child(
+            required_program=required_program,
+            node_type=ProgramRequirementNodeType.PROGRAM,
+        )
+
+        return new_req  # noqa: RET504
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
@@ -412,6 +440,46 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns just the courses under the "Required Courses" node.
         """
         return [course for (course, type) in self.courses if type == "Elective Courses"]  # noqa: A001
+
+    @property
+    def required_programs(self):
+        """
+        Returns the programs that are required by this program.
+
+        Returns:
+        - list of Program: programs that are requirements
+        """
+        return [
+            req.required_program
+            for req in ProgramRequirement.objects.filter(
+                program=self,
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                required_program__isnull=False,
+            )
+            .select_related("required_program")
+            .all()
+            if not req.get_parent().elective_flag
+        ]
+
+    @property
+    def elective_programs(self):
+        """
+        Returns the programs that are electives for this program.
+
+        Returns:
+        - list of Program: programs that are electives
+        """
+        return [
+            req.required_program
+            for req in ProgramRequirement.objects.filter(
+                program=self,
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                required_program__isnull=False,
+            )
+            .select_related("required_program")
+            .all()
+            if req.get_parent().elective_flag
+        ]
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
@@ -1479,6 +1547,7 @@ class ProgramRequirementNodeType(models.TextChoices):
     PROGRAM_ROOT = "program_root", "Program Root"
     OPERATOR = "operator", "Operator"
     COURSE = "course", "Course"
+    PROGRAM = "program", "Program"
 
 
 class ProgramRequirement(MP_Node):
@@ -1548,6 +1617,14 @@ class ProgramRequirement(MP_Node):
         blank=True,
         related_name="in_programs",
     )
+    required_program = models.ForeignKey(
+        "courses.Program",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="required_by",
+        help_text="Program that is required to be completed",
+    )
 
     title = models.TextField(null=True, blank=True, default="")  # noqa: DJ001
     elective_flag = models.BooleanField(null=True, blank=True, default=False)
@@ -1573,6 +1650,11 @@ class ProgramRequirement(MP_Node):
         return self.node_type == ProgramRequirementNodeType.COURSE
 
     @property
+    def is_program(self):
+        """True if the node references a program"""
+        return self.node_type == ProgramRequirementNodeType.PROGRAM
+
+    @property
     def is_root(self):
         """True if the node is the root"""
         return self.node_type == ProgramRequirementNodeType.PROGRAM_ROOT
@@ -1594,6 +1676,8 @@ class ProgramRequirement(MP_Node):
             attrs["operator_value"] = self.operator_value
         elif self.is_course:
             attrs["course"] = self.course
+        elif self.is_program:
+            attrs["required_program"] = self.required_program
 
         return " ".join(f"{key}={value}" for key, value in attrs.items())
 
@@ -1609,6 +1693,7 @@ class ProgramRequirement(MP_Node):
                         operator__isnull=True,
                         operator_value__isnull=True,
                         course__isnull=True,
+                        required_program__isnull=True,
                         depth=1,
                     )
                     # operator nodes
@@ -1616,6 +1701,7 @@ class ProgramRequirement(MP_Node):
                         node_type=ProgramRequirementNodeType.OPERATOR.value,
                         operator__isnull=False,
                         course__isnull=True,
+                        required_program__isnull=True,
                         depth__gt=1,
                     )
                     # course nodes
@@ -1624,6 +1710,16 @@ class ProgramRequirement(MP_Node):
                         operator__isnull=True,
                         operator_value__isnull=True,
                         course__isnull=False,
+                        required_program__isnull=True,
+                        depth__gt=1,
+                    )
+                    # program nodes
+                    | Q(
+                        node_type=ProgramRequirementNodeType.PROGRAM.value,
+                        operator__isnull=True,
+                        operator_value__isnull=True,
+                        course__isnull=True,
+                        required_program__isnull=False,
                         depth__gt=1,
                     )
                 ),
@@ -1638,6 +1734,8 @@ class ProgramRequirement(MP_Node):
         indexes = [
             models.Index(fields=("program", "course")),
             models.Index(fields=("course", "program")),
+            models.Index(fields=("program", "required_program")),
+            models.Index(fields=("required_program", "program")),
         ]
 
 

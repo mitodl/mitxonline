@@ -6,6 +6,7 @@ Django settings for main.
 import logging
 import os
 import platform
+import sys
 from datetime import timedelta
 from urllib.parse import urljoin, urlparse
 
@@ -599,7 +600,8 @@ for name, path in [
 ]:
     if os.path.exists(path):  # noqa: PTH110
         STATICFILES_DIRS.append((name, path))
-    else:
+    elif not ("pytest" in sys.modules or "test" in sys.argv):
+        # Only log warning if we're not running tests
         log.warning(f"Static file directory was missing: {path}")  # noqa: G004
 
 # Important to define this so DEBUG works properly

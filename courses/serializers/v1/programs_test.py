@@ -230,6 +230,7 @@ def test_learner_record_serializer(
                         {
                             "data": {
                                 "course": courses[0].id,
+                                "required_program": None,
                                 "node_type": "course",
                                 "operator": None,
                                 "operator_value": None,
@@ -248,6 +249,7 @@ def test_learner_record_serializer(
                         {
                             "data": {
                                 "course": courses[1].id,
+                                "required_program": None,
                                 "node_type": "course",
                                 "operator": None,
                                 "operator_value": None,
@@ -266,6 +268,7 @@ def test_learner_record_serializer(
                         {
                             "data": {
                                 "course": courses[2].id,
+                                "required_program": None,
                                 "node_type": "course",
                                 "operator": None,
                                 "operator_value": None,
@@ -284,6 +287,7 @@ def test_learner_record_serializer(
                     ],
                     "data": {
                         "course": None,
+                        "required_program": None,
                         "node_type": "operator",
                         "operator": ProgramRequirement.Operator.ALL_OF.value,
                         "operator_value": None,
@@ -296,6 +300,7 @@ def test_learner_record_serializer(
                 {
                     "data": {
                         "course": None,
+                        "required_program": None,
                         "node_type": "operator",
                         "operator": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
                         "operator_value": "1",
@@ -308,6 +313,7 @@ def test_learner_record_serializer(
             ],
             "data": {
                 "course": None,
+                "required_program": None,
                 "node_type": "program_root",
                 "operator": None,
                 "operator_value": None,
