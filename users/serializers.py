@@ -17,7 +17,6 @@ from hubspot_sync.task_helpers import sync_hubspot_user
 # from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
 from mail import verification_api
 from main.constants import USER_REGISTRATION_FAILED_MSG
-from main.serializers import WriteableSerializerMethodField
 from openedx.api import validate_username_email_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
@@ -251,7 +250,7 @@ class UserSerializer(serializers.ModelSerializer):
     @extend_schema_field(str)
     def get_email(self, instance):
         """Returns the email or None in the case of AnonymousUser"""
-        if hasattr(instance, 'is_anonymous') and instance.is_anonymous:
+        if hasattr(instance, "is_anonymous") and instance.is_anonymous:
             return None
         return getattr(instance, "email", None)
 
@@ -259,7 +258,7 @@ class UserSerializer(serializers.ModelSerializer):
     def get_username(self, instance):
         """Returns the username or None in the case of AnonymousUser"""
         # For anonymous users, return empty string (as expected by the test)
-        if hasattr(instance, 'is_anonymous') and instance.is_anonymous:
+        if hasattr(instance, "is_anonymous") and instance.is_anonymous:
             return ""
         # For authenticated users, return the edx_username if available, otherwise return username
         edx_username = getattr(instance, "edx_username", None)
