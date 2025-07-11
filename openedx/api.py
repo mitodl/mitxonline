@@ -102,8 +102,8 @@ def create_edx_user(user, edx_username=None):
         open_edx_user, _ = OpenEdxUser.objects.select_for_update().get_or_create(
             user=user, platform=PLATFORM_EDX
         )
-
-        if open_edx_user.edx_username is None:
+        # if username is provided make sure to set it on the OpenEdxUser
+        if edx_username is not None:
             open_edx_user.edx_username = edx_username
             open_edx_user.save()
 
@@ -130,7 +130,7 @@ def create_edx_user(user, edx_username=None):
         resp = req_session.post(
             edx_url(OPENEDX_REGISTER_USER_PATH),
             data=dict(
-                username=open_edx_user.edx_username,
+                username=edx_username or user.edx_username,
                 email=user.email,
                 name=user.name,
                 country=user.legal_address.country if user.legal_address else None,
@@ -210,10 +210,10 @@ def create_edx_auth_token(user):
     # In order to acquire auth tokens from Open edX we need to perform the following steps:
     #
     # 1. Create a persistent session so that state is retained like a browser
-    # 2. Initialize a session cookie for xPro, this emulates a user login
-    # 3. Initiate an Open edX login, delegates to xPro using the session cookie
-    # 4. Initiate an Open edX OAuth2 authorization for xPro
-    # 5. Redirects back to xPro with the access token
+    # 2. Initialize a session cookie for MITxOnline, this emulates a user login
+    # 3. Initiate an Open edX login, delegates to MITxOnline using the session cookie
+    # 4. Initiate an Open edX OAuth2 authorization for MITxOnline
+    # 5. Redirects back to MITxOnline with the access token
     # 6. Redeem access token for a refresh/access token pair
 
     # ensure only we can update this for the duration of the

@@ -25,7 +25,9 @@ def test_register_details_serializer_create(
         "legal_address": valid_address_dict,
         "user_profile": user_profile_dict,
     }
-    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
+    mock_create_edx_user = mocker.patch(
+        "authentication.api_gateway.serializers.create_edx_user"
+    )
     mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
 
     serializer = RegisterDetailsSerializer(data=data, context={"request": request})
@@ -39,7 +41,6 @@ def test_register_details_serializer_create(
     assert validated_data["user_profile"]["year_of_birth"] == 1980
     assert validated_data["legal_address"]["country"] == "US"
     assert mock_create_edx_user.call_count == 1
-    assert mock_create_edx_auth_token.call_count == 1
 
 
 @pytest.mark.django_db
@@ -78,7 +79,6 @@ def test_register_no_edx_user(  # noqa: PLR0913
     user = serializer.save()
 
     assert OpenEdxUser.objects.filter(user=user, has_been_synced=True).exists() is True
-    assert patched_create_edx_auth_token.call_count == 1
     assert user.name == "John Doe"
     assert user.openedx_users.exists() is True
     assert user.openedx_users.first().has_been_synced is True

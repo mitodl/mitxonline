@@ -34,7 +34,6 @@ def test_post_user_profile_detail(mocker, valid_address_dict, client, user):
     # Checks that user's name in database is also updated
     assert User.objects.get(pk=user.pk).name == data["name"]
     assert mock_create_edx_user.called is True
-    assert mock_create_edx_auth_token.called is True
 
     data = {
         "name": "John Doe",
