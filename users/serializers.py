@@ -3,6 +3,7 @@
 import logging
 import re
 
+from main.serializers import WriteableSerializerMethodField
 import pycountry
 from django.db import transaction
 from drf_spectacular.utils import extend_schema_field
@@ -212,8 +213,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     # password is explicitly write_only
     password = serializers.CharField(write_only=True, required=False)
-    email = serializers.SerializerMethodField()
-    username = serializers.SerializerMethodField()
+    email = serializers.EmailField()
+    username = serializers.CharField()
     legal_address = LegalAddressSerializer(allow_null=True)
     user_profile = UserProfileSerializer(allow_null=True, required=False)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
@@ -223,32 +224,19 @@ class UserSerializer(serializers.ModelSerializer):
     is_authenticated = serializers.BooleanField(read_only=True)
 
     def validate_email(self, value):
-        """Empty validation function, but this is required for WriteableSerializerMethodField"""
         if (
             not self.instance
             and User.objects.filter(email__iexact=value.strip().lower()).exists()
         ):
             raise serializers.ValidationError(EMAIL_ERROR_MSG)
 
-        return {"email": value}
+        return value
 
     def validate_username(self, value):
-        """Validates the username field"""
         trimmed_value = value.strip()
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
-
         return trimmed_value
-
-    @extend_schema_field(str)
-    def get_email(self, instance):
-        """Returns the email or None in the case of AnonymousUser"""
-        return getattr(instance, "email", None)
-
-    @extend_schema_field(str)
-    def get_username(self, instance):
-        """Returns the username or None in the case of AnonymousUser"""
-        return getattr(instance, "edx_username", None)
 
     @extend_schema_field(list[str])
     def get_grants(self, instance):
@@ -267,20 +255,26 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         request = self.context.get("request", None)
-        # Certain fields are required only if a new User is being created (i.e.: the request method is POST)
         if request is not None and request.method == "POST":
             if not data.get("password"):
-                raise serializers.ValidationError(
-                    {"password": "This field is required."}
-                )
+                raise serializers.ValidationError({"password": "This field is required."})
             if not data.get("username"):
-                raise serializers.ValidationError(
-                    {"username": "This field is required."}
-                )
+                raise serializers.ValidationError({"username": "This field is required."})
 
         username = data.get("username")
         email = data.get("email")
+
         if username:
+            # Local duplicate check
+            if (
+                not self.instance
+                and User.objects.filter(username__iexact=username).exists()
+            ):
+                raise serializers.ValidationError(
+                    {"username": "A user already exists with this username. Please try a different one."}
+                )
+
+            # Open edX username/email validation
             try:
                 openedx_validation_msg_dict = validate_username_email_with_edx(
                     username, email
@@ -292,6 +286,7 @@ class UserSerializer(serializers.ModelSerializer):
             ) as exc:
                 log.exception("Unable to create user account")
                 raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG) from exc
+
             if openedx_validation_msg_dict["username"]:
                 raise serializers.ValidationError(
                     {
@@ -300,9 +295,12 @@ class UserSerializer(serializers.ModelSerializer):
                         )
                     }
                 )
+
             if openedx_validation_msg_dict["email"]:
-                # there is no email form field at this point, but we are still validating the email address
-                raise serializers.ValidationError(openedx_validation_msg_dict["email"])
+                raise serializers.ValidationError(
+                    {"email": openedx_validation_msg_dict["email"]}
+                )
+
         return data
 
     def create(self, validated_data):
@@ -408,7 +406,6 @@ class UserSerializer(serializers.ModelSerializer):
             "b2b_organizations",
         )
         read_only_fields = (
-            "username",
             "is_anonymous",
             "is_authenticated",
             "is_editor",

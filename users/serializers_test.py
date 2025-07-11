@@ -223,7 +223,7 @@ def test_username_validation(
 
 
 @responses.activate
-def test_username_validation_exception(user, settings):
+def test_username_validation_exception(user, settings, valid_address_dict):
     """
     UserSerializer should raise a EdxApiRegistrationValidationException if the username already exists
     in OpenEdx.
@@ -357,6 +357,7 @@ def test_user_create_required_fields_not_post(valid_address_dict):
     request = rf.patch("/")
     request.user = AnonymousUser()
     serializer = UserSerializer(data=base_data, context={"request": request})
+    assert serializer.errors == {}
     assert serializer.is_valid() is True
 
 
