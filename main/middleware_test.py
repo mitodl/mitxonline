@@ -7,10 +7,11 @@ from main.middleware import HostBasedCSRFMiddleware
 @pytest.mark.parametrize(
     ("host", "expected_domain"),
     [
-        ("mitxonline.mit.edu", "mitxonline.mit.edu"),
-        ("api.learn.mit.edu", ".learn.mit.edu"),
-        ("learn.mit.edu", "learn.mit.edu"),
-        ("example.com", ""),
+        ("http://mitxonline.mit.edu", "mitxonline.mit.edu"),
+        ("http://api.learn.mit.edu", ".learn.mit.edu"),
+        ("http://learn.mit.edu", "learn.mit.edu"),
+        ("http://mitxonline.odl.local:8013", "mitxonline.odl.local:8013"),
+        ("http://example.com", ""),
     ],
 )
 def test_host_based_csrf_middleware(mocker, rf, settings, host, expected_domain):
@@ -20,10 +21,11 @@ def test_host_based_csrf_middleware(mocker, rf, settings, host, expected_domain)
         "https://mitxonline.mit.edu",
         "https://learn.mit.edu",
         "https://api.learn.mit.edu",
+        "http://mitxonline.odl.local:8013",
     ]
 
     request = rf.get("/some/path")
-    request.META["HTTP_HOST"] = host
+    request.META["HTTP_REFERER"] = host
 
     get_response = mocker.MagicMock()
     middleware = HostBasedCSRFMiddleware(get_response)

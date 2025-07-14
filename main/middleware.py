@@ -31,8 +31,10 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
 
     def process_response(self, request, response):
         response = super().process_response(request, response)
-        if settings.CSRF_COOKIE_NAME in response.cookies:
-            host = request.get_host()
+        referrer = request.META.get('HTTP_REFERER', None)
+        if settings.CSRF_COOKIE_NAME in response.cookies and referrer:
+            parsed_referrer = urlparse(referrer)
+            host = parsed_referrer.netloc
             csrf_trusted_hosts = []
             for origin in getattr(settings, "CSRF_TRUSTED_ORIGINS", []):
                 parsed_origin = urlparse(origin)
