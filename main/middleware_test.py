@@ -29,7 +29,13 @@ def test_host_based_csrf_middleware(mocker, rf, settings, host, expected_domain)
     middleware = HostBasedCSRFMiddleware(get_response)
 
     response = HttpResponse()
-    response.set_cookie(settings.CSRF_COOKIE_NAME, "dummy_value")
+    response.set_cookie(
+        settings.CSRF_COOKIE_NAME,
+        "dummy_value",
+        secure=True,
+        httponly=True,
+        samesite="Lax",
+    )
 
     processed_response = middleware.process_response(request, response)
 
