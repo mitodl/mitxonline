@@ -24,7 +24,10 @@ class CachelessAPIMiddleware(MiddlewareMixin):
 
 
 class HostBasedCSRFMiddleware(CsrfViewMiddleware):
-    """CSRF middleware that changes CSRF_COOKIE_DOMAIN to match the request's host if it exists in settings.CSRF_TRUSTED_ORIGINS"""
+    """
+    CSRF middleware that changes the response cookie's domain property
+    to match the request's host if it exists in settings.CSRF_TRUSTED_ORIGINS
+    """
 
     def process_response(self, request, response):
         response = super().process_response(request, response)
@@ -37,7 +40,8 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
                     csrf_trusted_origins.append(parsed_origin.netloc)
             if host in csrf_trusted_origins:
                 host_parts = host.split(".")
-                # Only wildcard on second tier subdomains
+                # Only wildcard on second tier subdomains (3 parts or more)
+                # e.g. "api.learn.mit.edu" -> ".learn.mit.edu"
                 if len(host_parts) > SUBDOMAIN_THRESHOLD:
                     parent_domain = "." + ".".join(host_parts[1:])
                 else:
