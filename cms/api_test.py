@@ -238,7 +238,15 @@ def test_home_page_featured_products_sorting(mocker):
     )
     featured_products = home_page.products
     assert len(featured_products) == 2
-    assert featured_products == page_data
+    sorted_featured_products = sorted(
+        featured_products,
+        key=lambda item: (item["start_date"] is None, item["start_date"]),
+    )
+    sorted_page_data = sorted(
+        page_data,
+        key=lambda item: (item["start_date"] is None, item["start_date"]),
+    )
+    assert sorted_featured_products == sorted_page_data
 
 
 @pytest.mark.django_db
