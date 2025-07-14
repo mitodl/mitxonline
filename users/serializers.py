@@ -213,7 +213,7 @@ class UserSerializer(serializers.ModelSerializer):
     # password is explicitly write_only
     password = serializers.CharField(write_only=True, required=False)
     email = serializers.EmailField(required=False, allow_null=True)
-    username = serializers.CharField(required=False, allow_null=True)
+    username = serializers.CharField(source="edx_username")
     legal_address = LegalAddressSerializer(allow_null=True)
     user_profile = UserProfileSerializer(allow_null=True, required=False)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
