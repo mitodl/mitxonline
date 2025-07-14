@@ -18,7 +18,8 @@ import {
   USER_MSG_TYPE_PAYMENT_REVIEW,
   USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
   USER_MSG_TYPE_DISCOUNT_INVALID,
-  USER_MSG_TYPE_PROFILE_CREATED
+  USER_MSG_TYPE_PROFILE_CREATED,
+  USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY
 } from "../constants"
 
 type UserMessage = {
@@ -108,6 +109,10 @@ export function parseStoredUserMessage(
   case USER_MSG_TYPE_DISCOUNT_INVALID:
     alertType = ALERT_TYPE_DANGER
     msgText = `The discount that was applied to your cart is no longer valid. If this is unexpected, please contact customer support at ${SETTINGS.support_email}.`
+    break
+  case USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY:
+    alertType = ALERT_TYPE_DANGER
+    msgText = "You must enter a valid coupon code to enroll in this course."
     break
   default:
     return null

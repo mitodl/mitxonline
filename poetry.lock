@@ -1353,7 +1353,7 @@ version = "5.2.0"
 description = "Monkey-patching and extensions for django-stubs"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["main", "dev"]
 files = [
     {file = "django_stubs_ext-5.2.0-py3-none-any.whl", hash = "sha256:b27ae0aab970af4894ba4e9b3fcd3e03421dc8731516669659ee56122d148b23"},
     {file = "django_stubs_ext-5.2.0.tar.gz", hash = "sha256:00c4ae307b538f5643af761a914c3f8e4e3f25f4e7c6d7098f1906c0d8f2aac9"},
@@ -1377,6 +1377,29 @@ files = [
 
 [package.dependencies]
 Django = ">=4.1"
+
+[[package]]
+name = "django-tasks"
+version = "0.7.0"
+description = "An implementation and backport of background workers and tasks in Django"
+optional = false
+python-versions = ">=3.9"
+groups = ["main", "dev"]
+files = [
+    {file = "django_tasks-0.7.0-py3-none-any.whl", hash = "sha256:8a8d64f2dc6e29ac2f45092d90e2dd82dc1dca100dfe3a4f2ce1209db99f3527"},
+    {file = "django_tasks-0.7.0.tar.gz", hash = "sha256:499f80d1a051566443cfa88a300d8b03435af7fc5708cad4d8da6d285614f739"},
+]
+
+[package.dependencies]
+Django = ">=4.2"
+django-stubs-ext = "*"
+typing_extensions = "*"
+
+[package.extras]
+dev = ["coverage", "dj-database-url", "django-stubs[compatible-mypy]", "django-tasks[rq]", "fakeredis", "ruff"]
+mysql = ["mysqlclient"]
+postgres = ["psycopg[binary]"]
+rq = ["django-rq", "rq_scheduler"]
 
 [[package]]
 name = "django-treebeard"
@@ -2409,22 +2432,6 @@ sqlalchemy = ["sqlalchemy (>=1.4.48,<2.1)"]
 sqs = ["boto3 (>=1.26.143)", "urllib3 (>=1.26.16)"]
 yaml = ["PyYAML (>=3.10)"]
 zookeeper = ["kazoo (>=2.8.0)"]
-
-[[package]]
-name = "l18n"
-version = "2021.3"
-description = "Internationalization for pytz timezones and territories"
-optional = false
-python-versions = "*"
-groups = ["main", "dev"]
-files = [
-    {file = "l18n-2021.3-py3-none-any.whl", hash = "sha256:78495d1df95b6f7dcc694d1ba8994df709c463a1cbac1bf016e1b9a5ce7280b9"},
-    {file = "l18n-2021.3.tar.gz", hash = "sha256:1956e890d673d17135cc20913253c154f6bc1c00266c22b7d503cc1a5a42d848"},
-]
-
-[package.dependencies]
-pytz = ">=2020.1"
-six = "*"
 
 [[package]]
 name = "laces"
@@ -4316,7 +4323,7 @@ version = "2025.2"
 description = "World timezone definitions, modern and historical"
 optional = false
 python-versions = "*"
-groups = ["main", "dev"]
+groups = ["main"]
 files = [
     {file = "pytz-2025.2-py2.py3-none-any.whl", hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00"},
     {file = "pytz-2025.2.tar.gz", hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3"},
@@ -5121,7 +5128,6 @@ files = [
     {file = "typing_extensions-4.14.0-py3-none-any.whl", hash = "sha256:a1514509136dd0b477638fc68d6a91497af5076466ad0fa6c338e44e359944af"},
     {file = "typing_extensions-4.14.0.tar.gz", hash = "sha256:8676b788e32f02ab42d9e7c61324048ae4c6d844a399eebace3d4979d75ceef4"},
 ]
-markers = {dev = "python_version < \"3.12\""}
 
 [[package]]
 name = "tzdata"
@@ -5296,38 +5302,38 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 
 [[package]]
 name = "wagtail"
-version = "6.3"
+version = "7.0.1"
 description = "A Django content management system."
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "wagtail-6.3-py3-none-any.whl", hash = "sha256:627e4d5c2a47cd8533994503f473da231a782dbd0f1f8f53641e0d994556a0f2"},
-    {file = "wagtail-6.3.tar.gz", hash = "sha256:98d94d12183b8fc689a0186ab095e6056bf116c21d94f245bdfd02ed4775442a"},
+    {file = "wagtail-7.0.1-py3-none-any.whl", hash = "sha256:92439c50a919826a4ce8c85bdaf3ed0e436d29598bb2954b4fca5f312b969666"},
+    {file = "wagtail-7.0.1.tar.gz", hash = "sha256:cfc5c37738f98cae380a15252f5676604f6c61554bef1a3791e34de1e703beec"},
 ]
 
 [package.dependencies]
 anyascii = ">=0.1.5"
-beautifulsoup4 = ">=4.8,<4.13"
-Django = ">=4.2,<6.0"
-django-filter = ">=23.3,<25"
+beautifulsoup4 = ">=4.8,<5"
+Django = ">=4.2"
+django-filter = ">=23.3"
 django-modelcluster = ">=6.2.1,<7.0"
 django-permissionedforms = ">=0.1,<1.0"
-django-taggit = ">=5.0,<6.2"
+django-taggit = ">=5.0,<7"
+django-tasks = ">=0.7,<0.8"
 django-treebeard = ">=4.5.1,<5.0"
 djangorestframework = ">=3.15.1,<4.0"
-draftjs-exporter = ">=2.1.5,<6.0"
-l18n = ">=2018.5"
+draftjs_exporter = ">=2.1.5,<6.0"
 laces = ">=0.1,<0.2"
 openpyxl = ">=3.0.10,<4.0"
 Pillow = ">=9.1.0,<12.0.0"
 requests = ">=2.11.1,<3.0"
 telepath = ">=0.3.1,<1"
-Willow = {version = ">=1.8.0,<2", extras = ["heif"]}
+Willow = {version = ">=1.10.0,<2", extras = ["heif"]}
 
 [package.extras]
-docs = ["Sphinx (>=7.3)", "myst-parser (==2.0.0)", "pyenchant (>=3.1.1,<4)", "sphinx-autobuild (>=0.6.0)", "sphinx-wagtail-theme (==6.4.0)", "sphinxcontrib-spelling (>=7,<8)"]
-testing = ["Jinja2 (>=3.0,<3.2)", "azure-mgmt-cdn (>=12.0,<13.0)", "azure-mgmt-frontdoor (>=1.0,<1.1)", "boto3 (>=1.28,<2)", "coverage (>=3.7.0)", "curlylint (==0.13.1)", "django-pattern-library (>=0.7)", "djhtml (==3.0.6)", "doc8 (==0.8.1)", "factory-boy (>=3.2)", "freezegun (>=0.3.8)", "polib (>=1.1,<2.0)", "python-dateutil (>=2.7)", "ruff (==0.1.5)", "semgrep (==1.40.0)", "tblib (>=2.0,<3.0)"]
+docs = ["Sphinx (>=7.3)", "myst_parser (==2.0.0)", "pyenchant (>=3.1.1,<4)", "sphinx-autobuild (>=0.6.0)", "sphinx-wagtail-theme (==6.5.0)", "sphinxcontrib-spelling (>=7,<8)"]
+testing = ["Jinja2 (>=3.0,<3.2)", "azure-mgmt-cdn (>=12.0,<13.0)", "azure-mgmt-frontdoor (>=1.0,<1.1)", "boto3 (>=1.28,<2)", "coverage (>=3.7.0)", "curlylint (==0.13.1)", "django-pattern-library (>=0.7)", "djhtml (==3.0.6)", "doc8 (==1.1.2)", "factory-boy (>=3.2)", "freezegun (>=0.3.8)", "polib (>=1.1,<2.0)", "python-dateutil (>=2.7)", "ruff (==0.9.6)", "semgrep (==1.40.0)", "tblib (>=2.0,<3.0)"]
 
 [[package]]
 name = "wagtail-factories"
@@ -5582,4 +5588,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "6b7f62d1d85daad5a5364fd7a17607976a431d8709702ce019fa4ab2015df63d"
+content-hash = "2b9e140da8529ac6289e733611fc64e8077035001e2a80ac1ef22c26ce67c60d"
