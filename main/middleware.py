@@ -33,12 +33,12 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
         response = super().process_response(request, response)
         if settings.CSRF_COOKIE_NAME in response.cookies:
             host = request.get_host()
-            csrf_trusted_origins = []
+            csrf_trusted_hosts = []
             for origin in getattr(settings, "CSRF_TRUSTED_ORIGINS", []):
                 parsed_origin = urlparse(origin)
                 if parsed_origin.netloc:
-                    csrf_trusted_origins.append(parsed_origin.netloc)
-            if host in csrf_trusted_origins:
+                    csrf_trusted_hosts.append(parsed_origin.netloc)
+            if host in csrf_trusted_hosts:
                 host_parts = host.split(".")
                 # Only wildcard on second tier subdomains (3 parts or more)
                 # e.g. "api.learn.mit.edu" -> ".learn.mit.edu"
