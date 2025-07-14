@@ -259,12 +259,14 @@ class UserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"password": "This field is required."}
                 )
-            if not data.get("username"):
+            # Since username field has source="edx_username", the data is stored under "edx_username" key
+            if not data.get("edx_username"):
                 raise serializers.ValidationError(
                     {"username": "This field is required."}
                 )
 
-        username = data.get("username")
+        # Since username field has source="edx_username", the data is stored under "edx_username" key
+        username = data.get("edx_username")
         email = data.get("email")
 
         if username:
@@ -313,7 +315,7 @@ class UserSerializer(serializers.ModelSerializer):
         legal_address_data = validated_data.pop("legal_address")
         user_profile_data = validated_data.pop("user_profile", None)
 
-        username = validated_data.pop("username")
+        username = validated_data.pop("edx_username")
         email = validated_data.pop("email")
         password = validated_data.pop("password")
 
