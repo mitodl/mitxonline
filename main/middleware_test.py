@@ -16,7 +16,7 @@ from main.middleware import HostBasedCSRFMiddleware
 )
 def test_host_based_csrf_middleware(mocker, rf, settings, host, expected_domain):
     """Tests that the CSRF cookie domain is set correctly based on the request host."""
-    settings.CSRF_COOKIE_NAME = "csrftoken"
+    settings.CSRF_COOKIE_NAME = "csrf_mitxonline"
     settings.CSRF_TRUSTED_ORIGINS = [
         "https://mitxonline.mit.edu",
         "https://learn.mit.edu",
