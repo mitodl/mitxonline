@@ -2053,13 +2053,16 @@ components:
       properties:
         username:
           type: string
+          nullable: true
           minLength: 1
         name:
           type: string
           maxLength: 255
         email:
           type: string
-          description: Returns the email or None in the case of AnonymousUser
+          format: email
+          nullable: true
+          minLength: 1
         password:
           type: string
           writeOnly: true
@@ -2324,12 +2327,14 @@ components:
           readOnly: true
         username:
           type: string
+          nullable: true
         name:
           type: string
           maxLength: 255
         email:
           type: string
-          description: Returns the email or None in the case of AnonymousUser
+          format: email
+          nullable: true
         legal_address:
           allOf:
           - $ref: '#/components/schemas/LegalAddress'
