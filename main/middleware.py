@@ -48,5 +48,7 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
                     parent_domain = "." + ".".join(host_parts[1:])
                 else:
                     parent_domain = host
-                response.cookies[settings.CSRF_COOKIE_NAME]["domain"] = parent_domain.split(":")[0]
+                response.cookies[settings.CSRF_COOKIE_NAME]["domain"] = (
+                    parent_domain.split(":")[0]
+                )
         return response
