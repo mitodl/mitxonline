@@ -127,7 +127,7 @@ def edx_username_validation_response_mock(username_exists, settings):
     ["test_username", None],
 )
 @pytest.mark.parametrize("missing_username", [True, False])
-def test_create_edx_user(  # noqa: PLR0913
+def test_create_edx_user(  # noqa: PLR0913,C901
     settings,
     application,
     has_been_synced,
@@ -178,6 +178,9 @@ def test_create_edx_user(  # noqa: PLR0913
     if has_been_synced:
         assert resp1.call_count == 1
         assert resp2.call_count == 0
+    elif provided_username is None and missing_username:
+        assert resp1.call_count == 0
+        assert resp2.call_count == 0
     else:
         assert resp1.call_count == 0
         assert resp2.call_count == 1
@@ -203,12 +206,11 @@ def test_create_edx_user(  # noqa: PLR0913
         if not missing_username:
             expected_request_body["username"] = original_username
         assert dict(parse_qsl(resp2.calls[0].request.body)) == expected_request_body
-    assert (
-        OpenEdxUser.objects.filter(
-            user=user, platform=PLATFORM_EDX, has_been_synced=True
-        ).exists()
-        is True
-    )
+
+    assert OpenEdxUser.objects.filter(
+        user=user, platform=PLATFORM_EDX, has_been_synced=True
+    ).exists() is not (provided_username is None and missing_username)
+
     if provided_username and missing_username:
         assert user.openedx_users.first().edx_username == provided_username
     elif provided_username and not missing_username:
