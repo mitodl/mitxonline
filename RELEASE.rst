@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.123.3
+---------------
+
+- Handle edx_username outside transaction (#2793)
+- /api/users/me API appears to be returning email address (#2788)
+- Set domain on CSRF cookies allowed by CSRF_TRUSTED_ORIGINS (#2786)
+- Re-introduce CSRF cookie configuration (#2782)
+- Optimize b2b code (#2767)
+- Allow program as requirement or elective on another program (#2772)
+- Added help text for the new price fields for product page (#2785)
+- update Wagtail to 7.0.1 (#2778)
+
 Version 0.123.0 (Released July 10, 2025)
 ---------------
 
