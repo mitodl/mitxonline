@@ -98,14 +98,19 @@ def create_edx_user(user, edx_username=None):
         user=user, application=application, token=generate_token(), expires=expiry_date
     )
 
+    if edx_username is not None:
+        OpenEdxUser.objects.filter(
+            user=user, platform=PLATFORM_EDX, edx_username=None
+        ).update(edx_username=edx_username)
+
     with transaction.atomic():
         open_edx_user, _ = OpenEdxUser.objects.select_for_update().get_or_create(
             user=user, platform=PLATFORM_EDX
         )
 
-        if open_edx_user.edx_username is None:
-            open_edx_user.edx_username = edx_username
-            open_edx_user.save()
+        if open_edx_user.edx_username:
+            # no username has been set so skip this
+            return False
 
         if open_edx_user.has_been_synced:
             # Here we should check with edx that the user exists on that end.
@@ -215,6 +220,12 @@ def create_edx_auth_token(user):
     # 4. Initiate an Open edX OAuth2 authorization for xPro
     # 5. Redirects back to xPro with the access token
     # 6. Redeem access token for a refresh/access token pair
+
+    # if the user hasn't been created on openedx, we can't do any of this
+    if user.openedxusers.filter(
+        edx_username__isnull=False, has_been_synced=True
+    ).exists():
+        return None
 
     # ensure only we can update this for the duration of the
     auth, _ = OpenEdxApiAuth.objects.select_for_update().get_or_create(user=user)
