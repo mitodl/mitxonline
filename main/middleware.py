@@ -6,8 +6,6 @@ from django.conf import settings
 from django.middleware.csrf import CsrfViewMiddleware
 from django.utils.deprecation import MiddlewareMixin
 
-SUBDOMAIN_THRESHOLD = 3
-
 
 class CachelessAPIMiddleware(MiddlewareMixin):
     """Add Cache-Control header to API responses"""
@@ -41,14 +39,7 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
                 if parsed_origin.netloc:
                     csrf_trusted_hosts.append(parsed_origin.netloc)
             if host in csrf_trusted_hosts:
-                host_parts = host.split(".")
-                # Only wildcard on second tier subdomains (3 parts or more)
-                # e.g. "api.learn.mit.edu" -> ".learn.mit.edu"
-                if len(host_parts) > SUBDOMAIN_THRESHOLD:
-                    parent_domain = "." + ".".join(host_parts[1:])
-                else:
-                    parent_domain = host
-                response.cookies[settings.CSRF_COOKIE_NAME]["domain"] = (
-                    parent_domain.split(":")[0]
-                )
+                response.cookies[settings.CSRF_COOKIE_NAME]["domain"] = host.split(":")[
+                    0
+                ]
         return response

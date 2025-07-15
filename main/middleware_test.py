@@ -8,7 +8,7 @@ from main.middleware import HostBasedCSRFMiddleware
     ("host", "expected_domain"),
     [
         ("http://mitxonline.mit.edu", "mitxonline.mit.edu"),
-        ("http://api.learn.mit.edu", ".learn.mit.edu"),
+        ("http://api.learn.mit.edu", "api.learn.mit.edu"),
         ("http://learn.mit.edu", "learn.mit.edu"),
         ("http://mitxonline.odl.local:8013", "mitxonline.odl.local"),
         ("http://example.com", ""),
@@ -16,7 +16,7 @@ from main.middleware import HostBasedCSRFMiddleware
         ("not-a-url", ""),
         ("http://", ""),
         ("http://mitxonline.mit.edu:8080", ""),
-        ("http://sub.sub.sub.learn.mit.edu", ".sub.sub.learn.mit.edu"),
+        ("http://sub.sub.sub.learn.mit.edu", "sub.sub.sub.learn.mit.edu"),
         ("http://localhost", ""),
     ],
 )
