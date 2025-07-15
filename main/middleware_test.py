@@ -10,7 +10,7 @@ from main.middleware import HostBasedCSRFMiddleware
         ("http://mitxonline.mit.edu", "mitxonline.mit.edu"),
         ("http://api.learn.mit.edu", ".learn.mit.edu"),
         ("http://learn.mit.edu", "learn.mit.edu"),
-        ("http://mitxonline.odl.local:8013", "mitxonline.odl.local:8013"),
+        ("http://mitxonline.odl.local:8013", "mitxonline.odl.local"),
         ("http://example.com", ""),
     ],
 )
