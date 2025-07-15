@@ -105,7 +105,9 @@ def create_edx_user(user, edx_username=None):
 
     with transaction.atomic():
         open_edx_user, _ = OpenEdxUser.objects.select_for_update().get_or_create(
-            user=user, platform=PLATFORM_EDX
+            user=user,
+            platform=PLATFORM_EDX,
+            defaults={"edx_username": edx_username or None},
         )
 
         if not open_edx_user.edx_username:
