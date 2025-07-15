@@ -222,7 +222,7 @@ def create_edx_auth_token(user):
     # 6. Redeem access token for a refresh/access token pair
 
     # if the user hasn't been created on openedx, we can't do any of this
-    if user.openedxusers.filter(
+    if not user.openedxusers.filter(
         edx_username__isnull=False, has_been_synced=True
     ).exists():
         return None
