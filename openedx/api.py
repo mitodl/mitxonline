@@ -108,7 +108,7 @@ def create_edx_user(user, edx_username=None):
             user=user, platform=PLATFORM_EDX
         )
 
-        if open_edx_user.edx_username:
+        if not open_edx_user.edx_username:
             # no username has been set so skip this
             return False
 

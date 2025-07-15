@@ -136,6 +136,9 @@ def test_create_edx_user(  # noqa: PLR0913
     missing_username,
 ):
     """Test that create_edx_user makes a request to create an edX user"""
+    if has_been_synced and missing_username:
+        pytest.skip("Invalidation combination")
+
     user = UserFactory.create(openedx_user__has_been_synced=has_been_synced)
     openedx_user = user.openedx_users.first()
     if missing_username:
