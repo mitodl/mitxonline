@@ -21,7 +21,10 @@ from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from treebeard.mp_tree import MP_Node
+from wagtail.admin.panels import FieldPanel, InlinePanel
+from wagtail.fields import RichTextField
 from wagtail.models import Revision
+from wagtail.snippets.models import register_snippet
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
@@ -1785,3 +1788,36 @@ class LearnerProgramRecordShare(TimestampedModel):
                 fields=("program", "user", "partner_school"),
             )
         ]
+
+
+@register_snippet
+class ProgramCollection(TimestampedModel):
+    """Model for a collection of programs with title and description"""
+
+    title = models.CharField(
+        max_length=255,
+        help_text="The title of the program collection"
+    )
+    description = RichTextField(
+        blank=True,
+        help_text="Description of the program collection"
+    )
+    programs = models.ManyToManyField(
+        Program,
+        blank=True,
+        help_text="Programs included in this collection"
+    )
+
+    panels = [
+        FieldPanel("title"),
+        FieldPanel("description"),
+        FieldPanel("programs"),
+    ]
+
+    class Meta:
+        ordering = ["title"]
+        verbose_name = "Program Collection"
+        verbose_name_plural = "Program Collections"
+
+    def __str__(self):
+        return self.title
