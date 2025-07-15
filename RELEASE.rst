@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.123.1
+---------------
+
+- Re-introduce CSRF cookie configuration (#2782)
+- Optimize b2b code (#2767)
+- Allow program as requirement or elective on another program (#2772)
+- Added help text for the new price fields for product page (#2785)
+- update Wagtail to 7.0.1 (#2778)
+
 Version 0.123.0 (Released July 10, 2025)
 ---------------
 
