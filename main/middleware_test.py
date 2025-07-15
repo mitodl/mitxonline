@@ -12,6 +12,12 @@ from main.middleware import HostBasedCSRFMiddleware
         ("http://learn.mit.edu", "learn.mit.edu"),
         ("http://mitxonline.odl.local:8013", "mitxonline.odl.local"),
         ("http://example.com", ""),
+        ("", ""),
+        ("not-a-url", ""),
+        ("http://", ""),
+        ("http://mitxonline.mit.edu:8080", ""),
+        ("http://sub.sub.sub.learn.mit.edu", ".sub.sub.learn.mit.edu"),
+        ("http://localhost", ""),
     ],
 )
 def test_host_based_csrf_middleware(mocker, rf, settings, host, expected_domain):
@@ -21,6 +27,7 @@ def test_host_based_csrf_middleware(mocker, rf, settings, host, expected_domain)
         "https://mitxonline.mit.edu",
         "https://learn.mit.edu",
         "https://api.learn.mit.edu",
+        "https://sub.sub.sub.learn.mit.edu",
         "http://mitxonline.odl.local:8013",
     ]
 
@@ -45,3 +52,23 @@ def test_host_based_csrf_middleware(mocker, rf, settings, host, expected_domain)
         processed_response.cookies[settings.CSRF_COOKIE_NAME]["domain"]
         == expected_domain
     )
+
+
+def test_host_based_csrf_middleware_no_referer(mocker, rf, settings):
+    """Test that middleware handles missing referer header gracefully."""
+    settings.CSRF_COOKIE_NAME = "csrf_mitxonline"
+    settings.CSRF_TRUSTED_ORIGINS = ["https://mitxonline.mit.edu"]
+
+    request = rf.get("/some/path")
+    # No HTTP_REFERER set
+
+    get_response = mocker.MagicMock()
+    middleware = HostBasedCSRFMiddleware(get_response)
+
+    response = HttpResponse()
+    response.set_cookie(settings.CSRF_COOKIE_NAME, "dummy_value")
+
+    processed_response = middleware.process_response(request, response)
+
+    # Domain should not be modified (should remain empty)
+    assert processed_response.cookies[settings.CSRF_COOKIE_NAME]["domain"] == ""
