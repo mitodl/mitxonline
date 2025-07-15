@@ -98,16 +98,20 @@ def create_edx_user(user, edx_username=None):
         user=user, application=application, token=generate_token(), expires=expiry_date
     )
 
-    if edx_username is not None:
-        OpenEdxUser.objects.filter(
-            user=user, platform=PLATFORM_EDX, edx_username=None
-        ).update(edx_username=edx_username)
+    open_edx_user, _ = OpenEdxUser.objects.get_or_create(
+        user=user,
+        platform=PLATFORM_EDX,
+        defaults={"edx_username": edx_username or None},
+    )
+
+    if open_edx_user.edx_username is None and edx_username is not None:
+        open_edx_user.edx_username = edx_username
+        open_edx_user.save()
 
     with transaction.atomic():
-        open_edx_user, _ = OpenEdxUser.objects.select_for_update().get_or_create(
+        open_edx_user = OpenEdxUser.objects.select_for_update().get(
             user=user,
             platform=PLATFORM_EDX,
-            defaults={"edx_username": edx_username or None},
         )
 
         if not open_edx_user.edx_username:
