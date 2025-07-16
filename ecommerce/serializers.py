@@ -129,31 +129,10 @@ class ProductPurchasableObjectField(serializers.RelatedField):
 class BaseProductSerializer(serializers.ModelSerializer):
     """Simple serializer for Product without related purchasable objects"""
 
-    min_price = serializers.SerializerMethodField()
-    max_price = serializers.SerializerMethodField()
-
-    def get_min_price(self, instance) -> int | None:
-        """
-        Get the min price of the product from the CMS page.
-        """
-        if hasattr(instance, "page") and hasattr(instance.page, "min_price"):
-            return instance.page.min_price
-        return None
-
-    def get_max_price(self, instance) -> int | None:
-        """
-        Get the max price of the product from the CMS page.
-        """
-        if hasattr(instance, "page") and hasattr(instance.page, "max_price"):
-            return instance.page.max_price
-        return None
-
     class Meta:
         fields = [
             "id",
             "price",
-            "min_price",
-            "max_price",
             "description",
             "is_active",
         ]

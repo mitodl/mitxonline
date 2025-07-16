@@ -45,6 +45,8 @@ class CourseSerializer(BaseCourseSerializer):
     time_commitment = serializers.SerializerMethodField()
     min_weekly_hours = serializers.SerializerMethodField()
     max_weekly_hours = serializers.SerializerMethodField()
+    min_price = serializers.SerializerMethodField()
+    max_price = serializers.SerializerMethodField()
 
     @extend_schema_field(bool)
     def get_required_prerequisites(self, instance):
@@ -166,6 +168,25 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
+    min_price = serializers.SerializerMethodField()
+    max_price = serializers.SerializerMethodField()
+
+    def get_min_price(self, instance) -> int | None:
+        """
+        Get the min price of the product from the CMS page.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "min_price"):
+            return instance.page.min_price
+        return None
+
+    def get_max_price(self, instance) -> int | None:
+        """
+        Get the max price of the product from the CMS page.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "max_price"):
+            return instance.page.max_price
+        return None
+
     class Meta:
         model = models.Course
         fields = [
@@ -182,6 +203,8 @@ class CourseSerializer(BaseCourseSerializer):
             "duration",
             "min_weeks",
             "max_weeks",
+            "min_price",
+            "max_price",
             "time_commitment",
             "availability",
             "min_weekly_hours",
