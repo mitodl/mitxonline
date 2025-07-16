@@ -36,7 +36,6 @@ class RegisterDetailsSerializer(serializers.Serializer):
         with transaction.atomic():
             user.name = name
             user.save()
-            create_user(user, username)
 
             if legal_address_data:
                 legal_address = LegalAddressSerializer(
@@ -51,6 +50,7 @@ class RegisterDetailsSerializer(serializers.Serializer):
                 )
                 if user_profile.is_valid():
                     user_profile.save()
+        create_user(user, username)
         sync_hubspot_user(user)
         return user
 
