@@ -1425,6 +1425,16 @@ components:
           nullable: true
           description: Get the max weeks of the course from the CMS page.
           readOnly: true
+        min_price:
+          type: integer
+          nullable: true
+          description: Get the min price of the product from the CMS page.
+          readOnly: true
+        max_price:
+          type: integer
+          nullable: true
+          description: Get the max price of the product from the CMS page.
+          readOnly: true
         time_commitment:
           type: string
           nullable: true
@@ -1459,8 +1469,10 @@ components:
       - departments
       - duration
       - id
+      - max_price
       - max_weekly_hours
       - max_weeks
+      - min_price
       - min_weekly_hours
       - min_weeks
       - next_run_id
