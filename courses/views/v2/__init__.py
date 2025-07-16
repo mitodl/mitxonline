@@ -16,6 +16,7 @@ from courses.models import (
     CoursesTopic,
     Department,
     Program,
+    ProgramCollection,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
@@ -26,7 +27,7 @@ from courses.serializers.v2.courses import (
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
 )
-from courses.serializers.v2.programs import ProgramSerializer
+from courses.serializers.v2.programs import ProgramSerializer, ProgramCollectionSerializer
 from courses.utils import get_enrollable_courses, get_unenrollable_courses
 
 
@@ -294,3 +295,21 @@ class CourseTopicViewSet(viewsets.ReadOnlyModelViewSet):
         Returns parent topics with course count > 0.
         """
         return CoursesTopic.parent_topics_with_courses()
+
+
+class ProgramCollectionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Readonly viewset for ProgramCollection objects.
+    """
+
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    serializer_class = ProgramCollectionSerializer
+    pagination_class = Pagination
+
+    def get_queryset(self):
+        """
+        Returns all ProgramCollection objects ordered by title.
+        """
+        return ProgramCollection.objects.select_related().prefetch_related(
+            "programs"
+        ).order_by("title")
