@@ -74,6 +74,8 @@ def test_serialize_course(
             "duration": course.page.length,
             "max_weeks": course.page.max_weeks,
             "min_weeks": course.page.min_weeks,
+            "min_price": course.page.min_price,
+            "max_price": course.page.max_price,
             "time_commitment": course.page.effort,
             "programs": (
                 BaseProgramSerializer(course.programs, many=True).data
@@ -119,6 +121,8 @@ def test_serialize_course_required_prerequisites(
             "duration": course.page.length,
             "max_weeks": course.page.max_weeks,
             "min_weeks": course.page.min_weeks,
+            "min_price": course.page.min_price,
+            "max_price": course.page.max_price,
             "time_commitment": course.page.effort,
             "programs": None,
         },
