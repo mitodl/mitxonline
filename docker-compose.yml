@@ -23,8 +23,10 @@ x-extra-hosts:
   &default-extra-hosts # pragma: allowlist secret
   - "edx.odl.local:${OPENEDX_IP:-172.22.0.1}"
   - "host.docker.internal:host-gateway"
-  - "local.openedx.io:host-gateway"
-  - "studio.local.openedx.io:host-gateway"
+  - "openedx.odl.local:host-gateway"
+  - "studio.openedx.odl.local:host-gateway"
+  - "apps.openedx.odl.local:host-gateway"
+  - "mitxonline.odl.local:host-gateway"
 
 services:
   db:
@@ -216,7 +218,7 @@ services:
     profiles:
       - apisix
     environment:
-      - OPENEDX_API_BASE_URL=${OPENEDX_API_BASE_URL:-http://local.openedx.io:8000}
+      - OPENEDX_API_BASE_URL={OPENEDX_API_BASE_URL:-http://openedx.odl.local:8000}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-ol-local}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apisix}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
