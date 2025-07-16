@@ -168,9 +168,6 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    min_price = serializers.SerializerMethodField()
-    max_price = serializers.SerializerMethodField()
-
     def get_min_price(self, instance) -> int | None:
         """
         Get the min price of the product from the CMS page.
