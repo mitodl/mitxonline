@@ -576,6 +576,12 @@ KEYCLOAK_REALM_NAME = get_string(
     description="Name of the realm the app uses in Keycloak.",
 )
 
+KEYCLOAK_CLIENT_ID = get_string(
+    name="KEYCLOAK_CLIENT_ID",
+    default=None,
+    description="The client name for mitxonline.",
+)
+
 
 # Social Auth Configuration end
 

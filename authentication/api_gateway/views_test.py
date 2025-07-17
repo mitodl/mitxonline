@@ -1,10 +1,11 @@
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 
 import pytest
 from django.urls import reverse
 from pytest_lazy_fixtures import lf
 from rest_framework import status
 
+from authentication.api_gateway.views import AccountActionStartView
 from users.api import User
 from users.factories import UserFactory
 from users.models import MALE, UserProfile
@@ -143,3 +144,41 @@ def test_logout_complete(client):
     resp = client.get("/logout/complete")
     assert resp.status_code == status.HTTP_200_OK
     assert resp.json() == {"message": "Logout complete"}
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        pytest.param(action, id=f"/account/action/start/{action[0]}")
+        for action in AccountActionStartView.ACTION_MAPPING.items()
+    ],
+)
+def test_account_action_start(settings, client, action):
+    url_action, kc_action = action
+
+    resp = client.get(
+        f"{reverse('account-action-start', kwargs={'action': url_action})}?next={quote('/dashboard')}"
+    )
+
+    assert resp.status_code == status.HTTP_302_FOUND
+    parsed = urlparse(resp.headers["Location"])
+
+    assert parsed.scheme == "http"
+    assert parsed.netloc == "keycloak"
+    assert parsed.path == "/realms/ol-test/protocol/openid-connect/auth"
+
+    assert parse_qs(parsed.query) == {
+        "kc_action": [kc_action],
+        "scope": ["openid"],
+        "response_type": ["code"],
+        "client_id": ["mitxonline"],
+        "redirect_uri": [
+            f"{settings.SITE_BASE_URL}/account/action/complete?{urlencode({'next': '/dashboard'})}"
+        ],
+    }
+
+
+def test_account_action_callback(client):
+    resp = client.get(f"{reverse('account-action-complete')}?{quote('/dashboard')}")
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.headers["Location"] == "/dashboard"

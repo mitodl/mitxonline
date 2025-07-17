@@ -1,10 +1,12 @@
 """Authentication views"""
 
+import logging
 from urllib.parse import urlencode, urljoin
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic.base import RedirectView
@@ -29,6 +31,8 @@ from main.constants import (
 from main.utils import encode_json_cookie_value, is_success_response
 
 User = get_user_model()
+
+log = logging.getLogger()
 
 
 class ProfileDetailsAPIView(APIView):
@@ -173,3 +177,61 @@ class OpenedxAndApiGatewayLogoutView(RedirectView):
 def logout_complete(request):  # noqa: ARG001
     """Simple response for openedx logout being complete"""
     return Response({"message": "Logout complete"}, content_type="application/json")
+
+
+class AccountActionStartView(RedirectView):
+    """View that redirect the user to keycloak based on the requested action"""
+
+    ACTION_MAPPING: dict[str, str] = {
+        "update-email": "UPDATE_EMAIL",
+        "update-password": "UPDATE_PASSWORD",
+    }
+
+    def get_redirect_url(self, *args, **kwargs):  # noqa: ARG002
+        """Get the redirect url"""
+
+        action = kwargs["action"]
+
+        if action not in self.ACTION_MAPPING:
+            log.error("Received unexpected account action: %s", action)
+            redirect_url = self.request.META.get("HTTP_REFERER", settings.SITE_BASE_URL)
+            return (
+                redirect_url
+                if url_has_allowed_host_and_scheme(
+                    redirect_url, allowed_hosts=settings.ALLOWED_REDIRECT_HOSTS
+                )
+                else settings.SITE_BASE_URL
+            )
+
+        next_url = get_redirect_url(self.request)
+
+        callback_qs = {
+            "next": next_url,
+        }
+        callback_url = f"{settings.SITE_BASE_URL.removesuffix('/')}{reverse('account-action-complete')}?{urlencode(callback_qs)}"
+
+        qs = {
+            "client_id": settings.KEYCLOAK_CLIENT_ID,
+            "response_type": "code",
+            "redirect_uri": callback_url,
+            "scope": "openid",
+            "kc_action": self.ACTION_MAPPING[action],
+        }
+
+        return "".join(
+            [
+                settings.KEYCLOAK_BASE_URL.removesuffix("/"),
+                "/realms/",
+                settings.KEYCLOAK_REALM_NAME,
+                "/protocol/openid-connect/auth?",
+                urlencode(qs),
+            ]
+        )
+
+
+class AccountActionCallbackView(RedirectView):
+    """Callback for the account action flow"""
+
+    def get_redirect_url(self, *args, **kwargs):  # noqa: ARG002
+        """Get the redirect url"""
+        return get_redirect_url(self.request)

@@ -1,4 +1,5 @@
 // @flow
+/* global SETTINGS: false */
 import { assert } from "chai"
 import sinon from "sinon"
 
@@ -174,5 +175,32 @@ describe("AccountSettingsPage", () => {
         }
       })
     })
+  })
+
+  it("Displays buttons to update email/password if api gateway is enabled", async () => {
+    SETTINGS.api_gateway_enabled = true
+    const { inner } = await renderPage({
+      entities: {
+        currentUser: user
+      }
+    })
+    assert.isFalse(inner.find("ChangeEmailForm").exists())
+    assert.isFalse(inner.find("ChangePasswordForm").exists())
+
+    const changeEmailBtn = inner.find("a[aria-label='change email']")
+
+    assert.ok(changeEmailBtn.exists())
+    assert.equal(
+      changeEmailBtn.prop("href"),
+      "/account/action/start/update-email/"
+    )
+
+    const changePasswordBtn = inner.find("a[aria-label='change password']")
+
+    assert.ok(changePasswordBtn.exists())
+    assert.equal(
+      changePasswordBtn.prop("href"),
+      "/account/action/start/update-password/"
+    )
   })
 })
