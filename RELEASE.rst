@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.123.5
+Version 0.123.5 (Released July 17, 2025)
 ---------------
 
 - fix: create edx user outside db transaction (#2798)
