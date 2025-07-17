@@ -222,7 +222,7 @@ class ProgramSerializer(serializers.ModelSerializer):
         """
         Get the start date of the program by finding the first available run.
         """
-        next_run = instance.next_enrollable_run
+        next_run = instance.next_starting_run
         if next_run and next_run.start_date:
             return next_run.start_date
         return instance.start_date

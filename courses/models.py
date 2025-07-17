@@ -186,7 +186,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         )
 
     @property
-    def next_enrollable_run(self):
+    def next_starting_run(self):
         """Gets the earliest starting CourseRun"""
         return (
             CourseRun.objects.filter(course__in_programs__program=self, start_date__gt=now_in_utc(), live=True)
