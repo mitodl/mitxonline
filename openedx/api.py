@@ -157,8 +157,7 @@ def _create_edx_user_request(open_edx_user, user, access_token):
                 continue
 
         raise OpenEdxUserCreateError(
-            "Error creating Open edX user. "
-            f"{get_error_response_summary(resp)}"
+            f"Error creating Open edX user. {get_error_response_summary(resp)}"  # noqa: EM102
         )
 
 
