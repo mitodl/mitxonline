@@ -139,34 +139,62 @@ def create_edx_user(user, edx_username=None):
                     ACCESS_TOKEN_HEADER_NAME: settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
                 }
             )
-        resp = req_session.post(
-            edx_url(OPENEDX_REGISTER_USER_PATH),
-            data=dict(
-                username=open_edx_user.edx_username,
-                email=user.email,
-                name=user.name,
-                country=user.legal_address.country if user.legal_address else None,
-                state=user.legal_address.us_state if user.legal_address else None,
-                gender=user.user_profile.gender if user.user_profile else None,
-                year_of_birth=(
-                    user.user_profile.year_of_birth if user.user_profile else None
+        # Try user creation, retry once if duplicate username with suggestion
+        tried_suggestion = False
+        while True:
+            resp = req_session.post(
+                edx_url(OPENEDX_REGISTER_USER_PATH),
+                data=dict(
+                    username=open_edx_user.edx_username,
+                    email=user.email,
+                    name=user.name,
+                    country=(
+                        user.legal_address.country if user.legal_address else None
+                    ),
+                    state=(
+                        user.legal_address.us_state if user.legal_address else None
+                    ),
+                    gender=(
+                        user.user_profile.gender if user.user_profile else None
+                    ),
+                    year_of_birth=(
+                        user.user_profile.year_of_birth if user.user_profile else None
+                    ),
+                    level_of_education=(
+                        user.user_profile.level_of_education if user.user_profile else None
+                    ),
+                    provider=settings.OPENEDX_OAUTH_PROVIDER,
+                    access_token=access_token.token,
+                    **OPENEDX_REQUEST_DEFAULTS,
                 ),
-                level_of_education=(
-                    user.user_profile.level_of_education if user.user_profile else None
-                ),
-                provider=settings.OPENEDX_OAUTH_PROVIDER,
-                access_token=access_token.token,
-                **OPENEDX_REQUEST_DEFAULTS,
-            ),
-        )
-        # edX responds with 200 on success, not 201
-        if resp.status_code != status.HTTP_200_OK:
-            raise OpenEdxUserCreateError(
-                f"Error creating Open edX user. {get_error_response_summary(resp)}"  # noqa: EM102
             )
-        open_edx_user.has_been_synced = True
-        open_edx_user.save()
-        return True
+            if resp.status_code == status.HTTP_200_OK:
+                open_edx_user.has_been_synced = True
+                open_edx_user.save()
+                return True
+            # Check for 409 duplicate username and suggestions
+            if (
+                resp.status_code == status.HTTP_409_CONFLICT
+                and not tried_suggestion
+            ):
+                try:
+                    data = resp.json()
+                except Exception:
+                    data = {}
+                suggestions = data.get("username_suggestions")
+                if (
+                    data.get("error_code") == "duplicate-username"
+                    and suggestions
+                    and len(suggestions) > 0
+                ):
+                    open_edx_user.edx_username = suggestions[0]
+                    open_edx_user.save()
+                    tried_suggestion = True
+                    continue
+            raise OpenEdxUserCreateError(
+                "Error creating Open edX user. "
+                f"{get_error_response_summary(resp)}"  # noqa: EM102
+            )
 
 
 def reconcile_edx_username(user):
@@ -230,7 +258,8 @@ def create_edx_auth_token(user):
 
     # if the user hasn't been created on openedx, we can't do any of this
     if not user.openedx_users.filter(
-        edx_username__isnull=False, has_been_synced=True
+        edx_username__isnull=False,
+        has_been_synced=True,
     ).exists():
         return None
 
