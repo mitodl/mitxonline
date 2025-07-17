@@ -59,6 +59,9 @@ routes:
           set:
             Content-Security-Policy: frame-ancestors 'self' ${{OPENEDX_API_BASE_URL}}
     uris:
-      - "/login*"
+      - "/login"
+      - "/login/"
+      - "/admin/login*"
+
 
 #END

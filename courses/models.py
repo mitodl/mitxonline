@@ -186,6 +186,19 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         )
 
     @property
+    def next_starting_run(self):
+        """Gets the earliest starting CourseRun"""
+        return (
+            CourseRun.objects.filter(
+                course__in_programs__program=self,
+                start_date__gt=now_in_utc(),
+                live=True,
+            )
+            .order_by("start_date")
+            .first()
+        )
+
+    @property
     def text_id(self):
         """Gets the readable_id"""
         return self.readable_id

@@ -375,6 +375,14 @@ class Command(BaseCommand):
                     courseware.b2b_contract = contract
                     courseware.save()
                     managed += 1
+            elif remove:
+                # If we're removing courseware, skip it if it's not a run.
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Skipping removal of courseware '{courseware_id}' for contract {contract} because it is not a run. Removals must specify runs."
+                    )
+                )
+                skipped += 1
             elif create_runs:
                 # This is a course, so create a run (unless we've been told not to).
 

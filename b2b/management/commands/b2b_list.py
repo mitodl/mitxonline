@@ -29,7 +29,7 @@ class Command(BaseCommand):
         if code.order_redemptions.count() == 0:
             return "No"
         elif code.order_redemptions.count() == 1:
-            return code.order_redemptions.first().redemeed_by.email
+            return code.order_redemptions.first().redeemed_by.email
 
         return code.order_redemptions.count()
 

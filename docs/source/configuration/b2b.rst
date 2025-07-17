@@ -158,7 +158,7 @@ Options:
 Notes:
 
 
-* The courseware ID is the readable ID. Don't specify a course run.
+* The courseware ID is the readable ID. Except when using `--remove`, don't specify runs.
 * If you specify a program, it will create runs for all the courses within the program. You may need to re-run this if the program is modified.
 
 Listing Data

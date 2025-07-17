@@ -222,9 +222,9 @@ class ProgramSerializer(serializers.ModelSerializer):
         """
         Get the start date of the program by finding the first available run.
         """
-        first_unexpired_run = instance.first_unexpired_run
-        if first_unexpired_run and first_unexpired_run.start_date:
-            return first_unexpired_run.start_date
+        next_run = instance.next_starting_run
+        if next_run and next_run.start_date:
+            return next_run.start_date
         return instance.start_date
 
     class Meta:
