@@ -85,6 +85,83 @@ def create_user(user, edx_username=None):
     create_edx_auth_token(user)
 
 
+def _create_edx_user_request(open_edx_user, user, access_token):
+    """
+    Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
+
+    Args:
+        open_edx_user (OpenEdxUser): the OpenEdxUser instance
+        user (user.models.User): the application user
+        access_token (AccessToken): the access token for the request
+
+    Returns:
+        bool: True if user was created successfully, False otherwise
+
+    Raises:
+        OpenEdxUserCreateError: if user creation fails
+    """
+    req_session = requests.Session()
+    if settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN is not None:
+        req_session.headers.update(
+            {ACCESS_TOKEN_HEADER_NAME: settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN}
+        )
+
+    tried_suggestion = False
+    while True:
+        resp = req_session.post(
+            edx_url(OPENEDX_REGISTER_USER_PATH),
+            data=dict(
+                username=open_edx_user.edx_username,
+                email=user.email,
+                name=user.name,
+                country=(
+                    user.legal_address.country if user.legal_address else None
+                ),
+                state=(
+                    user.legal_address.us_state if user.legal_address else None
+                ),
+                gender=(
+                    user.user_profile.gender if user.user_profile else None
+                ),
+                year_of_birth=(
+                    user.user_profile.year_of_birth if user.user_profile else None
+                ),
+                level_of_education=(
+                    user.user_profile.level_of_education if user.user_profile else None
+                ),
+                provider=settings.OPENEDX_OAUTH_PROVIDER,
+                access_token=access_token.token,
+                **OPENEDX_REQUEST_DEFAULTS,
+            ),
+        )
+
+        if resp.status_code == status.HTTP_200_OK:
+            open_edx_user.has_been_synced = True
+            open_edx_user.save()
+            return True
+
+        if resp.status_code == status.HTTP_409_CONFLICT and not tried_suggestion:
+            try:
+                data = resp.json()
+            except (ValueError, requests.exceptions.JSONDecodeError):
+                data = {}
+            suggestions = data.get("username_suggestions")
+            if (
+                data.get("error_code") == "duplicate-username"
+                and suggestions
+                and len(suggestions) > 0
+            ):
+                open_edx_user.edx_username = suggestions[0]
+                open_edx_user.save()
+                tried_suggestion = True
+                continue
+
+        raise OpenEdxUserCreateError(
+            "Error creating Open edX user. "
+            f"{get_error_response_summary(resp)}"
+        )
+
+
 def create_edx_user(user, edx_username=None):
     """
     Makes a request to create an equivalent user in Open edX
@@ -131,70 +208,7 @@ def create_edx_user(user, edx_username=None):
                 open_edx_user.save()
                 return False
 
-        # a non-200 status here will ensure we rollback creation of the OpenEdxUser and try again
-        req_session = requests.Session()
-        if settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN is not None:
-            req_session.headers.update(
-                {
-                    ACCESS_TOKEN_HEADER_NAME: settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
-                }
-            )
-        # Try user creation, retry once if duplicate username with suggestion
-        tried_suggestion = False
-        while True:
-            resp = req_session.post(
-                edx_url(OPENEDX_REGISTER_USER_PATH),
-                data=dict(
-                    username=open_edx_user.edx_username,
-                    email=user.email,
-                    name=user.name,
-                    country=(
-                        user.legal_address.country if user.legal_address else None
-                    ),
-                    state=(
-                        user.legal_address.us_state if user.legal_address else None
-                    ),
-                    gender=(
-                        user.user_profile.gender if user.user_profile else None
-                    ),
-                    year_of_birth=(
-                        user.user_profile.year_of_birth if user.user_profile else None
-                    ),
-                    level_of_education=(
-                        user.user_profile.level_of_education if user.user_profile else None
-                    ),
-                    provider=settings.OPENEDX_OAUTH_PROVIDER,
-                    access_token=access_token.token,
-                    **OPENEDX_REQUEST_DEFAULTS,
-                ),
-            )
-            if resp.status_code == status.HTTP_200_OK:
-                open_edx_user.has_been_synced = True
-                open_edx_user.save()
-                return True
-            # Check for 409 duplicate username and suggestions
-            if (
-                resp.status_code == status.HTTP_409_CONFLICT
-                and not tried_suggestion
-            ):
-                try:
-                    data = resp.json()
-                except Exception:
-                    data = {}
-                suggestions = data.get("username_suggestions")
-                if (
-                    data.get("error_code") == "duplicate-username"
-                    and suggestions
-                    and len(suggestions) > 0
-                ):
-                    open_edx_user.edx_username = suggestions[0]
-                    open_edx_user.save()
-                    tried_suggestion = True
-                    continue
-            raise OpenEdxUserCreateError(
-                "Error creating Open edX user. "
-                f"{get_error_response_summary(resp)}"  # noqa: EM102
-            )
+        return _create_edx_user_request(open_edx_user, user, access_token)
 
 
 def reconcile_edx_username(user):
