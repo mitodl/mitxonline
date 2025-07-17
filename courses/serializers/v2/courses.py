@@ -206,6 +206,8 @@ class CourseSerializer(BaseCourseSerializer):
             "availability",
             "min_weekly_hours",
             "max_weekly_hours",
+            "include_in_learn_catalog",
+            "ingest_content_files_for_ai",
         ]
 
 

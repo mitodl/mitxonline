@@ -651,6 +651,16 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         object_id_field="courseware_object_id",
         content_type_field="courseware_content_type",
     )
+    include_in_learn_catalog = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="If true, Learn should include this in its catalog.",
+    )
+    ingest_content_files_for_ai = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="If true, allow the AI chatbots to ingest the course's content files.",
+    )
 
     @cached_property
     def course_number(self):
