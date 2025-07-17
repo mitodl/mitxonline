@@ -27,7 +27,10 @@ from courses.serializers.v2.courses import (
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
 )
-from courses.serializers.v2.programs import ProgramSerializer, ProgramCollectionSerializer
+from courses.serializers.v2.programs import (
+    ProgramCollectionSerializer,
+    ProgramSerializer,
+)
 from courses.utils import get_enrollable_courses, get_unenrollable_courses
 
 
@@ -310,6 +313,8 @@ class ProgramCollectionViewSet(viewsets.ReadOnlyModelViewSet):
         """
         Returns all ProgramCollection objects ordered by title.
         """
-        return ProgramCollection.objects.select_related().prefetch_related(
-            "programs"
-        ).order_by("title")
+        return (
+            ProgramCollection.objects.select_related()
+            .prefetch_related("programs")
+            .order_by("title")
+        )
