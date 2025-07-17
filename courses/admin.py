@@ -25,6 +25,7 @@ from courses.models import (
     PartnerSchool,
     Program,
     ProgramCertificate,
+    ProgramCollection,
     ProgramEnrollment,
     ProgramEnrollmentAudit,
     ProgramRun,
@@ -546,3 +547,14 @@ class RelatedProgramAdmin(admin.ModelAdmin):
     model = RelatedProgram
     list_display = ("id", "first_program", "second_program")
     list_filter = ["first_program", "second_program"]
+
+
+@admin.register(ProgramCollection)
+class ProgramCollectionAdmin(TimestampedModelAdmin):
+    """Admin for ProgramCollection"""
+
+    model = ProgramCollection
+    list_display = ("id", "title", "created_on", "updated_on")
+    search_fields = ["title", "description"]
+    filter_horizontal = ["programs"]
+    ordering = ["title"]
