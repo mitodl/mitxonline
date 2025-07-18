@@ -107,11 +107,12 @@ def _create_edx_user_request(open_edx_user, user, access_token):
         )
 
     tried_suggestion = False
+    suggested_username = None
     while True:
         resp = req_session.post(
             edx_url(OPENEDX_REGISTER_USER_PATH),
             data=dict(
-                username=open_edx_user.edx_username,
+                username=open_edx_user.edx_username if not suggested_username else suggested_username,
                 email=user.email,
                 name=user.name,
                 country=(
@@ -136,6 +137,8 @@ def _create_edx_user_request(open_edx_user, user, access_token):
         )
 
         if resp.status_code == status.HTTP_200_OK:
+            if suggested_username:
+                open_edx_user.edx_username = suggested_username
             open_edx_user.has_been_synced = True
             open_edx_user.save()
             return True
@@ -151,8 +154,7 @@ def _create_edx_user_request(open_edx_user, user, access_token):
                 and suggestions
                 and len(suggestions) > 0
             ):
-                open_edx_user.edx_username = suggestions[0]
-                open_edx_user.save()
+                suggested_username = suggestions[0]
                 tried_suggestion = True
                 continue
 
