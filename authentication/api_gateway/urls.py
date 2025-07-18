@@ -3,6 +3,8 @@
 from django.urls import path, re_path
 
 from authentication.api_gateway.views import (
+    AccountActionCallbackView,
+    AccountActionStartView,
     GatewayLoginView,
     OpenedxAndApiGatewayLogoutView,
     RegisterDetailsView,
@@ -29,4 +31,14 @@ urlpatterns = [
     ),
     path("logout/complete", logout_complete, name="logout-complete"),
     # NOTE: APISIX handles the logout/oidc route
+    path(
+        "account/action/start/<slug:action>/",
+        AccountActionStartView.as_view(),
+        name="account-action-start",
+    ),
+    path(
+        "account/action/complete",
+        AccountActionCallbackView.as_view(),
+        name="account-action-complete",
+    ),
 ]

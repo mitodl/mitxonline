@@ -134,14 +134,42 @@ export class AccountSettingsPage extends React.Component<Props> {
           <div className="std-page-body container auth-page">
             <div className="std-card std-card-auth">
               <div className="std-card-body my-account-page">
-                <ChangeEmailForm
-                  user={currentUser}
-                  onSubmit={this.onSubmitEmailForm.bind(this)}
-                />
+                {SETTINGS.api_gateway_enabled ? (
+                  <section className="email-section">
+                    <h2>Email</h2>
+
+                    <div className="row">{currentUser.email}</div>
+                    <a
+                      aria-label="change email"
+                      className="btn btn-primary btn-gradient-red-to-blue"
+                      href={routes.account.action.updateEmail}
+                    >
+                      Change Email
+                    </a>
+                  </section>
+                ) : (
+                  <ChangeEmailForm
+                    user={currentUser}
+                    onSubmit={this.onSubmitEmailForm.bind(this)}
+                  />
+                )}
                 <hr />
-                <ChangePasswordForm
-                  onSubmit={this.onSubmitPasswordForm.bind(this)}
-                />
+                {SETTINGS.api_gateway_enabled ? (
+                  <section className="password-section">
+                    <h2>Password</h2>
+                    <a
+                      aria-label="change password"
+                      className="btn btn-primary btn-gradient-red-to-blue"
+                      href={routes.account.action.updatePassword}
+                    >
+                      Change Password
+                    </a>
+                  </section>
+                ) : (
+                  <ChangePasswordForm
+                    onSubmit={this.onSubmitPasswordForm.bind(this)}
+                  />
+                )}
               </div>
             </div>
           </div>

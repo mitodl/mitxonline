@@ -40,7 +40,11 @@ export const routes = {
   }),
 
   account: include("/account/", {
-    confirmEmail: "confirm-email"
+    confirmEmail: "confirm-email",
+    action:       include("action/start/", {
+      updateEmail:    "update-email/",
+      updatePassword: "update-password/"
+    })
   }),
 
   cart: include("/cart/", {
