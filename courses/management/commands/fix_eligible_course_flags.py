@@ -19,11 +19,9 @@ from django.db.models import Count, Q
 
 from courses.models import (
     Course,
-    CourseRun,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
-from courses.utils import get_enrollable_course_run_filter
 
 
 class Command(BaseCommand):
@@ -70,16 +68,6 @@ class Command(BaseCommand):
 
         courses_base_qs = (
             Course.objects.all()
-            .annotate(
-                enrollable_runs=Count(
-                    "courseruns",
-                    filter=Q(
-                        courseruns__in=CourseRun.objects.filter(
-                            get_enrollable_course_run_filter()
-                        )
-                    ),
-                ),
-            )
             .annotate(
                 regular_courserun_count=Count(
                     "courseruns", filter=Q(courseruns__b2b_contract__isnull=True)

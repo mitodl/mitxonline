@@ -1317,3 +1317,9 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
         *course_params,
         client=edx_client,
     )
+
+    # Set the ingestion flag on the course run to True
+    # All B2B courses should be flagged for content file ingestion - we can
+    # toggle it off manually if necessary.
+    target_course.course.ingest_content_files_for_ai = True
+    target_course.course.save()

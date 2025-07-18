@@ -1,9 +1,6 @@
 """Tests for the fix_eligible_course_flags command."""
 
-from datetime import timedelta
-
 import pytest
-from mitol.common.utils.datetime import now_in_utc
 
 from b2b.factories import ContractPageFactory
 from courses.factories import CourseRunFactory, ProgramFactory
@@ -30,15 +27,7 @@ def test_basic_eligible_course(page_published):
     marketing page.)
     """
 
-    start_dates = now_in_utc() - timedelta(days=30)
-    end_dates = now_in_utc() + timedelta(days=30)
-
-    run = CourseRunFactory.create(
-        start_date=start_dates,
-        enrollment_start=start_dates,
-        end_date=end_dates,
-        enrollment_end=end_dates,
-    )
+    run = CourseRunFactory.create()
     run.course.page.live = page_published
     run.course.page.save()
 
@@ -75,16 +64,9 @@ def test_b2b_course(page_published, include_regular_run):
     *and* at least one regular course run.
     """
 
-    start_dates = now_in_utc() - timedelta(days=30)
-    end_dates = now_in_utc() + timedelta(days=30)
-
     contract = ContractPageFactory.create()
 
     run = CourseRunFactory.create(
-        start_date=start_dates,
-        enrollment_start=start_dates,
-        end_date=end_dates,
-        enrollment_end=end_dates,
         b2b_contract=contract,
     )
     run.course.page.live = page_published
@@ -92,10 +74,6 @@ def test_b2b_course(page_published, include_regular_run):
 
     if include_regular_run:
         CourseRunFactory.create(
-            start_date=start_dates,
-            enrollment_start=start_dates,
-            end_date=end_dates,
-            enrollment_end=end_dates,
             course=run.course,
         )
 
@@ -123,15 +101,8 @@ def test_b2b_course(page_published, include_regular_run):
 def test_filter_by_course(filter_count):
     """Test that the course filtering works."""
 
-    start_dates = now_in_utc() - timedelta(days=30)
-    end_dates = now_in_utc() + timedelta(days=30)
-
     regular_courses = CourseRunFactory.create_batch(
         3,
-        start_date=start_dates,
-        enrollment_start=start_dates,
-        end_date=end_dates,
-        enrollment_end=end_dates,
     )
 
     for rcrun in regular_courses:
@@ -140,10 +111,6 @@ def test_filter_by_course(filter_count):
 
     filter_courses = CourseRunFactory.create_batch(
         filter_count,
-        start_date=start_dates,
-        enrollment_start=start_dates,
-        end_date=end_dates,
-        enrollment_end=end_dates,
     )
 
     filters = []
