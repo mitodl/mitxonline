@@ -85,6 +85,58 @@ def create_user(user, edx_username=None):
     create_edx_auth_token(user)
 
 
+def _build_user_data(user, current_username, access_token):
+    """Build the user data dictionary for the edX API request."""
+    return dict(
+        username=current_username,
+        email=user.email,
+        name=user.name,
+        country=(
+            user.legal_address.country if user.legal_address else None
+        ),
+        state=(
+            user.legal_address.us_state if user.legal_address else None
+        ),
+        gender=(
+            user.user_profile.gender if user.user_profile else None
+        ),
+        year_of_birth=(
+            user.user_profile.year_of_birth if user.user_profile else None
+        ),
+        level_of_education=(
+            user.user_profile.level_of_education if user.user_profile else None
+        ),
+        provider=settings.OPENEDX_OAUTH_PROVIDER,
+        access_token=access_token.token,
+        **OPENEDX_REQUEST_DEFAULTS,
+    )
+
+
+def _handle_successful_user_creation(open_edx_user, current_username):
+    """Handle successful user creation response."""
+    if current_username != open_edx_user.edx_username:
+        open_edx_user.edx_username = current_username
+    open_edx_user.has_been_synced = True
+    open_edx_user.save()
+
+
+def _is_duplicate_username_error(resp, data):
+    """Check if the response indicates a duplicate username error."""
+    return (
+        resp.status_code == status.HTTP_409_CONFLICT
+        and data.get("error_code") == "duplicate-username"
+    )
+
+
+def _extract_username_suggestions(data, suggestions_extracted):
+    """Extract username suggestions from API response if not already extracted."""
+    if not suggestions_extracted:
+        suggestions = data.get("username_suggestions", [])
+        if suggestions:
+            return suggestions, True
+    return [], suggestions_extracted
+
+
 def _create_edx_user_request(open_edx_user, user, access_token):
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
@@ -106,61 +158,56 @@ def _create_edx_user_request(open_edx_user, user, access_token):
             {ACCESS_TOKEN_HEADER_NAME: settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN}
         )
 
-    tried_suggestion = False
-    suggested_username = None
-    while True:
+    max_attempts = 4
+    attempt = 0
+    suggested_usernames = []
+    suggestions_extracted = False
+    current_username = open_edx_user.edx_username
+
+    while attempt < max_attempts:
+
+        attempt += 1
+
+        user_data = _build_user_data(user, current_username, access_token)
         resp = req_session.post(
             edx_url(OPENEDX_REGISTER_USER_PATH),
-            data=dict(
-                username=open_edx_user.edx_username if not suggested_username else suggested_username,
-                email=user.email,
-                name=user.name,
-                country=(
-                    user.legal_address.country if user.legal_address else None
-                ),
-                state=(
-                    user.legal_address.us_state if user.legal_address else None
-                ),
-                gender=(
-                    user.user_profile.gender if user.user_profile else None
-                ),
-                year_of_birth=(
-                    user.user_profile.year_of_birth if user.user_profile else None
-                ),
-                level_of_education=(
-                    user.user_profile.level_of_education if user.user_profile else None
-                ),
-                provider=settings.OPENEDX_OAUTH_PROVIDER,
-                access_token=access_token.token,
-                **OPENEDX_REQUEST_DEFAULTS,
-            ),
+            data=user_data
         )
 
         if resp.status_code == status.HTTP_200_OK:
-            if suggested_username:
-                open_edx_user.edx_username = suggested_username
-            open_edx_user.has_been_synced = True
-            open_edx_user.save()
+            _handle_successful_user_creation(open_edx_user, current_username)
             return True
 
-        if resp.status_code == status.HTTP_409_CONFLICT and not tried_suggestion:
-            try:
-                data = resp.json()
-            except (ValueError, requests.exceptions.JSONDecodeError):
-                data = {}
-            suggestions = data.get("username_suggestions")
-            if (
-                data.get("error_code") == "duplicate-username"
-                and suggestions
-                and len(suggestions) > 0
-            ):
-                suggested_username = suggestions[0]
-                tried_suggestion = True
-                continue
+        if resp.status_code != status.HTTP_409_CONFLICT:
+            break
 
-        raise OpenEdxUserCreateError(
-            f"Error creating Open edX user. {get_error_response_summary(resp)}"  # noqa: EM102
+        try:
+            data = resp.json()
+        except (ValueError, requests.exceptions.JSONDecodeError):
+            data = {}
+
+        if not _is_duplicate_username_error(resp, data):
+            break
+
+        suggestions, suggestions_extracted = _extract_username_suggestions(
+            data, suggestions_extracted
         )
+        if suggestions:
+            suggested_usernames = suggestions
+
+        if not suggested_usernames:
+            break
+
+        current_username = suggested_usernames.pop(0)
+
+    if attempt >= max_attempts:
+        log.error(
+            "Failed to create Open edX user after %d attempts.", max_attempts
+        )
+
+    raise OpenEdxUserCreateError(
+        f"Error creating Open edX user. {get_error_response_summary(resp)}"  # noqa: EM102
+    )
 
 
 def create_edx_user(user, edx_username=None):
