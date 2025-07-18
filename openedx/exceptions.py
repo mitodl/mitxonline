@@ -18,8 +18,10 @@ class NoEdxApiAuthError(Exception):
 class EdxApiUserUpdateError(Exception):
     """Exception updating the edX user via API"""
 
+
 class EdxApiUserDoesNotExistError(Exception):
     """An edX user does not exist"""
+
 
 class EdxApiEnrollErrorException(Exception):  # noqa: N818
     """An edX enrollment API call resulted in an error response"""
