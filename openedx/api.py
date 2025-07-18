@@ -44,7 +44,8 @@ from openedx.exceptions import (
     OpenEdxUserCreateError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
-    UserNameUpdateFailedException, EdxApiUserDoesNotExistException,
+    UserNameUpdateFailedException,
+    EdxApiUserDoesNotExistErrorException,
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import SyncResult, edx_url
@@ -813,7 +814,7 @@ def enroll_in_edx_course_runs(
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
             raise EdxApiEnrollErrorException(user, course_run, exc) from exc
-        except EdxApiUserDoesNotExistException as exc:
+        except EdxApiUserDoesNotExistErrorException as exc:
             log.warning(
                 "User %s does not exist in edX, attempting to create user.",
                 user.edx_username,
@@ -831,7 +832,7 @@ def enroll_in_edx_course_runs(
                     results.append(enrollment)
             except Exception as exc:
                 log.exception(
-                    "Failed to create user %s in edX: %s", user.edx_username, exc
+                    "Failed to create user %s in edX.", user.edx_username
                 )
                 raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
         except Exception as exc:  # pylint: disable=broad-except
