@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: release-candidate
-      - uses: akhileshns/heroku-deploy@96f4455bfc127bf16feac4b180aae9ec380c5a20
+      - uses: akhileshns/heroku-deploy@e3eb99d45a8e2ec5dca08735e089607befa4bf28
         with:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
           heroku_app_name: "mitxonline-rc"
