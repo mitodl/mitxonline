@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.124.0
+Version 0.124.0 (Released July 21, 2025)
 ---------------
 
 - Start Date for program is the start of next course run (#2803)
