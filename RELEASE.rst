@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.125.1
+---------------
+
+- Update mitol-django-scim (#2813)
+- Add support for changing email/password through Keycloak (#2807)
+- Try to create edx user on enrollment (#2806)
+- Add price range from the cms page to api (#2800)
+
 Version 0.124.0 (Released July 21, 2025)
 ---------------
 
