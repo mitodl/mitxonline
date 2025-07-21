@@ -17,6 +17,7 @@ overwrite the flags so running it without filters should be done with care.
 from django.core.management import BaseCommand
 from django.db.models import Count, Q
 
+from cms.models import CoursePage
 from courses.models import (
     Course,
     ProgramRequirement,
@@ -67,7 +68,8 @@ class Command(BaseCommand):
             )
 
         courses_base_qs = (
-            Course.objects.all()
+            Course.objects.select_related("page")
+            .all()
             .annotate(
                 regular_courserun_count=Count(
                     "courseruns", filter=Q(courseruns__b2b_contract__isnull=True)
@@ -109,11 +111,12 @@ class Command(BaseCommand):
         ingest_qs = courses_base_qs
         ingest_qs = ingest_qs.filter(Q(b2b_courserun_count__gt=0) | Q(page__live=True))
 
-        updated_count = (
-            ingest_qs.count()
-            if dry_run
-            else ingest_qs.update(ingest_content_files_for_ai=True)
-        )
+        if dry_run:
+            updated_count = ingest_qs.count()
+        else:
+            updated_count = CoursePage.objects.filter(
+                course__in=ingest_qs.all()
+            ).update(ingest_content_files_for_ai=True)
 
         self.stdout.write(
             self.style.SUCCESS(f"Set ingestion flag on {updated_count} courses")
@@ -124,11 +127,12 @@ class Command(BaseCommand):
             regular_courserun_count__gt=0, page__live=True
         ).all()
 
-        updated_count = (
-            include_qs.count()
-            if dry_run
-            else include_qs.update(include_in_learn_catalog=True)
-        )
+        if dry_run:
+            updated_count = include_qs.count()
+        else:
+            updated_count = CoursePage.objects.filter(
+                course__in=include_qs.all()
+            ).update(include_in_learn_catalog=True)
 
         self.stdout.write(
             self.style.SUCCESS(f"Set Learn catalog flag on {updated_count} courses")
