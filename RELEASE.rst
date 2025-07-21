@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.124.0 (Released July 21, 2025)
+---------------
+
+- Start Date for program is the start of next course run (#2803)
+- Improve docs + warning on `b2b_contract courseware --remove` command (#2801)
+- Fix typo in the b2b_list command; some minor changes for local deployments (#2792)
+- Sub program requirement certificate logic (#2789)
+
 Version 0.123.5 (Released July 17, 2025)
 ---------------
 
