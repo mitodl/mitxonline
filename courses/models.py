@@ -23,8 +23,7 @@ from mitol.openedx.utils import get_course_number
 from treebeard.mp_tree import MP_Node
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
-from wagtail.models import Revision
-from wagtail.snippets.models import register_snippet
+from wagtail.models import Page, Revision
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
@@ -1790,13 +1789,9 @@ class LearnerProgramRecordShare(TimestampedModel):
         ]
 
 
-@register_snippet
-class ProgramCollection(TimestampedModel):
+class ProgramCollection(Page):
     """Model for a collection of programs with title and description"""
 
-    title = models.CharField(
-        max_length=255, help_text="The title of the program collection"
-    )
     description = RichTextField(
         blank=True, help_text="Description of the program collection"
     )
@@ -1804,16 +1799,12 @@ class ProgramCollection(TimestampedModel):
         Program, blank=True, help_text="Programs included in this collection"
     )
 
-    panels = [
-        FieldPanel("title"),
+    content_panels = [
+        *Page.content_panels,
         FieldPanel("description"),
         FieldPanel("programs"),
     ]
 
     class Meta:
-        ordering = ["title"]
         verbose_name = "Program Collection"
         verbose_name_plural = "Program Collections"
-
-    def __str__(self):
-        return self.title
