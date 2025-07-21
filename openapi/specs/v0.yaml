@@ -1457,6 +1457,12 @@ components:
           description: Get the max weekly hours of the course from the course page
             CMS.
           readOnly: true
+        include_in_learn_catalog:
+          type: boolean
+          readOnly: true
+        ingest_content_files_for_ai:
+          type: boolean
+          readOnly: true
         courseruns:
           type: array
           items:
@@ -1469,6 +1475,8 @@ components:
       - departments
       - duration
       - id
+      - include_in_learn_catalog
+      - ingest_content_files_for_ai
       - max_price
       - max_weekly_hours
       - max_weeks
