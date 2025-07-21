@@ -1798,7 +1798,6 @@ class ProgramCollection(Page):
     programs = models.ManyToManyField(
         Program, blank=True, help_text="Programs included in this collection"
     )
-
     content_panels = [
         *Page.content_panels,
         FieldPanel("description"),
