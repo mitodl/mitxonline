@@ -17,7 +17,8 @@ import {
   STATE_REGISTER_CONFIRM_SENT,
   STATE_LOGIN_PASSWORD,
   STATE_REGISTER_EMAIL,
-  handleAuthResponse
+  handleAuthResponse,
+  generateLoginRedirectUrl
 } from "../../../lib/auth"
 import { qsNextSelector } from "../../../lib/selectors"
 import { ALERT_TYPE_TEXT } from "../../../constants"
@@ -46,6 +47,14 @@ type Props = {
 const accountExistsNotificationText = (email: string): string =>
   `You already have an account with ${email}. Enter password to sign in.`
 export class RegisterEmailPage extends React.Component<Props> {
+  componentDidMount() {
+    // If OIDC login is disabled but API gateway is enabled, redirect to login
+    if (!SETTINGS.oidc_login_url && SETTINGS.api_gateway_enabled) {
+      generateLoginRedirectUrl()
+      return
+    }
+  }
+
   async onSubmit(
     { email, recaptcha }: RegisterEmailFormValues,
     { setSubmitting, setErrors }: any
