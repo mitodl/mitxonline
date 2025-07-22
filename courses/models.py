@@ -708,6 +708,28 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             lambda course_run: True,  # noqa: ARG005
         )
 
+    @cached_property
+    def include_in_learn_catalog(self):
+        """
+        Return true if the course should be included in the Learn catalog.
+
+        This is controlled in the CoursePage for the course, and will default
+        to False if there isn't one.
+        """
+
+        return self.page.include_in_learn_catalog if self.page else False
+
+    @cached_property
+    def ingest_content_files_for_ai(self):
+        """
+        Return true if the course's content files should be ingested.
+
+        This is controlled in the CoursePage for the course, and will default
+        to False if there isn't one.
+        """
+
+        return self.page.ingest_content_files_for_ai if self.page else False
+
     def get_first_unexpired_org_run(self, user_contracts):
         """
         Gets the first unexpired/enrollable CourseRun associated with both this

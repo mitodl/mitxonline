@@ -1317,3 +1317,16 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
         *course_params,
         client=edx_client,
     )
+
+    # Set the ingestion flag on the course run to True
+    # All B2B courses should be flagged for content file ingestion - we can
+    # toggle it off manually if necessary.
+    # In the odd chance we don't have a page, trigger a warning.
+    if target_course.course.page:
+        target_course.course.page.ingest_content_files_for_ai = True
+        target_course.course.save()
+    else:
+        log.warning(
+            "Warning: processed course run clone for %s but can't set the ingestion flag because there's no CoursePage",
+            target_course,
+        )

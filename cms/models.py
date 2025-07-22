@@ -1086,8 +1086,9 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             courseware_object = self.course
         elif self.is_program_page:
             courseware_object = self.program
-        courseware_object.title = self.title
-        courseware_object.save()
+        if courseware_object:
+            courseware_object.title = self.title
+            courseware_object.save()
 
         return super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
@@ -1195,6 +1196,16 @@ class CoursePage(ProductPage):
         help_text="Select topic pairs (primary -> secondary) for this course page.",
         limit_choices_to=~models.Q(parent=None),
     )
+    include_in_learn_catalog = models.BooleanField(
+        default=False,
+        null=True,
+        help_text="If true, Learn should include this in its catalog.",
+    )
+    ingest_content_files_for_ai = models.BooleanField(
+        default=False,
+        null=True,
+        help_text="If true, allow the AI chatbots to ingest the course's content files.",
+    )
 
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
@@ -1279,10 +1290,13 @@ class CoursePage(ProductPage):
             "product": product,
         }
 
-    content_panels = [  # noqa: RUF005
+    content_panels = [
         FieldPanel("course"),
         FieldPanel("topics"),
-    ] + ProductPage.content_panels
+        *ProductPage.content_panels,
+        FieldPanel("include_in_learn_catalog"),
+        FieldPanel("ingest_content_files_for_ai"),
+    ]
 
 
 class ProgramPage(ProductPage):
