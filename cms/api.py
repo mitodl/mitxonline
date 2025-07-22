@@ -326,13 +326,11 @@ def create_featured_items():
     redis_cache = caches["redis"]
     cache_key = "CMS_homepage_featured_courses"
 
-    # Clear cache if already present
     redis_cache.delete(cache_key)
 
     now = now_in_utc()
     end_of_day = now + timedelta(days=1)
 
-    # Get valid CoursePage-linked course IDs in a single query
     valid_course_ids = set(
         cms_models.CoursePage.objects.filter(live=True).values_list(
             "course_id", flat=True
@@ -340,11 +338,9 @@ def create_featured_items():
     )
 
     if not valid_course_ids:
-        # No valid courses, cache empty result
         redis_cache.set(cache_key, [], HOMEPAGE_CACHE_AGE)
         return []
 
-    # Fetch enrollable course runs with optimized query
     enrollable_courses_qs = Course.objects.select_related("page").filter(
         id__in=valid_course_ids, live=True
     )
@@ -355,11 +351,9 @@ def create_featured_items():
     )
 
     if not enrollable_courseruns.exists():
-        # No enrollable course runs, cache empty result
         redis_cache.set(cache_key, [], HOMEPAGE_CACHE_AGE)
         return []
 
-    # Separate self-paced and regular course runs in single pass
     self_paced_runs = []
     regular_runs = []
 
@@ -369,11 +363,9 @@ def create_featured_items():
         else:
             regular_runs.append(courserun)
 
-    # Get 2 random self-paced course IDs
     random.shuffle(self_paced_runs)
     self_paced_course_ids = [run.course_id for run in self_paced_runs[:2]]
 
-    # Get 20 random regular course runs and split by start date
     random.shuffle(regular_runs)
     selected_regular_runs = regular_runs[:20]
 
@@ -386,19 +378,15 @@ def create_featured_items():
         else:
             started_course_ids.append(courserun.course_id)
 
-    # Sort future runs by start date and extract course IDs
     future_runs.sort(key=lambda cr: cr.start_date)
     future_course_ids = [run.course_id for run in future_runs]
 
-    # Combine all course IDs in priority order
     all_course_ids = self_paced_course_ids + future_course_ids + started_course_ids
 
     if not all_course_ids:
-        # No course IDs to feature, cache empty result
         redis_cache.set(cache_key, [], HOMEPAGE_CACHE_AGE)
         return []
 
-    # Fetch featured courses preserving order with optimized query
     ordering = Case(
         *[When(id=cid, then=pos) for pos, cid in enumerate(all_course_ids)],
         output_field=IntegerField(),
@@ -411,7 +399,6 @@ def create_featured_items():
         .order_by(ordering)
     )
 
-    # Cache the result for homepage
     redis_cache.set(cache_key, featured_courses, HOMEPAGE_CACHE_AGE)
 
     return featured_courses
