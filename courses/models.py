@@ -24,6 +24,7 @@ from treebeard.mp_tree import MP_Node
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page, Revision
+from modelcluster.fields import ParentalManyToManyField
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
@@ -1795,7 +1796,7 @@ class ProgramCollection(Page):
     description = RichTextField(
         blank=True, help_text="Description of the program collection"
     )
-    programs = models.ManyToManyField(
+    programs = ParentalManyToManyField(
         Program, blank=True, help_text="Programs included in this collection"
     )
     content_panels = [
