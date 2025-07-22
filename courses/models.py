@@ -20,11 +20,11 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
+from modelcluster.fields import ParentalManyToManyField
 from treebeard.mp_tree import MP_Node
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page, Revision
-from modelcluster.fields import ParentalManyToManyField
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
