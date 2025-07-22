@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.125.1
+Version 0.125.1 (Released July 22, 2025)
 ---------------
 
 - Update mitol-django-scim (#2813)
