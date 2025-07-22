@@ -348,9 +348,11 @@ def create_featured_items():
     enrollable_courses_qs = Course.objects.select_related("page").filter(
         id__in=valid_course_ids, live=True
     )
-    enrollable_courseruns = get_enrollable_courseruns_qs(
-        end_of_day, enrollable_courses_qs
-    ).select_related("course").prefetch_related("course__page")
+    enrollable_courseruns = (
+        get_enrollable_courseruns_qs(end_of_day, enrollable_courses_qs)
+        .select_related("course")
+        .prefetch_related("course__page")
+    )
 
     if not enrollable_courseruns.exists():
         # No enrollable course runs, cache empty result
