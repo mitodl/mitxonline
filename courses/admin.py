@@ -546,3 +546,6 @@ class RelatedProgramAdmin(admin.ModelAdmin):
     model = RelatedProgram
     list_display = ("id", "first_program", "second_program")
     list_filter = ["first_program", "second_program"]
+
+
+# ProgramCollection is now a Page, managed through Wagtail admin

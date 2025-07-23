@@ -20,8 +20,11 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
+from modelcluster.fields import ParentalManyToManyField
 from treebeard.mp_tree import MP_Node
-from wagtail.models import Revision
+from wagtail.admin.panels import FieldPanel
+from wagtail.fields import RichTextField
+from wagtail.models import Page, Revision
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
@@ -707,6 +710,28 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             sorted(eligible_course_runs, key=lambda course_run: course_run.start_date),
             lambda course_run: True,  # noqa: ARG005
         )
+
+    @cached_property
+    def include_in_learn_catalog(self):
+        """
+        Return true if the course should be included in the Learn catalog.
+
+        This is controlled in the CoursePage for the course, and will default
+        to False if there isn't one.
+        """
+
+        return self.page.include_in_learn_catalog if self.page else False
+
+    @cached_property
+    def ingest_content_files_for_ai(self):
+        """
+        Return true if the course's content files should be ingested.
+
+        This is controlled in the CoursePage for the course, and will default
+        to False if there isn't one.
+        """
+
+        return self.page.ingest_content_files_for_ai if self.page else False
 
     def get_first_unexpired_org_run(self, user_contracts):
         """
@@ -1798,3 +1823,23 @@ class LearnerProgramRecordShare(TimestampedModel):
                 fields=("program", "user", "partner_school"),
             )
         ]
+
+
+class ProgramCollection(Page):
+    """Model for a collection of programs with title and description"""
+
+    description = RichTextField(
+        blank=True, help_text="Description of the program collection"
+    )
+    programs = ParentalManyToManyField(
+        Program, blank=True, help_text="Programs included in this collection"
+    )
+    content_panels = [
+        *Page.content_panels,
+        FieldPanel("description"),
+        FieldPanel("programs"),
+    ]
+
+    class Meta:
+        verbose_name = "Program Collection"
+        verbose_name_plural = "Program Collections"

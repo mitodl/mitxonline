@@ -27,6 +27,8 @@ x-extra-hosts:
   - "studio.openedx.odl.local:host-gateway"
   - "apps.openedx.odl.local:host-gateway"
   - "mitxonline.odl.local:host-gateway"
+  - "local.openedx.io:host-gateway"
+  - "studio.local.openedx.io:host-gateway"
 
 services:
   db:

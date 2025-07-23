@@ -4,7 +4,7 @@ import logging
 from collections.abc import Iterable
 from decimal import Decimal
 from typing import Union
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 from uuid import uuid4
 
 import reversion
@@ -147,7 +147,9 @@ def create_contract_run(
         is_self_paced=True,
         live=True,
         b2b_contract=contract,
-        courseware_url_path=urljoin(settings.OPENEDX_COURSE_BASE_URL, new_readable_id),
+        courseware_url_path=urljoin(
+            settings.OPENEDX_COURSE_BASE_URL, quote(new_readable_id)
+        ),
     )
     course_run.save()
     clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)

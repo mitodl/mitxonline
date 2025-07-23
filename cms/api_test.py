@@ -381,3 +381,214 @@ def test_create_featured_items():
     assert cache_value[3] == in_progress_course
 
     assert unenrollable_course not in cache_value
+
+
+@pytest.mark.django_db
+def test_create_featured_items_no_courses():
+    """Test create_featured_items with no courses at all"""
+    redis_cache = caches["redis"]
+    redis_cache.delete("CMS_homepage_featured_courses")
+
+    result = create_featured_items()
+    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+
+    assert result == []
+    assert cache_value == []
+
+
+@pytest.mark.django_db
+def test_create_featured_items_no_enrollable_courses():
+    """Test create_featured_items with courses but no enrollable runs"""
+    redis_cache = caches["redis"]
+    redis_cache.delete("CMS_homepage_featured_courses")
+
+    # Create course with no enrollable runs
+    course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=course, live=True)
+    CourseRunFactory.create(course=course, live=False, past_enrollment_end=True)
+
+    result = create_featured_items()
+    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+
+    assert result == []
+    assert cache_value == []
+
+
+@pytest.mark.django_db
+def test_create_featured_items_many_self_paced_courses():
+    """Test create_featured_items limits self-paced courses to 2"""
+    redis_cache = caches["redis"]
+    redis_cache.delete("CMS_homepage_featured_courses")
+
+    now = now_in_utc()
+    further_future_date = now + timedelta(days=2)
+
+    # Create 5 self-paced courses
+    self_paced_courses = []
+    for _ in range(5):
+        course = CourseFactory.create(page=None, live=True)
+        CoursePageFactory.create(course=course, live=True)
+        run = CourseRunFactory.create(
+            course=course,
+            live=True,
+            in_progress=True,
+            enrollment_end=further_future_date,
+        )
+        run.is_self_paced = True
+        run.save()
+        self_paced_courses.append(course)
+
+    result = create_featured_items()
+
+    # Should only return 2 self-paced courses
+    assert len(result) == 2
+    assert all(course in self_paced_courses for course in result)
+
+
+@pytest.mark.django_db
+def test_create_featured_items_many_regular_courses():
+    """Test create_featured_items limits regular courses to 20"""
+    redis_cache = caches["redis"]
+    redis_cache.delete("CMS_homepage_featured_courses")
+
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    further_future_date = now + timedelta(days=2)
+    further_past_date = now - timedelta(days=1)
+
+    # Create 25 regular courses
+    regular_courses = []
+    for _ in range(25):
+        course = CourseFactory.create(page=None, live=True)
+        CoursePageFactory.create(course=course, live=True)
+        CourseRunFactory.create(
+            course=course,
+            live=True,
+            start_date=future_date,
+            enrollment_start=further_past_date,
+            enrollment_end=further_future_date,
+            end_date=further_future_date,
+        )
+        regular_courses.append(course)
+
+    result = create_featured_items()
+
+    # Should only return 20 regular courses (no self-paced)
+    assert len(result) == 20
+    assert all(course in regular_courses for course in result)
+
+
+@pytest.mark.django_db
+def test_create_featured_items_course_run_at_exact_time():
+    """Test create_featured_items with course run starting exactly at now"""
+    redis_cache = caches["redis"]
+    redis_cache.delete("CMS_homepage_featured_courses")
+
+    now = now_in_utc()
+    further_future_date = now + timedelta(days=2)
+    further_past_date = now - timedelta(days=1)
+
+    # Course run starting exactly at now (should be considered "future")
+    exact_time_course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=exact_time_course, live=True)
+    CourseRunFactory.create(
+        course=exact_time_course,
+        live=True,
+        start_date=now,  # Exactly at now
+        enrollment_start=further_past_date,
+        enrollment_end=further_future_date,
+        end_date=further_future_date,
+    )
+
+    result = create_featured_items()
+    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+
+    assert len(result) == 1
+    assert result[0] == exact_time_course
+    assert exact_time_course in cache_value
+
+
+@pytest.mark.django_db
+def test_create_featured_items_mixed_course_types():
+    """Test create_featured_items with mix of self-paced, future, and started courses"""
+    redis_cache = caches["redis"]
+    redis_cache.delete("CMS_homepage_featured_courses")
+
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    further_future_date = now + timedelta(days=2)
+    further_past_date = now - timedelta(days=2)
+
+    # 1 self-paced course
+    self_paced_course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=self_paced_course, live=True)
+    run = CourseRunFactory.create(
+        course=self_paced_course,
+        live=True,
+        in_progress=True,
+        enrollment_end=further_future_date,
+    )
+    run.is_self_paced = True
+    run.save()
+
+    # 1 future course
+    future_course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=future_course, live=True)
+    CourseRunFactory.create(
+        course=future_course,
+        live=True,
+        start_date=future_date,
+        enrollment_start=further_past_date,
+        enrollment_end=further_future_date,
+        end_date=further_future_date,
+    )
+
+    # 1 started course
+    started_course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=started_course, live=True)
+    CourseRunFactory.create(
+        course=started_course,
+        live=True,
+        start_date=past_date,
+        enrollment_start=further_past_date,
+        enrollment_end=further_future_date,
+        end_date=further_future_date,
+    )
+
+    result = create_featured_items()
+
+    assert len(result) == 3
+    # Verify order: self-paced first, then future, then started
+    assert result[0] == self_paced_course
+    assert result[1] == future_course
+    assert result[2] == started_course
+
+
+@pytest.mark.django_db
+def test_create_featured_items_cache_expiration():
+    """Test that cache is set with correct expiration time"""
+    redis_cache = caches["redis"]
+    redis_cache.delete("CMS_homepage_featured_courses")
+
+    # Create a simple course to have something to cache
+    course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=course, live=True)
+    run = CourseRunFactory.create(
+        course=course,
+        live=True,
+        in_progress=True,
+        enrollment_end=now_in_utc() + timedelta(days=2),
+    )
+    run.is_self_paced = True
+    run.save()
+
+    create_featured_items()
+
+    # Verify cache is set
+    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    assert cache_value is not None
+    assert len(cache_value) == 1
+
+    # Note: TTL testing would require mocking or actual time measurement
+    # which might be flaky, so we just verify the cache is set

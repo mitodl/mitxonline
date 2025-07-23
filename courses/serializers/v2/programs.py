@@ -6,7 +6,7 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from cms.serializers import ProgramPageSerializer
-from courses.models import Program, ProgramRequirementNodeType
+from courses.models import Program, ProgramCollection, ProgramRequirementNodeType
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
@@ -47,6 +47,32 @@ class ProgramRequirementSerializer(StrictFieldsSerializer):
         fields = super().get_fields()
         fields["children"] = ProgramRequirementSerializer(many=True, default=[])
         return fields
+
+
+@extend_schema_serializer(component_name="V2ProgramCollection")
+class ProgramCollectionSerializer(StrictFieldsSerializer):
+    """Serializer for ProgramCollection"""
+
+    id = serializers.IntegerField(read_only=True)
+    title = serializers.CharField()
+    description = serializers.CharField()
+    programs = serializers.PrimaryKeyRelatedField(
+        many=True,
+        read_only=True,
+    )
+    created_on = serializers.DateTimeField(read_only=True)
+    updated_on = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = ProgramCollection
+        fields = [
+            "id",
+            "title",
+            "description",
+            "programs",
+            "created_on",
+            "updated_on",
+        ]
 
 
 class ProgramRequirementTreeSerializer(BaseProgramRequirementTreeSerializer):

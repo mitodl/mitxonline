@@ -498,5 +498,6 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     assert course.courseruns.filter(courseware_id=target_course_id).exists()
     assert created_run.courseware_id == target_course_id
     assert created_product.object_id == created_run.id
+    assert settings.OPENEDX_COURSE_BASE_URL in created_run.courseware_url
 
     mocked_clone_run.assert_called()

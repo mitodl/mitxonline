@@ -56,6 +56,7 @@ from cms.constants import (
     CERTIFICATE_INDEX_SLUG,
     COURSE_INDEX_SLUG,
     INSTRUCTOR_INDEX_SLUG,
+    PROGRAM_COLLECTION_INDEX_SLUG,
     PROGRAM_INDEX_SLUG,
     SIGNATORY_INDEX_SLUG,
 )
@@ -967,6 +968,17 @@ class ProgramIndexPage(CourseObjectIndexPage):
         return self.get_children().get(programpage__program__readable_id=readable_id)
 
 
+class ProgramCollectionIndexPage(CourseObjectIndexPage):
+    """Index page for ProgramCollections."""
+
+    slug = PROGRAM_COLLECTION_INDEX_SLUG
+    subpage_types = ["courses.ProgramCollection"]
+
+    def get_child_by_readable_id(self, readable_id):
+        """Fetch a child page by the related ProgramCollection's slug value"""
+        return self.get_children().get(slug=readable_id)
+
+
 class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     """
     Abstract detail page for course runs and any other "product" that a user can enroll in
@@ -1086,8 +1098,9 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             courseware_object = self.course
         elif self.is_program_page:
             courseware_object = self.program
-        courseware_object.title = self.title
-        courseware_object.save()
+        if courseware_object:
+            courseware_object.title = self.title
+            courseware_object.save()
 
         return super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
@@ -1195,6 +1208,16 @@ class CoursePage(ProductPage):
         help_text="Select topic pairs (primary -> secondary) for this course page.",
         limit_choices_to=~models.Q(parent=None),
     )
+    include_in_learn_catalog = models.BooleanField(
+        default=False,
+        null=True,
+        help_text="If true, Learn should include this in its catalog.",
+    )
+    ingest_content_files_for_ai = models.BooleanField(
+        default=False,
+        null=True,
+        help_text="If true, allow the AI chatbots to ingest the course's content files.",
+    )
 
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
@@ -1279,10 +1302,13 @@ class CoursePage(ProductPage):
             "product": product,
         }
 
-    content_panels = [  # noqa: RUF005
+    content_panels = [
         FieldPanel("course"),
         FieldPanel("topics"),
-    ] + ProductPage.content_panels
+        *ProductPage.content_panels,
+        FieldPanel("include_in_learn_catalog"),
+        FieldPanel("ingest_content_files_for_ai"),
+    ]
 
 
 class ProgramPage(ProductPage):

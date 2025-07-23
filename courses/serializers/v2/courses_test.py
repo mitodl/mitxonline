@@ -82,6 +82,8 @@ def test_serialize_course(
                 if all_runs
                 else None
             ),
+            "include_in_learn_catalog": course.page.include_in_learn_catalog,
+            "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
         },
     )
 
@@ -125,5 +127,7 @@ def test_serialize_course_required_prerequisites(
             "max_price": course.page.max_price,
             "time_commitment": course.page.effort,
             "programs": None,
+            "include_in_learn_catalog": course.page.include_in_learn_catalog,
+            "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
         },
     )
