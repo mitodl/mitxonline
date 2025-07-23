@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("wagtailcore", "0094_alter_page_locale"),
-        ("cms", "0048_alter_coursepage_max_price_and_more"),
+        ("cms", "0049_add_course_flag_fields"),
     ]
 
     operations = [
