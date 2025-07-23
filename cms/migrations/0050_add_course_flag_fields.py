@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0048_alter_coursepage_max_price_and_more"),
+        ("cms", "0049_programcollectionindexpage"),
     ]
 
     operations = [
