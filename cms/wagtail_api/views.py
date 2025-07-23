@@ -60,12 +60,10 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         """
         instance = self.get_object()
         if isinstance(instance, CertificatePage) and request.GET.get("revision_id"):
-            try:
-                instance = Revision.objects.get(
-                    id=request.GET.get("revision_id")
-                ).as_object()
-            except Revision.DoesNotExist:
+            revision = instance.revisions.filter(id=request.GET.get("revision_id")).first()
+            if not revision:
                 return Response({"error": "Revision not found"}, status=404)
+            instance = revision.as_object()
         serializer = self.get_serializer(instance)
         data = serializer.data
         return Response(data)
