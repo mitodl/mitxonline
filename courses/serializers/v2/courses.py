@@ -28,6 +28,7 @@ from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED
 log = logging.getLogger(__name__)
 
 
+@extend_schema_serializer(component_name="V2Course")
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer"""
 
@@ -261,6 +262,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         return flexible_price_exists  # noqa: RET504
 
 
+@extend_schema_serializer(component_name="V2CourseWithCourseRunsSerializer")
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
