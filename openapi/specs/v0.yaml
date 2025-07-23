@@ -918,6 +918,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/DepartmentWithCoursesAndPrograms'
           description: ''
+  /api/v2/pages/:
+    get:
+      operationId: pages_retrieve
+      description: Returns pages of all types
+      summary: List all Wagtail Pages
+      parameters:
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: Specify fields (e.g. `*`)
+      - in: query
+        name: type
+        schema:
+          type: string
+        description: Filter by Wagtail page type
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageList'
+          description: ''
+  /api/v2/pages/?fields=*&type=cms.CertificatePage:
+    get:
+      operationId: pages_?fields=*&type=cms.CertificatePage_retrieve
+      description: Returns pages of type cms.CertificatePage
+      summary: List all Certificate Pages
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificatePageList'
+          description: ''
+  /api/v2/pages/?fields=*&type=cms.CoursePage:
+    get:
+      operationId: pages_?fields=*&type=cms.CoursePage_retrieve
+      description: Returns pages of type cms.CoursePage
+      summary: List all Course Pages
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoursePageList'
+          description: ''
   /api/v2/program-collections/:
     get:
       operationId: program_collections_list
@@ -1065,6 +1118,50 @@ components:
     BlankEnum:
       enum:
       - ''
+    CertificatePage:
+      type: object
+      description: Serializer for certificate pages, including overrides and signatory
+        items.
+      properties:
+        id:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+        title:
+          type: string
+        product_name:
+          type: string
+        CEUs:
+          type: string
+        overrides:
+          type: array
+          items:
+            $ref: '#/components/schemas/Override'
+        signatory_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SignatoryItem'
+      required:
+      - CEUs
+      - id
+      - meta
+      - overrides
+      - product_name
+      - signatory_items
+      - title
+    CertificatePageList:
+      type: object
+      description: Serializer for a list of certificate pages.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CertificatePage'
+      required:
+      - items
+      - meta
     ChangeEmailRequestCreate:
       type: object
       description: Serializer for starting a user email change
@@ -1254,6 +1351,86 @@ components:
       - programs
       - readable_id
       - title
+    CourseDepartment:
+      type: object
+      description: Serializer for department details used in course pages.
+      properties:
+        name:
+          type: string
+      required:
+      - name
+    CourseDetails:
+      type: object
+      description: Serializer for course details used in course pages.
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        readable_id:
+          type: string
+        next_run_id:
+          type: integer
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseDepartment'
+        page:
+          $ref: '#/components/schemas/CoursePageDetails'
+        programs:
+          nullable: true
+        topics:
+          type: array
+          items:
+            $ref: '#/components/schemas/Topic'
+        certificate_type:
+          type: string
+        required_prerequisites:
+          type: boolean
+        duration:
+          type: string
+        min_weeks:
+          type: integer
+        max_weeks:
+          type: integer
+        min_price:
+          type: integer
+        max_price:
+          type: integer
+        time_commitment:
+          type: string
+        availability:
+          type: string
+        min_weekly_hours:
+          type: string
+        max_weekly_hours:
+          type: string
+        include_in_learn_catalog:
+          type: boolean
+        ingest_content_files_for_ai:
+          type: boolean
+      required:
+      - availability
+      - certificate_type
+      - departments
+      - duration
+      - id
+      - include_in_learn_catalog
+      - ingest_content_files_for_ai
+      - max_price
+      - max_weekly_hours
+      - max_weeks
+      - min_price
+      - min_weekly_hours
+      - min_weeks
+      - next_run_id
+      - page
+      - programs
+      - readable_id
+      - required_prerequisites
+      - time_commitment
+      - title
+      - topics
     CoursePage:
       type: object
       description: Course page model serializer
@@ -1301,6 +1478,151 @@ components:
       - length
       - live
       - page_url
+    CoursePageDetails:
+      type: object
+      description: Serializer for course page details, including instructors and other
+        metadata.
+      properties:
+        feature_image_src:
+          type: string
+          format: uri
+        page_url:
+          type: string
+        description:
+          type: string
+        live:
+          type: boolean
+        length:
+          type: string
+        effort:
+          type: string
+        financial_assistance_form_url:
+          type: string
+        current_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        instructors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Instructor'
+      required:
+      - current_price
+      - description
+      - effort
+      - feature_image_src
+      - financial_assistance_form_url
+      - instructors
+      - length
+      - live
+      - page_url
+    CoursePageItem:
+      type: object
+      description: Serializer for individual course page items, including all relevant
+        fields.
+      properties:
+        id:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+        title:
+          type: string
+        description:
+          type: string
+        length:
+          type: string
+        effort:
+          type: string
+        min_weekly_hours:
+          type: string
+        max_weekly_hours:
+          type: string
+        min_weeks:
+          type: integer
+        max_weeks:
+          type: integer
+        price:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceItem'
+        min_price:
+          type: integer
+        max_price:
+          type: integer
+        prerequisites:
+          type: string
+        faq_url:
+          type: string
+        about:
+          type: string
+        what_you_learn:
+          type: string
+        feature_image:
+          $ref: '#/components/schemas/FeatureImage'
+        video_url:
+          type: string
+          format: uri
+        faculty_section_title:
+          type: string
+        faculty:
+          type: array
+          items:
+            $ref: '#/components/schemas/Faculty'
+        certificate_page:
+          allOf:
+          - $ref: '#/components/schemas/CertificatePage'
+          nullable: true
+        course_details:
+          $ref: '#/components/schemas/CourseDetails'
+        topic_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Topic'
+        include_in_learn_catalog:
+          type: boolean
+        ingest_content_files_for_ai:
+          type: boolean
+      required:
+      - about
+      - certificate_page
+      - course_details
+      - description
+      - effort
+      - faculty
+      - faculty_section_title
+      - faq_url
+      - feature_image
+      - id
+      - include_in_learn_catalog
+      - ingest_content_files_for_ai
+      - length
+      - max_price
+      - max_weekly_hours
+      - max_weeks
+      - meta
+      - min_price
+      - min_weekly_hours
+      - min_weeks
+      - prerequisites
+      - price
+      - title
+      - topic_list
+      - video_url
+      - what_you_learn
+    CoursePageList:
+      type: object
+      description: Serializer for a list of course pages, including metadata and items.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoursePageItem'
+      required:
+      - items
+      - meta
     CourseRequest:
       type: object
       description: Course model serializer
@@ -1708,6 +2030,47 @@ components:
       x-enum-descriptions:
       - audit
       - verified
+    Faculty:
+      type: object
+      description: Serializer for faculty details used in course pages.
+      properties:
+        id:
+          type: integer
+        instructor_name:
+          type: string
+        instructor_title:
+          type: string
+        instructor_bio_short:
+          type: string
+        instructor_bio_long:
+          type: string
+        feature_image_src:
+          type: string
+      required:
+      - feature_image_src
+      - id
+      - instructor_bio_long
+      - instructor_bio_short
+      - instructor_name
+      - instructor_title
+    FeatureImage:
+      type: object
+      description: Serializer for feature images used in course pages.
+      properties:
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        height:
+          type: integer
+        width:
+          type: integer
+      required:
+      - height
+      - image_url
+      - title
+      - width
     GenderEnum:
       enum:
       - m
@@ -1791,6 +2154,17 @@ components:
       - Elementary/primary school
       - No formal education
       - Other education
+    Instructor:
+      type: object
+      description: Serializer for instructor details used in course pages.
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+      - description
+      - name
     IntegrationTypeEnum:
       enum:
       - sso
@@ -1952,6 +2326,116 @@ components:
       - logo
       - name
       - slug
+    Override:
+      type: object
+      description: Serializer for overrides used in certificate pages.
+      properties:
+        type:
+          type: string
+        value:
+          $ref: '#/components/schemas/OverrideValue'
+        id:
+          type: string
+      required:
+      - id
+      - type
+      - value
+    OverrideValue:
+      type: object
+      description: Serializer for override values used in certificate pages.
+      properties:
+        readable_id:
+          type: string
+        CEUs:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+      required:
+      - CEUs
+      - readable_id
+    Page:
+      type: object
+      description: Serializer for individual Wagtail pages.
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      required:
+      - id
+      - meta
+      - title
+    PageList:
+      type: object
+      description: Serializer for a list of Wagtail pages.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Page'
+      required:
+      - items
+      - meta
+    PageListMeta:
+      type: object
+      description: Serializer for metadata of a list of Wagtail pages.
+      properties:
+        total_count:
+          type: integer
+      required:
+      - total_count
+    PageMeta:
+      type: object
+      description: Serializer for page metadata used in various Wagtail pages.
+      properties:
+        type:
+          type: string
+        detail_url:
+          type: string
+          format: uri
+        html_url:
+          type: string
+          format: uri
+        slug:
+          type: string
+        show_in_menus:
+          type: boolean
+        seo_title:
+          type: string
+        search_description:
+          type: string
+        first_published_at:
+          type: string
+          format: date-time
+          nullable: true
+        alias_of:
+          type: string
+          nullable: true
+        locale:
+          type: string
+        live:
+          type: boolean
+        last_published_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - alias_of
+      - detail_url
+      - first_published_at
+      - html_url
+      - last_published_at
+      - live
+      - locale
+      - search_description
+      - seo_title
+      - show_in_menus
+      - slug
+      - type
     PaginatedCourseWithCourseRunsList:
       type: object
       required:
@@ -2194,6 +2678,22 @@ components:
       - customer-support
       - staff
       - legacy
+    PriceItem:
+      type: object
+      description: Serializer for price items used in course pages.
+      properties:
+        type:
+          type: string
+        value:
+          type: object
+          additionalProperties: {}
+        id:
+          type: string
+          format: uuid
+      required:
+      - id
+      - type
+      - value
     ProductFlexibilePrice:
       type: object
       description: Simple serializer for Product without related purchasable objects
@@ -2377,6 +2877,26 @@ components:
       - b2b-error-invalid-enrollment-code
       - b2b-error-requires-checkout
       - b2b-enroll-success
+    SignatoryItem:
+      type: object
+      description: Serializer for signatory items used in certificate pages.
+      properties:
+        name:
+          type: string
+        title_1:
+          type: string
+        title_2:
+          type: string
+        organization:
+          type: string
+        signature_image:
+          type: string
+      required:
+      - name
+      - organization
+      - signature_image
+      - title_1
+      - title_2
     StaffDashboardUser:
       type: object
       description: Serializer for data we care about in the staff dashboard
@@ -2411,6 +2931,16 @@ components:
       - id
       - legal_address
       - username
+    Topic:
+      type: object
+      description: Serializer for topics used in course pages.
+      properties:
+        name:
+          type: string
+        parent:
+          type: string
+      required:
+      - name
     User:
       type: object
       description: Serializer for users

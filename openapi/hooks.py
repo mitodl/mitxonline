@@ -2,6 +2,7 @@
 
 import re
 
+from cms.wagtail_api.schema.views import WagtailPagesSchemaView
 from openapi.exceptions import EnumDescriptionError
 
 ENUM_DESCRIPTION_RE = re.compile(r"\w*\*\s`(?P<key>.*)`\s\-\s(?P<description>.*)")
@@ -117,3 +118,57 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         for (path, path_regex, method, callback) in endpoints
         if not any(path.startswith(prefix) for prefix in EXCLUDED_PATHS)
     ]
+
+
+def insert_wagtail_pages_schema(endpoints):
+    """
+    Insert Wagtail pages schema into the OpenAPI endpoints.
+    """
+
+    from cms.wagtail_api.schema.views import (
+        WagtailCertificatePagesSchemaView,
+        WagtailCoursePagesSchemaView,
+    )
+
+    class WrappedPagesView(WagtailPagesSchemaView):
+        pass
+
+    class WrappedCertificateView(WagtailCertificatePagesSchemaView):
+        pass
+
+    class WrappedCourseView(WagtailCoursePagesSchemaView):
+        pass
+
+    pages_view = WrappedPagesView.as_view()
+    certificate_view = WrappedCertificateView.as_view()
+    course_view = WrappedCourseView.as_view()
+
+    # manually attach the class for schema inspection
+    pages_view.cls = WrappedPagesView
+    certificate_view.cls = WrappedCertificateView
+    course_view.cls = WrappedCourseView
+    endpoints.append(
+        (
+            "/api/v2/pages/",
+            "^api/v2/pages/$",
+            "GET",
+            pages_view,
+        )
+    )
+    endpoints.append(
+        (
+            "/api/v2/pages/?fields=*&type=cms.CertificatePage",
+            "^api/v2/pages/?fields=*&type=cms.CertificatePage$",
+            "GET",
+            certificate_view,
+        )
+    )
+    endpoints.append(
+        (
+            "/api/v2/pages/?fields=*&type=cms.CoursePage",
+            "^api/v2/pages/?fields=*&type=cms.CoursePage$",
+            "GET",
+            course_view,
+        )
+    )
+    return endpoints
