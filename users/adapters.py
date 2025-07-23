@@ -63,7 +63,7 @@ class LearnUserAdapter(UserAdapter):
         """
         super().from_dict(d)
 
-        self.obj.name = d.get("fullName", "")
+        self.obj.name = d.get("fullName", self.obj.name)  # name's default is ""
 
         first_name = d.get("name", {}).get("given_name", "")
         if first_name:
