@@ -1,6 +1,7 @@
 """API functionality for the CMS app"""
 
 import logging
+import random
 from datetime import timedelta
 from typing import Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
@@ -342,75 +343,81 @@ def create_featured_items():
     Used only by cron task or management command.
     """
     redis_cache = caches["redis"]
+    cache_key = "CMS_homepage_featured_courses"
 
-    # Clear cache if already present
-    if redis_cache.get("CMS_homepage_featured_courses"):
-        redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cache_key)
 
     now = now_in_utc()
     end_of_day = now + timedelta(days=1)
 
-    # Get valid CoursePage-linked course IDs
-    valid_course_ids = cms_models.CoursePage.objects.filter(live=True).values_list(
-        "course_id", flat=True
+    valid_course_ids = set(
+        cms_models.CoursePage.objects.filter(live=True).values_list(
+            "course_id", flat=True
+        )
     )
 
-    # Fetch enrollable course runs
+    if not valid_course_ids:
+        redis_cache.set(cache_key, [], HOMEPAGE_CACHE_AGE)
+        return []
+
     enrollable_courses_qs = Course.objects.select_related("page").filter(
         id__in=valid_course_ids, live=True
     )
-    enrollable_courseruns = get_enrollable_courseruns_qs(
-        end_of_day, enrollable_courses_qs
+    enrollable_courseruns = (
+        get_enrollable_courseruns_qs(end_of_day, enrollable_courses_qs)
+        .select_related("course")
+        .prefetch_related("course__page")
     )
 
-    # Pick 2 random self-paced course runs
-    self_paced_courseruns = enrollable_courseruns.filter(is_self_paced=True).order_by(
-        "?"
-    )[:2]
-    self_paced_course_ids = list(
-        self_paced_courseruns.values_list("course_id", flat=True)
-    )
+    if not enrollable_courseruns.exists():
+        redis_cache.set(cache_key, [], HOMEPAGE_CACHE_AGE)
+        return []
 
-    # Pick 20 random non-self-paced course runs
-    random_courseruns = enrollable_courseruns.exclude(
-        id__in=self_paced_courseruns.values_list("id", flat=True)
-    ).order_by("?")[:20]
+    self_paced_runs = []
+    regular_runs = []
 
-    # Split random course runs into future and started, and collect IDs
+    for courserun in enrollable_courseruns:
+        if courserun.is_self_paced:
+            self_paced_runs.append(courserun)
+        else:
+            regular_runs.append(courserun)
+
+    random.shuffle(self_paced_runs)
+    self_paced_course_ids = [run.course_id for run in self_paced_runs[:2]]
+
+    random.shuffle(regular_runs)
+    selected_regular_runs = regular_runs[:20]
+
     future_runs = []
-    started_ids = []
-    for courserun in random_courseruns:
+    started_course_ids = []
+
+    for courserun in selected_regular_runs:
         if courserun.start_date >= now:
             future_runs.append(courserun)
         else:
-            started_ids.append(courserun.course.id)
+            started_course_ids.append(courserun.course_id)
 
-    # Sort future course runs by start_date ascending
-    future_ids = [
-        cr.course.id for cr in sorted(future_runs, key=lambda cr: cr.start_date)
-    ]
+    future_runs.sort(key=lambda cr: cr.start_date)
+    future_course_ids = [run.course_id for run in future_runs]
 
-    # Combine all course IDs
-    all_course_ids = self_paced_course_ids + future_ids + started_ids
+    all_course_ids = self_paced_course_ids + future_course_ids + started_course_ids
 
-    # Fetch featured courses preserving order
+    if not all_course_ids:
+        redis_cache.set(cache_key, [], HOMEPAGE_CACHE_AGE)
+        return []
+
     ordering = Case(
         *[When(id=cid, then=pos) for pos, cid in enumerate(all_course_ids)],
         output_field=IntegerField(),
     )
 
-    # Query courses
     featured_courses = list(
         Course.objects.filter(id__in=all_course_ids)
-        .only("id")
         .select_related("page")
         .prefetch_related("courseruns")
         .order_by(ordering)
     )
 
-    # Cache the result for homepage
-    redis_cache.set(
-        "CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE
-    )
+    redis_cache.set(cache_key, featured_courses, HOMEPAGE_CACHE_AGE)
 
     return featured_courses
