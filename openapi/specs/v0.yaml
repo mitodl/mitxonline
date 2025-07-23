@@ -943,6 +943,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/PageList'
           description: ''
+  /api/v2/pages/<int>/:
+    get:
+      operationId: pages_<int>_retrieve
+      description: Returns details of a specific Wagtail page by ID
+      summary: Get Wagtail Page Details
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/CoursePageItem'
+                - $ref: '#/components/schemas/ProgramPageItem'
+                - $ref: '#/components/schemas/CertificatePage'
+                - $ref: '#/components/schemas/Page'
+          description: Returns a page of any known Wagtail page type
+  /api/v2/pages/<int>/?revision_id=<int>:
+    get:
+      operationId: pages_<int>_?revision_id=<int>_retrieve
+      description: Returns details of a specific certificate page by ID. Can be used
+        to retrieve a specific revision if `revision_id` is provided.
+      summary: Get Certificate Page and Revision Details
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificatePage'
+          description: ''
   /api/v2/pages/?fields=*&type=cms.CertificatePage:
     get:
       operationId: pages_?fields=*&type=cms.CertificatePage_retrieve
@@ -970,6 +1003,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CoursePageList'
+          description: ''
+  /api/v2/pages/?fields=*&type=cms.ProgramPage:
+    get:
+      operationId: pages_?fields=*&type=cms.ProgramPage_retrieve
+      description: Returns pages of type cms.ProgramPage
+      summary: List all Program Pages
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramPageList'
           description: ''
   /api/v2/program-collections/:
     get:
@@ -1351,14 +1398,6 @@ components:
       - programs
       - readable_id
       - title
-    CourseDepartment:
-      type: object
-      description: Serializer for department details used in course pages.
-      properties:
-        name:
-          type: string
-      required:
-      - name
     CourseDetails:
       type: object
       description: Serializer for course details used in course pages.
@@ -1374,7 +1413,7 @@ components:
         departments:
           type: array
           items:
-            $ref: '#/components/schemas/CourseDepartment'
+            $ref: '#/components/schemas/CoursewareDepartment'
         page:
           $ref: '#/components/schemas/CoursePageDetails'
         programs:
@@ -1863,6 +1902,14 @@ components:
       - time_commitment
       - title
       - topics
+    CoursewareDepartment:
+      type: object
+      description: Serializer for department details used in course pages.
+      properties:
+        name:
+          type: string
+      required:
+      - name
     CreateB2BEnrollment:
       type: object
       description: |-
@@ -2768,6 +2815,94 @@ components:
       required:
       - link
       - uuid
+    ProgramDetails:
+      type: object
+      description: Serializer for program details, including courses, requirements,
+        and metadata.
+      properties:
+        title:
+          type: string
+        readable_id:
+          type: string
+        id:
+          type: integer
+        courses:
+          type: array
+          items: {}
+        requirements:
+          $ref: '#/components/schemas/ProgramRequirement'
+        req_tree:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProgramReqTreeNode'
+        page:
+          $ref: '#/components/schemas/ProgramPageSection'
+        program_type:
+          type: string
+        certificate_type:
+          type: string
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoursewareDepartment'
+        live:
+          type: boolean
+        topics:
+          type: array
+          items: {}
+        availability:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        enrollment_start:
+          type: string
+          format: date-time
+        enrollment_end:
+          type: string
+          format: date-time
+        required_prerequisites:
+          type: boolean
+        duration:
+          type: string
+        min_weeks:
+          type: integer
+        max_weeks:
+          type: integer
+        time_commitment:
+          type: string
+        min_weekly_hours:
+          type: string
+        max_weekly_hours:
+          type: string
+      required:
+      - availability
+      - certificate_type
+      - courses
+      - departments
+      - duration
+      - end_date
+      - enrollment_end
+      - enrollment_start
+      - id
+      - live
+      - max_weekly_hours
+      - max_weeks
+      - min_weekly_hours
+      - min_weeks
+      - page
+      - program_type
+      - readable_id
+      - req_tree
+      - required_prerequisites
+      - requirements
+      - start_date
+      - time_commitment
+      - title
+      - topics
     ProgramPage:
       type: object
       description: Program page model serializer
@@ -2811,6 +2946,203 @@ components:
       - live
       - page_url
       - price
+    ProgramPageItem:
+      type: object
+      description: Serializer for individual program page items, including all relevant
+        fields.
+      properties:
+        id:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+        title:
+          type: string
+        description:
+          type: string
+        length:
+          type: string
+        effort:
+          type: string
+        min_weekly_hours:
+          type: string
+        max_weekly_hours:
+          type: string
+        min_weeks:
+          type: integer
+        max_weeks:
+          type: integer
+        price:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceItem'
+        min_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        max_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        prerequisites:
+          type: string
+        faq_url:
+          type: string
+          format: uri
+        about:
+          type: string
+        what_you_learn:
+          type: string
+        feature_image:
+          $ref: '#/components/schemas/FeatureImage'
+        video_url:
+          type: string
+          format: uri
+        faculty_section_title:
+          type: string
+        faculty:
+          type: array
+          items:
+            $ref: '#/components/schemas/Faculty'
+        certificate_page:
+          $ref: '#/components/schemas/CertificatePage'
+        program_details:
+          $ref: '#/components/schemas/ProgramDetails'
+      required:
+      - about
+      - certificate_page
+      - description
+      - effort
+      - faculty
+      - faculty_section_title
+      - faq_url
+      - feature_image
+      - id
+      - length
+      - max_price
+      - max_weekly_hours
+      - max_weeks
+      - meta
+      - min_price
+      - min_weekly_hours
+      - min_weeks
+      - prerequisites
+      - price
+      - program_details
+      - title
+      - video_url
+      - what_you_learn
+    ProgramPageList:
+      type: object
+      description: Serializer for a list of program pages, including metadata and
+        items.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProgramPageItem'
+      required:
+      - items
+      - meta
+    ProgramPageSection:
+      type: object
+      description: Serializer for program page for program details, including feature
+        image and URLs.
+      properties:
+        feature_image_src:
+          type: string
+        page_url:
+          type: string
+        financial_assistance_form_url:
+          type: string
+        description:
+          type: string
+        live:
+          type: boolean
+        length:
+          type: string
+        effort:
+          type: string
+        price:
+          type: string
+      required:
+      - description
+      - effort
+      - feature_image_src
+      - financial_assistance_form_url
+      - length
+      - live
+      - page_url
+      - price
+    ProgramReqTreeNode:
+      type: object
+      description: Serializer for program requirement tree nodes, including data and
+        children.
+      properties:
+        data:
+          $ref: '#/components/schemas/ProgramReqTreeNodeData'
+        id:
+          type: integer
+        children:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - data
+      - id
+    ProgramReqTreeNodeData:
+      type: object
+      description: Serializer for data in program requirement tree nodes.
+      properties:
+        node_type:
+          type: string
+        operator:
+          type: string
+          nullable: true
+        operator_value:
+          type: string
+          nullable: true
+        program:
+          type: integer
+        course:
+          type: string
+          nullable: true
+        required_program:
+          type: string
+          nullable: true
+        title:
+          type: string
+        elective_flag:
+          type: boolean
+      required:
+      - course
+      - elective_flag
+      - node_type
+      - operator
+      - operator_value
+      - program
+      - required_program
+      - title
+    ProgramRequirement:
+      type: object
+      description: Serializer for program requirements, including required and elective
+        courses.
+      properties:
+        required:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        electives:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - electives
+      - required
     PublicUser:
       type: object
       description: Serializer for public user data

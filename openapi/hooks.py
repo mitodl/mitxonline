@@ -2,7 +2,6 @@
 
 import re
 
-from cms.wagtail_api.schema.views import WagtailPagesSchemaView
 from openapi.exceptions import EnumDescriptionError
 
 ENUM_DESCRIPTION_RE = re.compile(r"\w*\*\s`(?P<key>.*)`\s\-\s(?P<description>.*)")
@@ -126,8 +125,12 @@ def insert_wagtail_pages_schema(endpoints):
     """
 
     from cms.wagtail_api.schema.views import (
+        WagtailCertificatePagesRetrieveSchemaView,
         WagtailCertificatePagesSchemaView,
         WagtailCoursePagesSchemaView,
+        WagtailPagesRetrieveSchemaView,
+        WagtailPagesSchemaView,
+        WagtailProgramPagesSchemaView,
     )
 
     class WrappedPagesView(WagtailPagesSchemaView):
@@ -139,14 +142,29 @@ def insert_wagtail_pages_schema(endpoints):
     class WrappedCourseView(WagtailCoursePagesSchemaView):
         pass
 
+    class WrappedProgramView(WagtailProgramPagesSchemaView):
+        pass
+
+    class WrappedPagesRetrieveView(WagtailPagesRetrieveSchemaView):
+        pass
+
+    class WrappedCertificateRetrieveView(WagtailCertificatePagesRetrieveSchemaView):
+        pass
+
     pages_view = WrappedPagesView.as_view()
     certificate_view = WrappedCertificateView.as_view()
     course_view = WrappedCourseView.as_view()
+    program_view = WrappedProgramView.as_view()
+    retrieve_view = WrappedPagesRetrieveView.as_view()
+    certificate_retrieve_view = WrappedCertificateRetrieveView.as_view()
 
     # manually attach the class for schema inspection
     pages_view.cls = WrappedPagesView
     certificate_view.cls = WrappedCertificateView
     course_view.cls = WrappedCourseView
+    program_view.cls = WrappedProgramView
+    retrieve_view.cls = WrappedPagesRetrieveView
+    certificate_retrieve_view.cls = WrappedCertificateRetrieveView
     endpoints.append(
         (
             "/api/v2/pages/",
@@ -169,6 +187,30 @@ def insert_wagtail_pages_schema(endpoints):
             "^api/v2/pages/?fields=*&type=cms.CoursePage$",
             "GET",
             course_view,
+        )
+    )
+    endpoints.append(
+        (
+            "/api/v2/pages/?fields=*&type=cms.ProgramPage",
+            "^api/v2/pages/?fields=*&type=cms.ProgramPage$",
+            "GET",
+            program_view,
+        )
+    )
+    endpoints.append(
+        (
+            "/api/v2/pages/<int>/",
+            "^api/v2/pages/<int>/",
+            "GET",
+            retrieve_view,
+        )
+    )
+    endpoints.append(
+        (
+            "/api/v2/pages/<int>/?revision_id=<int>",
+            "^api/v2/pages/<int>/?revision_id=<int>$",
+            "GET",
+            certificate_retrieve_view,
         )
     )
     return endpoints

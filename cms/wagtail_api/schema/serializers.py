@@ -55,7 +55,7 @@ class CoursePageDetailsSerializer(serializers.Serializer):
     instructors = InstructorSerializer(many=True)
 
 
-class CourseDepartmentSerializer(serializers.Serializer):
+class CoursewareDepartmentSerializer(serializers.Serializer):
     """
     Serializer for department details used in course pages.
     """
@@ -192,7 +192,7 @@ class CourseDetailsSerializer(serializers.Serializer):
     title = serializers.CharField()
     readable_id = serializers.CharField()
     next_run_id = serializers.IntegerField()
-    departments = CourseDepartmentSerializer(many=True)
+    departments = CoursewareDepartmentSerializer(many=True)
     page = CoursePageDetailsSerializer()
     programs = serializers.JSONField(allow_null=True)
     topics = TopicSerializer(many=True)
@@ -251,3 +251,122 @@ class CoursePageListSerializer(serializers.Serializer):
 
     meta = PageListMetaSerializer()
     items = CoursePageItemSerializer(many=True)
+
+
+class ProgramRequirementSerializer(serializers.Serializer):
+    """
+    Serializer for program requirements, including required and elective courses.
+    """
+
+    required = serializers.ListField(child=serializers.DictField())
+    electives = serializers.ListField(child=serializers.DictField())
+
+
+class ProgramReqTreeNodeDataSerializer(serializers.Serializer):
+    """
+    Serializer for data in program requirement tree nodes.
+    """
+
+    node_type = serializers.CharField()
+    operator = serializers.CharField(allow_null=True)
+    operator_value = serializers.CharField(allow_null=True)
+    program = serializers.IntegerField()
+    course = serializers.CharField(allow_null=True)
+    required_program = serializers.CharField(allow_null=True)
+    title = serializers.CharField()
+    elective_flag = serializers.BooleanField()
+
+
+class ProgramReqTreeNodeSerializer(serializers.Serializer):
+    """
+    Serializer for program requirement tree nodes, including data and children.
+    """
+
+    data = ProgramReqTreeNodeDataSerializer()
+    id = serializers.IntegerField()
+    children = serializers.ListField(child=serializers.DictField(), required=False)
+
+
+class ProgramPageSectionSerializer(serializers.Serializer):
+    """
+    Serializer for program page for program details, including feature image and URLs.
+    """
+
+    feature_image_src = serializers.CharField()
+    page_url = serializers.CharField()
+    financial_assistance_form_url = serializers.CharField()
+    description = serializers.CharField()
+    live = serializers.BooleanField()
+    length = serializers.CharField()
+    effort = serializers.CharField()
+    price = serializers.CharField()
+
+
+class ProgramDetailsSerializer(serializers.Serializer):
+    """
+    Serializer for program details, including courses, requirements, and metadata.
+    """
+
+    title = serializers.CharField()
+    readable_id = serializers.CharField()
+    id = serializers.IntegerField()
+    courses = serializers.ListField()
+    requirements = ProgramRequirementSerializer()
+    req_tree = ProgramReqTreeNodeSerializer(many=True)
+    page = ProgramPageSectionSerializer()
+    program_type = serializers.CharField()
+    certificate_type = serializers.CharField()
+    departments = CoursewareDepartmentSerializer(many=True)
+    live = serializers.BooleanField()
+    topics = serializers.ListField()
+    availability = serializers.CharField()
+    start_date = serializers.DateTimeField()
+    end_date = serializers.DateTimeField()
+    enrollment_start = serializers.DateTimeField()
+    enrollment_end = serializers.DateTimeField()
+    required_prerequisites = serializers.BooleanField()
+    duration = serializers.CharField()
+    min_weeks = serializers.IntegerField()
+    max_weeks = serializers.IntegerField()
+    time_commitment = serializers.CharField()
+    min_weekly_hours = serializers.CharField()
+    max_weekly_hours = serializers.CharField()
+
+
+class ProgramPageItemSerializer(serializers.Serializer):
+    """
+    Serializer for individual program page items, including all relevant fields.
+    """
+
+    id = serializers.IntegerField()
+    meta = PageMetaSerializer()
+    title = serializers.CharField()
+    description = serializers.CharField()
+    length = serializers.CharField()
+    effort = serializers.CharField()
+    min_weekly_hours = serializers.CharField()
+    max_weekly_hours = serializers.CharField()
+    min_weeks = serializers.IntegerField()
+    max_weeks = serializers.IntegerField()
+    price = PriceItemSerializer(many=True)
+    min_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    max_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    prerequisites = serializers.CharField()
+    faq_url = serializers.URLField()
+    about = serializers.CharField()
+    what_you_learn = serializers.CharField()
+    feature_image = FeatureImageSerializer()
+    video_url = serializers.URLField()
+    faculty_section_title = serializers.CharField()
+    faculty = FacultySerializer(many=True)
+    certificate_page = CertificatePageSerializer()
+    program_details = ProgramDetailsSerializer()
+
+
+class ProgramPageListSerializer(serializers.Serializer):
+    """
+    Serializer for a list of program pages, including metadata and items.
+    """
+
+    meta = PageListMetaSerializer()
+    items = ProgramPageItemSerializer(many=True)

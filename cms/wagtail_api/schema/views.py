@@ -2,14 +2,16 @@
 Views for Wagtail API Schema
 """
 
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import (
     CertificatePageListSerializer,
+    CertificatePageSerializer,
     CoursePageListSerializer,
     PageListSerializer,
+    ProgramPageListSerializer,
 )
 
 
@@ -89,5 +91,83 @@ class WagtailCoursePagesSchemaView(APIView):
                     "total_count": 0,
                 },
                 "items": [],
+            }
+        )
+
+
+class WagtailProgramPagesSchemaView(APIView):
+    """
+    View for listing all Program Pages with schema documentation.
+    """
+
+    @extend_schema(
+        summary="List all Program Pages",
+        description="Returns pages of type cms.ProgramPage",
+        responses=ProgramPageListSerializer,
+    )
+    def get(self, request, *args, **kwargs):  # noqa: ARG002
+        # You can return a dummy response or redirect to actual Wagtail logic
+        return Response(
+            {
+                "meta": {
+                    "total_count": 0,
+                },
+                "items": [],
+            }
+        )
+
+
+class WagtailPagesRetrieveSchemaView(APIView):
+    """
+    View for retrieving details of a specific Wagtail page with schema documentation.
+    """
+
+    @extend_schema(
+        summary="Get Wagtail Page Details",
+        description="Returns details of a specific Wagtail page by ID",
+        responses={
+            200: OpenApiResponse(
+                response={
+                    "oneOf": [
+                        {"$ref": "#/components/schemas/CoursePageItem"},
+                        {"$ref": "#/components/schemas/ProgramPageItem"},
+                        {"$ref": "#/components/schemas/CertificatePage"},
+                        {"$ref": "#/components/schemas/Page"},
+                    ]
+                },
+                description="Returns a page of any known Wagtail page type",
+            )
+        },
+    )
+    def get(self, request, pk, *args, **kwargs):  # noqa: ARG002
+        return Response(
+            {
+                "id": pk,
+                "title": "Sample Page",
+                "meta": {
+                    "total_count": 1,
+                },
+            }
+        )
+
+
+class WagtailCertificatePagesRetrieveSchemaView(APIView):
+    """
+    View for retrieving details of a specific Certificate Page with schema documentation.
+    """
+
+    @extend_schema(
+        summary="Get Certificate Page and Revision Details",
+        description="Returns details of a specific certificate page by ID. Can be used to retrieve a specific revision if `revision_id` is provided.",
+        responses=CertificatePageSerializer,
+    )
+    def get(self, request, pk, *args, **kwargs):  # noqa: ARG002
+        return Response(
+            {
+                "id": pk,
+                "title": "Sample Page",
+                "meta": {
+                    "total_count": 1,
+                },
             }
         )
