@@ -6,7 +6,6 @@ from django.db.models import F
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from wagtail.api.v2.views import PagesAPIViewSet
-from wagtail.models import Revision
 
 from cms.models import CertificatePage
 from cms.wagtail_api.filters import ReadableIDFilter
@@ -60,7 +59,9 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         """
         instance = self.get_object()
         if isinstance(instance, CertificatePage) and request.GET.get("revision_id"):
-            revision = instance.revisions.filter(id=request.GET.get("revision_id")).first()
+            revision = instance.revisions.filter(
+                id=request.GET.get("revision_id")
+            ).first()
             if not revision:
                 return Response({"error": "Revision not found"}, status=404)
             instance = revision.as_object()
