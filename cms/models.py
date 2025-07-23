@@ -56,6 +56,7 @@ from cms.constants import (
     CERTIFICATE_INDEX_SLUG,
     COURSE_INDEX_SLUG,
     INSTRUCTOR_INDEX_SLUG,
+    PROGRAM_COLLECTION_INDEX_SLUG,
     PROGRAM_INDEX_SLUG,
     SIGNATORY_INDEX_SLUG,
 )
@@ -965,6 +966,17 @@ class ProgramIndexPage(CourseObjectIndexPage):
     def get_child_by_readable_id(self, readable_id):
         """Fetch a child page by the related Program's readable_id value"""
         return self.get_children().get(programpage__program__readable_id=readable_id)
+
+
+class ProgramCollectionIndexPage(CourseObjectIndexPage):
+    """Index page for ProgramCollections."""
+
+    slug = PROGRAM_COLLECTION_INDEX_SLUG
+    subpage_types = ["courses.ProgramCollection"]
+
+    def get_child_by_readable_id(self, readable_id):
+        """Fetch a child page by the related ProgramCollection's slug value"""
+        return self.get_children().get(slug=readable_id)
 
 
 class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):

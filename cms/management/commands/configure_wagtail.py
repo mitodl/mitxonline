@@ -7,6 +7,7 @@ from cms.api import (
     ensure_home_page_and_site,
     ensure_instructors_index,
     ensure_product_index,
+    ensure_program_collection_index,
     ensure_program_product_index,
     ensure_resource_pages,
     ensure_signatory_index,
@@ -26,6 +27,7 @@ class Command(BaseCommand):
         ensure_signatory_index()
         ensure_certificate_index()
         ensure_instructors_index()
+        ensure_program_collection_index()
 
         from b2b.api import ensure_b2b_organization_index
 

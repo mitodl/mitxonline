@@ -175,6 +175,25 @@ def ensure_program_product_index() -> cms_models.ProgramIndexPage:
     return program_index
 
 
+def ensure_program_collection_index() -> cms_models.ProgramCollectionIndexPage:
+    """
+    Ensures that an index page has been created for program collections.
+    """
+    home_page = get_home_page()
+    program_collection_index = Page.objects.filter(
+        content_type=ContentType.objects.get_for_model(
+            cms_models.ProgramCollectionIndexPage
+        )
+    ).first()
+    if not program_collection_index:
+        program_collection_index = cms_models.ProgramCollectionIndexPage(
+            title="Program Collections"
+        )
+        home_page.add_child(instance=program_collection_index)
+        program_collection_index.save_revision().publish()
+    return program_collection_index
+
+
 def ensure_signatory_index() -> cms_models.SignatoryIndexPage:
     """
     Ensures that an index page has been created for signatories.

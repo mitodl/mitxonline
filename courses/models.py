@@ -20,8 +20,11 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
+from modelcluster.fields import ParentalManyToManyField
 from treebeard.mp_tree import MP_Node
-from wagtail.models import Revision
+from wagtail.admin.panels import FieldPanel
+from wagtail.fields import RichTextField
+from wagtail.models import Page, Revision
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
@@ -1820,3 +1823,23 @@ class LearnerProgramRecordShare(TimestampedModel):
                 fields=("program", "user", "partner_school"),
             )
         ]
+
+
+class ProgramCollection(Page):
+    """Model for a collection of programs with title and description"""
+
+    description = RichTextField(
+        blank=True, help_text="Description of the program collection"
+    )
+    programs = ParentalManyToManyField(
+        Program, blank=True, help_text="Programs included in this collection"
+    )
+    content_panels = [
+        *Page.content_panels,
+        FieldPanel("description"),
+        FieldPanel("programs"),
+    ]
+
+    class Meta:
+        verbose_name = "Program Collection"
+        verbose_name_plural = "Program Collections"
