@@ -11,6 +11,7 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Count, DateTimeField, Q
+from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
 from django_scim.models import AbstractSCIMUserMixin
 from mitol.common.models import TimestampedModel, UserGlobalIdMixin
@@ -261,7 +262,7 @@ class User(
     # NOTE: Username max length was set to 50 before we lowered it. We're hardcoding this
     # value here now until we are ready to migrate the max length at the database level.
     username = models.CharField(unique=True, max_length=500)
-    email = models.EmailField(blank=False, unique=True)
+    email = models.EmailField(blank=False)
     name = models.CharField(blank=True, default="", max_length=255)
     is_staff = models.BooleanField(
         default=False, help_text="The user can access the admin site"
@@ -342,6 +343,11 @@ class User(
         return OrganizationPage.objects.filter(
             pk__in=self.b2b_contracts.values_list("organization", flat=True).distinct()
         ).all()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("email"), name="user_email_unique"),
+        ]
 
 
 def generate_change_email_code():
