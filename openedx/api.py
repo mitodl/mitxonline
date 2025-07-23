@@ -91,18 +91,10 @@ def _build_user_data(user, current_username, access_token):
         username=current_username,
         email=user.email,
         name=user.name,
-        country=(
-            user.legal_address.country if user.legal_address else None
-        ),
-        state=(
-            user.legal_address.us_state if user.legal_address else None
-        ),
-        gender=(
-            user.user_profile.gender if user.user_profile else None
-        ),
-        year_of_birth=(
-            user.user_profile.year_of_birth if user.user_profile else None
-        ),
+        country=(user.legal_address.country if user.legal_address else None),
+        state=(user.legal_address.us_state if user.legal_address else None),
+        gender=(user.user_profile.gender if user.user_profile else None),
+        year_of_birth=(user.user_profile.year_of_birth if user.user_profile else None),
         level_of_education=(
             user.user_profile.level_of_education if user.user_profile else None
         ),
@@ -165,14 +157,10 @@ def _create_edx_user_request(open_edx_user, user, access_token):
     current_username = open_edx_user.edx_username
 
     while attempt < max_attempts:
-
         attempt += 1
 
         user_data = _build_user_data(user, current_username, access_token)
-        resp = req_session.post(
-            edx_url(OPENEDX_REGISTER_USER_PATH),
-            data=user_data
-        )
+        resp = req_session.post(edx_url(OPENEDX_REGISTER_USER_PATH), data=user_data)
 
         if resp.status_code == status.HTTP_200_OK:
             _handle_successful_user_creation(open_edx_user, current_username)
@@ -201,9 +189,7 @@ def _create_edx_user_request(open_edx_user, user, access_token):
         current_username = suggested_usernames.pop(0)
 
     if attempt >= max_attempts:
-        log.error(
-            "Failed to create Open edX user after %d attempts.", max_attempts
-        )
+        log.error("Failed to create Open edX user after %d attempts.", max_attempts)
 
     raise OpenEdxUserCreateError(
         f"Error creating Open edX user. {get_error_response_summary(resp)}"  # noqa: EM102
