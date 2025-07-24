@@ -1,5 +1,4 @@
 """Tests for hubspot_sync.rate_limiter"""
-å
 from unittest.mock import patch
 
 import pytest
