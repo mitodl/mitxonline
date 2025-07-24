@@ -25,6 +25,7 @@ from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
 from cms.views import instructor_page
+from cms.wagtail_api.urls import api_router as wagtail_api_router
 from main.views import cms_signin_redirect_to_site_signin, index, refine
 
 urlpatterns = [
@@ -94,6 +95,7 @@ urlpatterns = [
     ),
     path("cms/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
+    path("api/v2/", wagtail_api_router.urls),
     path("", include(wagtail_urls)),
     path("", include("cms.urls")),
     # Example view

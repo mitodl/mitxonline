@@ -226,6 +226,7 @@ INSTALLED_APPS = (
     "webpack_loader",
     "django_scim",
     # WAGTAIL
+    "wagtail.api.v2",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
     "wagtail.embeds",

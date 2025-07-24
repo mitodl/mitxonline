@@ -861,7 +861,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedCourseWithCourseRunsList'
+                $ref: '#/components/schemas/PaginatedV2CourseWithCourseRunsList'
           description: ''
   /api/v2/courses/{id}/:
     get:
@@ -881,7 +881,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseWithCourseRuns'
+                $ref: '#/components/schemas/V2CourseWithCourseRuns'
           description: ''
   /api/v2/departments/:
     get:
@@ -917,6 +917,104 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DepartmentWithCoursesAndPrograms'
+          description: ''
+  /api/v2/pages/:
+    get:
+      operationId: pages_list
+      description: Returns pages of all types
+      summary: List all Wagtail Pages
+      parameters:
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: Specify fields (e.g. `*`)
+      - in: query
+        name: type
+        schema:
+          type: string
+        description: Filter by Wagtail page type
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageList'
+          description: ''
+  /api/v2/pages/{id}/:
+    get:
+      operationId: pages_retrieve
+      description: Returns details of a specific Wagtail page by ID
+      summary: Get Wagtail Page Details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the Wagtail page
+        required: true
+      - in: query
+        name: revision_id
+        schema:
+          type: integer
+        description: Optional certificate revision ID to retrieve a specific revision
+          of the certificate page
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/CoursePageItem'
+                - $ref: '#/components/schemas/ProgramPageItem'
+                - $ref: '#/components/schemas/CertificatePage'
+                - $ref: '#/components/schemas/Page'
+          description: Returns a page of any known Wagtail page type
+  /api/v2/pages/?fields=*&type=cms.CertificatePage:
+    get:
+      operationId: pages_?fields=*&type=cms.CertificatePage_retrieve
+      description: Returns pages of type cms.CertificatePage
+      summary: List all Certificate Pages
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificatePageList'
+          description: ''
+  /api/v2/pages/?fields=*&type=cms.CoursePage:
+    get:
+      operationId: pages_?fields=*&type=cms.CoursePage_retrieve
+      description: Returns pages of type cms.CoursePage
+      summary: List all Course Pages
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoursePageList'
+          description: ''
+  /api/v2/pages/?fields=*&type=cms.ProgramPage:
+    get:
+      operationId: pages_?fields=*&type=cms.ProgramPage_retrieve
+      description: Returns pages of type cms.ProgramPage
+      summary: List all Program Pages
+      tags:
+      - pages
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramPageList'
           description: ''
   /api/v2/program-collections/:
     get:
@@ -1065,6 +1163,50 @@ components:
     BlankEnum:
       enum:
       - ''
+    CertificatePage:
+      type: object
+      description: Serializer for certificate pages, including overrides and signatory
+        items.
+      properties:
+        id:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+        title:
+          type: string
+        product_name:
+          type: string
+        CEUs:
+          type: string
+        overrides:
+          type: array
+          items:
+            $ref: '#/components/schemas/Override'
+        signatory_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SignatoryItem'
+      required:
+      - CEUs
+      - id
+      - meta
+      - overrides
+      - product_name
+      - signatory_items
+      - title
+    CertificatePageList:
+      type: object
+      description: Serializer for a list of certificate pages.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CertificatePage'
+      required:
+      - items
+      - meta
     ChangeEmailRequestCreate:
       type: object
       description: Serializer for starting a user email change
@@ -1301,6 +1443,112 @@ components:
       - length
       - live
       - page_url
+    CoursePageItem:
+      type: object
+      description: Serializer for individual course page items, including all relevant
+        fields.
+      properties:
+        id:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+        title:
+          type: string
+        description:
+          type: string
+        length:
+          type: string
+        effort:
+          type: string
+        min_weekly_hours:
+          type: string
+        max_weekly_hours:
+          type: string
+        min_weeks:
+          type: integer
+        max_weeks:
+          type: integer
+        price:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceItem'
+        min_price:
+          type: integer
+        max_price:
+          type: integer
+        prerequisites:
+          type: string
+        faq_url:
+          type: string
+        about:
+          type: string
+        what_you_learn:
+          type: string
+        feature_image:
+          $ref: '#/components/schemas/FeatureImage'
+        video_url:
+          type: string
+          format: uri
+        faculty_section_title:
+          type: string
+        faculty:
+          type: array
+          items:
+            $ref: '#/components/schemas/Faculty'
+        certificate_page:
+          allOf:
+          - $ref: '#/components/schemas/CertificatePage'
+          nullable: true
+        course_details:
+          $ref: '#/components/schemas/V2Course'
+        topic_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Topic'
+        include_in_learn_catalog:
+          type: boolean
+        ingest_content_files_for_ai:
+          type: boolean
+      required:
+      - about
+      - certificate_page
+      - course_details
+      - description
+      - effort
+      - faculty
+      - faculty_section_title
+      - faq_url
+      - feature_image
+      - id
+      - include_in_learn_catalog
+      - ingest_content_files_for_ai
+      - length
+      - max_price
+      - max_weekly_hours
+      - max_weeks
+      - meta
+      - min_price
+      - min_weekly_hours
+      - min_weeks
+      - prerequisites
+      - price
+      - title
+      - topic_list
+      - video_url
+      - what_you_learn
+    CoursePageList:
+      type: object
+      description: Serializer for a list of course pages, including metadata and items.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoursePageItem'
+      required:
+      - items
+      - meta
     CourseRequest:
       type: object
       description: Course model serializer
@@ -1409,138 +1657,6 @@ components:
       required:
       - grade
       - grade_percent
-    CourseWithCourseRuns:
-      type: object
-      description: Course model serializer - also serializes child course runs
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        title:
-          type: string
-          maxLength: 255
-        readable_id:
-          type: string
-          pattern: ^[\w\-+:\.]+$
-          maxLength: 255
-        next_run_id:
-          type: integer
-          nullable: true
-          description: Get next run id
-          readOnly: true
-        departments:
-          type: array
-          items:
-            $ref: '#/components/schemas/Department'
-          readOnly: true
-        page:
-          allOf:
-          - $ref: '#/components/schemas/CoursePage'
-          readOnly: true
-        programs:
-          type: array
-          items:
-            type: object
-            additionalProperties: {}
-          nullable: true
-          readOnly: true
-        topics:
-          type: array
-          items:
-            type: object
-            additionalProperties: {}
-          description: List topics of a course
-          readOnly: true
-        certificate_type:
-          type: string
-          readOnly: true
-        required_prerequisites:
-          type: boolean
-          description: |-
-            Check if the prerequisites field is populated in the course page CMS.
-            Returns:
-                bool: True when the prerequisites field is populated in the course page CMS.  False otherwise.
-          readOnly: true
-        duration:
-          type: string
-          description: Get the duration of the course from the course page CMS.
-          readOnly: true
-        min_weeks:
-          type: integer
-          nullable: true
-          description: Get the min weeks of the course from the CMS page.
-          readOnly: true
-        max_weeks:
-          type: integer
-          nullable: true
-          description: Get the max weeks of the course from the CMS page.
-          readOnly: true
-        min_price:
-          type: integer
-          nullable: true
-          description: Get the min price of the product from the CMS page.
-          readOnly: true
-        max_price:
-          type: integer
-          nullable: true
-          description: Get the max price of the product from the CMS page.
-          readOnly: true
-        time_commitment:
-          type: string
-          nullable: true
-          description: Get the time commitment of the course from the course page
-            CMS.
-          readOnly: true
-        availability:
-          type: string
-          description: Get course availability
-          readOnly: true
-        min_weekly_hours:
-          type: string
-          nullable: true
-          description: Get the min weekly hours of the course from the course page
-            CMS.
-          readOnly: true
-        max_weekly_hours:
-          type: string
-          nullable: true
-          description: Get the max weekly hours of the course from the course page
-            CMS.
-          readOnly: true
-        include_in_learn_catalog:
-          type: boolean
-          readOnly: true
-        ingest_content_files_for_ai:
-          type: boolean
-          readOnly: true
-        courseruns:
-          type: array
-          items:
-            $ref: '#/components/schemas/V2CourseRun'
-          readOnly: true
-      required:
-      - availability
-      - certificate_type
-      - courseruns
-      - departments
-      - duration
-      - id
-      - include_in_learn_catalog
-      - ingest_content_files_for_ai
-      - max_price
-      - max_weekly_hours
-      - max_weeks
-      - min_price
-      - min_weekly_hours
-      - min_weeks
-      - next_run_id
-      - page
-      - programs
-      - readable_id
-      - required_prerequisites
-      - time_commitment
-      - title
-      - topics
     CreateB2BEnrollment:
       type: object
       description: |-
@@ -1708,6 +1824,47 @@ components:
       x-enum-descriptions:
       - audit
       - verified
+    Faculty:
+      type: object
+      description: Serializer for faculty details used in course pages.
+      properties:
+        id:
+          type: integer
+        instructor_name:
+          type: string
+        instructor_title:
+          type: string
+        instructor_bio_short:
+          type: string
+        instructor_bio_long:
+          type: string
+        feature_image_src:
+          type: string
+      required:
+      - feature_image_src
+      - id
+      - instructor_bio_long
+      - instructor_bio_short
+      - instructor_name
+      - instructor_title
+    FeatureImage:
+      type: object
+      description: Serializer for feature images used in course pages.
+      properties:
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        height:
+          type: integer
+        width:
+          type: integer
+      required:
+      - height
+      - image_url
+      - title
+      - width
     GenderEnum:
       enum:
       - m
@@ -1952,29 +2109,116 @@ components:
       - logo
       - name
       - slug
-    PaginatedCourseWithCourseRunsList:
+    Override:
       type: object
-      required:
-      - count
-      - results
+      description: Serializer for overrides used in certificate pages.
       properties:
-        count:
+        type:
+          type: string
+        value:
+          $ref: '#/components/schemas/OverrideValue'
+        id:
+          type: string
+      required:
+      - id
+      - type
+      - value
+    OverrideValue:
+      type: object
+      description: Serializer for override values used in certificate pages.
+      properties:
+        readable_id:
+          type: string
+        CEUs:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+      required:
+      - CEUs
+      - readable_id
+    Page:
+      type: object
+      description: Serializer for individual Wagtail pages.
+      properties:
+        id:
           type: integer
-          example: 123
-        next:
+        title:
           type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      required:
+      - id
+      - meta
+      - title
+    PageList:
+      type: object
+      description: Serializer for a list of Wagtail pages.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
           type: array
           items:
-            $ref: '#/components/schemas/CourseWithCourseRuns'
+            $ref: '#/components/schemas/Page'
+      required:
+      - items
+      - meta
+    PageListMeta:
+      type: object
+      description: Serializer for metadata of a list of Wagtail pages.
+      properties:
+        total_count:
+          type: integer
+      required:
+      - total_count
+    PageMeta:
+      type: object
+      description: Serializer for page metadata used in various Wagtail pages.
+      properties:
+        type:
+          type: string
+        detail_url:
+          type: string
+          format: uri
+        html_url:
+          type: string
+          format: uri
+        slug:
+          type: string
+        show_in_menus:
+          type: boolean
+        seo_title:
+          type: string
+        search_description:
+          type: string
+        first_published_at:
+          type: string
+          format: date-time
+          nullable: true
+        alias_of:
+          type: string
+          nullable: true
+        locale:
+          type: string
+        live:
+          type: boolean
+        last_published_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - alias_of
+      - detail_url
+      - first_published_at
+      - html_url
+      - last_published_at
+      - live
+      - locale
+      - search_description
+      - seo_title
+      - show_in_menus
+      - slug
+      - type
     PaginatedStaffDashboardUserList:
       type: object
       required:
@@ -2044,6 +2288,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/V1Program'
+    PaginatedV2CourseWithCourseRunsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2CourseWithCourseRuns'
     PaginatedV2ProgramCollectionList:
       type: object
       required:
@@ -2194,6 +2461,22 @@ components:
       - customer-support
       - staff
       - legacy
+    PriceItem:
+      type: object
+      description: Serializer for price items used in course pages.
+      properties:
+        type:
+          type: string
+        value:
+          type: object
+          additionalProperties: {}
+        id:
+          type: string
+          format: uuid
+      required:
+      - id
+      - type
+      - value
     ProductFlexibilePrice:
       type: object
       description: Simple serializer for Product without related purchasable objects
@@ -2311,6 +2594,105 @@ components:
       - live
       - page_url
       - price
+    ProgramPageItem:
+      type: object
+      description: Serializer for individual program page items, including all relevant
+        fields.
+      properties:
+        id:
+          type: integer
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+        title:
+          type: string
+        description:
+          type: string
+        length:
+          type: string
+        effort:
+          type: string
+        min_weekly_hours:
+          type: string
+        max_weekly_hours:
+          type: string
+        min_weeks:
+          type: integer
+        max_weeks:
+          type: integer
+        price:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceItem'
+        min_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        max_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        prerequisites:
+          type: string
+        faq_url:
+          type: string
+          format: uri
+        about:
+          type: string
+        what_you_learn:
+          type: string
+        feature_image:
+          $ref: '#/components/schemas/FeatureImage'
+        video_url:
+          type: string
+          format: uri
+        faculty_section_title:
+          type: string
+        faculty:
+          type: array
+          items:
+            $ref: '#/components/schemas/Faculty'
+        certificate_page:
+          $ref: '#/components/schemas/CertificatePage'
+        program_details:
+          $ref: '#/components/schemas/V2Program'
+      required:
+      - about
+      - certificate_page
+      - description
+      - effort
+      - faculty
+      - faculty_section_title
+      - faq_url
+      - feature_image
+      - id
+      - length
+      - max_price
+      - max_weekly_hours
+      - max_weeks
+      - meta
+      - min_price
+      - min_weekly_hours
+      - min_weeks
+      - prerequisites
+      - price
+      - program_details
+      - title
+      - video_url
+      - what_you_learn
+    ProgramPageList:
+      type: object
+      description: Serializer for a list of program pages, including metadata and
+        items.
+      properties:
+        meta:
+          $ref: '#/components/schemas/PageListMeta'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProgramPageItem'
+      required:
+      - items
+      - meta
     PublicUser:
       type: object
       description: Serializer for public user data
@@ -2377,6 +2759,26 @@ components:
       - b2b-error-invalid-enrollment-code
       - b2b-error-requires-checkout
       - b2b-enroll-success
+    SignatoryItem:
+      type: object
+      description: Serializer for signatory items used in certificate pages.
+      properties:
+        name:
+          type: string
+        title_1:
+          type: string
+        title_2:
+          type: string
+        organization:
+          type: string
+        signature_image:
+          type: string
+      required:
+      - name
+      - organization
+      - signature_image
+      - title_1
+      - title_2
     StaffDashboardUser:
       type: object
       description: Serializer for data we care about in the staff dashboard
@@ -2411,6 +2813,16 @@ components:
       - id
       - legal_address
       - username
+    Topic:
+      type: object
+      description: Serializer for topics used in course pages.
+      properties:
+        name:
+          type: string
+        parent:
+          type: string
+      required:
+      - name
     User:
       type: object
       description: Serializer for users
@@ -3152,6 +3564,132 @@ components:
       - operator
       - course
       - program
+    V2Course:
+      type: object
+      description: Course model serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        next_run_id:
+          type: integer
+          nullable: true
+          description: Get next run id
+          readOnly: true
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+          readOnly: true
+        page:
+          allOf:
+          - $ref: '#/components/schemas/CoursePage'
+          readOnly: true
+        programs:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          nullable: true
+          readOnly: true
+        topics:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: List topics of a course
+          readOnly: true
+        certificate_type:
+          type: string
+          readOnly: true
+        required_prerequisites:
+          type: boolean
+          description: |-
+            Check if the prerequisites field is populated in the course page CMS.
+            Returns:
+                bool: True when the prerequisites field is populated in the course page CMS.  False otherwise.
+          readOnly: true
+        duration:
+          type: string
+          description: Get the duration of the course from the course page CMS.
+          readOnly: true
+        min_weeks:
+          type: integer
+          nullable: true
+          description: Get the min weeks of the course from the CMS page.
+          readOnly: true
+        max_weeks:
+          type: integer
+          nullable: true
+          description: Get the max weeks of the course from the CMS page.
+          readOnly: true
+        min_price:
+          type: integer
+          nullable: true
+          description: Get the min price of the product from the CMS page.
+          readOnly: true
+        max_price:
+          type: integer
+          nullable: true
+          description: Get the max price of the product from the CMS page.
+          readOnly: true
+        time_commitment:
+          type: string
+          nullable: true
+          description: Get the time commitment of the course from the course page
+            CMS.
+          readOnly: true
+        availability:
+          type: string
+          description: Get course availability
+          readOnly: true
+        min_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the min weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+        max_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the max weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+        include_in_learn_catalog:
+          type: boolean
+          readOnly: true
+        ingest_content_files_for_ai:
+          type: boolean
+          readOnly: true
+      required:
+      - availability
+      - certificate_type
+      - departments
+      - duration
+      - id
+      - include_in_learn_catalog
+      - ingest_content_files_for_ai
+      - max_price
+      - max_weekly_hours
+      - max_weeks
+      - min_price
+      - min_weekly_hours
+      - min_weeks
+      - next_run_id
+      - page
+      - programs
+      - readable_id
+      - required_prerequisites
+      - time_commitment
+      - title
+      - topics
     V2CourseRun:
       type: object
       description: CourseRun model serializer
@@ -3263,6 +3801,138 @@ components:
       - products
       - run_tag
       - title
+    V2CourseWithCourseRuns:
+      type: object
+      description: Course model serializer - also serializes child course runs
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        next_run_id:
+          type: integer
+          nullable: true
+          description: Get next run id
+          readOnly: true
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+          readOnly: true
+        page:
+          allOf:
+          - $ref: '#/components/schemas/CoursePage'
+          readOnly: true
+        programs:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          nullable: true
+          readOnly: true
+        topics:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: List topics of a course
+          readOnly: true
+        certificate_type:
+          type: string
+          readOnly: true
+        required_prerequisites:
+          type: boolean
+          description: |-
+            Check if the prerequisites field is populated in the course page CMS.
+            Returns:
+                bool: True when the prerequisites field is populated in the course page CMS.  False otherwise.
+          readOnly: true
+        duration:
+          type: string
+          description: Get the duration of the course from the course page CMS.
+          readOnly: true
+        min_weeks:
+          type: integer
+          nullable: true
+          description: Get the min weeks of the course from the CMS page.
+          readOnly: true
+        max_weeks:
+          type: integer
+          nullable: true
+          description: Get the max weeks of the course from the CMS page.
+          readOnly: true
+        min_price:
+          type: integer
+          nullable: true
+          description: Get the min price of the product from the CMS page.
+          readOnly: true
+        max_price:
+          type: integer
+          nullable: true
+          description: Get the max price of the product from the CMS page.
+          readOnly: true
+        time_commitment:
+          type: string
+          nullable: true
+          description: Get the time commitment of the course from the course page
+            CMS.
+          readOnly: true
+        availability:
+          type: string
+          description: Get course availability
+          readOnly: true
+        min_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the min weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+        max_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the max weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+        include_in_learn_catalog:
+          type: boolean
+          readOnly: true
+        ingest_content_files_for_ai:
+          type: boolean
+          readOnly: true
+        courseruns:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2CourseRun'
+          readOnly: true
+      required:
+      - availability
+      - certificate_type
+      - courseruns
+      - departments
+      - duration
+      - id
+      - include_in_learn_catalog
+      - ingest_content_files_for_ai
+      - max_price
+      - max_weekly_hours
+      - max_weeks
+      - min_price
+      - min_weekly_hours
+      - min_weeks
+      - next_run_id
+      - page
+      - programs
+      - readable_id
+      - required_prerequisites
+      - time_commitment
+      - title
+      - topics
     V2Program:
       type: object
       description: Program Model Serializer v2

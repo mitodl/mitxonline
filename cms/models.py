@@ -28,6 +28,7 @@ from wagtail.admin.panels import (
     InlinePanel,
     PageChooserPanel,
 )
+from wagtail.api import APIField
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import (
@@ -61,6 +62,7 @@ from cms.constants import (
     SIGNATORY_INDEX_SLUG,
 )
 from cms.forms import CertificatePageForm
+from cms.wagtail_api.serializers import ImageSerializer, ProductChildPageSerializer
 from courses.api import get_relevant_course_run_qset
 from courses.models import (
     Course,
@@ -373,6 +375,12 @@ class CertificatePage(CourseProgramChildPage):
         FieldPanel("overrides"),
         FieldPanel("signatories"),
     ]
+    api_fields = [
+        APIField("product_name"),
+        APIField("CEUs"),
+        APIField("overrides"),
+        APIField("signatory_items"),
+    ]
 
     base_form_class = CertificatePageForm
 
@@ -410,6 +418,22 @@ class CertificatePage(CourseProgramChildPage):
             if block.value:
                 pages.append(block.value.specific)  # noqa: PERF401
         return pages
+
+    @property
+    def signatory_items(self):
+        """
+        Returns the signatories as a list of SignatoryPage objects.
+        """
+        return [
+            {
+                "name": page.name,
+                "title_1": page.title_1,
+                "title_2": page.title_2,
+                "organization": page.organization,
+                "signature_image": page.signature_image.file.url,
+            }
+            for page in self.signatory_pages
+        ]
 
     @property
     def parent(self):
@@ -586,6 +610,14 @@ class InstructorPage(Page):
         FieldPanel("instructor_bio_short"),
         FieldPanel("instructor_bio_long"),
         FieldPanel("feature_image"),
+    ]
+    api_fields = [
+        APIField("title"),
+        APIField("instructor_name"),
+        APIField("instructor_title"),
+        APIField("instructor_bio_short"),
+        APIField("instructor_bio_long"),
+        APIField("feature_image", serializer=ImageSerializer()),
     ]
 
     def serve(self, request, *args, **kwargs):  # noqa: ARG002
@@ -1089,6 +1121,56 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         help_text="The title text to display in the faculty cards section of the product page.",
     )
 
+    content_panels = Page.content_panels + [  # noqa: RUF005
+        FieldPanel("description"),
+        FieldPanel("length"),
+        FieldPanel("effort"),
+        FieldPanel("min_weekly_hours"),
+        FieldPanel("max_weekly_hours"),
+        FieldPanel("min_weeks"),
+        FieldPanel("max_weeks"),
+        FieldPanel("price"),
+        FieldPanel("min_price"),
+        FieldPanel("max_price"),
+        FieldPanel("prerequisites"),
+        FieldPanel("faq_url"),
+        FieldPanel("about"),
+        FieldPanel("what_you_learn"),
+        FieldPanel("feature_image"),
+        FieldPanel("video_url"),
+        FieldPanel("faculty_section_title"),
+        InlinePanel(
+            "linked_instructors",
+            label="Faculty Members",
+        ),
+    ]
+    api_fields = [
+        APIField("description"),
+        APIField("length"),
+        APIField("effort"),
+        APIField("min_weekly_hours"),
+        APIField("max_weekly_hours"),
+        APIField("min_weeks"),
+        APIField("max_weeks"),
+        APIField("price"),
+        APIField("min_price"),
+        APIField("max_price"),
+        APIField("prerequisites"),
+        APIField("faq_url"),
+        APIField("about"),
+        APIField("what_you_learn"),
+        APIField("feature_image", serializer=ImageSerializer()),
+        APIField("video_url"),
+        APIField("faculty_section_title"),
+        APIField("faculty"),
+        APIField("certificate_page", serializer=ProductChildPageSerializer()),
+    ]
+
+    subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
+
+    # Matches the standard page path that Wagtail returns for this page type.
+    slugged_page_path_pattern = re.compile(r"(^.*/)([^/]+)(/?$)")
+
     def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
         """
         Updates related courseware object title.
@@ -1124,34 +1206,18 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         """Gets the product page type, this is used for sorting product pages."""
         return isinstance(self, ProgramPage)
 
-    content_panels = Page.content_panels + [  # noqa: RUF005
-        FieldPanel("description"),
-        FieldPanel("length"),
-        FieldPanel("effort"),
-        FieldPanel("min_weekly_hours"),
-        FieldPanel("max_weekly_hours"),
-        FieldPanel("min_weeks"),
-        FieldPanel("max_weeks"),
-        FieldPanel("price"),
-        FieldPanel("min_price"),
-        FieldPanel("max_price"),
-        FieldPanel("prerequisites"),
-        FieldPanel("faq_url"),
-        FieldPanel("about"),
-        FieldPanel("what_you_learn"),
-        FieldPanel("feature_image"),
-        FieldPanel("video_url"),
-        FieldPanel("faculty_section_title"),
-        InlinePanel(
-            "linked_instructors",
-            label="Faculty Members",
-        ),
-    ]
+    @property
+    def faculty(self):
+        """
+        Returns a list of linked instructors for this product page.
+        This is used for wagtail API.
+        """
+        from cms.serializers import InstructorPageSerializer
 
-    subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
-
-    # Matches the standard page path that Wagtail returns for this page type.
-    slugged_page_path_pattern = re.compile(r"(^.*/)([^/]+)(/?$)")
+        instructor_pages = [
+            member.linked_instructor_page for member in self.linked_instructors.all()
+        ]
+        return InstructorPageSerializer(instructor_pages, many=True).data
 
     @property
     def product(self):
@@ -1219,6 +1285,7 @@ class CoursePage(ProductPage):
         help_text="If true, allow the AI chatbots to ingest the course's content files.",
     )
 
+    template = "product_page.html"
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
             "course",
@@ -1226,6 +1293,20 @@ class CoursePage(ProductPage):
                 index.AutocompleteField("readable_id"),
             ],
         )
+    ]
+    content_panels = [
+        FieldPanel("course"),
+        FieldPanel("topics"),
+        *ProductPage.content_panels,
+        FieldPanel("include_in_learn_catalog"),
+        FieldPanel("ingest_content_files_for_ai"),
+    ]
+    api_fields = [
+        *ProductPage.api_fields,
+        APIField("course_details"),
+        APIField("topic_list"),
+        APIField("include_in_learn_catalog"),
+        APIField("ingest_content_files_for_ai"),
     ]
 
     @cached_property
@@ -1264,8 +1345,6 @@ class CoursePage(ProductPage):
 
         return None
 
-    template = "product_page.html"
-
     def get_admin_display_title(self):
         """Gets the title of the course in the specified format"""
         return f"{self.course.readable_id} | {self.title}"
@@ -1302,13 +1381,21 @@ class CoursePage(ProductPage):
             "product": product,
         }
 
-    content_panels = [
-        FieldPanel("course"),
-        FieldPanel("topics"),
-        *ProductPage.content_panels,
-        FieldPanel("include_in_learn_catalog"),
-        FieldPanel("ingest_content_files_for_ai"),
-    ]
+    @property
+    def topic_list(self):
+        return [
+            {
+                "name": topic.name,
+                "parent": topic.parent.name if topic.parent else None,
+            }
+            for topic in self.topics.all()
+        ]
+
+    @property
+    def course_details(self):
+        from courses.serializers.v2.courses import CourseSerializer
+
+        return CourseSerializer(self.course).data
 
 
 class ProgramPage(ProductPage):
@@ -1322,6 +1409,7 @@ class ProgramPage(ProductPage):
         "courses.Program", null=True, on_delete=models.SET_NULL, related_name="page"
     )
 
+    template = "product_page.html"
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
             "program",
@@ -1330,13 +1418,18 @@ class ProgramPage(ProductPage):
             ],
         )
     ]
+    content_panels = [  # noqa: RUF005
+        FieldPanel("program"),
+    ] + ProductPage.content_panels
+    api_fields = [
+        *ProductPage.api_fields,
+        APIField("program_details"),
+    ]
 
     @property
     def product(self):
         """Gets the product associated with this page"""
         return self.program
-
-    template = "product_page.html"
 
     def get_admin_display_title(self):
         """Gets the title of the course in the specified format"""
@@ -1363,9 +1456,11 @@ class ProgramPage(ProductPage):
             "program_type": self.product.program_type,
         }
 
-    content_panels = [  # noqa: RUF005
-        FieldPanel("program"),
-    ] + ProductPage.content_panels
+    @property
+    def program_details(self):
+        from courses.serializers.v2.programs import ProgramSerializer
+
+        return ProgramSerializer(self.program).data
 
 
 class ResourcePage(Page):
@@ -1776,6 +1871,13 @@ class SignatoryPage(Page):
         FieldPanel("title_2"),
         FieldPanel("organization"),
         FieldPanel("signature_image"),
+    ]
+    api_fields = [
+        APIField("name"),
+        APIField("title_1"),
+        APIField("title_2"),
+        APIField("organization"),
+        APIField("signature_image", serializer=ImageSerializer()),
     ]
 
     def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
