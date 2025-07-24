@@ -138,7 +138,7 @@ class WagtailPagesRetrieveSchemaView(APIView):
                 name="revision_id",
                 required=False,
                 type=int,
-                description="Optional revision ID to retrieve a specific revision of the page",
+                description="Optional certificate revision ID to retrieve a specific revision of the certificate page",
             ),
         ],
         responses={

@@ -959,7 +959,8 @@ paths:
         name: revision_id
         schema:
           type: integer
-        description: Optional revision ID to retrieve a specific revision of the page
+        description: Optional certificate revision ID to retrieve a specific revision
+          of the certificate page
       tags:
       - pages
       responses:
@@ -973,34 +974,6 @@ paths:
                 - $ref: '#/components/schemas/CertificatePage'
                 - $ref: '#/components/schemas/Page'
           description: Returns a page of any known Wagtail page type
-  /api/v2/pages/{id}/?revision_id={revision_id}:
-    get:
-      operationId: pages_?revision_id=_retrieve
-      description: Returns details of a specific certificate page by ID. Can be used
-        to retrieve a specific revision if `revision_id` is provided.
-      summary: Get Certificate Page and Revision Details
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: ID of the Certificate page
-        required: true
-      - in: path
-        name: revision_id
-        schema:
-          type: string
-          pattern: ^[0-9]+$
-        required: true
-      tags:
-      - pages
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CertificatePage'
-          description: ''
   /api/v2/pages/?fields=*&type=cms.CertificatePage:
     get:
       operationId: pages_?fields=*&type=cms.CertificatePage_retrieve
