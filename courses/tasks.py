@@ -29,7 +29,7 @@ def sync_courseruns_data():
     now = now_in_utc()
     runs = CourseRun.objects.live().filter(
         Q(expiration_date__isnull=True) | Q(expiration_date__gt=now)
-    )
+    ).exclude(run_tag__startswith="fake-")
 
     # `sync_course_runs` logs internally so no need to capture/output the returned values
     sync_course_mode(runs)
