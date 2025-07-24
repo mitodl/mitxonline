@@ -38,7 +38,6 @@ from openedx.exceptions import (
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
-    EdxApiUserDoesNotExistError,
     EdxApiUserUpdateError,
     NoEdxApiAuthError,
     OpenEdXOAuth2Error,
