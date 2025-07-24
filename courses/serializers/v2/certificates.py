@@ -1,10 +1,123 @@
 """Serializers for certificate data."""
 
 from rest_framework import serializers
-from wagtail.api.v2.serializers import PageSerializer
+from rest_framework.reverse import reverse
+from wagtail.api.v2.serializers import (
+    PageHtmlUrlField,
+    PageLocaleField,
+)
+from wagtail.models import Page
 
+from cms.models import CertificatePage
+from cms.wagtail_api.schema.serializers import (
+    CertificatePageSerializer,
+    PageMetaSerializer,
+)
 from courses.models import BaseCertificate, CourseRunCertificate, ProgramCertificate
 from users.serializers import UserSerializer
+
+
+class PageMetaModelSerializer(PageMetaSerializer, serializers.ModelSerializer):
+    """Extends the PageMetaSerializer to work with a Page object"""
+
+    type = serializers.SerializerMethodField()
+    detail_url = serializers.SerializerMethodField()
+    html_url = PageHtmlUrlField()
+    locale = PageLocaleField()
+
+    def get_type(self, instance):
+        """
+        Get the page type, in a more simple manner than Wagtail.
+
+        The Wagtail version of this is PageTypeField, and it tries to modify the
+        context, which we neither need nor is in the correct format for it.
+        """
+
+        if instance.specific_class is None:
+            return None
+        return (
+            instance.specific_class._meta.app_label  # noqa: SLF001
+            + "."
+            + instance.specific_class.__name__
+        )
+
+    def get_detail_url(self, instance):
+        """
+        Get the detail URL, which should be the API call for this page.
+        """
+
+        return reverse("wagtailapi:pages:detail", kwargs={"pk": instance.id})
+
+    class Meta:
+        """Meta opts for the serializer."""
+
+        model = Page
+        fields = [
+            "type",
+            "detail_url",
+            "html_url",
+            "slug",
+            "show_in_menus",
+            "seo_title",
+            "search_description",
+            "first_published_at",
+            "alias_of",
+            "locale",
+            "live",
+            "last_published_at",
+        ]
+        read_only_fields = [
+            "type",
+            "detail_url",
+            "html_url",
+            "slug",
+            "show_in_menus",
+            "seo_title",
+            "search_description",
+            "first_published_at",
+            "alias_of",
+            "locale",
+            "live",
+            "last_published_at",
+        ]
+
+
+class CertificatePageModelSerializer(
+    CertificatePageSerializer, serializers.ModelSerializer
+):
+    """Extends the CertificatePageSerializer to work with a model object."""
+
+    meta = serializers.SerializerMethodField()
+
+    def get_meta(self, instance):
+        """Get page metadata."""
+
+        return PageMetaModelSerializer(
+            instance.page_ptr, context={"request": self.context["request"]}
+        ).data
+
+    class Meta:
+        """Meta opts for the serializer."""
+
+        model = CertificatePage
+        fields = [
+            "id",
+            "meta",
+            "title",
+            "product_name",
+            "CEUs",
+            "overrides",
+            "signatory_items",
+        ]
+        read_only_fields = [
+            "id",
+            "meta",
+            "title",
+            "product_name",
+            "CEUs",
+            "overrides",
+            "signatory_items",
+        ]
 
 
 class BaseCertificateSerializer(serializers.ModelSerializer):
@@ -25,8 +138,9 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
         if hasattr(instance, "certificate_page_revision"):
             cert = instance.certificate_page_revision.as_object()
 
-            # This should change once the Wagtail API stuff gets merged.
-            return PageSerializer(cert).data
+            return CertificatePageModelSerializer(
+                cert, context={"request": self.context["request"]}
+            ).data
 
         return None
 
@@ -40,7 +154,7 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
             "is_revoked",
             "certificate_page",
         ]
-        readonly_fields = [
+        read_only_fields = [
             "user",
             "uuid",
             "is_revoked",
@@ -60,8 +174,8 @@ class CourseRunCertificateSerializer(BaseCertificateSerializer):
             "course_run",
             "certificate_page_revision",
         ]
-        readonly_fields = [
-            *BaseCertificateSerializer.Meta.readonly_fields,
+        read_only_fields = [
+            *BaseCertificateSerializer.Meta.read_only_fields,
             "course_run",
             "certificate_page_revision",
         ]
@@ -79,8 +193,8 @@ class ProgramCertificateSerializer(BaseCertificateSerializer):
             "program",
             "certificate_page_revision",
         ]
-        readonly_fields = [
-            *BaseCertificateSerializer.Meta.readonly_fields,
+        read_only_fields = [
+            *BaseCertificateSerializer.Meta.read_only_fields,
             "program",
             "certificate_page_revision",
         ]

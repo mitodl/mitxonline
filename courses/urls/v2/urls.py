@@ -1,3 +1,4 @@
+from django.urls import path
 from rest_framework import routers
 
 from courses.views import v2
@@ -13,4 +14,7 @@ router.register(
 router.register(r"courses", v2.CourseViewSet, basename="courses_api")
 router.register(r"departments", v2.DepartmentViewSet, basename="departments_api")
 
-urlpatterns = router.urls
+urlpatterns = [
+    *router.urls,
+    path(r"course_certificates/<str:cert_uuid>/", v2.get_course_certificate),
+]
