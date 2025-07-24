@@ -23,6 +23,7 @@ class WagtailPagesSchemaView(APIView):
     @extend_schema(
         summary="List all Wagtail Pages",
         description="Returns pages of all types",
+        operation_id="pages_list",
         parameters=[
             OpenApiParameter(
                 name="type",
@@ -125,9 +126,10 @@ class WagtailPagesRetrieveSchemaView(APIView):
     @extend_schema(
         summary="Get Wagtail Page Details",
         description="Returns details of a specific Wagtail page by ID",
+        operation_id="pages_retrieve",
         parameters=[
             OpenApiParameter(
-                name="pk",
+                name="id",
                 type=int,
                 location=OpenApiParameter.PATH,
                 required=True,
@@ -148,10 +150,10 @@ class WagtailPagesRetrieveSchemaView(APIView):
             )
         },
     )
-    def get(self, request, pk, *args, **kwargs):  # noqa: ARG002
+    def get(self, request, id, *args, **kwargs):  # noqa: ARG002, A002
         return Response(
             {
-                "id": pk,
+                "id": id,
                 "title": "Sample Page",
                 "meta": {
                     "total_count": 1,
@@ -170,25 +172,19 @@ class WagtailCertificatePagesRetrieveSchemaView(APIView):
         description="Returns details of a specific certificate page by ID. Can be used to retrieve a specific revision if `revision_id` is provided.",
         parameters=[
             OpenApiParameter(
-                name="pk",
+                name="id",
                 type=int,
                 location=OpenApiParameter.PATH,
                 required=True,
                 description="ID of the Certificate page",
             ),
-            OpenApiParameter(
-                name="revision_id",
-                required=False,
-                type=int,
-                description="ID of the specific revision to retrieve",
-            ),
         ],
         responses=CertificatePageSerializer,
     )
-    def get(self, request, pk, *args, **kwargs):  # noqa: ARG002
+    def get(self, request, id, *args, **kwargs):  # noqa: ARG002, A002
         return Response(
             {
-                "id": pk,
+                "id": id,
                 "title": "Sample Page",
                 "meta": {
                     "total_count": 1,
