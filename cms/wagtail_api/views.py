@@ -3,7 +3,6 @@ Views for Wagtail API
 """
 
 from django.db.models import F
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from wagtail.api.v2.views import PagesAPIViewSet
 
