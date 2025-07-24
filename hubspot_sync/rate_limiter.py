@@ -22,7 +22,7 @@ class HubSpotRateLimiter:
 
     def __init__(self):
         self.last_request_time = 0
-        self.min_delay_ms = getattr(settings, 'HUBSPOT_TASK_DELAY', 60)
+        self.min_delay_ms = getattr(settings, "HUBSPOT_TASK_DELAY", 60)
 
     def wait_for_rate_limit(self, response_headers: dict | None = None) -> None:
         """
@@ -37,7 +37,6 @@ class HubSpotRateLimiter:
             delay_ms = self._calculate_delay_from_headers(response_headers)
         else:
             delay_ms = self.min_delay_ms
-
 
         time_since_last = (current_time - self.last_request_time) * 1000
         if time_since_last < delay_ms:
@@ -59,12 +58,16 @@ class HubSpotRateLimiter:
         """
         try:
             # Check if we're close to hitting limits
-            remaining_secondly = int(headers.get('x-hubspot-ratelimit-secondly-remaining', 19))
-            max_secondly = int(headers.get('x-hubspot-ratelimit-secondly', 19))
+            remaining_secondly = int(
+                headers.get("x-hubspot-ratelimit-secondly-remaining", 19)
+            )
+            max_secondly = int(headers.get("x-hubspot-ratelimit-secondly", 19))
 
-            remaining_interval = int(headers.get('x-hubspot-ratelimit-remaining', 190))
-            max_interval = int(headers.get('x-hubspot-ratelimit-max', 190))
-            interval_ms = int(headers.get('x-hubspot-ratelimit-interval-milliseconds', 10000))
+            remaining_interval = int(headers.get("x-hubspot-ratelimit-remaining", 190))
+            max_interval = int(headers.get("x-hubspot-ratelimit-max", 190))
+            interval_ms = int(
+                headers.get("x-hubspot-ratelimit-interval-milliseconds", 10000)
+            )
 
             if remaining_secondly <= CRITICAL_SECONDLY_THRESHOLD:
                 return 1100
@@ -73,7 +76,9 @@ class HubSpotRateLimiter:
             elif remaining_interval <= CRITICAL_INTERVAL_THRESHOLD:
                 return max(200, interval_ms // max_interval * 2)
             else:
-                target_rate = min(max_secondly * 0.8, max_interval * 0.8 / (interval_ms / 1000))
+                target_rate = min(
+                    max_secondly * 0.8, max_interval * 0.8 / (interval_ms / 1000)
+                )
                 return int(1000 / target_rate) if target_rate > 0 else self.min_delay_ms
 
         except (ValueError, KeyError, ZeroDivisionError) as e:
@@ -106,4 +111,4 @@ def calculate_exponential_backoff(attempt: int, base_delay: int = 60) -> float:
         float: Delay in seconds
     """
     max_delay = 300
-    return min(base_delay * (2 ** attempt), max_delay)
+    return min(base_delay * (2**attempt), max_delay)
