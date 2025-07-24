@@ -27,7 +27,6 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
     known_query_parameters = PagesAPIViewSet.known_query_parameters.union(
         ["readable_id"]
     )
-    permission_classes = (AllowAny,)
 
     def get_queryset(self):
         """
