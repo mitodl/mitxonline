@@ -8,7 +8,6 @@ from rest_framework.views import APIView
 
 from .serializers import (
     CertificatePageListSerializer,
-    CertificatePageSerializer,
     CoursePageListSerializer,
     PageListSerializer,
     ProgramPageListSerializer,
@@ -134,7 +133,13 @@ class WagtailPagesRetrieveSchemaView(APIView):
                 location=OpenApiParameter.PATH,
                 required=True,
                 description="ID of the Wagtail page",
-            )
+            ),
+            OpenApiParameter(
+                name="revision_id",
+                required=False,
+                type=int,
+                description="Optional revision ID to retrieve a specific revision of the page",
+            ),
         ],
         responses={
             200: OpenApiResponse(
@@ -149,37 +154,6 @@ class WagtailPagesRetrieveSchemaView(APIView):
                 description="Returns a page of any known Wagtail page type",
             )
         },
-    )
-    def get(self, request, id, *args, **kwargs):  # noqa: ARG002, A002
-        return Response(
-            {
-                "id": id,
-                "title": "Sample Page",
-                "meta": {
-                    "total_count": 1,
-                },
-            }
-        )
-
-
-class WagtailCertificatePagesRetrieveSchemaView(APIView):
-    """
-    View for retrieving details of a specific Certificate Page with schema documentation.
-    """
-
-    @extend_schema(
-        summary="Get Certificate Page and Revision Details",
-        description="Returns details of a specific certificate page by ID. Can be used to retrieve a specific revision if `revision_id` is provided.",
-        parameters=[
-            OpenApiParameter(
-                name="id",
-                type=int,
-                location=OpenApiParameter.PATH,
-                required=True,
-                description="ID of the Certificate page",
-            ),
-        ],
-        responses=CertificatePageSerializer,
     )
     def get(self, request, id, *args, **kwargs):  # noqa: ARG002, A002
         return Response(

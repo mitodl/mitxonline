@@ -955,6 +955,11 @@ paths:
           type: integer
         description: ID of the Wagtail page
         required: true
+      - in: query
+        name: revision_id
+        schema:
+          type: integer
+        description: Optional revision ID to retrieve a specific revision of the page
       tags:
       - pages
       responses:

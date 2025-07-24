@@ -125,7 +125,6 @@ def insert_wagtail_pages_schema(endpoints):
     """
 
     from cms.wagtail_api.schema.views import (
-        WagtailCertificatePagesRetrieveSchemaView,
         WagtailCertificatePagesSchemaView,
         WagtailCoursePagesSchemaView,
         WagtailPagesRetrieveSchemaView,
@@ -148,15 +147,11 @@ def insert_wagtail_pages_schema(endpoints):
     class WrappedPagesRetrieveView(WagtailPagesRetrieveSchemaView):
         pass
 
-    class WrappedCertificateRetrieveView(WagtailCertificatePagesRetrieveSchemaView):
-        pass
-
     pages_view = WrappedPagesView.as_view()
     certificate_view = WrappedCertificateView.as_view()
     course_view = WrappedCourseView.as_view()
     program_view = WrappedProgramView.as_view()
     retrieve_view = WrappedPagesRetrieveView.as_view()
-    certificate_retrieve_view = WrappedCertificateRetrieveView.as_view()
 
     # manually attach the class for schema inspection
     pages_view.cls = WrappedPagesView
@@ -164,7 +159,6 @@ def insert_wagtail_pages_schema(endpoints):
     course_view.cls = WrappedCourseView
     program_view.cls = WrappedProgramView
     retrieve_view.cls = WrappedPagesRetrieveView
-    certificate_retrieve_view.cls = WrappedCertificateRetrieveView
     endpoints.append(
         (
             "/api/v2/pages/",
@@ -203,14 +197,6 @@ def insert_wagtail_pages_schema(endpoints):
             "^api/v2/pages/(?P<id>[0-9]+)/$",
             "GET",
             retrieve_view,
-        )
-    )
-    endpoints.append(
-        (
-            "/api/v2/pages/{id}/?revision_id={revision_id}",
-            "^api/v2/pages/(?P<id>[0-9]+)/?revision_id=(?P<revision_id>[0-9]+)$",
-            "GET",
-            certificate_retrieve_view,
         )
     )
     return endpoints
