@@ -890,7 +890,7 @@ def enroll_in_edx_course_runs(
                     )
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
-            if exc.response.status_code == 406:
+            if exc.response.status_code == 406:  # noqa: PLR2004
                 log.warning(
                     "User %s does not exist in edX, attempting to create user.",
                     user.edx_username,
