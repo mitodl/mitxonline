@@ -314,16 +314,29 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         return node
 
-    def add_requirement(self, course):
+    def add_requirement(self, requirement):
         """Makes the specified course a required course"""
+        if isinstance(requirement, Course):
+            self.get_requirements_root().get_children().filter(
+                course=requirement
+            ).delete()
 
-        self.get_requirements_root().get_children().filter(course=course).delete()
+            new_req = self._add_course_node(
+                ProgramRequirement.Operator.ALL_OF
+            ).add_child(course=requirement, node_type=ProgramRequirementNodeType.COURSE)
+        elif isinstance(requirement, Program):
+            self.get_requirements_root().get_children().filter(
+                required_program=requirement
+            ).delete()
 
-        new_req = self._add_course_node(ProgramRequirement.Operator.ALL_OF).add_child(
-            course=course, node_type=ProgramRequirementNodeType.COURSE
-        )
+            new_req = self._add_course_node(
+                ProgramRequirement.Operator.ALL_OF
+            ).add_child(
+                required_program=requirement,
+                node_type=ProgramRequirementNodeType.PROGRAM,
+            )
 
-        return new_req  # noqa: RET504
+        return new_req
 
     def add_elective(self, course):
         """Makes the specified course an elective course"""
@@ -538,6 +551,16 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def is_run(self):
         """Flag to indicate if this is a run"""
         return False
+
+    @property
+    def collections(self):
+        """
+        Returns a list of ProgramCollections that this program is part of.
+
+        Returns:
+            list: List of ProgramCollection objects
+        """
+        return list(ProgramCollection.objects.filter(programs__id=self.id).distinct())
 
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):

@@ -3282,21 +3282,44 @@ components:
           items:
             type: integer
           readOnly: true
+        collections:
+          type: array
+          items:
+            type: integer
+          readOnly: true
         requirements:
           type: object
           properties:
-            required:
-              type: array
-              items:
-                oneOf:
-                - type: integer
-              description: List of required course IDs
-            electives:
-              type: array
-              items:
-                oneOf:
-                - type: integer
-              description: List of elective course IDs
+            courses:
+              type: object
+              properties:
+                required:
+                  type: array
+                  items:
+                    oneOf:
+                    - type: integer
+                  description: List of required course IDs
+                electives:
+                  type: array
+                  items:
+                    oneOf:
+                    - type: integer
+                  description: List of elective course IDs
+            programs:
+              type: object
+              properties:
+                required:
+                  type: array
+                  items:
+                    oneOf:
+                    - type: integer
+                  description: List of required program IDs
+                electives:
+                  type: array
+                  items:
+                    oneOf:
+                    - type: integer
+                  description: List of elective program IDs
           readOnly: true
         req_tree:
           type: array
@@ -3389,6 +3412,7 @@ components:
           readOnly: true
       required:
       - certificate_type
+      - collections
       - courses
       - departments
       - duration

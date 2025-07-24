@@ -7,6 +7,8 @@ from cms.factories import CoursePageFactory
 from cms.serializers import ProgramPageSerializer
 from courses.factories import (  # noqa: F401
     CourseRunFactory,
+    ProgramCollectionFactory,
+    ProgramFactory,
     program_with_empty_requirements,
 )
 from courses.models import CoursesTopic, Department
@@ -55,18 +57,37 @@ def test_serialize_program(
     )
     course2 = run2.course
     CoursePageFactory.create(course=run2.course)
+    program_collection = ProgramCollectionFactory.create(
+        title="Test Collection",
+    )
+    program_collection.programs.add(program_with_empty_requirements)
+    program_collection.save()
+    required_program = ProgramFactory.create(
+        page=None,
+        title="Required Program",
+    )
 
-    formatted_reqs = {"required": [], "electives": []}
+    formatted_reqs = {
+        "courses": {"required": [], "electives": []},
+        "programs": {"required": [], "electives": []},
+    }
 
     topics = []
     if not remove_tree:
         program_with_empty_requirements.add_requirement(course1)
         program_with_empty_requirements.add_requirement(course2)
-        formatted_reqs["required"] = [
+        program_with_empty_requirements.add_requirement(required_program)
+        formatted_reqs["courses"]["required"] = [
             course.id for course in program_with_empty_requirements.required_courses
         ]
-        formatted_reqs["electives"] = [
+        formatted_reqs["courses"]["electives"] = [
             course.id for course in program_with_empty_requirements.elective_courses
+        ]
+        formatted_reqs["programs"]["required"] = [
+            program.id for program in program_with_empty_requirements.required_programs
+        ]
+        formatted_reqs["programs"]["electives"] = [
+            program.id for program in program_with_empty_requirements.elective_programs
         ]
         topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
         course1.page.topics.set([topics[0], topics[1]])
@@ -96,6 +117,7 @@ def test_serialize_program(
             "courses": [course.id for course in [course1, course2]]
             if not remove_tree
             else [],
+            "collections": [program_collection.id],
             "requirements": formatted_reqs,
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root

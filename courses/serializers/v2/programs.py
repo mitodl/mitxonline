@@ -86,6 +86,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     """Program Model Serializer v2"""
 
     courses = serializers.SerializerMethodField()
+    collections = serializers.SerializerMethodField()
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
@@ -104,35 +105,75 @@ class ProgramSerializer(serializers.ModelSerializer):
     def get_courses(self, instance) -> list[int]:
         return [course[0].id for course in instance.courses if course[0].live]
 
+    def get_collections(self, instance) -> list[int]:
+        return [
+            collection.id
+            for collection in ProgramCollection.objects.filter(programs__id=instance.id)
+        ]
+
     @extend_schema_field(
         {
             "type": "object",
             "properties": {
-                "required": {
-                    "type": "array",
-                    "items": {
-                        "oneOf": [
-                            {"type": "integer"},
-                        ]
+                "courses": {
+                    "type": "object",
+                    "properties": {
+                        "required": {
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    {"type": "integer"},
+                                ]
+                            },
+                            "description": "List of required course IDs",
+                        },
+                        "electives": {
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    {"type": "integer"},
+                                ]
+                            },
+                            "description": "List of elective course IDs",
+                        },
                     },
-                    "description": "List of required course IDs",
                 },
-                "electives": {
-                    "type": "array",
-                    "items": {
-                        "oneOf": [
-                            {"type": "integer"},
-                        ]
+                "programs": {
+                    "type": "object",
+                    "properties": {
+                        "required": {
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    {"type": "integer"},
+                                ]
+                            },
+                            "description": "List of required program IDs",
+                        },
+                        "electives": {
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    {"type": "integer"},
+                                ]
+                            },
+                            "description": "List of elective program IDs",
+                        },
                     },
-                    "description": "List of elective course IDs",
                 },
             },
         }
     )
     def get_requirements(self, instance):
         return {
-            "required": [course.id for course in instance.required_courses],
-            "electives": [course.id for course in instance.elective_courses],
+            "courses": {
+                "required": [course.id for course in instance.required_courses],
+                "electives": [course.id for course in instance.elective_courses],
+            },
+            "programs": {
+                "required": [program.id for program in instance.required_programs],
+                "electives": [program.id for program in instance.elective_programs],
+            },
         }
 
     def get_required_prerequisites(self, instance) -> bool:
@@ -260,6 +301,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "readable_id",
             "id",
             "courses",
+            "collections",
             "requirements",
             "req_tree",
             "page",
