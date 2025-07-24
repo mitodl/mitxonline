@@ -199,16 +199,16 @@ def insert_wagtail_pages_schema(endpoints):
     )
     endpoints.append(
         (
-            "/api/v2/pages/<int>/",
-            "^api/v2/pages/<int>/",
+            "/api/v2/pages/<int:pk>/",
+            "^api/v2/pages/(?P<pk>[0-9]+)/",
             "GET",
             retrieve_view,
         )
     )
     endpoints.append(
         (
-            "/api/v2/pages/<int>/?revision_id=<int>",
-            "^api/v2/pages/<int>/?revision_id=<int>$",
+            "/api/v2/pages/<int:pk>/?revision_id=<int>",
+            "^api/v2/pages/(?P<pk>[0-9]+)/?revision_id=<int>$",
             "GET",
             certificate_retrieve_view,
         )

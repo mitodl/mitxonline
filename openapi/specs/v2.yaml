@@ -943,11 +943,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/PageList'
           description: ''
-  /api/v2/pages/<int>/:
+  /api/v2/pages/<int:pk>/:
     get:
-      operationId: pages_<int>_retrieve
+      operationId: pages_<int:pk>_retrieve
       description: Returns details of a specific Wagtail page by ID
       summary: Get Wagtail Page Details
+      parameters:
+      - in: path
+        name: pk
+        schema:
+          type: integer
+        description: ID of the Wagtail page
+        required: true
       tags:
       - pages
       responses:
@@ -961,12 +968,24 @@ paths:
                 - $ref: '#/components/schemas/CertificatePage'
                 - $ref: '#/components/schemas/Page'
           description: Returns a page of any known Wagtail page type
-  /api/v2/pages/<int>/?revision_id=<int>:
+  /api/v2/pages/<int:pk>/?revision_id=<int>:
     get:
-      operationId: pages_<int>_?revision_id=<int>_retrieve
+      operationId: pages_<int:pk>_?revision_id=<int>_retrieve
       description: Returns details of a specific certificate page by ID. Can be used
         to retrieve a specific revision if `revision_id` is provided.
       summary: Get Certificate Page and Revision Details
+      parameters:
+      - in: path
+        name: pk
+        schema:
+          type: integer
+        description: ID of the Certificate page
+        required: true
+      - in: query
+        name: revision_id
+        schema:
+          type: integer
+        description: ID of the specific revision to retrieve
       tags:
       - pages
       responses:

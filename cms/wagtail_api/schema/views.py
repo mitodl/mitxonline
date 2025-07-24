@@ -125,6 +125,15 @@ class WagtailPagesRetrieveSchemaView(APIView):
     @extend_schema(
         summary="Get Wagtail Page Details",
         description="Returns details of a specific Wagtail page by ID",
+        parameters=[
+            OpenApiParameter(
+                name="pk",
+                type=int,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="ID of the Wagtail page",
+            )
+        ],
         responses={
             200: OpenApiResponse(
                 response={
@@ -159,6 +168,21 @@ class WagtailCertificatePagesRetrieveSchemaView(APIView):
     @extend_schema(
         summary="Get Certificate Page and Revision Details",
         description="Returns details of a specific certificate page by ID. Can be used to retrieve a specific revision if `revision_id` is provided.",
+        parameters=[
+            OpenApiParameter(
+                name="pk",
+                type=int,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="ID of the Certificate page",
+            ),
+            OpenApiParameter(
+                name="revision_id",
+                required=False,
+                type=int,
+                description="ID of the specific revision to retrieve",
+            ),
+        ],
         responses=CertificatePageSerializer,
     )
     def get(self, request, pk, *args, **kwargs):  # noqa: ARG002
