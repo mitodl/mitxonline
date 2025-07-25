@@ -36,7 +36,7 @@ class TestHubSpotRateLimiter:
     def test_wait_for_rate_limit_no_headers(self, mock_time, mock_sleep):
         """Test rate limiting with no headers uses minimum delay."""
         mock_time.return_value = 0
-        
+
         self.rate_limiter.last_request_time = 0
         self.rate_limiter.min_delay_ms = 100
 
@@ -49,7 +49,7 @@ class TestHubSpotRateLimiter:
     def test_wait_for_rate_limit_no_sleep_needed(self, mock_time, mock_sleep):
         """Test that no sleep occurs if enough time has already passed."""
         mock_time.side_effect = [0.15, 0.2, 0.3, 0.4, 0.5]
-        
+
         self.rate_limiter.last_request_time = 0
         self.rate_limiter.min_delay_ms = 100
 
@@ -64,7 +64,7 @@ class TestHubSpotRateLimiter:
     ):
         """Test rate limiting when critically low on per-second requests."""
         mock_time.return_value = 0
-        
+
         headers = {
             "x-hubspot-ratelimit-secondly-remaining": "1",
             "x-hubspot-ratelimit-secondly": "19",
@@ -85,7 +85,7 @@ class TestHubSpotRateLimiter:
     ):
         """Test rate limiting when getting close to per-second limit."""
         mock_time.return_value = 0
-        
+
         headers = {
             "x-hubspot-ratelimit-secondly-remaining": "4",
             "x-hubspot-ratelimit-secondly": "19",
@@ -106,7 +106,7 @@ class TestHubSpotRateLimiter:
     ):
         """Test rate limiting when critically low on interval requests."""
         mock_time.return_value = 0
-        
+
         headers = {
             "x-hubspot-ratelimit-secondly-remaining": "15",
             "x-hubspot-ratelimit-secondly": "19",
@@ -125,7 +125,7 @@ class TestHubSpotRateLimiter:
     def test_wait_for_rate_limit_with_headers_normal(self, mock_time, mock_sleep):
         """Test rate limiting under normal conditions."""
         mock_time.return_value = 0
-        
+
         headers = {
             "x-hubspot-ratelimit-secondly-remaining": "15",
             "x-hubspot-ratelimit-secondly": "19",
@@ -169,10 +169,10 @@ class TestHubSpotRateLimiter:
     @patch("hubspot_sync.rate_limiter.time.time")
     def test_wait_for_rate_limit_updates_last_request_time(self, mock_time, mock_sleep):
         """Test that last_request_time is updated after waiting."""
-        
+
         self.rate_limiter.last_request_time = 0
         self.rate_limiter.wait_for_rate_limit()
-        
+
         assert self.rate_limiter.last_request_time == 2.0
 
 
@@ -247,11 +247,11 @@ class TestIntegration:
         ]
 
         sleep_times = []
-        
+
         with patch("hubspot_sync.rate_limiter.time.time", return_value=0):
             for headers in scenarios:
                 limiter.last_request_time = 0
-                
+
                 full_headers = {
                     "x-hubspot-ratelimit-secondly": "19",
                     "x-hubspot-ratelimit-max": "190",
@@ -270,7 +270,7 @@ class TestIntegration:
 
         assert len(sleep_times) == 4
         assert sleep_times[2] == 0.25  # Warning zone: 250ms
-        assert sleep_times[3] == 1.1   # Critical zone: 1100ms
+        assert sleep_times[3] == 1.1  # Critical zone: 1100ms
         assert sleep_times[3] > sleep_times[2]  # Critical > Warning
 
 
