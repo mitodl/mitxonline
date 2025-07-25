@@ -5,7 +5,8 @@ Course API Views version 2
 import django_filters
 from django.db.models import Count, Exists, OuterRef, Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import viewsets
 from rest_framework.decorators import api_view
 from rest_framework.pagination import PageNumberPagination
@@ -324,6 +325,12 @@ class ProgramCollectionViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),
+    ],
+    responses=CourseRunCertificateSerializer,
+)
 @api_view(["GET"])
 def get_course_certificate(request, cert_uuid):
     """Get a course certificate by UUID."""

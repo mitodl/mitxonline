@@ -1,5 +1,6 @@
 """Serializers for certificate data."""
 
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 from wagtail.api.v2.serializers import (
@@ -22,9 +23,22 @@ class PageMetaModelSerializer(PageMetaSerializer, serializers.ModelSerializer):
 
     type = serializers.SerializerMethodField()
     detail_url = serializers.SerializerMethodField()
-    html_url = PageHtmlUrlField()
-    locale = PageLocaleField()
+    html_url = serializers.SerializerMethodField()
+    locale = serializers.SerializerMethodField()
 
+    @extend_schema_field(str)
+    def get_html_url(self, instance):
+        """Return PageHtmlUrlField. This is wrapped for OpenAPI schema generation."""
+
+        return PageHtmlUrlField(instance.html_url)
+
+    @extend_schema_field(str)
+    def get_locale(self, instance):
+        """Return PageLocaleField. This is wrapped for OpenAPI schema generation."""
+
+        return PageLocaleField(instance.locale)
+
+    @extend_schema_field(str)
     def get_type(self, instance):
         """
         Get the page type, in a more simple manner than Wagtail.
@@ -41,9 +55,13 @@ class PageMetaModelSerializer(PageMetaSerializer, serializers.ModelSerializer):
             + instance.specific_class.__name__
         )
 
+    @extend_schema_field(str)
     def get_detail_url(self, instance):
         """
         Get the detail URL, which should be the API call for this page.
+
+        The Wagtail version of this is DetailUrlField and it also tries to make
+        changes to the context that we don't need.
         """
 
         return reverse("wagtailapi:pages:detail", kwargs={"pk": instance.id})
@@ -89,6 +107,7 @@ class CertificatePageModelSerializer(
 
     meta = serializers.SerializerMethodField()
 
+    @extend_schema_field(PageMetaModelSerializer)
     def get_meta(self, instance):
         """Get page metadata."""
 
@@ -126,6 +145,7 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     certificate_page = serializers.SerializerMethodField()
 
+    @extend_schema_field(CertificatePageModelSerializer)
     def get_certificate_page(self, instance):
         """
         Retrieve the certificate page. For certificates, we want to return the
@@ -162,6 +182,7 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
         ]
 
 
+@extend_schema_serializer(component_name="V2CourseRunCertificateSerializer")
 class CourseRunCertificateSerializer(BaseCertificateSerializer):
     """Serializer for course certificates."""
 
