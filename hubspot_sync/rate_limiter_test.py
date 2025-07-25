@@ -151,7 +151,7 @@ class TestHubSpotRateLimiter:
         }
 
         self.rate_limiter.min_delay_ms = 50
-        delay = self.rate_limiter._calculate_delay_from_headers(headers)
+        delay = self.rate_limiter._calculate_delay_from_headers(headers)  # noqa: SLF001
 
         assert delay == 50
         mock_log.warning.assert_called_once()
@@ -160,14 +160,14 @@ class TestHubSpotRateLimiter:
         """Test that missing headers use default values."""
         headers = {}
 
-        delay = self.rate_limiter._calculate_delay_from_headers(headers)
+        delay = self.rate_limiter._calculate_delay_from_headers(headers)  # noqa: SLF001
 
         expected_delay = int(1000 / (19 * 0.8))
         assert delay == expected_delay
 
     @patch("hubspot_sync.rate_limiter.time.sleep")
     @patch("hubspot_sync.rate_limiter.time.time")
-    def test_wait_for_rate_limit_updates_last_request_time(self, mock_time, mock_sleep):
+    def test_wait_for_rate_limit_updates_last_request_time(self):
         """Test that last_request_time is updated after waiting."""
 
         self.rate_limiter.last_request_time = 0
