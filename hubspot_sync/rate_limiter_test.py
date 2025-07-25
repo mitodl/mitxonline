@@ -167,8 +167,9 @@ class TestHubSpotRateLimiter:
 
     @patch("hubspot_sync.rate_limiter.time.sleep")
     @patch("hubspot_sync.rate_limiter.time.time")
-    def test_wait_for_rate_limit_updates_last_request_time(self):
+    def test_wait_for_rate_limit_updates_last_request_time(self, mock_time, mock_sleep):  # noqa: ARG002
         """Test that last_request_time is updated after waiting."""
+        mock_time.return_value = 2.0
 
         self.rate_limiter.last_request_time = 0
         self.rate_limiter.wait_for_rate_limit()
