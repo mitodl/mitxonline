@@ -20,11 +20,15 @@ from courses.models import (
     CoursesTopic,
     Department,
     Program,
+    ProgramCertificate,
     ProgramCollection,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
-from courses.serializers.v2.certificates import CourseRunCertificateSerializer
+from courses.serializers.v2.certificates import (
+    CourseRunCertificateSerializer,
+    ProgramCertificateSerializer,
+)
 from courses.serializers.v2.courses import (
     CourseTopicSerializer,
     CourseWithCourseRunsSerializer,
@@ -339,4 +343,21 @@ def get_course_certificate(request, cert_uuid):
 
     return Response(
         CourseRunCertificateSerializer(cert, context={"request": request}).data
+    )
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),
+    ],
+    responses=ProgramCertificateSerializer,
+)
+@api_view(["GET"])
+def get_program_certificate(request, cert_uuid):
+    """Get a program certificate by UUID."""
+
+    cert = ProgramCertificate.objects.filter(is_revoked=False, uuid=cert_uuid).get()
+
+    return Response(
+        ProgramCertificateSerializer(cert, context={"request": request}).data
     )

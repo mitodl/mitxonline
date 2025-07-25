@@ -1086,6 +1086,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2ProgramCollection'
           description: ''
+  /api/v2/program_certificates/{cert_uuid}/:
+    get:
+      operationId: program_certificates_retrieve
+      description: Get a program certificate by UUID.
+      parameters:
+      - in: path
+        name: cert_uuid
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - program_certificates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ProgramCertificate'
+          description: ''
   /api/v2/programs/:
     get:
       operationId: programs_list_v2
@@ -4249,6 +4269,39 @@ components:
       - time_commitment
       - title
       - topics
+    V2ProgramCertificate:
+      type: object
+      description: Serializer for course certificates.
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        is_revoked:
+          type: boolean
+          readOnly: true
+          title: Revoked
+          description: Indicates whether or not the certificate is revoked
+        certificate_page:
+          allOf:
+          - $ref: '#/components/schemas/CertificatePageModel'
+          readOnly: true
+        program:
+          type: integer
+          readOnly: true
+        certificate_page_revision:
+          type: integer
+          readOnly: true
+          nullable: true
+      required:
+      - certificate_page
+      - certificate_page_revision
+      - is_revoked
+      - program
+      - user
+      - uuid
     V2ProgramCollection:
       type: object
       description: Serializer for ProgramCollection

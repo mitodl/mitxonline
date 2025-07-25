@@ -30,13 +30,13 @@ class PageMetaModelSerializer(PageMetaSerializer, serializers.ModelSerializer):
     def get_html_url(self, instance):
         """Return PageHtmlUrlField. This is wrapped for OpenAPI schema generation."""
 
-        return PageHtmlUrlField(instance.html_url)
+        return PageHtmlUrlField().to_representation(instance)
 
     @extend_schema_field(str)
     def get_locale(self, instance):
         """Return PageLocaleField. This is wrapped for OpenAPI schema generation."""
 
-        return PageLocaleField(instance.locale)
+        return PageLocaleField().to_representation(instance)
 
     @extend_schema_field(str)
     def get_type(self, instance):
@@ -111,9 +111,7 @@ class CertificatePageModelSerializer(
     def get_meta(self, instance):
         """Get page metadata."""
 
-        return PageMetaModelSerializer(
-            instance.page_ptr, context={"request": self.context["request"]}
-        ).data
+        return PageMetaModelSerializer(instance.page_ptr).data
 
     class Meta:
         """Meta opts for the serializer."""
@@ -158,9 +156,7 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
         if hasattr(instance, "certificate_page_revision"):
             cert = instance.certificate_page_revision.as_object()
 
-            return CertificatePageModelSerializer(
-                cert, context={"request": self.context["request"]}
-            ).data
+            return CertificatePageModelSerializer(cert).data
 
         return None
 
@@ -202,6 +198,7 @@ class CourseRunCertificateSerializer(BaseCertificateSerializer):
         ]
 
 
+@extend_schema_serializer(component_name="V2ProgramCertificateSerializer")
 class ProgramCertificateSerializer(BaseCertificateSerializer):
     """Serializer for course certificates."""
 
