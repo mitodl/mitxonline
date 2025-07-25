@@ -801,6 +801,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/V1Program'
           description: ''
+  /api/v2/course_certificates/{cert_uuid}/:
+    get:
+      operationId: course_certificates_retrieve
+      description: Get a course certificate by UUID.
+      parameters:
+      - in: path
+        name: cert_uuid
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - course_certificates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2CourseRunCertificate'
+          description: ''
   /api/v2/courses/:
     get:
       operationId: api_v2_courses_list
@@ -1207,6 +1227,38 @@ components:
       required:
       - items
       - meta
+    CertificatePageModel:
+      type: object
+      description: Extends the CertificatePageSerializer to work with a model object.
+      properties:
+        id:
+          type: integer
+        meta:
+          allOf:
+          - $ref: '#/components/schemas/PageMetaModel'
+          readOnly: true
+        title:
+          type: string
+        product_name:
+          type: string
+        CEUs:
+          type: string
+        overrides:
+          type: array
+          items:
+            $ref: '#/components/schemas/Override'
+        signatory_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SignatoryItem'
+      required:
+      - CEUs
+      - id
+      - meta
+      - overrides
+      - product_name
+      - signatory_items
+      - title
     ChangeEmailRequestCreate:
       type: object
       description: Serializer for starting a user email change
@@ -2200,6 +2252,70 @@ components:
           nullable: true
         locale:
           type: string
+        live:
+          type: boolean
+        last_published_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - alias_of
+      - detail_url
+      - first_published_at
+      - html_url
+      - last_published_at
+      - live
+      - locale
+      - search_description
+      - seo_title
+      - show_in_menus
+      - slug
+      - type
+    PageMetaModel:
+      type: object
+      description: Extends the PageMetaSerializer to work with a Page object
+      properties:
+        type:
+          type: string
+          description: |-
+            Get the page type, in a more simple manner than Wagtail.
+
+            The Wagtail version of this is PageTypeField, and it tries to modify the
+            context, which we neither need nor is in the correct format for it.
+          readOnly: true
+        detail_url:
+          type: string
+          description: |-
+            Get the detail URL, which should be the API call for this page.
+
+            The Wagtail version of this is DetailUrlField and it also tries to make
+            changes to the context that we don't need.
+          readOnly: true
+        html_url:
+          type: string
+          description: Return PageHtmlUrlField. This is wrapped for OpenAPI schema
+            generation.
+          readOnly: true
+        slug:
+          type: string
+        show_in_menus:
+          type: boolean
+        seo_title:
+          type: string
+        search_description:
+          type: string
+        first_published_at:
+          type: string
+          format: date-time
+          nullable: true
+        alias_of:
+          type: string
+          nullable: true
+        locale:
+          type: string
+          description: Return PageLocaleField. This is wrapped for OpenAPI schema
+            generation.
+          readOnly: true
         live:
           type: boolean
         last_published_at:
@@ -3801,6 +3917,39 @@ components:
       - products
       - run_tag
       - title
+    V2CourseRunCertificate:
+      type: object
+      description: Serializer for course certificates.
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        is_revoked:
+          type: boolean
+          readOnly: true
+          title: Revoked
+          description: Indicates whether or not the certificate is revoked
+        certificate_page:
+          allOf:
+          - $ref: '#/components/schemas/CertificatePageModel'
+          readOnly: true
+        course_run:
+          type: integer
+          readOnly: true
+        certificate_page_revision:
+          type: integer
+          readOnly: true
+          nullable: true
+      required:
+      - certificate_page
+      - certificate_page_revision
+      - course_run
+      - is_revoked
+      - user
+      - uuid
     V2CourseWithCourseRuns:
       type: object
       description: Course model serializer - also serializes child course runs
