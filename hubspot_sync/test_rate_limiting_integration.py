@@ -59,7 +59,7 @@ class TestAPIRateLimitingIntegration:
         """Test that rate limiting is called before the API request."""
         user = UserFactory()
         mock_upsert.side_effect = ApiException("Test error")
-        
+
         with pytest.raises(ApiException):
             api.sync_contact_with_hubspot(user)
 
@@ -129,7 +129,7 @@ class TestTaskRateLimitingIntegration:
         """Test that rate limiting is called before each sync operation."""
         users = [UserFactory()]
         mock_filter.return_value = users
-        
+
         mock_sync_contact.side_effect = ApiException("Test error")
 
         result = sync_failed_contacts([users[0].id])
@@ -147,12 +147,12 @@ class TestRateLimitingConfiguration:
     def test_custom_task_delay_setting(self, mock_time, mock_sleep):
         """Test that custom HUBSPOT_TASK_DELAY setting is respected."""
         from hubspot_sync.rate_limiter import HubSpotRateLimiter
-        
+
         mock_time.side_effect = [0, 0, 0]
-        
+
         limiter = HubSpotRateLimiter()
         assert limiter.min_delay_ms == 200
-        
+
         limiter.wait_for_rate_limit()
 
         mock_sleep.assert_called_once_with(0.2)
@@ -162,6 +162,7 @@ class TestRateLimitingConfiguration:
         """Test behavior when aggressive rate limiting is disabled."""
 
         from django.conf import settings
+
         assert not settings.HUBSPOT_AGGRESSIVE_RATE_LIMITING
 
 
@@ -203,37 +204,39 @@ class TestRateLimitingPerformance:
     def test_consecutive_requests_timing(self, mock_time, mock_sleep):
         """Test that consecutive requests are properly spaced."""
         from hubspot_sync.rate_limiter import HubSpotRateLimiter
-        
+
         call_times = [0, 0.01, 0.02, 0.03, 0.04]
-        mock_time.side_effect = call_times * 3 
-        
+        mock_time.side_effect = call_times * 3
+
         limiter = HubSpotRateLimiter()
-        limiter.min_delay_ms = 60 
-        
+        limiter.min_delay_ms = 60
+
         limiter.wait_for_rate_limit()
         first_sleep = mock_sleep.call_args[0][0] if mock_sleep.called else 0
-        
+
         mock_sleep.reset_mock()
-        
+
         limiter.last_request_time = 0
         limiter.wait_for_rate_limit()
         second_sleep = mock_sleep.call_args[0][0] if mock_sleep.called else 0
-        
-        assert first_sleep == 0.06 
+
+        assert first_sleep == 0.06
         assert abs(second_sleep - 0.05) < 0.01
 
     @patch("hubspot_sync.rate_limiter.log")
     def test_rate_limiting_logging(self, mock_log):
         """Test that rate limiting produces appropriate log messages."""
         from hubspot_sync.rate_limiter import HubSpotRateLimiter
-        
+
         limiter = HubSpotRateLimiter()
-        
+
         headers = {"invalid": "data"}
-        with patch("hubspot_sync.rate_limiter.time.time", return_value=0), \
-             patch("hubspot_sync.rate_limiter.time.sleep"):
+        with (
+            patch("hubspot_sync.rate_limiter.time.time", return_value=0),
+            patch("hubspot_sync.rate_limiter.time.sleep"),
+        ):
             limiter.wait_for_rate_limit(headers)
-        
+
         mock_log.warning.assert_called_once()
         assert "Failed to parse rate limit headers" in str(mock_log.warning.call_args)
 
@@ -243,12 +246,14 @@ def create_test_user_batch(count=10):
     return [UserFactory() for _ in range(count)]
 
 
-def simulate_hubspot_response_with_headers(remaining_secondly=15, remaining_interval=150):
+def simulate_hubspot_response_with_headers(
+    remaining_secondly=15, remaining_interval=150
+):
     """Create mock HubSpot response headers for testing."""
     return {
-        'x-hubspot-ratelimit-secondly-remaining': str(remaining_secondly),
-        'x-hubspot-ratelimit-secondly': '19',
-        'x-hubspot-ratelimit-remaining': str(remaining_interval),
-        'x-hubspot-ratelimit-max': '190',
-        'x-hubspot-ratelimit-interval-milliseconds': '10000',
+        "x-hubspot-ratelimit-secondly-remaining": str(remaining_secondly),
+        "x-hubspot-ratelimit-secondly": "19",
+        "x-hubspot-ratelimit-remaining": str(remaining_interval),
+        "x-hubspot-ratelimit-max": "190",
+        "x-hubspot-ratelimit-interval-milliseconds": "10000",
     }
