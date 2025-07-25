@@ -26,6 +26,7 @@ from hubspot_sync import api
 from hubspot_sync.api import (
     get_hubspot_id_for_object,
 )
+from hubspot_sync.rate_limiter import wait_for_hubspot_rate_limit
 from main.celery import app
 from users.models import User
 
@@ -97,8 +98,9 @@ def sync_failed_contacts(chunk: List[int]) -> List[int]:  # noqa: UP006
     users = list(User.objects.filter(id__in=chunk))
     for user in users:
         try:
+            # Use intelligent rate limiting instead of fixed delay
+            wait_for_hubspot_rate_limit()
             api.sync_contact_with_hubspot(user)
-            time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
         except ApiException:  # noqa: PERF203
             failed_ids.append(user.id)
     return failed_ids
@@ -132,9 +134,10 @@ def handle_failed_batch_chunk(chunk: List[int], hubspot_type: str) -> List[int]:
 @app.task(
     acks_late=True,
     autoretry_for=(TooManyRequestsException, BlockingIOError),
-    max_retries=3,
-    retry_backoff=60,
+    max_retries=5,  # Increased retries for rate limits
+    retry_backoff=120,  # Longer initial backoff
     retry_jitter=True,
+    retry_backoff_max=600,  # Cap backoff at 10 minutes
 )
 @raise_429
 @single_task(10, key=task_obj_lock)

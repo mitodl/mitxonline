@@ -30,6 +30,7 @@ from mitol.hubspot_api.api import (
 from mitol.hubspot_api.models import HubspotObject
 
 from ecommerce.models import Line, Order, Product
+from hubspot_sync.rate_limiter import wait_for_hubspot_rate_limit
 from users.models import User
 
 log = logging.getLogger(__name__)
@@ -653,6 +654,10 @@ def sync_contact_with_hubspot(user: User):
     """
     content_type = ContentType.objects.get_for_model(User)
     body = make_contact_sync_message_from_user(user)
+
+    # Apply rate limiting before making the request
+    wait_for_hubspot_rate_limit()
+
     result = upsert_object_request(
         content_type,
         HubspotObjectType.CONTACTS.value,
