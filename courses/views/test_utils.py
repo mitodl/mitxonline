@@ -36,9 +36,9 @@ def num_queries_from_programs(programs, version="v1"):
     fixture always generates the same (3 course runs per course, no more than 3 courses per program.
 
     The added on num_queries value is:
-    - 4 query to get the program, related courses, related runs, department
-    - 3 times num_courses for wagtail to get the generic data for the program and courses
-    - 3 times num_courses for program requirements plus one for the initial call
+    - 4 (v1) / 9 (v2) query to get the program, program collections, related courses, related runs, department
+    - 3 (v1) / 6 (v2) times num_courses for wagtail to get the generic data for the program and courses
+    - 3 (v1) / 6 (v2) times num_courses for program requirements plus one for the initial call
 
 
     Args:
@@ -54,7 +54,7 @@ def num_queries_from_programs(programs, version="v1"):
                 num_queries += num_queries_from_course(course)
             num_queries += 4 + (6 * num_courses) + 1
         if version == "v2":
-            num_queries += 6 + (17 * num_courses) + 2
+            num_queries += 9 + (17 * num_courses) + 2
     return num_queries
 
 

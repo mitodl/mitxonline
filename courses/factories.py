@@ -7,6 +7,7 @@ import factory
 import faker
 import pytest
 import pytz
+import wagtail_factories
 from factory import SubFactory, fuzzy
 from factory.django import DjangoModelFactory
 
@@ -342,3 +343,21 @@ def program_with_requirements():
         mut_exclusive_courses=mut_exclusive_courses,
         mut_exclusive_courses_node=mut_exclusive_courses_node,
     )
+
+
+class ProgramCollectionFactory(wagtail_factories.PageFactory):
+    """Factory for ProgramCollection"""
+
+    description = fuzzy.FuzzyText(prefix="Description of Collection ")
+    live = True
+
+    class Meta:
+        model = "courses.ProgramCollection"
+
+    @factory.post_generation
+    def programs(self, create, extracted):
+        if not create or not extracted:
+            return
+        for program in extracted:
+            self.programs.add(program)
+        self.save()
