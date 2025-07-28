@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.125.2
+Version 0.125.2 (Released July 28, 2025)
 ---------------
 
 - feat: generate locally unique openedx name (#2833)
