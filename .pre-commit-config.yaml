@@ -14,11 +14,11 @@ repos:
       - id: check-toml
       - id: debug-statements
   - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.11.0-1
+    rev: v3.12.0-2
     hooks:
       - id: shfmt
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.37.0
+    rev: v1.37.1
     hooks:
       - id: yamllint
         args: [--format, parsable, -d, relaxed]
@@ -47,7 +47,7 @@ repos:
           - "config/keycloak/*"
         additional_dependencies: ["gibberish-detector"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.11.7"
+    rev: "v0.12.5"
     hooks:
       - id: ruff-format
       - id: ruff
