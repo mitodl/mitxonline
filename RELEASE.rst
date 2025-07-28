@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.125.3
+---------------
+
+- Update mitol-django-scim (#2831)
+- Catch the 406 Exception when user does not exist and create user (#2826)
+
 Version 0.125.2 (Released July 28, 2025)
 ---------------
 
