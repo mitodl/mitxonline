@@ -1,6 +1,25 @@
 Release Notes
 =============
 
+Version 0.125.2 (Released July 28, 2025)
+---------------
+
+- feat: generate locally unique openedx name (#2833)
+- Hubspot rate limiting (#2827)
+- add collections to program, show program type requirements (#2828)
+- Make unique index on User.email case insensitive (#2824)
+- feat: enable wagtail API (#2809)
+- Fix sentry + uwsgi warning for localdev (#2823)
+- Fix overwriting of name field with blank values (#2820)
+- Adding default extra hosts to docker compose (#2817)
+- Rename the course flag migration to fix conflict (#2818)
+- Optimize create_featured_items (#2816)
+- Collections model (#2804)
+- fix: handle duplicate username errors from edX by retrying user creation (#2802)
+- Add course status flags for AI ingestion and Learn catalog visibility (#2808)
+- Disable create-account page when keycloak login is enabled (#2811)
+- Fix the URL generation for B2B course runs (#2814)
+
 Version 0.125.1 (Released July 22, 2025)
 ---------------
 
