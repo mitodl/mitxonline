@@ -81,7 +81,7 @@ export class CourseProductDetailEnroll extends React.PureComponent<
 
   constructor(props: Props) {
     super(props)
-    
+
     // Bind methods to avoid creating new functions on every render
     this.toggleAddlProfileFieldsModal = this.toggleAddlProfileFieldsModal.bind(this)
     this.toggleCartConfirmationDialogVisibility = this.toggleCartConfirmationDialogVisibility.bind(this)
@@ -89,12 +89,12 @@ export class CourseProductDetailEnroll extends React.PureComponent<
     this.redirectToCourseHomepage = this.redirectToCourseHomepage.bind(this)
     this.saveProfile = this.saveProfile.bind(this)
     this.cancelEnrollment = this.cancelEnrollment.bind(this)
-    
+
     // Initialize memoization cache
     this._computedCourseDataCache = null
     this._lastCoursesRef = null
   }
-  
+
   componentWillUnmount() {
     // Clean up cache references to prevent memory leaks
     this._computedCourseDataCache = null
@@ -117,7 +117,7 @@ export class CourseProductDetailEnroll extends React.PureComponent<
       window.open(target, "_blank")
     }
   }
-  
+
   toggleCartConfirmationDialogVisibility() {
     this.setState({
       addedToCartDialogVisibility: !this.state.addedToCartDialogVisibility
@@ -229,28 +229,28 @@ export class CourseProductDetailEnroll extends React.PureComponent<
   // Memoize expensive computations to avoid recalculation on every render
   getComputedCourseData = () => {
     const { courses } = this.props
-    
+
     // Return cached result if courses haven't changed
     if (this._lastCoursesRef === courses && this._computedCourseDataCache) {
       return this._computedCourseDataCache
     }
-    
+
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     const course = courses && courses[0] ? courses[0] : null
-    
+
     const enrollableCourseRuns = courseRuns ?
       courseRuns.filter(
         (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
       ) :
       []
-    
+
     const upgradableCourseRuns = enrollableCourseRuns.filter(
       (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
     )
-    
+
     let run = null
     let product = null
-    
+
     if (courses && courseRuns) {
       run = getFirstRelevantRun(courses[0], courseRuns)
       if (run) {
@@ -258,7 +258,7 @@ export class CourseProductDetailEnroll extends React.PureComponent<
         this.updateDate(run)
       }
     }
-    
+
     const computedData = {
       course,
       courseRuns,
@@ -268,11 +268,11 @@ export class CourseProductDetailEnroll extends React.PureComponent<
       product,
       hasMultipleEnrollableRuns: enrollableCourseRuns && enrollableCourseRuns.length > 1
     }
-    
+
     // Cache the result
     this._computedCourseDataCache = computedData
     this._lastCoursesRef = courses
-    
+
     return computedData
   }
 
@@ -342,7 +342,7 @@ export class CourseProductDetailEnroll extends React.PureComponent<
     const { courses } = this.props
     const { addedToCartDialogVisibility } = this.state
     const course = courses && courses[0] ? courses[0] : null
-    
+
     return (
       <Modal
         id="added-to-cart-dialog"
@@ -391,18 +391,18 @@ export class CourseProductDetailEnroll extends React.PureComponent<
   renderUpgradeEnrollmentDialog() {
     const { courses, currentUser } = this.props
     const { upgradeEnrollmentDialogVisibility } = this.state
-    
+
     // Use memoized computation
     const {
       course,
       enrollableCourseRuns,
       upgradableCourseRuns
     } = this.getComputedCourseData()
-    
+
     if (upgradableCourseRuns.length < 1 && enrollableCourseRuns.length < 1) {
       return null
     }
-    
+
     const run = this.getCurrentCourseRun()
     const product = run && run.products ? run.products[0] : null
     const newCartDesign = checkFeatureFlag(
@@ -410,7 +410,7 @@ export class CourseProductDetailEnroll extends React.PureComponent<
       currentUser && currentUser.id ? currentUser.id : "anonymousUser"
     )
     const canUpgrade = !!(run && run.is_upgradable && product)
-    
+
     const needFinancialAssistanceLink =
       run &&
       course &&
@@ -426,7 +426,7 @@ export class CourseProductDetailEnroll extends React.PureComponent<
           Need financial assistance?
           </a>
         ) : null
-        
+
     return upgradableCourseRuns.length > 0 ||
       enrollableCourseRuns.length > 1 ? (
         <Modal
@@ -672,7 +672,7 @@ export class CourseProductDetailEnroll extends React.PureComponent<
 
   render() {
     const { courses, courseIsLoading, currentUser } = this.props
-    
+
     // Use memoized computation to avoid repeated calculations
     const {
       run,

@@ -81,7 +81,7 @@ export class DashboardPage extends React.PureComponent<
 
   constructor(props: DashboardPageProps) {
     super(props)
-    
+
     // Bind methods to avoid creating new functions on every render
     this.toggleDrawer = this.toggleDrawer.bind(this)
     this.updateDrawerEnrollments = this.updateDrawerEnrollments.bind(this)
@@ -91,7 +91,7 @@ export class DashboardPage extends React.PureComponent<
     this.saveProfile = this.saveProfile.bind(this)
     this.renderCurrentTab = this.renderCurrentTab.bind(this)
     this.renderAddlProfileFieldsModal = this.renderAddlProfileFieldsModal.bind(this)
-    
+
     // Cache for computed values
     this._tabClassesCache = null
     this._lastCurrentTab = null
@@ -157,25 +157,25 @@ export class DashboardPage extends React.PureComponent<
   // Memoize tab classes computation to avoid recalculation on every render
   getTabClasses = () => {
     const { currentTab } = this.state
-    
+
     // Return cached result if currentTab hasn't changed
     if (this._lastCurrentTab === currentTab && this._tabClassesCache) {
       return this._tabClassesCache
     }
-    
+
     const myCourseClasses = `dash-tab${
       currentTab === DashboardTab.courses ? " active" : ""
     }`
     const programsClasses = `dash-tab${
       currentTab === DashboardTab.programs ? " active" : ""
     }`
-    
+
     const classes = { myCourseClasses, programsClasses }
-    
+
     // Cache the result
     this._tabClassesCache = classes
     this._lastCurrentTab = currentTab
-    
+
     return classes
   }
 
@@ -312,10 +312,10 @@ export class DashboardPage extends React.PureComponent<
 
   render() {
     const { isLoading, programEnrollments, forceRequest } = this.props
-    
+
     // Use memoized tab classes computation
     const { myCourseClasses, programsClasses } = this.getTabClasses()
-    
+
     const programEnrollmentsLength = programEnrollments ?
       programEnrollments.length :
       0
