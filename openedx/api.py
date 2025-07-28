@@ -14,6 +14,7 @@ from edx_api.client import EdxApi
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from edx_api.course_runs.models import CourseRun, CourseRunList
 from mitol.common.utils import (
+    _find_available_username,
     find_object_with_matching_attr,
     get_error_response_summary,
     now_in_utc,
@@ -217,7 +218,16 @@ def create_edx_user(user, edx_username=None):
     )
 
     if open_edx_user.edx_username is None and edx_username is not None:
-        open_edx_user.edx_username = edx_username
+        if OpenEdxUser.objects.filter(edx_username=edx_username).exists():
+            unique_username = _find_available_username(
+                edx_username,
+                model=OpenEdxUser,
+                username_field="edx_username",
+                max_length=OPENEDX_USERNAME_MAX_LEN,
+            )
+            open_edx_user.edx_username = unique_username
+        else:
+            open_edx_user.edx_username = edx_username
         open_edx_user.save()
 
     with transaction.atomic():
