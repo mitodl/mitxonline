@@ -14,12 +14,12 @@ from edx_api.client import EdxApi
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from edx_api.course_runs.models import CourseRun, CourseRunList
 from mitol.common.utils import (
-    _find_available_username,
     find_object_with_matching_attr,
     get_error_response_summary,
     now_in_utc,
     usernameify,
 )
+from mitol.common.utils.user import _find_available_username
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
