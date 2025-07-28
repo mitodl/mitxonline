@@ -19,6 +19,7 @@ from mitol.common.utils import (
     now_in_utc,
     usernameify,
 )
+from mitol.common.utils.user import _find_available_username
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
@@ -217,7 +218,16 @@ def create_edx_user(user, edx_username=None):
     )
 
     if open_edx_user.edx_username is None and edx_username is not None:
-        open_edx_user.edx_username = edx_username
+        if OpenEdxUser.objects.filter(edx_username=edx_username).exists():
+            unique_username = _find_available_username(
+                edx_username,
+                model=OpenEdxUser,
+                username_field="edx_username",
+                max_length=OPENEDX_USERNAME_MAX_LEN,
+            )
+            open_edx_user.edx_username = unique_username
+        else:
+            open_edx_user.edx_username = edx_username
         open_edx_user.save()
 
     with transaction.atomic():
