@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.125.4
+---------------
+
+- tell wagtail to use our custom user model and order by email (#2839)
+- 7932 flaky test   test migrate usernames (#2835)
+
 Version 0.125.3 (Released July 28, 2025)
 ---------------
 
