@@ -2880,14 +2880,14 @@ setuptools = "*"
 
 [[package]]
 name = "mitol-django-scim"
-version = "2025.7.28"
+version = "2025.7.29"
 description = "Django application for SCIM integrations"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol_django_scim-2025.7.28-py3-none-any.whl", hash = "sha256:39fb60621a80ef9884abb3ca21bf5833a5cd6e016749457756cbb5fa89e30057"},
-    {file = "mitol_django_scim-2025.7.28.tar.gz", hash = "sha256:2a25414f19843519d4327c5e9c471d9d6e9ed13bb7823e330dfe6baa4a3cadbf"},
+    {file = "mitol_django_scim-2025.7.29-py3-none-any.whl", hash = "sha256:aa10c93756d15a2fd8e8f747095e53d0c9aa7510d6fad8ce559db5ad67acfb87"},
+    {file = "mitol_django_scim-2025.7.29.tar.gz", hash = "sha256:d9470c0b6293f3030229a2e495b249cad5b96f1cdc4b932a8dc67f9c433bd739"},
 ]
 
 [package.dependencies]
