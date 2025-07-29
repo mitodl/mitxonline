@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.125.6
+---------------
+
+- Add a management command to extend dates on unused courpons (#2838)
+
 Version 0.125.5 (Released July 29, 2025)
 ---------------
 
