@@ -9,8 +9,6 @@ from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.utils import IntegrityError
 
-from users.constants import MIGRATE_USERNAME_BATCH_SIZE
-
 log = logging.getLogger(__name__)
 
 
@@ -20,6 +18,7 @@ class Command(BaseCommand):
     """
 
     help = "Update users' usernames to match their email addresses."
+    MIGRATE_USERNAME_BATCH_SIZE = 1000
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
         """Set the username to the email address"""
@@ -32,8 +31,8 @@ class Command(BaseCommand):
         skipped_users = 0
         already_migrated_users = 0
 
-        for start in range(0, total_users, MIGRATE_USERNAME_BATCH_SIZE):
-            batch = users[start : start + MIGRATE_USERNAME_BATCH_SIZE]
+        for start in range(0, total_users, self.MIGRATE_USERNAME_BATCH_SIZE):
+            batch = users[start : start + self.MIGRATE_USERNAME_BATCH_SIZE]
             updates = []
             new_usernames = []
 

@@ -1,4 +1,0 @@
-"""User constants"""
-
-USERNAME_MAX_LEN = 500
-MIGRATE_USERNAME_BATCH_SIZE = 1000

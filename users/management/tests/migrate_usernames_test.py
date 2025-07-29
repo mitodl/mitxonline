@@ -7,7 +7,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 
-from users.constants import USERNAME_MAX_LEN
+from openedx.constants import OPENEDX_USERNAME_MAX_LEN
 from users.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
@@ -30,7 +30,7 @@ def test_migrate_usernames(break_one):
         # another user's email address.
         problem_email = FAKE.email()
         user1 = UserFactory(email=problem_email)
-        UserFactory(username=problem_email[:USERNAME_MAX_LEN])
+        UserFactory(username=problem_email[:OPENEDX_USERNAME_MAX_LEN])
 
     call_command(
         "migrate_usernames",
@@ -40,10 +40,10 @@ def test_migrate_usernames(break_one):
     if break_one:
         assert "Skipping update" in out.getvalue()
         user1.refresh_from_db()
-        assert user1.username != user1.email[:USERNAME_MAX_LEN]
+        assert user1.username != user1.email[:OPENEDX_USERNAME_MAX_LEN]
     else:
         assert "Successfully updated 10" in out.getvalue()
 
     for user in User.objects.all():
         if not break_one or user.id != user1.id:
-            assert user.username == user.email[:USERNAME_MAX_LEN]
+            assert user.username == user.email[:OPENEDX_USERNAME_MAX_LEN]
