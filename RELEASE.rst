@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.125.5
+---------------
+
+- Update scim package to pick up sync search fixes (#2842)
+
 Version 0.125.4 (Released July 29, 2025)
 ---------------
 
