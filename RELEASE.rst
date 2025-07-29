@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.125.4
+Version 0.125.4 (Released July 29, 2025)
 ---------------
 
 - tell wagtail to use our custom user model and order by email (#2839)
