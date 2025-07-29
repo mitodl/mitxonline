@@ -1,4 +1,3 @@
-
 from django.core.management import BaseCommand
 
 from ecommerce.models import Discount
@@ -18,7 +17,6 @@ class Command(BaseCommand):
     help = "Extend expiration date for unused coupons discount/enrollment codes."
 
     def add_arguments(self, parser) -> None:
-
         parser.add_argument(
             "--expires",
             type=str,
@@ -47,4 +45,4 @@ class Command(BaseCommand):
                 discount_code.expiration_date = extension_date
                 discount_code.save()
 
-        self.stdout.write(self.style.SUCCESS(f"Coupons expiration date extended."))
+        self.stdout.write(self.style.SUCCESS("Coupons expiration date extended."))
