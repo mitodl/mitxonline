@@ -1,14 +1,13 @@
 
 from django.core.management import BaseCommand
 
-from docs.source.conf import extensions
 from ecommerce.models import Discount
 from main.utils import parse_supplied_date
 
 
 class Command(BaseCommand):
     """
-    Generates discount (sometimes called enrollment) codes with some parameters.
+    Extends existing unused discount codes with some parameters.
 
     Make sure that the prefix you are providing has a term associated with the discount or that
     it is unique across all discounts.
