@@ -47,4 +47,8 @@ class Command(BaseCommand):
                 discount_code.save()
                 num_updated_coupons += 1
 
-        self.stdout.write(self.style.SUCCESS(f"Successfully updated {num_updated_coupons} discount codes."))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Successfully updated {num_updated_coupons} discount codes."
+            )
+        )
