@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.125.7
+---------------
+
+- Add certificate retrieval APIs (#2832)
+- Dont sync test course runs for product page enrollment scenarios (#2825)
+
 Version 0.125.6 (Released July 30, 2025)
 ---------------
 
