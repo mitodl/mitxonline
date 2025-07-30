@@ -8,9 +8,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import viewsets
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 
 from courses.models import (
@@ -336,6 +336,7 @@ class ProgramCollectionViewSet(viewsets.ReadOnlyModelViewSet):
     responses=CourseRunCertificateSerializer,
 )
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def get_course_certificate(request, cert_uuid):
     """Get a course certificate by UUID."""
 
@@ -353,6 +354,7 @@ def get_course_certificate(request, cert_uuid):
     responses=ProgramCertificateSerializer,
 )
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def get_program_certificate(request, cert_uuid):
     """Get a program certificate by UUID."""
 

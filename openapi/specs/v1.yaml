@@ -814,6 +814,8 @@ paths:
         required: true
       tags:
       - course_certificates
+      security:
+      - {}
       responses:
         '200':
           content:
@@ -1099,6 +1101,8 @@ paths:
         required: true
       tags:
       - program_certificates
+      security:
+      - {}
       responses:
         '200':
           content:
@@ -3942,7 +3946,7 @@ components:
       description: Serializer for course certificates.
       properties:
         user:
-          $ref: '#/components/schemas/User'
+          $ref: '#/components/schemas/PublicUser'
         uuid:
           type: string
           format: uuid
@@ -4274,7 +4278,7 @@ components:
       description: Serializer for course certificates.
       properties:
         user:
-          $ref: '#/components/schemas/User'
+          $ref: '#/components/schemas/PublicUser'
         uuid:
           type: string
           format: uuid

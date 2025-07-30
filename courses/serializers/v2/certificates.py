@@ -15,7 +15,7 @@ from cms.wagtail_api.schema.serializers import (
     PageMetaSerializer,
 )
 from courses.models import BaseCertificate, CourseRunCertificate, ProgramCertificate
-from users.serializers import UserSerializer
+from users.serializers import PublicUserSerializer
 
 
 class PageMetaModelSerializer(PageMetaSerializer, serializers.ModelSerializer):
@@ -140,7 +140,7 @@ class CertificatePageModelSerializer(
 class BaseCertificateSerializer(serializers.ModelSerializer):
     """Serializer for the shared BaseCertificate model"""
 
-    user = UserSerializer()
+    user = PublicUserSerializer()
     certificate_page = serializers.SerializerMethodField()
 
     @extend_schema_field(CertificatePageModelSerializer)
