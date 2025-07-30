@@ -40,9 +40,11 @@ class Command(BaseCommand):
         discounts = Discount.objects.filter(discount_code__contains=code_prefix)
         extension_date = parse_supplied_date(kwargs.get("expires"))
 
+        num_updated_coupons = 0
         for discount_code in discounts:
             if not discount_code.is_redeemed:
                 discount_code.expiration_date = extension_date
                 discount_code.save()
+                num_updated_coupons += 1
 
-        self.stdout.write(self.style.SUCCESS("Coupons expiration date extended."))
+        self.stdout.write(self.style.SUCCESS(f"Successfully updated {num_updated_coupons} discount codes."))
