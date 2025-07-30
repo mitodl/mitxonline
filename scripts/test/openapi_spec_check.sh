@@ -4,6 +4,7 @@ set -eo pipefail
 TMPDIR="$(mktemp -d)"
 SPECS_DIR=./openapi/specs/
 
+./manage.py migrate --noinput
 ./manage.py generate_openapi_spec \
 	--directory=$TMPDIR --fail-on-warn
 
