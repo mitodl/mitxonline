@@ -11,7 +11,7 @@ from courses.serializers.v2.certificates import (
     ProgramCertificateSerializer,
 )
 from main.test_utils import assert_drf_json_equal
-from users.serializers import UserSerializer
+from users.serializers import PublicUserSerializer
 
 pytestmark = [pytest.mark.django_db]
 
@@ -53,7 +53,7 @@ def test_serialize_certificate(is_program):
         serialized_data = CourseRunCertificateSerializer(certificate).data
 
     expected_data = {
-        "user": UserSerializer(certificate.user).data,
+        "user": PublicUserSerializer(certificate.user).data,
         "uuid": certificate.uuid,
         "is_revoked": certificate.is_revoked,
         "certificate_page_revision": cert_page.revisions.last().id,
