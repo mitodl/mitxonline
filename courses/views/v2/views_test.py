@@ -21,6 +21,7 @@ from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from courses.factories import (
     CourseFactory,
+    CourseRunEnrollmentFactory,
     CourseRunFactory,
     DepartmentFactory,
     ProgramFactory,
@@ -538,3 +539,41 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     resp = auth_api_client.get(f"{url}?org_id={second_contract.organization.id}")
 
     assert resp.status_code == 404
+
+
+def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+
+    org = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=org)
+
+    regular_course = CourseFactory.create()
+    regular_run = CourseRunFactory.create(course=regular_course)
+
+    b2b_course = CourseFactory.create()
+    b2b_run = CourseRunFactory.create(course=b2b_course, b2b_contract=contract)
+
+    CourseRunEnrollmentFactory.create(user=user, run=regular_run)
+    b2b_enrollment = CourseRunEnrollmentFactory.create(user=user, run=b2b_run)
+
+    resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()) == 2
+
+    resp = user_drf_client.get(
+        reverse("v2:user-enrollments-api-list"),
+        {"b2b_organization_id": org.id}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["id"] == b2b_enrollment.id
+    assert data[0]["b2b_organization_id"] == org.id
+    assert data[0]["b2b_contract_id"] == contract.id
+
+    resp = user_drf_client.get(
+        reverse("v2:user-enrollments-api-list"),
+        {"b2b_organization_id": 99999}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()) == 0
