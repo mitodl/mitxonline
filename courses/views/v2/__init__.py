@@ -10,6 +10,12 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status, viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import viewsets
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 
 from courses.api import deactivate_run_enrollment
@@ -18,12 +24,18 @@ from courses.models import (
     Course,
     CourseRun,
     CourseRunEnrollment,
+    CourseRunCertificate,
     CoursesTopic,
     Department,
     Program,
+    ProgramCertificate,
     ProgramCollection,
     ProgramRequirement,
     ProgramRequirementNodeType,
+)
+from courses.serializers.v2.certificates import (
+    CourseRunCertificateSerializer,
+    ProgramCertificateSerializer,
 )
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
@@ -424,3 +436,37 @@ class UserEnrollmentsApiViewSet(
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
+@extend_schema(
+    parameters=[
+        OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),
+    ],
+    responses=CourseRunCertificateSerializer,
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_course_certificate(request, cert_uuid):
+    """Get a course certificate by UUID."""
+
+    cert = CourseRunCertificate.objects.filter(is_revoked=False, uuid=cert_uuid).get()
+
+    return Response(
+        CourseRunCertificateSerializer(cert, context={"request": request}).data
+    )
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),
+    ],
+    responses=ProgramCertificateSerializer,
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_program_certificate(request, cert_uuid):
+    """Get a program certificate by UUID."""
+
+    cert = ProgramCertificate.objects.filter(is_revoked=False, uuid=cert_uuid).get()
+
+    return Response(
+        ProgramCertificateSerializer(cert, context={"request": request}).data
+    )

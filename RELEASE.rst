@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 0.125.6 (Released July 30, 2025)
+---------------
+
+- Add a management command to extend dates on unused courpons (#2838)
+
+Version 0.125.5 (Released July 29, 2025)
+---------------
+
+- Update scim package to pick up sync search fixes (#2842)
+
+Version 0.125.4 (Released July 29, 2025)
+---------------
+
+- tell wagtail to use our custom user model and order by email (#2839)
+- 7932 flaky test   test migrate usernames (#2835)
+
 Version 0.125.3 (Released July 28, 2025)
 ---------------
 

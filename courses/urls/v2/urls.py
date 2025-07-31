@@ -1,5 +1,6 @@
 """Course API v2 URL configuration."""
 
+from django.urls import path
 from rest_framework import routers
 
 from courses.views import v2
@@ -18,4 +19,8 @@ router.register(
     r"enrollments", v2.UserEnrollmentsApiViewSet, basename="user-enrollments-api"
 )
 
-urlpatterns = router.urls
+urlpatterns = [
+    *router.urls,
+    path(r"course_certificates/<str:cert_uuid>/", v2.get_course_certificate),
+    path(r"program_certificates/<str:cert_uuid>/", v2.get_program_certificate),
+]
