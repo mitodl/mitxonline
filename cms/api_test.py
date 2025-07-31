@@ -214,23 +214,27 @@ def test_home_page_featured_products_sorting(mocker):
     patched_get_home_page = mocker.patch(  # noqa: F841
         "cms.api.get_home_page", return_value=home_page
     )
-    
+
     now = now_in_utc()
     earlier_date = now - timedelta(days=30)
     later_date = now + timedelta(days=30)
 
     course_page_1 = CoursePageFactory.create(parent=home_page)
     course_page_2 = CoursePageFactory.create(parent=home_page)
-    
-    CourseRunFactory.create(course=course_page_1.product, start_date=later_date, live=True)
-    CourseRunFactory.create(course=course_page_2.product, start_date=earlier_date, live=True)
-    
+
+    CourseRunFactory.create(
+        course=course_page_1.product, start_date=later_date, live=True
+    )
+    CourseRunFactory.create(
+        course=course_page_2.product, start_date=earlier_date, live=True
+    )
+
     HomeProductLink.objects.create(page=home_page, course_product_page=course_page_1)
     HomeProductLink.objects.create(page=home_page, course_product_page=course_page_2)
-    
+
     featured_products = home_page.products
     assert len(featured_products) == 2
-    
+
     assert featured_products[0]["title"] == course_page_2.title
     assert featured_products[1]["title"] == course_page_1.title
 
