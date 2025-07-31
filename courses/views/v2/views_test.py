@@ -569,7 +569,7 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     assert len(data) == 1
     assert data[0]["id"] == b2b_enrollment.id
     assert data[0]["b2b_organization_id"] == org.id
-    assert data[0]["b2b_contract_id"] == contract.id
+    assert data[0]["b2b_contract] == contract.id
 
     resp = user_drf_client.get(
         reverse("v2:user-enrollments-api-list"),
