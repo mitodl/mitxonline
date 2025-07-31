@@ -18,7 +18,7 @@ from courses.serializers.v2.courses import (
 )
 from courses.views.v2 import UserEnrollmentFilterSet
 from main.test_utils import assert_drf_json_equal
-from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.factories import ContractPageFactory, OrganizationIndexPageFactory, OrganizationPageFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -190,7 +190,7 @@ class TestUserEnrollmentFiltering:
         """Test that the exclude_b2b filter correctly filters out B2B enrollments."""
         regular_enrollment = CourseRunEnrollmentFactory.create()
 
-        org = OrganizationPageFactory.create()
+        org = OrganizationPageFactory.create(title="Test B2B Org")
         contract = ContractPageFactory.create(organization=org)
         b2b_enrollment = CourseRunEnrollmentFactory.create()
         b2b_enrollment.run.b2b_contract = contract
@@ -216,9 +216,11 @@ class TestUserEnrollmentFiltering:
 
     def test_org_id_filter_logic(self):
         """Test that the org_id filter correctly filters by B2B organization."""
-        org1 = OrganizationPageFactory.create()
-        org2 = OrganizationPageFactory.create()
-        
+        org1_index_page = OrganizationIndexPageFactory.create(slug="org1")
+        org1 = OrganizationPageFactory.create(title="Test Org 1", parent=org1_index_page, org_key="test-org-1")
+        org2_index_page = OrganizationIndexPageFactory.create(slug="org2")
+        org2 = OrganizationPageFactory.create(title="Test Org 2", parent=org2_index_page, org_key="test-org-2")
+
         contract1 = ContractPageFactory.create(organization=org1)
         contract2 = ContractPageFactory.create(organization=org2)
         
