@@ -215,35 +215,27 @@ def test_home_page_featured_products_sorting(mocker):
         "cms.api.get_home_page", return_value=home_page
     )
     
-    # Create courses with deterministic start dates
     now = now_in_utc()
-    earlier_date = now - timedelta(days=30)  # 30 days ago
-    later_date = now + timedelta(days=30)    # 30 days from now
-    
-    # Create course pages in reverse chronological order to test sorting
+    earlier_date = now - timedelta(days=30)
+    later_date = now + timedelta(days=30)
+
     course_page_1 = CoursePageFactory.create(parent=home_page)
     course_page_2 = CoursePageFactory.create(parent=home_page)
     
-    # Create course runs with different start dates
-    # Course 1 gets the later date, Course 2 gets the earlier date
     CourseRunFactory.create(course=course_page_1.product, start_date=later_date, live=True)
     CourseRunFactory.create(course=course_page_2.product, start_date=earlier_date, live=True)
     
-    # Create home product links
     HomeProductLink.objects.create(page=home_page, course_product_page=course_page_1)
     HomeProductLink.objects.create(page=home_page, course_product_page=course_page_2)
     
-    # Get the featured products (should be sorted by start_date)
     featured_products = home_page.products
     assert len(featured_products) == 2
     
-    # Verify that products are sorted by start_date (earlier first)
-    assert featured_products[0]["start_date"] == earlier_date
-    assert featured_products[1]["start_date"] == later_date
+    assert featured_products[0]["start_date"].timestamp() == earlier_date.timestamp()
+    assert featured_products[1]["start_date"].timestamp() == later_date.timestamp()
     
-    # Verify that the products correspond to the correct course pages
-    assert featured_products[0]["title"] == course_page_2.title  # Earlier date
-    assert featured_products[1]["title"] == course_page_1.title  # Later date
+    assert featured_products[0]["title"] == course_page_2.title
+    assert featured_products[1]["title"] == course_page_1.title
 
 
 @pytest.mark.django_db
