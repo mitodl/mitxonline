@@ -333,6 +333,7 @@ MIDDLEWARE = (
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "main.middleware.apisix_debug_middleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "main.middleware.HostBasedCSRFMiddleware",
@@ -450,7 +451,7 @@ ROBOTS_CACHE_TIMEOUT = get_int(
 # Social Auth Configuration
 
 AUTHENTICATION_BACKENDS = (
-    "mitol.apigateway.backends.ApisixRemoteUserBackend",
+    "authentication.backends.apisix_remote_user_org.ApisixRemoteUserOrgBackend",
     "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
