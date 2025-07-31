@@ -1,3 +1,5 @@
+"""Course API v2 URL configuration."""
+
 from rest_framework import routers
 
 from courses.views import v2
@@ -12,5 +14,8 @@ router.register(
 )
 router.register(r"courses", v2.CourseViewSet, basename="courses_api")
 router.register(r"departments", v2.DepartmentViewSet, basename="departments_api")
+router.register(
+    r"enrollments", v2.UserEnrollmentsApiViewSet, basename="user-enrollments-api"
+)
 
 urlpatterns = router.urls
