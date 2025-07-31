@@ -2,6 +2,11 @@ import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.http import QueryDict
 
+from b2b.factories import (
+    ContractPageFactory,
+    OrganizationIndexPageFactory,
+    OrganizationPageFactory,
+)
 from cms.serializers import CoursePageSerializer
 from courses.factories import (
     CourseFactory,
@@ -18,7 +23,6 @@ from courses.serializers.v2.courses import (
 )
 from courses.views.v2 import UserEnrollmentFilterSet
 from main.test_utils import assert_drf_json_equal
-from b2b.factories import ContractPageFactory, OrganizationIndexPageFactory, OrganizationPageFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -195,21 +199,21 @@ class TestUserEnrollmentFiltering:
         b2b_enrollment = CourseRunEnrollmentFactory.create()
         b2b_enrollment.run.b2b_contract = contract
         b2b_enrollment.run.save()
-        
+
         queryset = CourseRunEnrollment.objects.filter(
             id__in=[regular_enrollment.id, b2b_enrollment.id]
         )
         filter_set = UserEnrollmentFilterSet(QueryDict(), queryset=queryset)
         result = filter_set.qs
         assert result.count() == 2
-        
-        filter_data = QueryDict('exclude_b2b=true')
+
+        filter_data = QueryDict("exclude_b2b=true")
         filter_set = UserEnrollmentFilterSet(filter_data, queryset=queryset)
         result = filter_set.qs
         assert result.count() == 1
         assert result.first().id == regular_enrollment.id
-        
-        filter_data = QueryDict('exclude_b2b=false')
+
+        filter_data = QueryDict("exclude_b2b=false")
         filter_set = UserEnrollmentFilterSet(filter_data, queryset=queryset)
         result = filter_set.qs
         assert result.count() == 2
@@ -217,29 +221,33 @@ class TestUserEnrollmentFiltering:
     def test_org_id_filter_logic(self):
         """Test that the org_id filter correctly filters by B2B organization."""
         org1_index_page = OrganizationIndexPageFactory.create(slug="org1")
-        org1 = OrganizationPageFactory.create(title="Test Org 1", parent=org1_index_page, org_key="test-org-1")
+        org1 = OrganizationPageFactory.create(
+            title="Test Org 1", parent=org1_index_page, org_key="test-org-1"
+        )
         org2_index_page = OrganizationIndexPageFactory.create(slug="org2")
-        org2 = OrganizationPageFactory.create(title="Test Org 2", parent=org2_index_page, org_key="test-org-2")
+        org2 = OrganizationPageFactory.create(
+            title="Test Org 2", parent=org2_index_page, org_key="test-org-2"
+        )
 
         contract1 = ContractPageFactory.create(organization=org1)
         contract2 = ContractPageFactory.create(organization=org2)
-        
+
         enrollment1 = CourseRunEnrollmentFactory.create()
         enrollment1.run.b2b_contract = contract1
         enrollment1.run.save()
-        
+
         enrollment2 = CourseRunEnrollmentFactory.create()
         enrollment2.run.b2b_contract = contract2
         enrollment2.run.save()
-        
+
         queryset = CourseRunEnrollment.objects.all()
-        filter_data = QueryDict(f'org_id={org1.id}')
+        filter_data = QueryDict(f"org_id={org1.id}")
         filter_set = UserEnrollmentFilterSet(filter_data, queryset=queryset)
         result = filter_set.qs
         assert result.count() == 1
         assert result.first().id == enrollment1.id
 
-        filter_data = QueryDict(f'org_id={org2.id}')
+        filter_data = QueryDict(f"org_id={org2.id}")
         filter_set = UserEnrollmentFilterSet(filter_data, queryset=queryset)
         result = filter_set.qs
         assert result.count() == 1

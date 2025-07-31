@@ -3,19 +3,21 @@ Course API Views version 2
 """
 
 import contextlib
+
 import django_filters
 from django.db.models import Count, Exists, OuterRef, Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema
-from rest_framework import mixins, status, viewsets
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import viewsets
+from mitol.olposthog.features import is_enabled
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.response import Response
 
 from courses.api import deactivate_run_enrollment
@@ -23,8 +25,8 @@ from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     Course,
     CourseRun,
-    CourseRunEnrollment,
     CourseRunCertificate,
+    CourseRunEnrollment,
     CoursesTopic,
     Department,
     Program,
@@ -51,7 +53,6 @@ from courses.serializers.v2.programs import (
 )
 from courses.utils import get_enrollable_courses, get_unenrollable_courses
 from main import features
-from mitol.olposthog.features import is_enabled
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
 
@@ -344,7 +345,7 @@ class ProgramCollectionViewSet(viewsets.ReadOnlyModelViewSet):
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
     """Filter set for user enrollments with B2B organization filtering."""
-    
+
     org_id = django_filters.NumberFilter(
         method="filter_org_id",
         label="Filter by B2B organization ID",
@@ -389,7 +390,13 @@ class UserEnrollmentsApiViewSet(
         """Get the queryset for user enrollments."""
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
-            .select_related("run__course__page", "user", "run", "run__b2b_contract", "run__b2b_contract__organization")
+            .select_related(
+                "run__course__page",
+                "user",
+                "run",
+                "run__b2b_contract",
+                "run__b2b_contract__organization",
+            )
             .all()
         )
 
@@ -403,8 +410,8 @@ class UserEnrollmentsApiViewSet(
     @extend_schema(
         operation_id="user_enrollments_list_v2",
         description="List user enrollments with B2B organization and contract information - API v2. "
-                   "Use ?exclude_b2b=true to filter out enrollments linked to course runs with B2B contracts. "
-                   "Use ?org_id=<id> to filter enrollments by specific B2B organization.",
+        "Use ?exclude_b2b=true to filter out enrollments linked to course runs with B2B contracts. "
+        "Use ?org_id=<id> to filter enrollments by specific B2B organization.",
     )
     def list(self, request, *args, **kwargs):
         """List user enrollments with optional sync."""
@@ -436,6 +443,8 @@ class UserEnrollmentsApiViewSet(
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 @extend_schema(
     parameters=[
         OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),

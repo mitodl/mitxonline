@@ -561,8 +561,7 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     assert len(resp.json()) == 2
 
     resp = user_drf_client.get(
-        reverse("v2:user-enrollments-api-list"),
-        {"org_id": org.id}
+        reverse("v2:user-enrollments-api-list"), {"org_id": org.id}
     )
     assert resp.status_code == status.HTTP_200_OK
     data = resp.json()
@@ -572,8 +571,7 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     assert data[0]["b2b_contract_id"] == contract.id
 
     resp = user_drf_client.get(
-        reverse("v2:user-enrollments-api-list"),
-        {"org_id": 99999}
+        reverse("v2:user-enrollments-api-list"), {"org_id": 99999}
     )
     assert resp.status_code == status.HTTP_200_OK
     assert len(resp.json()) == 0
