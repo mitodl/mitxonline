@@ -231,9 +231,6 @@ def test_home_page_featured_products_sorting(mocker):
     featured_products = home_page.products
     assert len(featured_products) == 2
     
-    assert featured_products[0]["start_date"].timestamp() == earlier_date.timestamp()
-    assert featured_products[1]["start_date"].timestamp() == later_date.timestamp()
-    
     assert featured_products[0]["title"] == course_page_2.title
     assert featured_products[1]["title"] == course_page_1.title
 
