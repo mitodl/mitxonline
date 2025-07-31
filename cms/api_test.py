@@ -209,44 +209,41 @@ def test_home_page_featured_products(mocker):
 
 @pytest.mark.django_db
 def test_home_page_featured_products_sorting(mocker):
-    """Tests that featured products are sorted in ascending order"""
+    """Tests that featured products are sorted in ascending order by start_date"""
     home_page = HomePageFactory.create()
     patched_get_home_page = mocker.patch(  # noqa: F841
         "cms.api.get_home_page", return_value=home_page
     )
-    course_pages = CoursePageFactory.create_batch(2, parent=home_page)
-    page_data = []
-    for course_page in course_pages:
-        HomeProductLink.objects.create(page=home_page, course_product_page=course_page)
-        run = course_page.product.first_unexpired_run
-        page_data.append(
-            {
-                "title": course_page.title,
-                "description": course_page.description,
-                "feature_image": course_page.feature_image,
-                "start_date": run.start_date if run is not None else None,
-                "url_path": course_page.get_url(),
-                "is_program": False,
-                "is_self_paced": run.is_self_paced if run is not None else None,
-                "program_type": None,
-            }
-        )
-
-    page_data = sorted(
-        page_data,
-        key=lambda item: (item["start_date"] is None, item["start_date"]),
-    )
+    
+    # Create courses with deterministic start dates
+    now = now_in_utc()
+    earlier_date = now - timedelta(days=30)  # 30 days ago
+    later_date = now + timedelta(days=30)    # 30 days from now
+    
+    # Create course pages in reverse chronological order to test sorting
+    course_page_1 = CoursePageFactory.create(parent=home_page)
+    course_page_2 = CoursePageFactory.create(parent=home_page)
+    
+    # Create course runs with different start dates
+    # Course 1 gets the later date, Course 2 gets the earlier date
+    CourseRunFactory.create(course=course_page_1.product, start_date=later_date, live=True)
+    CourseRunFactory.create(course=course_page_2.product, start_date=earlier_date, live=True)
+    
+    # Create home product links
+    HomeProductLink.objects.create(page=home_page, course_product_page=course_page_1)
+    HomeProductLink.objects.create(page=home_page, course_product_page=course_page_2)
+    
+    # Get the featured products (should be sorted by start_date)
     featured_products = home_page.products
     assert len(featured_products) == 2
-    sorted_featured_products = sorted(
-        featured_products,
-        key=lambda item: (item["start_date"] is None, item["start_date"]),
-    )
-    sorted_page_data = sorted(
-        page_data,
-        key=lambda item: (item["start_date"] is None, item["start_date"]),
-    )
-    assert sorted_featured_products == sorted_page_data
+    
+    # Verify that products are sorted by start_date (earlier first)
+    assert featured_products[0]["start_date"] == earlier_date
+    assert featured_products[1]["start_date"] == later_date
+    
+    # Verify that the products correspond to the correct course pages
+    assert featured_products[0]["title"] == course_page_2.title  # Earlier date
+    assert featured_products[1]["title"] == course_page_1.title  # Later date
 
 
 @pytest.mark.django_db
