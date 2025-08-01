@@ -28,7 +28,7 @@ class HubSpotRateLimiter:
 
         # Rate limiting parameters
         self._window_size_seconds = 1.0  # 1 second sliding window
-        self._max_requests_per_second = 1000 / self.min_delay_ms  # Derived from min_delay
+        self._max_requests_per_second = 19
 
         # Performance optimization: batch cleanup every N requests
         self._cleanup_counter = 0
