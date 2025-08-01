@@ -15,7 +15,7 @@ from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
 
-from b2b.constants import B2B_RUN_TAG_FORMAT
+from b2b.constants import B2B_RUN_TAG_FORMAT, CONTRACT_INTEGRATION_SSO
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.api import get_home_page
@@ -699,3 +699,74 @@ def create_b2b_enrollment(request, product: Product):
         "result": main_constants.USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
         "price": basket_price,
     }
+
+
+def reconcile_user_orgs(user, organizations):
+    """
+    Reconcile the specified users with the provided organization list.
+
+    When we get a list of organizations from an authoritative source, we need to
+    be able to parse that list and make sure the user's org attachments match.
+    This will pull the contracts that the user belongs to that are also
+    SSO-enabled, and will remove the user from the contract if they're not
+    supposed to be in them. It will also add the user to any SSO-enabled contract
+    that the org has.
+
+    This only considers contracts that are SSO-enabled and zero-cost. If the
+    contract is seat limited, we will only add the user if there's room.
+    (If there isn't, we will log an error.) Only SSO-enabled contracts are
+    considered; any that the user is in that aren't SSO-enabled will be left alone.
+
+    If the user is enrolled in any courses that are in a contract they'll be
+    removed from, they will be left there. Not real sure what we should do in
+    that case.
+
+    Args:
+    - user (User): the user to work with
+    - organizations (dict[str]): UUIDs of the organizations for the user
+
+    Returns:
+    - tuple(int, int); contracts added and contracts removed
+    """
+
+    user_contracts_qs = user.b2b_contracts.filter(
+        integration_type=CONTRACT_INTEGRATION_SSO
+    )
+
+    if len(organizations) == 0:
+        # User has no orgs, so we should clear them from all SSO contracts.
+        contracts_to_remove = user_contracts_qs.all()
+        [user.b2b_contracts.remove(contract) for contract in contracts_to_remove]
+        user.save()
+        return (0, len(contracts_to_remove))
+
+    orgs = OrganizationPage.objects.filter(sso_organization_id__in=organizations).all()
+    no_orgs = OrganizationPage.objects.exclude(
+        sso_organization_id__in=organizations
+    ).all()
+
+    contracts_to_remove = user_contracts_qs.filter(organization__in=no_orgs).all()
+
+    if contracts_to_remove.count() > 0:
+        [
+            user.b2b_contracts.remove(contract_to_remove)
+            for contract_to_remove in contracts_to_remove
+        ]
+
+    contracts_to_add = (
+        ContractPage.objects.filter(
+            integration_type=CONTRACT_INTEGRATION_SSO, organization__in=orgs
+        )
+        .exclude(pk__in=user_contracts_qs.all().values_list("id", flat=True))
+        .all()
+    )
+
+    if contracts_to_add.count() > 0:
+        [
+            user.b2b_contracts.add(contract_to_add)
+            for contract_to_add in contracts_to_add
+        ]
+
+    user.save()
+
+    return (len(contracts_to_add), len(contracts_to_remove))

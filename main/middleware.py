@@ -1,10 +1,14 @@
 """Common mitx_online middleware"""
 
+import logging
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.middleware.csrf import CsrfViewMiddleware
 from django.utils.deprecation import MiddlewareMixin
+from mitol.apigateway.api import decode_x_header
+
+log = logging.getLogger(__name__)
 
 
 class CachelessAPIMiddleware(MiddlewareMixin):
@@ -43,3 +47,22 @@ class HostBasedCSRFMiddleware(CsrfViewMiddleware):
                     0
                 ]
         return response
+
+
+def apisix_debug_middleware(get_response):
+    """Dump out the APISIX payload for debugging purposes."""
+
+    def middleware(request):
+        """Make the dumping happen."""
+
+        response = get_response(request)
+
+        xheader = decode_x_header(request)
+
+        log.warning("apisix_debug_middleware: we have a request!")
+        log.warning("apisix_debug_middleware: meta: %s", request.META)
+        log.warning("apisix_debug_middleware: x-header: %s", xheader)
+
+        return response
+
+    return middleware
