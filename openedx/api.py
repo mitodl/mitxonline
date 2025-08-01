@@ -890,13 +890,13 @@ def enroll_in_edx_course_runs(
                     username=username,
                     force_enrollment=force_enrollment,
                 )
-                if not enrollment.is_active:
-                    enrollment = edx_client.enrollments.create_student_enrollment(
-                        course_run.courseware_id,
-                        mode=mode,
-                        username=username,
-                        force_enrollment=force_enrollment,
-                    )
+            if not enrollment.is_active:
+                enrollment = edx_client.enrollments.create_student_enrollment(
+                    course_run.courseware_id,
+                    mode=mode,
+                    username=username,
+                    force_enrollment=force_enrollment,
+                )
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
             if exc.response.status_code == 406:  # noqa: PLR2004
