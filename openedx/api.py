@@ -880,16 +880,22 @@ def enroll_in_edx_course_runs(
     results = []
     for course_run in course_runs:
         try:
-            enrollment = existing_edx_enrollment(
-                user, course_run.courseware_id, mode=mode
+            edx_enrollments = edx_client.enrollments.get_enrollments(
+                course_id=course_run.courseware_id, usernames=[user.edx_username]
             )
-            if enrollment is None:
-                enrollment = edx_client.enrollments.create_student_enrollment(
-                    course_run.courseware_id,
-                    mode=mode,
-                    username=username,
-                    force_enrollment=force_enrollment,
-                )
+            if edx_enrollments:
+                for enrollment in edx_enrollments:
+                    edx_client.enrollments.deactivate_enrollment(
+                        course_id=course_run.courseware_id,
+                        username=username
+                    )
+
+            enrollment = edx_client.enrollments.create_student_enrollment(
+                course_run.courseware_id,
+                mode=mode,
+                username=username,
+                force_enrollment=force_enrollment,
+            )
             if not enrollment.is_active:
                 enrollment = edx_client.enrollments.create_student_enrollment(
                     course_run.courseware_id,
