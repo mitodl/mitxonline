@@ -6,7 +6,6 @@ from django.test import override_settings
 
 from hubspot_sync.rate_limiter import (
     HubSpotRateLimiter,
-    wait_for_hubspot_rate_limit,
 )
 
 
@@ -33,9 +32,9 @@ class TestHubSpotRateLimiter:
     def test_wait_for_rate_limit_first_request(self, mock_time, mock_sleep):
         """Test first request with no previous requests."""
         mock_time.return_value = 1000.0
-        
+
         self.rate_limiter.wait_for_rate_limit()
-        
+
         mock_sleep.assert_not_called()
 
     @patch("hubspot_sync.rate_limiter.time.sleep")
@@ -45,10 +44,10 @@ class TestHubSpotRateLimiter:
 
         mock_time.side_effect = [1000.0, 1000.05, 1000.05, 1000.05]
         self.rate_limiter.min_delay_ms = 100
-        
+
         self.rate_limiter.wait_for_rate_limit()
         self.rate_limiter.wait_for_rate_limit()
-        
+
         expected_sleep = 0.05
         mock_sleep.assert_called_once()
         sleep_time = mock_sleep.call_args[0][0]
@@ -56,7 +55,9 @@ class TestHubSpotRateLimiter:
 
     @patch("hubspot_sync.rate_limiter.time.sleep")
     @patch("hubspot_sync.rate_limiter.time.time")
-    def test_wait_for_rate_limit_no_sleep_when_min_delay_satisfied(self, mock_time, mock_sleep):
+    def test_wait_for_rate_limit_no_sleep_when_min_delay_satisfied(
+        self, mock_time, mock_sleep
+    ):
         """Test no sleep when minimum delay is already satisfied."""
         mock_time.side_effect = [1000.0, 1000.2, 1000.2, 1000.2]
         self.rate_limiter.min_delay_ms = 100
@@ -90,9 +91,9 @@ class TestHubSpotRateLimiter:
             self.rate_limiter._request_times.append(base_time + i * 0.1)  # noqa: SLF001
 
         mock_time.return_value = base_time + 2.0
-        
+
         self.rate_limiter.wait_for_rate_limit()
-        
+
         mock_sleep.assert_not_called()
 
     @patch("hubspot_sync.rate_limiter.time.time")
@@ -123,7 +124,9 @@ class TestHubSpotRateLimiter:
     @patch("hubspot_sync.rate_limiter.time.sleep")
     @patch("hubspot_sync.rate_limiter.time.time")
     @patch("hubspot_sync.rate_limiter.random.uniform")
-    def test_wait_for_rate_limit_negative_jitter_protection(self, mock_random, mock_time, mock_sleep):
+    def test_wait_for_rate_limit_negative_jitter_protection(
+        self, mock_random, mock_time, mock_sleep
+    ):
         """Test that negative jitter doesn't result in negative sleep time."""
         mock_time.side_effect = [1000.0, 1000.05, 1000.05, 1000.05]
         mock_random.return_value = -0.1
@@ -154,7 +157,6 @@ class TestHubSpotRateLimiter:
         self.rate_limiter.wait_for_rate_limit()
         self.rate_limiter.wait_for_rate_limit()
 
-
         mock_log.assert_called_once()
         log_message = mock_log.call_args[0][0]
         assert "Rate limiting: sleeping for" in log_message
@@ -166,23 +168,25 @@ class TestHubSpotRateLimiter:
         base_time = 1000.0
         for i in range(19):
             self.rate_limiter._request_times.append(base_time + i * 0.01)  # noqa: SLF001
-        
+
         mock_time.return_value = base_time + 1.0
-        
+
         self.rate_limiter.wait_for_rate_limit()
-        
+
         mock_sleep.assert_not_called()
 
     @patch("hubspot_sync.rate_limiter.time.sleep")
     @patch("hubspot_sync.rate_limiter.time.time")
-    def test_wait_for_rate_limit_concurrent_requests_in_window(self, mock_time, mock_sleep):
+    def test_wait_for_rate_limit_concurrent_requests_in_window(
+        self, mock_time, mock_sleep
+    ):
         """Test multiple requests within the same time window."""
         mock_time.return_value = 1000.0
         self.rate_limiter.min_delay_ms = 10
-        
+
         for _ in range(3):
             self.rate_limiter.wait_for_rate_limit()
-        
+
         assert mock_sleep.call_count >= 2
 
     @patch("hubspot_sync.rate_limiter.time.sleep")
@@ -196,4 +200,3 @@ class TestHubSpotRateLimiter:
         self.rate_limiter.wait_for_rate_limit()
 
         mock_sleep.assert_not_called()
-
