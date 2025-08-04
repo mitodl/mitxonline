@@ -83,7 +83,7 @@ class HubSpotRateLimiter:
             next_available = max(next_available, min_next_time)
 
         return max(next_available, current_time)
-    
+
     def get_current_load(self) -> dict:
         """Get current rate limiter statistics for monitoring."""
         with self._lock:
@@ -93,10 +93,12 @@ class HubSpotRateLimiter:
             return {
                 "requests_in_window": len(self._request_times),
                 "max_requests_per_second": self._max_requests_per_second,
-                "utilization_percent": (len(self._request_times) / self._max_requests_per_second) * 100,
+                "utilization_percent": (
+                    len(self._request_times) / self._max_requests_per_second
+                )
+                * 100,
                 "window_size_seconds": self._window_size_seconds,
             }
-
 
 
 rate_limiter = HubSpotRateLimiter()

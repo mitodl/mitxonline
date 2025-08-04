@@ -3,7 +3,6 @@ Hubspot tasks
 """
 
 import logging
-import time
 from math import ceil
 from typing import List, Tuple  # noqa: UP035
 
