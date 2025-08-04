@@ -18,6 +18,7 @@ x-environment:
   KEYCLOAK_PORT: ${KEYCLOAK_PORT:-7080}
   KEYCLOAK_SSL_PORT: ${KEYCLOAK_SSL_PORT:-7443}
   UNIFIED_ECOMMERCE_URL: ${UNIFIED_ECOMMERCE_URL:-http://ue.odl.local:9080}
+  REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
 
 x-extra-hosts:
   &default-extra-hosts # pragma: allowlist secret
@@ -29,6 +30,7 @@ x-extra-hosts:
   - "mitxonline.odl.local:host-gateway"
   - "local.openedx.io:host-gateway"
   - "studio.local.openedx.io:host-gateway"
+  - "kc.odl.local:host-gateway"
 
 services:
   db:

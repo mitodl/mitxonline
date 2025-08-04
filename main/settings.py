@@ -333,7 +333,7 @@ MIDDLEWARE = (
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "main.middleware.apisix_debug_middleware",
+    # "main.middleware.apisix_debug_middleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "main.middleware.HostBasedCSRFMiddleware",
@@ -1096,8 +1096,13 @@ OAUTH2_PROVIDER = {
     ),
 }
 
-SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
+# SCIM provider settings
 
+SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
+SCIM_SERVICE_PROVIDER["GROUP_ADAPTER"] = "users.adapters.LearnGroupAdapter"  # noqa: F405
+SCIM_SERVICE_PROVIDER["SCHEMAS_GETTER"] = "users.api.load_custom_scim_schemas"
+
+MITXONLINE_SCIM_RESOURCE_PREFIX = "/scim/v2"
 
 # DRF configuration
 REST_FRAMEWORK = {
@@ -1509,4 +1514,12 @@ OPENTELEMETRY_EXPORT_TIMEOUT_MS = get_int(
     name="OPENTELEMETRY_EXPORT_TIMEOUT_MS",
     default=5000,
     description="Timeout for opentelemetry export",
+)
+
+# RemoteUserOrg backend config
+
+MITOL_REMOTEUSER_DISABLE_ORG = get_bool(
+    name="MITOL_REMOTEUSER_DISABLE_ORG",
+    default=True,
+    description="Disable B2B org reconciliation via APISIX data.",
 )

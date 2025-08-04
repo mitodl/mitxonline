@@ -1,14 +1,19 @@
 """Users api"""
 
+import json
+import logging
 import operator
 from functools import reduce
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db.models import Q
+from django_scim.schemas import ALL as default_scim_schemas
 from mitol.common.utils import first_or_none, unique, unique_ignore_case
 
+log = logging.getLogger(__name__)
 User = get_user_model()
 
 CASE_INSENSITIVE_SEARCHABLE_FIELDS = {"email"}
@@ -138,3 +143,33 @@ def fetch_users(filter_values, ignore_case=True):  # noqa: FBT002
             )
         )
     return user_qset
+
+
+def load_custom_scim_schemas():
+    """
+    Load custom SCIM schemas, along with the default ones.
+    """
+
+    log.warning("load_custom_scim_schemas started")
+
+    my_schemas = []
+    schema_path = Path(__file__).parent.joinpath("scim_schemas")
+
+    log.warning("load_blah: here's the path %s", schema_path)
+
+    for jsonfile in schema_path.glob("*.json"):
+        with jsonfile.open(mode="r") as opened_jsonfile:
+            my_schemas.append(json.load(opened_jsonfile))
+
+    # If we define a custom one that ships with django-scim2, then override it.
+    # The SCIM for Keycloak plugin doesn't like the default User one.
+    my_schema_ids = [schema["id"] for schema in my_schemas]
+
+    return [
+        *[
+            default_schema
+            for default_schema in default_scim_schemas
+            if default_schema["id"] not in my_schema_ids
+        ],
+        *my_schemas,
+    ]

@@ -6,6 +6,7 @@ This should go in the ol-django app. It's here to make it easier to write.
 
 import logging
 
+from django.conf import settings
 from mitol.apigateway.api import decode_x_header
 from mitol.apigateway.backends import ApisixRemoteUserBackend
 
@@ -22,12 +23,18 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
     payload, so we should reconcile them (occasionally, maybe) when the user gets
     here. SCIM should also take care of this but we won't necessarily have that
     for local deployments.
+
+    For production, this should (probably) be disabled via
+    MITOL_REMOTEUSER_DISABLE_ORG. This setting defaults to True.
     """
 
     def configure_user(self, request, user, *args, created=True):
         """Configure the user, then reconcile the orgs."""
 
         user = super().configure_user(request, user, *args, created=created)
+
+        if settings.MITOL_REMOTEUSER_DISABLE_ORG:
+            return user
 
         apisix_header = decode_x_header(request)
 
