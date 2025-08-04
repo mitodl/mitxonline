@@ -35,7 +35,6 @@ class TestAPIRateLimitingIntegration:
         mock_upsert.assert_called_once()
         assert result == mock_result
 
-
     @patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
     @patch("hubspot_sync.api.upsert_object_request")
     def test_sync_contact_with_hubspot_rate_limit_called_before_api(
@@ -121,7 +120,6 @@ class TestTaskRateLimitingIntegration:
 
         mock_rate_limit.assert_called_once_with()
         assert result == [users[0].id]
-
 
 
 class TestRateLimitingErrorScenarios:
