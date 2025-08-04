@@ -35,7 +35,7 @@ class HubSpotRateLimiter:
         Wait for an amount of time based on sliding window rate limiting.
         """
         current_time = time.time()
-        
+
         with self._lock:
             self._cleanup_counter += 1
             if self._cleanup_counter >= self._cleanup_interval:
