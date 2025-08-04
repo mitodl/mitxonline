@@ -152,4 +152,3 @@ class TestRateLimitingErrorScenarios:
             api.sync_contact_with_hubspot(user)
 
         mock_rate_limit.assert_called_once_with()
-
