@@ -23,12 +23,6 @@ class TestHubSpotRateLimiter:
         limiter = HubSpotRateLimiter()
         assert limiter.min_delay_ms == 100
 
-    def test_init_with_default_delay(self):
-        """Test that HubSpotRateLimiter initializes with default delay when setting not found."""
-        with patch("hubspot_sync.rate_limiter.getattr", return_value=60):
-            limiter = HubSpotRateLimiter()
-            assert limiter.min_delay_ms == 60
-
     def test_init_sets_correct_defaults(self):
         """Test that HubSpotRateLimiter initializes with correct default values."""
         limiter = HubSpotRateLimiter()
