@@ -1342,11 +1342,6 @@ HUBSPOT_TASK_DELAY = get_int(
     default=60,
     description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
-HUBSPOT_AGGRESSIVE_RATE_LIMITING = get_bool(
-    name="HUBSPOT_AGGRESSIVE_RATE_LIMITING",
-    default=True,
-    description="Enable rate limiting based on HubSpot response headers",
-)
 
 # PostHog related settings
 POSTHOG_PROJECT_API_KEY = get_string(

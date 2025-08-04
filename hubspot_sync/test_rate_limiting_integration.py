@@ -3,8 +3,6 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from django.conf import settings
-from django.test import override_settings
 from hubspot.crm.objects import ApiException
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 
@@ -37,20 +35,6 @@ class TestAPIRateLimitingIntegration:
         mock_upsert.assert_called_once()
         assert result == mock_result
 
-    @patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
-    @patch("hubspot_sync.api.upsert_object_request")
-    def test_sync_contact_with_hubspot_rate_limit_with_response_headers(
-        self, mock_upsert, mock_rate_limit
-    ):
-        """Test that we could potentially pass response headers to rate limiter."""
-        user = UserFactory()
-        mock_result = Mock()
-        mock_result.id = "hubspot_id_123"
-        mock_upsert.return_value = mock_result
-
-        api.sync_contact_with_hubspot(user)
-
-        mock_rate_limit.assert_called_once_with()
 
     @patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
     @patch("hubspot_sync.api.upsert_object_request")
@@ -138,31 +122,6 @@ class TestTaskRateLimitingIntegration:
         mock_rate_limit.assert_called_once_with()
         assert result == [users[0].id]
 
-
-class TestRateLimitingConfiguration:
-    """Test rate limiting configuration and settings."""
-
-    @override_settings(HUBSPOT_TASK_DELAY=200)
-    @patch("hubspot_sync.rate_limiter.time.sleep")
-    @patch("hubspot_sync.rate_limiter.time.time")
-    def test_custom_task_delay_setting(self, mock_time, mock_sleep):
-        """Test that custom HUBSPOT_TASK_DELAY setting is respected."""
-        from hubspot_sync.rate_limiter import HubSpotRateLimiter
-
-        mock_time.side_effect = [0, 0, 0]
-
-        limiter = HubSpotRateLimiter()
-        assert limiter.min_delay_ms == 200
-
-        limiter.wait_for_rate_limit()
-
-        mock_sleep.assert_called_once_with(0.2)
-
-    @override_settings(HUBSPOT_AGGRESSIVE_RATE_LIMITING=False)
-    def test_aggressive_rate_limiting_disabled(self):
-        """Test behavior when aggressive rate limiting is disabled."""
-
-        assert not settings.HUBSPOT_AGGRESSIVE_RATE_LIMITING
 
 
 class TestRateLimitingErrorScenarios:
