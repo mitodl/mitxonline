@@ -210,7 +210,7 @@ class Command(BaseCommand):
             "program-v1:MITx+DEDP",
             "Data, Economics and Development Policy",
             live=True,
-            depts="Economics",
+            depts=["Economics"],
             create_depts=True,
         )
 
@@ -240,7 +240,7 @@ class Command(BaseCommand):
             create_run="Demo_Course",
             run_url=f"http://{edx_host}/courses/course-v1:edX+DemoX+Demo_Course/",
             program="program-v1:MITx+DEDP",
-            depts="Science",
+            depts=["Science"],
             create_depts=True,
         )
 
@@ -252,7 +252,7 @@ class Command(BaseCommand):
             live=True,
             create_run="course",
             run_url=f"http://{edx_host}/courses/course-v1:edX+E2E-101+course/",
-            depts="Math",
+            depts=["Math"],
             create_depts=True,
         )
 
