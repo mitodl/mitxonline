@@ -40,7 +40,7 @@ class HubSpotRateLimiter:
         This scales efficiently to thousands of concurrent requests.
         """
         current_time = time.time()
-        
+
         with self._lock:
             # Periodically clean old timestamps for performance
             self._cleanup_counter += 1
@@ -108,7 +108,10 @@ class HubSpotRateLimiter:
             return {
                 "requests_in_window": len(self._request_times),
                 "max_requests_per_second": self._max_requests_per_second,
-                "utilization_percent": (len(self._request_times) / self._max_requests_per_second) * 100,
+                "utilization_percent": (
+                    len(self._request_times) / self._max_requests_per_second
+                )
+                * 100,
                 "window_size_seconds": self._window_size_seconds,
             }
 
