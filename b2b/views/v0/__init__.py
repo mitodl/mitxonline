@@ -1,6 +1,7 @@
 """Views for the B2B API (v0)."""
 
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Count, Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
@@ -17,7 +18,7 @@ from b2b.serializers.v0 import (
     OrganizationPageSerializer,
 )
 from courses.models import CourseRun
-from ecommerce.models import Product
+from ecommerce.models import Discount, Product
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 
 
@@ -73,4 +74,42 @@ class Enroll(APIView):
             status=status.HTTP_201_CREATED
             if response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
             else status.HTTP_406_NOT_ACCEPTABLE,
+        )
+
+
+class EnrollmentCodeViewSet(viewsets.ReadOnlyModelViewSet):
+    """View for checking enrollment codes."""
+
+    serializer_class = OrganizationPageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Get the queryset for this use case.
+
+        We only want discount codes that are eligible for redemption and tied to
+        a B2B contract.
+        """
+
+        return (
+            Discount.objects.annotate(
+                num_user_redemptions=Count(
+                    "order_redemptions__id", filter=Q(redeemed_by=self.request.user)
+                )
+            )
+            .annotate(num_redemptions=Count("order_redemptions__id"))
+            .filter(
+                Q(num_redemptions=0)
+                | Q(Q(num_redemptions__gt=0) & Q(num_user_redemptions__gt=0))
+            )
+            .filter(
+                Q(products__product__content_type__model="courserun")
+                & Q(
+                    products__product__purchaseable_object_id__in=CourseRun.objects.filter(
+                        b2b_contract__isnull=False
+                    )
+                    .all()
+                    .values_list("id", flat=True)
+                )
+            )
         )
