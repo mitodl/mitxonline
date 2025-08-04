@@ -466,35 +466,39 @@ class TestRateLimitingInBatchFunctions:
     """Test that batch functions call rate limiting appropriately."""
 
     @pytest.mark.parametrize("id_count", [5, 15])
-    def test_batch_create_hubspot_objects_chunked_calls_rate_limit(self, mocker, id_count):
+    def test_batch_create_hubspot_objects_chunked_calls_rate_limit(
+        self, mocker, id_count
+    ):
         """Test that batch_create_hubspot_objects_chunked calls wait_for_hubspot_rate_limit for each chunk."""
         contacts = UserFactory.create_batch(id_count)
         mock_ids = [user.id for user in contacts]
-        
+
         # Mock the HubSpot API
         mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
         mock_hubspot_api.return_value.crm.objects.batch_api.create.return_value = (
             mocker.Mock(
                 results=[
-                    SimplePublicObjectFactory(id=user.id, properties={"email": user.email})
+                    SimplePublicObjectFactory(
+                        id=user.id, properties={"email": user.email}
+                    )
                     for user in contacts
                 ]
             )
         )
-        
+
         # Mock the rate limiting function
         mock_rate_limit = mocker.patch("hubspot_sync.tasks.wait_for_hubspot_rate_limit")
-        
+
         tasks.batch_create_hubspot_objects_chunked(
             HubspotObjectType.CONTACTS.value, "user", mock_ids
         )
-        
+
         # Expected number of batches: 5 items = 1 batch, 15 items = 2 batches
         expected_batches = 1 if id_count == 5 else 2
-        
+
         # Rate limiting should be called once per batch
         assert mock_rate_limit.call_count == expected_batches
-        
+
         # Verify API was called expected number of times
         assert (
             mock_hubspot_api.return_value.crm.objects.batch_api.create.call_count
@@ -502,7 +506,9 @@ class TestRateLimitingInBatchFunctions:
         )
 
     @pytest.mark.parametrize("id_count", [5, 15])
-    def test_batch_update_hubspot_objects_chunked_calls_rate_limit(self, mocker, id_count):
+    def test_batch_update_hubspot_objects_chunked_calls_rate_limit(
+        self, mocker, id_count
+    ):
         """Test that batch_update_hubspot_objects_chunked calls wait_for_hubspot_rate_limit for each chunk."""
         contacts = UserFactory.create_batch(id_count)
         mock_ids = sorted(
@@ -511,7 +517,7 @@ class TestRateLimitingInBatchFunctions:
                 [f"10001{i}" for i in range(id_count)],
             )
         )
-        
+
         # Mock the HubSpot API
         mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
         mock_hubspot_api.return_value.crm.objects.batch_api.update.return_value = (
@@ -524,47 +530,49 @@ class TestRateLimitingInBatchFunctions:
                 ]
             )
         )
-        
+
         # Mock the rate limiting function
         mock_rate_limit = mocker.patch("hubspot_sync.tasks.wait_for_hubspot_rate_limit")
-        
+
         tasks.batch_update_hubspot_objects_chunked(
             HubspotObjectType.CONTACTS.value, "user", mock_ids
         )
-        
+
         # Expected number of batches: 5 items = 1 batch, 15 items = 2 batches
         expected_batches = 1 if id_count == 5 else 2
-        
+
         # Rate limiting should be called once per batch
         assert mock_rate_limit.call_count == expected_batches
-        
+
         # Verify API was called expected number of times
         assert (
             mock_hubspot_api.return_value.crm.objects.batch_api.update.call_count
             == expected_batches
         )
 
-    def test_batch_create_hubspot_objects_chunked_rate_limit_called_after_exception(self, mocker):
+    def test_batch_create_hubspot_objects_chunked_rate_limit_called_after_exception(
+        self, mocker
+    ):
         """Test that rate limiting is called even when an API exception occurs."""
         contacts = UserFactory.create_batch(5)
         mock_ids = [user.id for user in contacts]
-        
+
         # Mock the HubSpot API to raise an exception
         mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
-        mock_hubspot_api.return_value.crm.objects.batch_api.create.side_effect = ApiException(
-            status=429, reason="Too Many Requests"
+        mock_hubspot_api.return_value.crm.objects.batch_api.create.side_effect = (
+            ApiException(status=429, reason="Too Many Requests")
         )
         
         # Mock handle_failed_batch_chunk to return failed items (so exception is raised)
         mocker.patch("hubspot_sync.tasks.handle_failed_batch_chunk", return_value=mock_ids)
         mock_rate_limit = mocker.patch("hubspot_sync.tasks.wait_for_hubspot_rate_limit")
-        
+
         # Should raise an exception but still call rate limiting
         with pytest.raises(ApiException):
             tasks.batch_create_hubspot_objects_chunked(
                 HubspotObjectType.CONTACTS.value, "user", mock_ids
             )
-        
+
         # Rate limiting should still be called once per batch (1 batch for 5 items)
         assert mock_rate_limit.call_count == 1
 
@@ -603,23 +611,23 @@ class TestRateLimitingInBatchFunctions:
                 [f"10001{i}" for i in range(5)],
             )
         )
-        
+
         # Mock the HubSpot API to raise an exception
         mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
-        mock_hubspot_api.return_value.crm.objects.batch_api.update.side_effect = ApiException(
-            status=429, reason="Too Many Requests"
+        mock_hubspot_api.return_value.crm.objects.batch_api.update.side_effect = (
+            ApiException(status=429, reason="Too Many Requests")
         )
         
         # Mock handle_failed_batch_chunk to return failed items (so exception is raised)
         mocker.patch("hubspot_sync.tasks.handle_failed_batch_chunk", return_value=[contact.id for contact in contacts])
         mock_rate_limit = mocker.patch("hubspot_sync.tasks.wait_for_hubspot_rate_limit")
-        
+
         # Should raise an exception but still call rate limiting
         with pytest.raises(ApiException):
             tasks.batch_update_hubspot_objects_chunked(
                 HubspotObjectType.CONTACTS.value, "user", mock_ids
             )
-        
+
         # Rate limiting should still be called once per batch (1 batch for 5 items)
         assert mock_rate_limit.call_count == 1
 
@@ -658,32 +666,39 @@ class TestRateLimitingInBatchFunctions:
         """Test that rate limiting is called after each API call, not before."""
         contacts = UserFactory.create_batch(5)
         mock_ids = [user.id for user in contacts]
-        
+
         # Track call order
         call_order = []
-        
+
         # Mock the HubSpot API
         mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
+
         def api_side_effect(*args, **kwargs):
             call_order.append("api_call")
             return mocker.Mock(
                 results=[
-                    SimplePublicObjectFactory(id=user.id, properties={"email": user.email})
+                    SimplePublicObjectFactory(
+                        id=user.id, properties={"email": user.email}
+                    )
                     for user in contacts
                 ]
             )
-        mock_hubspot_api.return_value.crm.objects.batch_api.create.side_effect = api_side_effect
-        
+
+        mock_hubspot_api.return_value.crm.objects.batch_api.create.side_effect = (
+            api_side_effect
+        )
+
         # Mock the rate limiting function
         def rate_limit_side_effect():
             call_order.append("rate_limit")
+
         mock_rate_limit = mocker.patch("hubspot_sync.tasks.wait_for_hubspot_rate_limit")
         mock_rate_limit.side_effect = rate_limit_side_effect
-        
+
         tasks.batch_create_hubspot_objects_chunked(
             HubspotObjectType.CONTACTS.value, "user", mock_ids
         )
-        
+
         # Should have one API call followed by one rate limit call
         assert call_order == ["api_call", "rate_limit"]
 
@@ -696,12 +711,13 @@ class TestRateLimitingInBatchFunctions:
                 [f"10001{i}" for i in range(5)],
             )
         )
-        
+
         # Track call order
         call_order = []
-        
+
         # Mock the HubSpot API
         mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
+
         def api_side_effect(*args, **kwargs):
             call_order.append("api_call")
             return mocker.Mock(
@@ -712,17 +728,21 @@ class TestRateLimitingInBatchFunctions:
                     for mock_id in mock_ids
                 ]
             )
-        mock_hubspot_api.return_value.crm.objects.batch_api.update.side_effect = api_side_effect
-        
+
+        mock_hubspot_api.return_value.crm.objects.batch_api.update.side_effect = (
+            api_side_effect
+        )
+
         # Mock the rate limiting function
         def rate_limit_side_effect():
             call_order.append("rate_limit")
+
         mock_rate_limit = mocker.patch("hubspot_sync.tasks.wait_for_hubspot_rate_limit")
         mock_rate_limit.side_effect = rate_limit_side_effect
-        
+
         tasks.batch_update_hubspot_objects_chunked(
             HubspotObjectType.CONTACTS.value, "user", mock_ids
         )
-        
+
         # Should have one API call followed by one rate limit call
         assert call_order == ["api_call", "rate_limit"]
