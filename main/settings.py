@@ -333,7 +333,6 @@ MIDDLEWARE = (
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "main.middleware.apisix_debug_middleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "main.middleware.HostBasedCSRFMiddleware",
