@@ -214,9 +214,7 @@ class CourseSerializer(BaseCourseSerializer):
         ]
 
 
-@extend_schema_serializer(
-    component_name="V2CourseRunSerializer",
-)
+@extend_schema_serializer(component_name="CourseRunV2")
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
@@ -262,7 +260,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         return flexible_price_exists  # noqa: RET504
 
 
-@extend_schema_serializer(component_name="V2CourseWithCourseRunsSerializer")
+@extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
@@ -285,6 +283,7 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
         fields = [*CourseSerializer.Meta.fields, "courseruns"]
 
 
+@extend_schema_serializer(component_name="V2CourseRunWithCourse")
 class CourseRunWithCourseSerializer(CourseRunSerializer):
     """
     CourseRun model serializer - also serializes the parent Course.
@@ -299,6 +298,7 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
         ]
 
 
+@extend_schema_serializer(component_name="CourseRunEnrollmentRequestV2")
 class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
     """CourseRunEnrollment model serializer"""
 
