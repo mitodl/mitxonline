@@ -38,13 +38,11 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
                 apisix_header["organization"][org]["id"]
                 for org in apisix_header["organization"]
             ]
-            log.warning(
-                "ApisixRemoteUserOrgBackend: got these orgs: %s", ", ".join(org_uuids)
-            )
 
         created, updated = reconcile_user_orgs(user, org_uuids)
-        log.warning(
-            "ApisixRemoteUserOrgBackend: created %s contract assocs, removed %s",
+        log.info(
+            "ApisixRemoteUserOrgBackend: user %s: created %s contract assocs, removed %s",
+            user,
             created,
             updated,
         )
