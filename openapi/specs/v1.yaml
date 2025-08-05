@@ -702,6 +702,21 @@ paths:
       description: |-
         Returns a unified set of program and course enrollments for the current
         user.
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserProgramEnrollmentDetail'
+          description: ''
+  /api/v1/program_enrollments/{id}/:
+    get:
+      operationId: program_enrollments_retrieve
+      description: Retrieve a specific program enrollment.
       parameters:
       - in: path
         name: id
@@ -716,11 +731,8 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/UserProgramEnrollmentDetail'
+                $ref: '#/components/schemas/UserProgramEnrollmentDetail'
           description: ''
-  /api/v1/program_enrollments/{id}/:
     delete:
       operationId: program_enrollments_destroy
       description: |-
