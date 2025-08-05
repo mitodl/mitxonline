@@ -71,7 +71,9 @@ class TestUnblockUsers(TestCase):
         }
 
         for email, username in zip(test_user_emails, test_usernames):
-            user = UserFactory.create(email=email, username=username, is_active=True)
+            user = UserFactory.create(
+                email=email, openedx_user__edx_username=username, is_active=True
+            )
             UserSocialAuthFactory.create(user=user, provider="not_edx")
 
             assert user.is_active is True

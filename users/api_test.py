@@ -19,7 +19,7 @@ def test_get_user_by_id(user):
 @pytest.mark.parametrize(
     "prop,value,db_value",  # noqa: PT006
     [
-        ["username", "abcdefgh", None],  # noqa: PT007
+        ["openedx_user__edx_username", "abcdefgh", None],  # noqa: PT007
         ["id", 100, None],  # noqa: PT007
         ["id", "100", 100],  # noqa: PT007
         ["email", "abc@example.com", None],  # noqa: PT007
@@ -57,7 +57,7 @@ def test_fetch_user_fail():
 @pytest.mark.parametrize(
     "prop,values,db_values",  # noqa: PT006
     [
-        ["username", ["abcdefgh", "ijklmnop", "qrstuvwxyz"], None],  # noqa: PT007
+        ["openedx_user__edx_username", ["abcdefgh", "ijklmnop", "qrstuvwxyz"], None],  # noqa: PT007
         ["id", [100, 101, 102], None],  # noqa: PT007
         ["id", ["100", "101", "102"], [100, 101, 102]],  # noqa: PT007
         ["email", ["abc@example.com", "def@example.com", "ghi@example.com"], None],  # noqa: PT007
@@ -90,7 +90,7 @@ def test_fetch_users_case_sens():
 @pytest.mark.parametrize(
     "prop,existing_values,missing_values",  # noqa: PT006
     [
-        ["username", ["abcdefgh"], ["ijklmnop", "qrstuvwxyz"]],  # noqa: PT007
+        ["openedx_user__edx_username", ["abcdefgh"], ["ijklmnop", "qrstuvwxyz"]],  # noqa: PT007
         ["id", [100], [101, 102]],  # noqa: PT007
         ["email", ["abc@example.com"], ["def@example.com", "ghi@example.com"]],  # noqa: PT007
     ],

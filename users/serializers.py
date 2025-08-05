@@ -158,6 +158,10 @@ class ExtendedLegalAddressSerializer(LegalAddressSerializer):
 class PublicUserSerializer(serializers.ModelSerializer):
     """Serializer for public user data"""
 
+    username = serializers.CharField(
+        source="edx_username", required=False, allow_null=True
+    )
+
     class Meta:
         model = User
         fields = ("id", "username", "name", "created_on", "updated_on")
