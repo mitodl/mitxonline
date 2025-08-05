@@ -1428,7 +1428,7 @@ MITOL_APIGATEWAY_USERINFO_MODEL_MAP = {
         "preferred_username": "username",
         "email": "email",
         "sub": "global_id",
-        "name": "name",
+        "name": ("name", False),
     },
     # Additional models to map in.
     # Key is the model name, then a list of tuples of header field name, model
