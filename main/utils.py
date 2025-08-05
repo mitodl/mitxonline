@@ -9,7 +9,9 @@ from urllib.parse import quote_plus
 
 import dateutil
 import pytz
+import redis_lock
 from django.conf import settings
+from django.core.cache import caches
 from django.core.serializers import serialize
 from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import reverse
@@ -205,3 +207,10 @@ def date_to_datetime(date: date, tzinfo: Optional[str] = None) -> datetime:
     if tzinfo:
         ret_date = ret_date.replace(tzinfo=pytz.timezone(tzinfo))
     return ret_date
+
+
+def get_redis_lock(name, **kwargs):
+    """Get a redis lock. Accepts same arguments as redis_lock.Lock(), minus the connection"""
+    redis_cache = caches["redis"]
+    client = redis_cache.client.get_client()
+    return redis_lock.Lock(client, name, **kwargs)

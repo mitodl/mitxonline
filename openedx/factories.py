@@ -5,6 +5,7 @@ from datetime import timedelta
 import pytz
 from factory import Faker, LazyAttribute, SelfAttribute, SubFactory, Trait
 from factory.django import DjangoModelFactory
+from factory.fuzzy import FuzzyText
 from mitol.common.utils import now_in_utc
 
 from openedx.constants import PLATFORM_EDX
@@ -17,7 +18,8 @@ class OpenEdxUserFactory(DjangoModelFactory):
     user = SubFactory("users.factories.UserFactory", no_openedx_user=True)
     platform = PLATFORM_EDX
     has_been_synced = True
-    edx_username = SelfAttribute("user.username")
+    edx_username = FuzzyText()
+    desired_edx_username = SelfAttribute("edx_username")
 
     class Meta:
         model = OpenEdxUser

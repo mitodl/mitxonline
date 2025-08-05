@@ -3,7 +3,7 @@
 import random
 from datetime import datetime
 
-from factory import Faker, RelatedFactory, SubFactory, Trait
+from factory import Faker, RelatedFactory, SelfAttribute, SubFactory, Trait
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyText
 from social_django.models import UserSocialAuth
@@ -14,7 +14,7 @@ from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 class UserFactory(DjangoModelFactory):
     """Factory for Users"""
 
-    username = FuzzyText()
+    username = SelfAttribute("email")
     email = FuzzyText(suffix="@example.com")
     name = Faker("name")
     password = FuzzyText(length=8)
