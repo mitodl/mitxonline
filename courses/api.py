@@ -590,7 +590,6 @@ def sync_course_runs_bulk(runs):
     runs_by_course_id = {run.courseware_id: run for run in runs}
 
     try:
-
         for course_detail in api_client.get_courses(course_keys=course_ids):
             course_id = course_detail.course_id
             run = runs_by_course_id.get(course_id)
@@ -634,7 +633,7 @@ def sync_course_runs_bulk(runs):
                 log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                 failure_count += 1
 
-    except HTTPError as e:  # noqa: PERF203
+    except HTTPError as e:
         failure_count += 1
         log.error("Bulk course list API error: %s", str(e))  # noqa: TRY400
     except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
