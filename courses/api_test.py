@@ -27,6 +27,7 @@ from courses.api import (
     process_course_run_grade_certificate,
     sync_course_mode,
     sync_course_runs,
+    sync_course_runs_bulk,
 )
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
@@ -1625,3 +1626,102 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(user, 
     # Only the revoked sub-program certificate should exist
     assert len(ProgramCertificate.objects.filter(is_revoked=False)) == 0
     assert len(ProgramCertificate.all_objects.all()) == 1
+
+
+@pytest.mark.parametrize(
+    "mocked_api_response, expect_success",  # noqa: PT006
+    [
+        [  # noqa: PT007
+            [
+                CourseDetail(
+                    {
+                        "id": "course-v1:edX+DemoX+2020_T1",
+                        "start": "2019-01-01T00:00:00Z",
+                        "end": "2020-02-01T00:00:00Z",
+                        "enrollment_start": "2019-01-01T00:00:00Z",
+                        "enrollment_end": "2020-02-01T00:00:00Z",
+                        "name": "Demonstration Course",
+                        "pacing": "self",
+                    }
+                ),
+                CourseDetail(
+                    {
+                        "id": "course-v1:MITx+6.00.1x+3T2015",
+                        "start": "2015-09-15T05:00:00Z",
+                        "end": "2015-12-31T05:00:00Z",
+                        "enrollment_start": "2015-09-01T00:00:00Z",
+                        "enrollment_end": None,
+                        "name": "Introduction to Computer Science",
+                        "pacing": "instructor",
+                    }
+                ),
+            ],
+            True,
+        ],
+        [  # noqa: PT007
+            [
+                CourseDetail(
+                    {
+                        "id": "course-v1:edX+DemoX+2020_T1",
+                        "start": "2021-01-01T00:00:00Z",
+                        "end": "2020-02-01T00:00:00Z",
+                        "enrollment_start": None,
+                        "enrollment_end": None,
+                        "name": None,
+                    }
+                )
+            ],
+            False,
+        ],
+        [HTTPError(response=Mock(status_code=404)), False],  # noqa: PT007
+        [HTTPError(response=Mock(status_code=400)), False],  # noqa: PT007
+        [ConnectionError(), False],  # noqa: PT007
+    ],
+)
+def test_sync_course_runs_bulk(settings, mocker, mocked_api_response, expect_success):
+    """
+    Test that sync_course_runs_bulk fetches data from edX course list API.
+    Should fail on API responding with an error, as well as trying to set
+    the course run title to None
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
+    mock_client = mock_course_list.return_value
+
+    if isinstance(mocked_api_response, list):
+        mock_client.get_courses.return_value = mocked_api_response
+    else:
+        mock_client.get_courses.side_effect = mocked_api_response
+
+    course_run1 = CourseRunFactory.create(
+        courseware_id="course-v1:edX+DemoX+2020_T1"
+    )
+    course_run2 = CourseRunFactory.create(
+        courseware_id="course-v1:MITx+6.00.1x+3T2015"
+    )
+
+    success_count, failure_count = sync_course_runs_bulk([course_run1, course_run2])
+
+    if expect_success:
+        course_run1.refresh_from_db()
+        course_run2.refresh_from_db()
+        assert success_count == 2
+        assert failure_count == 0
+
+        assert course_run1.title == mocked_api_response[0].name
+        assert course_run1.start_date == mocked_api_response[0].start
+        assert course_run1.end_date == mocked_api_response[0].end
+        assert course_run1.enrollment_start == mocked_api_response[0].enrollment_start
+        assert course_run1.enrollment_end == mocked_api_response[0].enrollment_end
+        assert course_run1.is_self_paced == mocked_api_response[0].is_self_paced()
+
+        assert course_run2.title == mocked_api_response[1].name
+        assert course_run2.start_date == mocked_api_response[1].start
+        assert course_run2.end_date == mocked_api_response[1].end
+        assert course_run2.enrollment_start == mocked_api_response[1].enrollment_start
+        assert course_run2.enrollment_end == mocked_api_response[1].enrollment_end
+        assert course_run2.is_self_paced == mocked_api_response[1].is_self_paced()
+    else:
+        assert success_count == 0
+        assert failure_count == 1
