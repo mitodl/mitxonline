@@ -1,15 +1,10 @@
 """Common mitx_online middleware"""
 
-import logging
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.middleware.csrf import CsrfViewMiddleware
 from django.utils.deprecation import MiddlewareMixin
-
-log = logging.getLogger(__name__)
-
-log = logging.getLogger(__name__)
 
 
 class CachelessAPIMiddleware(MiddlewareMixin):
