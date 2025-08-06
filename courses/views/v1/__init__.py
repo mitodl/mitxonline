@@ -475,21 +475,21 @@ class UserEnrollmentsApiViewSet(
             raise NotImplementedError
 
 
-@extend_schema(
-    responses={200: UserProgramEnrollmentDetailSerializer},
-    parameters=[
-        OpenApiParameter(
-            name="id",
-            type=OpenApiTypes.INT,
-            location=OpenApiParameter.PATH,
-            description="Program enrollment ID",
-            required=True,
-        )
-    ],
-)
 class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
+    id_parameter = OpenApiParameter(
+        name="id",
+        type=OpenApiTypes.INT,
+        location=OpenApiParameter.PATH,
+        description="Program enrollment ID",
+        required=True,
+    )
+
+    @extend_schema(
+        responses={200: UserProgramEnrollmentDetailSerializer},
+        parameters=[],
+    )
     def list(self, request):
         """
         Returns a unified set of program and course enrollments for the current
@@ -528,6 +528,25 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             UserProgramEnrollmentDetailSerializer(program_list, many=True).data
         )
 
+    @extend_schema(
+        responses={200: UserProgramEnrollmentDetailSerializer},
+        parameters=[id_parameter],
+    )
+    def retrieve(self, request, pk=None):
+        """
+        Retrieve a specific program enrollment.
+        """
+        program = Program.objects.get(pk=pk)
+        enrollment = ProgramEnrollment.objects.get(user=request.user, program=program)
+        serializer = UserProgramEnrollmentDetailSerializer(
+            enrollment, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(
+        responses={200: UserProgramEnrollmentDetailSerializer},
+        parameters=[id_parameter],
+    )
     def destroy(self, request, pk=None):
         """
         Unenroll the user from this program. This is simpler than the corresponding
