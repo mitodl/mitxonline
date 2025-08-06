@@ -1,8 +1,10 @@
 """Views for the B2B API (v0)."""
 
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
+from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -87,7 +89,7 @@ class AttachContractApi(APIView):
 
     @extend_schema(
         request=None,
-        responses=[ContractPageSerializer],
+        responses=ContractPageSerializer(many=True),
     )
     @csrf_exempt
     def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002
@@ -109,7 +111,14 @@ class AttachContractApi(APIView):
         - ContractPageSerializer - the contracts we added
         """
 
-        code = Discount.objects.get(discount_code=enrollment_code)
+        now = now_in_utc()
+        code = (
+            Discount.objects.filter(
+                Q(activation_date__isnull=True) | Q(activation_date__lte=now)
+            )
+            .filter(Q(expiration_date__isnull=True) | Q(expiration_date__lte=now))
+            .get(discount_code=enrollment_code)
+        )
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
         contracts = (
             ContractPage.objects.filter(pk__in=contract_ids)
@@ -118,6 +127,9 @@ class AttachContractApi(APIView):
         )
 
         for contract in contracts:
+            if contract.is_full():
+                continue
+
             request.user.b2b_contracts.add(contract)
             DiscountContractAttachmentRedemption.objects.create(
                 user=request.user, discount=code, contract=contract
@@ -125,4 +137,6 @@ class AttachContractApi(APIView):
 
         request.user.save()
 
-        return ContractPageSerializer(contracts, many=True).data()
+        return ContractPageSerializer(
+            request.user.b2b_contracts.all(), many=True
+        ).data()

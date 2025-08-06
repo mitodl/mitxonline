@@ -223,6 +223,24 @@ class ContractPage(Page):
             .distinct()
         )
 
+    def is_full(self):
+        """Determine if the contract is full or not."""
+
+        return (
+            self.get_learners().count() >= self.max_learners
+            if self.max_learners
+            else False
+        )
+
+    def is_overfull(self):
+        """Determine if the contract is overcommitted."""
+
+        return (
+            self.get_learners().count() > self.max_learners
+            if self.max_learners
+            else False
+        )
+
     def get_course_runs(self):
         """Get the runs associated with the contract."""
 
