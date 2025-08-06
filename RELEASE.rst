@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.125.7
+Version 0.125.7 (Released August 06, 2025)
 ---------------
 
 - Add certificate retrieval APIs (#2832)
