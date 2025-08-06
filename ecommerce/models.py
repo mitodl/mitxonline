@@ -391,16 +391,39 @@ class Discount(TimestampedModel):
         """
         from ecommerce.discounts import DiscountType
 
-        if (user is None and self.valid_now()) or self.check_validity(user):  # noqa: RET503
+        if (user is None and self.valid_now()) or self.check_validity(user):
             return DiscountType.get_discounted_price([self], product).quantize(
                 Decimal("0.01")
             )
+
+        return None
 
     @property
     def is_full_discount(self):
         return (
             self.discount_type == DISCOUNT_TYPE_PERCENT_OFF and self.amount == 100  # noqa: PLR2004
         ) or (self.discount_type == DISCOUNT_TYPE_FIXED_PRICE and self.amount == 0)
+
+    def b2b_contracts(self):
+        """Return the applicable B2B contract(s), if any."""
+        from b2b.models import ContractPage
+
+        products_qs = self.products.select_related(
+            "product", "product__content_type"
+        ).filter(
+            product__content_type__app_label="courses",
+            product__content_type__model="courserun",
+        )
+
+        courserun_ids = products_qs.all().values_list("product__object_id", flat=True)
+
+        return ContractPage.objects.filter(
+            pk__in=CourseRun.objects.filter(
+                pk__in=courserun_ids, b2b_contract__isnull=False
+            )
+            .all()
+            .values_list("b2b_contract", flat=True)
+        ).all()
 
 
 class DiscountProduct(TimestampedModel):

@@ -1,10 +1,12 @@
 """Models for B2B data."""
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.http import Http404
 from django.utils.text import slugify
+from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.fields import RichTextField
@@ -250,3 +252,23 @@ class ContractPage(Page):
         from ecommerce.models import Discount
 
         return Discount.objects.filter(products__product__in=self.get_products()).all()
+
+
+class DiscountContractAttachmentRedemption(TimestampedModel):
+    """Records when a discount was used to attach the user to a contract."""
+
+    discount = models.ForeignKey(
+        "ecommerce.Discount",
+        on_delete=models.DO_NOTHING,
+        help_text="The discount that was redemeed.",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.DO_NOTHING,
+        help_text="The user that redeemed the discount.",
+    )
+    contract = models.ForeignKey(
+        ContractPage,
+        on_delete=models.DO_NOTHING,
+        help_text="The contract that the user was attached to.",
+    )
