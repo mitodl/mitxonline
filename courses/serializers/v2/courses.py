@@ -214,9 +214,7 @@ class CourseSerializer(BaseCourseSerializer):
         ]
 
 
-@extend_schema_serializer(
-    component_name="V2CourseRunSerializer",
-)
+@extend_schema_serializer(component_name="CourseRunV2")
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
@@ -262,7 +260,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         return flexible_price_exists  # noqa: RET504
 
 
-@extend_schema_serializer(component_name="V2CourseWithCourseRunsSerializer")
+@extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
@@ -285,6 +283,7 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
         fields = [*CourseSerializer.Meta.fields, "courseruns"]
 
 
+@extend_schema_serializer(component_name="V2CourseRunWithCourse")
 class CourseRunWithCourseSerializer(CourseRunSerializer):
     """
     CourseRun model serializer - also serializes the parent Course.
@@ -299,6 +298,7 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
         ]
 
 
+@extend_schema_serializer(component_name="CourseRunEnrollmentRequestV2")
 class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
     """CourseRunEnrollment model serializer"""
 
@@ -310,24 +310,43 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
     )
     approved_flexible_price_exists = serializers.SerializerMethodField()
     grades = serializers.SerializerMethodField(read_only=True)
+    b2b_organization_id = serializers.SerializerMethodField()
+    b2b_contract_id = serializers.SerializerMethodField()
 
     def create(self, validated_data):
+        """Create a new course run enrollment."""
         user = self.context["user"]
         run_id = validated_data["run_id"]
         try:
             run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
-        successful_enrollments, edx_request_success = create_run_enrollments(
+        successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
             keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
         )
         return successful_enrollments
 
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_b2b_organization_id(self, enrollment):
+        """Get the B2B organization ID if this enrollment is associated with a B2B contract."""
+        if enrollment.run.b2b_contract:
+            return enrollment.run.b2b_contract.organization.id
+        return None
+
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_b2b_contract_id(self, enrollment):
+        """Get the B2B contract ID if this enrollment is associated with a B2B contract."""
+        if enrollment.run.b2b_contract:
+            return enrollment.run.b2b_contract.id
+        return None
+
     class Meta(BaseCourseRunEnrollmentSerializer.Meta):
         fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [  # noqa: RUF005
             "run_id",
+            "b2b_organization_id",
+            "b2b_contract_id",
         ]
 
 

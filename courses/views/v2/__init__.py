@@ -2,21 +2,31 @@
 Course API Views version 2
 """
 
+import contextlib
+
 import django_filters
 from django.db.models import Count, Exists, OuterRef, Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import viewsets
+from mitol.olposthog.features import is_enabled
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.response import Response
 
+from courses.api import deactivate_run_enrollment
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     Course,
     CourseRun,
     CourseRunCertificate,
+    CourseRunEnrollment,
     CoursesTopic,
     Department,
     Program,
@@ -30,6 +40,7 @@ from courses.serializers.v2.certificates import (
     ProgramCertificateSerializer,
 )
 from courses.serializers.v2.courses import (
+    CourseRunEnrollmentSerializer,
     CourseTopicSerializer,
     CourseWithCourseRunsSerializer,
 )
@@ -41,6 +52,9 @@ from courses.serializers.v2.programs import (
     ProgramSerializer,
 )
 from courses.utils import get_enrollable_courses, get_unenrollable_courses
+from main import features
+from openapi.utils import extend_schema_get_queryset
+from openedx.api import sync_enrollments_with_edx
 
 
 class Pagination(PageNumberPagination):
@@ -327,6 +341,108 @@ class ProgramCollectionViewSet(viewsets.ReadOnlyModelViewSet):
             .prefetch_related("programs")
             .order_by("title")
         )
+
+
+class UserEnrollmentFilterSet(django_filters.FilterSet):
+    """Filter set for user enrollments with B2B organization filtering."""
+
+    org_id = django_filters.NumberFilter(
+        method="filter_org_id",
+        label="Filter by B2B organization ID",
+    )
+    exclude_b2b = django_filters.BooleanFilter(
+        method="filter_exclude_b2b",
+        label="Exclude B2B enrollments (enrollments linked to course runs with B2B contracts)",
+    )
+
+    class Meta:
+        model = CourseRunEnrollment
+        fields = ["org_id", "exclude_b2b"]
+
+    def filter_exclude_b2b(self, queryset, name, value):  # noqa: ARG002
+        """Filter out B2B enrollments if exclude_b2b is True."""
+        if value:
+            return queryset.filter(run__b2b_contract__isnull=True)
+        return queryset
+
+    def filter_org_id(self, queryset, name, value):  # noqa: ARG002
+        """Filter enrollments by B2B organization ID."""
+        if value:
+            return queryset.filter(run__b2b_contract__organization_id=value)
+        return queryset
+
+
+class UserEnrollmentsApiViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """API view set for user enrollments - v2"""
+
+    serializer_class = CourseRunEnrollmentSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = UserEnrollmentFilterSet
+
+    @extend_schema_get_queryset(CourseRunEnrollment.objects.none())
+    def get_queryset(self):
+        """Get the queryset for user enrollments."""
+        return (
+            CourseRunEnrollment.objects.filter(user=self.request.user)
+            .select_related(
+                "run__course__page",
+                "user",
+                "run",
+                "run__b2b_contract",
+                "run__b2b_contract__organization",
+            )
+            .all()
+        )
+
+    def get_serializer_context(self):
+        """Get the serializer context."""
+        if self.action == "list":
+            return {"include_page_fields": True}
+        else:
+            return {"user": self.request.user}
+
+    @extend_schema(
+        operation_id="user_enrollments_list_v2",
+        description="List user enrollments with B2B organization and contract information - API v2. "
+        "Use ?exclude_b2b=true to filter out enrollments linked to course runs with B2B contracts. "
+        "Use ?org_id=<id> to filter enrollments by specific B2B organization.",
+    )
+    def list(self, request, *args, **kwargs):
+        """List user enrollments with optional sync."""
+        if is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
+            with contextlib.suppress(Exception):
+                sync_enrollments_with_edx(self.request.user)
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        operation_id="user_enrollments_create_v2",
+        description="Create a new user enrollment - API v2",
+    )
+    def create(self, request, *args, **kwargs):
+        """Create a new enrollment."""
+        return super().create(request, *args, **kwargs)
+
+    @extend_schema(
+        operation_id="user_enrollments_destroy_v2",
+        description="Unenroll from a course - API v2",
+    )
+    def destroy(self, request, *args, **kwargs):  # noqa: ARG002
+        """Unenroll from a course."""
+        enrollment = self.get_object()
+        deactivated_enrollment = deactivate_run_enrollment(
+            enrollment,
+            change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+        )
+        if deactivated_enrollment is None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @extend_schema(
