@@ -36,7 +36,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.125.7"
+VERSION = "0.125.8"
 
 log = logging.getLogger()
 
@@ -450,7 +450,7 @@ ROBOTS_CACHE_TIMEOUT = get_int(
 # Social Auth Configuration
 
 AUTHENTICATION_BACKENDS = (
-    "mitol.apigateway.backends.ApisixRemoteUserBackend",
+    "authentication.backends.apisix_remote_user_org.ApisixRemoteUserOrgBackend",
     "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
@@ -1096,7 +1096,6 @@ OAUTH2_PROVIDER = {
 }
 
 SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
-
 
 # DRF configuration
 REST_FRAMEWORK = {

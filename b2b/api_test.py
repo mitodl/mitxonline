@@ -17,6 +17,7 @@ from b2b.api import (
     create_contract_run,
     ensure_enrollment_codes_exist,
     get_active_contracts_from_basket_items,
+    reconcile_user_orgs,
     validate_basket_for_b2b_purchase,
 )
 from b2b.constants import (
@@ -48,7 +49,7 @@ from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
-FAKE = faker.Factory.create()
+FAKE = faker.Faker()
 pytestmark = [
     pytest.mark.django_db,
 ]
@@ -501,3 +502,42 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     assert settings.OPENEDX_COURSE_BASE_URL in created_run.courseware_url
 
     mocked_clone_run.assert_called()
+
+
+def test_reconcile_b2b_orgs():
+    """Test that we can get a list of B2B orgs from somewhere and fix a user's associations."""
+
+    contracts = ContractPageFactory.create_batch(
+        2, integration_type=CONTRACT_INTEGRATION_NONSSO
+    )
+    sso_contracts = ContractPageFactory.create_batch(
+        2, integration_type=CONTRACT_INTEGRATION_SSO
+    )
+    user = UserFactory.create()
+
+    assert user.b2b_contracts.count() == 0
+
+    user.b2b_contracts.add(contracts[0])
+    user.b2b_contracts.add(contracts[1])
+    user.b2b_contracts.add(sso_contracts[0])
+    user.save()
+
+    assert user.b2b_contracts.count() == 3
+
+    sso_required_org = sso_contracts[1].organization.sso_organization_id
+
+    added, removed = reconcile_user_orgs(user, [sso_required_org])
+
+    assert added == 1
+    assert removed == 1
+
+    user.refresh_from_db()
+    assert user.b2b_contracts.count() == 3
+    assert (
+        user.b2b_contracts.filter(
+            organization__sso_organization_id=sso_contracts[
+                0
+            ].organization.sso_organization_id
+        ).count()
+        == 0
+    )

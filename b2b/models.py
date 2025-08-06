@@ -70,11 +70,18 @@ class OrganizationPage(Page):
         blank=True,
         help_text="The organization's logo. Will be displayed in the app in various places.",
     )
+    sso_organization_id = models.UUIDField(
+        "Organization SSO ID",
+        null=True,
+        blank=True,
+        help_text="The UUID for the organization in the SSO provider.",
+    )
 
     content_panels = [
         FieldPanel("name"),
         FieldPanel("description"),
         FieldPanel("logo"),
+        FieldPanel("sso_organization_id"),
     ]
 
     promote_panels = []

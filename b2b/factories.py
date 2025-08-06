@@ -1,5 +1,7 @@
 """Test factories for B2B models."""
 
+from uuid import uuid4
+
 import faker
 import wagtail_factories
 from factory import LazyAttribute, LazyFunction, SubFactory
@@ -27,14 +29,16 @@ class OrganizationIndexPageFactory(wagtail_factories.PageFactory):
 class OrganizationPageFactory(wagtail_factories.PageFactory):
     """OrganizationPage factory class"""
 
-    name = FAKE.unique.company()
-    org_key = FAKE.unique.text(max_nb_chars=5)
-    description = FAKE.unique.text()
+    name = LazyAttribute(lambda _: FAKE.unique.company())
+    org_key = LazyAttribute(lambda _: FAKE.unique.text(max_nb_chars=5))
+    description = LazyAttribute(lambda _: FAKE.unique.text())
     logo = None
+    sso_organization_id = LazyAttribute(lambda _: uuid4())
     parent = LazyAttribute(
         lambda _: OrganizationIndexPage.objects.first()
         or OrganizationIndexPageFactory.create()
     )
+    slug = LazyAttribute(lambda _: FAKE.unique.slug())
 
     class Meta:
         model = OrganizationPage
@@ -43,8 +47,8 @@ class OrganizationPageFactory(wagtail_factories.PageFactory):
 class ContractPageFactory(wagtail_factories.PageFactory):
     """ContractPage factory class"""
 
-    name = FAKE.unique.bs()
-    description = FAKE.unique.text()
+    name = LazyAttribute(lambda _: FAKE.unique.bs())
+    description = LazyAttribute(lambda _: FAKE.unique.text())
     organization = SubFactory(OrganizationPageFactory)
     parent = LazyAttribute(lambda o: o.organization)
     integration_type = LazyFunction(
@@ -52,6 +56,7 @@ class ContractPageFactory(wagtail_factories.PageFactory):
         if FAKE.boolean()
         else CONTRACT_INTEGRATION_SSO
     )
+    slug = LazyAttribute(lambda _: FAKE.unique.slug())
 
     class Meta:
         model = ContractPage

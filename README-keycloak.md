@@ -88,6 +88,19 @@ The endpoint URL is available in the Keycloak admin. Open the realm you wish to 
 
 The key and secret are available under `Clients`. The key is the client name (so, by default, `apisix`) and the secret is available under `Credentials` once you open the client configuration.
 
+To be able to use APISIX for login you have to use port 9080, for example, http://mitxonline.odl.local:9080.
+Make sure to update your local tutor configuration to use this port.
+
+When using APISIX you also have to set the following environment variables in your `.env` file:
+- `COMPOSE_PROFILES=keycloak,apisix`
+- `MITOL_APIGATEWAY_DISABLE_MIDDLEWARE=False`
+- `MITOL_APIGATEWAY_USERINFO_UPDATE=True`
+- `MITOL_APIGATEWAY_USERINFO_CREATE=True`
+
+#### Enable User Registration
+To enable user registration, log into the Keycloak admin console https://kc.odl.local:7443/admin/master/console/.
+Then navigate to the `ol-local` realm, then go to `Realm Settings` -> `Login` tab. Enable the `User Registration` option. This will allow users to create accounts directly in Keycloak.
+
 ### Other Keycloak Instances
 
 You can use MITx Online with Keycloak instances that aren't the pack-in one - the provided one is just for convenience. Just set the same settings above, but get them from whatever Keycloak instance you already have running.
