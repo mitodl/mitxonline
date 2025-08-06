@@ -27,5 +27,9 @@ v0_router.register(
 urlpatterns = [
     re_path(r"^", include(v0_router.urls)),
     path(r"enroll/<str:readable_id>/", Enroll.as_view()),
-    path(r"attach/<str:enrollment_code>/", AttachContractApi.as_view()),
+    path(
+        r"attach/<str:enrollment_code>/",
+        AttachContractApi.as_view(),
+        name="attach-user",
+    ),
 ]

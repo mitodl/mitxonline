@@ -108,17 +108,23 @@ class AttachContractApi(APIView):
         If the user is already in the contract, then we skip it.
 
         Returns:
-        - ContractPageSerializer - the contracts we added
+        - list of ContractPageSerializer - the contracts for the user
         """
 
         now = now_in_utc()
-        code = (
-            Discount.objects.filter(
-                Q(activation_date__isnull=True) | Q(activation_date__lte=now)
+        try:
+            code = (
+                Discount.objects.filter(
+                    Q(activation_date__isnull=True) | Q(activation_date__lte=now)
+                )
+                .filter(Q(expiration_date__isnull=True) | Q(expiration_date__lte=now))
+                .get(discount_code=enrollment_code)
             )
-            .filter(Q(expiration_date__isnull=True) | Q(expiration_date__lte=now))
-            .get(discount_code=enrollment_code)
-        )
+        except Discount.DoesNotExist:
+            return Response(
+                ContractPageSerializer(request.user.b2b_contracts.all(), many=True).data
+            )
+
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
         contracts = (
             ContractPage.objects.filter(pk__in=contract_ids)
@@ -137,6 +143,6 @@ class AttachContractApi(APIView):
 
         request.user.save()
 
-        return ContractPageSerializer(
-            request.user.b2b_contracts.all(), many=True
-        ).data()
+        return Response(
+            ContractPageSerializer(request.user.b2b_contracts.all(), many=True).data
+        )
