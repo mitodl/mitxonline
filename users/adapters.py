@@ -1,9 +1,14 @@
+import logging
 from typing import TYPE_CHECKING
 
 from mitol.scim.adapters import UserAdapter
 
+from b2b.api import reconcile_user_orgs
+from b2b.models import OrganizationPage
 from openedx.models import OpenEdxUser
 from users.models import LegalAddress, UserProfile
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from users.models import User
@@ -25,6 +30,7 @@ class LearnUserAdapter(UserAdapter):
     user_profile: UserProfile
     legal_address: LegalAddress
     openedx_user: OpenEdxUser
+    groups: list[dict] = []
 
     def __init__(self, obj, request=None):
         super().__init__(obj, request=request)
@@ -73,6 +79,10 @@ class LearnUserAdapter(UserAdapter):
         if last_name:
             self.legal_address.last_name = last_name
 
+        groups = d.get("groups", None)
+        if groups:
+            self.groups = groups
+
     def _save_related(self):
         self.user_profile.user = self.obj
         self.user_profile.save()
@@ -82,3 +92,19 @@ class LearnUserAdapter(UserAdapter):
 
         self.openedx_user.user = self.obj
         self.openedx_user.save()
+
+        if self.groups:
+            log.info("saving groups for %s: %s", self.obj, self.groups)
+            group_keys = [
+                group["display"]
+                for group in self.groups
+                if group["type"] == "organization"
+            ]
+            log.info("keys to update: %s", group_keys)
+            group_sso_ids = (
+                OrganizationPage.objects.filter(org_key__in=group_keys)
+                .all()
+                .values_list("sso_organization_id", flat=True)
+            )
+            created, removed = reconcile_user_orgs(self.obj, group_sso_ids)
+            log.info("%s groups created %s groups removed", created, removed)
