@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.125.8
+---------------
+
+- remove id requirement from program enrollment listing view (#2862)
+- Add APIs and updates to middleware to process Keycloak organizations (#2851)
+- 7924 add b2b data and filtering to course enrollments apis (#2849)
+- Adding some missing steps for keycloak setup (#2860)
+- fix course creation in configure_instance (#2856)
+- Fix feature item flaky test test_home_page_featured_products_sorting (#2850)
+- Add a count of updated coupons (#2846)
+- Remove Heroku github actions (#2847)
+
 Version 0.125.7 (Released August 06, 2025)
 ---------------
 
