@@ -15,6 +15,7 @@ from b2b.constants import CONTRACT_INTEGRATION_NONSSO
 from b2b.factories import ContractPageFactory
 from courses.factories import CourseRunFactory
 from ecommerce.factories import ProductFactory
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
 
@@ -153,6 +154,49 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
 
     with freeze_time(slightly_future_time):
         resp = client.post(url)
+
+    assert resp.status_code == 200
+
+    user.refresh_from_db()
+    assert not user.b2b_contracts.filter(pk=contract.id).exists()
+
+
+def test_b2b_contract_attachment_full_contract():
+    """Test that the attachment fails properly if the contract is full."""
+
+    contract = ContractPageFactory.create(
+        integration_type=CONTRACT_INTEGRATION_NONSSO,
+        max_learners=1,
+    )
+
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=courserun)
+
+    ensure_enrollment_codes_exist(contract)
+    contract_code = contract.get_discounts().first()
+
+    user = UserFactory.create()
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
+    )
+    resp = client.post(url)
+
+    assert resp.status_code == 200
+
+    user.refresh_from_db()
+    assert user.b2b_contracts.filter(pk=contract.id).exists()
+
+    user = UserFactory.create()
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
+    )
+    resp = client.post(url)
 
     assert resp.status_code == 200
 
