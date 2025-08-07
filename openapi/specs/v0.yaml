@@ -116,7 +116,7 @@ paths:
         If the user is already in the contract, then we skip it.
 
         Returns:
-        - ContractPageSerializer - the contracts we added
+        - list of ContractPageSerializer - the contracts for the user
       parameters:
       - in: path
         name: enrollment_code
