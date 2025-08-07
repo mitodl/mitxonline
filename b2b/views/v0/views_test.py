@@ -13,6 +13,7 @@ from rest_framework.test import APIClient
 from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_INTEGRATION_NONSSO
 from b2b.factories import ContractPageFactory
+from b2b.models import DiscountContractAttachmentRedemption
 from courses.factories import CourseRunFactory
 from ecommerce.factories import ProductFactory
 from users.factories import UserFactory
@@ -59,6 +60,10 @@ def test_b2b_contract_attachment(user):
 
     user.refresh_from_db()
     assert user.b2b_contracts.filter(pk=contract.id).exists()
+
+    assert DiscountContractAttachmentRedemption.objects.filter(
+        contract=contract, user=user, discount=contract_codes[0]
+    ).exists()
 
 
 @pytest.mark.parametrize(
