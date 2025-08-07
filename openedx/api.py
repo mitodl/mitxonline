@@ -8,7 +8,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import reverse
 from edx_api.client import EdxApi
 from edx_api.course_runs.exceptions import CourseRunAPIError
@@ -49,6 +49,7 @@ from openedx.exceptions import (
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import SyncResult, edx_url
+from users.utils import is_duplicate_username_error
 
 log = logging.getLogger(__name__)
 User = get_user_model()
@@ -163,13 +164,20 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
 
     try:
         while attempt < max_attempts:
-            attempt += 1
+            try:
+                # it is required to save the username because OpenedX will callback to our userinfo
+                # API when we POST to the registration API
+                # if the username doesn't match our input, it's possible we see an error
+                open_edx_user.edx_username = current_username
+                open_edx_user.save()
+            except IntegrityError as exc:
+                if is_duplicate_username_error(exc):
+                    continue
 
-            # it is required to save the username because OpenedX will callback to our userinfo
-            # API when we POST to the registration API
-            # if the username doesn't match our input, it's possible we see an error
-            open_edx_user.edx_username = current_username
-            open_edx_user.save()
+                raise
+
+            # this is after the attempted save because if it conflicts it won't consume an attempt
+            attempt += 1
 
             user_data = _build_user_data(user, current_username, access_token)
 
