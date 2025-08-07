@@ -117,7 +117,7 @@ class AttachContractApi(APIView):
                 Discount.objects.filter(
                     Q(activation_date__isnull=True) | Q(activation_date__lte=now)
                 )
-                .filter(Q(expiration_date__isnull=True) | Q(expiration_date__lte=now))
+                .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
                 .get(discount_code=enrollment_code)
             )
         except Discount.DoesNotExist:
@@ -129,6 +129,7 @@ class AttachContractApi(APIView):
         contracts = (
             ContractPage.objects.filter(pk__in=contract_ids)
             .exclude(pk__in=request.user.b2b_contracts.all())
+            .exclude(Q(contract_end__lt=now) | Q(contract_start__gt=now))
             .all()
         )
 
