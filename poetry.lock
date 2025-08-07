@@ -2655,14 +2655,14 @@ files = [
 
 [[package]]
 name = "mitol-django-apigateway"
-version = "2025.4.25.1"
+version = "2025.8.7"
 description = "MIT Open Learning Django app for API Gateway support"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol_django_apigateway-2025.4.25.1-py3-none-any.whl", hash = "sha256:639cadb4a7b29ace53e8d84fa3b8339c301539c567e780bc5f073a9dd971d1e0"},
-    {file = "mitol_django_apigateway-2025.4.25.1.tar.gz", hash = "sha256:1f61b9223cf78c9d1cb9b8c952ac6906f4370ed3a6d839a99f07b912b6605f20"},
+    {file = "mitol_django_apigateway-2025.8.7-py3-none-any.whl", hash = "sha256:7c71017b7e92bac70a0fca000e55dfcdcb471ba9b826248ebaaa48db506a59bf"},
+    {file = "mitol_django_apigateway-2025.8.7.tar.gz", hash = "sha256:9b69849755514a5a02d66388f5d7b00795f97f6b3620c1560d4831a02e846d45"},
 ]
 
 [package.dependencies]
@@ -5588,4 +5588,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "2b9e140da8529ac6289e733611fc64e8077035001e2a80ac1ef22c26ce67c60d"
+content-hash = "3117c0ce63c04113ace79ea98e043d89d7a7bad76e72ced1c6366aa6736ec397"
