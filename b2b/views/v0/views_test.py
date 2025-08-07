@@ -114,6 +114,9 @@ def test_b2b_contract_attachment_invalid_code_dates(user, bad_start_or_end):
 
     user.refresh_from_db()
     assert not user.b2b_contracts.filter(pk=contract.id).exists()
+    assert not DiscountContractAttachmentRedemption.objects.filter(
+        contract=contract, user=user, discount=contract_code
+    ).exists()
 
 
 @pytest.mark.parametrize(
@@ -164,6 +167,9 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
 
     user.refresh_from_db()
     assert not user.b2b_contracts.filter(pk=contract.id).exists()
+    assert not DiscountContractAttachmentRedemption.objects.filter(
+        contract=contract, user=user, discount=contract_code
+    ).exists()
 
 
 def test_b2b_contract_attachment_full_contract():
@@ -207,3 +213,6 @@ def test_b2b_contract_attachment_full_contract():
 
     user.refresh_from_db()
     assert not user.b2b_contracts.filter(pk=contract.id).exists()
+    assert not DiscountContractAttachmentRedemption.objects.filter(
+        contract=contract, user=user, discount=contract_code
+    ).exists()
