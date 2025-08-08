@@ -129,6 +129,26 @@ def _extract_username_suggestions(data, suggestions_extracted):
     return [], suggestions_extracted
 
 
+def _ensure_unique_edx_username(desired_username):
+    """
+    Ensure the desired username is unique in the OpenEdxUser table.
+
+    Args:
+        desired_username (str): The desired username
+
+    Returns:
+        str: A unique username, either the original or a modified version
+    """
+    if OpenEdxUser.objects.filter(edx_username=desired_username).exists():
+        return _find_available_username(
+            desired_username,
+            model=OpenEdxUser,
+            username_field="edx_username",
+            max_length=OPENEDX_USERNAME_MAX_LEN,
+        )
+    return desired_username
+
+
 def _create_edx_user_request(open_edx_user, user, access_token):
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
@@ -217,16 +237,7 @@ def create_edx_user(user, edx_username=None):
     )
 
     if open_edx_user.edx_username is None and edx_username is not None:
-        if OpenEdxUser.objects.filter(edx_username=edx_username).exists():
-            unique_username = _find_available_username(
-                edx_username,
-                model=OpenEdxUser,
-                username_field="edx_username",
-                max_length=OPENEDX_USERNAME_MAX_LEN,
-            )
-            open_edx_user.edx_username = unique_username
-        else:
-            open_edx_user.edx_username = edx_username
+        open_edx_user.edx_username = _ensure_unique_edx_username(edx_username)
         open_edx_user.save()
 
     with transaction.atomic():
@@ -281,11 +292,13 @@ def reconcile_edx_username(user):
             else user.username
         )
 
-        edx_user.edx_username = (
+        desired_username = (
             user_username[:OPENEDX_USERNAME_MAX_LEN]
             if user_username
             else usernameify(user.name, user.email, OPENEDX_USERNAME_MAX_LEN)
         )
+
+        edx_user.edx_username = _ensure_unique_edx_username(desired_username)
         edx_user.save()
         return True
 
