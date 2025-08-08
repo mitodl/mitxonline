@@ -98,6 +98,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/LearnerRecord'
           description: ''
+  /api/v0/b2b/attach/{enrollment_code}/:
+    post:
+      operationId: b2b_attach_create
+      description: |-
+        Use the provided enrollment code to attach the user to a B2B contract.
+
+        This will not create an order, nor will it enroll the user. It will
+        attach the user to the contract and log that the code was used for this
+        purpose (but will _not_ invalidate the code, since we're not actually
+        using it at this point).
+
+        This will respect the activation and expiration dates (of both the contract
+        and the discount), and will make sure there's sufficient available seats
+        in the contract.
+
+        If the user is already in the contract, then we skip it.
+
+        Returns:
+        - list of ContractPageSerializer - the contracts for the user
+      parameters:
+      - in: path
+        name: enrollment_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContractPage'
+          description: ''
   /api/v0/b2b/contracts/:
     get:
       operationId: b2b_contracts_list

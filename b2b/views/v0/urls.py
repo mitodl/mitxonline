@@ -3,7 +3,12 @@
 from django.urls import include, path, re_path
 from rest_framework.routers import SimpleRouter
 
-from b2b.views.v0 import ContractPageViewSet, Enroll, OrganizationPageViewSet
+from b2b.views.v0 import (
+    AttachContractApi,
+    ContractPageViewSet,
+    Enroll,
+    OrganizationPageViewSet,
+)
 
 app_name = "b2b"
 
@@ -22,4 +27,9 @@ v0_router.register(
 urlpatterns = [
     re_path(r"^", include(v0_router.urls)),
     path(r"enroll/<str:readable_id>/", Enroll.as_view()),
+    path(
+        r"attach/<str:enrollment_code>/",
+        AttachContractApi.as_view(),
+        name="attach-user",
+    ),
 ]

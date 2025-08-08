@@ -1,8 +1,10 @@
 """Views for the B2B API (v0)."""
 
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
+from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -10,14 +12,18 @@ from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
 
 from b2b.api import create_b2b_enrollment
-from b2b.models import ContractPage, OrganizationPage
+from b2b.models import (
+    ContractPage,
+    DiscountContractAttachmentRedemption,
+    OrganizationPage,
+)
 from b2b.serializers.v0 import (
     ContractPageSerializer,
     CreateB2BEnrollmentSerializer,
     OrganizationPageSerializer,
 )
 from courses.models import CourseRun
-from ecommerce.models import Product
+from ecommerce.models import Discount, Product
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 
 
@@ -73,4 +79,71 @@ class Enroll(APIView):
             status=status.HTTP_201_CREATED
             if response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
             else status.HTTP_406_NOT_ACCEPTABLE,
+        )
+
+
+class AttachContractApi(APIView):
+    """View for attaching a user to a B2B contract."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=None,
+        responses=ContractPageSerializer(many=True),
+    )
+    @csrf_exempt
+    def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002
+        """
+        Use the provided enrollment code to attach the user to a B2B contract.
+
+        This will not create an order, nor will it enroll the user. It will
+        attach the user to the contract and log that the code was used for this
+        purpose (but will _not_ invalidate the code, since we're not actually
+        using it at this point).
+
+        This will respect the activation and expiration dates (of both the contract
+        and the discount), and will make sure there's sufficient available seats
+        in the contract.
+
+        If the user is already in the contract, then we skip it.
+
+        Returns:
+        - list of ContractPageSerializer - the contracts for the user
+        """
+
+        now = now_in_utc()
+        try:
+            code = (
+                Discount.objects.filter(
+                    Q(activation_date__isnull=True) | Q(activation_date__lte=now)
+                )
+                .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
+                .get(discount_code=enrollment_code)
+            )
+        except Discount.DoesNotExist:
+            return Response(
+                ContractPageSerializer(request.user.b2b_contracts.all(), many=True).data
+            )
+
+        contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
+        contracts = (
+            ContractPage.objects.filter(pk__in=contract_ids)
+            .exclude(pk__in=request.user.b2b_contracts.all())
+            .exclude(Q(contract_end__lt=now) | Q(contract_start__gt=now))
+            .all()
+        )
+
+        for contract in contracts:
+            if contract.is_full():
+                continue
+
+            request.user.b2b_contracts.add(contract)
+            DiscountContractAttachmentRedemption.objects.create(
+                user=request.user, discount=code, contract=contract
+            )
+
+        request.user.save()
+
+        return Response(
+            ContractPageSerializer(request.user.b2b_contracts.all(), many=True).data
         )
