@@ -4,15 +4,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('b2b', '0004_add_sso_org_id_field'),
+        ("b2b", "0004_add_sso_org_id_field"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='organizationpage',
-            name='sso_alias',
-            field=models.CharField(blank=True, default='', help_text="The organization's alias as set in the SSO provider.", max_length=255, verbose_name='Alias'),
+            model_name="organizationpage",
+            name="sso_alias",
+            field=models.CharField(
+                blank=True,
+                default="",
+                help_text="The organization's alias as set in the SSO provider.",
+                max_length=255,
+                verbose_name="Alias",
+            ),
         ),
     ]
