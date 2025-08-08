@@ -76,12 +76,20 @@ class OrganizationPage(Page):
         blank=True,
         help_text="The UUID for the organization in the SSO provider.",
     )
+    sso_alias = models.CharField(
+        "Alias",
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="The organization's alias as set in the SSO provider.",
+    )
 
     content_panels = [
         FieldPanel("name"),
         FieldPanel("description"),
         FieldPanel("logo"),
         FieldPanel("sso_organization_id"),
+        FieldPanel("sso_alias"),
     ]
 
     promote_panels = []

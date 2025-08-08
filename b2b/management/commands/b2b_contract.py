@@ -103,6 +103,11 @@ class Command(BaseCommand):
             help="The org UUID to use for the new organization.",
         )
         create_parser.add_argument(
+            "--org-alias",
+            type=str,
+            help="The org alias (from Keycloak) to use for the new organization.",
+        )
+        create_parser.add_argument(
             "--max-learners",
             type=int,
             help="The maximum number of learners for this contract.",
@@ -222,6 +227,7 @@ class Command(BaseCommand):
         price = kwargs.pop("price")
         new_org_key = kwargs.pop("org_key")
         new_org_uuid = kwargs.pop("org_uuid")
+        new_org_alias = kwargs.pop("org_alias")
 
         self.stdout.write(
             f"Creating contract '{contract_name}' for organization '{organization_name}'"
@@ -243,6 +249,7 @@ class Command(BaseCommand):
                 name=organization_name,
                 org_key=new_org_key,
                 sso_organization_id=new_org_uuid,
+                sso_alias=new_org_alias,
             )
             parent.add_child(instance=org)
             org.save()

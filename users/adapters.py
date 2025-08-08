@@ -102,7 +102,7 @@ class LearnUserAdapter(UserAdapter):
             ]
             log.info("keys to update: %s", group_keys)
             group_sso_ids = (
-                OrganizationPage.objects.filter(org_key__in=group_keys)
+                OrganizationPage.objects.filter(sso_alias__in=group_keys)
                 .all()
                 .values_list("sso_organization_id", flat=True)
             )
