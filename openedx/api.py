@@ -8,7 +8,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import reverse
 from edx_api.client import EdxApi
 from edx_api.course_runs.exceptions import CourseRunAPIError
@@ -28,7 +28,7 @@ from rest_framework import status
 import courses.models
 from authentication import api as auth_api
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
-from main.utils import get_partitioned_set_difference
+from main.utils import get_partitioned_set_difference, get_redis_lock
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
@@ -49,6 +49,7 @@ from openedx.exceptions import (
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import SyncResult, edx_url
+from users.utils import is_duplicate_username_error
 
 log = logging.getLogger(__name__)
 User = get_user_model()
@@ -104,12 +105,18 @@ def _build_user_data(user, current_username, access_token):
     )
 
 
-def _handle_successful_user_creation(open_edx_user, current_username):
-    """Handle successful user creation response."""
-    if current_username != open_edx_user.edx_username:
-        open_edx_user.edx_username = current_username
-    open_edx_user.has_been_synced = True
-    open_edx_user.save()
+def _is_valid_user_data(user_data):
+    """Return True if the user_data is valid to send to openedx"""
+    return all(
+        value
+        for key, value in user_data.items()
+        if key
+        in (
+            "username",
+            "email",
+            "name",
+        )
+    )
 
 
 def _is_duplicate_username_error(resp, data):
@@ -120,16 +127,7 @@ def _is_duplicate_username_error(resp, data):
     )
 
 
-def _extract_username_suggestions(data, suggestions_extracted):
-    """Extract username suggestions from API response if not already extracted."""
-    if not suggestions_extracted:
-        suggestions = data.get("username_suggestions", [])
-        if suggestions:
-            return suggestions, True
-    return [], suggestions_extracted
-
-
-def _create_edx_user_request(open_edx_user, user, access_token):
+def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
 
@@ -150,50 +148,82 @@ def _create_edx_user_request(open_edx_user, user, access_token):
             {ACCESS_TOKEN_HEADER_NAME: settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN}
         )
 
-    max_attempts = 4
+    max_attempts = settings.OPENEDX_SUGGESTED_USERNAME_MAX_ATTEMPTS
     attempt = 0
     suggested_usernames = []
-    suggestions_extracted = False
-    current_username = open_edx_user.edx_username
+    current_username = open_edx_user.desired_edx_username
 
-    while attempt < max_attempts:
-        attempt += 1
+    # we use a redis lock instead of a db lock because we need to be able to update the `edx_username`
+    # we give ourselves a generous 120 seconds to accomplish this and we do not block if something else has the lock
+    lock_name = f"openedx-create-user-lock.{user.global_id}"
+    lock = get_redis_lock(lock_name, expire=120)
 
-        user_data = _build_user_data(user, current_username, access_token)
-        resp = req_session.post(edx_url(OPENEDX_REGISTER_USER_PATH), data=user_data)
+    if not lock.acquire(blocking=False):
+        log.debug("Failed to acquire lock: %s", lock_name)
+        return False
 
-        if resp.status_code == status.HTTP_200_OK:
-            _handle_successful_user_creation(open_edx_user, current_username)
-            return True
+    try:
+        while attempt < max_attempts:
+            try:
+                # it is required to save the username because OpenedX will callback to our userinfo
+                # API when we POST to the registration API
+                # if the username doesn't match our input, it's possible we see an error
+                open_edx_user.edx_username = current_username
+                open_edx_user.save()
+            except IntegrityError as exc:
+                if is_duplicate_username_error(exc):
+                    continue
 
-        if resp.status_code != status.HTTP_409_CONFLICT:
-            break
+                raise
 
-        try:
-            data = resp.json()
-        except (ValueError, requests.exceptions.JSONDecodeError):
-            data = {}
+            # this is after the attempted save because if it conflicts it won't consume an attempt
+            attempt += 1
 
-        if not _is_duplicate_username_error(resp, data):
-            break
+            user_data = _build_user_data(user, current_username, access_token)
 
-        suggestions, suggestions_extracted = _extract_username_suggestions(
-            data, suggestions_extracted
+            if not _is_valid_user_data(user_data):
+                log.info(
+                    "Not creating user in openedx because their data is incomplete: %s",
+                    user.id,
+                )
+                return False
+
+            resp = req_session.post(edx_url(OPENEDX_REGISTER_USER_PATH), data=user_data)
+
+            if resp.status_code == status.HTTP_200_OK:
+                open_edx_user.has_been_synced = True
+                open_edx_user.save()
+                return True
+
+            if resp.status_code != status.HTTP_409_CONFLICT:
+                break
+
+            try:
+                data = resp.json()
+            except (ValueError, requests.exceptions.JSONDecodeError):
+                data = {}
+
+            if not _is_duplicate_username_error(resp, data):
+                break
+
+            # append to the list and only keep unique suggestions
+            suggested_usernames = list(
+                {*suggested_usernames, *data.get("username_suggestions", [])}
+            )
+
+            if not suggested_usernames:
+                break
+
+            current_username = suggested_usernames.pop(0)
+
+        if attempt >= max_attempts:
+            log.error("Failed to create Open edX user after %d attempts.", max_attempts)
+
+        raise OpenEdxUserCreateError(
+            f"Error creating Open edX user. {get_error_response_summary(resp)}"  # noqa: EM102
         )
-        if suggestions:
-            suggested_usernames = suggestions
-
-        if not suggested_usernames:
-            break
-
-        current_username = suggested_usernames.pop(0)
-
-    if attempt >= max_attempts:
-        log.error("Failed to create Open edX user after %d attempts.", max_attempts)
-
-    raise OpenEdxUserCreateError(
-        f"Error creating Open edX user. {get_error_response_summary(resp)}"  # noqa: EM102
-    )
+    finally:
+        lock.release()
 
 
 def create_edx_user(user, edx_username=None):
@@ -213,45 +243,42 @@ def create_edx_user(user, edx_username=None):
     open_edx_user, _ = OpenEdxUser.objects.get_or_create(
         user=user,
         platform=PLATFORM_EDX,
-        defaults={"edx_username": edx_username or None},
+        defaults={
+            "edx_username": edx_username or None,
+            "desired_edx_username": edx_username or None,
+        },
     )
 
     if open_edx_user.edx_username is None and edx_username is not None:
         if OpenEdxUser.objects.filter(edx_username=edx_username).exists():
-            unique_username = _find_available_username(
+            edx_username = _find_available_username(
                 edx_username,
                 model=OpenEdxUser,
                 username_field="edx_username",
                 max_length=OPENEDX_USERNAME_MAX_LEN,
             )
-            open_edx_user.edx_username = unique_username
-        else:
-            open_edx_user.edx_username = edx_username
+
+        open_edx_user.edx_username = edx_username
+        open_edx_user.desired_edx_username = edx_username
         open_edx_user.save()
 
-    with transaction.atomic():
-        open_edx_user = OpenEdxUser.objects.select_for_update().get(
-            user=user,
-            platform=PLATFORM_EDX,
-        )
+    if not open_edx_user.edx_username:
+        # no username has been set so skip this
+        return False
 
-        if not open_edx_user.edx_username:
-            # no username has been set so skip this
+    if open_edx_user.has_been_synced:
+        # Here we should check with edx that the user exists on that end.
+        try:
+            client = get_edx_api_client(user)
+            client.user_info.get_user_info()
+        except:  # noqa: S110, E722
+            pass
+        else:
+            open_edx_user.has_been_synced = True
+            open_edx_user.save()
             return False
 
-        if open_edx_user.has_been_synced:
-            # Here we should check with edx that the user exists on that end.
-            try:
-                client = get_edx_api_client(user)
-                client.user_info.get_user_info()
-            except:  # noqa: S110, E722
-                pass
-            else:
-                open_edx_user.has_been_synced = True
-                open_edx_user.save()
-                return False
-
-        return _create_edx_user_request(open_edx_user, user, access_token)
+    return _create_edx_user_request(open_edx_user, user, access_token)
 
 
 def reconcile_edx_username(user):
@@ -273,18 +300,8 @@ def reconcile_edx_username(user):
             edx_username__isnull=True, user=user
         ).get_or_create(defaults={"user": user})
 
-        # skip the user's username if it's an email address or has a @ in it
-        # @ is disallowed in edx usernames so instead force it through usernameify
-        user_username = (
-            None
-            if "@" in user.username or user.username == user.email
-            else user.username
-        )
-
-        edx_user.edx_username = (
-            user_username[:OPENEDX_USERNAME_MAX_LEN]
-            if user_username
-            else usernameify(user.name, user.email, OPENEDX_USERNAME_MAX_LEN)
+        edx_user.edx_username = usernameify(
+            user.name, user.email, OPENEDX_USERNAME_MAX_LEN
         )
         edx_user.save()
         return True

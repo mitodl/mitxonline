@@ -1240,6 +1240,12 @@ OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET = get_string(
     description="OAuth2 client secret for retirement service worker",
 )
 
+OPENEDX_SUGGESTED_USERNAME_MAX_ATTEMPTS = get_int(
+    name="OPENEDX_SUGGESTED_USERNAME_MAX_ATTEMPTS",
+    default=4,
+    description="The maximum number of attempts for suggested usernames we'll do",
+)
+
 EDX_API_CLIENT_TIMEOUT = get_int(
     name="EDX_API_CLIENT_TIMEOUT",
     default=60,

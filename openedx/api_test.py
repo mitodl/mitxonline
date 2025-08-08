@@ -49,7 +49,6 @@ from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
-    OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
 )
 from openedx.exceptions import (
@@ -1023,26 +1022,13 @@ def test_bulk_retire_edx_users(mocker):
     )
 
 
-@pytest.mark.parametrize("username_is_email", [True, False])
 @pytest.mark.parametrize("name_is_empty", [True, False])
-@pytest.mark.parametrize("username_is_long", [True, False])
-def test_reconcile_edx_username(username_is_email, name_is_empty, username_is_long):
+def test_reconcile_edx_username(name_is_empty):
     """Ensure the edX username reconciliation works properly."""
 
     user = UserFactory.create(openedx_user=None)
-
-    if username_is_email:
-        user.username = user.email
-
-        if name_is_empty:
-            user.name = ""
-
-        user.save()
-        user.refresh_from_db()
-    elif username_is_long:
-        user.username = str(
-            factory.Faker("pystr", max_characters=(OPENEDX_USERNAME_MAX_LEN + 2))
-        )
+    if name_is_empty:
+        user.name = ""
         user.save()
 
     assert reconcile_edx_username(user)
@@ -1051,22 +1037,11 @@ def test_reconcile_edx_username(username_is_email, name_is_empty, username_is_lo
 
     assert user.openedx_users.count() == 1
 
-    if username_is_email:
-        # If the username is explicitly an email address (or contains @),
-        # it should use the usernameify function, with one of a couple of outcomes.
-
-        if name_is_empty:
-            assert user.openedx_users.get().edx_username == _reformat_for_username(
-                user.email.split("@")[0]
-            )
-        else:
-            assert user.openedx_users.get().edx_username == _reformat_for_username(
-                user.name
-            )
+    if name_is_empty:
+        assert user.openedx_users.get().edx_username == _reformat_for_username(
+            user.email.split("@")[0]
+        )
     else:
-        if username_is_long:
-            assert len(user.username) > OPENEDX_USERNAME_MAX_LEN
-        assert (
-            user.openedx_users.get().edx_username
-            == user.username[:OPENEDX_USERNAME_MAX_LEN]
+        assert user.openedx_users.get().edx_username == _reformat_for_username(
+            user.name
         )
