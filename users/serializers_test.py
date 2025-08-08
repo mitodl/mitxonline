@@ -203,7 +203,7 @@ def test_username_validation(
         status=status.HTTP_200_OK,
     )
     # Seed an initial user with a constant username
-    UserFactory.create(username=USERNAME)
+    UserFactory.create(openedx_user__edx_username=USERNAME)
     serializer = UserSerializer(
         data={
             "username": new_username,
@@ -236,7 +236,7 @@ def test_username_validation_exception(user, settings, valid_address_dict):
         status=status.HTTP_200_OK,
     )
     # Seed an initial user with a constant username
-    UserFactory.create(username=USERNAME)
+    UserFactory.create(openedx_user__edx_username=USERNAME)
     serializer = UserSerializer(
         data={
             "username": user.edx_username,
