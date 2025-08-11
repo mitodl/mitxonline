@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 
-from courses.api import sync_course_runs_bulk
+from courses.api import sync_course_runs
 from courses.models import CourseRun
 
 
@@ -50,7 +50,7 @@ class Command(BaseCommand):
                 Q(expiration_date__isnull=True) | Q(expiration_date__gt=now)
             )
 
-        success_count, error_count = sync_course_runs_bulk(runs)
+        success_count, error_count = sync_course_runs(runs)
 
         self.stdout.write(
             self.style.SUCCESS(
