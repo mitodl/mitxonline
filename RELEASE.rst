@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.125.8
+Version 0.125.8 (Released August 11, 2025)
 ---------------
 
 - remove id requirement from program enrollment listing view (#2862)
