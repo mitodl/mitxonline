@@ -611,11 +611,9 @@ class OrderFlow:
         self.create_paid_courseruns()
 
         # No email is required as this order is generated from management command
-        if not already_enrolled:
-            # Skip receipt emails for UAI orders
-            if not is_uai_order(self.order):
-                # send the receipt emails
-                transaction.on_commit(self.order.send_ecommerce_order_receipt)
+        # Skip receipt emails for UAI orders
+        if not already_enrolled and not is_uai_order(self.order):
+            transaction.on_commit(self.order.send_ecommerce_order_receipt)
 
 
 class Order(TimestampedModel):
