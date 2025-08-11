@@ -7,6 +7,7 @@ from django.db.models import Prefetch, Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
+from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import CourseRun, CourseRunEnrollment, ProgramCertificate
 
 log = logging.getLogger(__name__)
@@ -221,7 +222,7 @@ def is_uai_course_run(course_run):
     if not course_run or not course_run.courseware_id:
         return False
 
-    return course_run.courseware_id.startswith("course-v1:UAI_")
+    return course_run.courseware_id.startswith(UAI_COURSEWARE_ID_PREFIX)
 
 
 def is_uai_order(order):
