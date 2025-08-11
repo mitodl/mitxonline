@@ -121,7 +121,6 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
         "global_id",
         "email",
         "name",
-        "edx_username",
         "is_staff",
         "last_login",
     )
@@ -141,10 +140,6 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
         UserProfileInline,
         UserContractPageInline,
     ]
-
-    @admin.display(description="OpenedX Username")
-    def edx_username(self, obj):
-        return obj.edx_username
 
 
 @admin.register(BlockList)
