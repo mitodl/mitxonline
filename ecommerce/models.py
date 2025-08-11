@@ -23,6 +23,7 @@ from viewflow import this
 from viewflow.fsm import State
 
 from courses.models import CourseRun, PaidCourseRun
+from courses.utils import is_uai_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -611,8 +612,10 @@ class OrderFlow:
 
         # No email is required as this order is generated from management command
         if not already_enrolled:
-            # send the receipt emails
-            transaction.on_commit(self.order.send_ecommerce_order_receipt)
+            # Skip receipt emails for UAI orders
+            if not is_uai_order(self.order):
+                # send the receipt emails
+                transaction.on_commit(self.order.send_ecommerce_order_receipt)
 
 
 class Order(TimestampedModel):

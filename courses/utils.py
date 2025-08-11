@@ -206,3 +206,37 @@ def get_dated_courseruns(queryset):
         & Q(is_self_paced=False)
         & Q(enrollment_end__isnull=False)
     )
+
+
+def is_uai_course_run(course_run):
+    """
+    Check if a course run is a UAI course run.
+
+    Args:
+        course_run: CourseRun instance
+
+    Returns:
+        bool: True if the course run is UAI, False otherwise
+    """
+    if not course_run or not course_run.courseware_id:
+        return False
+
+    return course_run.courseware_id.startswith("course-v1:UAI_")
+
+
+def is_uai_order(order):
+    """
+    Check if an order contains any UAI courses.
+
+    Args:
+        order: Order instance
+
+    Returns:
+        bool: True if the order contains UAI courses, False otherwise
+    """
+    for line in order.lines.all():
+        if hasattr(line.product, 'purchasable_object'):
+            course_run = line.product.purchasable_object
+            if hasattr(course_run, 'courseware_id') and is_uai_course_run(course_run):
+                return True
+    return False
