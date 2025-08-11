@@ -770,12 +770,8 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
     else:
         mock_client.get_courses.side_effect = mocked_api_response
 
-    course_run1 = CourseRunFactory.create(
-        courseware_id="course-v1:edX+DemoX+2020_T1"
-    )
-    course_run2 = CourseRunFactory.create(
-        courseware_id="course-v1:MITx+6.00.1x+3T2015"
-    )
+    course_run1 = CourseRunFactory.create(courseware_id="course-v1:edX+DemoX+2020_T1")
+    course_run2 = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
 
     success_count, failure_count = sync_course_runs([course_run1, course_run2])
 
