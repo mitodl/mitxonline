@@ -19,6 +19,7 @@ from mail import verification_api
 from main.constants import USER_REGISTRATION_FAILED_MSG
 from openedx.api import validate_username_email_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
+from openedx.models import OpenEdxUser
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
 
@@ -273,7 +274,7 @@ class UserSerializer(serializers.ModelSerializer):
             # Local duplicate check
             if (
                 not self.instance
-                and User.objects.filter(username__iexact=username).exists()
+                and OpenEdxUser.objects.filter(edx_username__iexact=username).exists()
             ):
                 raise serializers.ValidationError(
                     {
