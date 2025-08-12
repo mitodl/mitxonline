@@ -1,8 +1,8 @@
 """Course email messages"""
 
+from django.conf import settings
 from mitol.mail.messages import TemplatedMessage
 
-from django.conf import settings
 from courses.utils import is_uai_course_run
 
 
