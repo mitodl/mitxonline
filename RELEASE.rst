@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.126.0 (Released August 12, 2025)
+---------------
+
+- Fix username validation to check edx_username (#2869)
+- Enable change of full name in the profile page (#2867)
+- Add API for redeeming enrollment codes for org membership (#2866)
+
 Version 0.125.8 (Released August 11, 2025)
 ---------------
 
