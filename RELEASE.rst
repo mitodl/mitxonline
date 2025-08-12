@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.126.1
+---------------
+
+- Remove display of edx_username to rid N+1 queries (#2871)
+
 Version 0.126.0 (Released August 12, 2025)
 ---------------
 
