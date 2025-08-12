@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.126.0
+Version 0.126.0 (Released August 12, 2025)
 ---------------
 
 - Fix username validation to check edx_username (#2869)
