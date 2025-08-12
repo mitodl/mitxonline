@@ -69,3 +69,13 @@
   </tr>
 <!-- 1 Column Text + Button : END -->
 {% endblock %}
+
+{% block footer-address %}
+{% if is_uai_enrollment %}
+<div style="text-align: center;">
+    MIT Open Learning, 600 Technology Square, NE49-2000, Cambridge, MA 02139
+</div>
+{% else %}
+{{ block.super }}
+{% endif %}
+{% endblock %}
