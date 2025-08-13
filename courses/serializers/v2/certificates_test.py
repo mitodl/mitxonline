@@ -10,6 +10,7 @@ from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
     ProgramCertificateSerializer,
 )
+from courses.serializers.v2.courses import CourseRunWithCourseSerializer
 from main.test_utils import assert_drf_json_equal
 from users.serializers import PublicUserSerializer
 
@@ -86,6 +87,8 @@ def test_serialize_certificate(is_program):
     if is_program:
         expected_data["program"] = certificate.program.id
     else:
-        expected_data["course_run"] = certificate.course_run.id
+        expected_data["course_run"] = CourseRunWithCourseSerializer(
+            certificate.course_run
+        ).data
 
     assert_drf_json_equal(expected_data, serialized_data, ignore_order=True)
