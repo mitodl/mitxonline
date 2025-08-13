@@ -16,6 +16,7 @@ from cms.wagtail_api.schema.serializers import (
 )
 from courses.models import BaseCertificate, CourseRunCertificate, ProgramCertificate
 from courses.serializers.v2.courses import CourseRunWithCourseSerializer
+from courses.serializers.v2.programs import ProgramSerializer
 from users.serializers import PublicUserSerializer
 
 
@@ -204,6 +205,8 @@ class CourseRunCertificateSerializer(BaseCertificateSerializer):
 @extend_schema_serializer(component_name="V2ProgramCertificateSerializer")
 class ProgramCertificateSerializer(BaseCertificateSerializer):
     """Serializer for course certificates."""
+
+    program = ProgramSerializer()
 
     class Meta:
         """Meta options for the serializer."""
