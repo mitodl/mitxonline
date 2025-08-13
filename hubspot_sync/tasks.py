@@ -3,7 +3,6 @@ Hubspot tasks
 """
 
 import logging
-import time
 from math import ceil
 from typing import List, Tuple  # noqa: UP035
 
@@ -280,7 +279,7 @@ def batch_create_hubspot_objects_chunked(
             still_failed = handle_failed_batch_chunk(chunk, hubspot_type)
             if still_failed:
                 errored_chunks.append(still_failed)
-        time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
+        wait_for_hubspot_rate_limit()
     if errored_chunks:
         raise ApiException(
             status=last_error_status,
@@ -340,7 +339,7 @@ def batch_update_hubspot_objects_chunked(
             )
             if still_failed:
                 errored_chunks.append(still_failed)
-        time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
+        wait_for_hubspot_rate_limit()
     if errored_chunks:
         raise ApiException(
             status=last_error_status,

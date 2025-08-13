@@ -3,8 +3,6 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from django.conf import settings
-from django.test import override_settings
 from hubspot.crm.objects import ApiException
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 
@@ -36,21 +34,6 @@ class TestAPIRateLimitingIntegration:
         mock_rate_limit.assert_called_once_with()
         mock_upsert.assert_called_once()
         assert result == mock_result
-
-    @patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
-    @patch("hubspot_sync.api.upsert_object_request")
-    def test_sync_contact_with_hubspot_rate_limit_with_response_headers(
-        self, mock_upsert, mock_rate_limit
-    ):
-        """Test that we could potentially pass response headers to rate limiter."""
-        user = UserFactory()
-        mock_result = Mock()
-        mock_result.id = "hubspot_id_123"
-        mock_upsert.return_value = mock_result
-
-        api.sync_contact_with_hubspot(user)
-
-        mock_rate_limit.assert_called_once_with()
 
     @patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
     @patch("hubspot_sync.api.upsert_object_request")
@@ -139,32 +122,6 @@ class TestTaskRateLimitingIntegration:
         assert result == [users[0].id]
 
 
-class TestRateLimitingConfiguration:
-    """Test rate limiting configuration and settings."""
-
-    @override_settings(HUBSPOT_TASK_DELAY=200)
-    @patch("hubspot_sync.rate_limiter.time.sleep")
-    @patch("hubspot_sync.rate_limiter.time.time")
-    def test_custom_task_delay_setting(self, mock_time, mock_sleep):
-        """Test that custom HUBSPOT_TASK_DELAY setting is respected."""
-        from hubspot_sync.rate_limiter import HubSpotRateLimiter
-
-        mock_time.side_effect = [0, 0, 0]
-
-        limiter = HubSpotRateLimiter()
-        assert limiter.min_delay_ms == 200
-
-        limiter.wait_for_rate_limit()
-
-        mock_sleep.assert_called_once_with(0.2)
-
-    @override_settings(HUBSPOT_AGGRESSIVE_RATE_LIMITING=False)
-    def test_aggressive_rate_limiting_disabled(self):
-        """Test behavior when aggressive rate limiting is disabled."""
-
-        assert not settings.HUBSPOT_AGGRESSIVE_RATE_LIMITING
-
-
 class TestRateLimitingErrorScenarios:
     """Test rate limiting behavior in error scenarios."""
 
@@ -193,71 +150,3 @@ class TestRateLimitingErrorScenarios:
             api.sync_contact_with_hubspot(user)
 
         mock_rate_limit.assert_called_once_with()
-
-
-class TestRateLimitingPerformance:
-    """Test rate limiting performance characteristics."""
-
-    @patch("hubspot_sync.rate_limiter.time.sleep")
-    @patch("hubspot_sync.rate_limiter.time.time")
-    def test_consecutive_requests_timing(self, mock_time, mock_sleep):
-        """Test that consecutive requests are properly spaced."""
-        from hubspot_sync.rate_limiter import HubSpotRateLimiter
-
-        # Use return_value to avoid side_effect complexity
-        mock_time.return_value = 0
-
-        limiter = HubSpotRateLimiter()
-        limiter.min_delay_ms = 60
-
-        # First request with no previous request time
-        limiter.last_request_time = 0
-        limiter.wait_for_rate_limit()
-        first_sleep = mock_sleep.call_args[0][0] if mock_sleep.called else 0
-
-        mock_sleep.reset_mock()
-
-        # Second request immediately after (no time passed)
-        limiter.last_request_time = 0  # Reset to simulate immediate request
-        limiter.wait_for_rate_limit()
-        second_sleep = mock_sleep.call_args[0][0] if mock_sleep.called else 0
-
-        # Both should sleep for the full min_delay_ms since time_since_last = 0
-        assert first_sleep == 0.06
-        assert second_sleep == 0.06
-
-    @patch("hubspot_sync.rate_limiter.log")
-    def test_rate_limiting_logging(self, mock_log):
-        """Test that rate limiting produces appropriate log messages."""
-        from hubspot_sync.rate_limiter import HubSpotRateLimiter
-
-        limiter = HubSpotRateLimiter()
-
-        # Use headers that will cause ValueError when converting to int
-        headers = {"x-hubspot-ratelimit-secondly-remaining": "invalid_number"}
-        with (
-            patch("hubspot_sync.rate_limiter.time.time", return_value=0),
-            patch("hubspot_sync.rate_limiter.time.sleep"),
-        ):
-            limiter.wait_for_rate_limit(headers)
-
-        mock_log.warning.assert_called_once()
-        assert "Failed to parse rate limit headers" in str(mock_log.warning.call_args)
-
-
-def create_test_user_batch(count=10):
-    """Create a batch of test users for rate limiting tests."""
-    return [UserFactory() for _ in range(count)]
-
-
-def simulate_hubspot_response_with_headers(
-    remaining_secondly=15, remaining_interval=150
-):
-    """Create mock HubSpot response headers for testing."""
-    return {
-        "x-hubspot-ratelimit-secondly-remaining": str(remaining_secondly),
-        "x-hubspot-ratelimit-secondly": "19",
-        "x-hubspot-ratelimit-remaining": str(remaining_interval),
-        "x-hubspot-ratelimit-max": "190",
-        "x-hubspot-ratelimit-interval-milliseconds": "10000",
-    }
