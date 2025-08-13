@@ -10,7 +10,6 @@ x-environment:
   MITX_ONLINE_DB_DISABLE_SSL: 'True'
   MITX_ONLINE_ADMIN_EMAIL: admin@localhost
   MITX_ONLINE_REFINE_OIDC_CONFIG_CLIENT_ID: ${MITX_ONLINE_ADMIN_CLIENT_ID:-refine-local-client-id}
-  ELASTICSEARCH_URL: elastic:9200
   CELERY_TASK_ALWAYS_EAGER: 'False'
   REDIS_URL: redis://redis:6379/4
   DOCKER_HOST: ${DOCKER_HOST:-missing}
