@@ -5,7 +5,7 @@ import { ValidationError } from "yup"
 import {
   changePasswordFormValidation,
   resetPasswordFormValidation,
-  usernameField,
+  usernameField
 } from "./validation"
 
 describe("validation utils", () => {
@@ -72,14 +72,20 @@ describe("validation utils", () => {
     it("should fail for username shorter than 3 characters", async () => {
       const promise = usernameField.validate("ab")
       const error = await assert.isRejected(promise, ValidationError)
-      assert.include(error.errors[0], "Username must be between 3 and 30 characters.")
+      assert.include(
+        error.errors[0],
+        "Username must be between 3 and 30 characters."
+      )
     })
 
     it("should fail for username longer than 30 characters", async () => {
       const longUsername = "a".repeat(31)
       const promise = usernameField.validate(longUsername)
       const error = await assert.isRejected(promise, ValidationError)
-      assert.include(error.errors[0], "Username must be between 3 and 30 characters.")
+      assert.include(
+        error.errors[0],
+        "Username must be between 3 and 30 characters."
+      )
     })
 
     it('should fail for username containing "@" symbol', async () => {
