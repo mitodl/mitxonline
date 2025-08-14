@@ -3,7 +3,7 @@ import React from "react"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { Switch, Route } from "react-router"
-import { connectRequest } from "redux-query-react"
+import { connectRequest, requestAsync } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
 import urljoin from "url-join"
 
@@ -45,7 +45,8 @@ type Props = {
   location: Location,
   currentUser: ?CurrentUser,
   cartItemsCount: number,
-  addUserNotification: Function
+  addUserNotification: Function,
+  forceRequest: Function
 }
 
 export class App extends React.Component<Props, void> {
@@ -66,6 +67,15 @@ export class App extends React.Component<Props, void> {
     }
   }
 
+  componentDidUpdate(prevProps: Props) {
+    const { currentUser, forceRequest } = this.props
+    
+    // If user just loaded and is authenticated, fetch cart items count
+    if (!prevProps.currentUser && currentUser && currentUser.is_authenticated) {
+      forceRequest(cartItemsCountQuery())
+    }
+  }
+
   render() {
     const { match, currentUser, cartItemsCount, location } = this.props
     if (!currentUser) {
@@ -77,7 +87,7 @@ export class App extends React.Component<Props, void> {
       <div className="app" aria-flowto="notifications-container">
         <Header
           currentUser={currentUser}
-          cartItemsCount={cartItemsCount}
+          cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
           location={location}
         />
         <div id="main" className="main-page-content">
@@ -167,7 +177,7 @@ const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = () => [cartItemsCountQuery(), users.currentUserQuery()]
+const mapPropsToConfig = () => [users.currentUserQuery()]
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)
