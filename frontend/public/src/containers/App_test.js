@@ -132,10 +132,7 @@ describe("Top-level App", () => {
 
     // Mock forceRequest to verify it gets called with cart query
     const forceRequestSpy = helper.sandbox.spy()
-    inner.setProps({ 
-      currentUser: authenticatedUser,
-      forceRequest: forceRequestSpy
-    })
+    inner.setProps({ currentUser: authenticatedUser, forceRequest: forceRequestSpy })
     inner.update()
 
     // Verify forceRequest was called (this would trigger the cart items query)
@@ -210,17 +207,11 @@ describe("Top-level App", () => {
     const forceRequestSpy = helper.sandbox.spy()
 
     // First update - user becomes authenticated
-    inner.setProps({ 
-      currentUser: authenticatedUser,
-      forceRequest: forceRequestSpy
-    })
+    inner.setProps({ currentUser: authenticatedUser, forceRequest: forceRequestSpy })
     inner.update()
 
     // Second update - user remains the same
-    inner.setProps({ 
-      currentUser: authenticatedUser,
-      forceRequest: forceRequestSpy
-    })
+    inner.setProps({ currentUser: authenticatedUser, forceRequest: forceRequestSpy })
     inner.update()
 
     // Should only be called once, not on subsequent updates

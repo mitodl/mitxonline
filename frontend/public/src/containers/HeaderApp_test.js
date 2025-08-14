@@ -126,10 +126,7 @@ describe("Top-level HeaderApp", () => {
 
     // Mock forceRequest to verify it gets called with cart query
     const forceRequestSpy = helper.sandbox.spy()
-    inner.setProps({
-      currentUser: authenticatedUser,
-      forceRequest: forceRequestSpy
-    })
+    inner.setProps({ currentUser: authenticatedUser, forceRequest: forceRequestSpy })
     inner.update()
 
     // Verify forceRequest was called (this would trigger the cart items query)
@@ -177,9 +174,7 @@ describe("Top-level HeaderApp", () => {
     const { inner } = await renderPage()
     inner.setProps({ cartItemsCount: 5 }) // Simulate cart count in state
     inner.update()
-
     const headerComponent = inner.find("Header")
     assert.equal(headerComponent.prop("cartItemsCount"), 5)
   })
-
 })
