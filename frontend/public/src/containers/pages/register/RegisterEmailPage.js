@@ -21,6 +21,7 @@ import {
   generateLoginRedirectUrl
 } from "../../../lib/auth"
 import { qsNextSelector } from "../../../lib/selectors"
+import { currentUserSelector } from "../../../lib/queries/users"
 import { ALERT_TYPE_TEXT } from "../../../constants"
 
 import RegisterEmailForm from "../../../components/forms/RegisterEmailForm"
@@ -41,16 +42,24 @@ type Props = {
     recaptcha: ?string,
     next: ?string
   ) => Promise<HttpResponse<AuthResponse>>,
-  addUserNotification: Function
+  addUserNotification: Function,
+  currentUser: ?Object
 }
 
 const accountExistsNotificationText = (email: string): string =>
   `You already have an account with ${email}. Enter password to sign in.`
 export class RegisterEmailPage extends React.Component<Props> {
   componentDidMount() {
-    // If OIDC login is disabled but API gateway is enabled, redirect to login
+    // If OIDC login is disabled but API gateway is enabled
     if (!SETTINGS.oidc_login_url && SETTINGS.api_gateway_enabled) {
-      generateLoginRedirectUrl()
+      const { currentUser } = this.props
+      if (currentUser && currentUser.is_authenticated) {
+        // Redirect logged-in users to dashboard
+        window.location.replace(routes.dashboard)
+      } else {
+        // Redirect others to login page
+        generateLoginRedirectUrl()
+      }
       return
     }
   }
@@ -141,7 +150,8 @@ export class RegisterEmailPage extends React.Component<Props> {
 const mapStateToProps = createStructuredSelector({
   params: createStructuredSelector({
     next: qsNextSelector
-  })
+  }),
+  currentUser: currentUserSelector
 })
 
 const registerEmail = (email: string, recaptcha: ?string, nextUrl: ?string) =>
