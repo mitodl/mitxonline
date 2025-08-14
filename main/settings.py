@@ -36,7 +36,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.126.1"
+VERSION = "0.126.2"
 
 log = logging.getLogger()
 
@@ -1340,11 +1340,6 @@ HUBSPOT_TASK_DELAY = get_int(
     name="HUBSPOT_TASK_DELAY",
     default=60,
     description="Number of milliseconds to wait between consecutive Hubspot calls",
-)
-HUBSPOT_AGGRESSIVE_RATE_LIMITING = get_bool(
-    name="HUBSPOT_AGGRESSIVE_RATE_LIMITING",
-    default=True,
-    description="Enable rate limiting based on HubSpot response headers",
 )
 
 # PostHog related settings
