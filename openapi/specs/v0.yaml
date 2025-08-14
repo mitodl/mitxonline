@@ -4285,8 +4285,7 @@ components:
           - $ref: '#/components/schemas/CertificatePageModel'
           readOnly: true
         course_run:
-          type: integer
-          readOnly: true
+          $ref: '#/components/schemas/V2CourseRunWithCourse'
         certificate_page_revision:
           type: integer
           readOnly: true
@@ -4674,8 +4673,7 @@ components:
           - $ref: '#/components/schemas/CertificatePageModel'
           readOnly: true
         program:
-          type: integer
-          readOnly: true
+          $ref: '#/components/schemas/V2Program'
         certificate_page_revision:
           type: integer
           readOnly: true
