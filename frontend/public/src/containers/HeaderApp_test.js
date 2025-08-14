@@ -101,7 +101,11 @@ describe("Top-level HeaderApp", () => {
 
     // Should only call user API, not cart items API
     sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-    sinon.assert.neverCalledWith(helper.handleRequestStub, "/api/checkout/basket_items_count/", "GET")
+    sinon.assert.neverCalledWith(
+      helper.handleRequestStub,
+      "/api/checkout/basket_items_count/",
+      "GET"
+    )
   })
 
   it("calls cart items API for authenticated users via componentDidUpdate", async () => {
@@ -126,7 +130,10 @@ describe("Top-level HeaderApp", () => {
 
     // Mock forceRequest to verify it gets called with cart query
     const forceRequestSpy = helper.sandbox.spy()
-    inner.setProps({ currentUser: authenticatedUser, forceRequest: forceRequestSpy })
+    inner.setProps({
+      currentUser:  authenticatedUser,
+      forceRequest: forceRequestSpy
+    })
     inner.update()
 
     // Verify forceRequest was called (this would trigger the cart items query)
