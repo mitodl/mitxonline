@@ -133,7 +133,7 @@ describe("Top-level App", () => {
     // Mock forceRequest to verify it gets called with cart query
     const forceRequestSpy = helper.sandbox.spy()
     inner.setProps({ 
-      currentUser: authenticatedUser,
+      currentUser : authenticatedUser,
       forceRequest: forceRequestSpy
     })
     inner.update()
@@ -211,14 +211,14 @@ describe("Top-level App", () => {
     
     // First update - user becomes authenticated
     inner.setProps({ 
-      currentUser: authenticatedUser,
+      currentUser : authenticatedUser,
       forceRequest: forceRequestSpy
     })
     inner.update()
     
     // Second update - user remains the same
     inner.setProps({ 
-      currentUser: authenticatedUser,
+      currentUser : authenticatedUser,
       forceRequest: forceRequestSpy
     })
     inner.update()

@@ -127,7 +127,7 @@ describe("Top-level HeaderApp", () => {
     // Mock forceRequest to verify it gets called with cart query
     const forceRequestSpy = helper.sandbox.spy()
     inner.setProps({ 
-      currentUser: authenticatedUser,
+      currentUser : authenticatedUser,
       forceRequest: forceRequestSpy
     })
     inner.update()
