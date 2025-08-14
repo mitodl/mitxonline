@@ -52,6 +52,7 @@ export const usernameField = yup
   .label("Public Username")
   .min(3, usernameFieldErrorMessage)
   .max(30, usernameFieldErrorMessage)
+  .matches(/^[^@]*$/, 'Username cannot contain the "@" symbol')
 
 const confirmPasswordChangePassword = newPasswordField
   .label("Confirm New Password")
