@@ -48,7 +48,7 @@ export class HeaderApp extends React.Component<Props, void> {
 
   componentDidUpdate(prevProps: Props) {
     const { currentUser, forceRequest } = this.props
-    
+
     // If user just loaded and is authenticated, fetch cart items count
     if (!prevProps.currentUser && currentUser && currentUser.is_authenticated) {
       forceRequest(cartItemsCountQuery())

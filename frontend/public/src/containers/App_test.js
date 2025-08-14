@@ -102,9 +102,9 @@ describe("Top-level App", () => {
       grants:           [],
       is_active:        true
     })
-    
+
     await renderPage()
-    
+
     // Should only call user API, not cart items API
     sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
     sinon.assert.neverCalledWith(helper.handleRequestStub, "/api/checkout/basket_items_count/", "GET")
@@ -114,7 +114,7 @@ describe("Top-level App", () => {
     // First, simulate component mounting with no user data
     helper.handleRequestStub.returns({})
     const { inner } = await renderPage()
-    
+
     // Now simulate user data being loaded with authenticated user
     const authenticatedUser = {
       id:               1,
@@ -129,15 +129,15 @@ describe("Top-level App", () => {
       grants:           [],
       is_active:        true
     }
-    
+
     // Mock forceRequest to verify it gets called with cart query
     const forceRequestSpy = helper.sandbox.spy()
-    inner.setProps({ 
+    inner.setProps({
       currentUser: authenticatedUser,
       forceRequest: forceRequestSpy
     })
     inner.update()
-    
+
     // Verify forceRequest was called (this would trigger the cart items query)
     sinon.assert.calledOnce(forceRequestSpy)
   })
@@ -156,11 +156,11 @@ describe("Top-level App", () => {
       grants:           [],
       is_active:        true
     })
-    
+
     const { inner } = await renderPage()
     inner.setProps({ cartItemsCount: 5 }) // Simulate some cart count in state
     inner.update()
-    
+
     const headerComponent = inner.find("Header")
     assert.equal(headerComponent.prop("cartItemsCount"), 0)
   })
@@ -179,11 +179,11 @@ describe("Top-level App", () => {
       grants:           [],
       is_active:        true
     })
-    
+
     const { inner } = await renderPage()
     inner.setProps({ cartItemsCount: 5 }) // Simulate cart count in state
     inner.update()
-    
+
     const headerComponent = inner.find("Header")
     assert.equal(headerComponent.prop("cartItemsCount"), 5)
   })
@@ -192,7 +192,7 @@ describe("Top-level App", () => {
     // Start with no user
     helper.handleRequestStub.returns({})
     const { inner } = await renderPage()
-    
+
     const authenticatedUser = {
       id:               1,
       username:         "testuser",
@@ -206,23 +206,23 @@ describe("Top-level App", () => {
       grants:           [],
       is_active:        true
     }
-    
+
     const forceRequestSpy = helper.sandbox.spy()
-    
+
     // First update - user becomes authenticated
-    inner.setProps({ 
+    inner.setProps({
       currentUser: authenticatedUser,
       forceRequest: forceRequestSpy
     })
     inner.update()
-    
+
     // Second update - user remains the same
-    inner.setProps({ 
+    inner.setProps({
       currentUser: authenticatedUser,
       forceRequest: forceRequestSpy
     })
     inner.update()
-    
+
     // Should only be called once, not on subsequent updates
     sinon.assert.calledOnce(forceRequestSpy)
   })
