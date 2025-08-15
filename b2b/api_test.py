@@ -27,6 +27,7 @@ from b2b.constants import (
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.factories import ContractPageFactory
+from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.factories import CourseFactory, CourseRunFactory
 from courses.models import CourseRunEnrollment
 from ecommerce.api_test import create_basket
@@ -471,7 +472,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
             course=course, courseware_id=source_course_run_key, run_tag="SOURCE"
         )
 
-    target_course_id = f"course-v1:UAI_{contract.organization.org_key}+{source_course_key.course}+{this_year}_C{contract.id}"
+    target_course_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_course_key.course}+{this_year}_C{contract.id}"
 
     if not source_run_exists:
         with pytest.raises(SourceCourseIncompleteError) as exc:
