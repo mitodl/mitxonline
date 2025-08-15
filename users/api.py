@@ -56,7 +56,7 @@ def _determine_filter_field(user_property):
             validate_email(user_property)
             return "email"  # noqa: TRY300
         except ValidationError:
-            return "username"
+            return "openedx_users__edx_username"
 
 
 def fetch_user(filter_value, ignore_case=True):  # noqa: FBT002

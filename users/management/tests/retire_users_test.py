@@ -25,7 +25,7 @@ def test_single_success(mocker):
         return_value={"successful_user_retirements": [test_username]},
     )
 
-    user = UserFactory.create(username=test_username, is_active=True)
+    user = UserFactory.create(openedx_user__edx_username=test_username, is_active=True)
     UserSocialAuthFactory.create(user=user, provider="edX")
 
     assert user.is_active is True
@@ -52,7 +52,7 @@ def test_multiple_success(mocker):
     )
 
     for username in test_usernames:
-        user = UserFactory.create(username=username, is_active=True)
+        user = UserFactory.create(openedx_user__edx_username=username, is_active=True)
         UserSocialAuthFactory.create(user=user, provider="not_edx")
 
         assert user.is_active is True
@@ -62,7 +62,7 @@ def test_multiple_success(mocker):
     COMMAND.handle("retire_users", users=test_usernames)
 
     for user_name in test_usernames:
-        user = User.objects.get(username=user_name)
+        user = User.objects.get(openedx_users__edx_username=user_name)
         assert user.is_active is False
         assert "retired_email" in user.email
         assert UserSocialAuth.objects.filter(user=user).count() == 0
@@ -134,7 +134,7 @@ def test_multiple_success_blocking_user(mocker):
     )
 
     for username in test_usernames:
-        user = UserFactory.create(username=username, is_active=True)
+        user = UserFactory.create(openedx_user__edx_username=username, is_active=True)
         UserSocialAuthFactory.create(user=user, provider="not_edx")
 
         assert user.is_active is True
@@ -145,7 +145,7 @@ def test_multiple_success_blocking_user(mocker):
     COMMAND.handle("retire_users", users=test_usernames, block_users=True)
 
     for user_name in test_usernames:
-        user = User.objects.get(username=user_name)
+        user = User.objects.get(openedx_users__edx_username=user_name)
         assert user.is_active is False
         assert "retired_email" in user.email
         assert UserSocialAuth.objects.filter(user=user).count() == 0
