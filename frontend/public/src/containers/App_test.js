@@ -87,4 +87,25 @@ describe("Top-level App", () => {
     })
     sinon.assert.calledOnce(removeStoredUserMessageStub)
   })
+
+  it("does not call cartItemsCountQuery for unauthenticated users", async () => {
+    helper.handleRequestStub.returns({
+      id:               null,
+      username:         "",
+      email:            null,
+      legal_address:    null,
+      user_profile:     null,
+      is_anonymous:     true,
+      is_authenticated: false,
+      is_staff:         false,
+      is_superuser:     false,
+      grants:           [],
+      is_active:        false
+    })
+    const { inner } = await renderPage()
+    // Should call /api/users/me to get user data
+    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+    // Should NOT call the cart items count API for unauthenticated users
+    sinon.assert.neverCalledWith(helper.handleRequestStub, "/api/checkout/basket_items_count/", "GET")
+  })
 })
