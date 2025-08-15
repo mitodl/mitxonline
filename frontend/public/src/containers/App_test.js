@@ -102,7 +102,7 @@ describe("Top-level App", () => {
       grants:           [],
       is_active:        false
     })
-    const { inner } = await renderPage()
+    await renderPage()
     // Should call /api/users/me to get user data
     sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
     // Should NOT call the cart items count API for unauthenticated users
