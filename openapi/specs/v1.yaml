@@ -2974,6 +2974,7 @@ components:
           type: string
           nullable: true
           minLength: 1
+          maxLength: 30
         name:
           type: string
           maxLength: 255
@@ -3261,7 +3262,8 @@ components:
           readOnly: true
         username:
           type: string
-          maxLength: 500
+          nullable: true
+          maxLength: 30
         name:
           type: string
           maxLength: 255
@@ -3277,7 +3279,6 @@ components:
       - created_on
       - id
       - updated_on
-      - username
     RedemptionTypeEnum:
       enum:
       - one-time
@@ -3392,6 +3393,7 @@ components:
         username:
           type: string
           nullable: true
+          maxLength: 30
         name:
           type: string
           maxLength: 255

@@ -11,7 +11,7 @@ import responses
 from django.contrib.auth import get_user_model
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
-from mitol.common.utils.user import _reformat_for_username
+from mitol.common.utils.user import _reformat_for_username, usernameify
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
@@ -56,7 +56,6 @@ from openedx.exceptions import (
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
-    OpenEdxUserCreateError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -120,14 +119,23 @@ def edx_username_validation_response_mock(username_exists, settings):
 
 
 @responses.activate
-@pytest.mark.parametrize("has_been_synced", [True, False])
+@pytest.mark.parametrize(
+    "has_been_synced",
+    [pytest.param(True, id="synced:true"), pytest.param(False, id="synced:false")],
+)
 @pytest.mark.parametrize("access_token_count", [0, 1, 3])
 @pytest.mark.parametrize(
     "provided_username",
     ["test_username", None],
 )
-@pytest.mark.parametrize("missing_username", [True, False])
-def test_create_edx_user(  # noqa: PLR0913,C901
+@pytest.mark.parametrize(
+    "missing_username",
+    [
+        pytest.param(True, id="missing_username:true"),
+        pytest.param(False, id="missing_username:false"),
+    ],
+)
+def test_create_edx_user(  # noqa: PLR0913
     settings,
     application,
     has_been_synced,
@@ -175,14 +183,9 @@ def test_create_edx_user(  # noqa: PLR0913,C901
     # An AccessToken should be created during execution
     created_access_token = AccessToken.objects.filter(application=application).last()
 
-    if has_been_synced:
-        assert resp1.call_count == 1
-        assert resp2.call_count == 0
-    elif provided_username is None and missing_username:
-        assert resp1.call_count == 0
-        assert resp2.call_count == 0
-    else:
-        assert resp1.call_count == 0
+    assert resp1.call_count == (1 if has_been_synced else 0)
+
+    if not has_been_synced:
         assert resp2.call_count == 1
 
         assert (
@@ -201,15 +204,21 @@ def test_create_edx_user(  # noqa: PLR0913,C901
             "gender": user.user_profile.gender if user.user_profile else None,
             "honor_code": "True",
         }
-        if provided_username:
-            expected_request_body["username"] = provided_username
         if not missing_username:
             expected_request_body["username"] = original_username
+        elif provided_username:
+            expected_request_body["username"] = provided_username
+        else:
+            expected_request_body["username"] = usernameify(
+                user.name, user.email, OPENEDX_USERNAME_MAX_LEN
+            )
         assert dict(parse_qsl(resp2.calls[0].request.body)) == expected_request_body
+    else:
+        assert resp2.call_count == 0
 
     assert OpenEdxUser.objects.filter(
         user=user, platform=PLATFORM_EDX, has_been_synced=True
-    ).exists() is not (provided_username is None and missing_username)
+    ).exists()
 
     if provided_username and missing_username:
         assert user.openedx_users.first().edx_username == provided_username
@@ -219,22 +228,46 @@ def test_create_edx_user(  # noqa: PLR0913,C901
 
 @responses.activate
 @pytest.mark.usefixtures("application")
-def test_create_edx_user_conflict(settings, user):
+def test_create_edx_user_conflict(settings):
     """Test that create_edx_user handles a 409 response from the edX API"""
-    responses.add(
+    user = UserFactory.create(openedx_user__has_been_synced=False)
+
+    resp1 = responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/mobile/v0.5/my_user_info",
+        json={},
+        status=status.HTTP_200_OK,
+    )
+    resp2 = responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
-        json=dict(username="exists"),  # noqa: C408
+        json={
+            "error_code": "duplicate-username",
+            "username_suggestions": ["openedx-generated-username"],
+        },
         status=status.HTTP_409_CONFLICT,
+    )
+
+    resp3 = responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
+        json=dict(success=True),  # noqa: C408
+        status=status.HTTP_200_OK,
     )
     edx_username_validation_response_mock(False, settings)  # noqa: FBT003
 
-    with pytest.raises(OpenEdxUserCreateError):
-        create_edx_user(user)
+    create_edx_user(user)
+
+    assert resp1.call_count == 0
+    assert resp2.call_count == 1
+    assert resp3.call_count == 1
 
     user.refresh_from_db()
 
-    assert user.openedx_users.first().has_been_synced is True
+    edx_user = user.openedx_users.first()
+
+    assert edx_user.has_been_synced is True
+    assert edx_user.edx_username == "openedx-generated-username"
 
 
 @responses.activate
@@ -1023,26 +1056,13 @@ def test_bulk_retire_edx_users(mocker):
     )
 
 
-@pytest.mark.parametrize("username_is_email", [True, False])
 @pytest.mark.parametrize("name_is_empty", [True, False])
-@pytest.mark.parametrize("username_is_long", [True, False])
-def test_reconcile_edx_username(username_is_email, name_is_empty, username_is_long):
+def test_reconcile_edx_username(name_is_empty):
     """Ensure the edX username reconciliation works properly."""
 
     user = UserFactory.create(openedx_user=None)
-
-    if username_is_email:
-        user.username = user.email
-
-        if name_is_empty:
-            user.name = ""
-
-        user.save()
-        user.refresh_from_db()
-    elif username_is_long:
-        user.username = str(
-            factory.Faker("pystr", max_characters=(OPENEDX_USERNAME_MAX_LEN + 2))
-        )
+    if name_is_empty:
+        user.name = ""
         user.save()
 
     assert reconcile_edx_username(user)
@@ -1051,22 +1071,11 @@ def test_reconcile_edx_username(username_is_email, name_is_empty, username_is_lo
 
     assert user.openedx_users.count() == 1
 
-    if username_is_email:
-        # If the username is explicitly an email address (or contains @),
-        # it should use the usernameify function, with one of a couple of outcomes.
-
-        if name_is_empty:
-            assert user.openedx_users.get().edx_username == _reformat_for_username(
-                user.email.split("@")[0]
-            )
-        else:
-            assert user.openedx_users.get().edx_username == _reformat_for_username(
-                user.name
-            )
+    if name_is_empty:
+        assert user.openedx_users.get().edx_username == _reformat_for_username(
+            user.email.split("@")[0]
+        )
     else:
-        if username_is_long:
-            assert len(user.username) > OPENEDX_USERNAME_MAX_LEN
-        assert (
-            user.openedx_users.get().edx_username
-            == user.username[:OPENEDX_USERNAME_MAX_LEN]
+        assert user.openedx_users.get().edx_username == _reformat_for_username(
+            user.name
         )

@@ -18,6 +18,7 @@ from hubspot_sync.task_helpers import sync_hubspot_user
 from mail import verification_api
 from main.constants import USER_REGISTRATION_FAILED_MSG
 from openedx.api import validate_username_email_with_edx
+from openedx.constants import OPENEDX_USERNAME_MAX_LEN
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.models import OpenEdxUser
 from openedx.tasks import change_edx_user_email_async
@@ -158,6 +159,13 @@ class ExtendedLegalAddressSerializer(LegalAddressSerializer):
 class PublicUserSerializer(serializers.ModelSerializer):
     """Serializer for public user data"""
 
+    username = serializers.CharField(
+        source="edx_username",
+        required=False,
+        allow_null=True,
+        max_length=OPENEDX_USERNAME_MAX_LEN,
+    )
+
     class Meta:
         model = User
         fields = ("id", "username", "name", "created_on", "updated_on")
@@ -215,7 +223,10 @@ class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     email = serializers.EmailField(required=False, allow_null=True)
     username = serializers.CharField(
-        source="edx_username", required=False, allow_null=True
+        source="edx_username",
+        required=False,
+        allow_null=True,
+        max_length=OPENEDX_USERNAME_MAX_LEN,
     )
     legal_address = LegalAddressSerializer(allow_null=True)
     user_profile = UserProfileSerializer(allow_null=True, required=False)

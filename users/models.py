@@ -173,8 +173,10 @@ def _post_create_user(user, username):
     """
     LegalAddress.objects.create(user=user)
     UserProfile.objects.create(user=user)
+
+    edx_username = username[:OPENEDX_USERNAME_MAX_LEN]
     OpenEdxUser.objects.create(
-        user=user, edx_username=username[:OPENEDX_USERNAME_MAX_LEN]
+        user=user, edx_username=edx_username, desired_edx_username=edx_username
     )
 
 
