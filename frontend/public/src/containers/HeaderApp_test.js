@@ -100,6 +100,10 @@ describe("Top-level HeaderApp", () => {
     // Should call /api/users/me to get user data
     sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
     // Should NOT call the cart items count API for unauthenticated users
-    sinon.assert.neverCalledWith(helper.handleRequestStub, "/api/checkout/basket_items_count/", "GET")
+    sinon.assert.neverCalledWith(
+      helper.handleRequestStub,
+      "/api/checkout/basket_items_count/",
+      "GET"
+    )
   })
 })
