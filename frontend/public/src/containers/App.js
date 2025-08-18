@@ -168,7 +168,7 @@ const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = (props) => {
+const mapPropsToConfig = props => {
   const queries = [users.currentUserQuery()]
 
   // Add cart query for authenticated users
