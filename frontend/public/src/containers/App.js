@@ -170,12 +170,12 @@ const mapDispatchToProps = {
 
 const mapPropsToConfig = (props) => {
   const queries = [users.currentUserQuery()]
-  
+
   // Add cart query for authenticated users
   if (props.currentUser && props.currentUser.is_authenticated) {
     queries.push(cartItemsCountQuery())
   }
-  
+
   return queries
 }
 export default compose(
