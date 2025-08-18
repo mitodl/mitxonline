@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.127.0
+---------------
+
+- create-account redirect logged in users to dashboard (#2878)
+- fix: ensure unique edx_username before save (#2868)
+- add extra data to certificate endpoint (#2875)
+- Add validation to public username to exclude @ (#2876)
+
 Version 0.126.2 (Released August 18, 2025)
 ---------------
 
