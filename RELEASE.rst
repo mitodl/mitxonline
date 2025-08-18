@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.126.2 (Released August 18, 2025)
+---------------
+
+- Removes remnants of Elasticsearch (#2848)
+- Rate limit sliding window (#2859)
+
 Version 0.126.1 (Released August 12, 2025)
 ---------------
 
