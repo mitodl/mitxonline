@@ -128,5 +128,6 @@ export const cartItemsCountQuery = () => ({
   }),
   update: {
     cartItemsCount: nextState
-  }
+  },
+  force: true
 })

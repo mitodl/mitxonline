@@ -67,12 +67,20 @@ export class App extends React.Component<Props, void> {
     }
   }
 
-  componentDidUpdate(prevProps: Props) {
-    const { currentUser, forceRequest } = this.props
+  componentDidMount() {
+    const { addUserNotification } = this.props
 
-    // If user just loaded and is authenticated, fetch cart items count
-    if (!prevProps.currentUser && currentUser && currentUser.is_authenticated) {
-      forceRequest(cartItemsCountQuery())
+    const userMsg = getStoredUserMessage()
+    if (userMsg) {
+      addUserNotification({
+        "loaded-user-msg": {
+          type:  userMsg.type,
+          props: {
+            text: userMsg.text
+          }
+        }
+      })
+      removeStoredUserMessage()
     }
   }
 
@@ -177,7 +185,16 @@ const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = () => [users.currentUserQuery()]
+const mapPropsToConfig = (props) => {
+  const queries = [users.currentUserQuery()]
+  
+  // Add cart query for authenticated users
+  if (props.currentUser && props.currentUser.is_authenticated) {
+    queries.push(cartItemsCountQuery())
+  }
+  
+  return queries
+}
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)
