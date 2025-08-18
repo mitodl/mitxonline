@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.127.0
+Version 0.127.0 (Released August 18, 2025)
 ---------------
 
 - create-account redirect logged in users to dashboard (#2878)
