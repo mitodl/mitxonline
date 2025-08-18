@@ -1,8 +1,13 @@
 """User admin"""
 
+import json
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as ContribUserAdmin
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django_object_actions import DjangoObjectActions, action
 from hijack.contrib.admin import HijackUserAdminMixin
 from mitol.common.admin import TimestampedModelAdmin
 
@@ -57,7 +62,19 @@ class OpenEdxUserInline(admin.StackedInline):
 
     model = OpenEdxUser
 
-    readonly_fields = ("has_been_synced", "platform")
+    readonly_fields = (
+        "has_been_synced",
+        "platform",
+        "has_sync_error",
+        "pretty_sync_error_data",
+    )
+
+    exclude = ("sync_error_data",)
+
+    @admin.display(description="Sync Error Data")
+    def pretty_sync_error_data(self, instance):
+        pretty_json = json.dumps(instance.sync_error_data, indent=4, sort_keys=True)
+        return mark_safe(f"<pre>{escape(pretty_json)}</pre>")  # noqa: S308
 
     can_delete = False
     max_num = 1
@@ -70,6 +87,8 @@ class OpenEdxUserInline(admin.StackedInline):
                 "fields": (
                     "edx_username",
                     "has_been_synced",
+                    "has_sync_error",
+                    "pretty_sync_error_data",
                 ),
                 "description": _username_warning,
             },
@@ -85,7 +104,9 @@ class UserContractPageInline(admin.TabularInline):
 
 
 @admin.register(User)
-class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
+class UserAdmin(
+    DjangoObjectActions, ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin
+):
     """Admin views for user"""
 
     include_created_on_in_list = True
@@ -140,6 +161,12 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
         UserProfileInline,
         UserContractPageInline,
     ]
+
+    @action(label="Clear Sync Errors", description="Clear OpenedX errors and resync")
+    def clear_sync_errors(self, request, obj):  # noqa: ARG002
+        obj.openedx_users.update(has_sync_error=False, sync_error_data=None)
+
+    change_actions = ["clear_sync_errors"]
 
 
 @admin.register(BlockList)

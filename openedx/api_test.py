@@ -689,6 +689,23 @@ def test_repair_faulty_edx_user(mocker, no_openedx_user, no_edx_auth):
     assert created_auth_token is no_edx_auth
 
 
+def _create_faulty_users():
+    """Create a set of users that meet the criteria of being in a faulty state"""
+    # these users shouldn't be picked up
+    UserFactory.create()
+    UserFactory.create(
+        no_openedx_api_auth=True,
+        openedx_user__has_been_synced=False,
+        openedx_user__has_sync_error=True,
+    )
+
+    return [
+        UserFactory.create(no_openedx_user=True),
+        UserFactory.create(no_openedx_api_auth=True),
+        UserFactory.create(openedx_user__has_been_synced=False),
+    ]
+
+
 @pytest.mark.parametrize("exception_raised", [MockHttpError, Exception, None])
 def test_repair_faulty_openedx_users(mocker, exception_raised):
     """
@@ -696,13 +713,9 @@ def test_repair_faulty_openedx_users(mocker, exception_raised):
     them, and continues iterating through the Users if an exception is raised
     """
     with freeze_time(now_in_utc() - timedelta(days=1)):
-        users = UserFactory.create_batch(3)
-    user_count = len(users)
+        users = _create_faulty_users()
+
     patched_log_exception = mocker.patch("openedx.api.log.exception")
-    patched_faulty_user_qset = mocker.patch(
-        "users.models.FaultyOpenEdxUserManager.get_queryset",
-        return_value=User.objects.all(),
-    )
     patched_repair_user = mocker.patch(
         "openedx.api.repair_faulty_edx_user",
         side_effect=[
@@ -712,16 +725,16 @@ def test_repair_faulty_openedx_users(mocker, exception_raised):
             (True, True),
         ],
     )
-    repaired_users = repair_faulty_openedx_users()
+    repair_faulty_openedx_users()
 
-    patched_faulty_user_qset.assert_called_once()
-    assert patched_repair_user.call_count == user_count
-    assert len(repaired_users) == (3 if exception_raised is None else 2)
+    assert patched_repair_user.call_count == len(users), (
+        patched_repair_user.call_args_list
+    )
+
     assert patched_log_exception.called == bool(exception_raised)
-    if exception_raised:
-        failed_user = patched_repair_user.call_args_list[1][0]
-        expected_repaired_users = [user for user in users if user != failed_user]
-        assert {u.id for u in users} == {u.id for u in expected_repaired_users}
+
+    for user in users:
+        patched_repair_user.assert_any_call(user)
 
 
 def test_retry_users_grace_period(mocker):
@@ -730,21 +743,19 @@ def test_retry_users_grace_period(mocker):
     """
     now = now_in_utc()
     with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS - 1)):
-        UserFactory.create()
+        _create_faulty_users()
     with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS + 1)):
-        user_to_repair = UserFactory.create()
-    patched_faulty_user_qset = mocker.patch(
-        "users.models.FaultyOpenEdxUserManager.get_queryset",
-        return_value=User.objects.all(),
-    )
+        users_to_repair = _create_faulty_users()
     patched_repair_user = mocker.patch(
         "openedx.api.repair_faulty_edx_user", return_value=(True, True)
     )
-    repaired_users = repair_faulty_openedx_users()
 
-    assert repaired_users == [user_to_repair]
-    patched_faulty_user_qset.assert_called_once()
-    patched_repair_user.assert_called_once_with(user_to_repair)
+    repair_faulty_openedx_users()
+
+    assert patched_repair_user.call_count == len(users_to_repair)
+
+    for user in users_to_repair:
+        patched_repair_user.assert_any_call(user)
 
 
 def test_unenroll_edx_course_run(mocker):
