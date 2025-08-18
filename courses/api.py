@@ -502,7 +502,7 @@ def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):  
 
 def sync_course_runs(runs):
     """
-    Sync course run dates and title from Open edX using bulk course list API
+    Sync course run dates and title from Open edX using course list API
 
     Args:
         runs ([CourseRun]): list of CourseRun objects.
@@ -516,20 +516,21 @@ def sync_course_runs(runs):
     failure_count = 0
 
     course_ids = [run.courseware_id for run in runs]
-
     runs_by_course_id = {run.courseware_id: run for run in runs}
 
     try:
-
+        received_course_ids = set()
         for course_detail in api_client.get_courses(course_keys=course_ids):
-            course_id = course_detail.course_id
-            run = runs_by_course_id.get(course_id)
+            received_course_ids.add(course_detail.course_id)
 
-            if not run:
+            if course_detail.course_id not in runs_by_course_id:
                 log.warning(
-                    "Course detail received for unknown course ID: %s", course_id
+                    "Course detail received for unrequested course ID: %s",
+                    course_detail.course_id
                 )
                 continue
+
+            run = runs_by_course_id[course_detail.course_id]
 
             try:
                 # Reset the expiration_date so it is calculated automatically and
@@ -563,6 +564,13 @@ def sync_course_runs(runs):
                 # Report any validation or otherwise model errors
                 log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                 failure_count += 1
+
+        missing_course_ids = set(course_ids) - received_course_ids
+        if missing_course_ids:
+            log.warning(
+                "No data received for requested courses: %s",
+                list(missing_course_ids),
+            )
 
     except HTTPError as e:  # noqa: PERF203
         failure_count += 1
