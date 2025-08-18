@@ -33,11 +33,25 @@ class OpenEdxUser(TimestampedModel):
         help_text="Indicates whether a corresponding user has been created on the openedx platform",
     )
 
+    has_sync_error = models.BooleanField(
+        default=False,
+        help_text="Indicates whether we hit an error or not trying to sync the user",
+    )
+
+    sync_error_data = models.JSONField(
+        null=True, default=None, help_text="The JSON sync error from openedx"
+    )
+
     def __str__(self):
         return f"OpenEdxUser for {self.user} in {self.platform}"
 
     class Meta:
         unique_together = ("user", "platform")
+        indexes = [
+            models.Index(
+                fields=["has_been_synced", "has_sync_error"], name="sync_state_idx"
+            )
+        ]
 
 
 class OpenEdxApiAuth(TimestampedModel):

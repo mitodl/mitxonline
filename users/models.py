@@ -243,7 +243,10 @@ class FaultyOpenEdxUserManager(BaseUserManager):
             faulty_users.filter(
                 Q(openedx_user_count=0)
                 | Q(openedx_api_auth_count=0)
-                | Q(openedx_users__has_been_synced=False)
+                | Q(
+                    openedx_users__has_been_synced=False,
+                    openedx_users__has_sync_error=False,
+                )
             )
         ).distinct()
 
