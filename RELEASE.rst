@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.126.2
+Version 0.126.2 (Released August 18, 2025)
 ---------------
 
 - Removes remnants of Elasticsearch (#2848)
