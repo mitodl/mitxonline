@@ -1,5 +1,9 @@
 {% extends "email_base.html" %}
 
+{% block logo %}
+  {% include "mail/partials/_uai_logo.html" %}
+{% endblock %}
+
 {% block content %}
 <!-- 1 Column Text + Button : BEGIN -->
   <tr>
@@ -10,12 +14,17 @@
                       <p style="margin: 0 0 10px;">Dear {{ user.name }},</p>
                       <p style="margin: 0 0 10px;">
                         You have been unenrolled from
-                        {% if enrollment.run.start_date %}
-                          {{ enrollment.run.course_number }} {{ enrollment.run.course.title }} starting {{ enrollment.run.start_date|date:"F j, Y"}}.
+                        {% if is_uai_enrollment %}
+                            {{ enrollment.run.course.title }}.
+                          It will no longer appear on your <a href="{{ dashboard_url }}" style="color: #A31F34; text-decoration: underline;">Learn Dashboard</a>.
                         {% else %}
-                          {{ enrollment.run.course_number }} {{ enrollment.run.course.title }}.
+                          {% if enrollment.run.start_date %}
+                            {{ enrollment.run.course_number }} {{ enrollment.run.course.title }} starting {{ enrollment.run.start_date|date:"F j, Y"}}.
+                          {% else %}
+                            {{ enrollment.run.course_number }} {{ enrollment.run.course.title }}.
+                          {% endif %}
+                          The course will no longer appear on your <a href="{{ base_url }}{% url 'user-dashboard' %}">{{ site_name }} dashboard</a>.
                         {% endif %}
-                        The course will no longer appear on your <a href="{{ base_url }}{% url 'user-dashboard' %}">{{ site_name }} dashboard</a>.
                       </p>
                   </td>
               </tr>
@@ -24,4 +33,8 @@
       </td>
   </tr>
 <!-- 1 Column Text + Button : END -->
+{% endblock %}
+
+{% block footer-address %}
+{% include "mail/partials/_uai_footer.html" %}
 {% endblock %}

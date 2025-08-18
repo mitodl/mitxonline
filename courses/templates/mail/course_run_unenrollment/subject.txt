@@ -1,1 +1,1 @@
-You have been unenrolled from {{ enrollment.run.course_number }} {{ enrollment.run.course.title }}.
+You have been unenrolled from {% if is_uai_enrollment %}{{ enrollment.run.course.title }}{% else %}{{ enrollment.run.course_number }} {{ enrollment.run.course.title }}{% endif %}.

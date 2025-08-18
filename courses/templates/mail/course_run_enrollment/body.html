@@ -1,43 +1,7 @@
 {% extends "email_base.html" %}
 
 {% block logo %}
-  {% if is_uai_enrollment %}
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="width: 100%; border-collapse: collapse;">
-      <tr>
-        <td style="text-align: left; width: 60%; padding: 0;">
-          <img
-            src="{{ base_url }}/static/images/mit-learn.png"
-            width="146"
-            height="24"
-            alt="MIT Learn"
-            style="display: block; max-width: 100%; height: auto;"
-          />
-        </td>
-        <td style="text-align: right; width: 40%; padding: 0;">
-          <img
-            src="{{ base_url }}/static/images/mit-black-logo.png"
-            width="48"
-            height="24"
-            alt="MIT"
-            style="display: block; max-width: 100%; height: auto; margin-left: auto;"
-          />
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2" style="padding-top: 32px;">
-          <hr style="border: none; height: 1px; background-color: #e0e0e0; margin: 0;">
-        </td>
-      </tr>
-    </table>
-  {% else %}
-    <img
-      src="{{ base_url }}/static/images/mitx-online-logo.png"
-      width="160"
-      height="80"
-      alt="{{ site_name }}"
-      class="logo"
-    />
-  {% endif %}
+  {% include "mail/partials/_uai_logo.html" %}
 {% endblock %}
 
 {% block content %}
@@ -51,7 +15,7 @@
                       <p style="margin: 0 0 10px;">
                         You have been enrolled in 
                         {% if is_uai_enrollment %}
-                          {{ enrollment.run.course.title }}. It should now appear on your <a href="https://learn.mit.edu/dashboard" style="color: #A31F34; text-decoration: underline;">Learn Dashboard</a>.
+                          {{ enrollment.run.course.title }}. It should now appear on your <a href="{{ dashboard_url }}" style="color: #A31F34; text-decoration: underline;">Learn Dashboard</a>.
                         {% else %}
                           {{ enrollment.run.course_number }} {{ enrollment.run.course.title }}. The course should now appear on your <a href="{{ base_url }}{% url 'user-dashboard' %}">{{ site_name }} dashboard</a>.
                         {% endif %}
@@ -71,11 +35,5 @@
 {% endblock %}
 
 {% block footer-address %}
-{% if is_uai_enrollment %}
-<div style="text-align: center;">
-    MIT Open Learning, 600 Technology Square, NE49-2000, Cambridge, MA 02139
-</div>
-{% else %}
-{{ block.super }}
-{% endif %}
+{% include "mail/partials/_uai_footer.html" %}
 {% endblock %}
