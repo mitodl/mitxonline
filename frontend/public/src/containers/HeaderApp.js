@@ -48,8 +48,11 @@ export class HeaderApp extends React.Component<Props, void> {
 
   componentDidUpdate() {
     const { currentUser, forceRequest, prevProps } = this.props
-    if (currentUser && currentUser.is_authenticated &&
-      (!prevProps.currentUser || !prevProps.currentUser.is_authenticated)) {
+    if (
+      currentUser &&
+      currentUser.is_authenticated &&
+      (!prevProps.currentUser || !prevProps.currentUser.is_authenticated)
+    ) {
       forceRequest(cartItemsCountQuery())
     }
   }
