@@ -67,23 +67,6 @@ export class App extends React.Component<Props, void> {
     }
   }
 
-  componentDidMount() {
-    const { addUserNotification } = this.props
-
-    const userMsg = getStoredUserMessage()
-    if (userMsg) {
-      addUserNotification({
-        "loaded-user-msg": {
-          type:  userMsg.type,
-          props: {
-            text: userMsg.text
-          }
-        }
-      })
-      removeStoredUserMessage()
-    }
-  }
-
   render() {
     const { match, currentUser, cartItemsCount, location } = this.props
     if (!currentUser) {
