@@ -1640,51 +1640,44 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(user, 
 def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
     """
     Test that deactivate_run_enrollment removes PaidCourseRun records to allow B2B re-enrollment.
-    
-    This test verifies the fix for the issue where users cannot re-enroll in B2B courses
-    after unenrolling and re-enrolling once. The problem was that PaidCourseRun records
-    persisted after unenrollment, causing subsequent enrollment attempts to fail with a
-    "duplicate enrollment" error.
     """
-    # Mock external dependencies
     mocker.patch("courses.api.unenroll_edx_course_run")
     mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
     
-    # Create a course run enrollment and associated order/PaidCourseRun
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
+    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+    
     enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
     fulfilled_order = OrderFactory.create(
-        state=OrderStatus.FULFILLED, 
+        state=OrderStatus.FULFILLED,
         purchaser=enrollment.user
     )
     
-    # Create a PaidCourseRun record (simulates successful B2B enrollment)
     PaidCourseRun.objects.create(
         user=enrollment.user,
         course_run=enrollment.run,
         order=fulfilled_order
     )
     
-    # Verify the PaidCourseRun record exists before unenrollment
     assert PaidCourseRun.objects.filter(
         user=enrollment.user,
         course_run=enrollment.run
     ).exists()
     
-    # Deactivate the enrollment (simulate unenrollment)
     result = deactivate_run_enrollment(
-        enrollment, 
+        enrollment,
         change_status=ENROLL_CHANGE_STATUS_UNENROLLED
     )
     
-    # Verify the enrollment was deactivated
     assert result == enrollment
     enrollment.refresh_from_db()
     assert enrollment.active is False
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
     assert enrollment.edx_enrolled is False
     
-    # Verify the PaidCourseRun record was removed to allow re-enrollment
     assert not PaidCourseRun.objects.filter(
         user=enrollment.user,
         course_run=enrollment.run
@@ -1696,18 +1689,20 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
     Test that users can re-enroll in B2B courses multiple times after unenrolling.
 
     This integration test verifies that the complete B2B enrollment workflow allows
-    for multiple unenroll/re-enroll cycles.
+    for multiple unenroll/re-enroll events.
     """
-    # Mock external dependencies
     mocker.patch("courses.api.enroll_in_edx_course_runs")
     mocker.patch("courses.api.unenroll_edx_course_run")
     mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
     mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
-    # Do not mock generate_checkout_payload - we want to test the real B2B enrollment logic
 
-    # Set up B2B contract and course with zero price and non-SSO integration
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
+    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+
     org_index = OrganizationIndexPageFactory.create()
     org = OrganizationPageFactory.create(parent=org_index)
     contract = ContractPageFactory.create(
@@ -1719,56 +1714,41 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
     with reversion.create_revision():
         product = ProductFactory.create(
             purchasable_object=course_run,
-            price=contract.enrollment_fixed_price  # Use the contract's fixed price
+            price=contract.enrollment_fixed_price
         )
 
-    # Add user to the contract
     user.b2b_contracts.add(contract)
     user.save()
 
-    # Create mock request
     request = RequestFactory().post("/")
     request.user = user
 
-    # First enrollment - should succeed
     result1 = create_b2b_enrollment(request, product)
     assert result1["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 
-    # Verify enrollment was created
     enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
     assert enrollment.active is True
 
-    # Clear any remaining baskets
     Basket.objects.filter(user=user).delete()
 
-    # First unenrollment
     deactivate_run_enrollment(enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED)
     enrollment.refresh_from_db()
     assert enrollment.active is False
 
-    # Second enrollment (re-enrollment) - should succeed after fix
-
-    # Second enrollment - should also succeed
     result2 = create_b2b_enrollment(request, product)
     assert result2["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 
-    # Verify enrollment was reactivated
     enrollment.refresh_from_db()
     assert enrollment.active is True
 
-    # Clear any remaining baskets
     Basket.objects.filter(user=user).delete()
 
-    # Second unenrollment
     deactivate_run_enrollment(enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED)
     enrollment.refresh_from_db()
     assert enrollment.active is False
 
-    # Third enrollment (second re-enrollment) - should succeed
-    # This is where the bug would occur before our fix
     result3 = create_b2b_enrollment(request, product)
     assert result3["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 
-    # Verify enrollment was reactivated again
     enrollment.refresh_from_db()
     assert enrollment.active is True
