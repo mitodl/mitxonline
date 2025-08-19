@@ -589,6 +589,17 @@ KEYCLOAK_CLIENT_ID = get_string(
     description="The client name for mitxonline.",
 )
 
+KEYCLOAK_CLIENT_SECRET = get_string(
+    name="KEYCLOAK_CLIENT_SECRET",
+    default=None,
+    description="The client secret for mitxonline.",
+)
+
+KEYCLOAK_ADMIN_REALM_TOKEN_ENDPOINT = get_string(
+    name="KEYCLOAK_ADMIN_REALM_TOKEN_ENDPOINT",
+    default=None,
+    description="The URL to the token endpoint for the admin realm."
+)
 
 # Social Auth Configuration end
 
