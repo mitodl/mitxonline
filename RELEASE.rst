@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.127.1
+---------------
+
+- Fix some issues with openedx user creation (#2861)
+
 Version 0.127.0 (Released August 18, 2025)
 ---------------
 
