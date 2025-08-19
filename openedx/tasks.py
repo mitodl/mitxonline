@@ -1,9 +1,15 @@
 """Courseware tasks"""
 
+import logging
+
+from django.conf import settings
+
 from main.celery import app
 from openedx import api
 from users.api import get_user_by_id
 from users.models import User
+
+log = logging.getLogger()
 
 
 @app.task(acks_late=True)
@@ -33,6 +39,9 @@ def retry_failed_edx_enrollments():
 @app.task(acks_late=True)
 def repair_faulty_openedx_users():
     """Calls the API method to repair faulty openedx users"""
+    if settings.DISABLE_USER_REPAIR_TASK:
+        log.info("Skipping repair_faulty_openedx_users task as it is disabled")
+        return None
     repaired_users = api.repair_faulty_openedx_users()
     return [user.email for user in repaired_users]
 

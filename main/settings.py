@@ -1503,3 +1503,9 @@ OPENTELEMETRY_EXPORT_TIMEOUT_MS = get_int(
     default=5000,
     description="Timeout for opentelemetry export",
 )
+
+DISABLE_USER_REPAIR_TASK = get_bool(
+    name="DISABLE_USER_REPAIR_TASK",
+    default=False,
+    description="Disable the task so it no-ops",
+)
