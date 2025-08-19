@@ -46,17 +46,6 @@ export class HeaderApp extends React.Component<Props, void> {
     }
   }
 
-  componentDidUpdate(prevProps: Props) {
-    const { currentUser, forceRequest } = this.props
-    if (
-      currentUser &&
-      currentUser.is_authenticated &&
-      (!prevProps.currentUser || !prevProps.currentUser.is_authenticated)
-    ) {
-      forceRequest(cartItemsCountQuery())
-    }
-  }
-
   render() {
     const { currentUser, cartItemsCount } = this.props
 
@@ -80,7 +69,16 @@ const mapStateToProps = createStructuredSelector({
   cartItemsCount: cartItemsCountSelector
 })
 
-const mapPropsToConfig = () => [users.currentUserQuery()]
+const mapPropsToConfig = props => {
+  const queries = [users.currentUserQuery()]
+
+  // Add cart query for authenticated users
+  if (props.currentUser && props.currentUser.is_authenticated) {
+    queries.push(cartItemsCountQuery())
+  }
+
+  return queries
+}
 
 const mapDispatchToProps = {
   addUserNotification
