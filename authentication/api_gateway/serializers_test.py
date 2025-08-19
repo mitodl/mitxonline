@@ -142,7 +142,10 @@ def test_register_extra_details_serializer_valid_data(user):
         ("user@domain", False),  # Invalid character (@)
         ("user#name", False),  # Invalid character (#)
         ("user$name", False),  # Invalid character ($)
-        ("  validuser  ", True),  # Valid with leading/trailing spaces (should be trimmed)
+        (
+            "  validuser  ",
+            True,
+        ),  # Valid with leading/trailing spaces (should be trimmed)
         ("user name", True),  # Valid with space
         ("user.name", True),  # Valid with period
         ("user+name", True),  # Valid with plus
@@ -167,13 +170,19 @@ def test_register_details_serializer_username_validation(
     serializer = RegisterDetailsSerializer(data=data, context={"request": request})
 
     if expected_valid:
-        assert serializer.is_valid(), f"Username '{username}' should be valid but got errors: {serializer.errors}"
+        assert serializer.is_valid(), (
+            f"Username '{username}' should be valid but got errors: {serializer.errors}"
+        )
         # Check that spaces are trimmed for valid usernames with leading/trailing spaces
         if username.strip() != username:
             assert serializer.validated_data["username"] == username.strip()
     else:
-        assert not serializer.is_valid(), f"Username '{username}' should be invalid but passed validation"
-        assert "username" in serializer.errors, f"Username error not found in {serializer.errors}"
+        assert not serializer.is_valid(), (
+            f"Username '{username}' should be invalid but passed validation"
+        )
+        assert "username" in serializer.errors, (
+            f"Username error not found in {serializer.errors}"
+        )
 
 
 @pytest.mark.django_db
@@ -196,7 +205,9 @@ def test_register_details_serializer_username_length_error_message(
     serializer = RegisterDetailsSerializer(data=data, context={"request": request})
     assert not serializer.is_valid()
     assert "username" in serializer.errors
-    assert f"must be no more than {OPENEDX_USERNAME_MAX_LEN} characters" in str(serializer.errors["username"][0])
+    assert f"must be no more than {OPENEDX_USERNAME_MAX_LEN} characters" in str(
+        serializer.errors["username"][0]
+    )
 
     # Test too short username
     data["username"] = "ab"

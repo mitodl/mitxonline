@@ -11,10 +11,10 @@ from hubspot_sync.task_helpers import sync_hubspot_user
 from openedx.api import create_user
 from openedx.constants import OPENEDX_USERNAME_MAX_LEN
 from users.serializers import (
+    USERNAME_ERROR_MSG,
+    USERNAME_RE_PARTIAL,
     LegalAddressSerializer,
     UserProfileSerializer,
-    USERNAME_RE_PARTIAL,
-    USERNAME_ERROR_MSG,
 )
 
 log = logging.getLogger()
@@ -35,7 +35,9 @@ class RegisterDetailsSerializer(serializers.Serializer):
 
         # Check length constraints
         if len(trimmed_value) > OPENEDX_USERNAME_MAX_LEN:
-            msg = f"Username must be no more than {OPENEDX_USERNAME_MAX_LEN} characters."
+            msg = (
+                f"Username must be no more than {OPENEDX_USERNAME_MAX_LEN} characters."
+            )
             raise serializers.ValidationError(msg)
 
         min_username_length = 3
