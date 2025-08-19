@@ -726,7 +726,7 @@ else:
 
 MIT_LEARN_FROM_EMAIL = get_string(
     name="MIT_LEARN_FROM_EMAIL",
-    default="MIT Learn <learn-support@mit.edu>",
+    default="MIT Learn <mitlearn-support@mit.edu>",
     description="From email address for UAI enrollment emails",
 )
 
