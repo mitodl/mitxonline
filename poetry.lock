@@ -4299,6 +4299,24 @@ files = [
 dev = ["coverage[toml]", "coveralls (>=3.3,<4.0)", "ruff", "twine"]
 
 [[package]]
+name = "python-redis-lock"
+version = "4.0.0"
+description = "Lock context manager implemented via redis SETNX/BLPOP."
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "python-redis-lock-4.0.0.tar.gz", hash = "sha256:4abd0bcf49136acad66727bf5486dd2494078ca55e49efa693f794077319091a"},
+    {file = "python_redis_lock-4.0.0-py3-none-any.whl", hash = "sha256:ff786e587569415f31e64ca9337fce47c4206e832776e9e42b83bfb9ee1af4bd"},
+]
+
+[package.dependencies]
+redis = ">=2.10.0"
+
+[package.extras]
+django = ["django-redis (>=3.8.0)"]
+
+[[package]]
 name = "python3-openid"
 version = "3.2.0"
 description = "OpenID support for modern servers and consumers."
@@ -5588,4 +5606,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "3117c0ce63c04113ace79ea98e043d89d7a7bad76e72ced1c6366aa6736ec397"
+content-hash = "f7175c45a30fe89fa6a66a24014ea3666d9000dc6365697bfb4f8160ba65209c"
