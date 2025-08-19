@@ -46,7 +46,7 @@ export class HeaderApp extends React.Component<Props, void> {
     }
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: Props) {
     const { currentUser, forceRequest } = this.props
     if (
       currentUser &&
