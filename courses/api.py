@@ -526,7 +526,7 @@ def sync_course_runs(runs):
             if course_detail.course_id not in runs_by_course_id:
                 log.warning(
                     "Course detail received for unrequested course ID: %s",
-                    course_detail.course_id
+                    course_detail.course_id,
                 )
                 continue
 
@@ -572,7 +572,7 @@ def sync_course_runs(runs):
                 list(missing_course_ids),
             )
 
-    except HTTPError as e:  # noqa: PERF203
+    except HTTPError as e:
         failure_count += 1
         log.error("Bulk course list API error: %s", str(e))  # noqa: TRY400
     except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
