@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.127.3
+Version 0.127.3 (Released August 20, 2025)
 ---------------
 
 - Revert "feat: use courselist for course sync" (#2886)
