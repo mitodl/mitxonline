@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.127.2
+---------------
+
+- Add flag to disable user repair task (#2884)
+- feat: use courselist for course sync (#2864)
+
 Version 0.127.1 (Released August 20, 2025)
 ---------------
 
