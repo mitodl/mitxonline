@@ -82,6 +82,7 @@ class OrganizationPage(Page):
     content_panels = [
         FieldPanel("name"),
         FieldPanel("description"),
+        FieldPanel("org_key"),
         FieldPanel("logo"),
         FieldPanel("sso_organization_id"),
     ]
