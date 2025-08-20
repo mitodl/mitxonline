@@ -50,7 +50,7 @@ from courses.utils import (
 from ecommerce.models import OrderStatus
 from openedx.api import (
     enroll_in_edx_course_runs,
-    get_edx_api_course_list_client,
+    get_edx_api_course_detail_client,
     get_edx_api_course_mode_client,
     get_edx_grades_with_users,
     unenroll_edx_course_run,
@@ -502,82 +502,69 @@ def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):  
 
 def sync_course_runs(runs):
     """
-    Sync course run dates and title from Open edX using course list API
+    Sync course run dates and title from Open edX
 
     Args:
         runs ([CourseRun]): list of CourseRun objects.
 
     Returns:
-        tuple: (success_count, failure_count) - counts of successful and failed syncs
+        [str], [str]: Lists of success and error logs respectively
     """
-    api_client = get_edx_api_course_list_client()
+    api_client = get_edx_api_course_detail_client()
 
     success_count = 0
     failure_count = 0
 
-    course_ids = [run.courseware_id for run in runs]
-    runs_by_course_id = {run.courseware_id: run for run in runs}
-
-    try:
-        received_course_ids = set()
-        for course_detail in api_client.get_courses(course_keys=course_ids):
-            received_course_ids.add(course_detail.course_id)
-
-            if course_detail.course_id not in runs_by_course_id:
-                log.warning(
-                    "Course detail received for unrequested course ID: %s",
-                    course_detail.course_id,
+    # Iterate all eligible runs and sync if possible
+    for run in runs:
+        try:
+            course_detail = api_client.get_detail(
+                course_id=run.courseware_id,
+                username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
+            )
+        except HTTPError as e:  # noqa: PERF203
+            failure_count += 1
+            if e.response.status_code == HTTP_404_NOT_FOUND:
+                log.error(  # noqa: TRY400
+                    "Course not found on edX for readable id: %s", run.courseware_id
                 )
-                continue
+            else:
+                log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
+        except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
+            failure_count += 1
+            log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
+        else:
+            # Reset the expiration_date so it is calculated automatically and
+            # does not raise a validation error now that the start or end date
+            # has changed.
+            if (
+                run.start_date != course_detail.start
+                or run.end_date != course_detail.end
+            ):
+                run.expiration_date = None
 
-            run = runs_by_course_id[course_detail.course_id]
+            run.title = course_detail.name
+            run.start_date = course_detail.start
+            run.end_date = course_detail.end
+            run.enrollment_start = course_detail.enrollment_start
+            run.enrollment_end = course_detail.enrollment_end
+            run.is_self_paced = course_detail.is_self_paced()
+            # Only sync the date if it's set in edX, Otherwise set it to course's end date
+            if course_detail.certificate_available_date:
+                run.certificate_available_date = (
+                    course_detail.certificate_available_date
+                )
+            else:
+                run.certificate_available_date = course_detail.end
 
             try:
-                # Reset the expiration_date so it is calculated automatically and
-                # does not raise a validation error now that the start or end date
-                # has changed.
-                if (
-                    run.start_date != course_detail.start
-                    or run.end_date != course_detail.end
-                ):
-                    run.expiration_date = None
-
-                run.title = course_detail.name
-                run.start_date = course_detail.start
-                run.end_date = course_detail.end
-                run.enrollment_start = course_detail.enrollment_start
-                run.enrollment_end = course_detail.enrollment_end
-                run.is_self_paced = course_detail.is_self_paced()
-                # Only sync the date if it's set in edX, Otherwise set it to course's end date
-                if course_detail.certificate_available_date:
-                    run.certificate_available_date = (
-                        course_detail.certificate_available_date
-                    )
-                else:
-                    run.certificate_available_date = course_detail.end
-
                 run.save()
                 success_count += 1
                 log.info("Updated course run: %s", run.courseware_id)
-
             except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
                 # Report any validation or otherwise model errors
                 log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                 failure_count += 1
-
-        missing_course_ids = set(course_ids) - received_course_ids
-        if missing_course_ids:
-            log.warning(
-                "No data received for requested courses: %s",
-                list(missing_course_ids),
-            )
-
-    except HTTPError as e:
-        failure_count += 1
-        log.error("Bulk course list API error: %s", str(e))  # noqa: TRY400
-    except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
-        failure_count += 1
-        log.error("Unexpected error in bulk sync: %s", str(e))  # noqa: TRY400
 
     return success_count, failure_count
 
