@@ -9,7 +9,7 @@ import logging
 from mitol.apigateway.api import decode_x_header
 from mitol.apigateway.backends import ApisixRemoteUserBackend
 
-from b2b.api import reconcile_user_orgs
+from b2b.tasks import queue_reconcile_user_orgs
 
 log = logging.getLogger(__name__)
 
@@ -39,12 +39,8 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
                 for org in apisix_header["organization"]
             ]
 
-        created, updated = reconcile_user_orgs(user, org_uuids)
-        log.info(
-            "ApisixRemoteUserOrgBackend: user %s: created %s contract assocs, removed %s",
-            user,
-            created,
-            updated,
-        )
+        if org_uuids.sort() != user.b2b_organization_sso_ids.sort():
+            # Only bother with this if we need to (and pass it off to Celery if we do)
+            queue_reconcile_user_orgs.delay(user.id, org_uuids)
 
         return user
