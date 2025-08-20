@@ -729,7 +729,7 @@ def reconcile_user_orgs(user, organizations):
     - tuple(int, int); contracts added and contracts removed
     """
 
-    if organizations.sort() == user.b2b_organization_sso_ids.sort():
+    if sorted(organizations) == sorted(user.b2b_organization_sso_ids):
         return (
             0,
             0,
