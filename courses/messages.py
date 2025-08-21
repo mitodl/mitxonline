@@ -1,8 +1,8 @@
 """Course email messages"""
 
+from django.conf import settings
 from mitol.mail.messages import TemplatedMessage
 
-from django.conf import settings
 from courses.utils import is_uai_course_run
 
 
@@ -17,9 +17,7 @@ class UAIEmailMixin:
 
         if enrollment and is_uai_course_run(enrollment.run):
             template_context["is_uai_enrollment"] = True
-            template_context["dashboard_url"] = (
-                settings.MIT_LEARN_DASHBOARD_URL
-            )
+            template_context["dashboard_url"] = settings.MIT_LEARN_DASHBOARD_URL
             kwargs["from_email"] = settings.MIT_LEARN_FROM_EMAIL
             kwargs["headers"] = {"Reply-To": settings.MIT_LEARN_REPLY_TO_EMAIL}
 

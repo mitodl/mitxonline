@@ -236,8 +236,8 @@ def is_uai_order(order):
         bool: True if the order contains UAI courses, False otherwise
     """
     for line in order.lines.all():
-        if hasattr(line.product, 'purchasable_object'):
+        if hasattr(line.product, "purchasable_object"):
             course_run = line.product.purchasable_object
-            if hasattr(course_run, 'courseware_id') and is_uai_course_run(course_run):
+            if hasattr(course_run, "courseware_id") and is_uai_course_run(course_run):
                 return True
     return False
