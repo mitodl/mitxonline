@@ -724,6 +724,24 @@ if ADMIN_EMAIL != "":  # noqa: SIM108
 else:
     ADMINS = ()
 
+MIT_LEARN_FROM_EMAIL = get_string(
+    name="MIT_LEARN_FROM_EMAIL",
+    default="MIT Learn <mitlearn-support@mit.edu>",
+    description="From email address for UAI enrollment emails",
+)
+
+MIT_LEARN_REPLY_TO_EMAIL = get_string(
+    name="MIT_LEARN_REPLY_TO_EMAIL",
+    default=MIT_LEARN_FROM_EMAIL,
+    description="Reply-to email address for UAI enrollment emails (defaults to MIT_LEARN_FROM_EMAIL)",
+)
+
+MIT_LEARN_DASHBOARD_URL = get_string(
+    name="MIT_LEARN_DASHBOARD_URL",
+    default="https://learn.mit.edu/dashboard",
+    description="Dashboard URL for UAI enrollment emails",
+)
+
 # Logging configuration
 LOG_LEVEL = get_string(
     name="MITX_ONLINE_LOG_LEVEL", default="INFO", description="The log level default"

@@ -19,6 +19,7 @@ from b2b.constants import B2B_RUN_TAG_FORMAT, CONTRACT_INTEGRATION_SSO
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.api import get_home_page
+from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -116,7 +117,7 @@ def create_contract_run(
         contract_id=contract.id,
     )
     source_id = CourseKey.from_string(clone_course_run.courseware_id)
-    new_readable_id = f"course-v1:UAI_{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
+    new_readable_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
 
     # Check first for an existing run with the same readable ID.
     if CourseRun.objects.filter(course=course, courseware_id=new_readable_id).exists():
