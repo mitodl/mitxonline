@@ -344,9 +344,9 @@ def reconcile_edx_username(user):
         edx_user.edx_username = edx_username
         edx_user.desired_edx_username = edx_username
 
-        try:
+        if not OpenEdxUser.objects.filter(edx_username=edx_username).exists():
             edx_user.save()
-        except OpenEdxUser.IntegrityError:
+        else:
             ranges = (
                 (0, 9),
                 (10, 99),
@@ -369,6 +369,9 @@ def reconcile_edx_username(user):
                     edx_username=username_to_try
                 ).exists():
                     edx_user.edx_username = username_to_try
+                    # We're generating this so it's still the desired one
+                    # Maybe edX comes back and tells us we can't use it later
+                    edx_user.desired_edx_username = username_to_try
                     edx_user.save()
                     break
 

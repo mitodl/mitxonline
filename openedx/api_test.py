@@ -1085,6 +1085,8 @@ def test_reconcile_edx_username_conflict():
     """Test that reconciling the username adds suffixes properly if there's a conflict"""
 
     user = UserFactory.create(
+        username="bobjones@place.email",
+        name="Bob Jones",
         legal_address__first_name="Bob",
         legal_address__last_name="Jones",
         openedx_user=None,
@@ -1094,7 +1096,9 @@ def test_reconcile_edx_username_conflict():
     user.refresh_from_db()
 
     new_user = UserFactory.create(
+        username="bobjones@other.place.email",
         openedx_user=None,
+        name="Bob Jones",
         legal_address__first_name=user.legal_address.first_name,
         legal_address__last_name=user.legal_address.last_name,
     )
