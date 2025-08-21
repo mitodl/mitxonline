@@ -74,25 +74,3 @@ def send_partner_school_email(record_uuid):
     record = LearnerProgramRecordShare.objects.get(share_uuid=record_uuid)
 
     send_partner_school_sharing_message(record)
-
-
-@app.task
-def clear_unenrolled_paid_course_run(enrollment_id):
-    """
-    Pulls the order specified and clears any PaidCourseRun records for it. If
-    these exist, the user won't be able to re-buy into the course later if they
-    want to.
-    """
-
-    try:
-        enrollment = CourseRunEnrollment.all_objects.filter(id=enrollment_id).get()
-
-        PaidCourseRun.objects.filter(
-            user=enrollment.user,
-            course_run=enrollment.run,
-            order__state=OrderStatus.FULFILLED,
-        ).delete()
-    except Exception as e:  # noqa: BLE001
-        log.error(  # noqa: TRY400
-            f"Unable to clear paid course run records for enrollment ID {enrollment_id}: {e!s}"  # noqa: G004
-        )
