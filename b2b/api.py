@@ -730,6 +730,18 @@ def reconcile_user_orgs(user, organizations):
     - tuple(int, int); contracts added and contracts removed
     """
 
+    user_org_cache_key = f"org-membership-cache-{user.id}"
+    cached_org_membership = caches["redis"].get(user_org_cache_key, False)
+
+    if cached_org_membership and sorted(cached_org_membership) == sorted(organizations):
+        log.info("reconcile_user_orgs: skipping reconcilation for %s", user.id)
+        return (
+            0,
+            0,
+        )
+
+    log.info("reconcile_user_orgs: running reconcilation for %s", user.id)
+
     user_contracts_qs = user.b2b_contracts.filter(
         integration_type=CONTRACT_INTEGRATION_SSO
     )

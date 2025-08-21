@@ -9,7 +9,7 @@ import logging
 from mitol.apigateway.api import decode_x_header
 from mitol.apigateway.backends import ApisixRemoteUserBackend
 
-from b2b.tasks import queue_reconcile_user_orgs
+from b2b.api import reconcile_user_orgs
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +40,6 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
             ]
 
         # Task should check to see if it needs to run or not
-        queue_reconcile_user_orgs.delay(user.id, org_uuids)
+        reconcile_user_orgs(user, org_uuids)
 
         return user
