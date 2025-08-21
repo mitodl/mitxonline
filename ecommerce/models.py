@@ -599,13 +599,15 @@ class OrderFlow:
         target=OrderStatus.FULFILLED,
     )
     def fulfill(self, payment_data, already_enrolled=False):  # noqa: FBT002
+        """This happens in a transaction"""
         # record the transaction
         self.create_transaction(payment_data)
 
         # if user already enrolled from management command it'll not recreate
         if not already_enrolled:
             # create enrollments for what the learner has paid for
-            self.create_enrollments()
+            # but after the transaction is done
+            transaction.on_commit(self.create_enrollments)
 
         # record all the courseruns in the order
         self.create_paid_courseruns()

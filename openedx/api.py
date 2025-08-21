@@ -1,6 +1,7 @@
 """Courseware API functions"""
 
 import logging
+import random
 from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urljoin, urlparse
 
@@ -342,7 +343,35 @@ def reconcile_edx_username(user):
         )
         edx_user.edx_username = edx_username
         edx_user.desired_edx_username = edx_username
-        edx_user.save()
+
+        try:
+            edx_user.save()
+        except OpenEdxUser.IntegrityError:
+            ranges = (
+                (0, 9),
+                (10, 99),
+                (100, 999),
+                (1000, 9999),
+                (10000, 99999),
+            )
+
+            for intrange in ranges:
+                random_int = random.randint(intrange[0], intrange[1])  # noqa: S311
+                username_to_try = f"{edx_username}_{random_int}"
+
+                if len(username_to_try) > OPENEDX_USERNAME_MAX_LEN:
+                    amount_to_truncate = len(username_to_try) - OPENEDX_USERNAME_MAX_LEN
+                    username_to_try = (
+                        f"{edx_username[:amount_to_truncate]}-{random_int}"
+                    )
+
+                if not OpenEdxUser.objects.filter(
+                    edx_username=username_to_try
+                ).exists():
+                    edx_user.edx_username = username_to_try
+                    edx_user.save()
+                    break
+
         return True
 
     return False
