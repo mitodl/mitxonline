@@ -39,8 +39,7 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
                 for org in apisix_header["organization"]
             ]
 
-        if sorted(org_uuids) != sorted(user.b2b_organization_sso_ids):
-            # Only bother with this if we need to (and pass it off to Celery if we do)
-            queue_reconcile_user_orgs.delay(user.id, org_uuids)
+        # Task should check to see if it needs to run or not
+        queue_reconcile_user_orgs.delay(user.id, org_uuids)
 
         return user

@@ -10,6 +10,7 @@ from uuid import uuid4
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import caches
 from django.db.models import Count, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -729,12 +730,6 @@ def reconcile_user_orgs(user, organizations):
     - tuple(int, int); contracts added and contracts removed
     """
 
-    if sorted(organizations) == sorted(user.b2b_organization_sso_ids):
-        return (
-            0,
-            0,
-        )
-
     user_contracts_qs = user.b2b_contracts.filter(
         integration_type=CONTRACT_INTEGRATION_SSO
     )
@@ -774,5 +769,10 @@ def reconcile_user_orgs(user, organizations):
         ]
 
     user.save()
+    user.refresh_from_db()
+    orgs = [str(org_id) for org_id in user.b2b_organization_sso_ids]
+
+    user_org_cache_key = f"org-membership-cache-{user.id}"
+    caches["redis"].set(user_org_cache_key, sorted(orgs))
 
     return (len(contracts_to_add), len(contracts_to_remove))
