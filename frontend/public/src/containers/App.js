@@ -45,7 +45,8 @@ type Props = {
   location: Location,
   currentUser: ?CurrentUser,
   cartItemsCount: number,
-  addUserNotification: Function
+  addUserNotification: Function,
+  forceRequest: Function
 }
 
 export class App extends React.Component<Props, void> {
@@ -77,7 +78,7 @@ export class App extends React.Component<Props, void> {
       <div className="app" aria-flowto="notifications-container">
         <Header
           currentUser={currentUser}
-          cartItemsCount={cartItemsCount}
+          cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
           location={location}
         />
         <div id="main" className="main-page-content">
@@ -167,7 +168,16 @@ const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = () => [cartItemsCountQuery(), users.currentUserQuery()]
+const mapPropsToConfig = props => {
+  const queries = [users.currentUserQuery()]
+
+  // Add cart query for authenticated users
+  if (props.currentUser && props.currentUser.is_authenticated) {
+    queries.push(cartItemsCountQuery())
+  }
+
+  return queries
+}
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)

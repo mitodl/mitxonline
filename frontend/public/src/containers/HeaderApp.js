@@ -24,7 +24,8 @@ type Props = {
   currentUser: ?CurrentUser,
   cartItemsCount: number,
   store: Store<*, *>,
-  addUserNotification: Function
+  addUserNotification: Function,
+  forceRequest: Function
 }
 
 export class HeaderApp extends React.Component<Props, void> {
@@ -56,7 +57,7 @@ export class HeaderApp extends React.Component<Props, void> {
     return (
       <Header
         currentUser={currentUser}
-        cartItemsCount={cartItemsCount}
+        cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
         location={null}
       />
     )
@@ -68,7 +69,16 @@ const mapStateToProps = createStructuredSelector({
   cartItemsCount: cartItemsCountSelector
 })
 
-const mapPropsToConfig = () => [cartItemsCountQuery(), users.currentUserQuery()]
+const mapPropsToConfig = props => {
+  const queries = [users.currentUserQuery()]
+
+  // Add cart query for authenticated users
+  if (props.currentUser && props.currentUser.is_authenticated) {
+    queries.push(cartItemsCountQuery())
+  }
+
+  return queries
+}
 
 const mapDispatchToProps = {
   addUserNotification
