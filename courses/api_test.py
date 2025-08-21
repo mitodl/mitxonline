@@ -1644,43 +1644,37 @@ def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
     mocker.patch("courses.api.unenroll_edx_course_run")
     mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
-    
+
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
     mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
     mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
     mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
-    
+
     enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
     fulfilled_order = OrderFactory.create(
-        state=OrderStatus.FULFILLED,
-        purchaser=enrollment.user
+        state=OrderStatus.FULFILLED, purchaser=enrollment.user
     )
-    
+
     PaidCourseRun.objects.create(
-        user=enrollment.user,
-        course_run=enrollment.run,
-        order=fulfilled_order
+        user=enrollment.user, course_run=enrollment.run, order=fulfilled_order
     )
-    
+
     assert PaidCourseRun.objects.filter(
-        user=enrollment.user,
-        course_run=enrollment.run
+        user=enrollment.user, course_run=enrollment.run
     ).exists()
-    
+
     result = deactivate_run_enrollment(
-        enrollment,
-        change_status=ENROLL_CHANGE_STATUS_UNENROLLED
+        enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED
     )
-    
+
     assert result == enrollment
     enrollment.refresh_from_db()
     assert enrollment.active is False
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
     assert enrollment.edx_enrolled is False
-    
+
     assert not PaidCourseRun.objects.filter(
-        user=enrollment.user,
-        course_run=enrollment.run
+        user=enrollment.user, course_run=enrollment.run
     ).exists()
 
 
@@ -1713,8 +1707,7 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
     course_run = CourseRunFactory.create(b2b_contract=contract)
     with reversion.create_revision():
         product = ProductFactory.create(
-            purchasable_object=course_run,
-            price=contract.enrollment_fixed_price
+            purchasable_object=course_run, price=contract.enrollment_fixed_price
         )
 
     user.b2b_contracts.add(contract)

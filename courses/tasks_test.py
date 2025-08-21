@@ -4,17 +4,13 @@ import pytest
 
 from courses.factories import (
     CourseRunEnrollmentFactory,
-    CourseRunFactory,
     LearnerProgramRecordShareFactory,
 )
-from courses.models import CourseRunEnrollment, PaidCourseRun
 from courses.tasks import (
     generate_course_certificates,
     send_partner_school_email,
     subscribe_edx_course_emails,
 )
-from ecommerce.factories import OrderFactory
-from ecommerce.models import OrderStatus
 
 pytestmark = pytest.mark.django_db
 

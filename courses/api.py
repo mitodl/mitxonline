@@ -319,8 +319,7 @@ def deactivate_run_enrollment(
     run_enrollment.deactivate_and_save(change_status, no_user=True)
 
     PaidCourseRun.objects.filter(
-        user=run_enrollment.user,
-        course_run=run_enrollment.run
+        user=run_enrollment.user, course_run=run_enrollment.run
     ).delete()
 
     # Find an associated Line and update HubSpot.

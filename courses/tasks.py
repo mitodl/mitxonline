@@ -11,9 +11,7 @@ from courses.models import (
     CourseRun,
     CourseRunEnrollment,
     LearnerProgramRecordShare,
-    PaidCourseRun,
 )
-from ecommerce.models import OrderStatus
 from main.celery import app
 
 log = logging.getLogger(__name__)
