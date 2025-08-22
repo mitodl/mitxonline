@@ -346,6 +346,15 @@ class User(
             pk__in=self.b2b_contracts.values_list("organization", flat=True).distinct()
         ).all()
 
+    @cached_property
+    def b2b_organization_sso_ids(self):
+        """Similar to b2b_organizations, but returns just the UUIDs."""
+        return list(
+            self.b2b_organizations.filter(
+                sso_organization_id__isnull=False
+            ).values_list("sso_organization_id", flat=True)
+        )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(Lower("email"), name="user_email_unique"),
