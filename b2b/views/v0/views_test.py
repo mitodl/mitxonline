@@ -10,12 +10,17 @@ from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework.test import APIClient
 
-from b2b.api import ensure_enrollment_codes_exist
-from b2b.constants import CONTRACT_INTEGRATION_NONSSO
+from b2b.api import create_contract_run, ensure_enrollment_codes_exist
+from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
 from b2b.factories import ContractPageFactory
 from b2b.models import DiscountContractAttachmentRedemption
 from courses.factories import CourseRunFactory
+from courses.models import CourseRunEnrollment
 from ecommerce.factories import ProductFactory
+from main.constants import (
+    USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+    USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
+)
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
@@ -216,3 +221,47 @@ def test_b2b_contract_attachment_full_contract():
     assert not DiscountContractAttachmentRedemption.objects.filter(
         contract=contract, user=user, discount=contract_code
     ).exists()
+
+
+@pytest.mark.parametrize("user_has_edx_user", [True, False])
+@pytest.mark.parametrize("has_price", [True, False])
+def test_b2b_enroll(mocker, user_has_edx_user, has_price):
+    """Make sure that hitting the enroll endpoint actually results in enrollments"""
+
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    mocker.patch("openedx.api._create_edx_user_request")
+
+    contract = ContractPageFactory.create(
+        integration_type=CONTRACT_INTEGRATION_SSO,
+        enrollment_fixed_price=100 if has_price else 0,
+    )
+    source_courserun = CourseRunFactory.create()
+
+    courserun, _ = create_contract_run(contract, source_courserun.course)
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+
+    if not user_has_edx_user:
+        user.openedx_users.all().delete()
+
+    user.save()
+    user.refresh_from_db()
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    resp = client.post(url)
+
+    if has_price:
+        assert resp.status_code == 406
+        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT
+    else:
+        assert resp.status_code == 201
+        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+        user.refresh_from_db()
+
+        assert user.edx_username
+        assert CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()

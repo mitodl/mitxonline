@@ -13,7 +13,7 @@ from rest_framework import status
 
 from b2b.factories import ContractPageFactory
 from courses.factories import CourseRunFactory, ProgramRunFactory
-from courses.models import PaidCourseRun
+from courses.models import CourseRunEnrollment, PaidCourseRun
 from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
@@ -570,6 +570,7 @@ def test_checkout_result(  # noqa: PLR0913
     Generates an order (using the API endpoint) and then cancels it using the endpoint.
     There shouldn't be any PendingOrders after that happens.
     """
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
@@ -617,6 +618,10 @@ def test_checkout_result(  # noqa: PLR0913
         ).count()
         assert paid_courserun_count == 1
 
+        # test that the user is actually enrolled
+        assert CourseRunEnrollment.objects.filter(
+            user=order.purchaser, run=course_run
+        ).exists()
     else:
         assert order.state == expected_state
 
@@ -626,6 +631,9 @@ def test_checkout_result(  # noqa: PLR0913
             order=order, course_run=course_run, user=order.purchaser
         ).count()
         assert paid_courserun_count == 0
+        assert not CourseRunEnrollment.objects.filter(
+            user=order.purchaser, run=course_run
+        ).exists()
 
     assert Basket.objects.filter(id=basket.id).exists() is basket_exists
 

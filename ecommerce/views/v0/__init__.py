@@ -785,6 +785,7 @@ class CheckoutCallbackView(View):
                 processed_order_state = api.process_cybersource_payment_response(
                     request, order
                 )
+                order.create_enrollments()
 
                 return self.post_checkout_redirect(
                     processed_order_state, order, request
@@ -829,6 +830,7 @@ class BackofficeCallbackView(APIView):
                 raise Http404
             elif order.state == OrderStatus.PENDING:
                 api.process_cybersource_payment_response(request, order)
+                order.create_enrollments()
 
             return Response(status=status.HTTP_200_OK)
 

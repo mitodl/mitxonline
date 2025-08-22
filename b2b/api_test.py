@@ -322,6 +322,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 
 @pytest.mark.parametrize("user_authenticated", [True, False])
 @pytest.mark.parametrize("user_in_contract", [True, False])
+@pytest.mark.parametrize("user_has_valid_edx_user", [True, False])
 @pytest.mark.parametrize("product_in_contract", [True, False])
 @pytest.mark.parametrize("price_is_zero", [True, False])
 @pytest.mark.parametrize("cart_has_products", [True, False])
@@ -332,6 +333,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     settings,
     user_authenticated,
     user_in_contract,
+    user_has_valid_edx_user,
     product_in_contract,
     price_is_zero,
     cart_has_products,
@@ -350,6 +352,8 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     mocker.patch("openedx.api.enroll_in_edx_course_runs")
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
     mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    if not user_has_valid_edx_user:
+        mocked_create_user = mocker.patch("openedx.api._create_edx_user_request")
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 
@@ -371,6 +375,9 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
         if user_in_contract:
             user.b2b_contracts.add(contract)
             user.save()
+
+        if not user_has_valid_edx_user:
+            user.openedx_users.all().delete()
 
         assert Basket.objects.filter(user=user).count() == 0
 
@@ -431,6 +438,9 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
         # This is the success state.
         assert result["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
         assert Basket.objects.filter(user=user).count() == 0
+
+        if not user_has_valid_edx_user:
+            mocked_create_user.assert_called()
 
         my_run_qs = CourseRunEnrollment.objects.filter(user=user, run=run, active=True)
         assert my_run_qs.count() == 1
