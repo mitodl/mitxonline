@@ -24,6 +24,7 @@ from b2b.serializers.v0 import (
 )
 from courses.models import CourseRun
 from ecommerce.models import Discount, Product
+from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 
 
@@ -86,12 +87,14 @@ class AttachContractApi(APIView):
     """View for attaching a user to a B2B contract."""
 
     permission_classes = [IsAuthenticated]
+    authentication_classes = [
+        CsrfExemptSessionAuthentication,
+    ]
 
     @extend_schema(
         request=None,
         responses=ContractPageSerializer(many=True),
     )
-    @csrf_exempt
     def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002
         """
         Use the provided enrollment code to attach the user to a B2B contract.
