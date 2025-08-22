@@ -4,18 +4,13 @@ import pytest
 
 from courses.factories import (
     CourseRunEnrollmentFactory,
-    CourseRunFactory,
     LearnerProgramRecordShareFactory,
 )
-from courses.models import CourseRunEnrollment, PaidCourseRun
 from courses.tasks import (
-    clear_unenrolled_paid_course_run,
     generate_course_certificates,
     send_partner_school_email,
     subscribe_edx_course_emails,
 )
-from ecommerce.factories import OrderFactory
-from ecommerce.models import OrderStatus
 
 pytestmark = pytest.mark.django_db
 
@@ -55,22 +50,3 @@ def test_send_partner_school_email(mocker):
     )
     send_partner_school_email.delay(record.share_uuid)
     send_partner_school_sharing_message.assert_called_once()
-
-
-def test_clear_unenrolled_paid_course_runs(user):
-    """Test generating a paid course run, then clearing the enrollment"""
-
-    course_run = CourseRunFactory.create()
-    enrollment = CourseRunEnrollment.objects.create(user=user, run=course_run)
-    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
-
-    PaidCourseRun.objects.create(user=user, course_run=course_run, order=order)
-
-    clear_unenrolled_paid_course_run(enrollment.id)
-
-    assert (
-        PaidCourseRun.objects.filter(
-            user=user, course_run=course_run, order=order
-        ).count()
-        == 0
-    )

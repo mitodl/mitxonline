@@ -1,6 +1,7 @@
 """Courses API tests"""
 
 from datetime import timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
@@ -8,12 +9,20 @@ import factory
 import pytest
 import reversion
 from django.core.exceptions import ValidationError
+from django.test import RequestFactory
 from edx_api.course_detail import CourseDetail, CourseDetails, CourseMode, CourseModes
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from reversion.models import Version
 
+from b2b.api import create_b2b_enrollment
+from b2b.constants import CONTRACT_INTEGRATION_NONSSO
+from b2b.factories import (
+    ContractPageFactory,
+    OrganizationIndexPageFactory,
+    OrganizationPageFactory,
+)
 from courses.api import (
     create_program_enrollments,
     create_run_enrollments,
@@ -57,7 +66,8 @@ from courses.models import (
     ProgramRequirementNodeType,
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import OrderStatus
+from ecommerce.models import Basket, OrderStatus
+from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.test_utils import MockHttpError
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -1625,3 +1635,113 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(user, 
     # Only the revoked sub-program certificate should exist
     assert len(ProgramCertificate.objects.filter(is_revoked=False)) == 0
     assert len(ProgramCertificate.all_objects.all()) == 1
+
+
+def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
+    """
+    Test that deactivate_run_enrollment removes PaidCourseRun records to allow B2B re-enrollment.
+    """
+    mocker.patch("courses.api.unenroll_edx_course_run")
+    mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
+
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
+    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+
+    enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+    fulfilled_order = OrderFactory.create(
+        state=OrderStatus.FULFILLED, purchaser=enrollment.user
+    )
+
+    PaidCourseRun.objects.create(
+        user=enrollment.user, course_run=enrollment.run, order=fulfilled_order
+    )
+
+    assert PaidCourseRun.objects.filter(
+        user=enrollment.user, course_run=enrollment.run
+    ).exists()
+
+    result = deactivate_run_enrollment(
+        enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED
+    )
+
+    assert result == enrollment
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+    assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+    assert enrollment.edx_enrolled is False
+
+    assert not PaidCourseRun.objects.filter(
+        user=enrollment.user, course_run=enrollment.run
+    ).exists()
+
+
+def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
+    """
+    Test that users can re-enroll in B2B courses multiple times after unenrolling.
+
+    This integration test verifies that the complete B2B enrollment workflow allows
+    for multiple unenroll/re-enroll events.
+    """
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.unenroll_edx_course_run")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
+    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+
+    org_index = OrganizationIndexPageFactory.create()
+    org = OrganizationPageFactory.create(parent=org_index)
+    contract = ContractPageFactory.create(
+        organization=org,
+        enrollment_fixed_price=Decimal("0.00"),
+        integration_type=CONTRACT_INTEGRATION_NONSSO,
+    )
+    course_run = CourseRunFactory.create(b2b_contract=contract)
+    with reversion.create_revision():
+        product = ProductFactory.create(
+            purchasable_object=course_run, price=contract.enrollment_fixed_price
+        )
+
+    user.b2b_contracts.add(contract)
+    user.save()
+
+    request = RequestFactory().post("/")
+    request.user = user
+
+    result1 = create_b2b_enrollment(request, product)
+    assert result1["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
+    assert enrollment.active is True
+
+    Basket.objects.filter(user=user).delete()
+
+    deactivate_run_enrollment(enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED)
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+
+    result2 = create_b2b_enrollment(request, product)
+    assert result2["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True
+
+    Basket.objects.filter(user=user).delete()
+
+    deactivate_run_enrollment(enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED)
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+
+    result3 = create_b2b_enrollment(request, product)
+    assert result3["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True

@@ -1401,17 +1401,6 @@ class CourseRunEnrollment(EnrollmentModel):
         program_courses = [course[0] for course in program.courses]
         return cls.objects.filter(user=user, run__course__in=program_courses)
 
-    def deactivate_and_save(self, change_status, no_user=False):  # noqa: FBT002
-        """
-        For course run enrollments, we need to clear any PaidCourseRun records
-        for this enrollment (if any) so they can re-enroll later.
-        """
-        from courses.tasks import clear_unenrolled_paid_course_run
-
-        clear_unenrolled_paid_course_run.delay(self.id)
-
-        return super().deactivate_and_save(change_status, no_user)
-
     def change_payment_to_run(self, to_run):
         """
         During a deferral process, if user has paid for this run
