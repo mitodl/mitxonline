@@ -348,6 +348,8 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
 
     mocker.patch("openedx.tasks.clone_courserun.delay")
     mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 

@@ -56,6 +56,7 @@ from openedx.exceptions import (
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
+    OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -544,11 +545,14 @@ def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
         user.openedx_users.all().delete()
         user.refresh_from_db()
 
-    enroll_results = enroll_in_edx_course_runs(user, course_runs)
+        with pytest.raises(OpenEdxUserMissingError) as e:
+            enroll_results = enroll_in_edx_course_runs(user, course_runs)
 
-    if not has_edx_username:
-        assert user.openedx_users.count() == 1
-        assert user.openedx_users.first().edx_username
+        assert e.type is OpenEdxUserMissingError
+        assert user.openedx_users.count() == 0
+        return
+
+    enroll_results = enroll_in_edx_course_runs(user, course_runs)
 
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[0].courseware_id,

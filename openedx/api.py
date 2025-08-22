@@ -44,6 +44,7 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     OpenEdXOAuth2Error,
     OpenEdxUserCreateError,
+    OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -271,27 +272,14 @@ def create_edx_user(user, edx_username=None):
         user=user, application=application, token=generate_token(), expires=expiry_date
     )
 
-    open_edx_user, _ = OpenEdxUser.objects.get_or_create(
-        user=user,
-        platform=PLATFORM_EDX,
-        defaults={
-            "edx_username": edx_username or None,
-            "desired_edx_username": edx_username or None,
-        },
-    )
+    if reconcile_edx_username(user, desired_username=edx_username):
+        user.refresh_from_db()
 
-    if open_edx_user.edx_username is None:
-        if edx_username is None:
-            edx_username = usernameify(user.name, user.email, OPENEDX_USERNAME_MAX_LEN)
-
-        edx_username = _ensure_unique_edx_username(edx_username)
-
-        open_edx_user.edx_username = edx_username
-        open_edx_user.desired_edx_username = edx_username
-        open_edx_user.save()
+    open_edx_user = user.openedx_users.first()
 
     if not open_edx_user.edx_username:
         # no username has been set so skip this
+        log.warning("create_edx_user: skipping create for %s, no edx_username", user)
         return False
 
     if open_edx_user.has_been_synced:
@@ -309,40 +297,54 @@ def create_edx_user(user, edx_username=None):
     return _create_edx_user_request(open_edx_user, user, access_token)
 
 
-def reconcile_edx_username(user):
+def reconcile_edx_username(user, *, desired_username=None):
     """
     Reconcile the user's edX username.
 
     If the user doesn't have an edX username, then we should use the user's
-    supplied username if it exists. If they don't have a username either, then
+    supplied username if it exists. If they have a desired username, then we
+    should use that, if it's OK to use. If they don't have a username either, then
     we should generate it.
 
     Args:
     - user: the user to reconcile
+    - desired_username: the username we'd like to use (optional)
     Returns:
     - boolean, true if we created a username
     """
 
-    if not user.openedx_users.filter(edx_username__isnull=False).exists():
+    if not user.openedx_users.filter(
+        platform=PLATFORM_EDX, edx_username__isnull=False
+    ).exists():
         edx_user, _ = OpenEdxUser.objects.filter(
-            edx_username__isnull=True, user=user
-        ).get_or_create(defaults={"user": user})
+            edx_username__isnull=True, platform=PLATFORM_EDX, user=user
+        ).get_or_create(
+            defaults={
+                "user": user,
+                "platform": PLATFORM_EDX,
+            }
+        )
 
         # skip the user's username if it's an email address or has a @ in it
         # @ is disallowed in edx usernames so instead force it through usernameify
-        user_username = (
-            None
-            if "@" in user.username or user.username == user.email
-            else user.username
-        )
+        if desired_username and "@" not in desired_username:
+            edx_username = desired_username
+            edx_user.edx_username = edx_username
+            edx_user.desired_edx_username = edx_username
+        else:
+            user_username = (
+                None
+                if "@" in user.username or user.username == user.email
+                else user.username
+            )
 
-        edx_username = (
-            user_username[:OPENEDX_USERNAME_MAX_LEN]
-            if user_username
-            else usernameify(user.name, user.email, OPENEDX_USERNAME_MAX_LEN)
-        )
-        edx_user.edx_username = edx_username
-        edx_user.desired_edx_username = edx_username
+            edx_username = (
+                user_username[:OPENEDX_USERNAME_MAX_LEN]
+                if user_username
+                else usernameify(user.name, user.email, OPENEDX_USERNAME_MAX_LEN)
+            )
+            edx_user.edx_username = edx_username
+            edx_user.desired_edx_username = edx_username
 
         if not OpenEdxUser.objects.filter(edx_username=edx_username).exists():
             edx_user.save()
@@ -369,9 +371,6 @@ def reconcile_edx_username(user):
                     edx_username=username_to_try
                 ).exists():
                     edx_user.edx_username = username_to_try
-                    # We're generating this so it's still the desired one
-                    # Maybe edX comes back and tells us we can't use it later
-                    edx_user.desired_edx_username = username_to_try
                     edx_user.save()
                     break
 
@@ -960,8 +959,11 @@ def enroll_in_edx_course_runs(
     """
     edx_client = get_edx_api_service_client()
 
-    if reconcile_edx_username(user):
-        user.refresh_from_db()
+    if not user.openedx_users.exists() or not user.edx_username:
+        msg = (
+            f"User {user} has no Open edX user (or no username): '{user.edx_username}'"
+        )
+        raise OpenEdxUserMissingError(msg)
 
     username = user.edx_username
 

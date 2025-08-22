@@ -1,6 +1,7 @@
 """Views for the B2B API (v0)."""
 
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
@@ -72,7 +73,8 @@ class Enroll(APIView):
             content_type=course_run_content_type, object_id=courserun.id
         ).get()
 
-        response = create_b2b_enrollment(request, product)
+        with transaction.atomic():
+            response = create_b2b_enrollment(request, product)
 
         return Response(
             CreateB2BEnrollmentSerializer(response).data,
