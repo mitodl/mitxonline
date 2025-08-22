@@ -80,8 +80,12 @@ def user(db):
 
 
 @pytest.fixture(autouse=True)
-def mock_create_run_enrollments(mocker):
-    return mocker.patch("courses.api.create_run_enrollments", autospec=True)
+def mock_create_run_enrollments(request, mocker):
+    return (
+        mocker.patch("courses.api.create_run_enrollments", autospec=True)
+        if "dont_mock_enrollments" not in request.keywords
+        else None
+    )
 
 
 def test_list_products(user_drf_client, products):
@@ -554,6 +558,7 @@ def test_start_checkout_with_discounts_and_b2b(
         ("ACCEPT", reverse("user-dashboard"), OrderStatus.FULFILLED, False),
     ],
 )
+@pytest.mark.dont_mock_enrollments
 def test_checkout_result(  # noqa: PLR0913
     settings,
     user,

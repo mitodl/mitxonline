@@ -225,11 +225,12 @@ def test_b2b_contract_attachment_full_contract():
 
 @pytest.mark.parametrize("user_has_edx_user", [True, False])
 @pytest.mark.parametrize("has_price", [True, False])
-def test_b2b_enroll(mocker, user_has_edx_user, has_price):
+def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price):
     """Make sure that hitting the enroll endpoint actually results in enrollments"""
 
     mocker.patch("openedx.tasks.clone_courserun.delay")
     mocker.patch("openedx.api._create_edx_user_request")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
 
     contract = ContractPageFactory.create(
         integration_type=CONTRACT_INTEGRATION_SSO,
