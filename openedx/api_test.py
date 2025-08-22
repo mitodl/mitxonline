@@ -1107,3 +1107,4 @@ def test_reconcile_edx_username_conflict():
     new_user.refresh_from_db()
 
     assert user.edx_username in new_user.edx_username
+    assert user.edx_username != new_user.edx_username
