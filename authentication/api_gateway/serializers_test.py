@@ -45,14 +45,13 @@ def test_register_details_serializer_create(
 
 @pytest.mark.django_db
 @responses.activate
-def test_register_no_edx_user(  # noqa: PLR0913
-    mocker, settings, user, valid_address_dict, user_profile_dict, rf
-):
+def test_register_no_edx_user(mocker, settings, register_details_test_data):
     """Test the create method of RegisterDetailsSerializer"""
 
-    request = rf.post("/api/profile/details/")
-
     user = UserFactory.create(no_openedx_user=True, no_openedx_api_auth=True)
+
+    # Create a new request with the different user
+    request = register_details_test_data["request"]
     request.user = user
 
     responses.add(
@@ -64,12 +63,8 @@ def test_register_no_edx_user(  # noqa: PLR0913
 
     patched_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
 
-    data = {
-        "name": "John Doe",
-        "username": "johndoe",
-        "legal_address": valid_address_dict,
-        "user_profile": user_profile_dict,
-    }
+    data = register_details_test_data["base_data"].copy()
+    data["username"] = "johndoe"
     assert user.openedx_user is None
 
     serializer = RegisterDetailsSerializer(data=data, context={"request": request})
@@ -131,6 +126,22 @@ def test_register_extra_details_serializer_valid_data(user):
     assert validated_data["company"] == "TechCorp"
 
 
+@pytest.fixture
+def register_details_test_data(user, valid_address_dict, user_profile_dict, rf):
+    """Fixture providing test data for RegisterDetailsSerializer tests"""
+    request = rf.post("/api/profile/details/")
+    request.user = user
+
+    return {
+        "base_data": {
+            "name": "John Doe",
+            "legal_address": valid_address_dict,
+            "user_profile": user_profile_dict,
+        },
+        "request": request,
+    }
+
+
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("username", "expected_valid"),
@@ -154,20 +165,15 @@ def test_register_extra_details_serializer_valid_data(user):
     ],
 )
 def test_register_details_serializer_username_validation(
-    user, valid_address_dict, user_profile_dict, rf, username, expected_valid
+    register_details_test_data, username, expected_valid
 ):
     """Test RegisterDetailsSerializer username validation"""
-    request = rf.post("/api/profile/details/")
-    request.user = user
+    data = register_details_test_data["base_data"].copy()
+    data["username"] = username
 
-    data = {
-        "name": "John Doe",
-        "username": username,
-        "legal_address": valid_address_dict,
-        "user_profile": user_profile_dict,
-    }
-
-    serializer = RegisterDetailsSerializer(data=data, context={"request": request})
+    serializer = RegisterDetailsSerializer(
+        data=data, context={"request": register_details_test_data["request"]}
+    )
 
     if expected_valid:
         assert serializer.is_valid(), (
