@@ -571,6 +571,9 @@ def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
     # Check if a matching hubspot object has been or can be synced
     get_hubspot_id_for_object(line)
 
+    # Apply rate limiting before making the request
+    wait_for_hubspot_rate_limit()
+
     # Create or update the line items
     result = upsert_object_request(
         content_type, HubspotObjectType.LINES.value, object_id=line.id, body=body
@@ -602,6 +605,9 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     # Check if a matching hubspot object has been or can be synced
     get_hubspot_id_for_object(order)
 
+    # Apply rate limiting before making the request
+    wait_for_hubspot_rate_limit()
+
     # Create or update the order aka deal
     result = upsert_object_request(
         content_type, HubspotObjectType.DEALS.value, object_id=order.id, body=body
@@ -632,6 +638,9 @@ def sync_product_with_hubspot(product: Product) -> SimplePublicObject:
     """
     body = make_product_sync_message_from_product(product)
     content_type = ContentType.objects.get_for_model(Product)
+
+    # Apply rate limiting before making the request
+    wait_for_hubspot_rate_limit()
 
     return upsert_object_request(
         content_type, HubspotObjectType.PRODUCTS.value, object_id=product.id, body=body
