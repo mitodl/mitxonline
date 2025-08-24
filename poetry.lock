@@ -1219,6 +1219,22 @@ oauthlib = ">=3.1.0"
 requests = ">=2.13.0"
 
 [[package]]
+name = "django-object-actions"
+version = "5.0.0"
+description = "A Django app for adding object tools for models in the admin"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "django_object_actions-5.0.0-py3-none-any.whl", hash = "sha256:1d5bce0fd38b73544130fae036d208f2811de5b0ca7ccb23486235e915015519"},
+    {file = "django_object_actions-5.0.0.tar.gz", hash = "sha256:ea455f76344316b620f815e4103c0f5151530177d35202682fc1734027bf0116"},
+]
+
+[package.extras]
+build = ["build", "twine"]
+dev = ["coverage (==7.*)", "dj-database-url (==2.*)", "django-extensions (==3.*)", "factory-boy (==3.*)", "ruff"]
+
+[[package]]
 name = "django-permissionedforms"
 version = "0.1"
 description = "Django extension for creating forms that vary according to user permissions"
@@ -5606,4 +5622,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "f7175c45a30fe89fa6a66a24014ea3666d9000dc6365697bfb4f8160ba65209c"
+content-hash = "ee62d8064039b0623f4b96a7c759a8e7cbef4c507e3074a2dc3e9dabb10e315f"

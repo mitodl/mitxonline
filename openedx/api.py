@@ -104,25 +104,19 @@ def _build_user_data(user, current_username, access_token):
     )
 
 
-def _is_valid_user_data(user_data):
-    """Return True if the user_data is valid to send to openedx"""
-    return all(
-        value
-        for key, value in user_data.items()
-        if key
-        in (
-            "username",
-            "email",
-            "name",
-        )
-    )
-
-
 def _is_duplicate_username_error(resp, data):
     """Check if the response indicates a duplicate username error."""
     return (
         resp.status_code == status.HTTP_409_CONFLICT
         and data.get("error_code") == "duplicate-username"
+    )
+
+
+def _is_validation_error(resp, data):
+    """Check if the response indicates a validation error."""
+    return (
+        resp.status_code == status.HTTP_400_BAD_REQUEST
+        and data.get("error_code") == "validation-error"
     )
 
 
@@ -155,7 +149,7 @@ def _ensure_unique_edx_username(desired_username):
     return desired_username
 
 
-def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
+def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901,PLR0915
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
 
@@ -210,13 +204,6 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
 
             user_data = _build_user_data(user, current_username, access_token)
 
-            if not _is_valid_user_data(user_data):
-                log.info(
-                    "Not creating user in openedx because their data is incomplete: %s",
-                    user.id,
-                )
-                return False
-
             resp = req_session.post(edx_url(OPENEDX_REGISTER_USER_PATH), data=user_data)
 
             if resp.status_code == status.HTTP_200_OK:
@@ -232,19 +219,24 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
             except (ValueError, requests.exceptions.JSONDecodeError):
                 data = {}
 
-            if not _is_duplicate_username_error(resp, data):
+            if _is_duplicate_username_error(resp, data):
+                suggestions, suggestions_extracted = _extract_username_suggestions(
+                    data, suggestions_extracted
+                )
+                if suggestions:
+                    suggested_usernames = suggestions
+
+                if not suggested_usernames:
+                    break
+
+                current_username = suggested_usernames.pop(0)
+            elif _is_validation_error(resp, data):
+                open_edx_user.has_sync_error = True
+                open_edx_user.sync_error_data = data
+                open_edx_user.save()
+                return False
+            else:
                 break
-
-            suggestions, suggestions_extracted = _extract_username_suggestions(
-                data, suggestions_extracted
-            )
-            if suggestions:
-                suggested_usernames = suggestions
-
-            if not suggested_usernames:
-                break
-
-            current_username = suggested_usernames.pop(0)
 
         if attempt >= max_attempts:
             log.error("Failed to create Open edX user after %d attempts.", max_attempts)

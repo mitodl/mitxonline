@@ -395,6 +395,9 @@ class UserSerializer(serializers.ModelSerializer):
                 if user_profile_serializer.is_valid(raise_exception=True):
                     user_profile_serializer.save()
 
+            # clear openedx error data to give this another chance to sync
+            instance.openedx_users.update(has_sync_error=False, sync_error_data=None)
+
             # save() will be called in super().update()
             if password is not None:
                 instance.set_password(password)
