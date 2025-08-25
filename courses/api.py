@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections import namedtuple
 from datetime import timedelta
+import re
 from traceback import format_exc
 from typing import TYPE_CHECKING
 
@@ -27,6 +28,7 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
+    COURSE_KEY_PATTERN,
 )
 from courses.models import (
     Course,
@@ -519,12 +521,30 @@ def sync_course_runs(runs):
     success_count = 0
     failure_count = 0
 
-    course_ids = [run.courseware_id for run in runs]
-    runs_by_course_id = {run.courseware_id: run for run in runs}
+    valid_course_ids = []
+    invalid_course_ids = []
+
+    for run in runs:
+        if re.match(COURSE_KEY_PATTERN, run.courseware_id):
+            valid_course_ids.append(run.courseware_id)
+        else:
+            invalid_course_ids.append(run.courseware_id)
+
+    if invalid_course_ids:
+        log.warning(
+            "Skipping invalid course keys: %s",
+            invalid_course_ids
+        )
+
+    if not valid_course_ids:
+        log.warning("No valid course keys found to sync")
+        return 0, len(runs)
+
+    runs_by_course_id = {run.courseware_id: run for run in runs if run.courseware_id in valid_course_ids}
 
     try:
         received_course_ids = set()
-        for course_detail in api_client.get_courses(course_keys=course_ids):
+        for course_detail in api_client.get_courses(course_keys=valid_course_ids):
             received_course_ids.add(course_detail.course_id)
 
             if course_detail.course_id not in runs_by_course_id:
@@ -569,7 +589,7 @@ def sync_course_runs(runs):
                 log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                 failure_count += 1
 
-        missing_course_ids = set(course_ids) - received_course_ids
+        missing_course_ids = set(valid_course_ids) - received_course_ids
         if missing_course_ids:
             log.warning(
                 "No data received for requested courses: %s",
