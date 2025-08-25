@@ -1735,7 +1735,7 @@ def test_sync_course_runs_bulk(settings, mocker, mocked_api_response, expect_suc
         courseware_id="course-v1:MITx+6.00.1x+3T2015"
     )
 
-    success_count, failure_count = sync_course_runs_bulk([course_run1, course_run2])
+    success_count, failure_count = sync_course_runs([course_run1, course_run2])
 
     if expect_success:
         course_run1.refresh_from_db()
