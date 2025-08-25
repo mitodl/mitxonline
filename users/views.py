@@ -60,6 +60,17 @@ class CurrentUserRetrieveUpdateViewSet(
             return update_result
 
 
+class UserInfoViewSet(CurrentUserRetrieveUpdateViewSet):
+    def retrieve(self, request, *args, **kwargs):
+        user = self.get_object()
+        if user.edx_username:
+            return super().retrieve(request, *args, **kwargs)
+        return Response(
+            {"get": "User has no edx_username."},
+            status=409
+        )
+
+
 class ChangeEmailRequestViewSet(
     mixins.CreateModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
 ):
