@@ -26,7 +26,7 @@ class OpenEdxUser(TimestampedModel):
         null=True, unique=True, max_length=OPENEDX_USERNAME_MAX_LEN
     )
     desired_edx_username = models.CharField(  # noqa: DJ001
-        null=True, unique=True, max_length=OPENEDX_USERNAME_MAX_LEN
+        null=True, max_length=OPENEDX_USERNAME_MAX_LEN
     )
     has_been_synced = models.BooleanField(
         default=False,

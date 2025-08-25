@@ -128,3 +128,7 @@ class EdxApiRegistrationValidationException(Exception):  # noqa: N818
             # Set some default useful error message
             msg = f"EdX API error validating registration username {self.edx_username}.\n{get_error_response_summary(self.response)}"
         super().__init__(msg)
+
+
+class OpenEdxUserMissingError(Exception):
+    """We tried to do something that requires an Open edX user, and there isn't one."""

@@ -56,6 +56,7 @@ from openedx.exceptions import (
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
+    OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -544,11 +545,14 @@ def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
         user.openedx_users.all().delete()
         user.refresh_from_db()
 
-    enroll_results = enroll_in_edx_course_runs(user, course_runs)
+        with pytest.raises(OpenEdxUserMissingError) as e:
+            enroll_results = enroll_in_edx_course_runs(user, course_runs)
 
-    if not has_edx_username:
-        assert user.openedx_users.count() == 1
-        assert user.openedx_users.first().edx_username
+        assert e.type is OpenEdxUserMissingError
+        assert user.openedx_users.count() == 0
+        return
+
+    enroll_results = enroll_in_edx_course_runs(user, course_runs)
 
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[0].courseware_id,
@@ -1079,3 +1083,32 @@ def test_reconcile_edx_username(name_is_empty):
         assert user.openedx_users.get().edx_username == _reformat_for_username(
             user.name
         )
+
+
+def test_reconcile_edx_username_conflict():
+    """Test that reconciling the username adds suffixes properly if there's a conflict"""
+
+    user = UserFactory.create(
+        username="bobjones@place.email",
+        name="Bob Jones",
+        legal_address__first_name="Bob",
+        legal_address__last_name="Jones",
+        openedx_user=None,
+    )
+    assert reconcile_edx_username(user)
+
+    user.refresh_from_db()
+
+    new_user = UserFactory.create(
+        username="bobjones@other.place.email",
+        openedx_user=None,
+        name="Bob Jones",
+        legal_address__first_name=user.legal_address.first_name,
+        legal_address__last_name=user.legal_address.last_name,
+    )
+    assert reconcile_edx_username(new_user)
+
+    new_user.refresh_from_db()
+
+    assert user.edx_username in new_user.edx_username
+    assert user.edx_username != new_user.edx_username

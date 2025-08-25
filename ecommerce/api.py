@@ -161,17 +161,21 @@ def generate_checkout_payload(request):  # noqa: PLR0911
             fulfill_completed_order(
                 order, payment_data=ZERO_PAYMENT_DATA, basket=basket
             )
-            return {
-                "no_checkout": True,
-                "response": redirect_with_user_message(
-                    reverse("user-dashboard"),
-                    {
-                        "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-                        "run": order.lines.first().purchased_object.course.title,
-                    },
-                ),
-                "order_id": order.id,
-            }
+
+        order.refresh_from_db()
+        order.create_enrollments()
+
+        return {
+            "no_checkout": True,
+            "response": redirect_with_user_message(
+                reverse("user-dashboard"),
+                {
+                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+                    "run": order.lines.first().purchased_object.course.title,
+                },
+            ),
+            "order_id": order.id,
+        }
 
     callback_uri = urljoin(settings.SITE_BASE_URL, reverse("checkout-result-callback"))
     payload = PaymentGateway.start_payment(
