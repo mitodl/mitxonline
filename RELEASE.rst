@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.127.4 (Released August 25, 2025)
+---------------
+
+- feat: customized uai un/enrollment emails (#2870)
+- Add org_key field (#2888)
+- Only call basket items api for authenticated users (#2879)
+
 Version 0.127.3 (Released August 20, 2025)
 ---------------
 
