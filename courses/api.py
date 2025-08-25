@@ -506,6 +506,28 @@ def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):  
     return run_grade, created, updated
 
 
+def _filter_valid_course_keys(runs):
+    """Filter runs to get valid course keys and create lookup dict."""
+    valid_course_ids = []
+    invalid_course_ids = []
+
+    for run in runs:
+        if re.match(COURSE_KEY_PATTERN, run.courseware_id):
+            valid_course_ids.append(run.courseware_id)
+        else:
+            invalid_course_ids.append(run.courseware_id)
+
+    if invalid_course_ids:
+        log.warning("Skipping invalid course keys: %s", invalid_course_ids)
+
+    runs_by_course_id = {
+        run.courseware_id: run for run in runs
+        if run.courseware_id in valid_course_ids
+    }
+    
+    return valid_course_ids, runs_by_course_id
+
+
 def sync_course_runs(runs):
     """
     Sync course run dates and title from Open edX using course list API
@@ -521,26 +543,11 @@ def sync_course_runs(runs):
     success_count = 0
     failure_count = 0
 
-    valid_course_ids = []
-    invalid_course_ids = []
-
-    for run in runs:
-        if re.match(COURSE_KEY_PATTERN, run.courseware_id):
-            valid_course_ids.append(run.courseware_id)
-        else:
-            invalid_course_ids.append(run.courseware_id)
-
-    if invalid_course_ids:
-        log.warning(
-            "Skipping invalid course keys: %s",
-            invalid_course_ids
-        )
+    valid_course_ids, runs_by_course_id = _filter_valid_course_keys(runs)
 
     if not valid_course_ids:
         log.warning("No valid course keys found to sync")
         return 0, len(runs)
-
-    runs_by_course_id = {run.courseware_id: run for run in runs if run.courseware_id in valid_course_ids}
 
     try:
         received_course_ids = set()
