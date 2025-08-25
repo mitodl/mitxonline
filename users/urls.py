@@ -10,6 +10,7 @@ from users.views import (
     ChangeEmailRequestViewSet,
     CountriesStatesViewSet,
     CurrentUserRetrieveUpdateViewSet,
+    UserInfoViewSet,
     UserRetrieveViewSet,
     UsersViewSet,
 )
@@ -51,6 +52,13 @@ urlpatterns = [
             {"patch": "update", "get": "retrieve"}
         ),
         name="users_api-current_user",
+    ),
+    path(
+        "api/userinfo",
+        UserInfoViewSet.as_view(
+            {"get": "retrieve"}
+        ),
+        name="userinfo_api",
     ),
     path("api/v0/", include(router.urls)),
 ]

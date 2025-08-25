@@ -26,6 +26,9 @@ def well_known_openid_configuration(request):  # noqa: ARG001
             "token_endpoint": urljoin(
                 settings.SITE_BASE_URL, reverse("oauth2_provider:token")
             ),
+            "userinfo_endpoint": urljoin(
+                settings.SITE_BASE_URL, reverse("userinfo_api")
+            ),
         },
         content_type="application/json",
     )
