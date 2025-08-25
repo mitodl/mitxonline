@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.127.4
+Version 0.127.4 (Released August 25, 2025)
 ---------------
 
 - feat: customized uai un/enrollment emails (#2870)
