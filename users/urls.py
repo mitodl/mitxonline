@@ -55,9 +55,7 @@ urlpatterns = [
     ),
     path(
         "api/userinfo",
-        UserInfoViewSet.as_view(
-            {"get": "retrieve"}
-        ),
+        UserInfoViewSet.as_view({"get": "retrieve"}),
         name="userinfo_api",
     ),
     path("api/v0/", include(router.urls)),

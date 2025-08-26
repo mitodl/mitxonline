@@ -65,10 +65,7 @@ class UserInfoViewSet(CurrentUserRetrieveUpdateViewSet):
         user = self.get_object()
         if user.edx_username:
             return super().retrieve(request, *args, **kwargs)
-        return Response(
-            {"get": "User has no edx_username."},
-            status=409
-        )
+        return Response({"get": "User has no edx_username."}, status=409)
 
 
 class ChangeEmailRequestViewSet(
