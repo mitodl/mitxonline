@@ -508,24 +508,20 @@ def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):  
 
 def _filter_valid_course_keys(runs):
     """Filter runs to get valid course keys and create lookup dict."""
-    valid_course_ids = []
+    runs_by_course_id = {}
     invalid_course_ids = []
 
     for run in runs:
         if re.match(COURSE_KEY_PATTERN, run.courseware_id):
-            valid_course_ids.append(run.courseware_id)
+            runs_by_course_id[run.courseware_id] = run
         else:
             invalid_course_ids.append(run.courseware_id)
 
     if invalid_course_ids:
         log.warning("Skipping invalid course keys: %s", invalid_course_ids)
 
-    runs_by_course_id = {
-        run.courseware_id: run for run in runs
-        if run.courseware_id in valid_course_ids
-    }
-    
-    return valid_course_ids, runs_by_course_id
+    valid_course_keys = list(runs_by_course_id.keys())
+    return valid_course_keys, runs_by_course_id
 
 
 def sync_course_runs(runs):
