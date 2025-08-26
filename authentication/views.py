@@ -21,7 +21,7 @@ def well_known_openid_configuration(request):  # noqa: ARG001
     # In dev, we need to use host.docker.internal to reach the token & userinfo endpoint
     token_base_url = settings.SITE_BASE_URL
     if settings.ENVIRONMENT == "dev":
-        token_base_url = "http://host.docker.internal:9080"
+        token_base_url = "http://host.docker.internal:9080"  # noqa: S105
 
     return Response(
         {

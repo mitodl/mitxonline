@@ -4,7 +4,7 @@ import pycountry
 from django.db import transaction
 from mitol.common.utils import now_in_utc
 from oauth2_provider.contrib.rest_framework import IsAuthenticatedOrTokenHasScope
-from rest_framework import mixins, viewsets, status
+from rest_framework import mixins, status, viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import GenericAPIView
@@ -64,6 +64,7 @@ class UserInfoViewSet(CurrentUserRetrieveUpdateViewSet):
     """
     User info viewset for the open edx OAuth, extends CurrentUserRetrieveUpdateViewSet
     """
+
     def retrieve(self, request, *args, **kwargs):
         """
         Retrieve the current user's info only if they have an edx_username, otherwise return 409
@@ -73,7 +74,9 @@ class UserInfoViewSet(CurrentUserRetrieveUpdateViewSet):
         user = self.get_object()
         if user.edx_username:
             return super().retrieve(request, *args, **kwargs)
-        return Response({"get": "User has no edx_username."}, status=status.HTTP_409_CONFLICT)
+        return Response(
+            {"get": "User has no edx_username."}, status=status.HTTP_409_CONFLICT
+        )
 
 
 class ChangeEmailRequestViewSet(
