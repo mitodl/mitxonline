@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections import namedtuple
 from datetime import timedelta
-import re
 from traceback import format_exc
 from typing import TYPE_CHECKING
 
@@ -25,10 +25,10 @@ from rest_framework.status import HTTP_404_NOT_FOUND
 
 from courses import mail_api
 from courses.constants import (
+    COURSE_KEY_PATTERN,
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
-    COURSE_KEY_PATTERN,
 )
 from courses.models import (
     Course,
@@ -553,7 +553,7 @@ def sync_course_runs(runs):
             if course_detail.course_id not in runs_by_course_id:
                 log.warning(
                     "Course detail received for unrequested course ID: %s",
-                    course_detail.course_id
+                    course_detail.course_id,
                 )
                 continue
 
@@ -599,7 +599,7 @@ def sync_course_runs(runs):
                 list(missing_course_ids),
             )
 
-    except HTTPError as e:  # noqa: PERF203
+    except HTTPError as e:
         failure_count += 1
         log.error("Bulk course list API error: %s", str(e))  # noqa: TRY400
     except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
