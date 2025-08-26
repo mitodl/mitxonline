@@ -347,6 +347,7 @@ def defer_enrollment(  # noqa: C901
 ):
     """
     Deactivates a user's existing enrollment in one course run and enrolls the user in another.
+    If the to_courseware_id is None, the user is simply unenrolled from the from_courseware_id run.
 
     Args:
         user (User): The enrolled user
@@ -364,10 +365,7 @@ def defer_enrollment(  # noqa: C901
     from_enrollment = CourseRunEnrollment.all_objects.get(
         user=user, run__courseware_id=from_courseware_id
     )
-    downgraded_enrollments = []
-    already_deferred_from = (
-        from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
-    )
+
     to_run = (
         CourseRun.objects.get(courseware_id=to_courseware_id)
         if to_courseware_id
@@ -375,14 +373,19 @@ def defer_enrollment(  # noqa: C901
     )
 
     if to_run is None:
-        downgraded_enrollments, _ = create_run_enrollments(
+        deferred_enrollments, _ = create_run_enrollments(
             user=user,
             runs=[from_enrollment.run],
             change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
-        return first_or_none(downgraded_enrollments), None
+        return first_or_none(deferred_enrollments), None
+
+    downgraded_enrollments = []
+    already_deferred_from = (
+        from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
+    )
 
     if not force and not from_enrollment.active:
         raise ValidationError(
@@ -401,6 +404,10 @@ def defer_enrollment(  # noqa: C901
         raise ValidationError(
             f"Cannot defer to a course run of a different course ('{from_enrollment.run.course.title}' -> '{to_run.course.title}'). "  # noqa: EM102
             "Set force=True to defer anyway."
+        )
+    if to_run.upgrade_deadline and to_run.upgrade_deadline < now_in_utc():
+        raise ValidationError(
+            f"Cannot defer to a course run whose upgrade deadline has passed (run: {to_run.courseware_id})."  # noqa: EM102
         )
 
     if already_deferred_from:
