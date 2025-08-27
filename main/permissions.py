@@ -28,7 +28,7 @@ class IsAdminOrReadOnly(permissions.IsAdminUser):
     Allows full access to admins, but read-only access to authenticated users.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, view):  # noqa: ARG002
         """Return True if the user is an admin, or if the user is authenticated and making a safe request."""
         if request.user and request.user.is_staff:
             return True
