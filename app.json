@@ -74,6 +74,10 @@
       "description": "The Cloundfront distribution to use for static assets",
       "required": false
     },
+    "CORS_ALLOWED_ORIGINS": {
+      "description": "Comma separated string of trusted domains that should be allowed for CORS",
+      "required": false
+    },
     "CORS_ALLOW_CREDENTIALS": {
       "description": "Allow cookies to be sent in cross-site HTTP requests",
       "required": false
@@ -108,6 +112,10 @@
     },
     "CSRF_COOKIE_DOMAIN": {
       "description": "Domain to set the CSRF cookie to.",
+      "required": false
+    },
+    "CSRF_TRUSTED_ORIGINS": {
+      "description": "Comma separated string of trusted domains that should be CSRF exempt",
       "required": false
     },
     "DISABLE_USER_REPAIR_TASK": {
