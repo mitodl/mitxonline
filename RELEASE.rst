@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.127.7
+Version 0.127.7 (Released August 27, 2025)
 ---------------
 
 - Save generated username in desired field too since locking uses this (#2906)
