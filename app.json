@@ -74,10 +74,6 @@
       "description": "The Cloundfront distribution to use for static assets",
       "required": false
     },
-    "CORS_ALLOWED_ORIGINS": {
-      "description": "Comma separated string of trusted domains that should be allowed for CORS",
-      "required": false
-    },
     "CORS_ALLOW_CREDENTIALS": {
       "description": "Allow cookies to be sent in cross-site HTTP requests",
       "required": false
@@ -114,8 +110,8 @@
       "description": "Domain to set the CSRF cookie to.",
       "required": false
     },
-    "CSRF_TRUSTED_ORIGINS": {
-      "description": "Comma separated string of trusted domains that should be CSRF exempt",
+    "DISABLE_USER_REPAIR_TASK": {
+      "description": "Disable the task so it no-ops",
       "required": false
     },
     "DJANGO_LOG_LEVEL": {
@@ -184,6 +180,10 @@
     },
     "KEYCLOAK_BASE_URL": {
       "description": "Base URL for the Keycloak instance.",
+      "required": false
+    },
+    "KEYCLOAK_CLIENT_ID": {
+      "description": "The client name for mitxonline.",
       "required": false
     },
     "KEYCLOAK_REALM_NAME": {
@@ -410,8 +410,16 @@
       "description": "The client secret for the Keycloak service",
       "required": false
     },
+    "MITOL_SCIM_KEYCLOAK_SEARCH_BATCH_SIZE": {
+      "description": "Number of operations to send in a single search request",
+      "required": false
+    },
     "MITOL_SCIM_REQUESTS_TIMEOUT_SECONDS": {
       "description": "Number of seconds to timeout requests to Keycloak",
+      "required": false
+    },
+    "MITXONLINE_DOCKER_BASE_URL": {
+      "description": "Base url for the application when accessed from inside docker containers in the format PROTOCOL://HOSTNAME[:PORT]",
       "required": false
     },
     "MITXONLINE_NEW_USER_LOGIN_URL": {
@@ -524,6 +532,18 @@
     },
     "MITX_ONLINE_USE_S3": {
       "description": "Use S3 for storage backend (required on Heroku)",
+      "required": false
+    },
+    "MIT_LEARN_DASHBOARD_URL": {
+      "description": "Dashboard URL for UAI enrollment emails",
+      "required": false
+    },
+    "MIT_LEARN_FROM_EMAIL": {
+      "description": "From email address for UAI enrollment emails",
+      "required": false
+    },
+    "MIT_LEARN_REPLY_TO_EMAIL": {
+      "description": "Reply-to email address for UAI enrollment emails (defaults to MIT_LEARN_FROM_EMAIL)",
       "required": false
     },
     "NEW_RELIC_APP_NAME": {

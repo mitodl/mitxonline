@@ -98,22 +98,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/LearnerRecord'
           description: ''
-  /api/userinfo:
-    get:
-      operationId: api_userinfo_retrieve
-      description: |-
-        Retrieve the current user's info only if they have an edx_username, otherwise return 409
-
-        This is to prevent issues with Open edX OAuth client that expect an edx_username to be present
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-          description: ''
   /api/v0/b2b/attach/{enrollment_code}/:
     post:
       operationId: b2b_attach_create
@@ -394,6 +378,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StaffDashboardUser'
+          description: ''
+  /api/v0/userinfo:
+    get:
+      operationId: userinfo_retrieve
+      description: |-
+        Retrieve the current user's info only if they have an edx_username, otherwise return 409
+
+        This is to prevent issues with Open edX OAuth client that expect an edx_username to be present
+      tags:
+      - userinfo
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
           description: ''
   /api/v0/users/{id}/:
     get:
