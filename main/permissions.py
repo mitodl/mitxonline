@@ -32,4 +32,8 @@ class IsAdminOrReadOnly(permissions.IsAdminUser):
         """Return True if the user is an admin, or if the user is authenticated and making a safe request."""
         if request.user and request.user.is_staff:
             return True
-        return request.method in permissions.SAFE_METHODS and request.user and request.user.is_authenticated
+        return (
+            request.method in permissions.SAFE_METHODS
+            and request.user
+            and request.user.is_authenticated
+        )
