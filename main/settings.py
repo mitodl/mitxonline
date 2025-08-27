@@ -86,7 +86,7 @@ SITE_BASE_URL = get_string(
 )
 MITXONLINE_DOCKER_BASE_URL = get_string(
     name="MITXONLINE_DOCKER_BASE_URL",
-    default=SITE_BASE_URL,  # noqa: S105
+    default=SITE_BASE_URL,
     description="Base url for the application when accessed from inside docker containers in the format PROTOCOL://HOSTNAME[:PORT]",
 )
 
