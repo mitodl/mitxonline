@@ -368,9 +368,11 @@ def reconcile_edx_username(user, *, desired_username=None):
                     )
 
                 if not OpenEdxUser.objects.filter(
-                    edx_username=username_to_try
+                    edx_username=username_to_try,
+                    desired_edx_username=username_to_try,
                 ).exists():
                     edx_user.edx_username = username_to_try
+                    edx_user.desired_edx_username = username_to_try
                     edx_user.save()
                     break
 
