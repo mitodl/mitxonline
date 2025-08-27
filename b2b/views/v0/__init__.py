@@ -6,7 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status, viewsets
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
@@ -26,6 +26,7 @@ from courses.models import CourseRun
 from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+from main.permissions import IsAdminOrReadOnly
 
 
 class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -35,7 +36,7 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = OrganizationPage.objects.all()
     serializer_class = OrganizationPageSerializer
-    permission_classes = [IsAdminUser | HasAPIKey]
+    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "organization_slug"
 
@@ -47,7 +48,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = ContractPage.objects.all()
     serializer_class = ContractPageSerializer
-    permission_classes = [IsAdminUser | HasAPIKey]
+    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "contract_slug"
 
