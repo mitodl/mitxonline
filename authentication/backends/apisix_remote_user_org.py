@@ -39,12 +39,7 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
                 for org in apisix_header["organization"]
             ]
 
-        created, updated = reconcile_user_orgs(user, org_uuids)
-        log.info(
-            "ApisixRemoteUserOrgBackend: user %s: created %s contract assocs, removed %s",
-            user,
-            created,
-            updated,
-        )
+        # Task should check to see if it needs to run or not
+        reconcile_user_orgs(user, org_uuids)
 
         return user

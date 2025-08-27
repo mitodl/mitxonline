@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections import namedtuple
 from datetime import timedelta
 from traceback import format_exc
@@ -24,6 +25,7 @@ from rest_framework.status import HTTP_404_NOT_FOUND
 
 from courses import mail_api
 from courses.constants import (
+    COURSE_KEY_PATTERN,
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
     PROGRAM_TEXT_ID_PREFIX,
@@ -50,7 +52,7 @@ from courses.utils import (
 from ecommerce.models import OrderStatus
 from openedx.api import (
     enroll_in_edx_course_runs,
-    get_edx_api_course_detail_client,
+    get_edx_api_course_list_client,
     get_edx_api_course_mode_client,
     get_edx_grades_with_users,
     unenroll_edx_course_run,
@@ -318,6 +320,10 @@ def deactivate_run_enrollment(
         run_enrollment.edx_emails_subscription = False
     run_enrollment.deactivate_and_save(change_status, no_user=True)
 
+    PaidCourseRun.objects.filter(
+        user=run_enrollment.user, course_run=run_enrollment.run
+    ).delete()
+
     # Find an associated Line and update HubSpot.
     content_type = ContentType.objects.get(app_label="courses", model="courserun")
     line = Line.objects.filter(
@@ -341,6 +347,7 @@ def defer_enrollment(  # noqa: C901
 ):
     """
     Deactivates a user's existing enrollment in one course run and enrolls the user in another.
+    If the to_courseware_id is None, the user is simply unenrolled from the from_courseware_id run.
 
     Args:
         user (User): The enrolled user
@@ -358,10 +365,7 @@ def defer_enrollment(  # noqa: C901
     from_enrollment = CourseRunEnrollment.all_objects.get(
         user=user, run__courseware_id=from_courseware_id
     )
-    downgraded_enrollments = []
-    already_deferred_from = (
-        from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
-    )
+
     to_run = (
         CourseRun.objects.get(courseware_id=to_courseware_id)
         if to_courseware_id
@@ -369,14 +373,19 @@ def defer_enrollment(  # noqa: C901
     )
 
     if to_run is None:
-        downgraded_enrollments, _ = create_run_enrollments(
+        deferred_enrollments, _ = create_run_enrollments(
             user=user,
             runs=[from_enrollment.run],
             change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
-        return first_or_none(downgraded_enrollments), None
+        return first_or_none(deferred_enrollments), None
+
+    downgraded_enrollments = []
+    already_deferred_from = (
+        from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
+    )
 
     if not force and not from_enrollment.active:
         raise ValidationError(
@@ -395,6 +404,10 @@ def defer_enrollment(  # noqa: C901
         raise ValidationError(
             f"Cannot defer to a course run of a different course ('{from_enrollment.run.course.title}' -> '{to_run.course.title}'). "  # noqa: EM102
             "Set force=True to defer anyway."
+        )
+    if to_run.upgrade_deadline and to_run.upgrade_deadline < now_in_utc():
+        raise ValidationError(
+            f"Cannot defer to a course run whose upgrade deadline has passed (run: {to_run.courseware_id})."  # noqa: EM102
         )
 
     if already_deferred_from:
@@ -500,71 +513,108 @@ def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):  
     return run_grade, created, updated
 
 
+def _filter_valid_course_keys(runs):
+    """Filter runs to get valid course keys and create lookup dict."""
+    runs_by_course_id = {}
+    invalid_course_ids = []
+
+    for run in runs:
+        if re.match(COURSE_KEY_PATTERN, run.courseware_id):
+            runs_by_course_id[run.courseware_id] = run
+        else:
+            invalid_course_ids.append(run.courseware_id)
+
+    if invalid_course_ids:
+        log.warning("Skipping invalid course keys: %s", invalid_course_ids)
+
+    valid_course_keys = list(runs_by_course_id.keys())
+    return valid_course_keys, runs_by_course_id
+
+
 def sync_course_runs(runs):
     """
-    Sync course run dates and title from Open edX
+    Sync course run dates and title from Open edX using course list API
 
     Args:
         runs ([CourseRun]): list of CourseRun objects.
 
     Returns:
-        [str], [str]: Lists of success and error logs respectively
+        tuple: (success_count, failure_count) - counts of successful and failed syncs
     """
-    api_client = get_edx_api_course_detail_client()
+    api_client = get_edx_api_course_list_client()
 
     success_count = 0
     failure_count = 0
 
-    # Iterate all eligible runs and sync if possible
-    for run in runs:
-        try:
-            course_detail = api_client.get_detail(
-                course_id=run.courseware_id,
-                username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
-            )
-        except HTTPError as e:  # noqa: PERF203
-            failure_count += 1
-            if e.response.status_code == HTTP_404_NOT_FOUND:
-                log.error(  # noqa: TRY400
-                    "Course not found on edX for readable id: %s", run.courseware_id
-                )
-            else:
-                log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
-        except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
-            failure_count += 1
-            log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
-        else:
-            # Reset the expiration_date so it is calculated automatically and
-            # does not raise a validation error now that the start or end date
-            # has changed.
-            if (
-                run.start_date != course_detail.start
-                or run.end_date != course_detail.end
-            ):
-                run.expiration_date = None
+    valid_course_ids, runs_by_course_id = _filter_valid_course_keys(runs)
 
-            run.title = course_detail.name
-            run.start_date = course_detail.start
-            run.end_date = course_detail.end
-            run.enrollment_start = course_detail.enrollment_start
-            run.enrollment_end = course_detail.enrollment_end
-            run.is_self_paced = course_detail.is_self_paced()
-            # Only sync the date if it's set in edX, Otherwise set it to course's end date
-            if course_detail.certificate_available_date:
-                run.certificate_available_date = (
-                    course_detail.certificate_available_date
+    if not valid_course_ids:
+        log.warning("No valid course keys found to sync")
+        return 0, len(runs)
+
+    try:
+        received_course_ids = set()
+        for course_detail in api_client.get_courses(
+            course_keys=valid_course_ids,
+            username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
+        ):
+            received_course_ids.add(course_detail.course_id)
+
+            if course_detail.course_id not in runs_by_course_id:
+                log.warning(
+                    "Course detail received for unrequested course ID: %s",
+                    course_detail.course_id,
                 )
-            else:
-                run.certificate_available_date = course_detail.end
+                continue
+
+            run = runs_by_course_id[course_detail.course_id]
 
             try:
+                # Reset the expiration_date so it is calculated automatically and
+                # does not raise a validation error now that the start or end date
+                # has changed.
+                if (
+                    run.start_date != course_detail.start
+                    or run.end_date != course_detail.end
+                ):
+                    run.expiration_date = None
+
+                run.title = course_detail.name
+                run.start_date = course_detail.start
+                run.end_date = course_detail.end
+                run.enrollment_start = course_detail.enrollment_start
+                run.enrollment_end = course_detail.enrollment_end
+                run.is_self_paced = course_detail.is_self_paced()
+                # Only sync the date if it's set in edX, Otherwise set it to course's end date
+                if course_detail.certificate_available_date:
+                    run.certificate_available_date = (
+                        course_detail.certificate_available_date
+                    )
+                else:
+                    run.certificate_available_date = course_detail.end
+
                 run.save()
                 success_count += 1
                 log.info("Updated course run: %s", run.courseware_id)
+
             except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
                 # Report any validation or otherwise model errors
                 log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                 failure_count += 1
+
+        missing_course_ids = set(valid_course_ids) - received_course_ids
+        if missing_course_ids:
+            log.warning(
+                "No data received for requested courses: %s",
+                list(missing_course_ids),
+            )
+
+    except HTTPError as e:
+        failure_count += 1
+        log.error("Bulk course list API error: %s", str(e))  # noqa: TRY400
+    except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
+        failure_count += 1
+        log.error("Unexpected error in bulk sync: %s", str(e))  # noqa: TRY400
 
     return success_count, failure_count
 

@@ -45,6 +45,9 @@ class Command(BaseCommand):
     For blocking user(s) use --block option:\n
     `./manage.py retire_users --user=foo@email.com --block` or do \n
     `./manage.py retire_users -u foo@email.com -b` \n or do \n
+
+    For retiring a user who doesn't have an edX account, use the `--no-edx` option to retire user anyway:\n
+    ./manage.py retire_users --user=foo@email.com --no-edx \n
     """
 
     def create_parser(self, prog_name, subcommand):  # pylint: disable=arguments-differ
@@ -76,6 +79,14 @@ class Command(BaseCommand):
             help="If provided, user's email will be hashed and added to the blocklist",
         )
 
+        parser.add_argument(
+            "-e",
+            "--no-edx",
+            action="store_true",
+            dest="no_edx",
+            help="If provided, user will be retired even if they do not have an edX account",
+        )
+
     def get_retired_email(self, email):
         """Convert user email to retired email format."""
         return user_util.get_retired_email(email, RETIRED_USER_SALTS, RETIRED_EMAIL_FMT)
@@ -83,6 +94,7 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):  # noqa: ARG002
         users = kwargs.get("users", [])
         block_users = kwargs.get("block_users")
+        no_edx = kwargs.get("no_edx", False)
 
         if not users:
             self.stderr.write(
@@ -103,21 +115,21 @@ class Command(BaseCommand):
                     )
                 )
                 continue
-
-            resp = bulk_retire_edx_users(user.edx_username)
-            if user.edx_username not in resp["successful_user_retirements"]:
-                self.stderr.write(
-                    self.style.ERROR(
-                        f"Could not initiate retirement request on edX for user {user}"
+            if not no_edx:
+                resp = bulk_retire_edx_users(user.edx_username)
+                if user.edx_username not in resp["successful_user_retirements"]:
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"Could not initiate retirement request on edX for user {user}"
+                        )
                     )
-                )
-                continue
-            else:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Retirement request initiated on edX for User: '{user}'"
+                    continue
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Retirement request initiated on edX for User: '{user}'"
+                        )
                     )
-                )
 
             user.is_active = False
 

@@ -583,17 +583,6 @@ class OrderFlow:
                 order=self.order, course_run=run, user=self.order.purchaser
             )
 
-    def create_enrollments(self):
-        # create enrollments for what the learner has paid for
-        from courses.api import create_run_enrollments
-
-        create_run_enrollments(
-            self.order.purchaser,
-            self.order.purchased_runs,
-            mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            keep_failed_enrollments=True,
-        )
-
     @state.transition(
         source=OrderStatus.PENDING,
         target=OrderStatus.FULFILLED,
@@ -601,11 +590,6 @@ class OrderFlow:
     def fulfill(self, payment_data, already_enrolled=False):  # noqa: FBT002
         # record the transaction
         self.create_transaction(payment_data)
-
-        # if user already enrolled from management command it'll not recreate
-        if not already_enrolled:
-            # create enrollments for what the learner has paid for
-            self.create_enrollments()
 
         # record all the courseruns in the order
         self.create_paid_courseruns()
@@ -682,6 +666,21 @@ class Order(TimestampedModel):
 
     def send_ecommerce_order_receipt(self):
         send_ecommerce_order_receipt.delay(self.id)
+
+    def create_enrollments(self):
+        """Enroll the user appropriately after the transaction has completed."""
+
+        from courses.api import create_run_enrollments
+
+        if not self.is_fulfilled:
+            return
+
+        create_run_enrollments(
+            self.purchaser,
+            self.purchased_runs,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            keep_failed_enrollments=True,
+        )
 
 
 class PendingOrder(Order):

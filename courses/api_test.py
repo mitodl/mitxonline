@@ -1,6 +1,7 @@
 """Courses API tests"""
 
 from datetime import timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
@@ -8,12 +9,20 @@ import factory
 import pytest
 import reversion
 from django.core.exceptions import ValidationError
-from edx_api.course_detail import CourseDetail, CourseDetails, CourseMode, CourseModes
+from django.test import RequestFactory
+from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from reversion.models import Version
 
+from b2b.api import create_b2b_enrollment
+from b2b.constants import CONTRACT_INTEGRATION_NONSSO
+from b2b.factories import (
+    ContractPageFactory,
+    OrganizationIndexPageFactory,
+    OrganizationPageFactory,
+)
 from courses.api import (
     create_program_enrollments,
     create_run_enrollments,
@@ -57,7 +66,8 @@ from courses.models import (
     ProgramRequirementNodeType,
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import OrderStatus
+from ecommerce.models import Basket, OrderStatus
+from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.test_utils import MockHttpError
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -708,44 +718,45 @@ def test_defer_enrollment_validation(mocker, user):
     "mocked_api_response, expect_success",  # noqa: PT006
     [
         [  # noqa: PT007
-            CourseDetail(
-                {
-                    "id": "course-v1:edX+DemoX+2020_T1",
-                    "start": "2019-01-01T00:00:00Z",
-                    "end": "2020-02-01T00:00:00Z",
-                    "enrollment_start": "2019-01-01T00:00:00Z",
-                    "enrollment_end": "2020-02-01T00:00:00Z",
-                    "name": "Demonstration Course",
-                    "pacing": "self",
-                }
-            ),
+            [
+                CourseDetail(
+                    {
+                        "id": "course-v1:edX+DemoX+2020_T1",
+                        "start": "2019-01-01T00:00:00Z",
+                        "end": "2020-02-01T00:00:00Z",
+                        "enrollment_start": "2019-01-01T00:00:00Z",
+                        "enrollment_end": "2020-02-01T00:00:00Z",
+                        "name": "Demonstration Course",
+                        "pacing": "self",
+                    }
+                ),
+                CourseDetail(
+                    {
+                        "id": "course-v1:MITx+6.00.1x+3T2015",
+                        "start": "2015-09-15T05:00:00Z",
+                        "end": "2015-12-31T05:00:00Z",
+                        "enrollment_start": "2015-09-01T00:00:00Z",
+                        "enrollment_end": None,
+                        "name": "Introduction to Computer Science",
+                        "pacing": "instructor",
+                    }
+                ),
+            ],
             True,
         ],
         [  # noqa: PT007
-            CourseDetail(
-                {
-                    "id": "course-v1:edX+DemoX+2020_T1",
-                    "start": "2019-01-01T00:00:00Z",
-                    "end": "2020-02-01T00:00:00Z",
-                    "enrollment_start": "2019-01-01T00:00:00Z",
-                    "enrollment_end": "2020-02-01T00:00:00Z",
-                    "name": "Demonstration Course",
-                    "pacing": "instructor",
-                }
-            ),
-            True,
-        ],
-        [  # noqa: PT007
-            CourseDetail(
-                {
-                    "id": "course-v1:edX+DemoX+2020_T1",
-                    "start": "2021-01-01T00:00:00Z",
-                    "end": "2020-02-01T00:00:00Z",
-                    "enrollment_start": None,
-                    "enrollment_end": None,
-                    "name": None,
-                }
-            ),
+            [
+                CourseDetail(
+                    {
+                        "id": "course-v1:edX+DemoX+2020_T1",
+                        "start": "2021-01-01T00:00:00Z",
+                        "end": "2020-02-01T00:00:00Z",
+                        "enrollment_start": None,
+                        "enrollment_end": None,
+                        "name": None,
+                    }
+                )
+            ],
             False,
         ],
         [HTTPError(response=Mock(status_code=404)), False],  # noqa: PT007
@@ -755,25 +766,44 @@ def test_defer_enrollment_validation(mocker, user):
 )
 def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success):
     """
-    Test that sync_course_runs fetches data from edX API. Should fail on API responding with
-    an error, as well as trying to set the course run title to None
+    Test that sync_course_runs fetches data from edX course list API.
+    Should fail on API responding with an error, as well as trying to set
+    the course run title to None
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
-    mocker.patch.object(CourseDetails, "get_detail", side_effect=[mocked_api_response])
-    course_run = CourseRunFactory.create()
 
-    success_count, failure_count = sync_course_runs([course_run])
+    mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
+    mock_client = mock_course_list.return_value
+
+    if isinstance(mocked_api_response, list):
+        mock_client.get_courses.return_value = mocked_api_response
+    else:
+        mock_client.get_courses.side_effect = mocked_api_response
+
+    course_run1 = CourseRunFactory.create(courseware_id="course-v1:edX+DemoX+2020_T1")
+    course_run2 = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+
+    success_count, failure_count = sync_course_runs([course_run1, course_run2])
 
     if expect_success:
-        course_run.refresh_from_db()
-        assert success_count == 1
+        course_run1.refresh_from_db()
+        course_run2.refresh_from_db()
+        assert success_count == 2
         assert failure_count == 0
-        assert course_run.title == mocked_api_response.name
-        assert course_run.start_date == mocked_api_response.start
-        assert course_run.end_date == mocked_api_response.end
-        assert course_run.enrollment_start == mocked_api_response.enrollment_start
-        assert course_run.enrollment_end == mocked_api_response.enrollment_end
-        assert course_run.is_self_paced == mocked_api_response.is_self_paced()
+
+        assert course_run1.title == mocked_api_response[0].name
+        assert course_run1.start_date == mocked_api_response[0].start
+        assert course_run1.end_date == mocked_api_response[0].end
+        assert course_run1.enrollment_start == mocked_api_response[0].enrollment_start
+        assert course_run1.enrollment_end == mocked_api_response[0].enrollment_end
+        assert course_run1.is_self_paced == mocked_api_response[0].is_self_paced()
+
+        assert course_run2.title == mocked_api_response[1].name
+        assert course_run2.start_date == mocked_api_response[1].start
+        assert course_run2.end_date == mocked_api_response[1].end
+        assert course_run2.enrollment_start == mocked_api_response[1].enrollment_start
+        assert course_run2.enrollment_end == mocked_api_response[1].enrollment_end
+        assert course_run2.is_self_paced == mocked_api_response[1].is_self_paced()
     else:
         assert success_count == 0
         assert failure_count == 1
@@ -1625,3 +1655,208 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(user, 
     # Only the revoked sub-program certificate should exist
     assert len(ProgramCertificate.objects.filter(is_revoked=False)) == 0
     assert len(ProgramCertificate.all_objects.all()) == 1
+
+
+@pytest.mark.parametrize(
+    "mocked_api_response, expect_success",  # noqa: PT006
+    [
+        [  # noqa: PT007
+            [
+                CourseDetail(
+                    {
+                        "id": "course-v1:edX+DemoX+2020_T1",
+                        "start": "2019-01-01T00:00:00Z",
+                        "end": "2020-02-01T00:00:00Z",
+                        "enrollment_start": "2019-01-01T00:00:00Z",
+                        "enrollment_end": "2020-02-01T00:00:00Z",
+                        "name": "Demonstration Course",
+                        "pacing": "self",
+                    }
+                ),
+                CourseDetail(
+                    {
+                        "id": "course-v1:MITx+6.00.1x+3T2015",
+                        "start": "2015-09-15T05:00:00Z",
+                        "end": "2015-12-31T05:00:00Z",
+                        "enrollment_start": "2015-09-01T00:00:00Z",
+                        "enrollment_end": None,
+                        "name": "Introduction to Computer Science",
+                        "pacing": "instructor",
+                    }
+                ),
+            ],
+            True,
+        ],
+        [  # noqa: PT007
+            [
+                CourseDetail(
+                    {
+                        "id": "course-v1:edX+DemoX+2020_T1",
+                        "start": "2021-01-01T00:00:00Z",
+                        "end": "2020-02-01T00:00:00Z",
+                        "enrollment_start": None,
+                        "enrollment_end": None,
+                        "name": None,
+                    }
+                )
+            ],
+            False,
+        ],
+        [HTTPError(response=Mock(status_code=404)), False],  # noqa: PT007
+        [HTTPError(response=Mock(status_code=400)), False],  # noqa: PT007
+        [ConnectionError(), False],  # noqa: PT007
+    ],
+)
+def test_sync_course_runs_bulk(settings, mocker, mocked_api_response, expect_success):
+    """
+    Test that sync_course_runs_bulk fetches data from edX course list API.
+    Should fail on API responding with an error, as well as trying to set
+    the course run title to None
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
+    mock_client = mock_course_list.return_value
+
+    if isinstance(mocked_api_response, list):
+        mock_client.get_courses.return_value = mocked_api_response
+    else:
+        mock_client.get_courses.side_effect = mocked_api_response
+
+    course_run1 = CourseRunFactory.create(courseware_id="course-v1:edX+DemoX+2020_T1")
+    course_run2 = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+3T2015")
+
+    success_count, failure_count = sync_course_runs([course_run1, course_run2])
+
+    if expect_success:
+        course_run1.refresh_from_db()
+        course_run2.refresh_from_db()
+        assert success_count == 2
+        assert failure_count == 0
+
+        assert course_run1.title == mocked_api_response[0].name
+        assert course_run1.start_date == mocked_api_response[0].start
+        assert course_run1.end_date == mocked_api_response[0].end
+        assert course_run1.enrollment_start == mocked_api_response[0].enrollment_start
+        assert course_run1.enrollment_end == mocked_api_response[0].enrollment_end
+        assert course_run1.is_self_paced == mocked_api_response[0].is_self_paced()
+
+        assert course_run2.title == mocked_api_response[1].name
+        assert course_run2.start_date == mocked_api_response[1].start
+        assert course_run2.end_date == mocked_api_response[1].end
+        assert course_run2.enrollment_start == mocked_api_response[1].enrollment_start
+        assert course_run2.enrollment_end == mocked_api_response[1].enrollment_end
+        assert course_run2.is_self_paced == mocked_api_response[1].is_self_paced()
+    else:
+        assert success_count == 0
+        assert failure_count == 1
+
+
+def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
+    """
+    Test that deactivate_run_enrollment removes PaidCourseRun records to allow B2B re-enrollment.
+    """
+    mocker.patch("courses.api.unenroll_edx_course_run")
+    mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
+
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
+    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+
+    enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+    fulfilled_order = OrderFactory.create(
+        state=OrderStatus.FULFILLED, purchaser=enrollment.user
+    )
+
+    PaidCourseRun.objects.create(
+        user=enrollment.user, course_run=enrollment.run, order=fulfilled_order
+    )
+
+    assert PaidCourseRun.objects.filter(
+        user=enrollment.user, course_run=enrollment.run
+    ).exists()
+
+    result = deactivate_run_enrollment(
+        enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED
+    )
+
+    assert result == enrollment
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+    assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+    assert enrollment.edx_enrolled is False
+
+    assert not PaidCourseRun.objects.filter(
+        user=enrollment.user, course_run=enrollment.run
+    ).exists()
+
+
+def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
+    """
+    Test that users can re-enroll in B2B courses multiple times after unenrolling.
+
+    This integration test verifies that the complete B2B enrollment workflow allows
+    for multiple unenroll/re-enroll events.
+    """
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.unenroll_edx_course_run")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
+    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+
+    org_index = OrganizationIndexPageFactory.create()
+    org = OrganizationPageFactory.create(parent=org_index)
+    contract = ContractPageFactory.create(
+        organization=org,
+        enrollment_fixed_price=Decimal("0.00"),
+        integration_type=CONTRACT_INTEGRATION_NONSSO,
+    )
+    course_run = CourseRunFactory.create(b2b_contract=contract)
+    with reversion.create_revision():
+        product = ProductFactory.create(
+            purchasable_object=course_run, price=contract.enrollment_fixed_price
+        )
+
+    user.b2b_contracts.add(contract)
+    user.save()
+
+    request = RequestFactory().post("/")
+    request.user = user
+
+    result1 = create_b2b_enrollment(request, product)
+    assert result1["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
+    assert enrollment.active is True
+
+    Basket.objects.filter(user=user).delete()
+
+    deactivate_run_enrollment(enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED)
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+
+    result2 = create_b2b_enrollment(request, product)
+    assert result2["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True
+
+    Basket.objects.filter(user=user).delete()
+
+    deactivate_run_enrollment(enrollment, change_status=ENROLL_CHANGE_STATUS_UNENROLLED)
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+
+    result3 = create_b2b_enrollment(request, product)
+    assert result3["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True
