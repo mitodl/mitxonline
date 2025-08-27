@@ -144,9 +144,18 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
         }
 
 
-@pytest.mark.parametrize("is_anonymous", [True, False])
-@pytest.mark.parametrize("has_openedx_user", [True, False])
-def test_get_userinfo(mocker, client, user, is_anonymous, has_openedx_user):
+@pytest.mark.parametrize(
+    ("is_anonymous", "has_openedx_user", "has_edx_username"),
+    [
+        (True, True, True),
+        (True, True, False),
+        (True, False, False),
+        (False, True, True),
+        (False, True, False),
+        (False, False, False),
+    ],
+)
+def test_get_userinfo(client, user, is_anonymous, has_openedx_user, has_edx_username):
     """Tests userinfo endpoint when user is anonymous, has no edx_username, or is valid"""
     b2b_orgs = []
 
@@ -156,15 +165,20 @@ def test_get_userinfo(mocker, client, user, is_anonymous, has_openedx_user):
     if not has_openedx_user:
         user.openedx_users.all().delete()
 
+    if has_openedx_user and not has_edx_username:
+        openedx_user = user.openedx_users.first()
+        openedx_user.edx_username = None
+        openedx_user.save()
+
     resp = client.get(reverse("userinfo_api"))
 
-    if is_anonymous or not has_openedx_user:
+    if is_anonymous or not has_openedx_user or not has_edx_username:
         assert resp.status_code == status.HTTP_409_CONFLICT
     else:
         assert resp.status_code == status.HTTP_200_OK
 
-    if is_anonymous or not has_openedx_user:
-        assert resp.json() == {"get": "User has no edx_username."}
+    if is_anonymous or not has_openedx_user or not has_edx_username:
+        assert resp.json() == {"error": "User has no edx_username."}
     else:
         assert resp.json() == {
             "id": user.id,

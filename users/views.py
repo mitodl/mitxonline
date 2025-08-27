@@ -75,7 +75,7 @@ class UserInfoViewSet(CurrentUserRetrieveUpdateViewSet):
         if user.is_authenticated and user.edx_username:
             return super().retrieve(request, *args, **kwargs)
         return Response(
-            {"get": "User has no edx_username."}, status=status.HTTP_409_CONFLICT
+            {"error": "User has no edx_username."}, status=status.HTTP_409_CONFLICT
         )
 
 

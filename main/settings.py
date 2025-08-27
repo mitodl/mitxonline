@@ -84,6 +84,11 @@ SITE_BASE_URL = get_string(
     description="Base url for the application in the format PROTOCOL://HOSTNAME[:PORT]",
     required=True,
 )
+MITXONLINE_DOCKER_BASE_URL = get_string(
+    name="MITXONLINE_DOCKER_BASE_URL",
+    default=SITE_BASE_URL,  # noqa: S105
+    description="Base url for the application when accessed from inside docker containers in the format PROTOCOL://HOSTNAME[:PORT]",
+)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = get_string(
