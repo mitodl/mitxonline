@@ -554,7 +554,10 @@ def sync_course_runs(runs):
 
     try:
         received_course_ids = set()
-        for course_detail in api_client.get_courses(course_keys=valid_course_ids):
+        for course_detail in api_client.get_courses(
+            course_keys=valid_course_ids,
+            username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
+        ):
             received_course_ids.add(course_detail.course_id)
 
             if course_detail.course_id not in runs_by_course_id:
