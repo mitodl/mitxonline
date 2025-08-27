@@ -1,6 +1,23 @@
 Release Notes
 =============
 
+Version 0.128.0
+---------------
+
+- Save generated username in desired field too since locking uses this (#2906)
+- fix: pass service worker for course sync (#2901)
+- Add an IsAdminOrReadOnly permission set for contracts/orgs (#2903)
+- Fixes for username generation and B2B enrollment processing (#2893)
+- Revert "Update hypothesis to 4.57.1"
+- Update hypothesis to 4.57.1
+- Show error if upgrade deadline passed (#2898)
+- feat: use courselist for course sync (#2896)
+- Add option to retire user with no edx account (#2891)
+- Actually make the contract attach API not require CSRF (#2895)
+- Add rate limiting for all Hubspot sync functions (#2894)
+- Re enrollment issue (#2892)
+- Only reconcile B2B organizations if we need to (#2889)
+
 Version 0.127.4 (Released August 25, 2025)
 ---------------
 
