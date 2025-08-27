@@ -6,7 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status, viewsets
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
