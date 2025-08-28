@@ -147,6 +147,11 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
     class Meta:
         ordering = ["id"]
+        indexes = [
+            models.Index(fields=['live', 'id']),
+            models.Index(fields=['readable_id']),
+            models.Index(fields=['start_date', 'end_date']),
+        ]
 
     objects = ProgramQuerySet.as_manager()
     title = models.CharField(max_length=255)
@@ -391,16 +396,12 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         requirements tree.
         """
 
-        course_ids = [  # noqa: C416
-            course_id
-            for course_id in ProgramRequirement.objects.filter(
-                program=self, node_type=ProgramRequirementNodeType.COURSE
-            )
-            .all()
-            .values_list("course__id", flat=True)
-        ]
-
-        return Course.objects.filter(id__in=course_ids)
+        return Course.objects.filter(
+            in_programs__program=self
+        ).distinct().prefetch_related(
+            'courseruns',
+            'departments'
+        )
 
     @property
     def courses(self):
@@ -1786,6 +1787,7 @@ class ProgramRequirement(MP_Node):
             models.Index(fields=("course", "program")),
             models.Index(fields=("program", "required_program")),
             models.Index(fields=("required_program", "program")),
+            models.Index(fields=("program", "node_type", "depth")),
         ]
 
 

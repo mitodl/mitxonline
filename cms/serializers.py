@@ -73,53 +73,109 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     instructors = serializers.SerializerMethodField()
     current_price = serializers.SerializerMethodField()
 
+    def _get_financial_assistance_url(self, page, slug):
+        """Helper method to construct financial assistance URL"""
+        return f"{page.get_url()}{slug}/" if page and slug else ""
+
     @extend_schema_field(serializers.URLField)
     def get_financial_assistance_form_url(self, instance):
         """
         Returns URL of the Financial Assistance Form.
+        Optimized version with reduced database queries.
         """
-        financial_assistance_page = None
-        if instance.product.programs:
-            valid_program_objs = [program for program in instance.product.programs]  # noqa: C416
-            valid_related_programs = []
-
-            for valid_program in valid_program_objs:
-                for valid_related_program in valid_program.related_programs:
-                    valid_related_programs.append(valid_related_program)  # noqa: PERF402
-
-            valid_program_objs.extend(valid_related_programs)
-
-            program_page = ProgramPage.objects.filter(
-                program_id__in=[program.id for program in valid_program_objs]
+        # Early return if no programs
+        if not instance.product.programs:
+            # Check for course-specific form first
+            financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
+                selected_course=instance.product
             ).first()
-
-            # for courses in program, financial assistance form from program should take precedence if exist
-            if program_page:
+            
+            if financial_assistance_page is None:
+                # Check for child form
                 financial_assistance_page = (
-                    program_page.get_children()
+                    instance.get_children()
                     .type(FlexiblePricingRequestForm)
                     .live()
                     .first()
                 )
-                if financial_assistance_page:
-                    return f"{program_page.get_url()}{financial_assistance_page.slug}/"
+            
+            return (
+                self._get_financial_assistance_url(instance, financial_assistance_page.slug)
+                if financial_assistance_page
+                else ""
+            )
 
-            financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
-                selected_program__in=valid_program_objs
-            ).first()
+        # Build list of all valid program IDs efficiently
+        program_ids = [program.id for program in instance.product.programs]
+        
+        # Collect related program IDs using list comprehension
+        related_program_ids = [
+            related_program.id
+            for program in instance.product.programs
+            for related_program in program.related_programs
+        ]
+        
+        all_program_ids = program_ids + related_program_ids
 
-        if financial_assistance_page is None:
-            financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
-                selected_course=instance.product
-            ).first()
+        # Single query to find program page with children prefetched
+        program_page = (
+            ProgramPage.objects
+            .filter(program_id__in=program_ids)
+            .prefetch_related(
+                'get_children__flexiblepricingrequestform'
+            )
+            .first()
+        )
 
-        if financial_assistance_page is None:
+        # Check for program page child form first (highest precedence)
+        if program_page:
             financial_assistance_page = (
-                instance.get_children().type(FlexiblePricingRequestForm).live().first()
+                program_page.get_children()
+                .type(FlexiblePricingRequestForm)
+                .live()
+                .first()
+            )
+            if financial_assistance_page:
+                return self._get_financial_assistance_url(program_page, financial_assistance_page.slug)
+
+        # Single optimized query for form by program selection
+        financial_assistance_page = (
+            FlexiblePricingRequestForm.objects
+            .filter(selected_program_id__in=all_program_ids)
+            .select_related('selected_program')
+            .first()
+        )
+
+        if financial_assistance_page:
+            # If form is for a different program, get its page URL
+            if financial_assistance_page.selected_program_id not in program_ids:
+                try:
+                    program_page = ProgramPage.objects.get(
+                        program=financial_assistance_page.selected_program
+                    )
+                    return self._get_financial_assistance_url(program_page, financial_assistance_page.slug)
+                except ProgramPage.DoesNotExist:
+                    pass
+            else:
+                # Use current instance URL if form is for current course's program
+                return self._get_financial_assistance_url(instance, financial_assistance_page.slug)
+
+                # Check for course-specific form
+        financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
+            selected_course=instance.product
+        ).first()
+
+        if financial_assistance_page is None:
+            # Check for child form as last resort
+            financial_assistance_page = (
+                instance.get_children()
+                .type(FlexiblePricingRequestForm)
+                .live()
+                .first()
             )
 
         return (
-            f"{instance.get_url()}{financial_assistance_page.slug}/"
+            self._get_financial_assistance_url(instance, financial_assistance_page.slug)
             if financial_assistance_page
             else ""
         )
@@ -169,6 +225,10 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     financial_assistance_form_url = serializers.SerializerMethodField()
 
+    def _get_financial_assistance_url(self, page, slug):
+        """Helper method to construct financial assistance URL"""
+        return f"{page.get_url()}{slug}/" if page and slug else ""
+
     @extend_schema_field(str)
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
@@ -190,41 +250,52 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     def get_financial_assistance_form_url(self, instance):
         """
         Returns URL of the Financial Assistance Form.
+        Optimized version with reduced database queries.
         """
+        # Check for form directly linked to this program first
         financial_assistance_page = (
-            FlexiblePricingRequestForm.objects.filter(
-                selected_program_id=instance.program.id
-            )
+            FlexiblePricingRequestForm.objects
+            .filter(selected_program_id=instance.program.id)
             .live()
             .first()
         )
-        page_children = instance.get_children()
-        if (financial_assistance_page is None) and (page_children is not None):
-            financial_assistance_page = (
-                page_children.type(FlexiblePricingRequestForm).live().first()
-            )
-        if (financial_assistance_page is None) & (
-            len(instance.program.related_programs) > 0
-        ):
-            financial_assistance_page = (
-                FlexiblePricingRequestForm.objects.filter(
-                    selected_program__in=instance.program.related_programs
+        
+        # Check for child form if no direct link found
+        if financial_assistance_page is None:
+            page_children = instance.get_children()
+            if page_children is not None:
+                financial_assistance_page = (
+                    page_children.type(FlexiblePricingRequestForm).live().first()
                 )
+        
+        # Check related programs if no form found yet
+        if (financial_assistance_page is None and
+            len(instance.program.related_programs) > 0):
+            
+            related_program_ids = [
+                rp.id for rp in instance.program.related_programs
+            ]
+            
+            financial_assistance_page = (
+                FlexiblePricingRequestForm.objects
+                .filter(selected_program_id__in=related_program_ids)
                 .select_related("selected_program")
                 .live()
                 .first()
             )
 
-            if financial_assistance_page is None:
-                return ""
-
-            program_page = ProgramPage.objects.filter(
-                program=financial_assistance_page.selected_program
-            ).get()
-            return f"{program_page.get_url()}{financial_assistance_page.slug}/"
+            if financial_assistance_page is not None:
+                # Get the program page for the related program
+                try:
+                    program_page = ProgramPage.objects.get(
+                        program=financial_assistance_page.selected_program
+                    )
+                    return self._get_financial_assistance_url(program_page, financial_assistance_page.slug)
+                except ProgramPage.DoesNotExist:
+                    return ""
 
         return (
-            f"{instance.get_url()}{financial_assistance_page.slug}/"
+            self._get_financial_assistance_url(instance, financial_assistance_page.slug)
             if financial_assistance_page
             else ""
         )

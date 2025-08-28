@@ -106,6 +106,10 @@ class ProgramSerializer(serializers.ModelSerializer):
         return [course[0].id for course in instance.courses if course[0].live]
 
     def get_collections(self, instance) -> list[int]:
+        if hasattr(instance, 'programcollection_set'):
+            return [collection.id for collection in instance.programcollection_set.all()]
+
+        # Fallback to database query
         return [
             collection.id
             for collection in ProgramCollection.objects.filter(programs__id=instance.id)
@@ -164,17 +168,70 @@ class ProgramSerializer(serializers.ModelSerializer):
             },
         }
     )
+    def _is_requirement_elective(self, requirement):
+        """Check if a requirement is elective based on its flag or parent flag"""
+        if requirement.elective_flag:
+            return True
+        try:
+            parent = requirement.get_parent()
+            return parent and bool(parent.elective_flag)
+        except AttributeError:
+            return False
+
     def get_requirements(self, instance):
+        """Get program requirements using prefetched data when available"""
+        if hasattr(instance, 'all_requirements'):
+            required_courses, elective_courses = self._process_course_requirements_from_all(instance.all_requirements.all())
+            required_programs, elective_programs = self._process_program_requirements_from_all(instance.all_requirements.all())
+        else:
+            # Fallback to  using model properties
+            return {
+                "courses": {
+                    "required": [course.id for course in instance.required_courses],
+                    "electives": [course.id for course in instance.elective_courses],
+                },
+                "programs": {
+                    "required": [program.id for program in instance.required_programs],
+                    "electives": [program.id for program in instance.elective_programs],
+                },
+            }
+
         return {
             "courses": {
-                "required": [course.id for course in instance.required_courses],
-                "electives": [course.id for course in instance.elective_courses],
+                "required": required_courses,
+                "electives": elective_courses,
             },
             "programs": {
-                "required": [program.id for program in instance.required_programs],
-                "electives": [program.id for program in instance.elective_programs],
+                "required": required_programs,
+                "electives": elective_programs,
             },
         }
+
+    def _process_course_requirements_from_all(self, requirements):
+        """Process course requirements from all_requirements and return required/elective course IDs"""
+        required_courses = []
+        elective_courses = []
+        for req in requirements:
+            # Check node_type and course_id first to avoid unnecessary queries
+            if req.node_type == ProgramRequirementNodeType.COURSE and req.course_id:
+                if self._is_requirement_elective(req):
+                    elective_courses.append(req.course_id)
+                else:
+                    required_courses.append(req.course_id)
+        return required_courses, elective_courses
+
+    def _process_program_requirements_from_all(self, requirements):
+        """Process program requirements from all_requirements and return required/elective program IDs"""
+        required_programs = []
+        elective_programs = []
+        for req in requirements:
+            # Check node_type and required_program_id first to avoid unnecessary queries
+            if req.node_type == ProgramRequirementNodeType.PROGRAM and req.required_program_id:
+                if self._is_requirement_elective(req):
+                    elective_programs.append(req.required_program_id)
+                else:
+                    required_programs.append(req.required_program_id)
+        return required_programs, elective_programs
 
     def get_required_prerequisites(self, instance) -> bool:
         """
@@ -234,14 +291,21 @@ class ProgramSerializer(serializers.ModelSerializer):
         }
     )
     def get_topics(self, instance):
-        """List all topics in all courses in the program"""
-        topics = set(  # noqa: C401
-            topic.name
-            for course in instance.courses
-            if hasattr(course[0], "page") and course[0].page is not None
-            for topic in course[0].page.topics.all()
-        )
-        return [{"name": topic} for topic in sorted(topics)]
+        """Get unique topics from courses using prefetched data to avoid N+1 queries"""
+        topics = set()
+        
+        # Check if we have prefetched all_requirements to avoid N+1 queries
+        if hasattr(instance, 'all_requirements'):
+            for req in instance.all_requirements.all():
+                if req.node_type == ProgramRequirementNodeType.COURSE and req.course and hasattr(req.course, 'page') and req.course.page:
+                    topics.update(topic.name for topic in req.course.page.topics.all())
+        else:
+            # Fallback to original courses property if prefetch not available
+            for course in instance.courses:
+                if hasattr(course, 'page') and course.page:
+                    topics.update(topic.name for topic in course.page.topics.all())
+                    
+        return list(topics)
 
     @extend_schema_field(str)
     def get_certificate_type(self, instance):
@@ -288,8 +352,16 @@ class ProgramSerializer(serializers.ModelSerializer):
     def get_start_date(self, instance) -> str | None:
         """
         Get the start date of the program by finding the first available run.
+        Optimized to avoid unnecessary queries.
         """
-        next_run = instance.next_starting_run
+        # Use cached property if available to avoid repeated queries
+        if hasattr(instance, '_cached_next_starting_run'):
+            next_run = instance._cached_next_starting_run
+        else:
+            next_run = instance.next_starting_run
+            # Cache the result for potential reuse in this request
+            instance._cached_next_starting_run = next_run
+            
         if next_run and next_run.start_date:
             return next_run.start_date
         return instance.start_date
