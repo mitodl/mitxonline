@@ -181,6 +181,43 @@ class ProgramSerializer(serializers.ModelSerializer):
         except AttributeError:
             return False
 
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "courses": {
+                    "type": "object",
+                    "properties": {
+                        "required": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "List of required course IDs"
+                        },
+                        "electives": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "List of elective course IDs"
+                        }
+                    }
+                },
+                "programs": {
+                    "type": "object",
+                    "properties": {
+                        "required": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "List of required program IDs"
+                        },
+                        "electives": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "List of elective program IDs"
+                        }
+                    }
+                }
+            }
+        }
+    )
     def get_requirements(self, instance):
         """Get program requirements using prefetched data when available"""
         if hasattr(instance, "all_requirements"):

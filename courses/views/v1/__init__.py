@@ -25,7 +25,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from reversion.models import Version
 
-from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from cms.serializers import CoursePageSerializer
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -117,8 +117,8 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = Program.objects.filter().prefetch_related("departments")
-        # Apply CMS serializer optimizations for program pages
-        return ProgramPageSerializer.optimize_queryset(queryset)
+        # Optimize queryset for Program objects - use 'page' (reverse relation to ProgramPage)
+        return queryset.select_related("page")
 
     def paginate_queryset(self, queryset):
         """

@@ -78,18 +78,9 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     current_price = serializers.SerializerMethodField()
 
     @classmethod
-    def optimize_queryset(cls, queryset):
-        """
-        Optimize the queryset for CoursePageSerializer to reduce database queries.
-        Call this method when using the serializer to prefetch related objects.
-        """
-        return queryset.select_related("product").prefetch_related(
-            "product__programs",
-            "product__programs__related_programs",
-            "product__active_products",
-            "linked_instructors__linked_instructor_page",
-            "get_children",
-        )
+    def optimize_queryset(cls, queryset, **kwargs):
+        """Optimize Course queryset to reduce database queries"""
+        return queryset.select_related("page")
 
     def _get_financial_assistance_url(self, page, slug):
         """Helper method to construct financial assistance URL"""
