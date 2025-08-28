@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
+from courses.serializers.utils import get_topics_from_page
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
@@ -19,8 +20,7 @@ from courses.serializers.v1.base import (
     ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
-from courses.utils import get_dated_courseruns, get_approved_flexible_price_exists
-from courses.serializers.utils import get_topics_from_page
+from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 

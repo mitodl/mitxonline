@@ -309,7 +309,8 @@ class ProgramSerializer(serializers.ModelSerializer):
         # Check if we have prefetched all_requirements to avoid N+1 queries
         if hasattr(instance, "all_requirements"):
             courses = [
-                req.course for req in instance.all_requirements.all()
+                req.course
+                for req in instance.all_requirements.all()
                 if req.node_type == ProgramRequirementNodeType.COURSE and req.course
             ]
             return get_unique_topics_from_courses(courses)
