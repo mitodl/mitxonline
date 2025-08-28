@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.127.8
+---------------
+
+- Stop sync on openedx user if validation errors occur (#2881)
+- fix: email logo distortion (#2899)
+
 Version 0.127.7 (Released August 27, 2025)
 ---------------
 
