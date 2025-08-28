@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.127.9
+---------------
+
+- Skip onboarding if the user has any enrollments (#2912)
+
 Version 0.127.8 (Released August 28, 2025)
 ---------------
 
