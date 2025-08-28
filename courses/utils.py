@@ -8,7 +8,12 @@ from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
-from courses.models import CourseRun, CourseRunEnrollment, CourseRunQuerySet, ProgramCertificate
+from courses.models import (
+    CourseRun,
+    CourseRunEnrollment,
+    CourseRunQuerySet,
+    ProgramCertificate,
+)
 
 log = logging.getLogger(__name__)
 

@@ -33,9 +33,11 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
             list: Course IDs associated with the Department.
         """
         related_courses = instance.course_set.filter(live=True, page__live=True)
-        relevant_courseruns = CourseRun.objects.enrollable().filter(
-            course__in=related_courses
-        ).values_list("id", flat=True)
+        relevant_courseruns = (
+            CourseRun.objects.enrollable()
+            .filter(course__in=related_courses)
+            .values_list("id", flat=True)
+        )
         return (
             related_courses.filter(courseruns__id__in=relevant_courseruns)
             .distinct()
