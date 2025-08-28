@@ -191,14 +191,14 @@ class ProgramSerializer(serializers.ModelSerializer):
                         "required": {
                             "type": "array",
                             "items": {"type": "integer"},
-                            "description": "List of required course IDs"
+                            "description": "List of required course IDs",
                         },
                         "electives": {
                             "type": "array",
                             "items": {"type": "integer"},
-                            "description": "List of elective course IDs"
-                        }
-                    }
+                            "description": "List of elective course IDs",
+                        },
+                    },
                 },
                 "programs": {
                     "type": "object",
@@ -206,16 +206,16 @@ class ProgramSerializer(serializers.ModelSerializer):
                         "required": {
                             "type": "array",
                             "items": {"type": "integer"},
-                            "description": "List of required program IDs"
+                            "description": "List of required program IDs",
                         },
                         "electives": {
                             "type": "array",
                             "items": {"type": "integer"},
-                            "description": "List of elective program IDs"
-                        }
-                    }
-                }
-            }
+                            "description": "List of elective program IDs",
+                        },
+                    },
+                },
+            },
         }
     )
     def get_requirements(self, instance):
