@@ -281,17 +281,6 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     financial_assistance_form_url = serializers.SerializerMethodField()
 
-    @classmethod
-    def optimize_queryset(cls, queryset):
-        """
-        Optimize the queryset for ProgramPageSerializer to reduce database queries.
-        Call this method when using the serializer to prefetch related objects.
-        """
-        return queryset.select_related("program").prefetch_related(
-            "program__related_programs",
-            "get_children",
-        )
-
     def _get_financial_assistance_url(self, page, slug):
         """Helper method to construct financial assistance URL"""
         return f"{page.get_url()}{slug}/" if page and slug else ""

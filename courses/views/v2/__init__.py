@@ -20,7 +20,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from cms.serializers import CoursePageSerializer
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -141,10 +141,11 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Get the queryset with optimized prefetching for performance"""
-        queryset = (
+        return (
             Program.objects.filter()
             .select_related("page")
             .prefetch_related(
+                "page__get_children",  # Optimize for ProgramPageSerializer.get_financial_assistance_form_url
                 Prefetch("departments", queryset=Department.objects.only("id", "name")),
                 Prefetch(
                     "all_requirements",
@@ -178,9 +179,6 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
                 ),
             )
         )
-
-        # Apply CMS serializer optimizations for program pages
-        return ProgramPageSerializer.optimize_queryset(queryset)
 
     @extend_schema(
         operation_id="programs_retrieve_v2",
