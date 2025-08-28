@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.127.8
+Version 0.127.8 (Released August 28, 2025)
 ---------------
 
 - Stop sync on openedx user if validation errors occur (#2881)
