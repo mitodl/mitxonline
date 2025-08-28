@@ -322,7 +322,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             for course in instance.courses:
                 if hasattr(course, "page") and course.page:
                     topics.update(topic.name for topic in course.page.topics.all())
-                    
+
         return [{"name": topic} for topic in sorted(topics)]
 
     @extend_schema_field(str)
