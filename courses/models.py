@@ -86,6 +86,76 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
             models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
         ).filter(b2b_contract__isnull=True)
 
+    def enrollable(self, enrollment_end_date=None):
+        """
+        Applies a filter for Course runs that are open for enrollment.
+        
+        This mirrors the logic from CourseRun.is_enrollable property but allows
+        for custom enrollment_end_date parameter.
+        
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+        """
+        
+        now = now_in_utc()
+        if enrollment_end_date is None:
+            enrollment_end_date = now
+            
+        return self.filter(
+            # Check if enrollment period is still open
+            (models.Q(enrollment_end__isnull=True) | models.Q(enrollment_end__gt=enrollment_end_date))
+            # Ensure enrollment has started
+            & models.Q(enrollment_start__isnull=False)
+            & models.Q(enrollment_start__lte=now)
+            # Course run must be live
+            & models.Q(live=True)
+            # Course run must have started
+            & models.Q(start_date__isnull=False)
+        )
+
+    def unenrollable(self):
+        """Applies a filter for Course runs that are closed for enrollment."""
+        
+        now = now_in_utc()
+        return self.filter(
+            models.Q(live=False)
+            | models.Q(start_date__isnull=True)
+            | (models.Q(enrollment_end__lte=now) | models.Q(enrollment_start__gt=now))
+        )
+
+    @classmethod
+    def get_enrollable_filter(cls, enrollment_end_date=None):
+        """
+        Returns Q filter for enrollable course runs.
+        
+        This allows other functions to use the same enrollment logic
+        while composing it with additional filters.
+        
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+        
+        Returns:
+            Q: Django Q filter for enrollable course runs
+        """
+        
+        now = now_in_utc()
+        if enrollment_end_date is None:
+            enrollment_end_date = now
+            
+        return (
+            # Check if enrollment period is still open
+            (models.Q(enrollment_end__isnull=True) | models.Q(enrollment_end__gt=enrollment_end_date))
+            # Ensure enrollment has started
+            & models.Q(enrollment_start__isnull=False)
+            & models.Q(enrollment_start__lte=now)
+            # Course run must be live
+            & models.Q(live=True)
+            # Course run must have started
+            & models.Q(start_date__isnull=False)
+        )
+
     def with_text_id(self, text_id):
         """Applies a filter for the CourseRun's courseware_id"""
         return self.filter(courseware_id=text_id)
@@ -414,23 +484,16 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         if not main_ops:
             return ProgramRequirement.objects.none()
 
-        # Build a single query to get all course requirements under all operators
-        operator_path_conditions = []
-        operator_path_params = []
-
+        path_q = Q()
         for op in main_ops:
-            operator_path_conditions.append("path LIKE %s")
-            operator_path_params.append(f"{op.path}%")
+            path_q |= Q(path__startswith=op.path)
 
         return (
             ProgramRequirement.objects.filter(
                 program__id=self.id,
                 node_type=ProgramRequirementNodeType.COURSE,
             )
-            .extra(
-                where=[" OR ".join(operator_path_conditions)],
-                params=operator_path_params,
-            )
+            .filter(path_q)
             .select_related("course")
         )
 
@@ -805,52 +868,25 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         Returns:
             CourseRun or None: An unexpired/enrollable course run
-
-        # NOTE: This is implemented with sorted() and courseruns.all() to allow for prefetch_related
-        #   optimization. You can get the desired course_run with a filter, but
-        #   that would run a new query even if prefetch_related was used.
         """
-        from mitol.common.utils.datetime import now_in_utc
-
-        now = now_in_utc()
-        best_run = None
-        best_start_date = None
-
-        # Filter by contract upfront to reduce iterations
-        course_runs = self.courseruns.filter(b2b_contract__isnull=True).all()
-
-        # First pass: look for non-past, enrollable runs
-        for course_run in course_runs:
-            if (
-                course_run.live
-                and course_run.start_date is not None
-                and course_run.enrollment_start is not None
-                and course_run.enrollment_start <= now
-                and (
-                    course_run.enrollment_end is None or course_run.enrollment_end > now
-                )
-                and (course_run.end_date is None or course_run.end_date >= now)
-                and (best_run is None or course_run.start_date < best_start_date)
-            ):
-                best_run = course_run
-                best_start_date = course_run.start_date
-
+        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
+        # First try to find non-past enrollable runs (end_date is None or in the future)
+        best_run = (
+            self.courseruns.filter(b2b_contract__isnull=True)
+            .enrollable()
+            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
+            .order_by("start_date")
+            .first()
+        )
+        
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
-            for course_run in course_runs:
-                if (
-                    course_run.live
-                    and course_run.start_date is not None
-                    and course_run.enrollment_start is not None
-                    and course_run.enrollment_start <= now
-                    and (
-                        course_run.enrollment_end is None
-                        or course_run.enrollment_end > now
-                    )
-                    and (best_run is None or course_run.start_date < best_start_date)
-                ):
-                    best_run = course_run
-                    best_start_date = course_run.start_date
+            best_run = (
+                self.courseruns.filter(b2b_contract__isnull=True)
+                .enrollable()
+                .order_by("start_date")
+                .first()
+            )
 
         return best_run
 
@@ -863,7 +899,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         to False if there isn't one.
         """
 
-        return self.page.include_in_learn_catalog if self.page else False
+        return getattr(self.page, "include_in_learn_catalog", False)
 
     @cached_property
     def ingest_content_files_for_ai(self):
@@ -874,7 +910,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         to False if there isn't one.
         """
 
-        return self.page.ingest_content_files_for_ai if self.page else False
+        return getattr(self.page, "ingest_content_files_for_ai", False)
 
     def get_first_unexpired_org_run(self, user_contracts):
         """
@@ -887,52 +923,25 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         Returns:
             CourseRun or None: An unexpired/enrollable course run
-
-        # NOTE: This is implemented with sorted() and courseruns.all() to allow for prefetch_related
-        #   optimization. You can get the desired course_run with a filter, but
-        #   that would run a new query even if prefetch_related was used.
         """
-        from mitol.common.utils.datetime import now_in_utc
-
-        now = now_in_utc()
-        best_run = None
-        best_start_date = None
-
-        # Filter by contract upfront to reduce iterations
-        course_runs = self.courseruns.filter(b2b_contract__in=user_contracts).all()
-
-        # First pass: look for non-past, enrollable runs
-        for course_run in course_runs:
-            if (
-                course_run.live
-                and course_run.start_date is not None
-                and course_run.enrollment_start is not None
-                and course_run.enrollment_start <= now
-                and (
-                    course_run.enrollment_end is None or course_run.enrollment_end > now
-                )
-                and (course_run.end_date is None or course_run.end_date >= now)
-                and (best_run is None or course_run.start_date < best_start_date)
-            ):
-                best_run = course_run
-                best_start_date = course_run.start_date
-
+        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
+        # First try to find non-past enrollable runs (end_date is None or in the future)
+        best_run = (
+            self.courseruns.filter(b2b_contract__in=user_contracts)
+            .enrollable()
+            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
+            .order_by("start_date")
+            .first()
+        )
+        
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
-            for course_run in course_runs:
-                if (
-                    course_run.live
-                    and course_run.start_date is not None
-                    and course_run.enrollment_start is not None
-                    and course_run.enrollment_start <= now
-                    and (
-                        course_run.enrollment_end is None
-                        or course_run.enrollment_end > now
-                    )
-                    and (best_run is None or course_run.start_date < best_start_date)
-                ):
-                    best_run = course_run
-                    best_start_date = course_run.start_date
+            best_run = (
+                self.courseruns.filter(b2b_contract__in=user_contracts)
+                .enrollable()
+                .order_by("start_date")
+                .first()
+            )
 
         return best_run
 
@@ -1085,12 +1094,21 @@ class CourseRun(TimestampedModel):
         """
         Returns True if the course run has started and has not yet ended
         """
+        # Course must have started
+        if not self.start_date:
+            return False
+            
         now = now_in_utc()
-        return (
-            self.start_date is not None
-            and self.start_date <= now
-            and (self.end_date is None or self.end_date > now)
-        )
+        
+        # Course hasn't started yet
+        if self.start_date > now:
+            return False
+            
+        # Course has ended
+        if self.end_date and self.end_date <= now:
+            return False
+            
+        return True
 
     @property
     def is_upgradable(self):

@@ -1,18 +1,4 @@
-"""CMS app serializers
-
-Performance optimizations applied:
-1. Added `optimize_queryset` class methods to reduce N+1 queries
-2. Used `select_related` and `prefetch_related` for related object fetching
-3. Replaced inefficient loops with list comprehensions
-4. Refactored complex methods into smaller helper methods
-5. Added safety checks to prevent AttributeError exceptions
-6. Optimized database query patterns and reduced duplicate queries
-7. Cached expensive operations to avoid repeated database hits
-
-Usage example for optimized queries:
-    queryset = CoursePageSerializer.optimize_queryset(CoursePage.objects.all())
-    serializer = CoursePageSerializer(queryset, many=True)
-"""
+"""CMS app serializers"""
 
 from __future__ import annotations
 
@@ -85,7 +71,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
 
 
 class CoursePageSerializer(BaseCoursePageSerializer):
-    """Course page model serializer with optimized database queries"""
+    """Course page model serializer"""
 
     financial_assistance_form_url = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
@@ -157,28 +143,39 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         program_ids = [program.id for program in programs]
         related_program_ids = []
         for program in programs:
-            # Handle both QuerySet and prefetched list cases for related_programs
             related_programs = program.related_programs
-            if hasattr(related_programs, "all"):
-                related_programs = related_programs.all()
-
             related_program_ids.extend([rp.id for rp in related_programs])
 
         return program_ids, program_ids + related_program_ids
 
     def _handle_form_logic(self, instance, program_page, form, program_ids):
-        """Handle the form logic and return appropriate URL."""
+        """
+        Handle the form logic and return appropriate URL.
+
+        Priority:
+        1. Use program page if available (form is child of program page)
+        2. If form is for a different program, use that program's page
+        3. If form is for current program, use current instance page
+        4. Return empty string if no valid page found
+        """
+        # Case 1: Form is a child of a program page
         if program_page:
             return self._get_financial_assistance_url(program_page, form.slug)
-        elif form.selected_program_id not in program_ids:
-            # Form is for different program
+
+        # Case 2: Form is for a different program - find its page
+        if form.selected_program_id not in program_ids:
             try:
-                page = ProgramPage.objects.get(program=form.selected_program)
-                return self._get_financial_assistance_url(page, form.slug)
+                different_program_page = ProgramPage.objects.get(program=form.selected_program)
+                return self._get_financial_assistance_url(different_program_page, form.slug)
             except ProgramPage.DoesNotExist:
+                # If the different program doesn't have a page, fall through to default
                 pass
-        else:
+
+        # Case 3: Form is for current program - use current instance
+        if form.selected_program_id in program_ids:
             return self._get_financial_assistance_url(instance, form.slug)
+
+        # Case 4: No valid page found
         return ""
 
     @extend_schema_field(serializers.URLField)
@@ -192,16 +189,8 @@ class CoursePageSerializer(BaseCoursePageSerializer):
             return ""
 
         # Cache program IDs to avoid repeated access
-        # Handle both QuerySet and prefetched list cases
         programs_relation = instance.product.programs
-        if hasattr(programs_relation, "all"):
-            # It's a QuerySet
-            programs = (
-                list(programs_relation.all()) if programs_relation.exists() else []
-            )
-        else:
-            # It's already a prefetched list
-            programs = list(programs_relation) if programs_relation else []
+        programs = list(programs_relation) if programs_relation else []
 
         if not programs:
             # Handle case with no programs
@@ -212,10 +201,8 @@ class CoursePageSerializer(BaseCoursePageSerializer):
                 self._get_financial_assistance_url(instance, form.slug) if form else ""
             )
 
-        # Build program ID lists using helper method
         program_ids, all_program_ids = self._get_program_ids(programs)
 
-        # Try to get program-related form
         program_page, form = self._get_program_form(program_ids, all_program_ids)
 
         if form:
@@ -237,41 +224,34 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         if active_products is None:
             return None
 
-        if hasattr(active_products, "exists"):
-            # It's a QuerySet
-            relevant_product = (
-                active_products.order_by("-price").first()
-                if active_products.exists()
-                else None
+        try:
+            # Convert to list and sort by price (descending)
+            products_list = (
+                list(active_products.all())
+                if hasattr(active_products, "all")
+                else list(active_products)
             )
-        else:
-            # It's a prefetched list/manager
-            try:
-                # Convert to list and sort by price (descending)
-                products_list = (
-                    list(active_products.all())
-                    if hasattr(active_products, "all")
-                    else list(active_products)
-                )
-                relevant_product = (
-                    max(products_list, key=lambda p: p.price) if products_list else None
-                )
-            except (AttributeError, TypeError):
-                relevant_product = None
+            relevant_product = (
+                max(products_list, key=lambda p: p.price) if products_list else None
+            )
+        except (AttributeError, TypeError):
+            relevant_product = None
 
         return relevant_product.price if relevant_product else None
 
     @extend_schema_field(list)
     def get_instructors(self, instance):
         """Get instructor information with optimized database queries."""
-        linked_instructors = instance.linked_instructors.select_related(
-            "linked_instructor_page"
-        )
-
         # Handle both QuerySet and prefetched list cases
+        linked_instructors = instance.linked_instructors
+
         if hasattr(linked_instructors, "all"):
-            instructor_links = linked_instructors.all()
+            # It's a Manager/QuerySet - apply select_related and get all
+            instructor_links = linked_instructors.select_related(
+                "linked_instructor_page"
+            ).all()
         else:
+            # It's already a prefetched list - use directly
             instructor_links = linked_instructors
 
         return [
@@ -370,14 +350,8 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         # Check related programs if no form found yet
         if financial_assistance_page is None:
             related_programs = instance.program.related_programs
-            # Handle both QuerySet and prefetched list cases
-            if hasattr(related_programs, "all"):
-                related_programs = related_programs.all()
 
-            if related_programs and (
-                (hasattr(related_programs, "exists") and related_programs.exists())
-                or len(related_programs) > 0
-            ):
+            if related_programs:
                 related_program_ids = [rp.id for rp in related_programs]
 
                 financial_assistance_page = (

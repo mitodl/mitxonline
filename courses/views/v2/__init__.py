@@ -20,6 +20,8 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -140,7 +142,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Get the queryset with optimized prefetching for performance"""
-        return (
+        queryset = (
             Program.objects.filter()
             .select_related("page")
             .prefetch_related(
@@ -177,6 +179,9 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
                 ),
             )
         )
+        
+        # Apply CMS serializer optimizations for program pages
+        return ProgramPageSerializer.optimize_queryset(queryset)
 
     @extend_schema(
         operation_id="programs_retrieve_v2",
@@ -282,7 +287,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Get the queryset for the viewset."""
 
-        return (
+        queryset = (
             Course.objects.select_related("page")
             .prefetch_related("departments")
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
@@ -290,6 +295,9 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by("title")
             .distinct()
         )
+        
+        # Apply CMS serializer optimizations for course pages
+        return CoursePageSerializer.optimize_queryset(queryset)
 
     def get_serializer_context(self):
         added_context = {}
