@@ -165,8 +165,12 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         # Case 2: Form is for a different program - find its page
         if form.selected_program_id not in program_ids:
             try:
-                different_program_page = ProgramPage.objects.get(program=form.selected_program)
-                return self._get_financial_assistance_url(different_program_page, form.slug)
+                different_program_page = ProgramPage.objects.get(
+                    program=form.selected_program
+                )
+                return self._get_financial_assistance_url(
+                    different_program_page, form.slug
+                )
             except ProgramPage.DoesNotExist:
                 # If the different program doesn't have a page, fall through to default
                 pass
