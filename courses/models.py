@@ -448,6 +448,16 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         elective_title = "Elective Courses"
         minimum_elective_requirement = None
         
+        # First, check all operators for titles and minimum elective requirements
+        for op in path_to_operator.values():
+            # Store titles from actual operator nodes
+            if not op.elective_flag and required_title == "Required Courses":
+                required_title = op.title or required_title
+            elif op.elective_flag and elective_title == "Elective Courses":
+                elective_title = op.title or elective_title
+                if op.is_min_number_of_operator and minimum_elective_requirement is None:
+                    minimum_elective_requirement = int(op.operator_value) if op.operator_value else None
+        
         for req in course_reqs:
             if not req.course:
                 continue
@@ -458,14 +468,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 continue
                 
             requirement_type = "Required Courses" if not parent_op.elective_flag else "Elective Courses"
-            
-            # Store titles from actual operator nodes (only set once per operator type)
-            if not parent_op.elective_flag and required_title == "Required Courses":
-                required_title = parent_op.title or required_title
-            elif parent_op.elective_flag and elective_title == "Elective Courses":
-                elective_title = parent_op.title or elective_title
-                if parent_op.is_min_number_of_operator and minimum_elective_requirement is None:
-                    minimum_elective_requirement = int(parent_op.operator_value) if parent_op.operator_value else None
             
             # Build course tuples and separate lists
             course_tuple = (req.course, requirement_type)
