@@ -11,6 +11,7 @@ from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
 )
+from courses.serializers.utils import get_unique_topics_from_courses
 from courses.serializers.v1.departments import DepartmentSerializer
 from main.serializers import StrictFieldsSerializer
 
@@ -305,25 +306,16 @@ class ProgramSerializer(serializers.ModelSerializer):
     )
     def get_topics(self, instance):
         """Get unique topics from courses using prefetched data to avoid N+1 queries"""
-        topics = set()
-
         # Check if we have prefetched all_requirements to avoid N+1 queries
         if hasattr(instance, "all_requirements"):
-            for req in instance.all_requirements.all():
-                if (
-                    req.node_type == ProgramRequirementNodeType.COURSE
-                    and req.course
-                    and hasattr(req.course, "page")
-                    and req.course.page
-                ):
-                    topics.update(topic.name for topic in req.course.page.topics.all())
+            courses = [
+                req.course for req in instance.all_requirements.all()
+                if req.node_type == ProgramRequirementNodeType.COURSE and req.course
+            ]
+            return get_unique_topics_from_courses(courses)
         else:
             # Fallback to original courses property if prefetch not available
-            for course in instance.courses:
-                if hasattr(course, "page") and course.page:
-                    topics.update(topic.name for topic in course.page.topics.all())
-
-        return [{"name": topic} for topic in sorted(topics)]
+            return get_unique_topics_from_courses(instance.courses)
 
     @extend_schema_field(str)
     def get_certificate_type(self, instance):

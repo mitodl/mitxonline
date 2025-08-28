@@ -12,7 +12,6 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
-from courses.models import CoursesTopic
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
@@ -21,6 +20,7 @@ from courses.serializers.v1.base import (
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_dated_courseruns, get_approved_flexible_price_exists
+from courses.serializers.utils import get_topics_from_page
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -122,18 +122,7 @@ class CourseSerializer(BaseCourseSerializer):
     def get_topics(self, instance):
         """List topics of a course"""
         if hasattr(instance, "page") and instance.page is not None:
-            course_topics = instance.page.topics.all()
-            parent_topics = CoursesTopic.objects.filter(
-                child_topics__in=course_topics
-            ).distinct()
-            all_topics = sorted(
-                [{"name": topic.name} for topic in course_topics],
-                key=lambda topic: topic["name"],
-            )
-
-            for parent_topic in parent_topics:
-                all_topics.append({"name": parent_topic.name})
-            return all_topics
+            return get_topics_from_page(instance.page)
         return []
 
     @extend_schema_field(str)
