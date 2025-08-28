@@ -1097,18 +1097,15 @@ class CourseRun(TimestampedModel):
         # Course must have started
         if not self.start_date:
             return False
-            
+
         now = now_in_utc()
-        
+
         # Course hasn't started yet
         if self.start_date > now:
             return False
-            
+
         # Course has ended
-        if self.end_date and self.end_date <= now:
-            return False
-            
-        return True
+        return not (self.end_date and self.end_date <= now)
 
     @property
     def is_upgradable(self):

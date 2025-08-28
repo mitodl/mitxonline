@@ -8,7 +8,7 @@ from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
-from courses.models import CourseRun, CourseRunEnrollment, ProgramCertificate
+from courses.models import CourseRun, CourseRunEnrollment, CourseRunQuerySet, ProgramCertificate
 
 log = logging.getLogger(__name__)
 
@@ -77,22 +77,6 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         return None
 
 
-def get_enrollable_course_run_filter(enrollment_end_date=None, valid_courses=None):
-    """
-    Returns a queryset of all course runs that are open for enrollment.
-
-    args:
-        enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
-        valid_courses: Queryset of Course objects, to filter the course runs by if needed
-    """
-    q_filters = CourseRun.get_enrollable_filter(enrollment_end_date)
-
-    if valid_courses:
-        q_filters = q_filters & Q(course__in=valid_courses)
-
-    return q_filters
-
-
 def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
     """
     Returns all course runs that are open for enrollment.
@@ -156,7 +140,7 @@ def get_archived_courseruns(queryset):
     """
     now = now_in_utc()
     return queryset.filter(
-        CourseRun.get_enrollable_filter(now)
+        CourseRunQuerySet.get_enrollable_filter(now)
         & Q(end_date__lt=now)
         & (Q(enrollment_end__isnull=True) | Q(enrollment_end__gt=now))
     )
@@ -171,7 +155,7 @@ def get_dated_courseruns(queryset):
     - Enrollable (enrollment start is in the past and enrollment end is in the future or null)
     """
     return queryset.filter(
-        CourseRun.get_enrollable_filter()
+        CourseRunQuerySet.get_enrollable_filter()
         & Q(is_self_paced=False)
         & Q(enrollment_end__isnull=False)
     )

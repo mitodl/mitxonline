@@ -1,9 +1,7 @@
-from django.db.models import Q
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from courses.models import CourseRun, Department
-from courses.utils import get_enrollable_course_run_filter
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -35,8 +33,8 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
             list: Course IDs associated with the Department.
         """
         related_courses = instance.course_set.filter(live=True, page__live=True)
-        relevant_courseruns = CourseRun.objects.filter(
-            get_enrollable_course_run_filter() & Q(course__in=related_courses)
+        relevant_courseruns = CourseRun.objects.enrollable().filter(
+            course__in=related_courses
         ).values_list("id", flat=True)
         return (
             related_courses.filter(courseruns__id__in=relevant_courseruns)
