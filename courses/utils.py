@@ -260,15 +260,6 @@ def get_approved_flexible_price_exists(instance, context):
     # Import here to avoid circular dependency
     from flexiblepricing.api import is_courseware_flexible_price_approved
 
-    # Early return if context doesn't require flexible pricing check
-    if not context or not context.get("include_approved_financial_aid"):
-        return False
-
-    # Get the user from context
-    user = context.get("request", {}).user if "request" in context else None
-    if not user or not user.id:
-        return False
-
     # Handle different instance types to extract course/run and user
     if isinstance(instance, list):
         # Handle list of enrollments (from BaseCourseRunEnrollmentSerializer.create)
@@ -282,11 +273,23 @@ def get_approved_flexible_price_exists(instance, context):
         course_or_run = instance.run
         check_user = instance.user
     elif hasattr(instance, "course"):
-        # Handle CourseRun instance - use the course for the check
+        # Handle CourseRun instance - need user from context
+        # Early return if context doesn't require flexible pricing check
+        if not context or not context.get("include_approved_financial_aid"):
+            return False
+        user = context.get("request", {}).user if "request" in context else None
+        if not user or not user.id:
+            return False
         course_or_run = instance.course
         check_user = user
     else:
-        # Handle Course instance directly
+        # Handle Course instance directly - need user from context
+        # Early return if context doesn't require flexible pricing check
+        if not context or not context.get("include_approved_financial_aid"):
+            return False
+        user = context.get("request", {}).user if "request" in context else None
+        if not user or not user.id:
+            return False
         course_or_run = instance
         check_user = user
 
