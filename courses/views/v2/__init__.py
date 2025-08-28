@@ -21,7 +21,6 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
-
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -179,7 +178,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
                 ),
             )
         )
-        
+
         # Apply CMS serializer optimizations for program pages
         return ProgramPageSerializer.optimize_queryset(queryset)
 
@@ -295,7 +294,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by("title")
             .distinct()
         )
-        
+
         # Apply CMS serializer optimizations for course pages
         return CoursePageSerializer.optimize_queryset(queryset)
 

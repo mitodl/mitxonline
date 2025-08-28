@@ -168,6 +168,7 @@ def test_get_enrollable_courseruns_qs():
     assert course_run in enrollable_qs
     assert unenrollable_course_run not in enrollable_qs
 
+
 @pytest.mark.django_db
 def test_get_enrollable_courses():
     """

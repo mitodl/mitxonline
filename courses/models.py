@@ -89,22 +89,25 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
     def enrollable(self, enrollment_end_date=None):
         """
         Applies a filter for Course runs that are open for enrollment.
-        
+
         This mirrors the logic from CourseRun.is_enrollable property but allows
         for custom enrollment_end_date parameter.
-        
+
         Args:
             enrollment_end_date: datetime, the date to check for enrollment end.
                                If None, uses current time.
         """
-        
+
         now = now_in_utc()
         if enrollment_end_date is None:
             enrollment_end_date = now
-            
+
         return self.filter(
             # Check if enrollment period is still open
-            (models.Q(enrollment_end__isnull=True) | models.Q(enrollment_end__gt=enrollment_end_date))
+            (
+                models.Q(enrollment_end__isnull=True)
+                | models.Q(enrollment_end__gt=enrollment_end_date)
+            )
             # Ensure enrollment has started
             & models.Q(enrollment_start__isnull=False)
             & models.Q(enrollment_start__lte=now)
@@ -116,7 +119,7 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
 
     def unenrollable(self):
         """Applies a filter for Course runs that are closed for enrollment."""
-        
+
         now = now_in_utc()
         return self.filter(
             models.Q(live=False)
@@ -128,25 +131,28 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
     def get_enrollable_filter(cls, enrollment_end_date=None):
         """
         Returns Q filter for enrollable course runs.
-        
+
         This allows other functions to use the same enrollment logic
         while composing it with additional filters.
-        
+
         Args:
             enrollment_end_date: datetime, the date to check for enrollment end.
                                If None, uses current time.
-        
+
         Returns:
             Q: Django Q filter for enrollable course runs
         """
-        
+
         now = now_in_utc()
         if enrollment_end_date is None:
             enrollment_end_date = now
-            
+
         return (
             # Check if enrollment period is still open
-            (models.Q(enrollment_end__isnull=True) | models.Q(enrollment_end__gt=enrollment_end_date))
+            (
+                models.Q(enrollment_end__isnull=True)
+                | models.Q(enrollment_end__gt=enrollment_end_date)
+            )
             # Ensure enrollment has started
             & models.Q(enrollment_start__isnull=False)
             & models.Q(enrollment_start__lte=now)
@@ -514,7 +520,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         required_title = "Required Courses"
         elective_title = "Elective Courses"
         minimum_elective_requirement = None
-        
+
         # First, check all operators for titles and minimum elective requirements
         for op in path_to_operator.values():
             # Store titles from actual operator nodes
@@ -522,9 +528,14 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 required_title = op.title or required_title
             elif op.elective_flag and elective_title == "Elective Courses":
                 elective_title = op.title or elective_title
-                if op.is_min_number_of_operator and minimum_elective_requirement is None:
-                    minimum_elective_requirement = int(op.operator_value) if op.operator_value else None
-        
+                if (
+                    op.is_min_number_of_operator
+                    and minimum_elective_requirement is None
+                ):
+                    minimum_elective_requirement = (
+                        int(op.operator_value) if op.operator_value else None
+                    )
+
         for req in course_reqs:
             if not req.course:
                 continue
@@ -533,9 +544,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             parent_op = self._find_parent_operator(req, path_to_operator)
             if parent_op is None:
                 continue
-                
-            requirement_type = "Required Courses" if not parent_op.elective_flag else "Elective Courses"
-            
+
+            requirement_type = (
+                "Required Courses"
+                if not parent_op.elective_flag
+                else "Elective Courses"
+            )
+
             # Build course tuples and separate lists
             course_tuple = (req.course, requirement_type)
             courses.append(course_tuple)
@@ -878,7 +893,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             .order_by("start_date")
             .first()
         )
-        
+
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
             best_run = (
@@ -933,7 +948,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             .order_by("start_date")
             .first()
         )
-        
+
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
             best_run = (

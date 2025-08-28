@@ -23,10 +23,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from reversion.models import Version
 
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -115,7 +114,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["id", "live", "readable_id"]
-    
+
     def get_queryset(self):
         queryset = Program.objects.filter().prefetch_related("departments")
         # Apply CMS serializer optimizations for program pages
@@ -190,7 +189,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 .prefetch_related("courseruns", "departments")
                 .all()
             )
-        
+
         # Apply CMS serializer optimizations for course pages
         return CoursePageSerializer.optimize_queryset(queryset)
 
