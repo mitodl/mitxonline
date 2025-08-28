@@ -305,7 +305,7 @@ class ProgramSerializer(serializers.ModelSerializer):
                 if hasattr(course, 'page') and course.page:
                     topics.update(topic.name for topic in course.page.topics.all())
                     
-        return list(topics)
+        return [{"name": topic} for topic in sorted(topics)]
 
     @extend_schema_field(str)
     def get_certificate_type(self, instance):
