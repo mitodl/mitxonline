@@ -355,6 +355,13 @@ class User(
             ).values_list("sso_organization_id", flat=True)
         )
 
+    @property
+    def should_skip_onboarding(self):
+        return (
+            self.user_profile.completed_onboarding
+            or self.courserunenrollment_set(manager="all_objects").exists()
+        )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(Lower("email"), name="user_email_unique"),
