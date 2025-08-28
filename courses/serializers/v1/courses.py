@@ -19,7 +19,7 @@ from courses.serializers.v1.base import (
     ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
-from flexiblepricing.api import is_courseware_flexible_price_approved
+from courses.utils import get_approved_flexible_price_exists
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -103,20 +103,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
-        # Get the User object if it exists.
-        user = self.context["request"].user if "request" in self.context else None
-
-        # Check for an approved flexible price record if the
-        # user exists and has an ID (not an Anonymous user).
-        # Otherwise return False.
-        flexible_price_exists = (
-            is_courseware_flexible_price_approved(
-                instance, self.context["request"].user
-            )
-            if user and user.id
-            else False
-        )
-        return flexible_price_exists  # noqa: RET504
+        return get_approved_flexible_price_exists(instance, self.context)
 
 
 @extend_schema_serializer(

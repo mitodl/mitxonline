@@ -159,6 +159,35 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
         return None, None
 
+    def _get_program_ids(self, programs):
+        """Extract program IDs and related program IDs."""
+        program_ids = [program.id for program in programs]
+        related_program_ids = []
+        for program in programs:
+            # Handle both QuerySet and prefetched list cases for related_programs
+            related_programs = program.related_programs
+            if hasattr(related_programs, 'all'):
+                related_programs = related_programs.all()
+
+            related_program_ids.extend([rp.id for rp in related_programs])
+
+        return program_ids, program_ids + related_program_ids
+
+    def _handle_form_logic(self, instance, program_page, form, program_ids):
+        """Handle the form logic and return appropriate URL."""
+        if program_page:
+            return self._get_financial_assistance_url(program_page, form.slug)
+        elif form.selected_program_id not in program_ids:
+            # Form is for different program
+            try:
+                page = ProgramPage.objects.get(program=form.selected_program)
+                return self._get_financial_assistance_url(page, form.slug)
+            except ProgramPage.DoesNotExist:
+                pass
+        else:
+            return self._get_financial_assistance_url(instance, form.slug)
+        return ""
+
     @extend_schema_field(serializers.URLField)
     def get_financial_assistance_form_url(self, instance):
         """
@@ -168,10 +197,17 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         # Early return if no product
         if not hasattr(instance, 'product') or not instance.product:
             return ""
-            
+
         # Cache program IDs to avoid repeated access
-        programs = list(instance.product.programs.all()) if instance.product.programs.exists() else []
-        
+        # Handle both QuerySet and prefetched list cases
+        programs_relation = instance.product.programs
+        if hasattr(programs_relation, 'all'):
+            # It's a QuerySet
+            programs = list(programs_relation.all()) if programs_relation.exists() else []
+        else:
+            # It's already a prefetched list
+            programs = list(programs_relation) if programs_relation else []
+
         if not programs:
             # Handle case with no programs
             form = self._get_course_specific_form(instance)
@@ -179,30 +215,16 @@ class CoursePageSerializer(BaseCoursePageSerializer):
                 form = self._get_child_form(instance)
             return self._get_financial_assistance_url(instance, form.slug) if form else ""
 
-        # Build program ID lists
-        program_ids = [program.id for program in programs]
-        related_program_ids = [
-            related_program.id
-            for program in programs
-            for related_program in program.related_programs
-        ]
-        all_program_ids = program_ids + related_program_ids
+        # Build program ID lists using helper method
+        program_ids, all_program_ids = self._get_program_ids(programs)
 
         # Try to get program-related form
         program_page, form = self._get_program_form(program_ids, all_program_ids)
         
         if form:
-            if program_page:
-                return self._get_financial_assistance_url(program_page, form.slug)
-            elif form.selected_program_id not in program_ids:
-                # Form is for different program
-                try:
-                    page = ProgramPage.objects.get(program=form.selected_program)
-                    return self._get_financial_assistance_url(page, form.slug)
-                except ProgramPage.DoesNotExist:
-                    pass
-            else:
-                return self._get_financial_assistance_url(instance, form.slug)
+            result = self._handle_form_logic(instance, program_page, form, program_ids)
+            if result:
+                return result
 
         # Fallback to course-specific or child form
         form = self._get_course_specific_form(instance)
@@ -213,17 +235,39 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
     def get_current_price(self, instance) -> int | None:
         """Get the current price of the course product."""
-        relevant_product = (
-            instance.product.active_products.order_by("-price").first()
-            if instance.product.active_products.exists()
-            else None
-        )
+        # Handle both QuerySet and prefetched list cases
+        active_products = instance.product.active_products
+        if active_products is None:
+            return None
+            
+        if hasattr(active_products, 'exists'):
+            # It's a QuerySet
+            relevant_product = (
+                active_products.order_by("-price").first()
+                if active_products.exists()
+                else None
+            )
+        else:
+            # It's a prefetched list/manager
+            try:
+                # Convert to list and sort by price (descending)
+                products_list = list(active_products.all()) if hasattr(active_products, 'all') else list(active_products)
+                relevant_product = max(products_list, key=lambda p: p.price) if products_list else None
+            except (AttributeError, TypeError):
+                relevant_product = None
+                
         return relevant_product.price if relevant_product else None
 
     @extend_schema_field(list)
     def get_instructors(self, instance):
         """Get instructor information with optimized database queries."""
         linked_instructors = instance.linked_instructors.select_related('linked_instructor_page')
+
+        # Handle both QuerySet and prefetched list cases
+        if hasattr(linked_instructors, 'all'):
+            instructor_links = linked_instructors.all()
+        else:
+            instructor_links = linked_instructors
 
         return [
             {
@@ -233,7 +277,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
                     tags=[], strip=True
                 ) if getattr(link.linked_instructor_page, 'instructor_bio_short', None) else "",
             }
-            for link in linked_instructors.all()
+            for link in instructor_links
             if link.linked_instructor_page
         ]
 
