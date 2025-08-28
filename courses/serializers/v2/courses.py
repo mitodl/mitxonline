@@ -20,7 +20,7 @@ from courses.serializers.v1.base import (
     ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
-from courses.utils import get_dated_courseruns, get_approved_flexible_price_exists
+from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 

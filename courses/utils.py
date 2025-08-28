@@ -277,11 +277,11 @@ def get_approved_flexible_price_exists(instance, context):
         enrollment = instance[0]
         course_or_run = enrollment.run
         check_user = enrollment.user
-    elif hasattr(instance, 'run'):
+    elif hasattr(instance, "run"):
         # Handle CourseRunEnrollment instance
         course_or_run = instance.run
         check_user = instance.user
-    elif hasattr(instance, 'course'):
+    elif hasattr(instance, "course"):
         # Handle CourseRun instance - use the course for the check
         course_or_run = instance.course
         check_user = user

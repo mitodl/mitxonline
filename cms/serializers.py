@@ -159,7 +159,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         for program in programs:
             # Handle both QuerySet and prefetched list cases for related_programs
             related_programs = program.related_programs
-            if hasattr(related_programs, 'all'):
+            if hasattr(related_programs, "all"):
                 related_programs = related_programs.all()
 
             related_program_ids.extend([rp.id for rp in related_programs])
@@ -194,9 +194,11 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         # Cache program IDs to avoid repeated access
         # Handle both QuerySet and prefetched list cases
         programs_relation = instance.product.programs
-        if hasattr(programs_relation, 'all'):
+        if hasattr(programs_relation, "all"):
             # It's a QuerySet
-            programs = list(programs_relation.all()) if programs_relation.exists() else []
+            programs = (
+                list(programs_relation.all()) if programs_relation.exists() else []
+            )
         else:
             # It's already a prefetched list
             programs = list(programs_relation) if programs_relation else []
@@ -234,8 +236,8 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         active_products = instance.product.active_products
         if active_products is None:
             return None
-            
-        if hasattr(active_products, 'exists'):
+
+        if hasattr(active_products, "exists"):
             # It's a QuerySet
             relevant_product = (
                 active_products.order_by("-price").first()
@@ -246,11 +248,17 @@ class CoursePageSerializer(BaseCoursePageSerializer):
             # It's a prefetched list/manager
             try:
                 # Convert to list and sort by price (descending)
-                products_list = list(active_products.all()) if hasattr(active_products, 'all') else list(active_products)
-                relevant_product = max(products_list, key=lambda p: p.price) if products_list else None
+                products_list = (
+                    list(active_products.all())
+                    if hasattr(active_products, "all")
+                    else list(active_products)
+                )
+                relevant_product = (
+                    max(products_list, key=lambda p: p.price) if products_list else None
+                )
             except (AttributeError, TypeError):
                 relevant_product = None
-                
+
         return relevant_product.price if relevant_product else None
 
     @extend_schema_field(list)
@@ -261,7 +269,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         )
 
         # Handle both QuerySet and prefetched list cases
-        if hasattr(linked_instructors, 'all'):
+        if hasattr(linked_instructors, "all"):
             instructor_links = linked_instructors.all()
         else:
             instructor_links = linked_instructors
