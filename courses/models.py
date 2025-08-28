@@ -404,40 +404,44 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def _get_operator_course_requirements(self, main_ops):
         """
         Helper method to fetch all course requirements under operator nodes.
-        
+
         Args:
             main_ops: List of main operator nodes
-            
+
         Returns:
             QuerySet of ProgramRequirement objects for courses
         """
         if not main_ops:
             return ProgramRequirement.objects.none()
-            
+
         # Build a single query to get all course requirements under all operators
         operator_path_conditions = []
         operator_path_params = []
-        
+
         for op in main_ops:
             operator_path_conditions.append("path LIKE %s")
             operator_path_params.append(f"{op.path}%")
-        
-        return ProgramRequirement.objects.filter(
-            program__id=self.id,
-            node_type=ProgramRequirementNodeType.COURSE,
-        ).extra(
-            where=[" OR ".join(operator_path_conditions)],
-            params=operator_path_params
-        ).select_related("course")
+
+        return (
+            ProgramRequirement.objects.filter(
+                program__id=self.id,
+                node_type=ProgramRequirementNodeType.COURSE,
+            )
+            .extra(
+                where=[" OR ".join(operator_path_conditions)],
+                params=operator_path_params,
+            )
+            .select_related("course")
+        )
 
     def _process_course_requirements(self, course_reqs, path_to_operator):
         """
         Helper method to process course requirements and categorize them.
-        
+
         Args:
             course_reqs: QuerySet of course requirements
             path_to_operator: Dict mapping operator paths to operators
-            
+
         Returns:
             Dict with processed course data
         """
@@ -447,52 +451,63 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         required_title = "Required Courses"
         elective_title = "Elective Courses"
         minimum_elective_requirement = None
-        
+
         for req in course_reqs:
             if not req.course:
                 continue
-                
+
             # Find which operator this requirement belongs to
             parent_op = self._find_parent_operator(req, path_to_operator)
             if parent_op is None:
                 continue
-                
-            requirement_type = "Required Courses" if not parent_op.elective_flag else "Elective Courses"
-            
+
+            requirement_type = (
+                "Required Courses"
+                if not parent_op.elective_flag
+                else "Elective Courses"
+            )
+
             # Store titles from actual operator nodes (only set once per operator type)
             if not parent_op.elective_flag and required_title == "Required Courses":
                 required_title = parent_op.title or required_title
             elif parent_op.elective_flag and elective_title == "Elective Courses":
                 elective_title = parent_op.title or elective_title
-                if parent_op.is_min_number_of_operator and minimum_elective_requirement is None:
-                    minimum_elective_requirement = int(parent_op.operator_value) if parent_op.operator_value else None
-            
+                if (
+                    parent_op.is_min_number_of_operator
+                    and minimum_elective_requirement is None
+                ):
+                    minimum_elective_requirement = (
+                        int(parent_op.operator_value)
+                        if parent_op.operator_value
+                        else None
+                    )
+
             # Build course tuples and separate lists
             course_tuple = (req.course, requirement_type)
             courses.append(course_tuple)
-            
+
             if not parent_op.elective_flag:
                 required_courses.append(req.course)
             else:
                 elective_courses.append(req.course)
-        
+
         return {
-            'courses': courses,
-            'required_courses': required_courses,
-            'elective_courses': elective_courses,
-            'required_title': required_title,
-            'elective_title': elective_title,
-            'minimum_elective_requirement': minimum_elective_requirement,
+            "courses": courses,
+            "required_courses": required_courses,
+            "elective_courses": elective_courses,
+            "required_title": required_title,
+            "elective_title": elective_title,
+            "minimum_elective_requirement": minimum_elective_requirement,
         }
 
     def _find_parent_operator(self, req, path_to_operator):
         """
         Helper method to find the parent operator for a course requirement.
-        
+
         Args:
             req: Course requirement object
             path_to_operator: Dict mapping operator paths to operators
-            
+
         Returns:
             Parent operator object or None
         """
@@ -512,23 +527,23 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """
         # Get all operator nodes at depth 2 (direct children of root)
         main_ops = ProgramRequirement.objects.filter(program=self, depth=2).all()
-        
+
         if not main_ops:
             return {
-                'courses': [],
-                'required_courses': [],
-                'elective_courses': [],
-                'required_title': "Required Courses",
-                'elective_title': "Elective Courses",
-                'minimum_elective_requirement': None,
+                "courses": [],
+                "required_courses": [],
+                "elective_courses": [],
+                "required_title": "Required Courses",
+                "elective_title": "Elective Courses",
+                "minimum_elective_requirement": None,
             }
-        
+
         # Fetch all course requirements efficiently
         course_reqs = self._get_operator_course_requirements(main_ops)
-        
+
         # Create a mapping from path prefix to operator for efficient lookup
         path_to_operator = {op.path: op for op in main_ops}
-        
+
         # Process and categorize the requirements
         return self._process_course_requirements(course_reqs, path_to_operator)
 
@@ -541,14 +556,14 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns:
         - list of tuple (Course, string): courses that are either requirements or electives, plus the requirement type
         """
-        return self._courses_with_requirements_data['courses']
+        return self._courses_with_requirements_data["courses"]
 
     @cached_property
     def required_courses(self) -> list:
         """
         Returns just the courses under the "Required Courses" node.
         """
-        return self._courses_with_requirements_data['required_courses']
+        return self._courses_with_requirements_data["required_courses"]
 
     @cached_property
     def required_title(self):
@@ -556,14 +571,14 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns the title of the requirements node that holds the required
         courses (e.g. the one that has elective_flag = False).
         """
-        return self._courses_with_requirements_data['required_title']
+        return self._courses_with_requirements_data["required_title"]
 
     @cached_property
     def elective_courses(self) -> list:
         """
         Returns just the courses under the "Elective Courses" node.
         """
-        return self._courses_with_requirements_data['elective_courses']
+        return self._courses_with_requirements_data["elective_courses"]
 
     @property
     def required_programs(self):
@@ -615,7 +630,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns the title of the requirements node that holds the elective
         courses (e.g. the one that has elective_flag = True).
         """
-        return self._courses_with_requirements_data['elective_title']
+        return self._courses_with_requirements_data["elective_title"]
 
     @cached_property
     def minimum_elective_courses_requirement(self):
@@ -626,7 +641,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             int: Minimum number of elective courses required to be completed by the Program.
                 Returns None, if no value is defined or elective node is absent.
         """
-        return self._courses_with_requirements_data['minimum_elective_requirement']
+        return self._courses_with_requirements_data["minimum_elective_requirement"]
 
     @property
     def is_program(self):
@@ -805,40 +820,47 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         #   that would run a new query even if prefetch_related was used.
         """
         from mitol.common.utils.datetime import now_in_utc
-        
+
         now = now_in_utc()
         best_run = None
         best_start_date = None
-        
+
         # Filter by contract upfront to reduce iterations
         course_runs = self.courseruns.filter(b2b_contract__isnull=True).all()
-        
+
         # First pass: look for non-past, enrollable runs
         for course_run in course_runs:
-            if (course_run.live
+            if (
+                course_run.live
                 and course_run.start_date is not None
                 and course_run.enrollment_start is not None
                 and course_run.enrollment_start <= now
-                and (course_run.enrollment_end is None or course_run.enrollment_end > now)
+                and (
+                    course_run.enrollment_end is None or course_run.enrollment_end > now
+                )
                 and (course_run.end_date is None or course_run.end_date >= now)
                 and (best_run is None or course_run.start_date < best_start_date)
             ):
                 best_run = course_run
                 best_start_date = course_run.start_date
-        
+
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
             for course_run in course_runs:
-                if (course_run.live 
+                if (
+                    course_run.live
                     and course_run.start_date is not None
-                    and course_run.enrollment_start is not None 
+                    and course_run.enrollment_start is not None
                     and course_run.enrollment_start <= now
-                    and (course_run.enrollment_end is None or course_run.enrollment_end > now)
+                    and (
+                        course_run.enrollment_end is None
+                        or course_run.enrollment_end > now
+                    )
                     and (best_run is None or course_run.start_date < best_start_date)
                 ):
                     best_run = course_run
                     best_start_date = course_run.start_date
-        
+
         return best_run
 
     @cached_property
@@ -880,40 +902,47 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         #   that would run a new query even if prefetch_related was used.
         """
         from mitol.common.utils.datetime import now_in_utc
-        
+
         now = now_in_utc()
         best_run = None
         best_start_date = None
-        
+
         # Filter by contract upfront to reduce iterations
         course_runs = self.courseruns.filter(b2b_contract__in=user_contracts).all()
-        
+
         # First pass: look for non-past, enrollable runs
         for course_run in course_runs:
-            if (course_run.live 
+            if (
+                course_run.live
                 and course_run.start_date is not None
-                and course_run.enrollment_start is not None 
+                and course_run.enrollment_start is not None
                 and course_run.enrollment_start <= now
-                and (course_run.enrollment_end is None or course_run.enrollment_end > now)
+                and (
+                    course_run.enrollment_end is None or course_run.enrollment_end > now
+                )
                 and (course_run.end_date is None or course_run.end_date >= now)
                 and (best_run is None or course_run.start_date < best_start_date)
             ):
                 best_run = course_run
                 best_start_date = course_run.start_date
-        
+
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
             for course_run in course_runs:
-                if (course_run.live 
+                if (
+                    course_run.live
                     and course_run.start_date is not None
-                    and course_run.enrollment_start is not None 
+                    and course_run.enrollment_start is not None
                     and course_run.enrollment_start <= now
-                    and (course_run.enrollment_end is None or course_run.enrollment_end > now)
+                    and (
+                        course_run.enrollment_end is None
+                        or course_run.enrollment_end > now
+                    )
                     and (best_run is None or course_run.start_date < best_start_date)
                 ):
                     best_run = course_run
                     best_start_date = course_run.start_date
-        
+
         return best_run
 
     @cached_property
