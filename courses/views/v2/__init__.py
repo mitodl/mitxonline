@@ -140,26 +140,42 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Get the queryset with optimized prefetching for performance"""
-        return Program.objects.filter().select_related(
-            'page'
-        ).prefetch_related(
-            Prefetch('departments',
-                    queryset=Department.objects.only('id', 'name')),
-            
-            Prefetch('all_requirements',
+        return (
+            Program.objects.filter()
+            .select_related("page")
+            .prefetch_related(
+                Prefetch("departments", queryset=Department.objects.only("id", "name")),
+                Prefetch(
+                    "all_requirements",
                     queryset=ProgramRequirement.objects.select_related(
-                        'course',
-                    ).prefetch_related(
-                        Prefetch('course__page__topics',
-                                queryset=CoursesTopic.objects.only('name'))
-                    ).only(
-                        'id', 'path', 'depth', 'numchild', 'node_type',
-                        'operator', 'operator_value', 'program_id', 'course_id',
-                        'required_program_id', 'title', 'elective_flag'
-                    )),
-            
-            Prefetch('programcollection_set',
-                    queryset=ProgramCollection.objects.only('id', 'title'))
+                        "course",
+                    )
+                    .prefetch_related(
+                        Prefetch(
+                            "course__page__topics",
+                            queryset=CoursesTopic.objects.only("name"),
+                        )
+                    )
+                    .only(
+                        "id",
+                        "path",
+                        "depth",
+                        "numchild",
+                        "node_type",
+                        "operator",
+                        "operator_value",
+                        "program_id",
+                        "course_id",
+                        "required_program_id",
+                        "title",
+                        "elective_flag",
+                    ),
+                ),
+                Prefetch(
+                    "programcollection_set",
+                    queryset=ProgramCollection.objects.only("id", "title"),
+                ),
+            )
         )
 
     @extend_schema(

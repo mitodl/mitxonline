@@ -300,8 +300,9 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         """
         # Check for form directly linked to this program first
         financial_assistance_page = (
-            FlexiblePricingRequestForm.objects
-            .filter(selected_program_id=instance.program.id)
+            FlexiblePricingRequestForm.objects.filter(
+                selected_program_id=instance.program.id
+            )
             .live()
             .first()
         )
