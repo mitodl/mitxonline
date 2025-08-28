@@ -129,16 +129,18 @@ class GatewayLoginView(View):
         GET endpoint for logging a user in.
         """
         redirect_url = get_redirect_url(request)
-        if not request.user.is_anonymous:
-            profile = request.user.user_profile
-            if (
-                not profile.completed_onboarding
-                and request.GET.get("skip_onboarding", "0") == "0"
-            ):
-                params = urlencode({"next": redirect_url})
-                redirect_url = f"{settings.MITXONLINE_NEW_USER_LOGIN_URL}?{params}"
-                profile.completed_onboarding = True
-                profile.save()
+        user = request.user
+        if (
+            not user.is_anonymous
+            and not user.should_skip_onboarding
+            and request.GET.get("skip_onboarding", "0") == "0"
+        ):
+            params = urlencode({"next": redirect_url})
+            redirect_url = f"{settings.MITXONLINE_NEW_USER_LOGIN_URL}?{params}"
+
+            profile = user.user_profile
+            profile.completed_onboarding = True
+            profile.save()
         return redirect(redirect_url)
 
 

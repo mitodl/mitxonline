@@ -6,6 +6,7 @@ from pytest_lazy_fixtures import lf
 from rest_framework import status
 
 from authentication.api_gateway.views import AccountActionStartView
+from courses.factories import CourseRunEnrollmentFactory
 from users.api import User
 from users.factories import UserFactory
 from users.models import MALE, UserProfile
@@ -86,13 +87,43 @@ def test_custom_login_view_authenticated_user_with_onboarding(settings, client):
     """Test GatewayLoginView for an authenticated user with incomplete onboarding"""
     settings.MITXONLINE_NEW_USER_LOGIN_URL = "/create-profile"
 
-    client.force_login(UserFactory.create())
+    user = UserFactory.create()
+
+    client.force_login(user)
 
     qs = {"next": "/dashboard"}
     response = client.get(f"{reverse('gateway-login')}?{urlencode(qs)}")
 
+    user.refresh_from_db()
+
     assert response.status_code == 302
     assert response.url == "/create-profile?next=%2Fdashboard"
+    assert user.user_profile.completed_onboarding is True
+
+
+@pytest.mark.parametrize(
+    "next_url", ["/dashboard", "http://openedx.odl.local/courses/abc"]
+)
+def test_custom_login_view_authenticated_user_with_enrollments(
+    settings, client, next_url
+):
+    """Test GatewayLoginView for an authenticated user with incomplete onboarding"""
+    settings.MITXONLINE_NEW_USER_LOGIN_URL = "/create-profile"
+    settings.ALLOWED_REDIRECT_HOSTS.append("openedx.odl.local")
+
+    user = UserFactory.create()
+    CourseRunEnrollmentFactory.create(user=user)
+
+    client.force_login(user)
+
+    assert user.user_profile.completed_onboarding is False
+
+    qs = {"next": next_url}
+    response = client.get(f"{reverse('gateway-login')}?{urlencode(qs)}")
+
+    assert response.status_code == 302
+    assert response.url == next_url
+    assert user.user_profile.completed_onboarding is False
 
 
 def test_custom_login_view_authenticated_user_with_completed_onboarding(client):
