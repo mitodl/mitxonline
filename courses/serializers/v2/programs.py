@@ -106,8 +106,10 @@ class ProgramSerializer(serializers.ModelSerializer):
         return [course[0].id for course in instance.courses if course[0].live]
 
     def get_collections(self, instance) -> list[int]:
-        if hasattr(instance, 'programcollection_set'):
-            return [collection.id for collection in instance.programcollection_set.all()]
+        if hasattr(instance, "programcollection_set"):
+            return [
+                collection.id for collection in instance.programcollection_set.all()
+            ]
 
         # Fallback to database query
         return [
@@ -180,9 +182,17 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_requirements(self, instance):
         """Get program requirements using prefetched data when available"""
-        if hasattr(instance, 'all_requirements'):
-            required_courses, elective_courses = self._process_course_requirements_from_all(instance.all_requirements.all())
-            required_programs, elective_programs = self._process_program_requirements_from_all(instance.all_requirements.all())
+        if hasattr(instance, "all_requirements"):
+            required_courses, elective_courses = (
+                self._process_course_requirements_from_all(
+                    instance.all_requirements.all()
+                )
+            )
+            required_programs, elective_programs = (
+                self._process_program_requirements_from_all(
+                    instance.all_requirements.all()
+                )
+            )
         else:
             # Fallback to  using model properties
             return {
@@ -226,7 +236,10 @@ class ProgramSerializer(serializers.ModelSerializer):
         elective_programs = []
         for req in requirements:
             # Check node_type and required_program_id first to avoid unnecessary queries
-            if req.node_type == ProgramRequirementNodeType.PROGRAM and req.required_program_id:
+            if (
+                req.node_type == ProgramRequirementNodeType.PROGRAM
+                and req.required_program_id
+            ):
                 if self._is_requirement_elective(req):
                     elective_programs.append(req.required_program_id)
                 else:
@@ -293,18 +306,23 @@ class ProgramSerializer(serializers.ModelSerializer):
     def get_topics(self, instance):
         """Get unique topics from courses using prefetched data to avoid N+1 queries"""
         topics = set()
-        
+
         # Check if we have prefetched all_requirements to avoid N+1 queries
-        if hasattr(instance, 'all_requirements'):
+        if hasattr(instance, "all_requirements"):
             for req in instance.all_requirements.all():
-                if req.node_type == ProgramRequirementNodeType.COURSE and req.course and hasattr(req.course, 'page') and req.course.page:
+                if (
+                    req.node_type == ProgramRequirementNodeType.COURSE
+                    and req.course
+                    and hasattr(req.course, "page")
+                    and req.course.page
+                ):
                     topics.update(topic.name for topic in req.course.page.topics.all())
         else:
             # Fallback to original courses property if prefetch not available
             for course in instance.courses:
-                if hasattr(course, 'page') and course.page:
+                if hasattr(course, "page") and course.page:
                     topics.update(topic.name for topic in course.page.topics.all())
-                    
+
         return list(topics)
 
     @extend_schema_field(str)
@@ -355,13 +373,13 @@ class ProgramSerializer(serializers.ModelSerializer):
         Optimized to avoid unnecessary queries.
         """
         # Use cached property if available to avoid repeated queries
-        if hasattr(instance, '_cached_next_starting_run'):
+        if hasattr(instance, "_cached_next_starting_run"):
             next_run = instance._cached_next_starting_run
         else:
             next_run = instance.next_starting_run
             # Cache the result for potential reuse in this request
             instance._cached_next_starting_run = next_run
-            
+
         if next_run and next_run.start_date:
             return next_run.start_date
         return instance.start_date

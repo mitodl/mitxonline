@@ -148,9 +148,9 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     class Meta:
         ordering = ["id"]
         indexes = [
-            models.Index(fields=['live', 'id']),
-            models.Index(fields=['readable_id']),
-            models.Index(fields=['start_date', 'end_date']),
+            models.Index(fields=["live", "id"]),
+            models.Index(fields=["readable_id"]),
+            models.Index(fields=["start_date", "end_date"]),
         ]
 
     objects = ProgramQuerySet.as_manager()
@@ -396,11 +396,10 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         requirements tree.
         """
 
-        return Course.objects.filter(
-            in_programs__program=self
-        ).distinct().prefetch_related(
-            'courseruns',
-            'departments'
+        return (
+            Course.objects.filter(in_programs__program=self)
+            .distinct()
+            .prefetch_related("courseruns", "departments")
         )
 
     @property

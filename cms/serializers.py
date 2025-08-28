@@ -89,7 +89,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
                 selected_course=instance.product
             ).first()
-            
+
             if financial_assistance_page is None:
                 # Check for child form
                 financial_assistance_page = (
@@ -98,32 +98,31 @@ class CoursePageSerializer(BaseCoursePageSerializer):
                     .live()
                     .first()
                 )
-            
+
             return (
-                self._get_financial_assistance_url(instance, financial_assistance_page.slug)
+                self._get_financial_assistance_url(
+                    instance, financial_assistance_page.slug
+                )
                 if financial_assistance_page
                 else ""
             )
 
         # Build list of all valid program IDs efficiently
         program_ids = [program.id for program in instance.product.programs]
-        
+
         # Collect related program IDs using list comprehension
         related_program_ids = [
             related_program.id
             for program in instance.product.programs
             for related_program in program.related_programs
         ]
-        
+
         all_program_ids = program_ids + related_program_ids
 
         # Single query to find program page with children prefetched
         program_page = (
-            ProgramPage.objects
-            .filter(program_id__in=program_ids)
-            .prefetch_related(
-                'get_children__flexiblepricingrequestform'
-            )
+            ProgramPage.objects.filter(program_id__in=program_ids)
+            .prefetch_related("get_children__flexiblepricingrequestform")
             .first()
         )
 
@@ -136,13 +135,16 @@ class CoursePageSerializer(BaseCoursePageSerializer):
                 .first()
             )
             if financial_assistance_page:
-                return self._get_financial_assistance_url(program_page, financial_assistance_page.slug)
+                return self._get_financial_assistance_url(
+                    program_page, financial_assistance_page.slug
+                )
 
         # Single optimized query for form by program selection
         financial_assistance_page = (
-            FlexiblePricingRequestForm.objects
-            .filter(selected_program_id__in=all_program_ids)
-            .select_related('selected_program')
+            FlexiblePricingRequestForm.objects.filter(
+                selected_program_id__in=all_program_ids
+            )
+            .select_related("selected_program")
             .first()
         )
 
@@ -153,12 +155,16 @@ class CoursePageSerializer(BaseCoursePageSerializer):
                     program_page = ProgramPage.objects.get(
                         program=financial_assistance_page.selected_program
                     )
-                    return self._get_financial_assistance_url(program_page, financial_assistance_page.slug)
+                    return self._get_financial_assistance_url(
+                        program_page, financial_assistance_page.slug
+                    )
                 except ProgramPage.DoesNotExist:
                     pass
             else:
                 # Use current instance URL if form is for current course's program
-                return self._get_financial_assistance_url(instance, financial_assistance_page.slug)
+                return self._get_financial_assistance_url(
+                    instance, financial_assistance_page.slug
+                )
 
                 # Check for course-specific form
         financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
@@ -168,10 +174,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         if financial_assistance_page is None:
             # Check for child form as last resort
             financial_assistance_page = (
-                instance.get_children()
-                .type(FlexiblePricingRequestForm)
-                .live()
-                .first()
+                instance.get_children().type(FlexiblePricingRequestForm).live().first()
             )
 
         return (
@@ -254,12 +257,13 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         """
         # Check for form directly linked to this program first
         financial_assistance_page = (
-            FlexiblePricingRequestForm.objects
-            .filter(selected_program_id=instance.program.id)
+            FlexiblePricingRequestForm.objects.filter(
+                selected_program_id=instance.program.id
+            )
             .live()
             .first()
         )
-        
+
         # Check for child form if no direct link found
         if financial_assistance_page is None:
             page_children = instance.get_children()
@@ -267,18 +271,18 @@ class ProgramPageSerializer(serializers.ModelSerializer):
                 financial_assistance_page = (
                     page_children.type(FlexiblePricingRequestForm).live().first()
                 )
-        
+
         # Check related programs if no form found yet
-        if (financial_assistance_page is None and
-            len(instance.program.related_programs) > 0):
-            
-            related_program_ids = [
-                rp.id for rp in instance.program.related_programs
-            ]
-            
+        if (
+            financial_assistance_page is None
+            and len(instance.program.related_programs) > 0
+        ):
+            related_program_ids = [rp.id for rp in instance.program.related_programs]
+
             financial_assistance_page = (
-                FlexiblePricingRequestForm.objects
-                .filter(selected_program_id__in=related_program_ids)
+                FlexiblePricingRequestForm.objects.filter(
+                    selected_program_id__in=related_program_ids
+                )
                 .select_related("selected_program")
                 .live()
                 .first()
@@ -290,7 +294,9 @@ class ProgramPageSerializer(serializers.ModelSerializer):
                     program_page = ProgramPage.objects.get(
                         program=financial_assistance_page.selected_program
                     )
-                    return self._get_financial_assistance_url(program_page, financial_assistance_page.slug)
+                    return self._get_financial_assistance_url(
+                        program_page, financial_assistance_page.slug
+                    )
                 except ProgramPage.DoesNotExist:
                     return ""
 
