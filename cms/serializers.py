@@ -97,14 +97,12 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         Optimize the queryset for CoursePageSerializer to reduce database queries.
         Call this method when using the serializer to prefetch related objects.
         """
-        return queryset.select_related(
-            'product'
-        ).prefetch_related(
-            'product__programs',
-            'product__programs__related_programs',
-            'product__active_products',
-            'linked_instructors__linked_instructor_page',
-            'get_children',
+        return queryset.select_related("product").prefetch_related(
+            "product__programs",
+            "product__programs__related_programs",
+            "product__active_products",
+            "linked_instructors__linked_instructor_page",
+            "get_children",
         )
 
     def _get_financial_assistance_url(self, page, slug):
@@ -119,20 +117,14 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
     def _get_child_form(self, instance):
         """Get financial assistance form from child pages."""
-        return (
-            instance.get_children()
-            .type(FlexiblePricingRequestForm)
-            .live()
-            .first()
-        )
+        return instance.get_children().type(FlexiblePricingRequestForm).live().first()
 
     def _get_program_form(self, program_ids, all_program_ids):
         """Get financial assistance form from program relationships."""
         # Check for program page with child form first
         program_page = (
-            ProgramPage.objects
-            .filter(program_id__in=program_ids)
-            .prefetch_related('get_children__flexiblepricingrequestform')
+            ProgramPage.objects.filter(program_id__in=program_ids)
+            .prefetch_related("get_children__flexiblepricingrequestform")
             .first()
         )
 
@@ -149,9 +141,10 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         # Check for form by program selection
         if all_program_ids:
             form = (
-                FlexiblePricingRequestForm.objects
-                .filter(selected_program_id__in=all_program_ids)
-                .select_related('selected_program')
+                FlexiblePricingRequestForm.objects.filter(
+                    selected_program_id__in=all_program_ids
+                )
+                .select_related("selected_program")
                 .first()
             )
             if form:
@@ -166,18 +159,24 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         Optimized version with reduced database queries.
         """
         # Early return if no product
-        if not hasattr(instance, 'product') or not instance.product:
+        if not hasattr(instance, "product") or not instance.product:
             return ""
-            
+
         # Cache program IDs to avoid repeated access
-        programs = list(instance.product.programs.all()) if instance.product.programs.exists() else []
-        
+        programs = (
+            list(instance.product.programs.all())
+            if instance.product.programs.exists()
+            else []
+        )
+
         if not programs:
             # Handle case with no programs
             form = self._get_course_specific_form(instance)
             if form is None:
                 form = self._get_child_form(instance)
-            return self._get_financial_assistance_url(instance, form.slug) if form else ""
+            return (
+                self._get_financial_assistance_url(instance, form.slug) if form else ""
+            )
 
         # Build program ID lists
         program_ids = [program.id for program in programs]
@@ -190,7 +189,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
         # Try to get program-related form
         program_page, form = self._get_program_form(program_ids, all_program_ids)
-        
+
         if form:
             if program_page:
                 return self._get_financial_assistance_url(program_page, form.slug)
@@ -208,7 +207,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         form = self._get_course_specific_form(instance)
         if form is None:
             form = self._get_child_form(instance)
-            
+
         return self._get_financial_assistance_url(instance, form.slug) if form else ""
 
     def get_current_price(self, instance) -> int | None:
@@ -223,15 +222,20 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     @extend_schema_field(list)
     def get_instructors(self, instance):
         """Get instructor information with optimized database queries."""
-        linked_instructors = instance.linked_instructors.select_related('linked_instructor_page')
+        linked_instructors = instance.linked_instructors.select_related(
+            "linked_instructor_page"
+        )
 
         return [
             {
-                "name": getattr(link.linked_instructor_page, 'instructor_name', ''),
+                "name": getattr(link.linked_instructor_page, "instructor_name", ""),
                 "description": bleach.clean(
-                    getattr(link.linked_instructor_page, 'instructor_bio_short', ''),
-                    tags=[], strip=True
-                ) if getattr(link.linked_instructor_page, 'instructor_bio_short', None) else "",
+                    getattr(link.linked_instructor_page, "instructor_bio_short", ""),
+                    tags=[],
+                    strip=True,
+                )
+                if getattr(link.linked_instructor_page, "instructor_bio_short", None)
+                else "",
             }
             for link in linked_instructors.all()
             if link.linked_instructor_page
@@ -260,11 +264,9 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         Optimize the queryset for ProgramPageSerializer to reduce database queries.
         Call this method when using the serializer to prefetch related objects.
         """
-        return queryset.select_related(
-            'program'
-        ).prefetch_related(
-            'program__related_programs',
-            'get_children',
+        return queryset.select_related("program").prefetch_related(
+            "program__related_programs",
+            "get_children",
         )
 
     def _get_financial_assistance_url(self, page, slug):
@@ -288,8 +290,10 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     @extend_schema_field(str)
     def get_price(self, instance):
         """Get the price text from the program page."""
-        if hasattr(instance, 'price') and instance.price:
-            return instance.price[0].value.get("text") if len(instance.price) > 0 else None
+        if hasattr(instance, "price") and instance.price:
+            return (
+                instance.price[0].value.get("text") if len(instance.price) > 0 else None
+            )
         return None
 
     @extend_schema_field(serializers.URLField)
@@ -319,15 +323,19 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         if financial_assistance_page is None:
             related_programs = instance.program.related_programs
             # Handle both QuerySet and prefetched list cases
-            if hasattr(related_programs, 'all'):
+            if hasattr(related_programs, "all"):
                 related_programs = related_programs.all()
 
-            if related_programs and ((hasattr(related_programs, 'exists') and related_programs.exists()) or len(related_programs) > 0):
+            if related_programs and (
+                (hasattr(related_programs, "exists") and related_programs.exists())
+                or len(related_programs) > 0
+            ):
                 related_program_ids = [rp.id for rp in related_programs]
 
                 financial_assistance_page = (
-                    FlexiblePricingRequestForm.objects
-                    .filter(selected_program_id__in=related_program_ids)
+                    FlexiblePricingRequestForm.objects.filter(
+                        selected_program_id__in=related_program_ids
+                    )
                     .select_related("selected_program")
                     .live()
                     .first()
@@ -339,7 +347,9 @@ class ProgramPageSerializer(serializers.ModelSerializer):
                         program_page = ProgramPage.objects.get(
                             program=financial_assistance_page.selected_program
                         )
-                        return self._get_financial_assistance_url(program_page, financial_assistance_page.slug)
+                        return self._get_financial_assistance_url(
+                            program_page, financial_assistance_page.slug
+                        )
                     except ProgramPage.DoesNotExist:
                         return ""
 
