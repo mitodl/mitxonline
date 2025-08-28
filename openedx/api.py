@@ -20,7 +20,6 @@ from mitol.common.utils import (
     now_in_utc,
     usernameify,
 )
-from mitol.common.utils.user import _find_available_username
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
@@ -106,26 +105,17 @@ def _build_user_data(user, current_username, access_token):
     )
 
 
-def _is_valid_user_data(user_data):
-    """Return True if the user_data is valid to send to openedx"""
-    return all(
-        value
-        for key, value in user_data.items()
-        if key
-        in (
-            "username",
-            "email",
-            "name",
-        )
-    )
-
-
 def _is_duplicate_username_error(resp, data):
     """Check if the response indicates a duplicate username error."""
     return (
         resp.status_code == status.HTTP_409_CONFLICT
         and data.get("error_code") == "duplicate-username"
     )
+
+
+def _is_bad_request(resp):
+    """Check if the response indicates a bad request."""
+    return resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def _extract_username_suggestions(data, suggestions_extracted):
@@ -135,26 +125,6 @@ def _extract_username_suggestions(data, suggestions_extracted):
         if suggestions:
             return suggestions, True
     return [], suggestions_extracted
-
-
-def _ensure_unique_edx_username(desired_username):
-    """
-    Ensure the desired username is unique in the OpenEdxUser table.
-
-    Args:
-        desired_username (str): The desired username
-
-    Returns:
-        str: A unique username, either the original or a modified version
-    """
-    if OpenEdxUser.objects.filter(edx_username=desired_username).exists():
-        return _find_available_username(
-            desired_username,
-            model=OpenEdxUser,
-            username_field="edx_username",
-            max_length=OPENEDX_USERNAME_MAX_LEN,
-        )
-    return desired_username
 
 
 def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
@@ -201,6 +171,8 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
         return True
 
     try:
+        resp = None
+
         while attempt < max_attempts:
             attempt += 1
 
@@ -212,13 +184,6 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
 
             user_data = _build_user_data(user, current_username, access_token)
 
-            if not _is_valid_user_data(user_data):
-                log.info(
-                    "Not creating user in openedx because their data is incomplete: %s",
-                    user.id,
-                )
-                return False
-
             resp = req_session.post(edx_url(OPENEDX_REGISTER_USER_PATH), data=user_data)
 
             if resp.status_code == status.HTTP_200_OK:
@@ -226,27 +191,29 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
                 open_edx_user.save()
                 return True
 
-            if resp.status_code != status.HTTP_409_CONFLICT:
-                break
-
             try:
                 data = resp.json()
             except (ValueError, requests.exceptions.JSONDecodeError):
                 data = {}
 
-            if not _is_duplicate_username_error(resp, data):
+            if _is_duplicate_username_error(resp, data):
+                suggestions, suggestions_extracted = _extract_username_suggestions(
+                    data, suggestions_extracted
+                )
+                if suggestions:
+                    suggested_usernames = suggestions
+
+                if not suggested_usernames:
+                    break
+
+                current_username = suggested_usernames.pop(0)
+            elif _is_bad_request(resp):
+                open_edx_user.has_sync_error = True
+                open_edx_user.sync_error_data = data
+                open_edx_user.save()
+                return False
+            else:
                 break
-
-            suggestions, suggestions_extracted = _extract_username_suggestions(
-                data, suggestions_extracted
-            )
-            if suggestions:
-                suggested_usernames = suggestions
-
-            if not suggested_usernames:
-                break
-
-            current_username = suggested_usernames.pop(0)
 
         if attempt >= max_attempts:
             log.error("Failed to create Open edX user after %d attempts.", max_attempts)
@@ -586,6 +553,9 @@ def repair_faulty_edx_user(user):
                 edX auth token was created.
     """
     created_user, created_auth_token = False, False
+
+    log.debug("Repairing faulty openedx user: %s", user.id)
+
     try:
         created_user = create_edx_user(user)
     except Exception as e:
@@ -619,15 +589,8 @@ def repair_faulty_openedx_users():
     """
     Loops through all Users that are incorrectly configured with the openedx and attempts to get
     them in the correct state.
-
-    Returns:
-        list of User: Users that were successfully repaired
     """
-    now = now_in_utc()
-    repaired_users = []
-    for user in User.faulty_openedx_users.filter(
-        created_on__lt=now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS)
-    ):
+    for user in User.faulty_users_iterator():
         try:
             # edX is our only openedx for the time being. If a different openedx is added, this
             # function will need to be updated.
@@ -643,10 +606,6 @@ def repair_faulty_openedx_users():
             log.exception(
                 "Failed to repair faulty user %s (%s)", user.edx_username, user.email
             )
-        else:
-            if created_user or created_auth_token:
-                repaired_users.append(user)
-    return repaired_users
 
 
 def get_valid_edx_api_auth(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS):

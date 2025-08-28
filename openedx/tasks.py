@@ -41,9 +41,8 @@ def repair_faulty_openedx_users():
     """Calls the API method to repair faulty openedx users"""
     if settings.DISABLE_USER_REPAIR_TASK:
         log.info("Skipping repair_faulty_openedx_users task as it is disabled")
-        return None
-    repaired_users = api.repair_faulty_openedx_users()
-    return [user.email for user in repaired_users]
+        return
+    api.repair_faulty_openedx_users()
 
 
 @app.task(acks_late=True)

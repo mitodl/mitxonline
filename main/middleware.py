@@ -21,6 +21,7 @@ class CachelessAPIMiddleware(MiddlewareMixin):
             or request.path.startswith("/checkout/")
         ):
             response["Cache-Control"] = "private, no-store"
+
         return response
 
 
