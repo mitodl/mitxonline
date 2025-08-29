@@ -1039,6 +1039,7 @@ def test_program_minimum_elective_courses_requirement():
         operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
         operator_value=minimum_elective_required,
         title="Elective Courses",
+        elective_flag=True,
     )
 
     assert program.minimum_elective_courses_requirement == minimum_elective_required
