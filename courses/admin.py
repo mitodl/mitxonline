@@ -116,7 +116,11 @@ class CourseRunAdmin(TimestampedModelAdmin):
         "enrollment_start",
         "upgrade_deadline",
     )
-    list_filter = ["live", "course"]
+    list_filter = [
+        "live",
+        "course",
+        "b2b_contract",
+    ]
     raw_id_fields = ("course",)
 
     formfield_overrides = {

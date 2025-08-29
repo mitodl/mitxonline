@@ -168,6 +168,9 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     enrollment_end = models.DateTimeField(null=True, blank=True, db_index=True)
     start_date = models.DateTimeField(null=True, blank=True, db_index=True)
     end_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    b2b_only = models.BooleanField(
+        default=False, help_text="Indicates if the program is B2B only"
+    )
 
     @cached_property
     def page(self):

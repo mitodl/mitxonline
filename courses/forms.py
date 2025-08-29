@@ -433,6 +433,7 @@ class ProgramAdminForm(ModelForm):
             "end_date",
             "enrollment_start",
             "enrollment_end",
+            "b2b_only",
         ]
 
     class Media:

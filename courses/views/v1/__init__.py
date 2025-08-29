@@ -113,7 +113,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["id", "live", "readable_id"]
-    queryset = Program.objects.filter().prefetch_related("departments")
+    queryset = Program.objects.filter(b2b_only=False).prefetch_related("departments")
 
     def paginate_queryset(self, queryset):
         """

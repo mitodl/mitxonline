@@ -336,11 +336,10 @@ class Command(BaseCommand):
                     )
                 )
 
-                for course, _ in courseware.courses:
-                    if self.create_run(contract, course):
-                        managed += 1
-                    else:
-                        skipped += 1
+                prog_add, prog_skip = contract.add_program_courses(courseware)
+                contract.save()
+                managed += prog_add
+                skipped += prog_skip
             elif courseware.is_run:
                 # This run already exists, so just add/remove it.
                 # - If the run is owned by a different contract, skip it.
