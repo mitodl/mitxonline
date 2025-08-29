@@ -375,6 +375,7 @@ def test_filter_by_org_id_with_contracted_user(
 def test_filter_by_org_id_without_contract_access(
     contract_ready_course, mock_course_run_clone
 ):
+    """Test that filtering by org_id does nothing if the user isn't in the org"""
     org = OrganizationPageFactory()
     user = UserFactory()
 
@@ -400,14 +401,15 @@ def test_filter_by_org_id_without_contract_access(
 
     filtered = filterset.qs
     assert public_program in filtered
-    assert program_with_contract not in filtered
-    assert filtered.count() == 1
+    assert program_with_contract in filtered
+    assert filtered.count() == 2
 
 
 @pytest.mark.django_db
 def test_filter_by_org_id_unauthenticated_user(
     contract_ready_course, mock_course_run_clone
 ):
+    """Test that filtering by org_id does nothing if the user is unauthenticated"""
     org = OrganizationPageFactory()
 
     program_with_contract = ProgramFactory()
@@ -432,8 +434,8 @@ def test_filter_by_org_id_unauthenticated_user(
 
     filtered = filterset.qs
     assert public_program in filtered
-    assert program_with_contract not in filtered
-    assert filtered.count() == 1
+    assert program_with_contract in filtered
+    assert filtered.count() == 2
 
 
 @pytest.mark.django_db
