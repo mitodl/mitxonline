@@ -4,26 +4,34 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0065_programcollection'),
+        ("courses", "0065_programcollection"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='program',
-            index=models.Index(fields=['live', 'id'], name='courses_pro_live_e5a870_idx'),
+            model_name="program",
+            index=models.Index(
+                fields=["live", "id"], name="courses_pro_live_e5a870_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='program',
-            index=models.Index(fields=['readable_id'], name='courses_pro_readabl_6569d0_idx'),
+            model_name="program",
+            index=models.Index(
+                fields=["readable_id"], name="courses_pro_readabl_6569d0_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='program',
-            index=models.Index(fields=['start_date', 'end_date'], name='courses_pro_start_d_f77821_idx'),
+            model_name="program",
+            index=models.Index(
+                fields=["start_date", "end_date"], name="courses_pro_start_d_f77821_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='programrequirement',
-            index=models.Index(fields=['program', 'node_type', 'depth'], name='courses_pro_program_4f3727_idx'),
+            model_name="programrequirement",
+            index=models.Index(
+                fields=["program", "node_type", "depth"],
+                name="courses_pro_program_4f3727_idx",
+            ),
         ),
     ]
