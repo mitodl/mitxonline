@@ -20,7 +20,6 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from cms.serializers import CoursePageSerializer
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -283,7 +282,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Get the queryset for the viewset."""
 
-        queryset = (
+        return (
             Course.objects.select_related("page")
             .prefetch_related("departments")
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
@@ -291,9 +290,6 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by("title")
             .distinct()
         )
-
-        # Apply CMS serializer optimizations for course pages
-        return CoursePageSerializer.optimize_queryset(queryset)
 
     def get_serializer_context(self):
         added_context = {}

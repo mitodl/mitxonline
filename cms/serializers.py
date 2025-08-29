@@ -77,11 +77,6 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     instructors = serializers.SerializerMethodField()
     current_price = serializers.SerializerMethodField()
 
-    @classmethod
-    def optimize_queryset(cls, queryset, **kwargs):
-        """Optimize Course queryset to reduce database queries"""
-        return queryset.select_related("page")
-
     def _get_financial_assistance_url(self, page, slug):
         """Helper method to construct financial assistance URL"""
         return f"{page.get_url()}{slug}/" if page and slug else ""

@@ -25,7 +25,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from reversion.models import Version
 
-from cms.serializers import CoursePageSerializer
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -190,8 +189,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 .all()
             )
 
-        # Apply CMS serializer optimizations for course pages
-        return CoursePageSerializer.optimize_queryset(queryset)
+        return queryset
 
     def get_serializer_context(self):
         added_context = {}
