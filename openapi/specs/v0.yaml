@@ -1630,7 +1630,7 @@ components:
         instructors:
           type: array
           items: {}
-          description: Get instructor information with optimized database queries.
+          description: Get instructor information
           readOnly: true
       required:
       - current_price
@@ -3118,7 +3118,7 @@ components:
       - uuid
     ProgramPage:
       type: object
-      description: Program page model serializer with optimized database queries
+      description: Program page model serializer
       properties:
         feature_image_src:
           type: string
@@ -4584,9 +4584,8 @@ components:
         start_date:
           type: string
           nullable: true
-          description: |-
-            Get the start date of the program by finding the first available run.
-            Optimized to avoid unnecessary queries.
+          description: Get the start date of the program by finding the first available
+            run.
           readOnly: true
         end_date:
           type: string

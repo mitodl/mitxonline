@@ -400,7 +400,6 @@ class ProgramSerializer(serializers.ModelSerializer):
     def get_start_date(self, instance) -> str | None:
         """
         Get the start date of the program by finding the first available run.
-        Optimized to avoid unnecessary queries.
         """
         # Use cached property if available to avoid repeated queries
         if hasattr(instance, "_cached_next_starting_run"):

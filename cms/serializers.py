@@ -172,9 +172,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     def get_financial_assistance_form_url(self, instance):
         """
         Returns URL of the Financial Assistance Form.
-        Optimized version with reduced database queries.
         """
-        # Early return if no product
         if not hasattr(instance, "product") or not instance.product:
             return ""
 
@@ -231,7 +229,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
     @extend_schema_field(list)
     def get_instructors(self, instance):
-        """Get instructor information with optimized database queries."""
+        """Get instructor information"""
         # Handle both QuerySet and prefetched list cases
         linked_instructors = instance.linked_instructors
 
@@ -269,7 +267,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
 
 class ProgramPageSerializer(serializers.ModelSerializer):
-    """Program page model serializer with optimized database queries"""
+    """Program page model serializer"""
 
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
@@ -307,7 +305,6 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     def get_financial_assistance_form_url(self, instance):
         """
         Returns URL of the Financial Assistance Form.
-        Optimized version with reduced database queries.
         """
         # Check for form directly linked to this program first
         financial_assistance_page = (

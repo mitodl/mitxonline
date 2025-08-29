@@ -139,7 +139,6 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = ProgramFilterSet
 
     def get_queryset(self):
-        """Get the queryset with optimized prefetching for performance"""
         return (
             Program.objects.filter()
             .select_related("page")
