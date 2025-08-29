@@ -144,6 +144,83 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
         }
 
 
+@pytest.mark.parametrize(
+    ("is_anonymous", "has_openedx_user", "has_edx_username"),
+    [
+        (True, True, True),
+        (True, True, False),
+        (True, False, False),
+        (False, True, True),
+        (False, True, False),
+        (False, False, False),
+    ],
+)
+def test_get_userinfo(client, user, is_anonymous, has_openedx_user, has_edx_username):
+    """Tests userinfo endpoint when user is anonymous, has no edx_username, or is valid"""
+    b2b_orgs = []
+
+    if not is_anonymous:
+        client.force_login(user)
+
+    if not has_openedx_user:
+        user.openedx_users.all().delete()
+
+    if has_openedx_user and not has_edx_username:
+        openedx_user = user.openedx_users.first()
+        openedx_user.edx_username = None
+        openedx_user.save()
+
+    resp = client.get(reverse("userinfo_api"))
+
+    if is_anonymous or not has_openedx_user or not has_edx_username:
+        assert resp.status_code == status.HTTP_409_CONFLICT
+    else:
+        assert resp.status_code == status.HTTP_200_OK
+
+    if is_anonymous or not has_openedx_user or not has_edx_username:
+        assert resp.json() == {"error": "User has no edx_username."}
+    else:
+        assert resp.json() == {
+            "id": user.id,
+            "username": user.edx_username,
+            "email": user.email,
+            "name": user.name,
+            "legal_address": {
+                "first_name": user.legal_address.first_name,
+                "last_name": user.legal_address.last_name,
+                "country": user.legal_address.country,
+                "state": user.legal_address.state,
+            },
+            "user_profile": {
+                "gender": user.user_profile.gender,
+                "year_of_birth": user.user_profile.year_of_birth,
+                "addl_field_flag": user.user_profile.addl_field_flag,
+                "company": user.user_profile.company,
+                "job_title": user.user_profile.job_title,
+                "industry": user.user_profile.industry,
+                "job_function": user.user_profile.job_function,
+                "company_size": user.user_profile.company_size,
+                "years_experience": user.user_profile.years_experience,
+                "leadership_level": user.user_profile.leadership_level,
+                "highest_education": user.user_profile.highest_education,
+                "type_is_student": user.user_profile.type_is_student,
+                "type_is_professional": user.user_profile.type_is_professional,
+                "type_is_educator": user.user_profile.type_is_educator,
+                "type_is_other": user.user_profile.type_is_other,
+            },
+            "is_anonymous": False,
+            "is_authenticated": True,
+            "is_editor": False,
+            "created_on": drf_datetime(user.created_on),
+            "updated_on": drf_datetime(user.updated_on),
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
+            "grants": list(user.get_all_permissions()),
+            "is_active": True,
+            "b2b_organizations": b2b_orgs,
+        }
+
+
 @pytest.mark.django_db
 def test_countries_states_view(client):
     """Test that a list of countries and states is returned"""

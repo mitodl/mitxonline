@@ -12,4 +12,5 @@ def test_well_known_openid_configuration(client, settings):
         "issuer": "http://mitx-online.local",
         "authorization_endpoint": "http://mitx-online.local/oauth2/authorize/",
         "token_endpoint": "http://mitx-online.local/oauth2/token/",
+        "userinfo_endpoint": "http://mitx-online.local/api/v0/userinfo",
     }
