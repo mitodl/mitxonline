@@ -579,3 +579,57 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     )
     assert resp.status_code == status.HTTP_200_OK
     assert len(resp.json()) == 0
+
+
+def test_program_filter_for_b2b_org(user, mock_course_run_clone):
+    """Test that filtering programs by org works as expected."""
+
+    org = OrganizationPageFactory.create()
+    contract = ContractPageFactory.create(organization=org)
+
+    regular_program = ProgramFactory.create()
+    b2b_program = ProgramFactory.create(b2b_only=True)
+
+    regular_course = CourseFactory.create()
+    CourseRunFactory.create(course=regular_course)
+    regular_program.add_requirement(regular_course)
+    regular_program.save()
+
+    b2b_course = CourseFactory.create()
+    CourseRunFactory.create(course=b2b_course)
+    b2b_program.add_requirement(b2b_course)
+    b2b_program.add_requirement(regular_course)
+    b2b_program.b2b_only = True
+    b2b_program.save()
+
+    contract.add_program_courses(b2b_program)
+    contract.save()
+
+    user.b2b_contracts.add(contract)
+    user.save()
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    resp = client.get(reverse("v2:programs_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["count"] == 1
+    assert data["results"][0]["id"] == regular_program.id
+
+    resp = client.get(reverse("v2:programs_api-list"), data={"org_id": org.id})
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["count"] == 1
+    assert data["results"][0]["id"] == b2b_program.id
+
+    resp = client.get(reverse("v2:programs_api-detail", kwargs={"pk": b2b_program.id}))
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    resp = client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": b2b_program.id}),
+        data={"org_id": org.id},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["id"] == b2b_program.id
