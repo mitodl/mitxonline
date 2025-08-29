@@ -353,9 +353,10 @@ def test_filter_by_org_id_with_contracted_user(
 
     program_with_contract = ProgramFactory.create()
     (course, _) = contract_ready_course
-    create_contract_run(contract, course)
-
     program_with_contract.add_requirement(course)
+    program_with_contract.refresh_from_db()
+
+    contract.add_program_courses(program_with_contract)
 
     # Unrelated program (should not be included)
     ProgramFactory()
@@ -380,9 +381,10 @@ def test_filter_by_org_id_without_contract_access(
     program_with_contract = ProgramFactory()
     (course, _) = contract_ready_course
     contract = ContractPageFactory(active=True, organization=org)
-    create_contract_run(contract, course)
-
     program_with_contract.add_requirement(course)
+    program_with_contract.refresh_from_db()
+
+    contract.add_program_courses(program_with_contract)
 
     # Another program without contract (should be included)
     public_program = ProgramFactory()
@@ -411,9 +413,11 @@ def test_filter_by_org_id_unauthenticated_user(
     program_with_contract = ProgramFactory()
     (course, _) = contract_ready_course
     contract = ContractPageFactory(active=True, organization=org)
-    create_contract_run(contract, course)
 
     program_with_contract.add_requirement(course)
+    program_with_contract.refresh_from_db()
+
+    contract.add_program_courses(program_with_contract)
 
     public_program = ProgramFactory()
 

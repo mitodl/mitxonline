@@ -5,7 +5,7 @@ Course API Views version 2
 import contextlib
 
 import django_filters
-from django.db.models import Count, Exists, OuterRef, Prefetch
+from django.db.models import Count, Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -32,8 +32,6 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramCollection,
-    ProgramRequirement,
-    ProgramRequirementNodeType,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
@@ -85,48 +83,14 @@ class ProgramFilterSet(django_filters.FilterSet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    @property
-    def qs(self):
-        """If the request isn't explicitly filtering on org_id, exclude contracted courses."""
-
-        if "org_id" not in getattr(self.request, "GET", {}):
-            program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
-                node_type=ProgramRequirementNodeType.COURSE,
-                course__courseruns__b2b_contract__isnull=False,
-                program_id=OuterRef("pk"),
-            )
-            return (
-                super()
-                .qs.annotate(
-                    has_contracted_courses=Exists(
-                        program_requirements_with_contract_runs
-                    )
-                )
-                .filter(has_contracted_courses=False)
-            )
-
-        return super().qs
-
     def filter_by_org_id(self, queryset, _, org_id):
+        """Filter according to org_id. If the user is in org_id, return only related programs."""
         if self.request and user_has_org_access(self.request.user, org_id):
-            program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
-                node_type=ProgramRequirementNodeType.COURSE,
-                course__courseruns__b2b_contract__organization_id=org_id,
-                course__courseruns__b2b_contract__active=True,
-                program_id=OuterRef("pk"),
-            )
-            return queryset.annotate(
-                has_contracted_courses=Exists(program_requirements_with_contract_runs)
-            ).filter(has_contracted_courses=True)
+            return queryset.filter(contracts__organization__id=org_id)
         else:
-            program_requirements_with_contract_runs = ProgramRequirement.objects.filter(
-                node_type=ProgramRequirementNodeType.COURSE,
-                course__courseruns__b2b_contract__isnull=False,
-                program_id=OuterRef("pk"),
+            return queryset.annotate(has_contracts=Count("contracts")).filter(
+                has_contracts=0
             )
-            return queryset.annotate(
-                has_contracted_courses=Exists(program_requirements_with_contract_runs)
-            ).filter(has_contracted_courses=False)
 
 
 class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
