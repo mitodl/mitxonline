@@ -108,6 +108,11 @@ class OrganizationPage(Page):
             .distinct()
         )
 
+    def __str__(self):
+        """Return a reasonable representation of the org as a string."""
+
+        return f"{self.name} <{self.org_key}>"
+
 
 class ContractPage(Page):
     """Stores information about a contract with an organization."""

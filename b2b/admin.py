@@ -9,14 +9,17 @@ from b2b.models import (
 )
 
 
-@admin.register(DiscountContractAttachmentRedemption)
-class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
-    """Admin for discount attachments."""
+class ReadOnlyModelAdmin(admin.ModelAdmin):
+    """Read-only admin for models."""
 
-    list_display = ["user", "contract", "discount", "created_on"]
-    date_hierarchy = "created_on"
-    fields = ["user", "contract", "discount", "created_on"]
-    readonly_fields = ["user", "contract", "discount", "created_on"]
+    def __init__(self, *args, **kwargs):
+        """Set the readonly_fields to the fields if we can."""
+
+        self.readonly_fields = self.fields or [
+            field.name
+            for field in self.model._meta.fields  # noqa: SLF001
+        ]
+        super().__init__(*args, **kwargs)
 
     def has_add_permission(self, request):  # noqa: ARG002
         """Disable create."""
@@ -29,5 +32,57 @@ class DiscountContractAttachmentRedemptionAdmin(admin.ModelAdmin):
         return False
 
 
-admin.site.register(OrganizationPage)
-admin.site.register(ContractPage)
+@admin.register(DiscountContractAttachmentRedemption)
+class DiscountContractAttachmentRedemptionAdmin(ReadOnlyModelAdmin):
+    """Admin for discount attachments."""
+
+    list_display = ["user", "contract", "discount", "created_on"]
+    date_hierarchy = "created_on"
+    fields = ["user", "contract", "discount", "created_on"]
+    readonly_fields = ["user", "contract", "discount", "created_on"]
+
+
+@admin.register(ContractPage)
+class ContractPageAdmin(ReadOnlyModelAdmin):
+    """Admin for contract pages."""
+
+    list_display = [
+        "id",
+        "slug",
+        "title",
+        "organization",
+        "integration_type",
+        "contract_start",
+        "contract_end",
+    ]
+    list_filter = ["integration_type", "organization", "contract_start", "contract_end"]
+    date_hierarchy = "contract_start"
+    fields = [
+        "id",
+        "active",
+        "slug",
+        "organization",
+        "title",
+        "description",
+        "integration_type",
+        "contract_start",
+        "contract_end",
+        "max_learners",
+        "enrollment_fixed_price",
+    ]
+
+
+@admin.register(OrganizationPage)
+class OrganizationPageAdmin(ReadOnlyModelAdmin):
+    """Admin for organization pages."""
+
+    list_display = ["id", "slug", "name", "org_key"]
+    fields = [
+        "id",
+        "slug",
+        "name",
+        "org_key",
+        "description",
+        "logo",
+        "sso_organization_id",
+    ]
