@@ -118,7 +118,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = Program.objects.filter().prefetch_related("departments")
         # Optimize queryset for Program objects - use 'page' (reverse relation to ProgramPage)
-        return queryset.select_related("page").prefetch_related("page__get_children")
+        return queryset.select_related("page")
 
     def paginate_queryset(self, queryset):
         """

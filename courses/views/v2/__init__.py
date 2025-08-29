@@ -145,7 +145,6 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
             Program.objects.filter()
             .select_related("page")
             .prefetch_related(
-                "page__get_children",  # Optimize for ProgramPageSerializer.get_financial_assistance_form_url
                 Prefetch("departments", queryset=Department.objects.only("id", "name")),
                 Prefetch(
                     "all_requirements",
