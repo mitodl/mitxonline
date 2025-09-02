@@ -54,7 +54,7 @@ urlpatterns = [
         name="users_api-current_user",
     ),
     path(
-        "api/v0/userinfo",
+        "api/v0/userinfo/",
         UserInfoViewSet.as_view({"get": "retrieve"}),
         name="userinfo_api",
     ),
