@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0065_programcollection"),
+        ("courses", "0066_add_b2b_only_flag_for_programs"),
     ]
 
     operations = [
