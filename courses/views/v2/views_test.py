@@ -110,8 +110,8 @@ def test_get_programs(
     assert len(programs_data) == Pagination.page_size
     for program, program_data in zip(programs, programs_data):
         # Clear cached property to ensure consistent data between API and serializer
-        if hasattr(program, '_courses_with_requirements_data'):
-            delattr(program, '_courses_with_requirements_data')
+        if hasattr(program, "_courses_with_requirements_data"):
+            delattr(program, "_courses_with_requirements_data")
         assert_drf_json_equal(
             program_data, ProgramSerializer(program).data, ignore_order=True
         )
