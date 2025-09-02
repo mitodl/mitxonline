@@ -16,10 +16,11 @@ from django.utils.translation import gettext_lazy as _
 from django_scim.models import AbstractSCIMUserMixin
 from mitol.common.models import TimestampedModel, UserGlobalIdMixin
 from mitol.common.utils import now_in_utc
+from mitol.common.utils.collections import chunks
 
 from b2b.models import OrganizationPage
 from cms.constants import CMS_EDITORS_GROUP_NAME
-from openedx.constants import OPENEDX_USERNAME_MAX_LEN
+from openedx.constants import OPENEDX_REPAIR_GRACE_PERIOD_MINS, OPENEDX_USERNAME_MAX_LEN
 from openedx.models import OpenEdxUser
 
 MALE = "m"
@@ -228,24 +229,24 @@ class FaultyOpenEdxUserManager(BaseUserManager):
     """User manager that defines a queryset of Users that are incorrectly configured in the openedx"""
 
     def get_queryset(self):  # pylint: disable=missing-docstring
-        faulty_users = (
+        return (
             super()
             .get_queryset()
-            .select_related("openedx_api_auth")
-            .prefetch_related("openedx_users")
             .annotate(
                 openedx_user_count=Count("openedx_users"),
                 openedx_api_auth_count=Count("openedx_api_auth"),
             )
             .filter(is_active=True)
-        )
-        return (
-            faulty_users.filter(
+            .filter(
                 Q(openedx_user_count=0)
                 | Q(openedx_api_auth_count=0)
-                | Q(openedx_users__has_been_synced=False)
+                | Q(
+                    openedx_users__has_been_synced=False,
+                )
             )
-        ).distinct()
+            .exclude(openedx_users__has_sync_error=True)
+            .distinct()
+        )
 
 
 class User(
@@ -297,6 +298,20 @@ class User(
 
     objects = UserManager()
     faulty_openedx_users = FaultyOpenEdxUserManager()
+
+    @classmethod
+    def faulty_users_iterator(cls):
+        """Return a memory-safe iterator for faulty users"""
+        now = now_in_utc()
+        for user_ids in chunks(
+            cls.faulty_openedx_users.filter(
+                created_on__lt=now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS)
+            ).values_list("id", flat=True),
+            chunk_size=1000,
+        ):
+            yield from User.objects.filter(id__in=user_ids).prefetch_related(
+                "openedx_users", "openedx_api_auth"
+            )
 
     def get_full_name(self):
         """Returns the user's fullname"""
@@ -353,6 +368,13 @@ class User(
             self.b2b_organizations.filter(
                 sso_organization_id__isnull=False
             ).values_list("sso_organization_id", flat=True)
+        )
+
+    @property
+    def should_skip_onboarding(self):
+        return (
+            self.user_profile.completed_onboarding
+            or self.courserunenrollment_set(manager="all_objects").exists()
         )
 
     class Meta:

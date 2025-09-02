@@ -36,9 +36,9 @@ class Command(BaseCommand):
             self.stdout.write(f"Repairing user '{user.edx_username}' ({user.email})")
             users = [user]
         else:
-            users_to_repair = User.faulty_openedx_users
+            users_to_repair = User.faulty_openedx_users.all()
             self.stdout.write(f"Repairing {users_to_repair.count()} users")
-            users = users_to_repair.iterator()
+            users = User.faulty_users_iterator()
 
         error_count = 0
         success_count = 0

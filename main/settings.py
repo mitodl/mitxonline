@@ -36,7 +36,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.127.4"
+VERSION = "0.127.9"
 
 log = logging.getLogger()
 
@@ -83,6 +83,11 @@ SITE_BASE_URL = get_string(
     default=None,
     description="Base url for the application in the format PROTOCOL://HOSTNAME[:PORT]",
     required=True,
+)
+MITXONLINE_DOCKER_BASE_URL = get_string(
+    name="MITXONLINE_DOCKER_BASE_URL",
+    default=None,
+    description="Base url for the application when accessed from inside docker containers in the format PROTOCOL://HOSTNAME[:PORT]",
 )
 
 # SECURITY WARNING: keep the secret key used in production secret!
@@ -240,6 +245,7 @@ INSTALLED_APPS = (
     "wagtail",
     "modelcluster",
     "taggit",
+    "django_object_actions",
     # django-robots
     "robots",
     # django-reversion

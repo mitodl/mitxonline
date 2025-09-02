@@ -13,6 +13,7 @@ from wagtail.fields import RichTextField
 from wagtail.models import Page
 
 from b2b.constants import CONTRACT_INTEGRATION_CHOICES, ORG_INDEX_SLUG
+from b2b.exceptions import TargetCourseRunExistsError
 from b2b.tasks import queue_enrollment_code_check
 
 
@@ -108,6 +109,11 @@ class OrganizationPage(Page):
             .distinct()
         )
 
+    def __str__(self):
+        """Return a reasonable representation of the org as a string."""
+
+        return f"{self.name} <{self.org_key}>"
+
 
 class ContractPage(Page):
     """Stores information about a contract with an organization."""
@@ -154,6 +160,11 @@ class ContractPage(Page):
         blank=True,
         null=True,
         help_text="The fixed price for enrollment under this contract. (Set to zero or leave blank for free.)",
+    )
+    programs = models.ManyToManyField(
+        "courses.Program",
+        help_text="The programs associated with this contract.",
+        related_name="contracts",
     )
 
     content_panels = [
@@ -271,6 +282,35 @@ class ContractPage(Page):
         from ecommerce.models import Discount
 
         return Discount.objects.filter(products__product__in=self.get_products()).all()
+
+    def add_program_courses(self, program):
+        """
+        Add a program, and then queue adding all its courses.
+
+        Args:
+        - program (courses.Program): the program to add
+
+        Returns:
+        - tuple, courses created and skipped
+        """
+
+        from b2b.api import create_contract_run
+
+        managed = 0
+        skipped = 0
+
+        for course, _ in program.courses:
+            try:
+                if create_contract_run(self, course):
+                    managed += 1
+                else:
+                    skipped += 1
+            except TargetCourseRunExistsError:  # noqa: PERF203
+                skipped += 1
+
+        self.programs.add(program)
+
+        return (managed, skipped)
 
 
 class DiscountContractAttachmentRedemption(TimestampedModel):

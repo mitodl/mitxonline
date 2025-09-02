@@ -1,6 +1,34 @@
 Release Notes
 =============
 
+Version 0.127.9 (Released September 02, 2025)
+---------------
+
+- Skip onboarding if the user has any enrollments (#2912)
+
+Version 0.127.8 (Released August 28, 2025)
+---------------
+
+- Stop sync on openedx user if validation errors occur (#2881)
+- fix: email logo distortion (#2899)
+
+Version 0.127.7 (Released August 27, 2025)
+---------------
+
+- Save generated username in desired field too since locking uses this (#2906)
+- fix: pass service worker for course sync (#2901)
+- Add an IsAdminOrReadOnly permission set for contracts/orgs (#2903)
+- Fixes for username generation and B2B enrollment processing (#2893)
+- Revert "Update hypothesis to 4.57.1"
+- Update hypothesis to 4.57.1
+- Show error if upgrade deadline passed (#2898)
+- feat: use courselist for course sync (#2896)
+- Add option to retire user with no edx account (#2891)
+- Actually make the contract attach API not require CSRF (#2895)
+- Add rate limiting for all Hubspot sync functions (#2894)
+- Re enrollment issue (#2892)
+- Only reconcile B2B organizations if we need to (#2889)
+
 Version 0.127.4 (Released August 25, 2025)
 ---------------
 
