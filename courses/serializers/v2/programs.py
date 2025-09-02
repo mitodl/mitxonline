@@ -401,13 +401,8 @@ class ProgramSerializer(serializers.ModelSerializer):
         """
         Get the start date of the program by finding the first available run.
         """
-        # Use cached property if available to avoid repeated queries
-        if hasattr(instance, "_cached_next_starting_run"):
-            next_run = instance._cached_next_starting_run
-        else:
-            next_run = instance.next_starting_run
-            # Cache the result for potential reuse in this request
-            instance._cached_next_starting_run = next_run
+        # Use next_starting_run property to avoid repeated queries
+        next_run = instance.next_starting_run
 
         if next_run and next_run.start_date:
             return next_run.start_date
