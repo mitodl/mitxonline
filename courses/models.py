@@ -97,25 +97,7 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
             enrollment_end_date: datetime, the date to check for enrollment end.
                                If None, uses current time.
         """
-
-        now = now_in_utc()
-        if enrollment_end_date is None:
-            enrollment_end_date = now
-
-        return self.filter(
-            # Check if enrollment period is still open
-            (
-                models.Q(enrollment_end__isnull=True)
-                | models.Q(enrollment_end__gt=enrollment_end_date)
-            )
-            # Ensure enrollment has started
-            & models.Q(enrollment_start__isnull=False)
-            & models.Q(enrollment_start__lte=now)
-            # Course run must be live
-            & models.Q(live=True)
-            # Course run must have started
-            & models.Q(start_date__isnull=False)
-        )
+        return self.filter(self.get_enrollable_filter(enrollment_end_date))
 
     def unenrollable(self):
         """Applies a filter for Course runs that are closed for enrollment."""
