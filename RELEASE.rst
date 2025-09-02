@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.128.1
+---------------
+
+- fix: append slash to userinfo endpoint (#2919)
+- Add hard FK between contracts and programs for B2B (#2915)
+- feat: add userinfo endpoint (#2897)
+- Fixes for contract/org page displays in Django Admin (#2914)
+
 Version 0.127.9 (Released September 02, 2025)
 ---------------
 
