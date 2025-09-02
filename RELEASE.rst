@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.128.0
+---------------
+
+- feat: add userinfo endpoint (#2897)
+- Fixes for contract/org page displays in Django Admin (#2914)
+
 Version 0.127.9 (Released September 02, 2025)
 ---------------
 
