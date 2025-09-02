@@ -379,7 +379,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/StaffDashboardUser'
           description: ''
-  /api/v0/userinfo:
+  /api/v0/userinfo/:
     get:
       operationId: userinfo_retrieve
       description: |-
