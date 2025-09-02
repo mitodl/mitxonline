@@ -32,6 +32,7 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramCollection,
+    ProgramRequirement,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
