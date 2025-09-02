@@ -115,7 +115,11 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ["id", "live", "readable_id"]
 
     def get_queryset(self):
-        return Program.objects.filter(b2b_only=False).prefetch_related("departments").select_related("page")
+        return (
+            Program.objects.filter(b2b_only=False)
+            .prefetch_related("departments")
+            .select_related("page")
+        )
 
     def paginate_queryset(self, queryset):
         """
