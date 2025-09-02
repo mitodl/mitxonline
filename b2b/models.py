@@ -299,12 +299,14 @@ class ContractPage(Page):
         managed = 0
         skipped = 0
 
+        # Clear any cached properties to ensure fresh data
+        if hasattr(program, '_courses_with_requirements_data'):
+            delattr(program, '_courses_with_requirements_data')
+
         for course, _ in program.courses:
             try:
-                if create_contract_run(self, course):
-                    managed += 1
-                else:
-                    skipped += 1
+                create_contract_run(self, course)
+                managed += 1
             except TargetCourseRunExistsError:  # noqa: PERF203
                 skipped += 1
 
