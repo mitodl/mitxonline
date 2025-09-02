@@ -300,8 +300,8 @@ class ContractPage(Page):
         skipped = 0
 
         # Clear any cached properties to ensure fresh data
-        if hasattr(program, '_courses_with_requirements_data'):
-            delattr(program, '_courses_with_requirements_data')
+        if hasattr(program, "_courses_with_requirements_data"):
+            delattr(program, "_courses_with_requirements_data")
 
         for course, _ in program.courses:
             try:
