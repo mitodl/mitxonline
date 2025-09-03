@@ -26,6 +26,10 @@ amount is 100% or less. You can set the discount payment type using --payment-ty
 The payment type should be one of (`marketing`, `sales`, `financial-assistance`,
 `customer-support`, or `staff`).
 
+For example:
+
+./manage.py generate_discount_code  --count 2 --payment-type customer-support  --prefix B2B_NNN_3T2025_ --expires 2026-08-15 --one-time --amount 100 --discount-type percent-off
+
 """
 
 import csv
