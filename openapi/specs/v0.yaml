@@ -1620,16 +1620,19 @@ components:
           readOnly: true
         description:
           type: string
+          description: Get cleaned description text.
           readOnly: true
         live:
           type: boolean
           readOnly: true
         length:
           type: string
+          description: Get cleaned length text.
           readOnly: true
         effort:
           type: string
           nullable: true
+          description: Get cleaned effort text.
           readOnly: true
         financial_assistance_form_url:
           type: string
@@ -1638,10 +1641,12 @@ components:
         current_price:
           type: integer
           nullable: true
+          description: Get the current price of the course product.
           readOnly: true
         instructors:
           type: array
           items: {}
+          description: Get instructor information
           readOnly: true
       required:
       - current_price
@@ -3162,6 +3167,7 @@ components:
           maxLength: 100
         price:
           type: string
+          description: Get the price text from the program page.
           readOnly: true
       required:
       - description
@@ -4537,14 +4543,12 @@ components:
                 required:
                   type: array
                   items:
-                    oneOf:
-                    - type: integer
+                    type: integer
                   description: List of required course IDs
                 electives:
                   type: array
                   items:
-                    oneOf:
-                    - type: integer
+                    type: integer
                   description: List of elective course IDs
             programs:
               type: object
@@ -4552,14 +4556,12 @@ components:
                 required:
                   type: array
                   items:
-                    oneOf:
-                    - type: integer
+                    type: integer
                   description: List of required program IDs
                 electives:
                   type: array
                   items:
-                    oneOf:
-                    - type: integer
+                    type: integer
                   description: List of elective program IDs
           readOnly: true
         req_tree:

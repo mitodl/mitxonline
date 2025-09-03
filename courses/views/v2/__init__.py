@@ -32,6 +32,7 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramCollection,
+    ProgramRequirement,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
@@ -110,8 +111,43 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = ProgramFilterSet
 
     def get_queryset(self):
-        """Get the queryset"""
-        return Program.objects.order_by("title").prefetch_related("departments")
+        return (
+            Program.objects.filter()
+            .select_related("page")
+            .prefetch_related(
+                Prefetch("departments", queryset=Department.objects.only("id", "name")),
+                Prefetch(
+                    "all_requirements",
+                    queryset=ProgramRequirement.objects.select_related(
+                        "course",
+                    )
+                    .prefetch_related(
+                        Prefetch(
+                            "course__page__topics",
+                            queryset=CoursesTopic.objects.only("name"),
+                        )
+                    )
+                    .only(
+                        "id",
+                        "path",
+                        "depth",
+                        "numchild",
+                        "node_type",
+                        "operator",
+                        "operator_value",
+                        "program_id",
+                        "course_id",
+                        "required_program_id",
+                        "title",
+                        "elective_flag",
+                    ),
+                ),
+                Prefetch(
+                    "programcollection_set",
+                    queryset=ProgramCollection.objects.only("id", "title"),
+                ),
+            )
+        )
 
     @extend_schema(
         operation_id="programs_retrieve_v2",

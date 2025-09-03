@@ -246,7 +246,7 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
 
 
 def get_active_contracts_from_basket_items(basket: Basket):
-    """Get active contracts from basket items with optimized queries."""
+    """Get active contracts from basket items"""
     course_run_ct = ContentType.objects.get_for_model(CourseRun)
 
     items = basket.basket_items.select_related("product__content_type").filter(

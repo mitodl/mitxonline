@@ -19,7 +19,8 @@ def test_add_program_courses_to_contract(mocker):
     courseruns = CourseRunFactory.create_batch(3)
     contract = ContractPageFactory.create()
 
-    [program.add_requirement(courserun.course) for courserun in courseruns]
+    for courserun in courseruns:
+        program.add_requirement(courserun.course)
 
     program.refresh_from_db()
 
