@@ -1,8 +1,9 @@
-from cms.api import create_default_courseware_page
-from trino.dbapi import connect
-from trino.auth import BasicAuthentication
-from django.core.management.base import BaseCommand
 from django.conf import settings
+from django.core.management.base import BaseCommand
+from trino.auth import BasicAuthentication
+from trino.dbapi import connect
+
+from cms.api import create_default_courseware_page
 from courses.models import Course, CourseRun, Department
 
 
@@ -19,14 +20,11 @@ class Command(BaseCommand):
                 catalog=settings.TRINO_CATALOG,
                 schema=settings.TRINO_SCHEMA,
             )
-            self.stdout.write(
-                self.style.SUCCESS("Successfully connected to Trino")
-            )
+            self.stdout.write(self.style.SUCCESS("Successfully connected to Trino"))
 
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Failed to connect to Trino: {str(e)}"))
+            self.stdout.write(self.style.ERROR(f"Failed to connect to Trino: {e!s}"))
             raise
-
 
         cur = conn.cursor()
         cur.execute("SELECT * FROM edxorg_to_mitxonline_course_runs")
@@ -40,24 +38,26 @@ class Command(BaseCommand):
                 break
 
             for row in rows:
-
                 row_dict = dict(zip(columns, row))
                 # Skip rows with no department courses or any course with no certificates
                 if (
-                    (not row_dict.get('department_name') and row_dict.get('mitxonline_course_id') is None)
-                    or (row_dict.get('certificate_count') is None or int(row_dict.get('certificate_count', 0)) < 1)
+                    not row_dict.get("department_name")
+                    and row_dict.get("mitxonline_course_id") is None
+                ) or (
+                    row_dict.get("certificate_count") is None
+                    or int(row_dict.get("certificate_count", 0)) < 1
                 ):
                     continue
 
                 department, _ = Department.objects.get_or_create(
-                    name=row_dict.get('department_name')
+                    name=row_dict.get("department_name")
                 )
 
                 (course, created) = Course.objects.get_or_create(
-                    readable_id=row_dict.get('course_readable_id'),
+                    readable_id=row_dict.get("course_readable_id"),
                     defaults={
-                        "title": row_dict.get('course_title'),
-                        "readable_id": row_dict.get('course_readable_id'),
+                        "title": row_dict.get("course_title"),
+                        "readable_id": row_dict.get("course_readable_id"),
                         "live": False,
                     },
                 )
@@ -75,25 +75,25 @@ class Command(BaseCommand):
                             )
                         )
 
-
                 course_run, created_run = CourseRun.objects.get_or_create(
-                    courseware_id=row_dict.get('courseware_id'),
+                    courseware_id=row_dict.get("courseware_id"),
                     defaults={
-                        'course': course,
-                        'run_tag': row_dict.get('run_tag'),
-                        'start_date': row_dict.get('start_date'),
-                        'end_date': row_dict.get('end_date'),
-                        'enrollment_start': row_dict.get('enrollment_start'),
-                        'enrollment_end': row_dict.get('enrollment_end'),
-                        'title': row_dict.get('courserun_title'),
-                        'live': True,
-                        'is_self_paced': row_dict.get('is_self_paced'),
-                    }
-
+                        "course": course,
+                        "run_tag": row_dict.get("run_tag"),
+                        "start_date": row_dict.get("start_date"),
+                        "end_date": row_dict.get("end_date"),
+                        "enrollment_start": row_dict.get("enrollment_start"),
+                        "enrollment_end": row_dict.get("enrollment_end"),
+                        "title": row_dict.get("courserun_title"),
+                        "live": True,
+                        "is_self_paced": row_dict.get("is_self_paced"),
+                    },
                 )
 
                 if created_run:
                     run_success_count += 1
 
         self.stdout.write(self.style.SUCCESS(f"{course_success_count} courses created"))
-        self.stdout.write(self.style.SUCCESS(f"{run_success_count} course runs created"))
+        self.stdout.write(
+            self.style.SUCCESS(f"{run_success_count} course runs created")
+        )
