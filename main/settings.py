@@ -1533,3 +1533,39 @@ DISABLE_USER_REPAIR_TASK = get_bool(
     default=False,
     description="Disable the task so it no-ops",
 )
+
+TRINO_HOST = get_string(
+    name="TRINO_HOST",
+    default="mitol-ol-data-interactive.trino.galaxy.starburst.io",
+    description="Host URL for Trino server",
+)
+
+TRINO_PORT = get_int(
+    name="TRINO_PORT",
+    default=443,
+    description="Port number for Trino server",
+)
+
+TRINO_CATALOG = get_string(
+    name="TRINO_CATALOG",
+    default="ol_data_lake_production",
+    description="Catalog name for Trino queries",
+)
+
+TRINO_SCHEMA = get_string(
+    name="TRINO_SCHEMA",
+    default="ol_warehouse_production",
+    description="Schema name for Trino queries",
+)
+
+TRINO_USER = get_string(
+    name="TRINO_USER",
+    default="trino",
+    description="Username for Trino authentication",
+)
+
+TRINO_PASSWORD = get_string(
+    name="TRINO_PASSWORD",
+    default="",
+    description="Password for Trino authentication",
+)
