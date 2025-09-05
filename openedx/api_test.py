@@ -33,6 +33,7 @@ from openedx.api import (
     get_edx_retirement_service_client,
     get_valid_edx_api_auth,
     reconcile_edx_username,
+    repair_all_faulty_openedx_users,
     repair_faulty_edx_user,
     repair_faulty_openedx_users,
     retry_failed_edx_enrollments,
@@ -706,6 +707,24 @@ def _create_faulty_users():
     ]
 
 
+def test_repair_all_faulty_openedx_users(mocker):
+    """
+    Tests that repair_faulty_openedx_users loops through all incorrectly configured Users, attempts to repair
+    them, and continues iterating through the Users if an exception is raised
+    """
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        users = _create_faulty_users()
+
+    patched_repair_users = mocker.patch(
+        "openedx.api.repair_faulty_openedx_users",
+    )
+
+    repair_all_faulty_openedx_users()
+
+    assert patched_repair_users.call_count == 1
+    assert list(patched_repair_users.call_args.args[0]) == users
+
+
 @pytest.mark.parametrize("exception_raised", [MockHttpError, Exception, None])
 def test_repair_faulty_openedx_users(mocker, exception_raised):
     """
@@ -725,7 +744,7 @@ def test_repair_faulty_openedx_users(mocker, exception_raised):
             (True, True),
         ],
     )
-    repair_faulty_openedx_users()
+    repair_faulty_openedx_users(users)
 
     assert patched_repair_user.call_count == len(users), (
         patched_repair_user.call_args_list
@@ -739,23 +758,20 @@ def test_repair_faulty_openedx_users(mocker, exception_raised):
 
 def test_retry_users_grace_period(mocker):
     """
-    Tests that repair_faulty_openedx_users does not attempt to repair any users that were recently created
+    Tests that repair_all_faulty_openedx_users does not attempt to repair any users that were recently created
     """
     now = now_in_utc()
     with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS - 1)):
         _create_faulty_users()
     with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS + 1)):
         users_to_repair = _create_faulty_users()
-    patched_repair_user = mocker.patch(
-        "openedx.api.repair_faulty_edx_user", return_value=(True, True)
-    )
+    patched_repair_users = mocker.patch("openedx.api.repair_faulty_openedx_users")
 
-    repair_faulty_openedx_users()
+    repair_all_faulty_openedx_users()
 
-    assert patched_repair_user.call_count == len(users_to_repair)
+    assert patched_repair_users.call_count == 1
 
-    for user in users_to_repair:
-        patched_repair_user.assert_any_call(user)
+    assert list(patched_repair_users.call_args.args[0]) == users_to_repair
 
 
 def test_unenroll_edx_course_run(mocker):
