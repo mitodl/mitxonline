@@ -14,18 +14,17 @@ def remove_empty_str(apps, schema_editor):
 
 
 def reverse_remove_empty_str(apps, schema_editor):
-    """converts None back to empty string for global_id field."""
+    """Converts None back to empty string for global_id field."""
     User = apps.get_model("users", "User")
 
     for user in User.objects.filter(global_id__isnull=True):
         user.global_id = ""
         user.save()
 
+
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0034_global_id_remove_not_null_constraint'),
+        ("users", "0034_global_id_remove_not_null_constraint"),
     ]
 
-    operations = [migrations.RunPython(remove_empty_str, reverse_remove_empty_str)
-    ]
+    operations = [migrations.RunPython(remove_empty_str, reverse_remove_empty_str)]

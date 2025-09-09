@@ -4,16 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0033_remove_case_sensitive_email_uniq'),
+        ("users", "0033_remove_case_sensitive_email_uniq"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='user',
-            name='global_id',
-            field=models.CharField(blank=True, help_text='The SSO ID (usually a Keycloak UUID) for the user.',
-                                   max_length=36, null=True),
+            model_name="user",
+            name="global_id",
+            field=models.CharField(
+                blank=True,
+                help_text="The SSO ID (usually a Keycloak UUID) for the user.",
+                max_length=36,
+                null=True,
+            ),
         ),
     ]

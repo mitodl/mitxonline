@@ -4,15 +4,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0035_remove_global_id_blanks'),
+        ("users", "0035_remove_global_id_blanks"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='user',
-            name='global_id',
-            field=models.CharField(blank=True, help_text='The SSO ID (usually a Keycloak UUID) for the user.', max_length=36, null=True, unique=True),
+            model_name="user",
+            name="global_id",
+            field=models.CharField(
+                blank=True,
+                help_text="The SSO ID (usually a Keycloak UUID) for the user.",
+                max_length=36,
+                null=True,
+                unique=True,
+            ),
         ),
     ]
