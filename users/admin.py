@@ -11,6 +11,7 @@ from django_object_actions import DjangoObjectActions, action
 from hijack.contrib.admin import HijackUserAdminMixin
 from mitol.common.admin import TimestampedModelAdmin
 
+from openedx.forms import OpenEdxUserForm
 from openedx.models import OpenEdxUser
 from users.models import BlockList, LegalAddress, User, UserProfile
 
@@ -52,7 +53,7 @@ _username_warning = """
    <strong>WARNING:</strong>
    Changing this username will require you to apply the same change in edX immediately after.<br /><br>
    Do not make this change unless you can perform the same change to the edX username, or you have someone
-   else lined up to do it.
+   else lined up to do it.<br/><br/>
 </div>
 """
 
@@ -79,6 +80,8 @@ class OpenEdxUserInline(admin.StackedInline):
     can_delete = False
     max_num = 1
     extra = 0
+
+    form = OpenEdxUserForm
 
     fieldsets = (
         (
