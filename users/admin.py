@@ -48,11 +48,16 @@ class UserProfileInline(admin.StackedInline):
 
 
 _username_warning = """
-<div style="background-color: #dc3545; color: #fff; padding: 10px; font-size: 16px; border-radius: 5px;">
-   <strong>WARNING:</strong>
+<div style="background-color: #dc3545; color: #fff; padding: 10px; font-size: 16px; border-radius: 5px; margin-bottom: 10px;">
+   <strong>WARNING:</strong><br/>
    Changing this username will require you to apply the same change in edX immediately after.<br /><br>
    Do not make this change unless you can perform the same change to the edX username, or you have someone
    else lined up to do it.
+</div>
+<div style="background-color: #0088e2; color: #fff; padding: 10px; font-size: 16px; border-radius: 5px;">
+   <strong>NOTE:</strong><br/>
+   If the user has not been synced to openedx yet, you will need to set Desired Edx Username as well. <br/><br/>
+   This is ultimately the source of truth on what value to start with when attempting to create the user.
 </div>
 """
 
@@ -86,6 +91,7 @@ class OpenEdxUserInline(admin.StackedInline):
             {
                 "fields": (
                     "edx_username",
+                    "desired_edx_username",
                     "has_been_synced",
                     "has_sync_error",
                     "pretty_sync_error_data",
