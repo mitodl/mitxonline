@@ -193,7 +193,7 @@ class UserManager(BaseUserManager):
         fields = {
             **extra_fields,
             "email": email,
-            "global_id": extra_fields.get("global_id", ""),
+            "global_id": extra_fields.get("global_id"),
         }
         if username is not None:
             fields["username"] = username
@@ -284,6 +284,7 @@ class User(
         null=True,
         blank=True,
         unique=True,
+        default=None,
         max_length=36,
         help_text="The SSO ID (usually a Keycloak UUID) for the user.",
     )
@@ -377,6 +378,12 @@ class User(
             self.user_profile.completed_onboarding
             or self.courserunenrollment_set(manager="all_objects").exists()
         )
+
+    @property
+    def edx_user_exists(self):
+        """Return True if the openedx user has been created"""
+        openedx_user = self.openedx_users.first()
+        return openedx_user is not None and openedx_user.has_been_synced
 
     class Meta:
         constraints = [
