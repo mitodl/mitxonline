@@ -43,7 +43,6 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     OpenEdXOAuth2Error,
     OpenEdxUserCreateError,
-    OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -902,7 +901,7 @@ def existing_edx_enrollment(user, course_id, mode, is_active=True):  # noqa: FBT
     return None
 
 
-def enroll_in_edx_course_runs(
+def enroll_in_edx_course_runs(  # noqa: C901
     user,
     course_runs,
     *,
@@ -931,10 +930,10 @@ def enroll_in_edx_course_runs(
     edx_client = get_edx_api_service_client()
 
     if not user.openedx_users.exists() or not user.edx_username:
-        msg = (
-            f"User {user} has no Open edX user (or no username): '{user.edx_username}'"
-        )
-        raise OpenEdxUserMissingError(msg)
+        from openedx.api import reconcile_edx_username
+
+        if reconcile_edx_username(user):
+            user.refresh_from_db()
 
     username = user.edx_username
 
