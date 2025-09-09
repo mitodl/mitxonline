@@ -201,9 +201,11 @@ export const learnerProgramIsCompleted = (learnerRecord: LearnerRecord) => {
   const electiveCourses = learnerRecord.program.requirements[0].children[1]
 
   const requirementsDone = walkNodes(requiredCourses, learnerRecord)
-  const electivesDone = walkNodes(electiveCourses, learnerRecord)
-
-  return requirementsDone && electivesDone
+  if (electiveCourses) {
+    const electivesDone = walkNodes(electiveCourses, learnerRecord)
+    return requirementsDone && electivesDone
+  }
+  return !!requirementsDone
 }
 
 export const getFirstRelevantRun = (

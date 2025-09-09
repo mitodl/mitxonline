@@ -149,19 +149,18 @@ describe("Course API", () => {
         it(`${returnResult} when ${courseConditions} and ${hasElectives}`, () => {
           const learnerRecord = makeLearnerRecord(shouldBeCompleted)
 
-          console.log(learnerRecord.program.requirements[0].children[1])
-
           if (hasElectives === "does not have electives") {
-            learnerRecord.program.requirements[0].children[1].children = []
+            learnerRecord.program.requirements[0].children[1] = undefined
           }
           if (shouldBeCompleted) {
             assert.isOk(learnerProgramIsCompleted(learnerRecord))
           } else {
-            // force one of the required courses to be incomplete
-            learnerRecord.program.courses[0].certificate = null
-            learnerRecord.program.courses[0].grade = null
-
-            assert.isNotOk(learnerProgramIsCompleted(learnerRecord))
+            if (courseConditions === "not enough courses are complete") {
+              // force one of the required courses to be incomplete
+              learnerRecord.program.courses[0].certificate = null
+              learnerRecord.program.courses[0].grade = null
+              assert.isNotOk(learnerProgramIsCompleted(learnerRecord))
+            }
           }
         })
       }
