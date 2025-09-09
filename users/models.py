@@ -280,6 +280,8 @@ class User(
     # We allow a blank value so we can have out-of-band users - we may want a
     # Django user that's not connected to an SSO user, for instance.
     global_id = models.CharField(
+        null=True,
+        blank=True,
         unique=True,
         max_length=36,
         help_text="The SSO ID (usually a Keycloak UUID) for the user.",
