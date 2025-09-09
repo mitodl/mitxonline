@@ -595,10 +595,16 @@ KEYCLOAK_CLIENT_SECRET = get_string(
     description="The client secret for mitxonline.",
 )
 
-KEYCLOAK_ADMIN_REALM_TOKEN_ENDPOINT = get_string(
-    name="KEYCLOAK_ADMIN_REALM_TOKEN_ENDPOINT",
+KEYCLOAK_DISCOVERY_URL = get_string(
+    name="KEYCLOAK_DISCOVERY_URL",
     default=None,
-    description="The URL to the token endpoint for the admin realm."
+    description="The OpenID discovery URL for the Keycloak realm.",
+)
+
+KEYCLOAK_ADMIN_CLIENT_SCOPES = get_string(
+    name="KEYCLOAK_ADMIN_CLIENT_SCOPES",
+    default=None,
+    description="The OpenID scopes to use for the admin client.",
 )
 
 # Social Auth Configuration end
