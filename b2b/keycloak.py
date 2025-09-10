@@ -13,6 +13,7 @@ from authlib.integrations.requests_client import OAuth2Session
 from django.conf import settings
 
 from b2b.exceptions import KeycloakAdminImproperlyConfiguredError
+from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
 
 
 class KeycloakAdminClient:
@@ -21,6 +22,7 @@ class KeycloakAdminClient:
     base_url = None
     realm = None
     oauth_session = None
+    skip_verify = False
 
     def __init__(self):
         """
@@ -29,9 +31,9 @@ class KeycloakAdminClient:
         These settings must be in place:
         - KEYCLOAK_BASE_URL: The base URL for the Keycloak instance.
         - KEYCLOAK_DISCOVERY_URL: The OpenID discovery URL for the realm.
-        - KEYCLOAK_CLIENT_ID: The client ID to use for the admin client.
-        - KEYCLOAK_CLIENT_SECRET: The client secret to use for the admin client.
-        - KEYCLOAK_REALM: The realm we are working with.
+        - KEYCLOAK_ADMIN_CLIENT_ID: The client ID to use for the admin client.
+        - KEYCLOAK_ADMIN_CLIENT_SECRET: The client secret to use for the admin client.
+        - KEYCLOAK_REALM_NAME: The realm we are working with.
 
         If any of these are incorrect or missing, you'll get an
         KeycloakAdminImproperlyConfiguredError.
@@ -40,35 +42,49 @@ class KeycloakAdminClient:
         regular authentication client may not have this permission.
         """
 
-        self.base_url = settings.get("KEYCLOAK_BASE_URL", None)
+        self.base_url = settings.KEYCLOAK_BASE_URL
         if not self.base_url:
             msg = "KEYCLOAK_BASE_URL setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
         self.base_url = urljoin(self.base_url, "/admin/realms")
-        self.realm = settings.get("KEYCLOAK_REALM", None)
+        self.realm = settings.KEYCLOAK_REALM_NAME
         if not self.realm:
-            msg = "KEYCLOAK_REALM setting is not configured."
+            msg = "KEYCLOAK_REALM_NAME setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
 
-        realm_discovery = settings.get("KEYCLOAK_DISCOVERY_URL", None)
+        realm_discovery = settings.KEYCLOAK_DISCOVERY_URL
         if not realm_discovery:
             msg = "KEYCLOAK_DISCOVERY_URL setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
-        client_id = settings.get("KEYCLOAK_CLIENT_ID", None)
+        client_id = settings.KEYCLOAK_ADMIN_CLIENT_ID
         if not client_id:
-            msg = "KEYCLOAK_CLIENT_ID setting is not configured."
+            msg = "KEYCLOAK_ADMIN_CLIENT_ID setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
-        client_secret = settings.get("KEYCLOAK_CLIENT_SECRET", None)
+        client_secret = settings.KEYCLOAK_ADMIN_CLIENT_SECRET
         if not client_secret:
-            msg = "KEYCLOAK_CLIENT_SECRET setting is not configured."
+            msg = "KEYCLOAK_ADMIN_CLIENT_SECRET setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
 
-        openid_configuration = requests.get(realm_discovery, timeout=60).json()
+        self.skip_verify = settings.KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL or False
+
+        openid_configuration = requests.get(
+            realm_discovery,
+            timeout=60,
+            verify=not self.skip_verify,
+        )
         openid_configuration.raise_for_status()
+        self.openid_configuration = openid_configuration.json()
+
         self.oauth_session = OAuth2Session(
             client_id=client_id,
             client_secret=client_secret,
-            token_endpoint=openid_configuration["token_endpoint"],
+            token_endpoint=self.openid_configuration["token_endpoint"],
+            scope=settings.KEYCLOAK_ADMIN_CLIENT_SCOPES,
+            verify=not self.skip_verify,
+        )
+        self.token = self.oauth_session.fetch_token(
+            self.openid_configuration["token_endpoint"],
+            grant_type="client_credentials",
         )
 
     def realmify_url(self, url_path):
@@ -86,11 +102,66 @@ class KeycloakAdminClient:
 
         return urljoin(self.base_url, f"{self.realm}/{url_path}")
 
-    def request(self, method, url_path, **kwargs):
+    def request(self, method, url_path, *, skip_realmify=False, **kwargs):
         """Perform an HTTP request against the given URL path."""
 
+        request_url = (
+            urljoin(self.base_url, url_path)
+            if skip_realmify
+            else self.realmify_url(url_path)
+        )
+
         return (
-            self.oauth_session.request(method, self.realmify_url(url_path), **kwargs)
+            self.oauth_session.request(method, request_url, **kwargs)
             if self.oauth_session
             else None
         )
+
+
+class KeycloakAdminOrganization:
+    """Client for working with Keycloak organizations via the admin API."""
+
+    def __init__(self, admin_client):
+        """
+        Configure the organization client.
+
+        Args:
+        - admin_client: An instance of KeycloakAdminClient.
+        """
+
+        self.admin_client = admin_client
+
+    def list(self, **kwargs):
+        """
+        List all organizations in the realm.
+
+        Keyword Args:
+        - exact: bool; If True, only return exact matches for the search term
+        - search: str; A search term to filter organizations by name or description.
+        - q: str; Search by attribute values ("key:value key:value").
+        Returns:
+        - A list of OrganizationRepresentation instances.
+        """
+
+        response = self.admin_client.request("GET", "organizations", params=kwargs)
+        response.raise_for_status()
+        orgs_data = response.json()
+
+        return [OrganizationRepresentation(**org) for org in orgs_data]
+
+    def get(self, org_id):
+        """
+        Get a single organization by its ID.
+
+        Args:
+        - org_id: The ID of the organization to retrieve.
+
+        Returns:
+        - An instance of OrganizationRepresentation.
+        """
+
+        response = self.admin_client.request("GET", f"organizations/{org_id}")
+        response.raise_for_status()
+        org_data = response.json()
+
+        return OrganizationRepresentation(**org_data)
