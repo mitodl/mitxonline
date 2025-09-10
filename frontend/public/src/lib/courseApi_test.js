@@ -131,23 +131,40 @@ describe("Course API", () => {
 
   describe("learnerProgramIsCompleted", () => {
     [
-      [true, "returns true", "all courses are complete"],
-      [false, "returns false", "not enough courses are complete"]
-    ].forEach(([shouldBeCompleted, returnResult, courseConditions]) => {
-      it(`${returnResult} when ${courseConditions}`, () => {
-        const learnerRecord = makeLearnerRecord(shouldBeCompleted)
+      [true, "returns true", "all courses are complete", "has electives"],
+      [
+        false,
+        "returns false",
+        "not enough courses are complete",
+        "no electives"
+      ],
+      [
+        true,
+        "returns true",
+        "all courses are complete",
+        "does not have electives"
+      ]
+    ].forEach(
+      ([shouldBeCompleted, returnResult, courseConditions, hasElectives]) => {
+        it(`${returnResult} when ${courseConditions} and ${hasElectives}`, () => {
+          const learnerRecord = makeLearnerRecord(shouldBeCompleted)
 
-        if (shouldBeCompleted) {
-          assert.isOk(learnerProgramIsCompleted(learnerRecord))
-        } else {
-          // force one of the required courses to be incomplete
-          learnerRecord.program.courses[0].certificate = null
-          learnerRecord.program.courses[0].grade = null
-
-          assert.isNotOk(learnerProgramIsCompleted(learnerRecord))
-        }
-      })
-    })
+          if (hasElectives === "does not have electives") {
+            learnerRecord.program.requirements[0].children[1] = undefined
+          }
+          if (shouldBeCompleted) {
+            assert.isOk(learnerProgramIsCompleted(learnerRecord))
+          } else {
+            if (courseConditions === "not enough courses are complete") {
+              // force one of the required courses to be incomplete
+              learnerRecord.program.courses[0].certificate = null
+              learnerRecord.program.courses[0].grade = null
+              assert.isNotOk(learnerProgramIsCompleted(learnerRecord))
+            }
+          }
+        })
+      }
+    )
   })
 
   describe("extractCoursesFromNode", () => {
