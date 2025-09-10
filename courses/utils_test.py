@@ -23,7 +23,6 @@ from courses.utils import (
     get_enrollable_courseruns_qs,
     get_enrollable_courses,
     get_program_certificate_by_enrollment,
-    get_unenrollable_courseruns_qs,
     get_unenrollable_courses,
 )
 
@@ -168,47 +167,6 @@ def test_get_enrollable_courseruns_qs():
     assert enrollable_qs.count() == 2
     assert course_run in enrollable_qs
     assert unenrollable_course_run not in enrollable_qs
-
-
-@pytest.mark.django_db
-def test_get_unenrollable_courseruns_qs():
-    """
-    Test get_enrollable_courseruns_qs
-    """
-    course = CourseFactory.create()
-    now = now_in_utc()
-    future_date = now + timedelta(days=1)
-    past_date = now - timedelta(days=1)
-    course_run = CourseRunFactory.create(
-        course=course,
-        live=True,
-        start_date=now,
-        enrollment_start=past_date,
-        enrollment_end=future_date,
-    )
-    CourseRunFactory.create(
-        course=course,
-        live=True,
-        start_date=now,
-        enrollment_start=past_date,
-        enrollment_end=future_date,
-    )
-
-    unenrollable_qs = get_unenrollable_courseruns_qs()
-    assert unenrollable_qs.count() == 0
-    assert course_run not in unenrollable_qs
-
-    unenrollable_course_run = CourseRunFactory.create(
-        course=course,
-        live=True,
-        start_date=future_date,
-        enrollment_start=future_date,
-        enrollment_end=past_date,
-    )
-    unenrollable_qs = get_unenrollable_courseruns_qs()
-    assert unenrollable_qs.count() == 1
-    assert course_run not in unenrollable_qs
-    assert unenrollable_course_run in unenrollable_qs
 
 
 @pytest.mark.django_db

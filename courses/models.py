@@ -17,7 +17,6 @@ from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django_countries.fields import CountryField
 from mitol.common.models import TimestampedModel
-from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from modelcluster.fields import ParentalManyToManyField
@@ -87,6 +86,64 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
             models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
         ).filter(b2b_contract__isnull=True)
 
+    def enrollable(self, enrollment_end_date=None):
+        """
+        Applies a filter for Course runs that are open for enrollment.
+
+        This mirrors the logic from CourseRun.is_enrollable property but allows
+        for custom enrollment_end_date parameter.
+
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+        """
+        return self.filter(self.get_enrollable_filter(enrollment_end_date))
+
+    def unenrollable(self):
+        """Applies a filter for Course runs that are closed for enrollment."""
+
+        now = now_in_utc()
+        return self.filter(
+            models.Q(live=False)
+            | models.Q(start_date__isnull=True)
+            | (models.Q(enrollment_end__lte=now) | models.Q(enrollment_start__gt=now))
+        )
+
+    @classmethod
+    def get_enrollable_filter(cls, enrollment_end_date=None):
+        """
+        Returns Q filter for enrollable course runs.
+
+        This allows other functions to use the same enrollment logic
+        while composing it with additional filters.
+
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+
+        Returns:
+            Q: Django Q filter for enrollable course runs
+        """
+
+        now = now_in_utc()
+        if enrollment_end_date is None:
+            enrollment_end_date = now
+
+        return (
+            # Check if enrollment period is still open
+            (
+                models.Q(enrollment_end__isnull=True)
+                | models.Q(enrollment_end__gt=enrollment_end_date)
+            )
+            # Ensure enrollment has started
+            & models.Q(enrollment_start__isnull=False)
+            & models.Q(enrollment_start__lte=now)
+            # Course run must be live
+            & models.Q(live=True)
+            # Course run must have started
+            & models.Q(start_date__isnull=False)
+        )
+
     def with_text_id(self, text_id):
         """Applies a filter for the CourseRun's courseware_id"""
         return self.filter(courseware_id=text_id)
@@ -147,6 +204,11 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
     class Meta:
         ordering = ["id"]
+        indexes = [
+            models.Index(fields=["live", "id"]),
+            models.Index(fields=["readable_id"]),
+            models.Index(fields=["start_date", "end_date"]),
+        ]
 
     objects = ProgramQuerySet.as_manager()
     title = models.CharField(max_length=255)
@@ -394,16 +456,150 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         requirements tree.
         """
 
-        course_ids = [  # noqa: C416
-            course_id
-            for course_id in ProgramRequirement.objects.filter(
-                program=self, node_type=ProgramRequirementNodeType.COURSE
-            )
-            .all()
-            .values_list("course__id", flat=True)
-        ]
+        return (
+            Course.objects.filter(in_programs__program=self)
+            .distinct()
+            .prefetch_related("courseruns", "departments")
+        )
 
-        return Course.objects.filter(id__in=course_ids)
+    def _get_operator_course_requirements(self, main_ops):
+        """
+        Helper method to fetch all course requirements under operator nodes.
+
+        Args:
+            main_ops: List of main operator nodes
+
+        Returns:
+            QuerySet of ProgramRequirement objects for courses
+        """
+        if not main_ops:
+            return ProgramRequirement.objects.none()
+
+        path_q = Q()
+        for op in main_ops:
+            path_q |= Q(path__startswith=op.path)
+
+        return (
+            ProgramRequirement.objects.filter(
+                program__id=self.id,
+                node_type=ProgramRequirementNodeType.COURSE,
+            )
+            .filter(path_q)
+            .select_related("course")
+        )
+
+    def _process_course_requirements(self, course_reqs, path_to_operator):
+        """
+        Helper method to process course requirements and categorize them.
+
+        Args:
+            course_reqs: QuerySet of course requirements
+            path_to_operator: Dict mapping operator paths to operators
+
+        Returns:
+            Dict with processed course data
+        """
+        courses = []
+        required_courses = []
+        elective_courses = []
+        required_title = "Required Courses"
+        elective_title = "Elective Courses"
+        minimum_elective_requirement = None
+
+        # First, check all operators for titles and minimum elective requirements
+        for op in path_to_operator.values():
+            # Store titles from actual operator nodes
+            if not op.elective_flag and required_title == "Required Courses":
+                required_title = op.title or required_title
+            elif op.elective_flag and elective_title == "Elective Courses":
+                elective_title = op.title or elective_title
+                if (
+                    op.is_min_number_of_operator
+                    and minimum_elective_requirement is None
+                ):
+                    minimum_elective_requirement = (
+                        int(op.operator_value) if op.operator_value else None
+                    )
+
+        for req in course_reqs:
+            if not req.course:
+                continue
+
+            # Find which operator this requirement belongs to
+            parent_op = self._find_parent_operator(req, path_to_operator)
+            if parent_op is None:
+                continue
+
+            requirement_type = (
+                "Required Courses"
+                if not parent_op.elective_flag
+                else "Elective Courses"
+            )
+
+            # Build course tuples and separate lists
+            course_tuple = (req.course, requirement_type)
+            courses.append(course_tuple)
+
+            if not parent_op.elective_flag:
+                required_courses.append(req.course)
+            else:
+                elective_courses.append(req.course)
+
+        return {
+            "courses": courses,
+            "required_courses": required_courses,
+            "elective_courses": elective_courses,
+            "required_title": required_title,
+            "elective_title": elective_title,
+            "minimum_elective_requirement": minimum_elective_requirement,
+        }
+
+    def _find_parent_operator(self, req, path_to_operator):
+        """
+        Helper method to find the parent operator for a course requirement.
+
+        Args:
+            req: Course requirement object
+            path_to_operator: Dict mapping operator paths to operators
+
+        Returns:
+            Parent operator object or None
+        """
+        for op_path, op in path_to_operator.items():
+            if req.path.startswith(op_path) and req.path != op_path:
+                return op
+        return None
+
+    @cached_property
+    def _courses_with_requirements_data(self):
+        """
+        Internal method that efficiently fetches course requirements data.
+
+        Returns:
+        - dict: Contains 'courses', 'required_courses', 'elective_courses',
+                'required_title', 'elective_title', and 'minimum_elective_requirement'
+        """
+        # Get all operator nodes at depth 2 (direct children of root)
+        main_ops = ProgramRequirement.objects.filter(program=self, depth=2).all()
+
+        if not main_ops:
+            return {
+                "courses": [],
+                "required_courses": [],
+                "elective_courses": [],
+                "required_title": "Required Courses",
+                "elective_title": "Elective Courses",
+                "minimum_elective_requirement": None,
+            }
+
+        # Fetch all course requirements efficiently
+        course_reqs = self._get_operator_course_requirements(main_ops)
+
+        # Create a mapping from path prefix to operator for efficient lookup
+        path_to_operator = {op.path: op for op in main_ops}
+
+        # Process and categorize the requirements
+        return self._process_course_requirements(course_reqs, path_to_operator)
 
     @property
     def courses(self):
@@ -414,43 +610,14 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns:
         - list of tuple (Course, string): courses that are either requirements or electives, plus the requirement type
         """
-
-        heap = []
-        main_ops = ProgramRequirement.objects.filter(program=self, depth=2).all()
-
-        for op in main_ops:
-            reqs = (
-                ProgramRequirement.objects.filter(
-                    program__id=self.id,
-                    path__startswith=op.path,
-                    node_type=ProgramRequirementNodeType.COURSE,
-                )
-                .select_related("course")
-                .all()
-            )
-
-            heap.extend(
-                [
-                    (
-                        req.course,
-                        (
-                            "Required Courses"
-                            if not op.elective_flag
-                            else "Elective Courses"
-                        ),
-                    )
-                    for req in reqs
-                ]
-            )
-
-        return heap
+        return self._courses_with_requirements_data["courses"]
 
     @cached_property
     def required_courses(self) -> list:
         """
         Returns just the courses under the "Required Courses" node.
         """
-        return [course for (course, type) in self.courses if type == "Required Courses"]  # noqa: A001
+        return self._courses_with_requirements_data["required_courses"]
 
     @cached_property
     def required_title(self):
@@ -458,20 +625,14 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns the title of the requirements node that holds the required
         courses (e.g. the one that has elective_flag = False).
         """
-
-        return (
-            self.requirements_root.get_children()
-            .filter(elective_flag=False)
-            .get()
-            .title
-        )
+        return self._courses_with_requirements_data["required_title"]
 
     @cached_property
     def elective_courses(self) -> list:
         """
-        Returns just the courses under the "Required Courses" node.
+        Returns just the courses under the "Elective Courses" node.
         """
-        return [course for (course, type) in self.courses if type == "Elective Courses"]  # noqa: A001
+        return self._courses_with_requirements_data["elective_courses"]
 
     @property
     def required_programs(self):
@@ -523,10 +684,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns the title of the requirements node that holds the elective
         courses (e.g. the one that has elective_flag = True).
         """
-
-        return (
-            self.requirements_root.get_children().filter(elective_flag=True).get().title
-        )
+        return self._courses_with_requirements_data["elective_title"]
 
     @cached_property
     def minimum_elective_courses_requirement(self):
@@ -537,13 +695,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             int: Minimum number of elective courses required to be completed by the Program.
                 Returns None, if no value is defined or elective node is absent.
         """
-        operator_nodes = self.requirements_root.get_children()
-        for operator_node in operator_nodes:
-            if operator_node.is_min_number_of_operator:
-                # has passed a minimum of the child requirements
-                return int(operator_node.operator_value)
-
-        return None
+        return self._courses_with_requirements_data["minimum_elective_requirement"]
 
     @property
     def is_program(self):
@@ -716,26 +868,27 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         Returns:
             CourseRun or None: An unexpired/enrollable course run
-
-        # NOTE: This is implemented with sorted() and courseruns.all() to allow for prefetch_related
-        #   optimization. You can get the desired course_run with a filter, but
-        #   that would run a new query even if prefetch_related was used.
         """
-        course_runs = self.courseruns.filter(b2b_contract__isnull=True).all()
-        eligible_course_runs = [
-            course_run
-            for course_run in course_runs
-            if (course_run.is_enrollable and not course_run.is_past)
-        ]
-        if len(eligible_course_runs) < 1:
-            # check for archived courses
-            eligible_course_runs = [
-                course_run for course_run in course_runs if course_run.is_enrollable
-            ]
-        return first_matching_item(
-            sorted(eligible_course_runs, key=lambda course_run: course_run.start_date),
-            lambda course_run: True,  # noqa: ARG005
+        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
+        # First try to find non-past enrollable runs (end_date is None or in the future)
+        best_run = (
+            self.courseruns.filter(b2b_contract__isnull=True)
+            .enrollable()
+            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
+            .order_by("start_date")
+            .first()
         )
+
+        # If no non-past runs found, look for any enrollable runs (including archived)
+        if best_run is None:
+            best_run = (
+                self.courseruns.filter(b2b_contract__isnull=True)
+                .enrollable()
+                .order_by("start_date")
+                .first()
+            )
+
+        return best_run
 
     @cached_property
     def include_in_learn_catalog(self):
@@ -746,7 +899,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         to False if there isn't one.
         """
 
-        return self.page.include_in_learn_catalog if self.page else False
+        return getattr(self.page, "include_in_learn_catalog", False)
 
     @cached_property
     def ingest_content_files_for_ai(self):
@@ -757,7 +910,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         to False if there isn't one.
         """
 
-        return self.page.ingest_content_files_for_ai if self.page else False
+        return getattr(self.page, "ingest_content_files_for_ai", False)
 
     def get_first_unexpired_org_run(self, user_contracts):
         """
@@ -770,26 +923,27 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         Returns:
             CourseRun or None: An unexpired/enrollable course run
-
-        # NOTE: This is implemented with sorted() and courseruns.all() to allow for prefetch_related
-        #   optimization. You can get the desired course_run with a filter, but
-        #   that would run a new query even if prefetch_related was used.
         """
-        course_runs = self.courseruns.filter(b2b_contract__in=user_contracts).all()
-        eligible_course_runs = [
-            course_run
-            for course_run in course_runs
-            if (course_run.is_enrollable and not course_run.is_past)
-        ]
-        if len(eligible_course_runs) < 1:
-            # check for archived courses
-            eligible_course_runs = [
-                course_run for course_run in course_runs if course_run.is_enrollable
-            ]
-        return first_matching_item(
-            sorted(eligible_course_runs, key=lambda course_run: course_run.start_date),
-            lambda course_run: True,  # noqa: ARG005
+        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
+        # First try to find non-past enrollable runs (end_date is None or in the future)
+        best_run = (
+            self.courseruns.filter(b2b_contract__in=user_contracts)
+            .enrollable()
+            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
+            .order_by("start_date")
+            .first()
         )
+
+        # If no non-past runs found, look for any enrollable runs (including archived)
+        if best_run is None:
+            best_run = (
+                self.courseruns.filter(b2b_contract__in=user_contracts)
+                .enrollable()
+                .order_by("start_date")
+                .first()
+            )
+
+        return best_run
 
     @cached_property
     def programs(self):
@@ -940,12 +1094,18 @@ class CourseRun(TimestampedModel):
         """
         Returns True if the course run has started and has not yet ended
         """
+        # Course must have started
+        if not self.start_date:
+            return False
+
         now = now_in_utc()
-        return (
-            self.start_date is not None
-            and self.start_date <= now
-            and (self.end_date is None or self.end_date > now)
-        )
+
+        # Course hasn't started yet
+        if self.start_date > now:
+            return False
+
+        # Course has ended
+        return not (self.end_date and self.end_date <= now)
 
     @property
     def is_upgradable(self):
@@ -1789,6 +1949,7 @@ class ProgramRequirement(MP_Node):
             models.Index(fields=("course", "program")),
             models.Index(fields=("program", "required_program")),
             models.Index(fields=("required_program", "program")),
+            models.Index(fields=("program", "node_type", "depth")),
         ]
 
 

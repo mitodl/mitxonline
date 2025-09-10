@@ -8,8 +8,8 @@ from rest_framework import serializers
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
+from courses.utils import get_approved_flexible_price_exists
 from ecommerce.serializers import ProductFlexibilePriceSerializer
-from flexiblepricing.api import is_courseware_flexible_price_approved
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
@@ -164,14 +164,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
-        instance_run = instance[0].run if isinstance(instance, list) else instance.run
-        instance_user = (
-            instance[0].user if isinstance(instance, list) else instance.user
-        )
-        flexible_price_exists = is_courseware_flexible_price_approved(
-            instance_run, instance_user
-        )
-        return flexible_price_exists  # noqa: RET504
+        return get_approved_flexible_price_exists(instance, self.context)
 
     @extend_schema_field(CourseRunGradeSerializer(many=True))
     def get_grades(self, instance):

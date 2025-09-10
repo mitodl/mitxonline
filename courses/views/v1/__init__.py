@@ -114,7 +114,13 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["id", "live", "readable_id"]
-    queryset = Program.objects.filter(b2b_only=False).prefetch_related("departments")
+
+    def get_queryset(self):
+        return (
+            Program.objects.filter(b2b_only=False)
+            .prefetch_related("departments")
+            .select_related("page")
+        )
 
     def paginate_queryset(self, queryset):
         """
@@ -172,18 +178,21 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         if courserun_is_enrollable:
-            return (
+            queryset = (
                 Course.objects.filter()
                 .select_related("page")
                 .prefetch_related("departments")
                 .all()
             )
-        return (
-            Course.objects.filter()
-            .select_related("page")
-            .prefetch_related("courseruns", "departments")
-            .all()
-        )
+        else:
+            queryset = (
+                Course.objects.filter()
+                .select_related("page")
+                .prefetch_related("courseruns", "departments")
+                .all()
+            )
+
+        return queryset
 
     def get_serializer_context(self):
         added_context = {}
