@@ -4,6 +4,7 @@ Tests for cms serializers
 
 import bleach
 import pytest
+from decimal import Decimal
 from django.test.client import RequestFactory
 
 from cms.factories import (
@@ -15,10 +16,12 @@ from cms.models import FlexiblePricingRequestForm
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
+    CourseRunFactory,
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
 )
+from ecommerce.factories import ProductFactory
 from main.test_utils import assert_drf_json_equal
 
 pytestmark = [pytest.mark.django_db]
@@ -445,3 +448,192 @@ def test_serialize_program_page__with_related_program_no_financial_form(
             "price": None,
         },
     )
+
+def test_get_current_price_no_active_products(mocker, fully_configured_wagtail):
+    """Test get_current_price when course has no active products"""
+    course_page = CoursePageFactory()
+    course_page.product.active_products = None
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result is None
+
+
+def test_get_current_price_with_queryset_single_product(mocker, fully_configured_wagtail):
+    """Test get_current_price with QuerySet containing single product"""
+    course_page = CoursePageFactory()
+    course_run = CourseRunFactory(course=course_page.product)
+    product = ProductFactory(purchasable_object=course_run, price=Decimal('99.99'))
+
+    # Mock active_products to return a QuerySet-like object
+    mock_queryset = mocker.MagicMock()
+    mock_queryset.all.return_value = [product]
+    course_page.product.active_products = mock_queryset
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result == Decimal('99.99')
+
+
+def test_get_current_price_with_queryset_multiple_products(mocker, fully_configured_wagtail):
+    """Test get_current_price with QuerySet containing multiple products - returns highest price"""
+    course_page = CoursePageFactory()
+    course_run1 = CourseRunFactory(course=course_page.product)
+    course_run2 = CourseRunFactory(course=course_page.product)
+    course_run3 = CourseRunFactory(course=course_page.product)
+    product1 = ProductFactory(purchasable_object=course_run1, price=Decimal('50.00'))
+    product2 = ProductFactory(purchasable_object=course_run2, price=Decimal('100.00'))
+    product3 = ProductFactory(purchasable_object=course_run3, price=Decimal('75.00'))
+
+    # Mock active_products to return a QuerySet-like object
+    mock_queryset = mocker.MagicMock()
+    mock_queryset.all.return_value = [product1, product2, product3]
+    course_page.product.active_products = mock_queryset
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result == Decimal('100.00')
+
+
+def test_get_current_price_with_prefetched_list_single_product(mocker, fully_configured_wagtail):
+    """Test get_current_price with prefetched list containing single product"""
+    course_page = CoursePageFactory()
+    course_run = CourseRunFactory(course=course_page.product)
+    product = ProductFactory(purchasable_object=course_run, price=Decimal('150.50'))
+
+    # Mock active_products to return a list (prefetched case)
+    course_page.product.active_products = [product]
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result == Decimal('150.50')
+
+
+def test_get_current_price_with_prefetched_list_multiple_products(mocker, fully_configured_wagtail):
+    """Test get_current_price with prefetched list containing multiple products - returns highest price"""
+    course_page = CoursePageFactory()
+    course_run1 = CourseRunFactory(course=course_page.product)
+    course_run2 = CourseRunFactory(course=course_page.product)
+    course_run3 = CourseRunFactory(course=course_page.product)
+    product1 = ProductFactory(purchasable_object=course_run1, price=Decimal('25.00'))
+    product2 = ProductFactory(purchasable_object=course_run2, price=Decimal('200.00'))
+    product3 = ProductFactory(purchasable_object=course_run3, price=Decimal('125.50'))
+
+    # Mock active_products to return a list (prefetched case)
+    course_page.product.active_products = [product1, product2, product3]
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result == Decimal('200.00')
+
+
+def test_get_current_price_with_empty_queryset(mocker, fully_configured_wagtail):
+    """Test get_current_price with empty QuerySet"""
+    course_page = CoursePageFactory()
+
+    # Mock active_products to return empty QuerySet
+    mock_queryset = mocker.MagicMock()
+    mock_queryset.all.return_value = []
+    course_page.product.active_products = mock_queryset
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result is None
+
+
+def test_get_current_price_with_empty_list(mocker, fully_configured_wagtail):
+    """Test get_current_price with empty prefetched list"""
+    course_page = CoursePageFactory()
+
+    # Mock active_products to return empty list
+    course_page.product.active_products = []
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result is None
+
+
+def test_get_current_price_with_attribute_error(mocker, fully_configured_wagtail):
+    """Test get_current_price handles AttributeError gracefully"""
+    course_page = CoursePageFactory()
+
+    # Mock active_products to raise AttributeError
+    mock_active_products = mocker.MagicMock()
+    mock_active_products.all.side_effect = AttributeError("Test error")
+    course_page.product.active_products = mock_active_products
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result is None
+
+
+def test_get_current_price_with_type_error(mocker, fully_configured_wagtail):
+    """Test get_current_price handles TypeError"""
+    course_page = CoursePageFactory()
+
+    # Mock active_products to raise TypeError when trying to iterate
+    mock_active_products = mocker.MagicMock()
+    mock_active_products.all.side_effect = TypeError("Test error")
+    course_page.product.active_products = mock_active_products
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result is None
+
+
+def test_get_current_price_product_without_price_attribute(mocker, fully_configured_wagtail):
+    """Test get_current_price when product doesn't have price attribute"""
+    course_page = CoursePageFactory()
+
+    # Create a mock product without price attribute
+    mock_product = mocker.MagicMock()
+    del mock_product.price  # Remove price attribute
+
+    # Mock active_products to return this problematic product
+    course_page.product.active_products = [mock_product]
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result is None
+
+
+def test_get_current_price_zero_price_product(mocker, fully_configured_wagtail):
+    """Test get_current_price with zero-priced product"""
+    course_page = CoursePageFactory()
+    course_run = CourseRunFactory(course=course_page.product)
+    product = ProductFactory(purchasable_object=course_run, price=Decimal('0.00'))
+
+    course_page.product.active_products = [product]
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result == Decimal('0.00')
+
+
+def test_get_current_price_mixed_zero_and_positive_prices(mocker, fully_configured_wagtail):
+    """Test get_current_price with mix of zero and positive prices - returns highest"""
+    course_page = CoursePageFactory()
+    course_run1 = CourseRunFactory(course=course_page.product)
+    course_run2 = CourseRunFactory(course=course_page.product)
+    course_run3 = CourseRunFactory(course=course_page.product)
+    product1 = ProductFactory(purchasable_object=course_run1, price=Decimal('0.00'))
+    product2 = ProductFactory(purchasable_object=course_run2, price=Decimal('50.00'))
+    product3 = ProductFactory(purchasable_object=course_run3, price=Decimal('25.00'))
+
+    course_page.product.active_products = [product1, product2, product3]
+
+    serializer = CoursePageSerializer()
+    result = serializer.get_current_price(course_page)
+
+    assert result == Decimal('50.00')
