@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.129.0
+Version 0.129.0 (Released September 10, 2025)
 ---------------
 
 - Fix user creation on enrollment (#2928)
