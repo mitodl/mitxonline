@@ -601,10 +601,28 @@ KEYCLOAK_DISCOVERY_URL = get_string(
     description="The OpenID discovery URL for the Keycloak realm.",
 )
 
+KEYCLOAK_ADMIN_CLIENT_ID = get_string(
+    name="KEYCLOAK_ADMIN_CLIENT_ID",
+    default=None,
+    description="The client name for the admin client.",
+)
+
+KEYCLOAK_ADMIN_CLIENT_SECRET = get_string(
+    name="KEYCLOAK_ADMIN_CLIENT_SECRET",
+    default=None,
+    description="The client secret for the admin client.",
+)
+
 KEYCLOAK_ADMIN_CLIENT_SCOPES = get_string(
     name="KEYCLOAK_ADMIN_CLIENT_SCOPES",
     default=None,
     description="The OpenID scopes to use for the admin client.",
+)
+
+KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL = get_bool(
+    name="KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL",
+    default=False,
+    description="If true, do not verify SSL certificates for the admin client.",
 )
 
 # Social Auth Configuration end
