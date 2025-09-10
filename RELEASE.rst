@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.129.0
+---------------
+
+- Fix user creation on enrollment (#2928)
+- Make global_id unique (#2905)
+- fix(deps): update dependency django to v4.2.24 (#2924)
+
 Version 0.128.1 (Released September 03, 2025)
 ---------------
 
