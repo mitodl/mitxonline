@@ -6,6 +6,7 @@ from django.db import transaction
 
 from courses.api import create_run_enrollments
 from courses.models import CourseRun
+from openedx.api import create_user
 from users.api import fetch_user
 
 User = get_user_model()
@@ -47,6 +48,10 @@ class Command(BaseCommand):
             raise CommandError(
                 "Could not find course run with courseware_id={}".format(options["run"])  # noqa: EM103
             )
+
+        if not user.openedx_user_exists:
+            create_user(user)
+            user.refresh_from_db()
 
         with transaction.atomic():
             successful_enrollments, edx_request_success = create_run_enrollments(
