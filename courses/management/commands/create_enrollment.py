@@ -49,7 +49,7 @@ class Command(BaseCommand):
                 "Could not find course run with courseware_id={}".format(options["run"])  # noqa: EM103
             )
 
-        if not user.edx_user_exists:
+        if not user.openedx_user_exists:
             create_user(user)
             user.refresh_from_db()
 

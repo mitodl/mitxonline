@@ -380,7 +380,7 @@ class User(
         )
 
     @property
-    def edx_user_exists(self):
+    def openedx_user_exists(self):
         """Return True if the openedx user has been created"""
         openedx_user = self.openedx_users.first()
         return openedx_user is not None and openedx_user.has_been_synced
