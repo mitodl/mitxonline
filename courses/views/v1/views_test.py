@@ -9,6 +9,7 @@ from urllib.parse import quote
 import pytest
 import reversion
 from django.db.models import Count, Q
+from django.test.client import Client
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
@@ -577,7 +578,10 @@ def test_user_enrollment_delete_other_fail(mocker, settings, user_drf_client, us
 
 @pytest.mark.parametrize("api_request", [True, False])
 @pytest.mark.parametrize("product_exists", [True, False])
-def test_create_enrollments(mocker, user_client, api_request, product_exists):
+@pytest.mark.parametrize("has_openedx_user", [True, False])
+def test_create_enrollments(
+    mocker, user, api_request, product_exists, has_openedx_user
+):
     """
     Create enrollment view should create an enrollment and include a user message in the response cookies.
     Unless api_request is set to True, in which case we should get a string back.
@@ -589,11 +593,18 @@ def test_create_enrollments(mocker, user_client, api_request, product_exists):
     mock_fulfilled_order_filter = mocker.patch(  # noqa: F841
         "ecommerce.models.FulfilledOrder.objects.filter", return_value=None
     )
+    mock_create_user = mocker.patch("courses.views.v1.create_user")
     run = CourseRunFactory.create()
     if product_exists:
         with reversion.create_revision():
             product = ProductFactory.create(purchasable_object=run)  # noqa: F841
-    resp = user_client.post(
+
+    if not has_openedx_user:
+        user.openedx_users.all().delete()
+
+    client = Client()
+    client.force_login(user)
+    resp = client.post(
         reverse("create-enrollment-via-form"),
         data={"run": str(run.id), "isapi": "true"}
         if api_request
@@ -617,6 +628,7 @@ def test_create_enrollments(mocker, user_client, api_request, product_exists):
             }
         )
     patched_create_enrollments.assert_called_once()
+    mock_create_user.assert_called_once() if not has_openedx_user else mock_create_user.assert_not_called()
 
 
 def test_create_enrollments_failed(mocker, settings, user_client):
