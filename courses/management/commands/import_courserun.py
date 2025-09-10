@@ -31,13 +31,18 @@ from courses.models import BlockedCountry, Course, CourseRun, Department, Progra
 from ecommerce.models import Product
 from openedx.api import get_edx_api_course_detail_client
 
+try:
+    from b2b.models import ContractPage
+except ImportError:
+    ContractPage = None
+
 
 class Command(BaseCommand):
     """
     Creates a courseware object.
     """
 
-    help = "Creates a course run using details from edX."
+    help = "Creates a course run using details from edX. Supports setting catalog/AI flags, CMS page creation options, and B2B contract assignment."
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -96,9 +101,88 @@ class Command(BaseCommand):
             dest="depts",
         )
 
+        parser.add_argument(
+            "--include-in-learn-catalog",
+            action="store_true",
+            help="Include this course in the Learn catalog (sets include_in_learn_catalog flag on CMS page).",
+        )
+
+        parser.add_argument(
+            "--ingest-content-files-for-ai",
+            action="store_true",
+            help="Allow AI chatbots to ingest the course's content files (sets ingest_content_files_for_ai flag on CMS page).",
+        )
+
+        parser.add_argument(
+            "--publish-cms-page",
+            action="store_true",
+            help="Explicitly publish the CMS page when --create-cms-page is used. By default, the CMS page follows the --live flag.",
+        )
+
+        parser.add_argument(
+            "--draft-cms-page",
+            action="store_true",
+            help="Explicitly create a draft CMS page when --create-cms-page is used. By default, the CMS page follows the --live flag.",
+        )
+
+        parser.add_argument(
+            "--contract",
+            type=str,
+            help="Assign the resulting course run to the specified B2B contract (contract ID or slug).",
+        )
+
+    def _resolve_contract(self, contract_identifier):
+        """
+        Resolve a contract by ID or slug.
+        
+        Args:
+            contract_identifier (str): Contract ID (numeric) or slug
+            
+        Returns:
+            ContractPage or None: The resolved contract or None if not found/not available
+        """
+        if not ContractPage or not contract_identifier:
+            return None
+            
+        # Try to resolve by ID first (if numeric)
+        if contract_identifier.isdigit():
+            try:
+                return ContractPage.objects.get(id=int(contract_identifier))
+            except ContractPage.DoesNotExist:
+                pass
+        
+        # Try to resolve by slug
+        try:
+            return ContractPage.objects.get(slug=contract_identifier)
+        except ContractPage.DoesNotExist:
+            pass
+            
+        return None
+
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
+        # Validate mutually exclusive flags
+        if kwargs.get("publish_cms_page") and kwargs.get("draft_cms_page"):
+            self.stderr.write(
+                self.style.ERROR(
+                    "Cannot specify both --publish-cms-page and --draft-cms-page."
+                )
+            )
+            return False
+        
         edx_course_detail = get_edx_api_course_detail_client()
         edx_courses = []
+
+        # Resolve contract if specified
+        contract = None
+        if kwargs.get("contract"):
+            contract = self._resolve_contract(kwargs["contract"])
+            if not contract:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Contract '{kwargs['contract']}' not found or B2B module not available."
+                    )
+                )
+                return False
 
         if kwargs["price"] and kwargs["price"].isnumeric():
             content_type = ContentType.objects.filter(
@@ -207,6 +291,7 @@ class Command(BaseCommand):
                     settings.OPENEDX_API_BASE_URL,
                     f"/courses/{edx_course.course_id}/course",
                 ),
+                b2b_contract=contract,
             )
 
             self.stdout.write(
@@ -214,14 +299,40 @@ class Command(BaseCommand):
                     f"Created course run for {edx_course.course_id}: id {new_run.id}"
                 )
             )
+            
+            if contract:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Assigned course run to contract: {contract.name} (ID: {contract.id})"
+                    )
+                )
+            
             success_count += 1
 
             if kwargs["create_cms_page"]:
                 try:
-                    create_default_courseware_page(new_run.course, live=kwargs["live"])
+                    # Determine whether to publish the CMS page
+                    cms_page_live = kwargs["live"]  # Default to following the --live flag
+                    
+                    if kwargs.get("publish_cms_page"):
+                        cms_page_live = True
+                    elif kwargs.get("draft_cms_page"):
+                        cms_page_live = False
+                    
+                    course_page = create_default_courseware_page(new_run.course, live=cms_page_live)
+                    
+                    # Set the new flags if specified
+                    if kwargs.get("include_in_learn_catalog") or kwargs.get("ingest_content_files_for_ai"):
+                        if kwargs.get("include_in_learn_catalog"):
+                            course_page.include_in_learn_catalog = True
+                        if kwargs.get("ingest_content_files_for_ai"):
+                            course_page.ingest_content_files_for_ai = True
+                        course_page.save()
+                    
+                    status_msg = "live" if cms_page_live else "draft"
                     self.stdout.write(
                         self.style.SUCCESS(
-                            f"Created CMS page for {new_run.course.readable_id}"
+                            f"Created {status_msg} CMS page for {new_run.course.readable_id}"
                         )
                     )
                 except Exception as e:  # noqa: BLE001
