@@ -40,6 +40,7 @@ from ecommerce.constants import (
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
 from main.settings import TIME_ZONE
+from openedx.api import create_user
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
@@ -674,6 +675,11 @@ class Order(TimestampedModel):
 
         if not self.is_fulfilled:
             return
+
+        # Check for an edX user, and create one if there's not one
+        if not self.purchaser.edx_username:
+            create_user(self.purchaser)
+            self.purchaser.refresh_from_db()
 
         create_run_enrollments(
             self.purchaser,
