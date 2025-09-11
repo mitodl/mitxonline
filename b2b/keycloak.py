@@ -13,14 +13,17 @@ from authlib.integrations.requests_client import OAuth2Session
 from django.conf import settings
 
 from b2b.exceptions import KeycloakAdminImproperlyConfiguredError
-from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
+from b2b.keycloak_admin_dataclasses import (
+    OrganizationRepresentation,
+    RealmRepresentation,
+)
 
 
 class KeycloakAdminClient:
     """Client for the Keycloak admin API."""
 
     base_url = None
-    realm = None
+    _realm = None
     oauth_session = None
     skip_verify = False
 
@@ -46,7 +49,7 @@ class KeycloakAdminClient:
         if not self.base_url:
             msg = "KEYCLOAK_BASE_URL setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
-        self.base_url = urljoin(self.base_url, "/admin/realms")
+        self.base_url = urljoin(self.base_url, "/admin/realms/")
         self.realm = settings.KEYCLOAK_REALM_NAME
         if not self.realm:
             msg = "KEYCLOAK_REALM_NAME setting is not configured."
@@ -100,7 +103,7 @@ class KeycloakAdminClient:
         - The full URL path with the realm base path prefixed.
         """
 
-        return urljoin(self.base_url, f"{self.realm}/{url_path}")
+        return urljoin(self.base_url, f"{self._realm}/{url_path}")
 
     def request(self, method, url_path, *, skip_realmify=False, **kwargs):
         """Perform an HTTP request against the given URL path."""
@@ -117,51 +120,245 @@ class KeycloakAdminClient:
             else None
         )
 
+    def realms(self):
+        """
+        Get the realms available for this client.
 
-class KeycloakAdminOrganization:
-    """Client for working with Keycloak organizations via the admin API."""
+        The realms URLs don't follow the same URL pattern as the rest of the
+        APIs. This will only return the realms that the configured client can
+        access; there's no other search parameters.
+
+        Returns:
+        - List of RealmRepresentation objects
+        """
+
+        response = self.oauth_session.request("GET", "", skip_realmify=True)
+        response.raise_for_status()
+        list_data = response.json()
+
+        return [RealmRepresentation(**item) for item in list_data]
+
+    def realm(self, realm_name):
+        """
+        Get a single realm by its name.
+
+        Args:
+        - realm_name: The name of the realm to retrieve.
+
+        Returns:
+        - A single RealmRepresentation object
+        """
+
+        response = self.oauth_session.request("GET", realm_name, skip_realmify=True)
+        response.raise_for_status()
+        item_data = response.json()
+
+        return RealmRepresentation(**item_data)
+
+    def set_realm(self, realm_name):
+        """Set the realm name in the client."""
+
+        self._realm = realm_name
+
+    def list(self, endpoint, representation, **kwargs):
+        """
+        List objects from the endpoint in the realm.
+
+        The keyword args should be whatever is supported by the endpoint itself.
+        The general ones listed are generally supported, but you should check
+        the API docs for the exact list for the endpoint.
+
+        Args:
+        - endpoint: The endpoint to list (e.g., "organizations", "users", etc).
+        - representation: The dataclass to use for the representation of each item.
+          (e.g. OrganizationRepresentation, etc.)
+        General Keyword Args:
+        - exact: bool; If True, only return exact matches for the search term
+        - search: str; A search term to filter organizations by name or description.
+        - q: str; Search by attribute values ("key:value key:value").
+        Returns:
+        - A list of "representation" type instances.
+        """
+
+        response = self.oauth_session.request("GET", endpoint, params=kwargs)
+        response.raise_for_status()
+        list_data = response.json()
+
+        return [representation(**item) for item in list_data]
+
+    def retrieve(self, endpoint, representation, **kwargs):
+        """
+        Retrieve an object from the endpoint in the realm.
+
+        Construct the endpoint param as necessary - for example, for a user,
+        pass "users/{user_id}".
+
+        Args:
+        - endpoint: The endpoint to list (e.g., "organizations", "users", etc).
+        - representation: The dataclass to use for the representation of each item.
+          (e.g. OrganizationRepresentation, etc.)
+        Returns:
+        - A single "representation" type instance.
+        """
+
+        response = self.oauth_session.request("GET", endpoint, params=kwargs)
+        response.raise_for_status()
+        list_data = response.json()
+
+        return representation(**list_data)
+
+    def create(self, endpoint, representation):
+        """
+        Create an object at the endpoint in the realm.
+
+        Args:
+        - endpoint: The endpoint to use (e.g., "organizations", "users", etc).
+        - representation: The dataclass instance to save.
+
+        Returns:
+        - The saved representation instance.
+        """
+
+        response = self.oauth_session.request(
+            "POST", endpoint, json=representation.__dict__
+        )
+        response.raise_for_status()
+        item_data = response.json()
+
+        return representation(**item_data)
+
+    def save(self, endpoint, representation):
+        """
+        Create an object at the endpoint in the realm.
+
+        Args:
+        - endpoint: The endpoint to use (e.g., "organizations", "users", etc).
+        - representation: The dataclass instance to save.
+
+        Returns:
+        - The saved representation instance.
+        """
+
+        response = self.oauth_session.request(
+            "PUT", endpoint, json=representation.__dict__
+        )
+        response.raise_for_status()
+        item_data = response.json()
+
+        return representation(**item_data)
+
+    def associate(self, endpoint, target_id):
+        """
+        Associate an object at the endpoint in the realm with the target ID.
+
+        For things like adding members to an organization, we don't send the
+        entire user object. We just send the user ID to associate. save will
+        try to JSONify the data we're sending, which is not necessarily useful
+        in this case, so this op is separate.
+
+        Args:
+        - endpoint: The endpoint to use (e.g., "organizations/{org_id}/members", etc).
+        - target_id: The ID of the object to associate.
+        Returns:
+        - True if successful.
+        Raises:
+        - requests.HTTPError if the request fails.
+        """
+
+        response = self.oauth_session.request("POST", endpoint, data=target_id)
+        response.raise_for_status()
+
+        return True
+
+
+class KeycloakAdminModel:
+    """Middleware class to help with working with Keycloak data."""
+
+    admin_client = None
+    representation_class = None
+    endpoint = None
+
+    def __init__(self, admin_client, representation_class, endpoint):
+        """
+        Configure the model.
+
+        Args:
+        - admin_client: An instance of KeycloakAdminClient.
+        - representation_class: The dataclass that we pass in/out of the API.
+        - endpoint: The endpoint to use.
+        """
+
+        self.admin_client = admin_client
+        self.representation_class = representation_class
+        self.endpoint = endpoint
+
+    def list(self, **kwargs):
+        """
+        List all objects in the realm.
+
+        As with the client list method, keyword args should be whatever's
+        supported by the API.
+
+        Keyword Args:
+        - exact: bool; If True, only return exact matches for the search term
+        - search: str; A search term to filter objects by name or description.
+        - q: str; Search by attribute values ("key:value key:value").
+        Returns:
+        - A list of representation instances.
+        """
+
+        return self.admin_client.list(
+            self.endpoint, self.representation_class, **kwargs
+        )
+
+    def get(self, item_id):
+        """
+        Get a single object by its ID.
+
+        Args:
+        - item_id: The ID of the object to retrieve.
+
+        Returns:
+        - An instance of representation.
+        """
+
+        return self.admin_client.retrieve(
+            f"{self.endpoint}/{item_id}",
+            self.representation_class,
+        )
+
+    def associate(self, association_type, parent_id, child_id):
+        """
+        Associate the object with the given ID with the target ID.
+
+        Args:
+        - association_type: The "type" of association to make (e.g., "members").
+        - parent_id: The ID of the object to add the item to.
+        - child_id: The ID of the object to add.
+        Returns:
+        - True if successful.
+        Raises:
+        - requests.HTTPError if the request fails.
+        """
+
+        return self.admin_client.associate(
+            f"{self.endpoint}/{parent_id}/{association_type}", child_id
+        )
+
+
+class KeycloakAdminOrganizationModel(KeycloakAdminModel):
+    """Keycloak Organizations."""
 
     def __init__(self, admin_client):
         """
-        Configure the organization client.
+        Configure the model.
 
         Args:
         - admin_client: An instance of KeycloakAdminClient.
         """
 
-        self.admin_client = admin_client
-
-    def list(self, **kwargs):
-        """
-        List all organizations in the realm.
-
-        Keyword Args:
-        - exact: bool; If True, only return exact matches for the search term
-        - search: str; A search term to filter organizations by name or description.
-        - q: str; Search by attribute values ("key:value key:value").
-        Returns:
-        - A list of OrganizationRepresentation instances.
-        """
-
-        response = self.admin_client.request("GET", "organizations", params=kwargs)
-        response.raise_for_status()
-        orgs_data = response.json()
-
-        return [OrganizationRepresentation(**org) for org in orgs_data]
-
-    def get(self, org_id):
-        """
-        Get a single organization by its ID.
-
-        Args:
-        - org_id: The ID of the organization to retrieve.
-
-        Returns:
-        - An instance of OrganizationRepresentation.
-        """
-
-        response = self.admin_client.request("GET", f"organizations/{org_id}")
-        response.raise_for_status()
-        org_data = response.json()
-
-        return OrganizationRepresentation(**org_data)
+        super().__init__(
+            admin_client,
+            OrganizationRepresentation,
+            "organizations",
+        )
