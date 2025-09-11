@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.129.2
+Version 0.129.2 (Released September 11, 2025)
 ---------------
 
 - Ensure there's an edx username on checkout (#2930)
