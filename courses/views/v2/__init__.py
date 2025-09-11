@@ -6,11 +6,12 @@ import contextlib
 
 import django_filters
 from django.db.models import Count, Prefetch
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.olposthog.features import is_enabled
-from rest_framework import mixins, status, viewsets
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import (
@@ -463,7 +464,9 @@ class UserEnrollmentsApiViewSet(
 def get_course_certificate(request, cert_uuid):
     """Get a course certificate by UUID."""
 
-    cert = CourseRunCertificate.objects.filter(is_revoked=False, uuid=cert_uuid).get()
+    cert_uuid = serializers.UUIDField().to_internal_value(cert_uuid)
+
+    cert = get_object_or_404(CourseRunCertificate, is_revoked=False, uuid=cert_uuid)
 
     return Response(
         CourseRunCertificateSerializer(cert, context={"request": request}).data
@@ -481,7 +484,9 @@ def get_course_certificate(request, cert_uuid):
 def get_program_certificate(request, cert_uuid):
     """Get a program certificate by UUID."""
 
-    cert = ProgramCertificate.objects.filter(is_revoked=False, uuid=cert_uuid).get()
+    cert_uuid = serializers.UUIDField().to_internal_value(cert_uuid)
+
+    cert = get_object_or_404(ProgramCertificate, is_revoked=False, uuid=cert_uuid)
 
     return Response(
         ProgramCertificateSerializer(cert, context={"request": request}).data
