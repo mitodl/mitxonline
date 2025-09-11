@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.129.1
+Version 0.129.1 (Released September 11, 2025)
 ---------------
 
 - Add an example command to run for discount code generation (#2917)
