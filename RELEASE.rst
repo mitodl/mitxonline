@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.129.2
+---------------
+
+- Ensure there's an edx username on checkout (#2930)
+- Fix 500 errors viewing financial assistance requests in Django Admin (#2925)
+
 Version 0.129.1 (Released September 11, 2025)
 ---------------
 
