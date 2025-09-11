@@ -17,21 +17,25 @@ from users.serializers import UserSerializer
 
 """
 Map order state to hubspot ids for pipeline stages
-These IDs are specific to the prod & sandbox accounts for mitxonline
-48288379: Checkout Abandoned
-48288388: Checkout Pending
-48288389: Checkout Completed
-48288390: Processed
+Updated for your HubSpot account based on available stages:
+[appointmentscheduled, qualifiedtobuy, presentationscheduled, 
+decisionmakerboughtin, contractsent, closedwon, closedlost, 1889888972, 1889888973]
+
+Mapping logic:
+- FULFILLED/REVIEW → closedwon (successful completion)
+- PENDING → qualifiedtobuy (in progress)
+- CANCELED → closedlost (abandoned/cancelled)
+- DECLINED/ERRORED/REFUNDED → closedlost (failed transactions)
 """
 ORDER_STATUS_MAPPING = {
-    models.OrderStatus.FULFILLED: "48288390",
-    models.OrderStatus.PENDING: "48288388",
-    models.OrderStatus.CANCELED: "48288379",
-    models.OrderStatus.DECLINED: "48288389",
-    models.OrderStatus.ERRORED: "48288389",
-    models.OrderStatus.REFUNDED: "48288389",
-    models.OrderStatus.PARTIALLY_REFUNDED: "48288389",
-    models.OrderStatus.REVIEW: "48288390",
+    models.OrderStatus.FULFILLED: "closedwon",
+    models.OrderStatus.PENDING: "qualifiedtobuy", 
+    models.OrderStatus.CANCELED: "closedlost",
+    models.OrderStatus.DECLINED: "closedlost",
+    models.OrderStatus.ERRORED: "closedlost",
+    models.OrderStatus.REFUNDED: "closedlost",
+    models.OrderStatus.PARTIALLY_REFUNDED: "closedlost",
+    models.OrderStatus.REVIEW: "closedwon",
 }
 
 

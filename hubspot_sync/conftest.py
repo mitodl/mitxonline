@@ -11,7 +11,7 @@ import pytz
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.objects import SimplePublicObject
-from mitol.hubspot_api.factories import HubspotObjectFactory
+# from mitol.hubspot_api.factories import HubspotObjectFactory
 from reversion.models import Version
 
 from ecommerce import factories

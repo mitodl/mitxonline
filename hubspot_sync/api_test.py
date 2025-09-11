@@ -7,8 +7,8 @@ import reversion
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.objects import ApiException
 from mitol.common.utils.datetime import now_in_utc
-from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
-from mitol.hubspot_api.models import HubspotObject
+# from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
+# from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES

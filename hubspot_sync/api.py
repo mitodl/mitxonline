@@ -7,6 +7,16 @@ from typing import List  # noqa: UP035
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
+# Conditional imports for hubspot-api-client v6 vs v12+ compatibility
+try:
+    import hubspot
+    HUBSPOT_VERSION = getattr(hubspot, '__version__', '6.0.0')
+    HUBSPOT_MAJOR_VERSION = int(HUBSPOT_VERSION.split('.')[0])
+except (ImportError, AttributeError, ValueError):
+    HUBSPOT_MAJOR_VERSION = 6
+    HUBSPOT_VERSION = '6.0.0'
+
+# Import the same classes regardless of version (they exist in both)
 from hubspot.crm.objects import (
     SimplePublicObject,
     SimplePublicObjectInput,

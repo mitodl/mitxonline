@@ -20,14 +20,18 @@ def sync_hubspot_user(user: User):
     Args:
         user (User): The user to sync
     """
+    log.info(f"🚀 sync_hubspot_user called for user {user.id} ({user.email})")
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
+            log.info(f"✅ Queueing sync_contact_with_hubspot task for user {user.id}")
             tasks.sync_contact_with_hubspot.delay(user.id)
         except:  # noqa: E722
             log.exception(
-                "Exception calling sync_contact_with_hubspot for user %s",
+                "❌ Exception calling sync_contact_with_hubspot for user %s",
                 user.edx_username,
             )
+    else:
+        log.warning("⚠️  MITOL_HUBSPOT_API_PRIVATE_TOKEN not set - skipping user sync")
 
 
 def sync_hubspot_deal(order: Order):
@@ -38,13 +42,20 @@ def sync_hubspot_deal(order: Order):
     Args:
         order (Order): The order to sync
     """
+    log.info(f"🚀 sync_hubspot_deal called for order {order.id} (state: {order.state})")
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN and order.lines.first() is not None:
         try:
+            log.info(f"✅ Queueing sync_deal_with_hubspot task for order {order.id} with 10s delay")
             tasks.sync_deal_with_hubspot.apply_async(args=(order.id,), countdown=10)
         except:  # noqa: E722
             log.exception(
-                "Exception calling sync_deal_with_hubspot for order %d", order.id
+                "❌ Exception calling sync_deal_with_hubspot for order %d", order.id
             )
+    else:
+        if not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
+            log.warning("⚠️  MITOL_HUBSPOT_API_PRIVATE_TOKEN not set - skipping order sync")
+        else:
+            log.info(f"⏭️  Order {order.id} has no lines - skipping sync")
 
 
 def sync_hubspot_line_by_line_id(line_id: int):
@@ -71,10 +82,14 @@ def sync_hubspot_product(product: Product):
     Args:
         product (Product): The product to sync
     """
+    log.info(f"🚀 sync_hubspot_product called for product {product.id}")
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
+            log.info(f"✅ Queueing sync_product_with_hubspot task for product {product.id}")
             tasks.sync_product_with_hubspot.delay(product.id)
         except:  # noqa: E722
             log.exception(
-                "Exception calling sync_product_with_hubspot for product %d", product.id
+                "❌ Exception calling sync_product_with_hubspot for product %d", product.id
             )
+    else:
+        log.warning("⚠️  MITOL_HUBSPOT_API_PRIVATE_TOKEN not set - skipping product sync")

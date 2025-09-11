@@ -2,6 +2,8 @@
 Signals for mitxonline course certificates
 """
 
+import logging
+
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -12,6 +14,8 @@ from courses.models import (
     Program,
 )
 from hubspot_sync.task_helpers import sync_hubspot_user
+
+log = logging.getLogger(__name__)
 
 
 @receiver(
@@ -28,6 +32,7 @@ def handle_create_course_run_certificate(
     """
     When a CourseRunCertificate model is created.
     """
+    log.info(f"🔄 CourseRunCertificate signal triggered: Certificate {instance.id} ({'created' if created else 'updated'}) for user {instance.user.id}")
     if created:
         user = instance.user
         course = instance.course_run.course
@@ -37,7 +42,9 @@ def handle_create_course_run_certificate(
             ).distinct()
         )
         if programs:
+            log.info(f"📜 Generating program certificates for user {user.id} in {len(programs)} programs")
             transaction.on_commit(
                 lambda: generate_multiple_programs_certificate(user, programs)
             )
+        log.info(f"🔄 Syncing user {user.id} to HubSpot due to certificate creation")
         sync_hubspot_user(instance.user)

@@ -58,11 +58,15 @@ WORKDIR /src
 RUN python3 -m venv $VIRTUAL_ENV
 RUN poetry install
 
-
 FROM poetry AS code
 
 COPY . /src
 WORKDIR /src
+
+# Install hubspot-api-client v12 and updated ol-django hubspot_api package
+RUN pip uninstall mitol-django-hubspot-api -y && \
+    pip install hubspot-api-client==12.0.0 && \
+    pip install /src/ol-django/dist/mitol_django_hubspot_api-*.whl
 
 # Set pip cache folder, as it is breaking pip when it is on a shared volume
 ENV XDG_CACHE_HOME=/tmp/.cache

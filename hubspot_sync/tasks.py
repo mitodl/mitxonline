@@ -10,8 +10,57 @@ import celery
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import F
+# Conditional imports for hubspot-api-client v6 vs v12+ compatibility
+try:
+    import hubspot
+    HUBSPOT_VERSION = hubspot.__version__  # No default - let it fail if not available
+    HUBSPOT_MAJOR_VERSION = int(HUBSPOT_VERSION.split('.')[0])
+except (ImportError, AttributeError, ValueError):
+    # Try to detect by checking pip list or other methods
+    try:
+        import subprocess
+        result = subprocess.run(['pip', 'show', 'hubspot-api-client'], capture_output=True, text=True)
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if line.startswith('Version:'):
+                    HUBSPOT_VERSION = line.split(':', 1)[1].strip()
+                    HUBSPOT_MAJOR_VERSION = int(HUBSPOT_VERSION.split('.')[0])
+                    break
+            else:
+                raise ValueError("Could not parse version from pip show")
+        else:
+            raise ValueError("pip show failed")
+    except Exception:
+        HUBSPOT_MAJOR_VERSION = None  # We'll detect by available classes
+        HUBSPOT_VERSION = 'unknown'
+
+# Conditional imports for hubspot-api-client v6 vs v12+ compatibility
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
-from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
+
+# In v12, ApiException moved to exceptions submodule
+try:
+    from hubspot.crm.objects import ApiException
+except ImportError:
+    from hubspot.crm.objects.exceptions import ApiException
+
+# Import the correct BatchInput class based on version or available classes
+if HUBSPOT_MAJOR_VERSION is None:
+    # Detect by available classes
+    import hubspot.crm.objects
+    available_classes = [name for name in dir(hubspot.crm.objects) if 'BatchInput' in name]
+    
+    if 'BatchInputSimplePublicObjectBatchInputForCreate' in available_classes:
+        from hubspot.crm.objects import BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate
+    elif 'BatchInputSimplePublicObjectInputForCreate' in available_classes:
+        from hubspot.crm.objects import BatchInputSimplePublicObjectInputForCreate as BatchInputCreate
+    elif 'BatchInputSimplePublicObjectInput' in available_classes:
+        from hubspot.crm.objects import BatchInputSimplePublicObjectInput as BatchInputCreate
+    else:
+        raise ImportError(f"Could not find a compatible BatchInput class. Available: {available_classes}")
+elif HUBSPOT_MAJOR_VERSION >= 12:
+    from hubspot.crm.objects import BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate
+else:
+    from hubspot.crm.objects import BatchInputSimplePublicObjectInput as BatchInputCreate
 from mitol.common.decorators import single_task
 from mitol.common.utils.collections import chunks
 from mitol.common.utils.datetime import now_in_utc
@@ -254,7 +303,7 @@ def batch_create_hubspot_objects_chunked(
         try:
             response = HubspotApi().crm.objects.batch_api.create(
                 hubspot_type,
-                BatchInputSimplePublicObjectInput(
+                BatchInputCreate(
                     inputs=api.MODEL_CREATE_FUNCTION_MAPPING[ct_model_name](chunk)
                 ),
             )
@@ -320,7 +369,7 @@ def batch_update_hubspot_objects_chunked(
         inputs = api.MODEL_UPDATE_FUNCTION_MAPPING[ct_model_name](chunk)
         try:
             response = HubspotApi().crm.objects.batch_api.update(
-                hubspot_type, BatchInputSimplePublicObjectInput(inputs=inputs)
+                hubspot_type, BatchInputCreate(inputs=inputs)
             )
             chunk_updated_ids = [result.id for result in response.results]
             for result in response.results:

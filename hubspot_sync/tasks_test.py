@@ -8,8 +8,56 @@ from decimal import Decimal
 import pytest
 import reversion
 from django.contrib.contenttypes.models import ContentType
+# Conditional imports for hubspot-api-client v6 vs v12+ compatibility
+try:
+    import hubspot
+    HUBSPOT_VERSION = hubspot.__version__  # No default - let it fail if not available
+    HUBSPOT_MAJOR_VERSION = int(HUBSPOT_VERSION.split('.')[0])
+except (ImportError, AttributeError, ValueError):
+    # Try to detect by checking pip list
+    try:
+        import subprocess
+        result = subprocess.run(['pip', 'show', 'hubspot-api-client'], capture_output=True, text=True)
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if line.startswith('Version:'):
+                    HUBSPOT_VERSION = line.split(':', 1)[1].strip()
+                    HUBSPOT_MAJOR_VERSION = int(HUBSPOT_VERSION.split('.')[0])
+                    break
+            else:
+                raise ValueError("Could not parse version from pip show")
+        else:
+            raise ValueError("pip show failed")
+    except Exception:
+        HUBSPOT_MAJOR_VERSION = None  # We'll detect by available classes
+        HUBSPOT_VERSION = 'unknown'
+
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
-from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
+
+# In v12, ApiException moved to exceptions submodule
+try:
+    from hubspot.crm.objects import ApiException
+except ImportError:
+    from hubspot.crm.objects.exceptions import ApiException
+
+# Import the correct BatchInput class based on version or available classes
+if HUBSPOT_MAJOR_VERSION is None:
+    # Detect by available classes
+    import hubspot.crm.objects
+    available_classes = [name for name in dir(hubspot.crm.objects) if 'BatchInput' in name]
+    
+    if 'BatchInputSimplePublicObjectBatchInputForCreate' in available_classes:
+        from hubspot.crm.objects import BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate
+    elif 'BatchInputSimplePublicObjectInputForCreate' in available_classes:
+        from hubspot.crm.objects import BatchInputSimplePublicObjectInputForCreate as BatchInputCreate
+    elif 'BatchInputSimplePublicObjectInput' in available_classes:
+        from hubspot.crm.objects import BatchInputSimplePublicObjectInput as BatchInputCreate
+    else:
+        raise ImportError(f"Could not find a compatible BatchInput class. Available: {available_classes}")
+elif HUBSPOT_MAJOR_VERSION >= 12:
+    from hubspot.crm.objects import BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate
+else:
+    from hubspot.crm.objects import BatchInputSimplePublicObjectInput as BatchInputCreate
 from mitol.hubspot_api.api import HubspotAssociationType, HubspotObjectType
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
@@ -238,7 +286,7 @@ def test_batch_update_hubspot_objects_chunked(mocker, id_count):
     )
     mock_hubspot_api.return_value.crm.objects.batch_api.update.assert_any_call(
         HubspotObjectType.CONTACTS.value,
-        BatchInputSimplePublicObjectInput(
+        BatchInputCreate(
             inputs=make_contact_update_message_list_from_user_ids(
                 mock_ids[0 : min(id_count, 10)]
             )
@@ -296,7 +344,7 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     )
     mock_hubspot_api.return_value.crm.objects.batch_api.create.assert_any_call(
         HubspotObjectType.CONTACTS.value,
-        BatchInputSimplePublicObjectInput(
+        BatchInputCreate(
             inputs=make_contact_create_message_list_from_user_ids(
                 mock_ids[0 : min(id_count, 10)]
             )

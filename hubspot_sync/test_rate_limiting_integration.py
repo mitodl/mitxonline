@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from hubspot.crm.objects import ApiException
-from mitol.hubspot_api.exceptions import TooManyRequestsException
+# from mitol.hubspot_api.exceptions import TooManyRequestsException
 
 from hubspot_sync import api
 from hubspot_sync.tasks import sync_contact_with_hubspot, sync_failed_contacts
