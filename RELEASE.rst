@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.129.1 (Released September 11, 2025)
+---------------
+
+- Add an example command to run for discount code generation (#2917)
+- Optimize and refactor course and program views serializers and models (#2910)
+- If program has no electives should still be completed (#2927)
+
 Version 0.129.0 (Released September 10, 2025)
 ---------------
 
