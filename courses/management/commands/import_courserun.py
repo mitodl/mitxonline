@@ -134,27 +134,27 @@ class Command(BaseCommand):
     def _resolve_contract(self, contract_identifier):
         """
         Resolve a contract by ID or slug.
-        
+
         Args:
             contract_identifier (str): Contract ID (numeric) or slug
-            
+
         Returns:
             ContractPage or None: The resolved contract or None if not found/not available
         """
         if not ContractPage or not contract_identifier:
             return None
-            
+
         if contract_identifier.isdigit():
             try:
                 return ContractPage.objects.get(id=int(contract_identifier))
             except ContractPage.DoesNotExist:
                 pass
-        
+
         try:
             return ContractPage.objects.get(slug=contract_identifier)
         except ContractPage.DoesNotExist:
             pass
-            
+
         return None
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
@@ -165,7 +165,7 @@ class Command(BaseCommand):
                 )
             )
             return False
-        
+
         edx_course_detail = get_edx_api_course_detail_client()
         edx_courses = []
 
@@ -253,7 +253,9 @@ class Command(BaseCommand):
             course_readable_id = edx_course.course_id.removesuffix(f"+{courserun_tag}")
             course = Course.objects.filter(readable_id=course_readable_id)
             if kwargs.get("depts") and len(kwargs.get("depts")) > 0:
-                add_depts = Department.objects.filter(name__in=kwargs.get("depts")).all()
+                add_depts = Department.objects.filter(
+                    name__in=kwargs.get("depts")
+                ).all()
 
             if "add_depts" not in locals() or not add_depts:
                 self.stdout.write(
@@ -304,35 +306,39 @@ class Command(BaseCommand):
                     f"Created course run for {edx_course.course_id}: id {new_run.id}"
                 )
             )
-            
+
             if contract:
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"Assigned course run to contract: {contract.name} (ID: {contract.id})"
                     )
                 )
-            
+
             success_count += 1
 
             if kwargs.get("create_cms_page"):
                 try:
                     # Determine whether to publish the CMS page
                     cms_page_live = kwargs.get("live", False)
-                    
+
                     if kwargs.get("publish_cms_page"):
                         cms_page_live = True
                     elif kwargs.get("draft_cms_page"):
                         cms_page_live = False
-                    
-                    course_page = create_default_courseware_page(new_run.course, live=cms_page_live)
-                    
-                    if kwargs.get("include_in_learn_catalog") or kwargs.get("ingest_content_files_for_ai"):
+
+                    course_page = create_default_courseware_page(
+                        new_run.course, live=cms_page_live
+                    )
+
+                    if kwargs.get("include_in_learn_catalog") or kwargs.get(
+                        "ingest_content_files_for_ai"
+                    ):
                         if kwargs.get("include_in_learn_catalog"):
                             course_page.include_in_learn_catalog = True
                         if kwargs.get("ingest_content_files_for_ai"):
                             course_page.ingest_content_files_for_ai = True
                         course_page.save()
-                    
+
                     status_msg = "live" if cms_page_live else "draft"
                     self.stdout.write(
                         self.style.SUCCESS(
@@ -356,7 +362,7 @@ class Command(BaseCommand):
                             "price": Decimal(price),
                             "description": new_run.courseware_id,
                             "is_active": True,
-                        }
+                        },
                     )
 
                     course_product.save()

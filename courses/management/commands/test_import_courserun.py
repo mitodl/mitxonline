@@ -1,21 +1,21 @@
 """Tests for import_courserun management command"""
 
-import pytest
 from decimal import Decimal
 from unittest.mock import Mock
 
-from courses.factories import (
-    CourseFactory,
-    DepartmentFactory,
-    ProgramFactory,
-    CourseRunFactory,
-)
-from courses.management.commands import import_courserun
-from courses.models import Course, CourseRun, BlockedCountry
-from ecommerce.models import Product
+import pytest
 from django.contrib.contenttypes.models import ContentType
 
 from b2b.factories import ContractPageFactory
+from courses.factories import (
+    CourseFactory,
+    CourseRunFactory,
+    DepartmentFactory,
+    ProgramFactory,
+)
+from courses.management.commands import import_courserun
+from courses.models import BlockedCountry, Course, CourseRun
+from ecommerce.models import Product
 
 pytestmark = [pytest.mark.django_db]
 
@@ -48,7 +48,7 @@ def department():
     return DepartmentFactory.create(name="Computer Science")
 
 
-@pytest.fixture  
+@pytest.fixture
 def program_with_courses():
     """Create a program with courses for testing"""
     program = ProgramFactory.create(readable_id="program-v1:MITx+CS")
@@ -81,16 +81,17 @@ class TestImportCourserunCommand:
             (True, False, False),
             (False, True, False),
             (False, False, False),
-        ]
+        ],
     )
-    def test_cms_page_flag_validation(self, publish_cms_page, draft_cms_page, expected_error):
+    def test_cms_page_flag_validation(
+        self, publish_cms_page, draft_cms_page, expected_error
+    ):
         """Test validation of mutually exclusive CMS page flags"""
         command = import_courserun.Command()
         result = command.handle(
-            publish_cms_page=publish_cms_page,
-            draft_cms_page=draft_cms_page
+            publish_cms_page=publish_cms_page, draft_cms_page=draft_cms_page
         )
-        
+
         if expected_error:
             assert result is False
         else:
@@ -100,7 +101,7 @@ class TestImportCourserunCommand:
         """Test resolving contract by numeric ID"""
         contract = ContractPageFactory.create()
         command = import_courserun.Command()
-        
+
         resolved = command._resolve_contract(str(contract.id))  # noqa: SLF001
         assert resolved == contract
 
@@ -108,14 +109,14 @@ class TestImportCourserunCommand:
         """Test resolving contract by slug"""
         contract = ContractPageFactory.create()
         command = import_courserun.Command()
-        
+
         resolved = command._resolve_contract(contract.slug)  # noqa: SLF001
         assert resolved == contract
 
     def test_resolve_contract_not_found(self):
         """Test handling of non-existent contract"""
         command = import_courserun.Command()
-        
+
         resolved = command._resolve_contract("nonexistent")  # noqa: SLF001
         assert resolved is None
 
@@ -135,7 +136,7 @@ class TestImportCourserunCommand:
         """Test that command fails when no departments are provided"""
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
 
         command = import_courserun.Command()
@@ -146,13 +147,12 @@ class TestImportCourserunCommand:
         """Test that command fails when specified departments don't exist"""
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
 
         command = import_courserun.Command()
         result = command.handle(
-            courserun="course-v1:MITx+6.00x+2023_Fall",
-            depts=["Nonexistent Department"]
+            courserun="course-v1:MITx+6.00x+2023_Fall", depts=["Nonexistent Department"]
         )
         assert result is False
 
@@ -162,42 +162,51 @@ class TestImportCourserunCommand:
         mock_client.get_detail.side_effect = Exception("API Error")
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_client
+            return_value=mock_client,
         )
-        
+
         command = import_courserun.Command()
         result = command.handle(
-            courserun="course-v1:MITx+6.00x+2023_Fall",
-            depts=[department.name]
+            courserun="course-v1:MITx+6.00x+2023_Fall", depts=[department.name]
         )
         assert result is False
 
-    def test_successful_courserun_creation(self, mocker, mock_edx_api_client, mock_edx_course_detail, department):
+    def test_successful_courserun_creation(
+        self, mocker, mock_edx_api_client, mock_edx_course_detail, department
+    ):
         """Test successful creation of a course run"""
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
-        
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
+
         command = import_courserun.Command()
         result = command.handle(
             courserun="course-v1:MITx+6.00x+2023_Fall",
             depts=[department.name],
-            live=True
+            live=True,
         )
-        
+
         assert result is None
-        
+
         # Verify course was created
         course = Course.objects.get(readable_id="course-v1:MITx+6.00x")
         assert course.title == mock_edx_course_detail.name
         assert course.live is True
         assert department in course.departments.all()
-        
+
         # Verify course run was created
-        course_run = CourseRun.objects.get(courseware_id="course-v1:MITx+6.00x+2023_Fall")
+        course_run = CourseRun.objects.get(
+            courseware_id="course-v1:MITx+6.00x+2023_Fall"
+        )
         assert course_run.course == course
         assert course_run.run_tag == "2023_Fall"
         assert course_run.title == mock_edx_course_detail.name
@@ -211,15 +220,20 @@ class TestImportCourserunCommand:
 
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
-            courserun="course-v1:MITx+6.00x+2023_Fall",
-            depts=[department.name]
+            courserun="course-v1:MITx+6.00x+2023_Fall", depts=[department.name]
         )
 
         assert result is None
@@ -239,43 +253,59 @@ class TestImportCourserunCommand:
 
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
             courserun="course-v1:MITx+6.00x+2023_Fall",
             depts=[department.name],
-            contract=str(contract.id)
+            contract=str(contract.id),
         )
 
         assert result is None
 
         # Verify course run was created with contract
-        course_run = CourseRun.objects.get(courseware_id="course-v1:MITx+6.00x+2023_Fall")
+        course_run = CourseRun.objects.get(
+            courseware_id="course-v1:MITx+6.00x+2023_Fall"
+        )
         assert course_run.b2b_contract == contract
 
     def test_cms_page_creation_draft(self, mocker, mock_edx_api_client, department):
         """Test CMS page creation in draft mode"""
-        mock_create_page = mocker.patch("courses.management.commands.import_courserun.create_default_courseware_page")
+        mock_create_page = mocker.patch(
+            "courses.management.commands.import_courserun.create_default_courseware_page"
+        )
         mock_page = Mock()
         mock_create_page.return_value = mock_page
 
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
             courserun="course-v1:MITx+6.00x+2023_Fall",
             depts=[department.name],
             create_cms_page=True,
-            draft_cms_page=True
+            draft_cms_page=True,
         )
 
         assert result is None
@@ -285,23 +315,31 @@ class TestImportCourserunCommand:
 
     def test_cms_page_creation_live(self, mocker, mock_edx_api_client, department):
         """Test CMS page creation in live mode"""
-        mock_create_page = mocker.patch("courses.management.commands.import_courserun.create_default_courseware_page")
+        mock_create_page = mocker.patch(
+            "courses.management.commands.import_courserun.create_default_courseware_page"
+        )
         mock_page = Mock()
         mock_create_page.return_value = mock_page
 
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
             courserun="course-v1:MITx+6.00x+2023_Fall",
             depts=[department.name],
             create_cms_page=True,
-            publish_cms_page=True
+            publish_cms_page=True,
         )
 
         assert result is None
@@ -309,9 +347,13 @@ class TestImportCourserunCommand:
         course = Course.objects.get(readable_id="course-v1:MITx+6.00x")
         mock_create_page.assert_called_once_with(course, live=True)
 
-    def test_cms_page_creation_with_flags(self, mocker, mock_edx_api_client, department):
+    def test_cms_page_creation_with_flags(
+        self, mocker, mock_edx_api_client, department
+    ):
         """Test CMS page creation with catalog and AI flags"""
-        mock_create_page = mocker.patch("courses.management.commands.import_courserun.create_default_courseware_page")
+        mock_create_page = mocker.patch(
+            "courses.management.commands.import_courserun.create_default_courseware_page"
+        )
         mock_page = Mock()
         mock_page.include_in_learn_catalog = False
         mock_page.ingest_content_files_for_ai = False
@@ -319,10 +361,16 @@ class TestImportCourserunCommand:
 
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
@@ -330,7 +378,7 @@ class TestImportCourserunCommand:
             depts=[department.name],
             create_cms_page=True,
             include_in_learn_catalog=True,
-            ingest_content_files_for_ai=True
+            ingest_content_files_for_ai=True,
         )
 
         assert result is None
@@ -344,27 +392,34 @@ class TestImportCourserunCommand:
         """Test product creation with price"""
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
             courserun="course-v1:MITx+6.00x+2023_Fall",
             depts=[department.name],
-            price="99.50"
+            price="99.50",
         )
 
         assert result is None
 
         # Verify product was created
-        course_run = CourseRun.objects.get(courseware_id="course-v1:MITx+6.00x+2023_Fall")
+        course_run = CourseRun.objects.get(
+            courseware_id="course-v1:MITx+6.00x+2023_Fall"
+        )
         content_type = ContentType.objects.get_for_model(CourseRun)
 
         product = Product.objects.get(
-            content_type=content_type,
-            object_id=course_run.id
+            content_type=content_type, object_id=course_run.id
         )
         assert product.price == Decimal("99.50")
         assert product.description == course_run.courseware_id
@@ -374,16 +429,22 @@ class TestImportCourserunCommand:
         """Test blocking countries by ISO code"""
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
             courserun="course-v1:MITx+6.00x+2023_Fall",
             depts=[department.name],
-            block_countries="US,CA,GB"
+            block_countries="US,CA,GB",
         )
 
         assert result is None
@@ -401,16 +462,22 @@ class TestImportCourserunCommand:
         """Test handling of invalid country codes/names"""
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
             courserun="course-v1:MITx+6.00x+2023_Fall",
             depts=[department.name],
-            block_countries="US,InvalidCountry,CA"
+            block_countries="US,InvalidCountry,CA",
         )
 
         assert result is None
@@ -446,16 +513,22 @@ class TestImportCourserunCommand:
 
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_client
+            return_value=mock_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
             program=str(program_with_courses.id),
             run_tag="2023_Fall",
-            depts=[department.name]
+            depts=[department.name],
         )
 
         assert result is None
@@ -463,14 +536,16 @@ class TestImportCourserunCommand:
         # Verify course runs were created for both courses
         assert CourseRun.objects.filter(run_tag="2023_Fall").count() == 2
 
-    def test_program_iteration_skip_existing(self, mocker, program_with_courses, department):
+    def test_program_iteration_skip_existing(
+        self, mocker, program_with_courses, department
+    ):
         """Test that existing course runs are skipped during program iteration"""
         # Create existing course run for one of the courses
         course = Course.objects.get(readable_id="course-v1:MITx+6.00x")
         CourseRunFactory.create(course=course, run_tag="2023_Fall")
-        
+
         mock_client = Mock()
-        
+
         def mock_get_detail(course_id, username):
             if "6.001x" in course_id:
                 mock_course = Mock()
@@ -483,25 +558,31 @@ class TestImportCourserunCommand:
                 mock_course.is_self_paced.return_value = False
                 return mock_course
             return None  # Don't return data for 6.00x since it already exists
-        
+
         mock_client.get_detail.side_effect = mock_get_detail
-        
+
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_client
+            return_value=mock_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
-        
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
+
         command = import_courserun.Command()
         result = command.handle(
             program=str(program_with_courses.id),
             run_tag="2023_Fall",
-            depts=[department.name]
+            depts=[department.name],
         )
-        
+
         assert result is None
-        
+
         # Should only create one new course run (6.001x), skip existing (6.00x)
         new_runs = CourseRun.objects.filter(run_tag="2023_Fall").count()
         assert new_runs == 2  # 1 existing + 1 newly created
@@ -510,19 +591,19 @@ class TestImportCourserunCommand:
         """Test finding program by readable_id instead of numeric ID"""
         mock_client = Mock()
         mock_client.get_detail.return_value = None  # No courses found in edX
-        
+
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_client
+            return_value=mock_client,
         )
-        
+
         command = import_courserun.Command()
         result = command.handle(
             program=program_with_courses.readable_id,
             run_tag="2023_Fall",
-            depts=[department.name]
+            depts=[department.name],
         )
-        
+
         assert result is None
 
     def test_program_not_found(self, mocker, department):
@@ -530,35 +611,33 @@ class TestImportCourserunCommand:
         mock_client = Mock()
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_client
+            return_value=mock_client,
         )
-        
+
         command = import_courserun.Command()
         result = command.handle(
-            program="nonexistent-program",
-            run_tag="2023_Fall",
-            depts=[department.name]
+            program="nonexistent-program", run_tag="2023_Fall", depts=[department.name]
         )
-        
+
         assert result is False
 
     def test_program_api_error(self, mocker, program_with_courses, department):
         """Test handling of API error during program iteration"""
         mock_client = Mock()
         mock_client.get_detail.side_effect = Exception("API Error")
-        
+
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_client
+            return_value=mock_client,
         )
-        
+
         command = import_courserun.Command()
         result = command.handle(
             program=str(program_with_courses.id),
             run_tag="2023_Fall",
-            depts=[department.name]
+            depts=[department.name],
         )
-        
+
         assert result is None  # Command continues despite API errors
 
     def test_multiple_departments(self, mocker, mock_edx_api_client):
@@ -568,15 +647,20 @@ class TestImportCourserunCommand:
 
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
-            courserun="course-v1:MITx+6.00x+2023_Fall",
-            depts=[dept1.name, dept2.name]
+            courserun="course-v1:MITx+6.00x+2023_Fall", depts=[dept1.name, dept2.name]
         )
 
         assert result is None
@@ -591,26 +675,33 @@ class TestImportCourserunCommand:
         """Test that non-numeric price doesn't create product"""
         mocker.patch(
             "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
-            return_value=mock_edx_api_client
+            return_value=mock_edx_api_client,
         )
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL", "https://courses.example.com")
-        mocker.patch("courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME", "worker")
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_API_BASE_URL",
+            "https://courses.example.com",
+        )
+        mocker.patch(
+            "courses.management.commands.import_courserun.settings.OPENEDX_SERVICE_WORKER_USERNAME",
+            "worker",
+        )
 
         command = import_courserun.Command()
         result = command.handle(
             courserun="course-v1:MITx+6.00x+2023_Fall",
             depts=[department.name],
-            price="invalid"
+            price="invalid",
         )
 
         assert result is None
 
         # Verify no product was created
-        course_run = CourseRun.objects.get(courseware_id="course-v1:MITx+6.00x+2023_Fall")
+        course_run = CourseRun.objects.get(
+            courseware_id="course-v1:MITx+6.00x+2023_Fall"
+        )
         content_type = ContentType.objects.get_for_model(CourseRun)
 
         products = Product.objects.filter(
-            content_type=content_type,
-            object_id=course_run.id
+            content_type=content_type, object_id=course_run.id
         )
         assert products.count() == 0
