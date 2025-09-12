@@ -4,6 +4,7 @@ Admin site bindings for profiles
 
 from django.contrib import admin
 
+from openedx.forms import OpenEdxUserForm
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 
 
@@ -16,17 +17,9 @@ class OpenEdxUserAdmin(admin.ModelAdmin):
     list_display = ["id", "user", "has_been_synced", "platform"]
     list_filter = ["has_been_synced", "platform"]
     raw_id_fields = ["user"]
-    readonly_fields = ["desired_edx_username"]
+    readonly_fields = ["has_sync_error", "sync_error_data"]
 
-    def get_readonly_fields(self):
-        fields = ["desired_edx_username"]
-
-        if self.instance.has_been_synced:
-            fields.append("desired_edx_username")
-        else:
-            fields.append("edx_username")
-
-        return fields
+    form = OpenEdxUserForm
 
     def get_queryset(self, request):
         """Overrides base queryset"""
