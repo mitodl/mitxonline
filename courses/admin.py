@@ -30,8 +30,9 @@ from courses.models import (
     ProgramRun,
     RelatedProgram,
 )
-from main.admin import AuditableModelAdmin
+from main.admin import AuditableModelAdmin, ModelAdminRunActionsForAllMixin
 from main.utils import get_field_names
+from openedx.tasks import retry_failed_edx_enrollments
 
 
 @admin.register(Program)
@@ -230,7 +231,7 @@ class CourseRunEnrollmentAuditInline(admin.TabularInline):
 
 
 @admin.register(CourseRunEnrollment)
-class CourseRunEnrollmentAdmin(AuditableModelAdmin):
+class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAdmin):
     """Admin for CourseRunEnrollment"""
 
     model = CourseRunEnrollment
@@ -256,6 +257,8 @@ class CourseRunEnrollmentAdmin(AuditableModelAdmin):
     inlines = [
         CourseRunEnrollmentAuditInline,
     ]
+    actions = ["retry_all_failed_edx_enrollment"]
+    run_for_all_actions = ["retry_all_failed_edx_enrollment"]
 
     def get_queryset(self, request):
         """
@@ -284,6 +287,14 @@ class CourseRunEnrollmentAdmin(AuditableModelAdmin):
     def get_run_courseware_id(self, obj):
         """Returns the related CourseRun courseware_id"""
         return obj.run.courseware_id
+
+    @admin.action(description="Retry all failed Open edX enrollments")
+    def retry_all_failed_edx_enrollment(self, request, queryset):  # noqa: ARG002
+        """Admin action to retry all failed Open edX enrollments"""
+        retry_failed_edx_enrollments.delay()
+        self.message_user(
+            request, "Retry all failed Open edX enrollments successfully requested."
+        )
 
 
 @admin.register(CourseRunEnrollmentAudit)
