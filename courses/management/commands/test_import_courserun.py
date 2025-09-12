@@ -62,14 +62,24 @@ def program_with_courses():
 class TestImportCourserunCommand:
     """Test cases for the import_courserun command"""
 
-    def test_program_without_run_tag(self, program_with_courses):
+    def test_program_without_run_tag(self, mocker, program_with_courses):
         """Test that providing program without run_tag does nothing"""
+        # Mock the API client to prevent it from being initialized
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client"
+        )
+
         command = import_courserun.Command()
         result = command.handle(program=str(program_with_courses.id))
         assert result is None
 
-    def test_run_tag_without_program(self):
+    def test_run_tag_without_program(self, mocker):
         """Test that providing run_tag without program does nothing"""
+        # Mock the API client to prevent it from being initialized
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client"
+        )
+
         command = import_courserun.Command()
         result = command.handle(run_tag="2023_Fall")
         assert result is None
@@ -83,14 +93,19 @@ class TestImportCourserunCommand:
             (False, False, False),
         ]
     )
-    def test_cms_page_flag_validation(self, publish_cms_page, draft_cms_page, expected_error):
+    def test_cms_page_flag_validation(self, mocker, publish_cms_page, draft_cms_page, expected_error):
         """Test validation of mutually exclusive CMS page flags"""
+        # Mock the API client to prevent it from being initialized
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client"
+        )
+
         command = import_courserun.Command()
         result = command.handle(
             publish_cms_page=publish_cms_page,
             draft_cms_page=draft_cms_page
         )
-        
+
         if expected_error:
             assert result is False
         else:
@@ -125,8 +140,13 @@ class TestImportCourserunCommand:
         resolved = command._resolve_contract(None)  # noqa: SLF001
         assert resolved is None
 
-    def test_contract_validation_failure(self):
+    def test_contract_validation_failure(self, mocker):
         """Test handling of invalid contract"""
+        # Mock the API client to prevent it from being initialized
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client"
+        )
+
         command = import_courserun.Command()
         result = command.handle(contract="nonexistent-contract")
         assert result is False
