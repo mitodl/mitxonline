@@ -93,7 +93,9 @@ class TestImportCourserunCommand:
             (False, False, False),
         ],
     )
-    def test_cms_page_flag_validation(self, mocker, publish_cms_page, draft_cms_page, expected_error):
+    def test_cms_page_flag_validation(
+        self, mocker, publish_cms_page, draft_cms_page, expected_error
+    ):
         """Test validation of mutually exclusive CMS page flags"""
         # Mock the API client to prevent it from being initialized
         mocker.patch(
