@@ -2,7 +2,9 @@
 
 import logging
 
+import celery
 from django.conf import settings
+from mitol.common.utils.collections import chunks
 
 from main.celery import app
 from openedx import api
@@ -42,7 +44,28 @@ def repair_faulty_openedx_users():
     if settings.DISABLE_USER_REPAIR_TASK:
         log.info("Skipping repair_faulty_openedx_users task as it is disabled")
         return
-    api.repair_faulty_openedx_users()
+    api.repair_all_faulty_openedx_users()
+
+
+@app.task(bind=True)
+def repair_faulty_openedx_users_parallel(self):
+    """Repair a set of users in parallel"""
+
+    chunked_tasks = [
+        repair_faulty_openedx_users_chunk.s(list(user_ids[0]))
+        for user_ids in chunks(
+            User.faulty_openedx_users.user_ids_with_grace_period(),
+            chunk_size=1000,
+        )
+    ]
+    raise self.replace(celery.group(chunked_tasks))
+
+
+@app.task(acks_late=True)
+def repair_faulty_openedx_users_chunk(user_ids):
+    """Sync a group of users"""
+    users = User.objects.filter(id__in=user_ids)
+    api.repair_faulty_openedx_users(users)
 
 
 @app.task(acks_late=True)

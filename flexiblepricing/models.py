@@ -49,7 +49,12 @@ class FlexiblePricingRequestSubmission(AbstractFormSubmission):
     user = models.ForeignKey(AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     def __str__(self):
-        formdata = json.loads(self.form_data)
+        if not self.form_data:
+            formdata = {"your_income": "Invalid"}
+        elif type(self.form_data) is dict:
+            formdata = self.form_data
+        else:
+            formdata = json.loads(self.form_data)
         return "Flexible Pricing request from {user}: annual income {income}".format(
             user=self.user.edx_username, income=formdata["your_income"]
         )

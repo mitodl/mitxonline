@@ -7,6 +7,7 @@ import pytest
 import pytz
 import reversion
 from django.forms.models import model_to_dict
+from django.test.client import Client
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
@@ -1098,6 +1099,38 @@ def test_start_checkout_with_zero_value(settings, user, user_client, products):
             "run": order.lines.first().purchased_object.course.title,
         }
     )
+
+
+def test_start_checkout_and_ensure_edx_username_created(mocker, settings, products):
+    """
+    Check that checking out with a user that doesn't have an edx username
+    creates them an edx username
+    """
+    mocked_create_user = mocker.patch("openedx.api.create_edx_user")
+    mocker.patch("openedx.api.create_edx_auth_token")
+    user = UserFactory.create()
+    user.openedx_users.all().delete()
+    user_client = Client()
+    user_client.force_login(user)
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
+    )
+    test_redeem_discount(user, user_client, products, [discount], False, False)  # noqa: FBT003
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    order = Order.objects.filter(purchaser=user).get()
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+            "run": order.lines.first().purchased_object.course.title,
+        }
+    )
+    mocked_create_user.assert_called_once()
 
 
 @pytest.mark.parametrize("use_redemption_type_flags", [True, False])
