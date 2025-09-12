@@ -14,7 +14,6 @@ from django.conf import settings
 
 from b2b.exceptions import KeycloakAdminImproperlyConfiguredError
 from b2b.keycloak_admin_dataclasses import (
-    OrganizationRepresentation,
     RealmRepresentation,
 )
 
@@ -132,7 +131,7 @@ class KeycloakAdminClient:
         - List of RealmRepresentation objects
         """
 
-        response = self.oauth_session.request("GET", "", skip_realmify=True)
+        response = self.request("GET", "", skip_realmify=True)
         response.raise_for_status()
         list_data = response.json()
 
@@ -149,7 +148,7 @@ class KeycloakAdminClient:
         - A single RealmRepresentation object
         """
 
-        response = self.oauth_session.request("GET", realm_name, skip_realmify=True)
+        response = self.request("GET", realm_name, skip_realmify=True)
         response.raise_for_status()
         item_data = response.json()
 
@@ -180,7 +179,7 @@ class KeycloakAdminClient:
         - A list of "representation" type instances.
         """
 
-        response = self.oauth_session.request("GET", endpoint, params=kwargs)
+        response = self.request("GET", endpoint, params=kwargs)
         response.raise_for_status()
         list_data = response.json()
 
@@ -201,7 +200,7 @@ class KeycloakAdminClient:
         - A single "representation" type instance.
         """
 
-        response = self.oauth_session.request("GET", endpoint, params=kwargs)
+        response = self.request("GET", endpoint, params=kwargs)
         response.raise_for_status()
         list_data = response.json()
 
@@ -219,9 +218,7 @@ class KeycloakAdminClient:
         - The saved representation instance.
         """
 
-        response = self.oauth_session.request(
-            "POST", endpoint, json=representation.__dict__
-        )
+        response = self.request("POST", endpoint, json=representation.__dict__)
         response.raise_for_status()
         item_data = response.json()
 
@@ -239,9 +236,7 @@ class KeycloakAdminClient:
         - The saved representation instance.
         """
 
-        response = self.oauth_session.request(
-            "PUT", endpoint, json=representation.__dict__
-        )
+        response = self.request("PUT", endpoint, json=representation.__dict__)
         response.raise_for_status()
         item_data = response.json()
 
@@ -265,7 +260,7 @@ class KeycloakAdminClient:
         - requests.HTTPError if the request fails.
         """
 
-        response = self.oauth_session.request("POST", endpoint, data=target_id)
+        response = self.request("POST", endpoint, data=target_id)
         response.raise_for_status()
 
         return True
@@ -343,22 +338,4 @@ class KeycloakAdminModel:
 
         return self.admin_client.associate(
             f"{self.endpoint}/{parent_id}/{association_type}", child_id
-        )
-
-
-class KeycloakAdminOrganizationModel(KeycloakAdminModel):
-    """Keycloak Organizations."""
-
-    def __init__(self, admin_client):
-        """
-        Configure the model.
-
-        Args:
-        - admin_client: An instance of KeycloakAdminClient.
-        """
-
-        super().__init__(
-            admin_client,
-            OrganizationRepresentation,
-            "organizations",
         )
