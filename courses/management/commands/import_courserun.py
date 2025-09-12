@@ -17,7 +17,7 @@ take care of it). If the creation is successful, this will optionally run the
 create_courseware_page command for the course run.
 """
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from urllib import parse
 
 import reversion
@@ -144,14 +144,12 @@ class Command(BaseCommand):
         if not ContractPage or not contract_identifier:
             return None
             
-        # Try to resolve by ID first (if numeric)
         if contract_identifier.isdigit():
             try:
                 return ContractPage.objects.get(id=int(contract_identifier))
             except ContractPage.DoesNotExist:
                 pass
         
-        # Try to resolve by slug
         try:
             return ContractPage.objects.get(slug=contract_identifier)
         except ContractPage.DoesNotExist:
@@ -160,7 +158,6 @@ class Command(BaseCommand):
         return None
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
-        # Validate mutually exclusive flags
         if kwargs.get("publish_cms_page") and kwargs.get("draft_cms_page"):
             self.stderr.write(
                 self.style.ERROR(
@@ -172,27 +169,35 @@ class Command(BaseCommand):
         edx_course_detail = get_edx_api_course_detail_client()
         edx_courses = []
 
-        # Resolve contract if specified
         contract = None
         if kwargs.get("contract"):
-            contract = self._resolve_contract(kwargs["contract"])
+            contract = self._resolve_contract(kwargs.get("contract"))
             if not contract:
                 self.stdout.write(
                     self.style.ERROR(
-                        f"Contract '{kwargs['contract']}' not found or B2B module not available."
+                        f"Contract '{kwargs.get('contract')}' not found or B2B module not available."
                     )
                 )
                 return False
 
-        if kwargs["price"] and kwargs["price"].isnumeric():
-            content_type = ContentType.objects.filter(
-                app_label="courses", model="courserun"
-            ).get()
+        price = None
+        if kwargs.get("price"):
+            try:
+                # Validate that price is a valid decimal
+                Decimal(kwargs.get("price"))
+                price = kwargs.get("price")
+            except (ValueError, TypeError, InvalidOperation):
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Invalid price format: {kwargs.get('price')}. Must be a valid decimal number. Skipping product creation."
+                    )
+                )
+                price = None
 
-        if kwargs["courserun"] is not None:
+        if kwargs.get("courserun") is not None:
             try:
                 course = edx_course_detail.get_detail(
-                    course_id=kwargs["courserun"],
+                    course_id=kwargs.get("courserun"),
                     username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
                 )
 
@@ -201,28 +206,28 @@ class Command(BaseCommand):
             except Exception as e:  # noqa: BLE001
                 self.stdout.write(
                     self.style.ERROR(
-                        f"Could not retrieve data for {kwargs['courserun']}: {e}"
+                        f"Could not retrieve data for {kwargs.get('courserun')}: {e}"
                     )
                 )
                 return False
-        elif kwargs["program"] is not None and kwargs["run_tag"] is not None:
+        elif kwargs.get("program") is not None and kwargs.get("run_tag") is not None:
             try:
-                if kwargs["program"].isnumeric():
-                    program = Program.objects.filter(pk=kwargs["program"]).get()
+                if kwargs.get("program").isnumeric():
+                    program = Program.objects.filter(pk=kwargs.get("program")).get()
                 else:
                     program = Program.objects.filter(
-                        readable_id=kwargs["program"]
+                        readable_id=kwargs.get("program")
                     ).get()
             except:  # noqa: E722
                 self.stdout.write(
-                    self.style.ERROR(f"Program {kwargs['program']} not found.")
+                    self.style.ERROR(f"Program {kwargs.get('program')} not found.")
                 )
                 return False
             for course, title in program.courses:  # noqa: B007
-                if course.courseruns.filter(run_tag=kwargs["run_tag"]).count() == 0:
+                if course.courseruns.filter(run_tag=kwargs.get("run_tag")).count() == 0:
                     try:
                         edx_course = edx_course_detail.get_detail(
-                            course_id=f"{course.readable_id}+{kwargs['run_tag']}",
+                            course_id=f"{course.readable_id}+{kwargs.get('run_tag')}",
                             username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
                         )
 
@@ -231,13 +236,13 @@ class Command(BaseCommand):
                     except Exception as e:  # noqa: BLE001
                         self.stdout.write(
                             self.style.ERROR(
-                                f"Could not retrieve data for {course.readable_id}+{kwargs['run_tag']}, skipping it: {e}"
+                                f"Could not retrieve data for {course.readable_id}+{kwargs.get('run_tag')}, skipping it: {e}"
                             )
                         )
                 else:
                     self.stdout.write(
                         self.style.ERROR(
-                            f"{course.readable_id}+{kwargs['run_tag']} appears to exist in MITx Online, skipping it"
+                            f"{course.readable_id}+{kwargs.get('run_tag')} appears to exist in MITx Online, skipping it"
                         )
                     )
 
@@ -247,8 +252,8 @@ class Command(BaseCommand):
             courserun_tag = edx_course.course_id.split("+")[-1]
             course_readable_id = edx_course.course_id.removesuffix(f"+{courserun_tag}")
             course = Course.objects.filter(readable_id=course_readable_id)
-            if kwargs["depts"] and len(kwargs["depts"]) > 0:
-                add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
+            if kwargs.get("depts") and len(kwargs.get("depts")) > 0:
+                add_depts = Department.objects.filter(name__in=kwargs.get("depts")).all()
 
             if "add_depts" not in locals() or not add_depts:
                 self.stdout.write(
@@ -263,7 +268,7 @@ class Command(BaseCommand):
                 defaults={
                     "title": edx_course.name,
                     "readable_id": course_readable_id,
-                    "live": kwargs["live"],
+                    "live": kwargs.get("live", False),
                 },
             )
             course.departments.set(add_depts)
@@ -285,7 +290,7 @@ class Command(BaseCommand):
                 enrollment_start=edx_course.enrollment_start,
                 enrollment_end=edx_course.enrollment_end,
                 title=edx_course.name,
-                live=kwargs["live"],
+                live=kwargs.get("live", False),
                 is_self_paced=edx_course.is_self_paced(),
                 courseware_url_path=parse.urljoin(
                     settings.OPENEDX_API_BASE_URL,
@@ -309,10 +314,10 @@ class Command(BaseCommand):
             
             success_count += 1
 
-            if kwargs["create_cms_page"]:
+            if kwargs.get("create_cms_page"):
                 try:
                     # Determine whether to publish the CMS page
-                    cms_page_live = kwargs["live"]  # Default to following the --live flag
+                    cms_page_live = kwargs.get("live", False)
                     
                     if kwargs.get("publish_cms_page"):
                         cms_page_live = True
@@ -321,7 +326,6 @@ class Command(BaseCommand):
                     
                     course_page = create_default_courseware_page(new_run.course, live=cms_page_live)
                     
-                    # Set the new flags if specified
                     if kwargs.get("include_in_learn_catalog") or kwargs.get("ingest_content_files_for_ai"):
                         if kwargs.get("include_in_learn_catalog"):
                             course_page.include_in_learn_catalog = True
@@ -342,14 +346,17 @@ class Command(BaseCommand):
                         )
                     )
 
-            if kwargs["price"] and kwargs["price"].isnumeric():
+            if price:
+                content_type = ContentType.objects.get_for_model(CourseRun)
                 with reversion.create_revision():
                     (course_product, created) = Product.objects.update_or_create(
                         content_type=content_type,
                         object_id=new_run.id,
-                        price=Decimal(kwargs["price"]),
-                        description=new_run.courseware_id,
-                        is_active=True,
+                        defaults={
+                            "price": Decimal(price),
+                            "description": new_run.courseware_id,
+                            "is_active": True,
+                        }
                     )
 
                     course_product.save()
@@ -359,8 +366,8 @@ class Command(BaseCommand):
                         )
                     )
 
-            if kwargs["block_countries"]:
-                for code_or_name in kwargs["block_countries"].split(","):
+            if kwargs.get("block_countries"):
+                for code_or_name in kwargs.get("block_countries").split(","):
                     country_code = countries.by_name(code_or_name)
                     if not country_code:
                         country_name = countries.countries.get(code_or_name, None)
