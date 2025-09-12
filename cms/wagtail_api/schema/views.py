@@ -60,6 +60,14 @@ class WagtailCertificatePagesSchemaView(APIView):
         summary="List all Certificate Pages",
         description="Returns pages of type cms.CertificatePage",
         responses=CertificatePageListSerializer,
+        parameters=[
+            OpenApiParameter(
+                name="readable_id",
+                required=False,
+                type=str,
+                description="filter by course readable_id",
+            ),
+        ],
     )
     def get(self, request, *args, **kwargs):  # noqa: ARG002
         # You can return a dummy response or redirect to actual Wagtail logic
@@ -82,6 +90,14 @@ class WagtailCoursePagesSchemaView(APIView):
         summary="List all Course Pages",
         description="Returns pages of type cms.CoursePage",
         responses=CoursePageListSerializer,
+        parameters=[
+            OpenApiParameter(
+                name="readable_id",
+                required=False,
+                type=str,
+                description="filter by course readable_id",
+            ),
+        ],
     )
     def get(self, request, *args, **kwargs):  # noqa: ARG002
         # You can return a dummy response or redirect to actual Wagtail logic
@@ -104,6 +120,14 @@ class WagtailProgramPagesSchemaView(APIView):
         summary="List all Program Pages",
         description="Returns pages of type cms.ProgramPage",
         responses=ProgramPageListSerializer,
+        parameters=[
+            OpenApiParameter(
+                name="readable_id",
+                required=False,
+                type=str,
+                description="filter by course readable_id",
+            ),
+        ],
     )
     def get(self, request, *args, **kwargs):  # noqa: ARG002
         # You can return a dummy response or redirect to actual Wagtail logic
