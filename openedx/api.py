@@ -160,6 +160,44 @@ def _generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN
     return None
 
 
+def _handle_username_collision(resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted):
+    """
+    Handle username collision by trying OpenEdX suggestions or falling back to local generation.
+    
+    Args:
+        resp: HTTP response from OpenEdX
+        data: Parsed JSON response data
+        open_edx_user: OpenEdxUser instance
+        user: User instance
+        suggested_usernames: List of suggested usernames from previous attempts
+        suggestions_extracted: Boolean indicating if suggestions were already extracted
+        
+    Returns:
+        tuple: (new_username, should_continue, should_reset_attempts)
+    """
+    if not _is_duplicate_username_error(resp, data):
+        return None, False, False
+        
+    suggestions, suggestions_extracted = _extract_username_suggestions(
+        data, suggestions_extracted
+    )
+    if suggestions:
+        suggested_usernames = suggestions
+
+    if not suggested_usernames:
+        log.info("OpenEdX returned empty username suggestions, falling back to local generation")
+        base_username = open_edx_user.desired_edx_username or user.username
+        
+        new_username = _generate_unique_username(base_username)
+        
+        if new_username:
+            return new_username, True, True
+        else:
+            return None, False, False
+
+    return suggested_usernames.pop(0), True, False
+
+
 def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
@@ -229,27 +267,15 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
             except (ValueError, requests.exceptions.JSONDecodeError):
                 data = {}
 
-            if _is_duplicate_username_error(resp, data):
-                suggestions, suggestions_extracted = _extract_username_suggestions(
-                    data, suggestions_extracted
-                )
-                if suggestions:
-                    suggested_usernames = suggestions
-
-                if not suggested_usernames:
-                    log.info("OpenEdX returned empty username suggestions, falling back to local generation")
-                    base_username = open_edx_user.desired_edx_username or user.username
-                    
-                    new_username = _generate_unique_username(base_username)
-                    
-                    if new_username:
-                        current_username = new_username
-                        attempt = 0
-                        continue
-                    else:
-                        break
-
-                current_username = suggested_usernames.pop(0)
+            new_username, should_continue, should_reset_attempts = _handle_username_collision(
+                resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted
+            )
+            
+            if should_continue:
+                current_username = new_username
+                if should_reset_attempts:
+                    attempt = 0
+                continue
             elif _is_bad_request(resp):
                 open_edx_user.has_sync_error = True
                 open_edx_user.sync_error_data = data
