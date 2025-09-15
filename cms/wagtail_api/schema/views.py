@@ -60,14 +60,6 @@ class WagtailCertificatePagesSchemaView(APIView):
         summary="List all Certificate Pages",
         description="Returns pages of type cms.CertificatePage",
         responses=CertificatePageListSerializer,
-        parameters=[
-            OpenApiParameter(
-                name="readable_id",
-                required=False,
-                type=str,
-                description="filter by course readable_id",
-            ),
-        ],
     )
     def get(self, request, *args, **kwargs):  # noqa: ARG002
         # You can return a dummy response or redirect to actual Wagtail logic
@@ -125,7 +117,7 @@ class WagtailProgramPagesSchemaView(APIView):
                 name="readable_id",
                 required=False,
                 type=str,
-                description="filter by course readable_id",
+                description="filter by program readable_id",
             ),
         ],
     )
