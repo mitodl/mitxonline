@@ -127,6 +127,39 @@ def _extract_username_suggestions(data, suggestions_extracted):
     return [], suggestions_extracted
 
 
+def _generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN):
+    """
+    Generate a unique username by appending random numbers to the base username.
+    
+    Args:
+        base_username (str): The base username to use
+        max_length (int): Maximum length for the generated username
+        
+    Returns:
+        str or None: A unique username, or None if no unique username could be generated
+    """
+    ranges = (
+        (0, 9),
+        (10, 99),
+        (100, 999),
+        (1000, 9999),
+        (10000, 99999),
+    )
+    
+    for intrange in ranges:
+        random_int = random.randint(intrange[0], intrange[1])  # noqa: S311
+        username_to_try = f"{base_username}_{random_int}"
+        
+        if len(username_to_try) > max_length:
+            amount_to_truncate = len(username_to_try) - max_length
+            username_to_try = f"{base_username[:amount_to_truncate]}-{random_int}"
+        
+        if not OpenEdxUser.objects.filter(edx_username=username_to_try).exists():
+            return username_to_try
+    
+    return None
+
+
 def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
@@ -204,7 +237,17 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
                     suggested_usernames = suggestions
 
                 if not suggested_usernames:
-                    break
+                    log.info("OpenEdX returned empty username suggestions, falling back to local generation")
+                    base_username = open_edx_user.desired_edx_username or user.username
+                    
+                    new_username = _generate_unique_username(base_username)
+                    
+                    if new_username:
+                        current_username = new_username
+                        attempt = 0
+                        continue
+                    else:
+                        break
 
                 current_username = suggested_usernames.pop(0)
             elif _is_bad_request(resp):
@@ -316,31 +359,13 @@ def reconcile_edx_username(user, *, desired_username=None):
         if not OpenEdxUser.objects.filter(edx_username=edx_username).exists():
             edx_user.save()
         else:
-            ranges = (
-                (0, 9),
-                (10, 99),
-                (100, 999),
-                (1000, 9999),
-                (10000, 99999),
-            )
-
-            for intrange in ranges:
-                random_int = random.randint(intrange[0], intrange[1])  # noqa: S311
-                username_to_try = f"{edx_username}_{random_int}"
-
-                if len(username_to_try) > OPENEDX_USERNAME_MAX_LEN:
-                    amount_to_truncate = len(username_to_try) - OPENEDX_USERNAME_MAX_LEN
-                    username_to_try = (
-                        f"{edx_username[:amount_to_truncate]}-{random_int}"
-                    )
-
-                if not OpenEdxUser.objects.filter(
-                    edx_username=username_to_try,
-                ).exists():
-                    edx_user.edx_username = username_to_try
-                    edx_user.desired_edx_username = username_to_try
-                    edx_user.save()
-                    break
+            unique_username = _generate_unique_username(edx_username)
+            if unique_username:
+                edx_user.edx_username = unique_username
+                edx_user.desired_edx_username = unique_username
+                edx_user.save()
+            else:
+                log.warning("Could not generate unique username for %s", edx_username)
 
         return True
 
