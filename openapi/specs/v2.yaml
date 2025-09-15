@@ -1135,12 +1135,6 @@ paths:
       operationId: pages_?fields=*&type=cms.CertificatePage_retrieve
       description: Returns pages of type cms.CertificatePage
       summary: List all Certificate Pages
-      parameters:
-      - in: query
-        name: readable_id
-        schema:
-          type: string
-        description: filter by course readable_id
       tags:
       - pages
       responses:
@@ -1180,7 +1174,7 @@ paths:
         name: readable_id
         schema:
           type: string
-        description: filter by course readable_id
+        description: filter by program readable_id
       tags:
       - pages
       responses:
