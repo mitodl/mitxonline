@@ -130,11 +130,11 @@ def _extract_username_suggestions(data, suggestions_extracted):
 def _generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN):
     """
     Generate a unique username by appending random numbers to the base username.
-    
+
     Args:
         base_username (str): The base username to use
         max_length (int): Maximum length for the generated username
-        
+
     Returns:
         str or None: A unique username, or None if no unique username could be generated
     """
@@ -145,18 +145,18 @@ def _generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN
         (1000, 9999),
         (10000, 99999),
     )
-    
+
     for intrange in ranges:
         random_int = random.randint(intrange[0], intrange[1])  # noqa: S311
         username_to_try = f"{base_username}_{random_int}"
-        
+
         if len(username_to_try) > max_length:
             amount_to_truncate = len(username_to_try) - max_length
             username_to_try = f"{base_username[:amount_to_truncate]}-{random_int}"
-        
+
         if not OpenEdxUser.objects.filter(edx_username=username_to_try).exists():
             return username_to_try
-    
+
     return None
 
 
@@ -237,11 +237,13 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
                     suggested_usernames = suggestions
 
                 if not suggested_usernames:
-                    log.info("OpenEdX returned empty username suggestions, falling back to local generation")
+                    log.info(
+                        "OpenEdX returned empty username suggestions, falling back to local generation"
+                    )
                     base_username = open_edx_user.desired_edx_username or user.username
-                    
+
                     new_username = _generate_unique_username(base_username)
-                    
+
                     if new_username:
                         current_username = new_username
                         attempt = 0
