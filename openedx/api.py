@@ -160,10 +160,12 @@ def _generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN
     return None
 
 
-def _handle_username_collision(resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted):
+def _handle_username_collision(
+    resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted
+):
     """
     Handle username collision by trying OpenEdX suggestions or falling back to local generation.
-    
+
     Args:
         resp: HTTP response from OpenEdX
         data: Parsed JSON response data
@@ -171,13 +173,13 @@ def _handle_username_collision(resp, data, open_edx_user, user, suggested_userna
         user: User instance
         suggested_usernames: List of suggested usernames from previous attempts
         suggestions_extracted: Boolean indicating if suggestions were already extracted
-        
+
     Returns:
         tuple: (new_username, should_continue, should_reset_attempts)
     """
     if not _is_duplicate_username_error(resp, data):
         return None, False, False
-        
+
     suggestions, suggestions_extracted = _extract_username_suggestions(
         data, suggestions_extracted
     )
@@ -185,11 +187,13 @@ def _handle_username_collision(resp, data, open_edx_user, user, suggested_userna
         suggested_usernames = suggestions
 
     if not suggested_usernames:
-        log.info("OpenEdX returned empty username suggestions, falling back to local generation")
+        log.info(
+            "OpenEdX returned empty username suggestions, falling back to local generation"
+        )
         base_username = open_edx_user.desired_edx_username or user.username
-        
+
         new_username = _generate_unique_username(base_username)
-        
+
         if new_username:
             return new_username, True, True
         else:
@@ -267,10 +271,17 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
             except (ValueError, requests.exceptions.JSONDecodeError):
                 data = {}
 
-            new_username, should_continue, should_reset_attempts = _handle_username_collision(
-                resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted
+            new_username, should_continue, should_reset_attempts = (
+                _handle_username_collision(
+                    resp,
+                    data,
+                    open_edx_user,
+                    user,
+                    suggested_usernames,
+                    suggestions_extracted,
+                )
             )
-            
+
             if should_continue:
                 current_username = new_username
                 if should_reset_attempts:
