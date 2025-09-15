@@ -160,7 +160,7 @@ def _generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN
     return None
 
 
-def _handle_username_collision(
+def _handle_username_collision(  # noqa: PLR0913
     resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted
 ):
     """
