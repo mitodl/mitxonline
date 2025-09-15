@@ -160,7 +160,9 @@ def _generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN
     return None
 
 
-def _handle_username_collision(resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted):  # noqa: PLR0913
+def _handle_username_collision(  # noqa: PLR0913
+    resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted
+):
     """
     Handle username collision by trying OpenEdX suggestions or falling back to local generation.
     
