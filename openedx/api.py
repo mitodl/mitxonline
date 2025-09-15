@@ -445,6 +445,12 @@ def update_edx_user_profile(user):
     Args:
         user(user.models.User): the user to update
     """
+    if not user.openedx_user_exists:
+        log.info(
+            "Skipping user profile update for %s, user has no Open edX account", user
+        )
+        return
+
     auth = get_valid_edx_api_auth(user)
     req_session = requests.Session()
     resp = req_session.patch(
@@ -585,12 +591,21 @@ def repair_faulty_edx_user(user):
     return created_user, created_auth_token
 
 
-def repair_faulty_openedx_users():
+def repair_all_faulty_openedx_users():
     """
     Loops through all Users that are incorrectly configured with the openedx and attempts to get
     them in the correct state.
     """
-    for user in User.faulty_users_iterator():
+    users = User.faulty_users_iterator()
+    repair_faulty_openedx_users(users)
+
+
+def repair_faulty_openedx_users(users):
+    """
+    Loops through all Users that are incorrectly configured with the openedx and attempts to get
+    them in the correct state.
+    """
+    for user in users:
         try:
             # edX is our only openedx for the time being. If a different openedx is added, this
             # function will need to be updated.

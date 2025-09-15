@@ -2,6 +2,8 @@
 Management command to repair missing openedx records
 """
 
+import sys
+
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
 from mitol.common.utils import get_error_response_summary
@@ -27,10 +29,23 @@ class Command(BaseCommand):
             help="The id, email, or username of the User",
             required=False,
         )
+        parser.add_argument(
+            "--parallel",
+            help="Run the command in parallel on celery",
+            required=False,
+            default=False,
+            action="store_true",
+        )
 
     def handle(self, *args, **options):  # noqa: ARG002
         """Walk all users who are missing records and repair them"""
         user_attr = options.get("user")
+        parallel = options.get("parallel")
+
+        if user_attr and parallel:
+            self.stderr.write("Cannot both specify a user and run in parallel")
+            sys.exit(1)
+
         if user_attr is not None:
             user = fetch_user(user_attr)
             self.stdout.write(f"Repairing user '{user.edx_username}' ({user.email})")
@@ -40,6 +55,20 @@ class Command(BaseCommand):
             self.stdout.write(f"Repairing {users_to_repair.count()} users")
             users = User.faulty_users_iterator()
 
+        if parallel:
+            self.repair_parallel()
+        else:
+            self.repair_sync(users)
+
+    def repair_parallel(self):
+        self.stdout.write("Sending task to celery to repair users in parallel")
+
+        from openedx import tasks
+
+        task = tasks.repair_faulty_openedx_users_parallel.delay()
+        task.get()
+
+    def repair_sync(self, users):
         error_count = 0
         success_count = 0
 

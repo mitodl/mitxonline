@@ -4,6 +4,7 @@ Tests for courses api views v2
 
 import logging
 import random
+import uuid
 from datetime import timedelta
 
 import pytest
@@ -19,14 +20,21 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from cms.factories import CoursePageFactory, ProgramPageFactory
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     DepartmentFactory,
+    ProgramCertificateFactory,
     ProgramFactory,
 )
 from courses.models import Course, Program
+from courses.serializers.v2.certificates import (
+    CourseRunCertificateSerializer,
+    ProgramCertificateSerializer,
+)
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
@@ -638,3 +646,49 @@ def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     assert resp.status_code == status.HTTP_200_OK
     data = resp.json()
     assert data["id"] == b2b_program.id
+
+
+def test_get_course_certificate():
+    """
+    Test that the get_course_certificate handles valid, invalid, and not-found
+    """
+    courseware_page = CoursePageFactory.create()
+    cert_page = courseware_page.certificate_page
+    cert_page.save_revision()  # we need at least one
+    certificate = CourseRunCertificateFactory.create(
+        certificate_page_revision=cert_page.revisions.last()
+    )
+
+    client = APIClient()
+    resp = client.get(reverse("v2:get_course_certificate", args=[certificate.uuid]))
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.data == CourseRunCertificateSerializer(certificate).data
+
+    resp404 = client.get(reverse("v2:get_course_certificate", args=[uuid.uuid4()]))
+    assert resp404.status_code == status.HTTP_404_NOT_FOUND
+
+    resp400 = client.get(reverse("v2:get_course_certificate", args=["not-uuid"]))
+    assert resp400.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_get_program_certificate():
+    """
+    Test that the get_course_certificate handles valid, invalid, and not-found
+    """
+    courseware_page = ProgramPageFactory.create()
+    cert_page = courseware_page.certificate_page
+    cert_page.save_revision()  # we need at least one
+    certificate = ProgramCertificateFactory.create(
+        certificate_page_revision=cert_page.revisions.last()
+    )
+
+    client = APIClient()
+    resp = client.get(reverse("v2:get_program_certificate", args=[certificate.uuid]))
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.data == ProgramCertificateSerializer(certificate).data
+
+    resp404 = client.get(reverse("v2:get_program_certificate", args=[uuid.uuid4()]))
+    assert resp404.status_code == status.HTTP_404_NOT_FOUND
+
+    resp400 = client.get(reverse("v2:get_program_certificate", args=["not-uuid"]))
+    assert resp400.status_code == status.HTTP_400_BAD_REQUEST

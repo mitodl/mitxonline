@@ -248,6 +248,15 @@ class FaultyOpenEdxUserManager(BaseUserManager):
             .distinct()
         )
 
+    def user_ids_with_grace_period(self):
+        """Return the list of user ids"""
+        now = now_in_utc()
+        return (
+            self.filter(
+                created_on__lt=now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS)
+            ).values_list("id", flat=True),
+        )
+
 
 class User(
     AbstractBaseUser,
@@ -304,11 +313,8 @@ class User(
     @classmethod
     def faulty_users_iterator(cls):
         """Return a memory-safe iterator for faulty users"""
-        now = now_in_utc()
         for user_ids in chunks(
-            cls.faulty_openedx_users.filter(
-                created_on__lt=now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS)
-            ).values_list("id", flat=True),
+            cls.faulty_openedx_users.user_ids_with_grace_period(),
             chunk_size=1000,
         ):
             yield from User.objects.filter(id__in=user_ids).prefetch_related(

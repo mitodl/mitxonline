@@ -3,6 +3,7 @@
 # pylint: disable=redefined-outer-name
 import itertools
 from datetime import timedelta
+from unittest.mock import patch
 from urllib.parse import parse_qsl
 
 import factory
@@ -33,6 +34,7 @@ from openedx.api import (
     get_edx_retirement_service_client,
     get_valid_edx_api_auth,
     reconcile_edx_username,
+    repair_all_faulty_openedx_users,
     repair_faulty_edx_user,
     repair_faulty_openedx_users,
     retry_failed_edx_enrollments,
@@ -42,6 +44,7 @@ from openedx.api import (
     unsubscribe_from_edx_course_emails,
     update_edx_user_email,
     update_edx_user_name,
+    update_edx_user_profile,
     validate_username_email_with_edx,
 )
 from openedx.constants import (
@@ -56,6 +59,7 @@ from openedx.exceptions import (
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
+    EdxApiUserUpdateError,
     OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
@@ -706,6 +710,24 @@ def _create_faulty_users():
     ]
 
 
+def test_repair_all_faulty_openedx_users(mocker):
+    """
+    Tests that repair_faulty_openedx_users loops through all incorrectly configured Users, attempts to repair
+    them, and continues iterating through the Users if an exception is raised
+    """
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        users = _create_faulty_users()
+
+    patched_repair_users = mocker.patch(
+        "openedx.api.repair_faulty_openedx_users",
+    )
+
+    repair_all_faulty_openedx_users()
+
+    assert patched_repair_users.call_count == 1
+    assert list(patched_repair_users.call_args.args[0]) == users
+
+
 @pytest.mark.parametrize("exception_raised", [MockHttpError, Exception, None])
 def test_repair_faulty_openedx_users(mocker, exception_raised):
     """
@@ -725,7 +747,7 @@ def test_repair_faulty_openedx_users(mocker, exception_raised):
             (True, True),
         ],
     )
-    repair_faulty_openedx_users()
+    repair_faulty_openedx_users(users)
 
     assert patched_repair_user.call_count == len(users), (
         patched_repair_user.call_args_list
@@ -739,23 +761,20 @@ def test_repair_faulty_openedx_users(mocker, exception_raised):
 
 def test_retry_users_grace_period(mocker):
     """
-    Tests that repair_faulty_openedx_users does not attempt to repair any users that were recently created
+    Tests that repair_all_faulty_openedx_users does not attempt to repair any users that were recently created
     """
     now = now_in_utc()
     with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS - 1)):
         _create_faulty_users()
     with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS + 1)):
         users_to_repair = _create_faulty_users()
-    patched_repair_user = mocker.patch(
-        "openedx.api.repair_faulty_edx_user", return_value=(True, True)
-    )
+    patched_repair_users = mocker.patch("openedx.api.repair_faulty_openedx_users")
 
-    repair_faulty_openedx_users()
+    repair_all_faulty_openedx_users()
 
-    assert patched_repair_user.call_count == len(users_to_repair)
+    assert patched_repair_users.call_count == 1
 
-    for user in users_to_repair:
-        patched_repair_user.assert_any_call(user)
+    assert list(patched_repair_users.call_args.args[0]) == users_to_repair
 
 
 def test_unenroll_edx_course_run(mocker):
@@ -1123,3 +1142,54 @@ def test_reconcile_edx_username_conflict():
 
     assert user.edx_username in new_user.edx_username
     assert user.edx_username != new_user.edx_username
+
+
+@patch("openedx.api.get_valid_edx_api_auth")
+@patch("openedx.api.requests.Session")
+def test_update_edx_user_profile_success(mock_session, mock_get_auth, mocker, user):
+    """
+    Test that update_edx_user_profile makes a call to update the user profile in Open edX via an API client
+    """
+    mock_auth = mocker.MagicMock()
+    mock_auth.access_token = "token"  # noqa: S105
+    mock_get_auth.return_value = mock_auth
+
+    mock_resp = mocker.MagicMock()
+    mock_resp.status_code = 200
+    mock_session.return_value.patch.return_value = mock_resp
+
+    update_edx_user_profile(user)
+    mock_session.return_value.patch.assert_called_once()
+
+
+@patch("openedx.api.get_valid_edx_api_auth")
+@patch("openedx.api.requests.Session")
+def test_update_edx_user_profile_no_openedx_user(
+    mock_session, mock_get_auth, user, caplog
+):
+    """
+    Test that update_edx_user_profile does not attempt to update the user profile in Open edX when Open edX user is not synced
+    """
+    user.openedx_users.all().delete()
+    update_edx_user_profile(user)
+    assert "Skipping user profile update" in caplog.text
+
+
+@patch("openedx.api.get_valid_edx_api_auth")
+@patch("openedx.api.requests.Session")
+def test_update_edx_user_profile_error(mock_session, mock_get_auth, mocker, user):
+    """
+    Test that update_edx_user_profile raises an EdxApiUserUpdateError if the request fails
+    """
+    mock_auth = mocker.MagicMock()
+    mock_auth.access_token = "token"  # noqa: S105
+    mock_get_auth.return_value = mock_auth
+
+    mock_resp = mocker.MagicMock()
+    mock_resp.status_code = 400
+    mock_session.return_value.patch.return_value = mock_resp
+
+    with patch("openedx.api.get_error_response_summary", return_value="error summary"):
+        with pytest.raises(EdxApiUserUpdateError) as exc:
+            update_edx_user_profile(user)
+        assert "Error updating Open edX user" in str(exc.value)
