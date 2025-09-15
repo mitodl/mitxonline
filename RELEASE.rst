@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.130.0
+---------------
+
+- fix: do not update open edx profile if user is not synced (#2940)
+- feat: add admin actions for faulty users and enrollments (#2936)
+- Add repair tasks that can be run in parallel (#2923)
+- Check to see what type the CMS submission data is before generating string representation (#2937)
+- for cert retrieval, return 400, 404 appropriately (#2935)
+
 Version 0.129.2 (Released September 11, 2025)
 ---------------
 
