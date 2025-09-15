@@ -3,6 +3,7 @@
 # pylint: disable=redefined-outer-name
 import itertools
 from datetime import timedelta
+from unittest.mock import patch
 from urllib.parse import parse_qsl
 
 import factory
@@ -43,6 +44,7 @@ from openedx.api import (
     unsubscribe_from_edx_course_emails,
     update_edx_user_email,
     update_edx_user_name,
+    update_edx_user_profile,
     validate_username_email_with_edx,
 )
 from openedx.constants import (
@@ -57,6 +59,7 @@ from openedx.exceptions import (
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
+    EdxApiUserUpdateError,
     OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
@@ -1139,3 +1142,54 @@ def test_reconcile_edx_username_conflict():
 
     assert user.edx_username in new_user.edx_username
     assert user.edx_username != new_user.edx_username
+
+
+@patch("openedx.api.get_valid_edx_api_auth")
+@patch("openedx.api.requests.Session")
+def test_update_edx_user_profile_success(mock_session, mock_get_auth, mocker, user):
+    """
+    Test that update_edx_user_profile makes a call to update the user profile in Open edX via an API client
+    """
+    mock_auth = mocker.MagicMock()
+    mock_auth.access_token = "token"  # noqa: S105
+    mock_get_auth.return_value = mock_auth
+
+    mock_resp = mocker.MagicMock()
+    mock_resp.status_code = 200
+    mock_session.return_value.patch.return_value = mock_resp
+
+    update_edx_user_profile(user)
+    mock_session.return_value.patch.assert_called_once()
+
+
+@patch("openedx.api.get_valid_edx_api_auth")
+@patch("openedx.api.requests.Session")
+def test_update_edx_user_profile_no_openedx_user(
+    mock_session, mock_get_auth, user, caplog
+):
+    """
+    Test that update_edx_user_profile does not attempt to update the user profile in Open edX when Open edX user is not synced
+    """
+    user.openedx_users.all().delete()
+    update_edx_user_profile(user)
+    assert "Skipping user profile update" in caplog.text
+
+
+@patch("openedx.api.get_valid_edx_api_auth")
+@patch("openedx.api.requests.Session")
+def test_update_edx_user_profile_error(mock_session, mock_get_auth, mocker, user):
+    """
+    Test that update_edx_user_profile raises an EdxApiUserUpdateError if the request fails
+    """
+    mock_auth = mocker.MagicMock()
+    mock_auth.access_token = "token"  # noqa: S105
+    mock_get_auth.return_value = mock_auth
+
+    mock_resp = mocker.MagicMock()
+    mock_resp.status_code = 400
+    mock_session.return_value.patch.return_value = mock_resp
+
+    with patch("openedx.api.get_error_response_summary", return_value="error summary"):
+        with pytest.raises(EdxApiUserUpdateError) as exc:
+            update_edx_user_profile(user)
+        assert "Error updating Open edX user" in str(exc.value)

@@ -445,6 +445,12 @@ def update_edx_user_profile(user):
     Args:
         user(user.models.User): the user to update
     """
+    if not user.openedx_user_exists:
+        log.info(
+            "Skipping user profile update for %s, user has no Open edX account", user
+        )
+        return
+
     auth = get_valid_edx_api_auth(user)
     req_session = requests.Session()
     resp = req_session.patch(
