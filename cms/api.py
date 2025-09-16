@@ -267,9 +267,11 @@ def ensure_instructors_index() -> cms_models.InstructorIndexPage:
 
 def get_wagtail_img_src(image_obj) -> str:
     """Returns the image source URL for a Wagtail Image object"""
+    root_rel = urljoin(settings.MEDIA_URL, image_obj.file.name)
+    abs_url = urljoin(settings.SITE_BASE_URL, root_rel)
     return (
         "{url}?{qs}".format(
-            url=urljoin(settings.MEDIA_URL, image_obj.file.name),
+            url=abs_url,
             qs=urlencode({"v": image_obj.file_hash}),
         )
         if image_obj
