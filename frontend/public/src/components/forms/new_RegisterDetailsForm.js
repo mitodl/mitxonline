@@ -1,6 +1,6 @@
 // @flow
 import React from "react"
-import {Formik, Form} from "formik"
+import { Formik, Form } from "formik"
 
 import {
   legalAddressValidation,

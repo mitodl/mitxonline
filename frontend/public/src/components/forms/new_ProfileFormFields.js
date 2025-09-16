@@ -14,7 +14,7 @@ import {
 } from "../../constants"
 import FormError from "./elements/FormError"
 import CardLabel from "../input/CardLabel"
-import {usernameFieldErrorMessage} from "../../lib/validation"
+import { usernameFieldErrorMessage } from "../../lib/validation"
 
 export const NAME_REGEX =
   /^(?![~!@&)(+:'.?,-])(?!.*[(/^$#*=[\]`%_;\\<>{}"|)]).*$/
@@ -26,12 +26,17 @@ export const NAME_REGEX_FAIL_MESSAGE =
   "Name cannot start with a special character (~!@&)(+:'.?,-), and cannot contain any of (/^$#*=[]`%_;\\<>{}\"|)"
 
 export const legalAddressValidation = yup.object().shape({
-  name:          yup.string().required().label("Full Name").min(2).max(254),
-  username: yup.string()
-    .required().label("Public Username")
+  name:     yup.string().required().label("Full Name").min(2).max(254),
+  username: yup
+    .string()
+    .required()
+    .label("Public Username")
     .min(3, usernameFieldErrorMessage)
     .max(30, usernameFieldErrorMessage)
-    .matches(/^[@!#$%^&*)(+=]*$/, 'Username cannot contain any of these "@!#$%^&*)(+=" symbols'),
+    .matches(
+      /^[@!#$%^&*)(+=]*$/,
+      'Username cannot contain any of these "@!#$%^&*)(+=" symbols'
+    ),
   legal_address: yup.object().shape({
     first_name: yup
       .string()
