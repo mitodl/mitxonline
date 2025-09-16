@@ -393,7 +393,7 @@ def bootstrap_client(*, verify_realm=False):
     target_realm = settings.KEYCLOAK_REALM_NAME
 
     if verify_realm:
-        realms = [realm.name for realm in client.realms()]
+        realms = [realm.realm for realm in client.realms()]
         if target_realm not in realms:
             msg = f"Realm '{target_realm}' not found in Keycloak."
             raise KeycloakAdminImproperlyConfiguredError(msg)
