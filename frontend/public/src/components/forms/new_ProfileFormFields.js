@@ -14,7 +14,7 @@ import {
 } from "../../constants"
 import FormError from "./elements/FormError"
 import CardLabel from "../input/CardLabel"
-import {usernameFieldErrorMessage} from "../../lib/validation";
+import {usernameFieldErrorMessage} from "../../lib/validation"
 
 export const NAME_REGEX =
   /^(?![~!@&)(+:'.?,-])(?!.*[(/^$#*=[\]`%_;\\<>{}"|)]).*$/
