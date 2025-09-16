@@ -14,8 +14,13 @@ from django.conf import settings
 
 from b2b.exceptions import KeycloakAdminImproperlyConfiguredError
 from b2b.keycloak_admin_dataclasses import (
+    OrganizationRepresentation,
     RealmRepresentation,
+    UserRepresentation,
 )
+
+KCAM_ORGANIZATIONS = (OrganizationRepresentation, "organizations")
+KCAM_USERS = (UserRepresentation, "users")
 
 
 class KeycloakAdminClient:
@@ -265,6 +270,28 @@ class KeycloakAdminClient:
 
         return True
 
+    def disassociate(self, endpoint):
+        """
+        Disassociate an object at the endpoint in the realm from the target ID.
+
+        This is the flip side of associate - removing a membership. The API call
+        for this is slightly different - we send a DELETE and the target ID is
+        sent in the URL.
+
+        Args:
+        - endpoint: The endpoint to use (e.g., "organizations/{org_id}/members", etc).
+        - target_id: The ID of the object to associate.
+        Returns:
+        - True if successful.
+        Raises:
+        - requests.HTTPError if the request fails.
+        """
+
+        response = self.request("DELETE", endpoint)
+        response.raise_for_status()
+
+        return True
+
 
 class KeycloakAdminModel:
     """Middleware class to help with working with Keycloak data."""
@@ -339,3 +366,59 @@ class KeycloakAdminModel:
         return self.admin_client.associate(
             f"{self.endpoint}/{parent_id}/{association_type}", child_id
         )
+
+    def disassociate(self, association_type, parent_id, child_id):
+        """
+        Disassociate the object with the given ID from the target ID.
+
+        Args:
+        - association_type: The "type" of association to make (e.g., "members").
+        - parent_id: The ID of the object to add the item to.
+        - child_id: The ID of the object to add.
+        Returns:
+        - True if successful.
+        Raises:
+        - requests.HTTPError if the request fails.
+        """
+
+        return self.admin_client.disassociate(
+            f"{self.endpoint}/{parent_id}/{association_type}/{child_id}"
+        )
+
+
+def bootstrap_client(*, verify_realm=False):
+    """Bootstrap a KeycloakAdminClient instance."""
+
+    client = KeycloakAdminClient()
+    target_realm = settings.KEYCLOAK_REALM_NAME
+
+    if verify_realm:
+        realms = [realm.name for realm in client.realms()]
+        if target_realm not in realms:
+            msg = f"Realm '{target_realm}' not found in Keycloak."
+            raise KeycloakAdminImproperlyConfiguredError(msg)
+
+    client.set_realm(target_realm)
+
+    return client
+
+
+def get_keycloak_model(representation, endpoint, *, client=None):
+    """
+    Get a KeycloakAdminModel instance for the given model type.
+
+    Use the KCAM_ constants as a shortcut - these are two-tuples of
+    (representation_class, endpoint). If a client isn't provided,
+    this will bootstrap one.
+
+    Args:
+    - representation: The dataclass representation to use.
+    - endpoint: The endpoint to use.
+    - client: An optional KeycloakAdminClient instance.
+    Returns:
+    - An instance of KeycloakAdminModel for the given type.
+    """
+
+    client = client or bootstrap_client(verify_realm=True)
+
+    return KeycloakAdminModel(client, representation, endpoint)
