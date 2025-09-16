@@ -148,6 +148,7 @@ def create_user_via_email(
 
     context = {}
     data = strategy.request_data().copy()
+    log.exception("Hello")
     expected_data_fields = {"name", "password", "username"}
     if any(field for field in expected_data_fields if field not in data):
         raise RequirePasswordAndPersonalInfoException(backend, current_partial)

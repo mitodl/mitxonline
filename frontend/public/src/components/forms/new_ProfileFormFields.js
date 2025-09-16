@@ -14,6 +14,7 @@ import {
 } from "../../constants"
 import FormError from "./elements/FormError"
 import CardLabel from "../input/CardLabel"
+import {usernameFieldErrorMessage} from "../../lib/validation";
 
 export const NAME_REGEX =
   /^(?![~!@&)(+:'.?,-])(?!.*[(/^$#*=[\]`%_;\\<>{}"|)]).*$/
@@ -26,6 +27,11 @@ export const NAME_REGEX_FAIL_MESSAGE =
 
 export const legalAddressValidation = yup.object().shape({
   name:          yup.string().required().label("Full Name").min(2).max(254),
+  username: yup.string()
+    .required().label("Public Username")
+    .min(3, usernameFieldErrorMessage)
+    .max(30, usernameFieldErrorMessage)
+    .matches(/^[@!#$%^&*)(+=]*$/, 'Username cannot contain any of these "@!#$%^&*)(+=" symbols'),
   legal_address: yup.object().shape({
     first_name: yup
       .string()
@@ -231,30 +237,27 @@ export const LegalAddressFields = ({
         />
         <ErrorMessage name="name" component={FormError} />
       </div>
-      {isNewAccount ? (
-        <React.Fragment>
-          <div className="form-group">
-            <CardLabel
-              htmlFor="username"
-              isRequired={true}
-              label="Public Username"
-              subLabel="Name that will identify you in courses"
-            />
-            <Field
-              type="text"
-              name="username"
-              className="form-control"
-              autoComplete="username"
-              id="username"
-              aria-invalid={errors.username ? "true" : null}
-              aria-describedby={errors.username ? "username-error" : null}
-              aria-description="Name that will identify you in courses."
-              required
-            />
-            <ErrorMessage name="username" component={FormError} />
-          </div>
-        </React.Fragment>
-      ) : null}
+
+      <div className="form-group">
+        <CardLabel
+          htmlFor="username"
+          isRequired={true}
+          label="Public Username"
+          subLabel="Name that will identify you in courses"
+        />
+        <Field
+          type="text"
+          name="username"
+          className="form-control"
+          autoComplete="username"
+          id="username"
+          aria-invalid={errors.username ? "true" : null}
+          aria-describedby={errors.username ? "username-error" : null}
+          aria-description="Name that will identify you in courses."
+          required
+        />
+        <ErrorMessage name="username" component={FormError} />
+      </div>
       <div className="form-group">
         <CardLabel
           htmlFor="legal_address.country"
