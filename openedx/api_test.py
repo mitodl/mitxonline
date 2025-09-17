@@ -235,7 +235,7 @@ def test_create_edx_user(  # noqa: PLR0913
 @responses.activate
 @pytest.mark.usefixtures("application")
 @pytest.mark.parametrize(
-    "username_suggestions,base_username,expected_username_pattern,test_description",
+    ("username_suggestions", "base_username", "expected_username_pattern", "test_description"),
     [
         (
             ["openedx-generated-username"],
@@ -297,7 +297,7 @@ def test_create_edx_user_conflict(settings, username_suggestions, base_username,
 
 
 @pytest.mark.parametrize(
-    "base_username,expected_prefix",
+    ("base_username", "expected_prefix"),
     [
         ("testuser", "testuser_"),
         ("José", "José_"),
