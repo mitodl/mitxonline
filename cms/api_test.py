@@ -92,13 +92,14 @@ def test_ensure_home_page_and_site():
 def test_get_wagtail_img_src(settings):
     """get_wagtail_img_src should return the correct image URL"""
     settings.MEDIA_URL = "/mediatest/"
-    img_path = "/path/to/my-image.jpg"
+    settings.SITE_BASE_URL = "http://mitxonline.test"
+    img_filename = "path/to/my-image.jpg"
     img_hash = "abc123"
     home_page = HomePageFactory.build(
-        hero__file__filename=img_path, hero__file_hash=img_hash
+        hero__file__filename=img_filename, hero__file_hash=img_hash
     )
     img_src = get_wagtail_img_src(home_page.hero)
-    assert img_src == f"{img_path}?v={img_hash}"
+    assert img_src == f"http://mitxonline.test/mediatest/{img_filename}?v={img_hash}"
 
 
 @pytest.mark.django_db
