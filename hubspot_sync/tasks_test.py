@@ -9,7 +9,7 @@ import pytest
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
-from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
+from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate
 from mitol.hubspot_api.api import HubspotAssociationType, HubspotObjectType
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
@@ -238,7 +238,7 @@ def test_batch_update_hubspot_objects_chunked(mocker, id_count):
     )
     mock_hubspot_api.return_value.crm.objects.batch_api.update.assert_any_call(
         HubspotObjectType.CONTACTS.value,
-        BatchInputSimplePublicObjectInput(
+        BatchInputCreate(
             inputs=make_contact_update_message_list_from_user_ids(
                 mock_ids[0 : min(id_count, 10)]
             )
@@ -296,7 +296,7 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     )
     mock_hubspot_api.return_value.crm.objects.batch_api.create.assert_any_call(
         HubspotObjectType.CONTACTS.value,
-        BatchInputSimplePublicObjectInput(
+        BatchInputCreate(
             inputs=make_contact_create_message_list_from_user_ids(
                 mock_ids[0 : min(id_count, 10)]
             )
