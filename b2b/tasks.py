@@ -12,3 +12,11 @@ def queue_enrollment_code_check(contract_id: int):
 
     contract = ContractPage.objects.get(id=contract_id)
     ensure_enrollment_codes_exist(contract)
+
+
+@app.task()
+def queue_organization_sync():
+    """Queue the sync_organizations call."""
+    from b2b.api import sync_organizations
+
+    sync_organizations()

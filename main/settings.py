@@ -1052,6 +1052,18 @@ REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ = get_int(
 
 REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET = int(REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ / 2)
 
+KEYCLOAK_ORG_SYNC_FREQUENCY = get_int(
+    name="KEYCLOAK_ORG_SYNC_FREQUENCY",
+    default=86400,
+    description="How many seconds to wait between refreshing organization data from the Keycloak API",
+)
+
+KEYCLOAK_ORG_SYNC_OFFSET = get_int(
+    name="KEYCLOAK_ORG_SYNC_OFFSET",
+    default=int(KEYCLOAK_ORG_SYNC_FREQUENCY / 2),
+    description="Offset for the Keycloak org sync",
+)
+
 CELERY_BEAT_SCHEDULE = {
     "retry-failed-edx-enrollments": {
         "task": "openedx.tasks.retry_failed_edx_enrollments",
@@ -1097,6 +1109,13 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": OffsettingSchedule(
             run_every=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ),
             offset=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET),
+        ),
+    },
+    "sync-keycloak": {
+        "task": "b2b.tasks.queue_organization_sync",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=KEYCLOAK_ORG_SYNC_FREQUENCY),
+            offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
         ),
     },
 }
