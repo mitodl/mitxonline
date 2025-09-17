@@ -46,6 +46,7 @@ from openedx.api import (
     update_edx_user_name,
     update_edx_user_profile,
     validate_username_email_with_edx,
+    _generate_unique_username,
 )
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -233,9 +234,29 @@ def test_create_edx_user(  # noqa: PLR0913
 
 @responses.activate
 @pytest.mark.usefixtures("application")
-def test_create_edx_user_conflict(settings):
+@pytest.mark.parametrize(
+    "username_suggestions,base_username,expected_username_pattern,test_description",
+    [
+        (
+            ["openedx-generated-username"],
+            "testuser",
+            lambda username: username == "openedx-generated-username",
+            "with OpenEdX suggestions"
+        ),
+        (
+            [],
+            "José",
+            lambda username: username.startswith("José_") and len(username) > len("José"),
+            "with empty suggestions (non-ASCII fallback)"
+        ),
+    ],
+)
+def test_create_edx_user_conflict(settings, username_suggestions, base_username, expected_username_pattern, test_description):
     """Test that create_edx_user handles a 409 response from the edX API"""
-    user = UserFactory.create(openedx_user__has_been_synced=False)
+    user = UserFactory.create(
+        openedx_user__has_been_synced=False,
+        openedx_user__desired_edx_username=base_username
+    )
 
     resp1 = responses.add(
         responses.GET,
@@ -248,7 +269,7 @@ def test_create_edx_user_conflict(settings):
         f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
         json={
             "error_code": "duplicate-username",
-            "username_suggestions": ["openedx-generated-username"],
+            "username_suggestions": username_suggestions,
         },
         status=status.HTTP_409_CONFLICT,
     )
@@ -272,7 +293,23 @@ def test_create_edx_user_conflict(settings):
     edx_user = user.openedx_users.first()
 
     assert edx_user.has_been_synced is True
-    assert edx_user.edx_username == "openedx-generated-username"
+    assert expected_username_pattern(edx_user.edx_username), f"Username {edx_user.edx_username} doesn't match expected pattern for {test_description}"
+
+
+@pytest.mark.parametrize(
+    "base_username,expected_prefix",
+    [
+        ("testuser", "testuser_"),
+        ("José", "José_"),
+        ("user123", "user123_"),
+    ],
+)
+def test_generate_unique_username(base_username, expected_prefix):
+    """Test that _generate_unique_username generates unique usernames"""
+    
+    username = _generate_unique_username(base_username)
+    assert username.startswith(expected_prefix)
+    assert len(username) > len(base_username)
 
 
 @responses.activate
