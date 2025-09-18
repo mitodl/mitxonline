@@ -5,7 +5,7 @@ Course API Views version 2
 import contextlib
 
 import django_filters
-from django.db.models import Count, Prefetch
+from django.db.models import Case, Count, Prefetch, When
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -254,14 +254,28 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Get the queryset for the viewset."""
 
-        return (
+        queryset = (
             Course.objects.select_related("page")
             .prefetch_related("departments")
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
             .annotate(count_courseruns=Count("courseruns"))
-            .order_by("title")
             .distinct()
         )
+
+        # If IDs are provided via filter, preserve their order
+        id_filter = self.request.query_params.get("id")
+        if id_filter:
+            try:
+                ids = [int(id_str.strip()) for id_str in id_filter.split(",")]
+                queryset = queryset.filter(id__in=ids).order_by(
+                    Case(*[When(id=pk, then=pos) for pos, pk in enumerate(ids)])
+                )
+            except (ValueError, TypeError):
+                queryset = queryset.order_by("title")
+        else:
+            queryset = queryset.order_by("title")
+
+        return queryset
 
     def get_serializer_context(self):
         added_context = {}

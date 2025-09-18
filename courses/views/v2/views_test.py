@@ -287,6 +287,55 @@ def test_get_course(
 
 
 @pytest.mark.django_db
+def test_courses_id_ordering():
+    """Test that the courses endpoint respects ID order when provided via id parameter"""
+    # Create test courses with specific IDs
+    course1 = CourseFactory.create(title="Course A")
+    course2 = CourseFactory.create(title="Course B")
+    course3 = CourseFactory.create(title="Course C")
+
+    client = APIClient()
+
+    # Test different ID orders to verify the endpoint preserves input order
+    test_cases = [
+        ([course3.id, course1.id, course2.id], "3,1,2 order"),
+        ([course2.id, course3.id, course1.id], "2,3,1 order"),
+        ([course1.id, course3.id, course2.id], "1,3,2 order"),
+    ]
+
+    for expected_ids, description in test_cases:
+        id_param = ",".join(str(course_id) for course_id in expected_ids)
+        resp = client.get(reverse("v2:courses_api-list"), {"id": id_param})
+
+        assert resp.status_code == status.HTTP_200_OK
+        results = resp.json()["results"]
+        returned_ids = [course["id"] for course in results]
+
+        assert returned_ids == expected_ids, (
+            f"Failed for {description}: expected {expected_ids}, got {returned_ids}"
+        )
+
+    # Test that default ordering (by title) still works when no ID parameter is provided
+    resp = client.get(reverse("v2:courses_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+    results = resp.json()["results"]
+
+    # Should be ordered by title: Course A, Course B, Course C
+    if len(results) >= 3:
+        # Find our test courses in the results
+        test_course_results = [
+            r for r in results if r["id"] in [course1.id, course2.id, course3.id]
+        ]
+        assert len(test_course_results) == 3
+        # Should be in title order
+        expected_title_order = [course1.id, course2.id, course3.id]  # A, B, C
+        actual_title_order = [r["id"] for r in test_course_results]
+        assert actual_title_order == expected_title_order, (
+            f"Default title ordering failed: expected {expected_title_order}, got {actual_title_order}"
+        )
+
+
+@pytest.mark.django_db
 def test_filter_with_org_id_returns_contracted_course(
     mocker, contract_ready_course, mock_course_run_clone
 ):
