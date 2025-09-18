@@ -398,7 +398,7 @@ def test_sync_deal_hubspot_ids_to_hubspot(
         mock_association = mocker.Mock()
         mock_association.to_object_id = f"line_item_{i}_id"
         mock_associations.append(mock_association)
-    
+
     mock_get_line_items = mocker.patch("hubspot_sync.api.get_line_items_for_deal")
     mock_get_line_items.return_value = line_items
     assert api.sync_deal_hubspot_ids_to_db() is (match_all_lines and match_all_deals)

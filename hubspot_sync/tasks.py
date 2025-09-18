@@ -11,7 +11,12 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import F
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
-from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate
+from hubspot.crm.objects import (
+    ApiException,
+)
+from hubspot.crm.objects import (
+    BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate,
+)
 from mitol.common.decorators import single_task
 from mitol.common.utils.collections import chunks
 from mitol.common.utils.datetime import now_in_utc
