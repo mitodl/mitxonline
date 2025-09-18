@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from json import dumps
 from urllib.parse import quote_plus
 
+import pycountry
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
@@ -525,7 +526,10 @@ class FormField(AbstractFormField):
     Adds support for the Country field (see FlexiblePricingFormBuilder below).
     """
 
-    CHOICES = FORM_FIELD_CHOICES + (("country", "Country"),)  # noqa: RUF005
+    CHOICES = FORM_FIELD_CHOICES + (  # noqa: RUF005
+        ("country", "Country Currency"),
+        ("iso_country", "Country Code"),
+    )
 
     page = ParentalKey(
         "FlexiblePricingRequestForm",
@@ -559,6 +563,17 @@ class FlexiblePricingFormBuilder(FormBuilder):
             exchange_rates.append((record.currency_code, desc))
 
         options["choices"] = exchange_rates
+        options["error_messages"] = {
+            "required": f"{options['label']} is a required field."
+        }
+        return ChoiceField(**options)
+
+    def create_iso_country_field(self, field, options):  # noqa: ARG002
+        """Creates a Country dropdown that just has country codes in it."""
+
+        options["choices"] = [
+            (country.alpha_2, country.name) for country in pycountry.countries
+        ]
         options["error_messages"] = {
             "required": f"{options['label']} is a required field."
         }
@@ -1662,12 +1677,17 @@ class FlexiblePricingRequestForm(AbstractForm):
                 else parent_page_course.programs[0]
             )
 
-    def get_previous_submission(self, request):
+    def get_previous_submission(self, request, *, get_absolute_last=False):
         """
         Gets the last submission by the user for the courseware object the page
         is associated with. If the object is a Course that has an attached
         Program, this returns the first FlexiblePrice that's for either the
         Course or the Program.
+
+        If get_absoulte_last is True, then this will pull whatever the last
+        submission was for the user regardless of the current form. (We use this
+        to auto-fill some form fields that shouldn't depend on the courseware
+        object.)
 
         Updated 15-Jun-2023 jkachel: We will now look for submissions in any of
         the programs that the course belongs to.
@@ -1676,6 +1696,10 @@ class FlexiblePricingRequestForm(AbstractForm):
         will probably overlap with the above.)
 
         TODO: this logic will break when we have Program pages
+
+        Args:
+        - get_absolute_last: if True, ignores the courseware object and gets
+            whatever the last submission was, for any form the user's submitted.
 
         Returns:
             FlexiblePrice, or None if not found.
@@ -1686,6 +1710,10 @@ class FlexiblePricingRequestForm(AbstractForm):
             return None
 
         sub_qset = FlexiblePrice.objects.filter(user=request.user)
+
+        if get_absolute_last:
+            return sub_qset.order_by("-created_on").first()
+
         course_ct = ContentType.objects.get(app_label="courses", model="course")
         program_ct = ContentType.objects.get(app_label="courses", model="program")
 
@@ -1731,10 +1759,19 @@ class FlexiblePricingRequestForm(AbstractForm):
         return sub_qset.order_by("-created_on").first()
 
     def get_context(self, request, *args, **kwargs):
+        """Add data to the request context so we can use it in the form."""
+
         context = super().get_context(request, *args, **kwargs)
 
         fp_request = self.get_previous_submission(request)
+        fp_abs_request = self.get_previous_submission(request, get_absolute_last=True)
         context["prior_request"] = fp_request
+        context["country_of_income"] = (
+            fp_abs_request.country_of_income or request.user.legal_address.country
+        )
+        context["country_of_residence"] = (
+            fp_abs_request.country_of_residence or request.user.legal_address.country
+        )
         product_page = self.get_parent_product_page()
         product = product_page.product
         context["product"] = (
@@ -1789,7 +1826,8 @@ class FlexiblePricingRequestForm(AbstractForm):
 
         flexible_price.original_income = form.cleaned_data["your_income"]
         flexible_price.original_currency = form.cleaned_data["income_currency"]
-        flexible_price.country_of_income = form.user.legal_address.country
+        flexible_price.country_of_income = form.cleaned_data["country_of_income"]
+        flexible_price.country_of_residence = form.cleaned_data["country_of_residence"]
         flexible_price.income_usd = income_usd
         flexible_price.date_exchange_rate = datetime.now()  # noqa: DTZ005
         flexible_price.cms_submission = form_submission
