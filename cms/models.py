@@ -1764,14 +1764,20 @@ class FlexiblePricingRequestForm(AbstractForm):
         context = super().get_context(request, *args, **kwargs)
 
         fp_request = self.get_previous_submission(request)
-        fp_abs_request = self.get_previous_submission(request, get_absolute_last=True)
         context["prior_request"] = fp_request
-        context["country_of_income"] = (
-            fp_abs_request.country_of_income or request.user.legal_address.country
-        )
-        context["country_of_residence"] = (
-            fp_abs_request.country_of_residence or request.user.legal_address.country
-        )
+
+        context["country_of_income"] = ""
+        context["country_of_residence"] = ""
+
+        if getattr(request.user, "legal_address", None):
+            context["country_of_income"] = request.user.legal_address.country
+            context["country_of_residence"] = request.user.legal_address.country
+
+        fp_abs_request = self.get_previous_submission(request, get_absolute_last=True)
+        if fp_abs_request:
+            context["country_of_income"] = fp_abs_request.country_of_income
+            context["country_of_residence"] = fp_abs_request.country_of_residence
+
         product_page = self.get_parent_product_page()
         product = product_page.product
         context["product"] = (
