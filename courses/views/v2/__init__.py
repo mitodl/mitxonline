@@ -5,7 +5,7 @@ Course API Views version 2
 import contextlib
 
 import django_filters
-from django.db.models import Count, Prefetch
+from django.db.models import Case, Count, IntegerField, Prefetch, When
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -141,7 +141,8 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
                         "required_program_id",
                         "title",
                         "elective_flag",
-                    ),
+                    )
+                    .order_by("path"),
                 ),
                 Prefetch(
                     "programcollection_set",
@@ -254,14 +255,28 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Get the queryset for the viewset."""
 
-        return (
+        queryset = (
             Course.objects.select_related("page")
             .prefetch_related("departments")
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
             .annotate(count_courseruns=Count("courseruns"))
-            .order_by("title")
             .distinct()
         )
+
+        # If specific IDs are requested, preserve their order
+        id_param = self.request.query_params.get("id")
+        if id_param:
+            try:
+                ids = [int(id_str.strip()) for id_str in id_param.split(",")]
+                preserved_order = Case(
+                    *[When(id=id_val, then=pos) for pos, id_val in enumerate(ids)],
+                    output_field=IntegerField(),
+                )
+                return queryset.filter(id__in=ids).order_by(preserved_order)
+            except (ValueError, TypeError):
+                pass
+
+        return queryset.order_by("title")
 
     def get_serializer_context(self):
         added_context = {}

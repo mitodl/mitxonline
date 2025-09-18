@@ -103,8 +103,24 @@ class ProgramSerializer(serializers.ModelSerializer):
     max_weekly_hours = serializers.SerializerMethodField()
     start_date = serializers.SerializerMethodField()
 
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {"type": "integer"},
+        }
+    )
     def get_courses(self, instance) -> list[int]:
-        return [course[0].id for course in instance.courses if course[0].live]
+        """Get course IDs from all requirements in the same order as get_requirements"""
+        if hasattr(instance, "all_requirements"):
+            all_requirements = instance.all_requirements.all()
+            required_courses, elective_courses = (
+                self._process_course_requirements_from_all(all_requirements)
+            )
+            return required_courses + elective_courses
+        else:
+            required_courses = [course.id for course in instance.required_courses]
+            elective_courses = [course.id for course in instance.elective_courses]
+            return required_courses + elective_courses
 
     def get_collections(self, instance) -> list[int]:
         if hasattr(instance, "programcollection_set"):
@@ -218,42 +234,41 @@ class ProgramSerializer(serializers.ModelSerializer):
             },
         }
     )
-    def get_requirements(self, instance):
-        """Get program requirements using prefetched data when available"""
+    def get_requirements(self, instance) -> dict:
+        """Get requirements in proper order by using prefetched, already-ordered data"""
         if hasattr(instance, "all_requirements"):
+            all_requirements = instance.all_requirements.all()
             required_courses, elective_courses = (
-                self._process_course_requirements_from_all(
-                    instance.all_requirements.all()
-                )
+                self._process_course_requirements_from_all(all_requirements)
             )
             required_programs, elective_programs = (
-                self._process_program_requirements_from_all(
-                    instance.all_requirements.all()
-                )
+                self._process_program_requirements_from_all(all_requirements)
             )
-        else:
-            # Fallback to  using model properties
             return {
                 "courses": {
-                    "required": [course.id for course in instance.required_courses],
-                    "electives": [course.id for course in instance.elective_courses],
+                    "required": required_courses,
+                    "electives": elective_courses,
                 },
                 "programs": {
-                    "required": [program.id for program in instance.required_programs],
-                    "electives": [program.id for program in instance.elective_programs],
+                    "required": required_programs,
+                    "electives": elective_programs,
                 },
             }
-
-        return {
-            "courses": {
-                "required": required_courses,
-                "electives": elective_courses,
-            },
-            "programs": {
-                "required": required_programs,
-                "electives": elective_programs,
-            },
-        }
+        else:
+            required_courses = [course.id for course in instance.required_courses]
+            elective_courses = [course.id for course in instance.elective_courses]
+            required_programs = [program.id for program in instance.required_programs]
+            elective_programs = [program.id for program in instance.elective_programs]
+            return {
+                "courses": {
+                    "required": required_courses,
+                    "electives": elective_courses,
+                },
+                "programs": {
+                    "required": required_programs,
+                    "electives": elective_programs,
+                },
+            }
 
     def _process_course_requirements_from_all(self, requirements):
         """Process course requirements from all_requirements and return required/elective course IDs"""

@@ -1,7 +1,5 @@
 """Shared pytest configuration for courses application"""
 
-import random
-
 import pytest
 
 from courses.factories import (
@@ -84,6 +82,7 @@ def _create_course(n):
 
 def _create_program(courses):
     program = ProgramFactory.create()
+
     ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
     required_courses_node = root_node.add_child(
@@ -99,11 +98,23 @@ def _create_program(courses):
         elective_flag=True,
     )
     if len(courses) > 3:  # noqa: PLR2004
-        for c in random.sample(courses, 3):
+        # Use deterministic selection based on course ID for consistent test results
+        # Sort courses by ID to ensure consistent ordering across test runs
+        sorted_courses = sorted(courses, key=lambda c: c.id)
+        required_courses = sorted_courses[:3]
+        # For electives, use next 3 courses, or last 3 if not enough available
+        min_courses_for_electives = 6
+        elective_courses = (
+            sorted_courses[3:min_courses_for_electives]
+            if len(sorted_courses) >= min_courses_for_electives
+            else sorted_courses[-3:]
+        )
+
+        for c in required_courses:
             required_courses_node.add_child(
                 node_type=ProgramRequirementNodeType.COURSE, course=c
             )
-        for c in random.sample(courses, 3):
+        for c in elective_courses:
             elective_courses_node.add_child(
                 node_type=ProgramRequirementNodeType.COURSE, course=c
             )
