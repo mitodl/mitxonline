@@ -46,11 +46,13 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
                 **{annotation_key: F(f"{annotation_map[model_type]}__{annotation_key}")}
             )
 
-        queryset = queryset.exclude(content_type__model__in=[
-            "organizationindexpage",
-            "organizationpage",
-            "contractpage",
-        ])
+        queryset = queryset.exclude(
+            content_type__model__in=[
+                "organizationindexpage",
+                "organizationpage",
+                "contractpage",
+            ]
+        )
 
         if model_type and model_type == "cms.programpage":
             queryset = queryset.filter(program__b2b_only=False)
