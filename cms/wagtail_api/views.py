@@ -34,17 +34,29 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         """
         queryset = super().get_queryset()
         annotation_map = {
-            "cms.CoursePage": "course",
-            "cms.ProgramPage": "program",
+            "cms.coursepage": "course",
+            "cms.programpage": "program",
         }
 
-        model_type = self.request.GET.get("type")
+        model_type = self.request.GET.get("type", "").lower()
         annotation_key = self.request.GET.get("annotation", "readable_id")
 
         if model_type in annotation_map:
             queryset = queryset.annotate(
                 **{annotation_key: F(f"{annotation_map[model_type]}__{annotation_key}")}
             )
+
+        queryset = queryset.exclude(content_type__model__in=[
+            "organizationindexpage",
+            "organizationpage",
+            "contractpage",
+        ])
+
+        if model_type and model_type == "cms.programpage":
+            queryset = queryset.filter(program__b2b_only=False)
+
+        if model_type and model_type == "cms.coursepage":
+            queryset = queryset.filter(include_in_learn_catalog=True)
 
         return queryset
 
