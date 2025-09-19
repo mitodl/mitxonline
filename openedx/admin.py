@@ -20,6 +20,7 @@ class OpenEdxUserAdmin(ModelAdminRunActionsForAllMixin, admin.ModelAdmin):
     raw_id_fields = ["user"]
     actions = ["repair_all_faulty_openedx_users"]
     run_for_all_actions = ["repair_all_faulty_openedx_users"]
+    readonly_fields = ["has_sync_error", "sync_error_data"]
 
     def get_queryset(self, request):
         """Overrides base queryset"""
