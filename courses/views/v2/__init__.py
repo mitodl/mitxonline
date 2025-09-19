@@ -5,7 +5,7 @@ Course API Views version 2
 import contextlib
 
 import django_filters
-from django.db.models import Case, Count, Prefetch, When
+from django.db.models import Count, F, Func, Prefetch
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -268,7 +268,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             try:
                 ids = [int(id_str.strip()) for id_str in id_filter.split(",")]
                 queryset = queryset.filter(id__in=ids).order_by(
-                    Case(*[When(id=pk, then=pos) for pos, pk in enumerate(ids)])
+                    Func(ids, F("id"), function="array_position")
                 )
             except (ValueError, TypeError):
                 queryset = queryset.order_by("title")
