@@ -22,7 +22,6 @@ from cms import models as cms_models
 from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
-from courses.constants import HOMEPAGE_CACHE_AGE
 from courses.models import Course, Program
 from courses.utils import (
     get_enrollable_courseruns_qs,
@@ -364,7 +363,7 @@ def create_featured_items():
     )
 
     if not valid_course_ids:
-        redis_cache.set(cache_key, [], HOMEPAGE_CACHE_AGE)
+        redis_cache.set(cache_key, [])
         return []
 
     enrollable_courses_qs = Course.objects.select_related("page").filter(
@@ -377,7 +376,7 @@ def create_featured_items():
     )
 
     if not enrollable_courseruns.exists():
-        redis_cache.set(cache_key, [], HOMEPAGE_CACHE_AGE)
+        redis_cache.set(cache_key, [])
         return []
 
     self_paced_runs = []
@@ -410,7 +409,7 @@ def create_featured_items():
     all_course_ids = self_paced_course_ids + future_course_ids + started_course_ids
 
     if not all_course_ids:
-        redis_cache.set(cache_key, [], HOMEPAGE_CACHE_AGE)
+        redis_cache.set(cache_key, [])
         return []
 
     ordering = Case(

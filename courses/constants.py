@@ -30,8 +30,6 @@ ENROLL_CHANGE_STATUS_CHOICES = list(
     zip(ALL_ENROLL_CHANGE_STATUSES, ALL_ENROLL_CHANGE_STATUSES)
 )
 
-HOMEPAGE_CACHE_AGE = 86400  # 24 hours
-
 SYNCED_COURSE_RUN_FIELD_MSG = "This value is synced automatically with edX studio."
 
 AVAILABILITY_ANYTIME = "anytime"

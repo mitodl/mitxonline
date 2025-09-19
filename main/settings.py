@@ -1011,8 +1011,8 @@ REPAIR_OPENEDX_USERS_OFFSET = int(REPAIR_OPENEDX_USERS_FREQUENCY / 2)
 
 REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ = get_int(
     name="REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ",
-    default=60,
-    description="How many seconds between checking for featured items for the homepage in the local in memory cache",
+    default=86400,
+    description="How many seconds between refreshing featured items in the cache",
 )
 
 REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET = int(REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ / 2)
