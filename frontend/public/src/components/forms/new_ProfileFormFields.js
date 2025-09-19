@@ -34,7 +34,7 @@ export const legalAddressValidation = yup.object().shape({
     .min(3, usernameFieldErrorMessage)
     .max(30, usernameFieldErrorMessage)
     .matches(
-      /^[^!@#$%^&*()+=[]{};':"\\|,<>\/?~]*$/,
+      /^[^!@#$%^&*()+=\[\]{};':"\\|,<>\/?~]*$/, // eslint-disable-line no-useless-escape
       "Username cannot contain any of these !@#$%^&*()+=[]{};':\"\\|,<>/?~ symbols"
     ),
   legal_address: yup.object().shape({
