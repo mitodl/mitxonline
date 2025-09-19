@@ -54,8 +54,8 @@ class KeycloakAdminClient:
             msg = "KEYCLOAK_BASE_URL setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
         self.base_url = urljoin(self.base_url, "/admin/realms/")
-        self.realm = settings.KEYCLOAK_REALM_NAME
-        if not self.realm:
+        self._realm = settings.KEYCLOAK_REALM_NAME
+        if not self._realm:
             msg = "KEYCLOAK_REALM_NAME setting is not configured."
             raise KeycloakAdminImproperlyConfiguredError(msg)
 
@@ -211,37 +211,41 @@ class KeycloakAdminClient:
 
         return representation(**list_data)
 
-    def create(self, endpoint, representation):
+    def create(self, endpoint, representation, data):
         """
         Create an object at the endpoint in the realm.
 
         Args:
         - endpoint: The endpoint to use (e.g., "organizations", "users", etc).
         - representation: The dataclass instance to save.
+        - data: The data to save.
 
         Returns:
         - The saved representation instance.
         """
 
-        response = self.request("POST", endpoint, json=representation.__dict__)
+        response = self.request("POST", endpoint, json=data)
         response.raise_for_status()
         item_data = response.json()
 
         return representation(**item_data)
 
-    def save(self, endpoint, representation):
+    def save(self, endpoint, data):
         """
         Create an object at the endpoint in the realm.
 
+        No data is returned - just a status - so we don't need th representation
+        class.
+
         Args:
         - endpoint: The endpoint to use (e.g., "organizations", "users", etc).
-        - representation: The dataclass instance to save.
+        - data: The data to save.
 
         Returns:
         - True on success
         """
 
-        response = self.request("PUT", endpoint, json=representation.__dict__)
+        response = self.request("PUT", endpoint, json=data)
         response.raise_for_status()
 
         return True
