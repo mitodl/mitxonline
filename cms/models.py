@@ -430,6 +430,7 @@ class CertificatePage(CourseProgramChildPage):
                 "name": page.name,
                 "title_1": page.title_1,
                 "title_2": page.title_2,
+                "title_3": page.title_3,
                 "organization": page.organization,
                 "signature_image": page.signature_image.file.url,
             }
@@ -1890,6 +1891,12 @@ class SignatoryPage(Page):
         blank=True,
         help_text="Specify signatory second title in organization.",
     )
+    title_3 = models.CharField(  # noqa: DJ001
+        max_length=250,
+        null=True,
+        blank=True,
+        help_text="Specify signatory thrid title in organization.",
+    )
     organization = models.CharField(  # noqa: DJ001
         max_length=250,
         null=True,
@@ -1913,6 +1920,7 @@ class SignatoryPage(Page):
         FieldPanel("name"),
         FieldPanel("title_1"),
         FieldPanel("title_2"),
+        FieldPanel("title_3"),
         FieldPanel("organization"),
         FieldPanel("signature_image"),
     ]
@@ -1920,6 +1928,7 @@ class SignatoryPage(Page):
         APIField("name"),
         APIField("title_1"),
         APIField("title_2"),
+        APIField("title_3"),
         APIField("organization"),
         APIField("signature_image", serializer=ImageSerializer()),
     ]

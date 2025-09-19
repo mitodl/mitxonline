@@ -967,6 +967,7 @@ def test_certificate_choice_limits():
         signatories__0__signatory__page__name="Name",
         signatories__0__signatory__page__title_1="Title_1",
         signatories__0__signatory__page__title_2="Title_2",
+        signatories__0__signatory__page__title_3="Title_3",
         signatories__0__signatory__page__organization="Organization",
         signatories__0__signatory__page__signature_image__title="Image",
     )
@@ -978,6 +979,7 @@ def test_certificate_choice_limits():
         signatories__0__signatory__page__name="Name",
         signatories__0__signatory__page__title_1="Title_1",
         signatories__0__signatory__page__title_2="Title_2",
+        signatories__0__signatory__page__title_3="Title_3",
         signatories__0__signatory__page__organization="Organization",
         signatories__0__signatory__page__signature_image__title="Image",
     )
