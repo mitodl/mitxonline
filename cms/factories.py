@@ -130,6 +130,7 @@ class SignatoryPageFactory(wagtail_factories.PageFactory):
     name = factory.fuzzy.FuzzyText(prefix="Name")
     title_1 = factory.fuzzy.FuzzyText(prefix="Title_1")
     title_2 = factory.fuzzy.FuzzyText(prefix="Title_2")
+    title_3 = factory.fuzzy.FuzzyText(prefix="Title_3")
     organization = factory.fuzzy.FuzzyText(prefix="Organization")
     signature_image = factory.SubFactory(wagtail_factories.ImageFactory)
 
