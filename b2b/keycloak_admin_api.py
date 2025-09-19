@@ -238,14 +238,13 @@ class KeycloakAdminClient:
         - representation: The dataclass instance to save.
 
         Returns:
-        - The saved representation instance.
+        - True on success
         """
 
         response = self.request("PUT", endpoint, json=representation.__dict__)
         response.raise_for_status()
-        item_data = response.json()
 
-        return representation(**item_data)
+        return True
 
     def associate(self, endpoint, target_id):
         """
