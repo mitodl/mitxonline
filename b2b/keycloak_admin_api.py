@@ -109,20 +109,28 @@ class KeycloakAdminClient:
 
         return urljoin(self.base_url, f"{self._realm}/{url_path}")
 
-    def request(self, method, url_path, *, skip_realmify=False, **kwargs):
+    def _request(self, method, url_path, **kwargs):
         """Perform an HTTP request against the given URL path."""
 
-        request_url = (
-            urljoin(self.base_url, url_path)
-            if skip_realmify
-            else self.realmify_url(url_path)
-        )
-
         return (
-            self.oauth_session.request(method, request_url, **kwargs)
+            self.oauth_session.request(method, url_path, **kwargs)
             if self.oauth_session
             else None
         )
+
+    def request(self, method, url_path, **kwargs):
+        """Perform an HTTP request against the given URL path."""
+
+        request_url = self.realmify_url(url_path)
+
+        return self._request(method, request_url, **kwargs)
+
+    def realm_request(self, method, url_path, **kwargs):
+        """Perform an HTTP request against the given URL path, skipping realm prefixing."""
+
+        request_url = urljoin(self.base_url, url_path)
+
+        return self._request(method, request_url, **kwargs)
 
     def realms(self):
         """
@@ -136,7 +144,7 @@ class KeycloakAdminClient:
         - List of RealmRepresentation objects
         """
 
-        response = self.request("GET", "", skip_realmify=True)
+        response = self.realm_request("GET", "")
         response.raise_for_status()
         list_data = response.json()
 
@@ -153,7 +161,7 @@ class KeycloakAdminClient:
         - A single RealmRepresentation object
         """
 
-        response = self.request("GET", realm_name, skip_realmify=True)
+        response = self.realm_request("GET", realm_name)
         response.raise_for_status()
         item_data = response.json()
 
