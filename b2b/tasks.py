@@ -14,7 +14,7 @@ def queue_enrollment_code_check(contract_id: int):
     ensure_enrollment_codes_exist(contract)
 
 
-@app.task()
+@app.task(acks_late=True)
 def queue_organization_sync():
     """Queue the sync_organizations call."""
     from b2b.api import sync_organizations
