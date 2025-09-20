@@ -18,6 +18,7 @@ from wagtail.models import Page
 
 from b2b.constants import B2B_RUN_TAG_FORMAT, CONTRACT_INTEGRATION_SSO
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
+from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
@@ -793,3 +794,51 @@ def reconcile_user_orgs(user, organizations):
     caches["redis"].set(user_org_cache_key, sorted(orgs))
 
     return (len(contracts_to_add), len(contracts_to_remove))
+
+
+def reconcile_keycloak_orgs():
+    """
+    Reconcile Keycloak org records.
+
+    Retrieves the organizations for the configured realm out of Keycloak, and
+    create or update corresponding records in MITx Online. This does not manage
+    memberships, just base org info.
+
+    Returns
+    - tuple (created, updated): number of orgs created and updated
+    """
+
+    org_model = get_keycloak_model(*KCAM_ORGANIZATIONS)
+    orgs = org_model.list()
+    parent_org_page = OrganizationIndexPage.objects.first()
+    created = 0
+    updated = 0
+
+    for org in orgs:
+        page = OrganizationPage.objects.filter(sso_organization_id=org.id).first()
+
+        if not page:
+            page = OrganizationPage(
+                title=org.name,
+                name=org.name,
+                sso_organization_id=org.id,
+                org_key=org.alias,
+                description=org.description,
+            )
+            parent_org_page.add_child(instance=page)
+            page.save()
+            parent_org_page.save()
+            log.info("Created organization %s from Keycloak", page)
+            created += 1
+        else:
+            # Don't update the org_key, because course keys are tied to it.
+            # If the org_key needs to change, then that's a much more involved
+            # process that needs to be done to shore it up.
+            page.name = org.name
+            page.title = org.name
+            page.description = org.description
+            page.save()
+            log.info("Updated organization %s from Keycloak", page)
+            updated += 1
+
+    return (created, updated)
