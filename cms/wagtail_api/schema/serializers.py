@@ -192,13 +192,13 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
         # And only for GET requests, in which all fields are returned.
         extra_kwargs = {field: {"required": True} for field in fields}
 
+    price = PriceItemSerializer(many=True)
     meta = PageMetaSerializer()
     feature_image = FeatureImageSerializer()
     faculty = FacultySerializer(many=True)
     certificate_page = CertificatePageSerializer(allow_null=True)
     course_details = CourseSerializer()
     topic_list = TopicSerializer(many=True)
-    price = PriceItemSerializer(many=True)
 
 
 class CoursePageListSerializer(serializers.Serializer):
