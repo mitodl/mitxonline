@@ -24,6 +24,7 @@ from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
     OPENEDX_REGISTRATION_VALIDATION_PATH,
+    generate_unique_username,
     bulk_retire_edx_users,
     create_edx_auth_token,
     create_edx_user,

@@ -127,7 +127,22 @@ def _extract_username_suggestions(data, suggestions_extracted):
     return [], suggestions_extracted
 
 
-def _generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN):
+def _extract_username_from_email(username):
+    """
+    Extract a valid username from a username that might be an email address.
+    
+    Args:
+        username (str): The username that might be an email address
+        
+    Returns:
+        str: The local part of the email if it's an email, otherwise the original username
+    """
+    if "@" in username:
+        return username.split("@")[0]
+    return username
+
+
+def generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN):
     """
     Generate a unique username by appending random numbers to the base username.
     
@@ -187,11 +202,15 @@ def _handle_username_collision(  # noqa: PLR0913
         suggested_usernames = suggestions
 
     if not suggested_usernames:
-        log.info("OpenEdX returned empty username suggestions, falling back to local generation")
-        base_username = open_edx_user.desired_edx_username or user.username
-        
-        new_username = _generate_unique_username(base_username)
-        
+        log.info(
+            "OpenEdX returned empty username suggestions, falling back to local generation"
+        )
+        base_username = open_edx_user.desired_edx_username
+        if not base_username:
+            base_username = _extract_username_from_email(user.username)
+
+        new_username = generate_unique_username(base_username)
+
         if new_username:
             return new_username, True, True
         else:
@@ -387,13 +406,13 @@ def reconcile_edx_username(user, *, desired_username=None):
         if not OpenEdxUser.objects.filter(edx_username=edx_username).exists():
             edx_user.save()
         else:
-            unique_username = _generate_unique_username(edx_username)
+            unique_username = generate_unique_username(edx_username)
             if unique_username:
                 edx_user.edx_username = unique_username
                 edx_user.desired_edx_username = unique_username
                 edx_user.save()
             else:
-                log.warning("Could not generate unique username for %s", edx_username)
+                log.error("Could not generate unique username for %s", edx_username)
 
         return True
 
