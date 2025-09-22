@@ -1677,47 +1677,98 @@ components:
       properties:
         id:
           type: integer
+          readOnly: true
         meta:
           $ref: '#/components/schemas/PageMeta'
         title:
           type: string
+          description: The page title as you'd like it to be seen by the public
+          maxLength: 255
         description:
           type: string
+          description: The description shown on the home page and product page.
         length:
           type: string
+          description: A short description indicating how long it takes to complete
+            (e.g. '4 weeks').
+          maxLength: 50
         effort:
           type: string
+          nullable: true
+          description: A short description indicating how much effort is required
+            (e.g. 1-3 hours per week).
+          maxLength: 100
         min_weekly_hours:
           type: string
+          description: The minimum number of hours per week required to complete the
+            course.
+          maxLength: 5
         max_weekly_hours:
           type: string
+          description: The maximum number of hours per week required to complete the
+            course.
+          maxLength: 5
         min_weeks:
           type: integer
+          maximum: 32767
+          minimum: -32768
+          nullable: true
+          description: The minimum number of weeks required to complete the course/program.
         max_weeks:
           type: integer
+          maximum: 32767
+          minimum: -32768
+          nullable: true
+          description: The maximum number of weeks required to complete the course/program.
         price:
           type: array
           items:
             $ref: '#/components/schemas/PriceItem'
         min_price:
           type: integer
+          maximum: 32767
+          minimum: -32768
+          nullable: true
+          description: Specify the minimum product price. This is used by MIT Learn.
         max_price:
           type: integer
+          maximum: 32767
+          minimum: -32768
+          nullable: true
+          description: Specify the maximum product price. This is used by MIT Learn.
         prerequisites:
           type: string
+          nullable: true
+          description: A short description indicating prerequisites of this course/program.
         faq_url:
           type: string
+          format: uri
+          nullable: true
+          description: URL a relevant FAQ page or entry for the course/program.
+          maxLength: 200
         about:
           type: string
+          nullable: true
+          description: Details about this course/program.
         what_you_learn:
           type: string
+          nullable: true
+          description: What you will learn from this course.
         feature_image:
           $ref: '#/components/schemas/FeatureImage'
         video_url:
           type: string
           format: uri
+          nullable: true
+          description: URL to the video to be displayed for this course/program. It
+            can be an HLS or Youtube video URL.
+          maxLength: 200
         faculty_section_title:
           type: string
+          nullable: true
+          description: The title text to display in the faculty cards section of the
+            product page.
+          maxLength: 255
         faculty:
           type: array
           items:
@@ -1734,8 +1785,13 @@ components:
             $ref: '#/components/schemas/Topic'
         include_in_learn_catalog:
           type: boolean
+          nullable: true
+          description: If true, Learn should include this in its catalog.
         ingest_content_files_for_ai:
           type: boolean
+          nullable: true
+          description: If true, allow the AI chatbots to ingest the course's content
+            files.
       required:
       - about
       - certificate_page
@@ -3195,52 +3251,98 @@ components:
       properties:
         id:
           type: integer
+          readOnly: true
         meta:
           $ref: '#/components/schemas/PageMeta'
         title:
           type: string
+          description: The page title as you'd like it to be seen by the public
+          maxLength: 255
         description:
           type: string
+          description: The description shown on the home page and product page.
         length:
           type: string
+          description: A short description indicating how long it takes to complete
+            (e.g. '4 weeks').
+          maxLength: 50
         effort:
           type: string
+          nullable: true
+          description: A short description indicating how much effort is required
+            (e.g. 1-3 hours per week).
+          maxLength: 100
         min_weekly_hours:
           type: string
+          description: The minimum number of hours per week required to complete the
+            course.
+          maxLength: 5
         max_weekly_hours:
           type: string
+          description: The maximum number of hours per week required to complete the
+            course.
+          maxLength: 5
         min_weeks:
           type: integer
+          maximum: 32767
+          minimum: -32768
+          nullable: true
+          description: The minimum number of weeks required to complete the course/program.
         max_weeks:
           type: integer
+          maximum: 32767
+          minimum: -32768
+          nullable: true
+          description: The maximum number of weeks required to complete the course/program.
         price:
           type: array
           items:
             $ref: '#/components/schemas/PriceItem'
         min_price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          nullable: true
+          description: Specify the minimum product price. This is used by MIT Learn.
         max_price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          nullable: true
+          description: Specify the maximum product price. This is used by MIT Learn.
         prerequisites:
           type: string
+          nullable: true
+          description: A short description indicating prerequisites of this course/program.
         faq_url:
           type: string
           format: uri
+          nullable: true
+          description: URL a relevant FAQ page or entry for the course/program.
+          maxLength: 200
         about:
           type: string
+          nullable: true
+          description: Details about this course/program.
         what_you_learn:
           type: string
+          nullable: true
+          description: What you will learn from this course.
         feature_image:
           $ref: '#/components/schemas/FeatureImage'
         video_url:
           type: string
           format: uri
+          nullable: true
+          description: URL to the video to be displayed for this course/program. It
+            can be an HLS or Youtube video URL.
+          maxLength: 200
         faculty_section_title:
           type: string
+          nullable: true
+          description: The title text to display in the faculty cards section of the
+            product page.
+          maxLength: 255
         faculty:
           type: array
           items:
