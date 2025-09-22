@@ -114,6 +114,17 @@ class OrganizationPage(Page):
 
         return f"{self.name} <{self.org_key}>"
 
+    class Meta:
+        """Meta options for the OrganizationPage."""
+
+        verbose_name = "Organization"
+        verbose_name_plural = "Organizations"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sso_organization_id"], name="unique_sso_organization_id"
+            )
+        ]
+
 
 class ContractPage(Page):
     """Stores information about a contract with an organization."""
@@ -313,6 +324,12 @@ class ContractPage(Page):
         self.programs.add(program)
 
         return (managed, skipped)
+
+    class Meta:
+        """Meta options for the ContractPage."""
+
+        verbose_name = "Contract"
+        verbose_name_plural = "Contracts"
 
 
 class DiscountContractAttachmentRedemption(TimestampedModel):

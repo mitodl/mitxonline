@@ -832,8 +832,6 @@ def reconcile_keycloak_orgs():
             created += 1
         else:
             # Don't update the org_key, because course keys are tied to it.
-            # If the org_key needs to change, then that's a much more involved
-            # process that needs to be done to shore it up.
             page.name = org.name
             page.title = org.name
             page.description = org.description

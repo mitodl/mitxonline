@@ -7,7 +7,10 @@ import wagtail_factories
 from factory import Factory, LazyAttribute, LazyFunction, SubFactory
 
 from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
-from b2b.keycloak_admin_dataclasses import RealmRepresentation
+from b2b.keycloak_admin_dataclasses import (
+    OrganizationRepresentation,
+    RealmRepresentation,
+)
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.factories import HomePageFactory
 from cms.models import HomePage
@@ -73,3 +76,16 @@ class RealmRepresentationFactory(Factory):
     realm = LazyAttribute(lambda _: FAKE.word())
     enabled = True
     displayName = LazyAttribute(lambda o: f"{o.realm} Display Name")  # noqa: N815
+
+
+class OrganizationRepresentationFactory(Factory):
+    """Factory for Keycloak OrganizationRepresentations"""
+
+    class Meta:
+        model = OrganizationRepresentation
+
+    id = LazyAttribute(lambda _: FAKE.unique.uuid4())
+    name = LazyAttribute(lambda _: FAKE.unique.sentence(nb_words=3))
+    alias = LazyAttribute(lambda _: FAKE.unique.word())
+    description = LazyAttribute(lambda _: FAKE.text())
+    enabled = True
