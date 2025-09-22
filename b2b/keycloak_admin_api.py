@@ -118,15 +118,15 @@ class KeycloakAdminClient:
             else None
         )
 
-    def request(self, method, url_path, **kwargs):
-        """Perform an HTTP request against the given URL path."""
+    def realm_request(self, method, url_path, **kwargs):
+        """Perform an HTTP request against the given URL path, including the current realm."""
 
         request_url = self.realmify_url(url_path)
 
         return self._request(method, request_url, **kwargs)
 
-    def realm_request(self, method, url_path, **kwargs):
-        """Perform an HTTP request against the given URL path, skipping realm prefixing."""
+    def request(self, method, url_path, **kwargs):
+        """Perform an HTTP request against the given URL path, prepending the base URL."""
 
         request_url = urljoin(self.base_url, url_path)
 
@@ -144,7 +144,7 @@ class KeycloakAdminClient:
         - List of RealmRepresentation objects
         """
 
-        response = self.realm_request("GET", "")
+        response = self.request("GET", "")
         response.raise_for_status()
         list_data = response.json()
 
@@ -161,7 +161,7 @@ class KeycloakAdminClient:
         - A single RealmRepresentation object
         """
 
-        response = self.realm_request("GET", realm_name)
+        response = self.request("GET", realm_name)
         response.raise_for_status()
         item_data = response.json()
 
@@ -192,7 +192,7 @@ class KeycloakAdminClient:
         - A list of "representation" type instances.
         """
 
-        response = self.request("GET", endpoint, params=kwargs)
+        response = self.realm_request("GET", endpoint, params=kwargs)
         response.raise_for_status()
         list_data = response.json()
 
@@ -213,7 +213,7 @@ class KeycloakAdminClient:
         - A single "representation" type instance.
         """
 
-        response = self.request("GET", endpoint, params=kwargs)
+        response = self.realm_request("GET", endpoint, params=kwargs)
         response.raise_for_status()
         list_data = response.json()
 
@@ -232,7 +232,7 @@ class KeycloakAdminClient:
         - The saved representation instance.
         """
 
-        response = self.request("POST", endpoint, json=data)
+        response = self.realm_request("POST", endpoint, json=data)
         response.raise_for_status()
         item_data = response.json()
 
@@ -253,7 +253,7 @@ class KeycloakAdminClient:
         - True on success
         """
 
-        response = self.request("PUT", endpoint, json=data)
+        response = self.realm_request("PUT", endpoint, json=data)
         response.raise_for_status()
 
         return True
@@ -276,7 +276,7 @@ class KeycloakAdminClient:
         - requests.HTTPError if the request fails.
         """
 
-        response = self.request("POST", endpoint, data=target_id)
+        response = self.realm_request("POST", endpoint, data=target_id)
         response.raise_for_status()
 
         return True
@@ -298,7 +298,7 @@ class KeycloakAdminClient:
         - requests.HTTPError if the request fails.
         """
 
-        response = self.request("DELETE", endpoint)
+        response = self.realm_request("DELETE", endpoint)
         response.raise_for_status()
 
         return True
