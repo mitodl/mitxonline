@@ -130,10 +130,10 @@ def _extract_username_suggestions(data, suggestions_extracted):
 def _extract_username_from_email(username):
     """
     Extract a valid username from a username that might be an email address.
-    
+
     Args:
         username (str): The username that might be an email address
-        
+
     Returns:
         str: The local part of the email if it's an email, otherwise the original username
     """
@@ -145,11 +145,11 @@ def _extract_username_from_email(username):
 def generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN):
     """
     Generate a unique username by appending random numbers to the base username.
-    
+
     Args:
         base_username (str): The base username to use
         max_length (int): Maximum length for the generated username
-        
+
     Returns:
         str or None: A unique username, or None if no unique username could be generated
     """
@@ -160,18 +160,18 @@ def generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN)
         (1000, 9999),
         (10000, 99999),
     )
-    
+
     for intrange in ranges:
         random_int = random.randint(intrange[0], intrange[1])  # noqa: S311
         username_to_try = f"{base_username}_{random_int}"
-        
+
         if len(username_to_try) > max_length:
             amount_to_truncate = len(username_to_try) - max_length
             username_to_try = f"{base_username[:amount_to_truncate]}-{random_int}"
-        
+
         if not OpenEdxUser.objects.filter(edx_username=username_to_try).exists():
             return username_to_try
-    
+
     return None
 
 
@@ -180,7 +180,7 @@ def _handle_username_collision(  # noqa: PLR0913
 ):
     """
     Handle username collision by trying OpenEdX suggestions or falling back to local generation.
-    
+
     Args:
         resp: HTTP response from OpenEdX
         data: Parsed JSON response data
@@ -188,13 +188,13 @@ def _handle_username_collision(  # noqa: PLR0913
         user: User instance
         suggested_usernames: List of suggested usernames from previous attempts
         suggestions_extracted: Boolean indicating if suggestions were already extracted
-        
+
     Returns:
         tuple: (new_username, should_continue, should_reset_attempts)
     """
     if not _is_duplicate_username_error(resp, data):
         return None, False, False
-        
+
     suggestions, suggestions_extracted = _extract_username_suggestions(
         data, suggestions_extracted
     )
@@ -288,10 +288,17 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
             except (ValueError, requests.exceptions.JSONDecodeError):
                 data = {}
 
-            new_username, should_continue, should_reset_attempts = _handle_username_collision(
-                resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted
+            new_username, should_continue, should_reset_attempts = (
+                _handle_username_collision(
+                    resp,
+                    data,
+                    open_edx_user,
+                    user,
+                    suggested_usernames,
+                    suggestions_extracted,
+                )
             )
-            
+
             if should_continue:
                 current_username = new_username
                 if should_reset_attempts:
