@@ -24,7 +24,6 @@ from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
     OPENEDX_REGISTRATION_VALIDATION_PATH,
-    generate_unique_username,
     bulk_retire_edx_users,
     create_edx_auth_token,
     create_edx_user,
@@ -47,7 +46,7 @@ from openedx.api import (
     update_edx_user_name,
     update_edx_user_profile,
     validate_username_email_with_edx,
-    _generate_unique_username,
+    generate_unique_username,
 )
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -306,9 +305,9 @@ def test_create_edx_user_conflict(settings, username_suggestions, base_username,
     ],
 )
 def test_generate_unique_username(base_username, expected_prefix):
-    """Test that _generate_unique_username generates unique usernames"""
+    """Test that generate_unique_username generates unique usernames"""
     
-    username = _generate_unique_username(base_username)
+    username = generate_unique_username(base_username)
     assert username.startswith(expected_prefix)
     assert len(username) > len(base_username)
 
