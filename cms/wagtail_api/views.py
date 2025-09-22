@@ -2,6 +2,7 @@
 Views for Wagtail API
 """
 
+from django.apps import apps
 from django.db.models import F
 from rest_framework.response import Response
 from wagtail.api.v2.views import PagesAPIViewSet
@@ -46,17 +47,22 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
                 **{annotation_key: F(f"{annotation_map[model_type]}__{annotation_key}")}
             )
 
-        queryset = queryset.exclude(content_type__model__in=[
-            "organizationindexpage",
-            "organizationpage",
-            "contractpage",
-        ])
+        if self.request.user and not self.request.user.is_authenticated:
+            b2b_app_config = apps.get_app_config("b2b")
+            b2b_model_names = [
+                model.__name__.lower() for model in b2b_app_config.get_models()
+            ]
+            queryset = queryset.exclude(
+                content_type__model__in=[
+                    *b2b_model_names,
+                ]
+            )
 
-        if model_type and model_type == "cms.programpage":
-            queryset = queryset.filter(program__b2b_only=False)
+            if model_type and model_type == "cms.programpage":
+                queryset = queryset.filter(program__b2b_only=False)
 
-        if model_type and model_type == "cms.coursepage":
-            queryset = queryset.filter(include_in_learn_catalog=True)
+            if model_type and model_type == "cms.coursepage":
+                queryset = queryset.filter(include_in_learn_catalog=True)
 
         return queryset
 
