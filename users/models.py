@@ -236,7 +236,7 @@ class FaultyOpenEdxUserManager(BaseUserManager):
                 openedx_user_count=Count("openedx_users"),
                 openedx_api_auth_count=Count("openedx_api_auth"),
             )
-            .filter(is_active=True)
+            .filter(is_active=True, last_login__isnull=False)
             .filter(
                 Q(openedx_user_count=0)
                 | Q(openedx_api_auth_count=0)
