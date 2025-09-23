@@ -1133,6 +1133,12 @@ REST_FRAMEWORK = {
     "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "ALLOWED_VERSIONS": ["v0", "v1", "v2"],
+    "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",)
+    if not DEBUG
+    else (
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ),
 }
 
 # Relative URL to be used by Djoser for the link in the password reset email
