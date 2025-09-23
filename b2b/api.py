@@ -113,7 +113,7 @@ def create_contract_run(
 
     if not clone_course_run:
         try:
-            clone_course_run = course.courseruns.order_by("-id").get()
+            clone_course_run = course.courseruns.order_by("-id").first()
             log.warning(
                 "create_contract_run: No SOURCE run for %s, using %s",
                 course,
@@ -122,6 +122,10 @@ def create_contract_run(
         except CourseRun.DoesNotExist as exc:
             msg = f"No course runs available for {course}."
             raise SourceCourseIncompleteError(msg) from exc
+
+    if not clone_course_run:
+        msg = f"No course runs available for {course}."
+        raise SourceCourseIncompleteError(msg)
 
     new_run_tag = B2B_RUN_TAG_FORMAT.format(
         year=now_in_utc().year,
