@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.130.2
+---------------
+
+- Infer some of the wagtail API spec automatically (#2955)
+- fix: disable restframework browseable API (#2957)
+- Make validation for username field work (#2945)
+- Fix django admin (#2932)
+- Check that image_obj is there and has a file before generating a URL. (#2950)
+- Add support for filling the country of residence and income fields for financial assistance forms (#2951)
+- Use absolute URLs for feature_image_source (#2946)
+- Improve Wagtail OpenApi Schema (#2938)
+
 Version 0.130.1 (Released September 23, 2025)
 ---------------
 
