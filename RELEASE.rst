@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.130.1
+Version 0.130.1 (Released September 23, 2025)
 ---------------
 
 - fix: do not update open edx profile if user is not synced (#2940)
