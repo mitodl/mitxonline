@@ -161,6 +161,35 @@ Notes:
 * The courseware ID is the readable ID. Except when using `--remove`, don't specify runs.
 * If you specify a program, it will create runs for all the courses within the program. You may need to re-run this if the program is modified.
 
+Choosing a Courseware ID/edX Run Creation:
+
+The ``courseware`` command will try to do one of a few things depending on what's passed as a courseware ID.
+
+
+* If a course ID is passed, it will try to create a single course run for the contract, and will attempt to create a re-run in edX for the source course run.
+* If a course run ID is passed, it will assign the run to the contract, unless the run is already assigned to a contract. If the run is assigned to a contract, you'll get an error.
+* If a program ID is passed, it will loop through the requirements tree and try to make new runs for each of the listed courses. It will skip any runs that the contract already has.
+
+If you want the system to automatically create re-runs in edX, you will need to make sure you have some additional configuration settings in place.
+
+
+* In edX, you will need a service account that has at least staff rights to be able to create course runs. Create an account via Django Admin (or other method), and make sure the staff and superuser flags are set to True. Also, make sure it has a profile - it just needs one at all; filling out just the name is sufficient.
+* Then, make an OAuth2 application for the service account. The Client Type should be "Confidential" and the Authorization Grant Type should be "Client credentials". Make sure the User is set to your service account user.
+* Set the ``OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID`` and ``OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET`` settings in your ``.env`` to the ID and secret from the new application.
+
+
+Courseware Setup in edX
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+B2B courses in edX should be set up in a particular fashion, both to make sure we can identify them within edX easily, and to allow the system to automatically create runs for new contracts.
+
+Each B2B course starts with a source course. Usually, these are separate courses and runs, but not always. If you're creating a new course, it should be created in edX with the organization ``UAI_SOURCE`` and the run tag ``SOURCE``. A corresponding course run in MITx Online should also be created. The ``import_courserun`` command can be used to help facilitate this. If you want to use an existing course, you should create a ``SOURCE`` run for it from the run you want to use as the source course in edX.
+
+When associating a course or program with a contract, the ``b2b_contract courseware`` command will try to create a contract-specific run for each source course (either the one you've specified or the ones that are in the specified program). It does this by trying to find an appropriate source course run for the course in MITx Online. It will look first for a course run with the run tag ``SOURCE`` - if it can't find this, it will use whatever the first course run is in database order. **This is probably not what you want** - you should try to have a ``SOURCE`` course run if at all possible.
+
+Course runs will be created using the start/end date of the contract, if those dates are set. If the contract is open-ended, the runs will be created with the current time/date as the course and enrollment start date and no end date. The runs will be created with the organization set to ``UAI_`` and the organization key set in the org record, and the run key will be set to the current year, ``C``, and the ID of the new contract.
+
+
 Listing Data
 ------------
 
@@ -289,4 +318,4 @@ If you run ``configure_wagtail``\ , you will see a new top-level Organizations p
 
 The Wagtail interface currently does not allow you to manage courseware assignments or retrieve the list of enrollment codes, so this is not a complete interface.
 
-We also expose the contracts and pages via the Django Admin. You should not use this for editing - it is there for convenience, so you can view the data without having to hunt around in Wagtail for it. This interface may be removed in future.
+We also expose the contracts and pages via the Django Admin. This is a read-only interface.
