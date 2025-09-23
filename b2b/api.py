@@ -11,12 +11,17 @@ import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
+from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
 
-from b2b.constants import B2B_RUN_TAG_FORMAT, CONTRACT_INTEGRATION_SSO
+from b2b.constants import (
+    B2B_RUN_TAG_FORMAT,
+    CONTRACT_INTEGRATION_SSO,
+    ORG_KEY_MAX_LENGTH,
+)
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
@@ -815,28 +820,32 @@ def reconcile_keycloak_orgs():
     updated = 0
 
     for org in orgs:
-        page = OrganizationPage.objects.filter(sso_organization_id=org.id).first()
+        try:
+            page = OrganizationPage.objects.filter(sso_organization_id=org.id).first()
 
-        if not page:
-            page = OrganizationPage(
-                title=org.name,
-                name=org.name,
-                sso_organization_id=org.id,
-                org_key=org.alias,
-                description=org.description,
-            )
-            parent_org_page.add_child(instance=page)
-            page.save()
-            parent_org_page.save()
-            log.info("Created organization %s from Keycloak", page)
-            created += 1
-        else:
-            # Don't update the org_key, because course keys are tied to it.
-            page.name = org.name
-            page.title = org.name
-            page.description = org.description
-            page.save()
-            log.info("Updated organization %s from Keycloak", page)
-            updated += 1
+            if not page:
+                page = OrganizationPage(
+                    title=org.name,
+                    name=org.name,
+                    sso_organization_id=org.id,
+                    org_key=org.alias[:ORG_KEY_MAX_LENGTH],
+                    description=org.description,
+                )
+                parent_org_page.add_child(instance=page)
+                page.save()
+                parent_org_page.save()
+                log.info("Created organization %s from Keycloak", page)
+                created += 1
+            else:
+                # Don't update the org_key, because course keys are tied to it.
+                page.name = org.name
+                page.title = org.name
+                page.description = org.description
+                page.save()
+                log.info("Updated organization %s from Keycloak", page)
+                updated += 1
+        except ValidationError as e:  # noqa: PERF203
+            msg = f"Validation error: could not create or update organization for Keycloak org {org.id}: {e}"
+            log.exception(msg)
 
     return (created, updated)

@@ -7,6 +7,7 @@ import pytest
 import pytz
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ValidationError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -25,6 +26,7 @@ from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
     CONTRACT_INTEGRATION_NONSSO,
     CONTRACT_INTEGRATION_SSO,
+    ORG_KEY_MAX_LENGTH,
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.factories import ContractPageFactory
@@ -630,3 +632,38 @@ def test_b2b_reconcile_keycloak_orgs(mocker, update_an_org):
                 assert org_page.org_key != "changedKey"
 
     assert found_count == (3 if not update_an_org else 4)
+
+
+def test_reconcile_keycloak_orgs_bad_org(mocker):
+    """Test that reconciliation works when there's bad data"""
+
+    class MockedOrgModel:
+        """A mocked organization model."""
+
+        orgs = []
+
+        def list(self):
+            """Return a list of fake orgs."""
+
+            return self.orgs
+
+    org_model = MockedOrgModel()
+    org_model.orgs = [
+        factories.OrganizationRepresentationFactory.create(
+            alias=FAKE.pystr(min_chars=ORG_KEY_MAX_LENGTH, max_chars=40)
+        )
+    ]
+
+    mocker.patch(
+        "b2b.keycloak_admin_api.KeycloakAdminModel",
+        return_value=org_model,
+        autospec=True,
+    )
+    mocker.patch("b2b.keycloak_admin_api.bootstrap_client")
+
+    if not OrganizationIndexPage.objects.exists():
+        factories.OrganizationIndexPageFactory.create()
+
+    with pytest.raises(ValidationError) as exc:
+        reconcile_keycloak_orgs()
+    assert "Ensure this value has at most 30 characters" in str(exc)

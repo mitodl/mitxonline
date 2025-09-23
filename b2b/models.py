@@ -61,7 +61,7 @@ class OrganizationPage(Page):
 
     name = models.CharField(max_length=255, help_text="The name of the organization")
     org_key = models.CharField(
-        max_length=10,
+        max_length=30,
         help_text="The short key used for the organization (for edX).",
         unique=True,
     )
