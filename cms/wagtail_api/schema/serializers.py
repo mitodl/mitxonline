@@ -4,6 +4,7 @@ Serializers for Wagtail API Schema
 
 from rest_framework import serializers
 
+from cms.models import CoursePage, ProgramPage
 from courses.serializers.v2.courses import CourseSerializer
 from courses.serializers.v2.programs import ProgramSerializer
 
@@ -151,37 +152,53 @@ class CertificatePageListSerializer(serializers.Serializer):
     items = CertificatePageSerializer(many=True)
 
 
-class CoursePageItemSerializer(serializers.Serializer):
+class CoursePageItemSerializer(serializers.ModelSerializer):
     """
     Serializer for individual course page items, including all relevant fields.
     """
 
-    id = serializers.IntegerField()
-    meta = PageMetaSerializer()
-    title = serializers.CharField()
-    description = serializers.CharField()
-    length = serializers.CharField()
-    effort = serializers.CharField()
-    min_weekly_hours = serializers.CharField()
-    max_weekly_hours = serializers.CharField()
-    min_weeks = serializers.IntegerField()
-    max_weeks = serializers.IntegerField()
+    class Meta:
+        model = CoursePage
+        fields = [
+            "id",
+            "meta",
+            "title",
+            "description",
+            "length",
+            "effort",
+            "min_weekly_hours",
+            "max_weekly_hours",
+            "min_weeks",
+            "max_weeks",
+            "price",
+            "min_price",
+            "max_price",
+            "prerequisites",
+            "faq_url",
+            "about",
+            "what_you_learn",
+            "feature_image",
+            "video_url",
+            "faculty_section_title",
+            "faculty",
+            "certificate_page",
+            "course_details",
+            "topic_list",
+            "include_in_learn_catalog",
+            "ingest_content_files_for_ai",
+        ]
+
+        # NOTE: We use this serializer for schema generation only,
+        # And only for GET requests, in which all fields are returned.
+        extra_kwargs = {field: {"required": True} for field in fields}
+
     price = PriceItemSerializer(many=True)
-    min_price = serializers.IntegerField()
-    max_price = serializers.IntegerField()
-    prerequisites = serializers.CharField()
-    faq_url = serializers.CharField()
-    about = serializers.CharField()
-    what_you_learn = serializers.CharField()
+    meta = PageMetaSerializer()
     feature_image = FeatureImageSerializer()
-    video_url = serializers.URLField()
-    faculty_section_title = serializers.CharField()
     faculty = FacultySerializer(many=True)
     certificate_page = CertificatePageSerializer(allow_null=True)
     course_details = CourseSerializer()
     topic_list = TopicSerializer(many=True)
-    include_in_learn_catalog = serializers.BooleanField()
-    ingest_content_files_for_ai = serializers.BooleanField()
 
 
 class CoursePageListSerializer(serializers.Serializer):
@@ -193,31 +210,46 @@ class CoursePageListSerializer(serializers.Serializer):
     items = CoursePageItemSerializer(many=True)
 
 
-class ProgramPageItemSerializer(serializers.Serializer):
+class ProgramPageItemSerializer(serializers.ModelSerializer):
     """
     Serializer for individual program page items, including all relevant fields.
     """
 
-    id = serializers.IntegerField()
+    class Meta:
+        model = ProgramPage
+        fields = [
+            "id",
+            "meta",
+            "title",
+            "description",
+            "length",
+            "effort",
+            "min_weekly_hours",
+            "max_weekly_hours",
+            "min_weeks",
+            "max_weeks",
+            "price",
+            "min_price",
+            "max_price",
+            "prerequisites",
+            "faq_url",
+            "about",
+            "what_you_learn",
+            "feature_image",
+            "video_url",
+            "faculty_section_title",
+            "faculty",
+            "certificate_page",
+            "program_details",
+        ]
+
+        # NOTE: We use this serializer for schema generation only,
+        # And only for GET requests, in which all fields are returned.
+        extra_kwargs = {field: {"required": True} for field in fields}
+
     meta = PageMetaSerializer()
-    title = serializers.CharField()
-    description = serializers.CharField()
-    length = serializers.CharField()
-    effort = serializers.CharField()
-    min_weekly_hours = serializers.CharField()
-    max_weekly_hours = serializers.CharField()
-    min_weeks = serializers.IntegerField()
-    max_weeks = serializers.IntegerField()
     price = PriceItemSerializer(many=True)
-    min_price = serializers.DecimalField(max_digits=10, decimal_places=2)
-    max_price = serializers.DecimalField(max_digits=10, decimal_places=2)
-    prerequisites = serializers.CharField()
-    faq_url = serializers.URLField()
-    about = serializers.CharField()
-    what_you_learn = serializers.CharField()
     feature_image = FeatureImageSerializer()
-    video_url = serializers.URLField()
-    faculty_section_title = serializers.CharField()
     faculty = FacultySerializer(many=True)
     certificate_page = CertificatePageSerializer()
     program_details = ProgramSerializer()
