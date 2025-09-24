@@ -101,6 +101,8 @@ class ProgramSerializer(serializers.ModelSerializer):
     time_commitment = serializers.SerializerMethodField()
     min_weekly_hours = serializers.SerializerMethodField()
     max_weekly_hours = serializers.SerializerMethodField()
+    min_price = serializers.SerializerMethodField()
+    max_price = serializers.SerializerMethodField()
     start_date = serializers.SerializerMethodField()
 
     def get_courses(self, instance) -> list[int]:
@@ -397,6 +399,22 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
+    def get_min_price(self, instance) -> int | None:
+        """
+        Get the min price of the product from the CMS page.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "min_price"):
+            return instance.page.min_price
+        return None
+
+    def get_max_price(self, instance) -> int | None:
+        """
+        Get the max price of the product from the CMS page.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "max_price"):
+            return instance.page.max_price
+        return None
+
     def get_start_date(self, instance) -> str | None:
         """
         Get the start date of the program by finding the first available run.
@@ -433,6 +451,8 @@ class ProgramSerializer(serializers.ModelSerializer):
             "duration",
             "min_weeks",
             "max_weeks",
+            "min_price",
+            "max_price",
             "time_commitment",
             "min_weekly_hours",
             "max_weekly_hours",
