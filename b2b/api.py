@@ -872,8 +872,10 @@ def reconcile_keycloak_orgs():
             else:
                 updated_count += 1
                 page.save()
-        except ValidationError as e:  # noqa: PERF203
-            msg = f"Validation error: could not create or update organization for Keycloak org {org.id}: {e}"
-            log.exception(msg)
+        except ValidationError:  # noqa: PERF203
+            log.exception(
+                "Validation error: could not create or update organization for Keycloak org %s",
+                org.id,
+            )
 
     return (created_count, updated_count)
