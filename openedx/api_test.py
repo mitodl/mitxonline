@@ -703,6 +703,11 @@ def _create_faulty_users():
         openedx_user__has_sync_error=True,
     )
 
+    # same as the ones that get returned, but no last_login excludes them
+    UserFactory.create(last_login=None, no_openedx_user=True)
+    UserFactory.create(last_login=None, no_openedx_api_auth=True)
+    UserFactory.create(last_login=None, openedx_user__has_been_synced=False)
+
     return [
         UserFactory.create(no_openedx_user=True),
         UserFactory.create(no_openedx_api_auth=True),

@@ -1,11 +1,11 @@
 """Factory for Users"""
 
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 
 from factory import Faker, RelatedFactory, SelfAttribute, SubFactory, Trait
 from factory.django import DjangoModelFactory
-from factory.fuzzy import FuzzyText
+from factory.fuzzy import FuzzyDateTime, FuzzyText
 from social_django.models import UserSocialAuth
 
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
@@ -37,6 +37,7 @@ class UserFactory(DjangoModelFactory):
         "openedx.factories.OpenEdxApiAuthFactory",
         "user",
     )
+    last_login = FuzzyDateTime(datetime(2008, 1, 1, tzinfo=timezone.utc))
 
     class Meta:
         model = User
