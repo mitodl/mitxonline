@@ -127,11 +127,9 @@ class LegalAddressSerializer(serializers.ModelSerializer):
             if "last_name" not in data or data.get("last_name") is None:
                 errors["last_name"] = "This field is required."
 
-        # If we have validation errors, raise them all at once
         if errors:
             raise serializers.ValidationError(errors)
 
-        # We only want a state if there are states
         # The CountriesStatesSerializer below only provides state options for
         # US and Canada - pycountry has them for everything but we therefore
         # only test for these two.
