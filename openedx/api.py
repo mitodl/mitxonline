@@ -562,16 +562,7 @@ def repair_faulty_edx_user(user):
 
     log.debug("Repairing faulty openedx user: %s", user.id)
 
-    try:
-        created_user = create_edx_user(user)
-    except Exception as e:
-        # 409 means we have a username conflict - pass in that case so we can
-        # try to create the api auth tokens; re-raise otherwise
-
-        if "code: 409" in str(e):
-            pass
-        else:
-            raise Exception from e  # noqa: TRY002
+    created_user = create_edx_user(user)
 
     if not hasattr(user, "openedx_api_auth"):
         create_edx_auth_token(user)
@@ -585,7 +576,7 @@ def repair_faulty_edx_user(user):
         ):
             # if we could create an auth token, then this user's just disconnected for some reason
             # so go ahead and create the OpenEdxUser record for them (if there isn't one)
-            (edx_user, forced_create) = user.openedx_users.get_or_create()
+            edx_user, _ = user.openedx_users.get_or_create()
             edx_user.save()
 
     return created_user, created_auth_token
