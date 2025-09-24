@@ -2,12 +2,35 @@
 Views for Wagtail API
 """
 
+from enum import Enum
+
 from django.db.models import F
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from wagtail.api.v2.views import PagesAPIViewSet
 
 from cms.models import CertificatePage
 from cms.wagtail_api.filters import ReadableIDFilter
+
+
+class PageType(Enum):
+    """
+    Enumeration of Wagtail page types.
+    """
+
+    COURSE = "cms.coursepage"
+    PROGRAM = "cms.programpage"
+    CERTIFICATE = "cms.certificatepage"
+
+    @classmethod
+    def anonymous_access_allowed_types(cls):
+        """
+        Returns a list of page types that allow anonymous access.
+
+        Returns:
+            list: List of page type values that allow anonymous access.
+        """
+        return [cls.COURSE.value, cls.PROGRAM.value, cls.CERTIFICATE.value]
 
 
 class WagtailPagesAPIViewSet(PagesAPIViewSet):
@@ -27,6 +50,15 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         ["readable_id"]
     )
 
+    def get_permissions(self):
+        """
+        Returns the appropriate permissions based on the 'type' query parameter.
+        """
+        page_type = self.request.query_params.get("type")
+        if page_type in PageType.anonymous_access_allowed_types():
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         """
         Returns the queryset for the API viewset, with additional annotations
@@ -34,17 +66,23 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         """
         queryset = super().get_queryset()
         annotation_map = {
-            "cms.CoursePage": "course",
-            "cms.ProgramPage": "program",
+            PageType.COURSE.value: "course",
+            PageType.PROGRAM.value: "program",
         }
 
-        model_type = self.request.GET.get("type")
+        model_type = self.request.GET.get("type", "").lower()
         annotation_key = self.request.GET.get("annotation", "readable_id")
 
         if model_type in annotation_map:
             queryset = queryset.annotate(
                 **{annotation_key: F(f"{annotation_map[model_type]}__{annotation_key}")}
             )
+
+        if model_type and not self.request.user.is_authenticated:
+            if model_type == PageType.PROGRAM.value:
+                queryset = queryset.filter(program__b2b_only=False)
+            elif model_type == PageType.COURSE.value:
+                queryset = queryset.filter(include_in_learn_catalog=True)
 
         return queryset
 
