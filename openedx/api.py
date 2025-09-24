@@ -376,54 +376,44 @@ def reconcile_edx_username(user, *, desired_username=None):
     Returns:
     - boolean, true if we created a username
     """
+    edx_user, _ = OpenEdxUser.objects.get_or_create(platform=PLATFORM_EDX, user=user)
 
-    if not user.openedx_users.filter(
-        platform=PLATFORM_EDX, edx_username__isnull=False
-    ).exists():
-        edx_user, _ = OpenEdxUser.objects.filter(
-            edx_username__isnull=True, platform=PLATFORM_EDX, user=user
-        ).get_or_create(
-            defaults={
-                "user": user,
-                "platform": PLATFORM_EDX,
-            }
+    if edx_user.edx_username:
+        return False
+
+    # skip the user's username if it's an email address or has a @ in it
+    # @ is disallowed in edx usernames so instead force it through usernameify
+    if desired_username and "@" not in desired_username:
+        edx_username = desired_username
+        edx_user.edx_username = edx_username
+        edx_user.desired_edx_username = edx_username
+    else:
+        user_username = (
+            None
+            if "@" in user.username or user.username == user.email
+            else user.username
         )
 
-        # skip the user's username if it's an email address or has a @ in it
-        # @ is disallowed in edx usernames so instead force it through usernameify
-        if desired_username and "@" not in desired_username:
-            edx_username = desired_username
-            edx_user.edx_username = edx_username
-            edx_user.desired_edx_username = edx_username
-        else:
-            user_username = (
-                None
-                if "@" in user.username or user.username == user.email
-                else user.username
-            )
+        edx_username = (
+            user_username[:OPENEDX_USERNAME_MAX_LEN]
+            if user_username
+            else usernameify(user.name, user.email, OPENEDX_USERNAME_MAX_LEN)
+        )
+        edx_user.edx_username = edx_username
+        edx_user.desired_edx_username = edx_username
 
-            edx_username = (
-                user_username[:OPENEDX_USERNAME_MAX_LEN]
-                if user_username
-                else usernameify(user.name, user.email, OPENEDX_USERNAME_MAX_LEN)
-            )
-            edx_user.edx_username = edx_username
-            edx_user.desired_edx_username = edx_username
-
-        if not OpenEdxUser.objects.filter(edx_username=edx_username).exists():
+    if not OpenEdxUser.objects.filter(edx_username=edx_username).exists():
+        edx_user.save()
+    else:
+        unique_username = generate_unique_username(edx_username)
+        if unique_username:
+            edx_user.edx_username = unique_username
+            edx_user.desired_edx_username = unique_username
             edx_user.save()
         else:
-            unique_username = generate_unique_username(edx_username)
-            if unique_username:
-                edx_user.edx_username = unique_username
-                edx_user.desired_edx_username = unique_username
-                edx_user.save()
-            else:
-                log.error("Could not generate unique username for %s", edx_username)
+            log.error("Could not generate unique username for %s", edx_username)
 
-        return True
-
-    return False
+    return True
 
 
 @transaction.atomic
