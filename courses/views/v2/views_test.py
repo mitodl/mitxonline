@@ -125,7 +125,6 @@ def test_get_departments(
     assert_drf_json_equal(departments_data, departments_from_fixture, ignore_order=True)
 
 
-
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_get_program(
