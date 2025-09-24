@@ -117,11 +117,25 @@ class LegalAddressSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        """We only want a state if there are states"""
+        """Validate the legal address data"""
+        errors = {}
+
+        # For CREATE operations (not partial updates), require first_name and last_name
+        if not self.partial:
+            if "first_name" not in data or data.get("first_name") is None:
+                errors["first_name"] = "This field is required."
+            if "last_name" not in data or data.get("last_name") is None:
+                errors["last_name"] = "This field is required."
+
+        # If we have validation errors, raise them all at once
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        # We only want a state if there are states
         # The CountriesStatesSerializer below only provides state options for
         # US and Canada - pycountry has them for everything but we therefore
         # only test for these two.
-        if data["country"] not in ["US", "CA"]:
+        if "country" not in data or data["country"] not in ["US", "CA"]:
             return data
         elif (
             "state" in data
