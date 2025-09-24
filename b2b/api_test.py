@@ -19,6 +19,7 @@ from b2b.api import (
     ensure_enrollment_codes_exist,
     get_active_contracts_from_basket_items,
     reconcile_keycloak_orgs,
+    reconcile_single_keycloak_org,
     reconcile_user_orgs,
     validate_basket_for_b2b_purchase,
 )
@@ -26,10 +27,8 @@ from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
     CONTRACT_INTEGRATION_NONSSO,
     CONTRACT_INTEGRATION_SSO,
-    ORG_KEY_MAX_LENGTH,
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
-from b2b.factories import ContractPageFactory
 from b2b.models import OrganizationIndexPage, OrganizationPage
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.factories import CourseFactory, CourseRunFactory
@@ -157,7 +156,7 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
     discount.products.add(discount_product)
 
     if run_contract:
-        contract = ContractPageFactory.create()
+        contract = factories.ContractPageFactory.create()
 
         product.purchasable_object.b2b_contract = contract
         product.purchasable_object.save()
@@ -361,7 +360,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 
-    contract = ContractPageFactory.create(
+    contract = factories.ContractPageFactory.create(
         integration_type=CONTRACT_INTEGRATION_SSO,
         enrollment_fixed_price=Decimal(0)
         if price_is_zero
@@ -472,7 +471,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     also queue up a course clone in edX.
     """
 
-    contract = ContractPageFactory.create()
+    contract = factories.ContractPageFactory.create()
     course = CourseFactory.create()
     source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
     mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
@@ -524,10 +523,10 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
 def test_b2b_reconcile_user_orgs():
     """Test that we can get a list of B2B orgs from somewhere and fix a user's associations."""
 
-    contracts = ContractPageFactory.create_batch(
+    contracts = factories.ContractPageFactory.create_batch(
         2, integration_type=CONTRACT_INTEGRATION_NONSSO
     )
-    sso_contracts = ContractPageFactory.create_batch(
+    sso_contracts = factories.ContractPageFactory.create_batch(
         2, integration_type=CONTRACT_INTEGRATION_SSO
     )
     user = UserFactory.create()
@@ -634,36 +633,20 @@ def test_b2b_reconcile_keycloak_orgs(mocker, update_an_org):
     assert found_count == (3 if not update_an_org else 4)
 
 
-def test_reconcile_keycloak_orgs_bad_org(mocker):
+def test_reconcile_bad_keycloak_org(mocker):
     """Test that reconciliation works when there's bad data"""
 
-    class MockedOrgModel:
-        """A mocked organization model."""
-
-        orgs = []
-
-        def list(self):
-            """Return a list of fake orgs."""
-
-            return self.orgs
-
-    org_model = MockedOrgModel()
-    org_model.orgs = [
-        factories.OrganizationRepresentationFactory.create(
-            alias=FAKE.pystr(min_chars=ORG_KEY_MAX_LENGTH, max_chars=40)
-        )
-    ]
-
-    mocker.patch(
-        "b2b.keycloak_admin_api.KeycloakAdminModel",
-        return_value=org_model,
-        autospec=True,
+    existing_org_page = factories.OrganizationPageFactory.create()
+    org = factories.OrganizationRepresentationFactory.create(
+        alias=existing_org_page.org_key
     )
-    mocker.patch("b2b.keycloak_admin_api.bootstrap_client")
 
     if not OrganizationIndexPage.objects.exists():
         factories.OrganizationIndexPageFactory.create()
 
+    page, _ = reconcile_single_keycloak_org(org)
+
     with pytest.raises(ValidationError) as exc:
-        reconcile_keycloak_orgs()
-    assert "Ensure this value has at most 30 characters" in str(exc)
+        page.save()
+
+    assert "Organization with this Org key already exists." in str(exc)

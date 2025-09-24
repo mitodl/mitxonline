@@ -24,6 +24,7 @@ from b2b.constants import (
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
+from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
@@ -801,6 +802,46 @@ def reconcile_user_orgs(user, organizations):
     return (len(contracts_to_add), len(contracts_to_remove))
 
 
+def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
+    """
+    Reconcile a single Keycloak organization.
+
+    This is the heavy lifting for reconcile_keycloak_orgs. When provided with a
+    Keycloak organization, it creates or updates the corresponding
+    OrganizationPage record for the record.
+
+    This won't save the OrganizationPage.
+
+    Args:
+    - keycloak_org (OrganizationRepresentation): The Keycloak organization to reconcile.
+    Returns:
+    - tuple(page: OrganizationPage, created: bool) on success, or False on error.
+    """
+
+    created_flag = False
+
+    page = OrganizationPage.objects.filter(sso_organization_id=keycloak_org.id).first()
+
+    if not page:
+        page = OrganizationPage(
+            title=keycloak_org.name,
+            name=keycloak_org.name,
+            sso_organization_id=keycloak_org.id,
+            org_key=keycloak_org.alias[:ORG_KEY_MAX_LENGTH],
+            description=keycloak_org.description,
+        )
+        log.info("Created organization %s from Keycloak", page)
+        created_flag = True
+    else:
+        # Don't update the org_key, because course keys are tied to it.
+        page.name = keycloak_org.name
+        page.title = keycloak_org.name
+        page.description = keycloak_org.description
+        log.info("Updated organization %s from Keycloak", page)
+
+    return (page, created_flag)
+
+
 def reconcile_keycloak_orgs():
     """
     Reconcile Keycloak org records.
@@ -816,36 +857,23 @@ def reconcile_keycloak_orgs():
     org_model = get_keycloak_model(*KCAM_ORGANIZATIONS)
     orgs = org_model.list()
     parent_org_page = OrganizationIndexPage.objects.first()
-    created = 0
-    updated = 0
+    created_count = 0
+    updated_count = 0
 
     for org in orgs:
         try:
-            page = OrganizationPage.objects.filter(sso_organization_id=org.id).first()
+            page, created = reconcile_single_keycloak_org(org)
 
-            if not page:
-                page = OrganizationPage(
-                    title=org.name,
-                    name=org.name,
-                    sso_organization_id=org.id,
-                    org_key=org.alias[:ORG_KEY_MAX_LENGTH],
-                    description=org.description,
-                )
+            if created:
+                created_count += 1
                 parent_org_page.add_child(instance=page)
                 page.save()
                 parent_org_page.save()
-                log.info("Created organization %s from Keycloak", page)
-                created += 1
             else:
-                # Don't update the org_key, because course keys are tied to it.
-                page.name = org.name
-                page.title = org.name
-                page.description = org.description
+                updated_count += 1
                 page.save()
-                log.info("Updated organization %s from Keycloak", page)
-                updated += 1
         except ValidationError as e:  # noqa: PERF203
             msg = f"Validation error: could not create or update organization for Keycloak org {org.id}: {e}"
             log.exception(msg)
 
-    return (created, updated)
+    return (created_count, updated_count)
