@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.130.2
+Version 0.130.2 (Released September 24, 2025)
 ---------------
 
 - Infer some of the wagtail API spec automatically (#2955)
