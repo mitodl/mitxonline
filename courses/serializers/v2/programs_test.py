@@ -140,5 +140,7 @@ def test_serialize_program(
             "time_commitment": program_with_empty_requirements.page.effort,
             "max_weekly_hours": program_with_empty_requirements.page.max_weekly_hours,
             "min_weekly_hours": program_with_empty_requirements.page.min_weekly_hours,
+            "min_price": program_with_empty_requirements.page.min_price,
+            "max_price": program_with_empty_requirements.page.max_price,
         },
     )
