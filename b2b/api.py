@@ -19,7 +19,8 @@ from wagtail.models import Page
 
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
-    CONTRACT_INTEGRATION_SSO,
+    CONTRACT_MEMBERSHIP_AUTO,
+    CONTRACT_MEMBERSHIP_MANAGED,
     ORG_KEY_MAX_LENGTH,
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
@@ -746,7 +747,9 @@ def reconcile_user_orgs(user, organizations):
     cached_org_membership = caches["redis"].get(user_org_cache_key, False)
 
     if cached_org_membership and sorted(cached_org_membership) == sorted(organizations):
-        log.info("reconcile_user_orgs: skipping reconcilation for %s", user.id)
+        log.info(
+            "reconcile_user_orgs: everything OK, skipping reconcilation for %s", user.id
+        )
         return (
             0,
             0,
@@ -755,7 +758,7 @@ def reconcile_user_orgs(user, organizations):
     log.info("reconcile_user_orgs: running reconcilation for %s", user.id)
 
     user_contracts_qs = user.b2b_contracts.filter(
-        integration_type=CONTRACT_INTEGRATION_SSO
+        CONTRACT_MEMBERSHIP_AUTO, integration_type=CONTRACT_MEMBERSHIP_MANAGED
     )
 
     if len(organizations) == 0:
@@ -780,7 +783,9 @@ def reconcile_user_orgs(user, organizations):
 
     contracts_to_add = (
         ContractPage.objects.filter(
-            integration_type=CONTRACT_INTEGRATION_SSO, organization__in=orgs
+            CONTRACT_MEMBERSHIP_AUTO,
+            integration_type=CONTRACT_MEMBERSHIP_MANAGED,
+            organization__in=orgs,
         )
         .exclude(pk__in=user_contracts_qs.all().values_list("id", flat=True))
         .all()
@@ -879,3 +884,21 @@ def reconcile_keycloak_orgs():
             )
 
     return (created_count, updated_count)
+
+
+def add_user_org_membership(org, user):
+    """
+    Add a given user to a Keycloak organization.
+
+    If we're adding a user to a contract, and they're not in that contract's
+    organization, we need to do that and update Keycloak as well. Since the user
+    won't have the org in their user data list initially, we'll also need to
+    flag the membership so we don't remove it immediately later in the
+    middleware.
+
+    Args:
+    - org (OrganizationPage): The organization to add the user to.
+    - user (User): The user to add to the organization.
+    Returns:
+    - bool: True if the user was added, False otherwise.
+    """

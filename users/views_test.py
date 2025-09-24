@@ -72,7 +72,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
                             "id": contract.id,
                             "name": contract.name,
                             "description": contract.description,
-                            "integration_type": contract.integration_type,
+                            "membership_type": contract.membership_type,
                             "contract_start": None,
                             "contract_end": None,
                             "active": True,

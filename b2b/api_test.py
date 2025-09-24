@@ -25,8 +25,8 @@ from b2b.api import (
 )
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
-    CONTRACT_INTEGRATION_NONSSO,
-    CONTRACT_INTEGRATION_SSO,
+    CONTRACT_MEMBERSHIP_NONSSO,
+    CONTRACT_MEMBERSHIP_SSO,
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.models import OrganizationIndexPage, OrganizationPage
@@ -260,9 +260,9 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
     assert_price = price if price else Decimal(0)
 
     contract = factories.ContractPageFactory(
-        integration_type=CONTRACT_INTEGRATION_SSO
+        membership_type=CONTRACT_MEMBERSHIP_SSO
         if is_sso
-        else CONTRACT_INTEGRATION_NONSSO,
+        else CONTRACT_MEMBERSHIP_NONSSO,
         enrollment_fixed_price=price,
         max_learners=max_learners,
     )
@@ -304,8 +304,8 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
         if update_no_price:
             contract.enrolment_fixed_price = None
         if update_sso:
-            contract.integration_type = (
-                CONTRACT_INTEGRATION_NONSSO if is_sso else CONTRACT_INTEGRATION_SSO
+            contract.membership_type = (
+                CONTRACT_MEMBERSHIP_NONSSO if is_sso else CONTRACT_MEMBERSHIP_SSO
             )
 
         contract.save()
@@ -361,7 +361,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 
     contract = factories.ContractPageFactory.create(
-        integration_type=CONTRACT_INTEGRATION_SSO,
+        membership_type=CONTRACT_MEMBERSHIP_SSO,
         enrollment_fixed_price=Decimal(0)
         if price_is_zero
         else FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
@@ -524,10 +524,10 @@ def test_b2b_reconcile_user_orgs():
     """Test that we can get a list of B2B orgs from somewhere and fix a user's associations."""
 
     contracts = factories.ContractPageFactory.create_batch(
-        2, integration_type=CONTRACT_INTEGRATION_NONSSO
+        2, membership_type=CONTRACT_MEMBERSHIP_NONSSO
     )
     sso_contracts = factories.ContractPageFactory.create_batch(
-        2, integration_type=CONTRACT_INTEGRATION_SSO
+        2, membership_type=CONTRACT_MEMBERSHIP_SSO
     )
     user = UserFactory.create()
 

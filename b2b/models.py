@@ -12,7 +12,11 @@ from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page
 
-from b2b.constants import CONTRACT_INTEGRATION_CHOICES, ORG_INDEX_SLUG
+from b2b.constants import (
+    CONTRACT_MEMBERSHIP_CHOICES,
+    CONTRACT_MEMBERSHIP_MANAGED,
+    ORG_INDEX_SLUG,
+)
 from b2b.exceptions import TargetCourseRunExistsError
 from b2b.tasks import queue_enrollment_code_check
 
@@ -135,16 +139,17 @@ class ContractPage(Page):
     description = RichTextField(
         blank=True, help_text="Any useful extra information about the contract."
     )
-    integration_type = models.CharField(
+    membership_type = models.CharField(
         max_length=255,
-        choices=CONTRACT_INTEGRATION_CHOICES,
-        help_text="The type of integration for this contract.",
+        choices=CONTRACT_MEMBERSHIP_CHOICES,
+        help_text="The method to use to manage membership in the contract.",
+        default=CONTRACT_MEMBERSHIP_MANAGED,
     )
     organization = models.ForeignKey(
         OrganizationPage,
         on_delete=models.PROTECT,
         related_name="contracts",
-        help_text="The organization this contract is with.",
+        help_text="The organization that owns this contract.",
     )
     contract_start = models.DateField(
         blank=True,
@@ -190,7 +195,7 @@ class ContractPage(Page):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("integration_type"),
+                FieldPanel("membership_type"),
                 FieldPanel("max_learners"),
                 FieldPanel("enrollment_fixed_price"),
             ],

@@ -18,7 +18,6 @@ from mitol.common.models import TimestampedModel, UserGlobalIdMixin
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import chunks
 
-from b2b.models import OrganizationPage
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from openedx.constants import OPENEDX_REPAIR_GRACE_PERIOD_MINS, OPENEDX_USERNAME_MAX_LEN
 from openedx.models import OpenEdxUser
@@ -363,19 +362,12 @@ class User(
         )
 
     @cached_property
-    def b2b_organizations(self):
-        """Return the organizations the user is associated with."""
-        return OrganizationPage.objects.filter(
-            pk__in=self.b2b_contracts.values_list("organization", flat=True).distinct()
-        ).all()
-
-    @cached_property
     def b2b_organization_sso_ids(self):
         """Similar to b2b_organizations, but returns just the UUIDs."""
         return list(
             self.b2b_organizations.filter(
                 sso_organization_id__isnull=False
-            ).values_list("sso_organization_id", flat=True)
+            ).values_list("organization__sso_organization_id", flat=True)
         )
 
     @property
@@ -601,3 +593,28 @@ class BlockList(TimestampedModel):
     """A user's blocklist model"""
 
     hashed_email = models.CharField(max_length=128)
+
+
+class UserOrganization(models.Model):
+    """The user's organizations memberships."""
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="b2b_organizations"
+    )
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="organization_users",
+    )
+    keep_until_seen = models.BooleanField(
+        default=False,
+        help_text="If True, the user will be kept in the organization until the organization is seen in their SSO data.",
+    )
+
+    class Meta:
+        unique_together = ("user", "organization")
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"UserOrganization: {self.user} in {self.organization}"
