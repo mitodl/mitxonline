@@ -56,6 +56,32 @@ faker = Faker()
 
 
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
+def test_get_programs(
+    user_drf_client, django_assert_max_num_queries, course_catalog_data
+):
+    """Test the view that handles requests for all Programs"""
+    course_catalog_data  # noqa: B018
+
+    # Fetch programs after running the fixture so they're in the right order
+    programs = Program.objects.order_by("title").prefetch_related("departments").all()
+
+    num_queries = num_queries_from_programs(programs, "v2")
+    with django_assert_max_num_queries(num_queries) as context:
+        resp = user_drf_client.get(reverse("v2:programs_api-list"))
+    duplicate_queries_check(context)
+    programs_data = resp.json()["results"]
+    assert len(programs_data) == Pagination.page_size
+    for program, program_data in zip(programs, programs_data):
+        # Clear cached property to ensure consistent data between API and serializer
+        if hasattr(program, "_courses_with_requirements_data"):
+            delattr(program, "_courses_with_requirements_data")
+        assert_drf_json_equal(
+            program_data, ProgramSerializer(program).data, ignore_order=True
+        )
+
+
+@pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
 def test_get_departments(
     user_drf_client, mock_context, django_assert_max_num_queries, course_catalog_data
@@ -98,31 +124,6 @@ def test_get_departments(
         )
     assert_drf_json_equal(departments_data, departments_from_fixture, ignore_order=True)
 
-
-@pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
-@pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
-def test_get_programs(
-    user_drf_client, django_assert_max_num_queries, course_catalog_data
-):
-    """Test the view that handles requests for all Programs"""
-    course_catalog_data  # noqa: B018
-
-    # Fetch programs after running the fixture so they're in the right order
-    programs = Program.objects.order_by("title").prefetch_related("departments").all()
-
-    num_queries = num_queries_from_programs(programs, "v2")
-    with django_assert_max_num_queries(num_queries) as context:
-        resp = user_drf_client.get(reverse("v2:programs_api-list"))
-    duplicate_queries_check(context)
-    programs_data = resp.json()["results"]
-    assert len(programs_data) == Pagination.page_size
-    for program, program_data in zip(programs, programs_data):
-        # Clear cached property to ensure consistent data between API and serializer
-        if hasattr(program, "_courses_with_requirements_data"):
-            delattr(program, "_courses_with_requirements_data")
-        assert_drf_json_equal(
-            program_data, ProgramSerializer(program).data, ignore_order=True
-        )
 
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
