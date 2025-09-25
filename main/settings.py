@@ -1539,3 +1539,39 @@ DISABLE_USER_REPAIR_TASK = get_bool(
     default=False,
     description="Disable the task so it no-ops",
 )
+
+TRINO_HOST = get_string(
+    name="TRINO_HOST",
+    default=None,
+    description="Host URL for Trino server",
+)
+
+TRINO_PORT = get_int(
+    name="TRINO_PORT",
+    default=443,
+    description="Port number for Trino server",
+)
+
+TRINO_CATALOG = get_string(
+    name="TRINO_CATALOG",
+    default=None,
+    description="Catalog name for Trino queries",
+)
+
+TRINO_SCHEMA = get_string(
+    name="TRINO_SCHEMA",
+    default=None,
+    description="Schema name for Trino queries",
+)
+
+TRINO_USER = get_string(
+    name="TRINO_USER",
+    default=None,
+    description="Username for Trino authentication",
+)
+
+TRINO_PASSWORD = get_string(
+    name="TRINO_PASSWORD",
+    default=None,
+    description="Password for Trino authentication",
+)
