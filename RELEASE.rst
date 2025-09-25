@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.130.3 (Released September 25, 2025)
+---------------
+
+- Add min_price and max_price to ProgramSerializer (#2961)
+- feat: update wagtail api permissions (#2952)
+- add unit tests for get_current_price function (#2934)
+
 Version 0.130.2 (Released September 24, 2025)
 ---------------
 
