@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.130.4
+Version 0.130.4 (Released September 25, 2025)
 ---------------
 
 - Repair queries in generating a username (#2966)
