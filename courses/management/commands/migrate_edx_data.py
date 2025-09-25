@@ -10,7 +10,7 @@ from courses.models import Course, CourseRun, Department
 
 class Command(BaseCommand):
     help = (
-        "Migrate the EdX data from Trino in the data platform to the corresponding models in MITxOnline "
+        "Migrate the edX data via Trino from the data platform to the corresponding models in MITx Online "
         "e.g Course, CourseRun, CoursePage CertificatePage, etc."
     )
 
@@ -126,6 +126,16 @@ class Command(BaseCommand):
         return course_run, created_run
 
     def _get_signatories(self, signatory_list, use_default_signatory):
+        """
+        Get SignatoryPage based on the provided list of names or use the default signatory.
+
+        Args:
+            signatory_list (list): List of signatory names
+            use_default_signatory: Boolean indicating whether to use the default signatory
+
+        Returns:
+            list: List of SignatoryPage
+        """
         if use_default_signatory:
             signatory_obj = SignatoryPage.objects.first()
             if not signatory_obj:
@@ -145,6 +155,9 @@ class Command(BaseCommand):
         return list(SignatoryPage.objects.filter(name__in=signatory_names))
 
     def _migrate_course_runs(self, conn, options):
+        """
+        Migrate course runs,their associated courses, course pages, and course certificate pages
+        """
         use_default_signatory = options["use_default_signatory"]
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
