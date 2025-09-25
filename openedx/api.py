@@ -127,6 +127,98 @@ def _extract_username_suggestions(data, suggestions_extracted):
     return [], suggestions_extracted
 
 
+def _extract_username_from_email(username):
+    """
+    Extract a valid username from a username that might be an email address.
+
+    Args:
+        username (str): The username that might be an email address
+
+    Returns:
+        str: The local part of the email if it's an email, otherwise the original username
+    """
+    if "@" in username:
+        return username.split("@")[0]
+    return username
+
+
+def generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN):
+    """
+    Generate a unique username by appending random numbers to the base username.
+
+    Args:
+        base_username (str): The base username to use
+        max_length (int): Maximum length for the generated username
+
+    Returns:
+        str or None: A unique username, or None if no unique username could be generated
+    """
+    ranges = (
+        (0, 9),
+        (10, 99),
+        (100, 999),
+        (1000, 9999),
+        (10000, 99999),
+    )
+
+    for intrange in ranges:
+        random_int = random.randint(intrange[0], intrange[1])  # noqa: S311
+        username_to_try = f"{base_username}_{random_int}"
+
+        if len(username_to_try) > max_length:
+            amount_to_truncate = len(username_to_try) - max_length
+            username_to_try = f"{base_username[:amount_to_truncate]}-{random_int}"
+
+        if not OpenEdxUser.objects.filter(edx_username=username_to_try).exists():
+            return username_to_try
+
+    return None
+
+
+def _handle_username_collision(  # noqa: PLR0913
+    resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted
+):
+    """
+    Handle username collision by trying OpenEdX suggestions or falling back to local generation.
+
+    Args:
+        resp: HTTP response from OpenEdX
+        data: Parsed JSON response data
+        open_edx_user: OpenEdxUser instance
+        user: User instance
+        suggested_usernames: List of suggested usernames from previous attempts
+        suggestions_extracted: Boolean indicating if suggestions were already extracted
+
+    Returns:
+        tuple: (new_username, should_continue, should_reset_attempts)
+    """
+    if not _is_duplicate_username_error(resp, data):
+        return None, False, False
+
+    suggestions, suggestions_extracted = _extract_username_suggestions(
+        data, suggestions_extracted
+    )
+    if suggestions:
+        suggested_usernames = suggestions
+
+    if not suggested_usernames:
+        log.info(
+            "OpenEdX returned empty username suggestions, falling back to local generation"
+        )
+        base_username = open_edx_user.desired_edx_username
+        if not base_username:
+            base_username = _extract_username_from_email(user.username)
+
+        new_username = generate_unique_username(base_username)
+
+        if new_username:
+            return new_username, True, True
+        else:
+            return None, False, False
+
+    return suggested_usernames.pop(0), True, False
+
+
 def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
@@ -196,17 +288,22 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
             except (ValueError, requests.exceptions.JSONDecodeError):
                 data = {}
 
-            if _is_duplicate_username_error(resp, data):
-                suggestions, suggestions_extracted = _extract_username_suggestions(
-                    data, suggestions_extracted
+            new_username, should_continue, should_reset_attempts = (
+                _handle_username_collision(
+                    resp,
+                    data,
+                    open_edx_user,
+                    user,
+                    suggested_usernames,
+                    suggestions_extracted,
                 )
-                if suggestions:
-                    suggested_usernames = suggestions
+            )
 
-                if not suggested_usernames:
-                    break
-
-                current_username = suggested_usernames.pop(0)
+            if should_continue:
+                current_username = new_username
+                if should_reset_attempts:
+                    attempt = 0
+                continue
             elif _is_bad_request(resp):
                 open_edx_user.has_sync_error = True
                 open_edx_user.sync_error_data = data
@@ -316,31 +413,13 @@ def reconcile_edx_username(user, *, desired_username=None):
         if not OpenEdxUser.objects.filter(edx_username=edx_username).exists():
             edx_user.save()
         else:
-            ranges = (
-                (0, 9),
-                (10, 99),
-                (100, 999),
-                (1000, 9999),
-                (10000, 99999),
-            )
-
-            for intrange in ranges:
-                random_int = random.randint(intrange[0], intrange[1])  # noqa: S311
-                username_to_try = f"{edx_username}_{random_int}"
-
-                if len(username_to_try) > OPENEDX_USERNAME_MAX_LEN:
-                    amount_to_truncate = len(username_to_try) - OPENEDX_USERNAME_MAX_LEN
-                    username_to_try = (
-                        f"{edx_username[:amount_to_truncate]}-{random_int}"
-                    )
-
-                if not OpenEdxUser.objects.filter(
-                    edx_username=username_to_try,
-                ).exists():
-                    edx_user.edx_username = username_to_try
-                    edx_user.desired_edx_username = username_to_try
-                    edx_user.save()
-                    break
+            unique_username = generate_unique_username(edx_username)
+            if unique_username:
+                edx_user.edx_username = unique_username
+                edx_user.desired_edx_username = unique_username
+                edx_user.save()
+            else:
+                log.error("Could not generate unique username for %s", edx_username)
 
         return True
 
