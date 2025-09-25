@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.130.4
+---------------
+
+- Repair queries in generating a username (#2966)
+- 8263 update flags on import courseware command (#2939)
+- Security: Disable yarn postinstall scripts (#2964)
+- fix: handle non-ascii username collisions (#2942)
+- Fix try..except occluding the error (#2965)
+- Only repair users who have logged in at least once (#2956)
+
 Version 0.130.3 (Released September 25, 2025)
 ---------------
 
