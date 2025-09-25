@@ -81,7 +81,8 @@ def create_contract_run(
     for the given course. This code expects you to pass in an MITx Online course
     that has a readable ID like 'course-v1:UAI_SOURCE+number` and that it has a
     run of some sort. This should just be a single run. If there's multiple runs,
-    this code will grab the last one in the database.
+    this will look for a run tag of "SOURCE". Failing that, it will try to use
+    the _first_ run in the list.
 
     The MITx Online course run will belong to the source course. They will get a
     course key that is modified to represent the organization they belong to,
@@ -108,7 +109,19 @@ def create_contract_run(
         Product: The created Product object.
     """
 
-    clone_course_run = course.courseruns.last()
+    clone_course_run = course.courseruns.filter(run_tag="SOURCE").first()
+
+    if not clone_course_run:
+        try:
+            clone_course_run = course.courseruns.order_by("-id").first()
+            log.warning(
+                "create_contract_run: No SOURCE run for %s, using %s",
+                course,
+                clone_course_run,
+            )
+        except CourseRun.DoesNotExist as exc:
+            msg = f"No course runs available for {course}."
+            raise SourceCourseIncompleteError(msg) from exc
 
     if not clone_course_run:
         msg = f"No course runs available for {course}."
