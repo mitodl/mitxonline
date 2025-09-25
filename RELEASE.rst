@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.130.3
+Version 0.130.3 (Released September 25, 2025)
 ---------------
 
 - Add min_price and max_price to ProgramSerializer (#2961)
