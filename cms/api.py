@@ -420,12 +420,9 @@ def create_featured_items():
     # Store only course IDs to avoid pickling issues and ensure fresh data on retrieval
     redis_cache.set(cache_key, all_course_ids)
 
-    # Return the actual courses for backward compatibility with tests/callers
-    featured_courses = list(
+    return list(
         Course.objects.filter(id__in=all_course_ids)
         .select_related("page")
         .prefetch_related("courseruns")
         .order_by(ordering)
     )
-
-    return featured_courses
