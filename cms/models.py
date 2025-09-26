@@ -791,13 +791,13 @@ class HomePage(VideoPlayerConfigMixin):
         """
         now = now_in_utc()
         redis_cache = caches["redis"]
-        cached_featured_products = redis_cache.get("CMS_homepage_featured_courses")
-        if cached_featured_products and len(cached_featured_products) > 0:
-            featured_product_ids = [course.id for course in cached_featured_products]
+        cached_featured_course_ids = redis_cache.get("CMS_homepage_featured_courses")
+        if cached_featured_course_ids and len(cached_featured_course_ids) > 0:
+            # Load fresh course data from database using cached IDs
             relevant_run_course_ids = (
                 CourseRun.objects.filter(live=True)
                 .filter(
-                    models.Q(course__id__in=featured_product_ids)
+                    models.Q(course__id__in=cached_featured_course_ids)
                     & models.Q(enrollment_start__lte=now)
                     & (
                         models.Q(enrollment_end__gte=now)
@@ -806,13 +806,25 @@ class HomePage(VideoPlayerConfigMixin):
                 )
                 .values_list("course__id", flat=True)
             )
-            featured_products = [
-                course.page
-                for course in cached_featured_products
-                if course.page is not None
-                and course.page.live
-                and course.id in relevant_run_course_ids
-            ]
+            
+            # Create ordering to maintain the sequence from the cache
+            ordering = models.Case(
+                *[models.When(id=cid, then=pos) for pos, cid in enumerate(cached_featured_course_ids)],
+                output_field=models.IntegerField(),
+            )
+
+            valid_course_ids = set(cached_featured_course_ids) & set(relevant_run_course_ids)
+            
+            featured_courses = (
+                Course.objects.filter(
+                    id__in=valid_course_ids,
+                    page__live=True
+                )
+                .select_related("page")
+                .order_by(ordering)
+            )
+            
+            featured_products = [course.page for course in featured_courses if course.page is not None]
             featured_product_pages = []
             for page in featured_products:
                 run = page.product.first_unexpired_run
