@@ -3,10 +3,6 @@
 from mitol.common.utils import get_error_response_summary
 
 
-class OpenEdxUserCreateError(Exception):
-    """Exception creating the OpenEdxUser"""
-
-
 class OpenEdXOAuth2Error(Exception):
     """We were unable to obtain a refresh token from openedx"""
 

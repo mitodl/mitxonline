@@ -234,15 +234,21 @@ def test_create_edx_user(  # noqa: PLR0913
 
 @responses.activate
 @pytest.mark.usefixtures("application")
-def test_create_edx_user_dupe_email_username(settings):
+@pytest.mark.parametrize(
+    "error_data",
+    [
+        {"error_code": "duplicate-email"},
+        {
+            "error_code": "duplicate-email-username",
+            "username_suggestions": [],
+        },
+    ],
+)
+def test_create_edx_user_409_errors(settings, error_data):
     """Test that create_edx_user handles a 409 response from the edX API"""
     user = UserFactory.create(
         openedx_user__has_been_synced=False,
     )
-    error_data = {
-        "error_code": "duplicate-email-username",
-        "username_suggestions": [],
-    }
 
     resp1 = responses.add(
         responses.GET,
