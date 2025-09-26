@@ -12,3 +12,7 @@ class SourceCourseIncompleteError(Exception):
 
 class TargetCourseRunExistsError(Exception):
     """Raised if the target course run we're trying to create already exists."""
+
+
+class KeycloakAdminImproperlyConfiguredError(Exception):
+    """Raised if Keycloak admin client is improperly configured."""

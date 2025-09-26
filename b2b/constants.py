@@ -13,3 +13,5 @@ CONTRACT_INTEGRATION_CHOICES = zip(
 )
 
 B2B_RUN_TAG_FORMAT = "{year}_C{contract_id}"
+
+ORG_KEY_MAX_LENGTH = 30
