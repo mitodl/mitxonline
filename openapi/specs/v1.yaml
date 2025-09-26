@@ -2626,19 +2626,15 @@ components:
           maxLength: 10
       required:
       - country
-      - first_name
-      - last_name
     LegalAddressRequest:
       type: object
       description: Serializer for legal address
       properties:
         first_name:
           type: string
-          minLength: 1
           maxLength: 60
         last_name:
           type: string
-          minLength: 1
           maxLength: 60
         country:
           type: string
@@ -2650,8 +2646,6 @@ components:
           maxLength: 10
       required:
       - country
-      - first_name
-      - last_name
     NullEnum:
       enum:
       - null

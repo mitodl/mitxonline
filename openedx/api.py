@@ -113,9 +113,20 @@ def _is_duplicate_username_error(resp, data):
     )
 
 
-def _is_bad_request(resp):
+def _is_duplicate_email_username_error(resp, data):
+    """Check if the response indicates a duplicate username error."""
+    return (
+        resp.status_code == status.HTTP_409_CONFLICT
+        and data.get("error_code") == "duplicate-email-username"
+    )
+
+
+def _is_bad_request(resp, data):
     """Check if the response indicates a bad request."""
-    return resp.status_code == status.HTTP_400_BAD_REQUEST
+    return (
+        resp.status_code == status.HTTP_400_BAD_REQUEST
+        or _is_duplicate_email_username_error(resp, data)
+    )
 
 
 def _extract_username_suggestions(data, suggestions_extracted):
@@ -175,6 +186,26 @@ def generate_unique_username(base_username, max_length=OPENEDX_USERNAME_MAX_LEN)
     return None
 
 
+def get_attemptable_username(user, desired_edx_username):
+    """
+    Return a unique username, starting with the desired one
+
+    Args:
+        user (User): the user we're doing this for
+        desired_edx_username (str): the desired edx username
+
+    Returns:
+        str or None: A unique username, or None if no unique username could be generated
+    """
+    return (
+        desired_edx_username
+        if not OpenEdxUser.objects.filter(edx_username=desired_edx_username)
+        .exclude(user=user)
+        .exists()
+        else generate_unique_username(desired_edx_username)
+    )
+
+
 def _handle_username_collision(  # noqa: PLR0913
     resp, data, open_edx_user, user, suggested_usernames, suggestions_extracted
 ):
@@ -219,6 +250,21 @@ def _handle_username_collision(  # noqa: PLR0913
     return suggested_usernames.pop(0), True, False
 
 
+def _parse_openedx_response(resp):
+    """Parse the openedx response"""
+    try:
+        return resp.json()
+    except (ValueError, requests.exceptions.JSONDecodeError):
+        return {}
+
+
+def _set_edx_error(open_edx_user, data):
+    """Set the openedx error on the OpenEdxUser"""
+    open_edx_user.has_sync_error = True
+    open_edx_user.sync_error_data = data
+    open_edx_user.save()
+
+
 def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
@@ -244,7 +290,13 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
     attempt = 0
     suggested_usernames = []
     suggestions_extracted = False
-    current_username = open_edx_user.desired_edx_username
+    current_username = get_attemptable_username(
+        user, open_edx_user.desired_edx_username
+    )
+
+    if current_username is None:
+        log.error("Failed to generate an attemptable username")
+        return False
 
     # we use a redis lock instead of a db lock because we need to be able to update the `edx_username`
     # we give ourselves a generous 120 seconds to accomplish this
@@ -283,10 +335,7 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
                 open_edx_user.save()
                 return True
 
-            try:
-                data = resp.json()
-            except (ValueError, requests.exceptions.JSONDecodeError):
-                data = {}
+            data = _parse_openedx_response(resp)
 
             new_username, should_continue, should_reset_attempts = (
                 _handle_username_collision(
@@ -304,10 +353,8 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
                 if should_reset_attempts:
                     attempt = 0
                 continue
-            elif _is_bad_request(resp):
-                open_edx_user.has_sync_error = True
-                open_edx_user.sync_error_data = data
-                open_edx_user.save()
+            elif _is_bad_request(resp, data):
+                _set_edx_error(open_edx_user, data)
                 return False
             else:
                 break

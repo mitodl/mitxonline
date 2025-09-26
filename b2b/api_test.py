@@ -7,6 +7,7 @@ import pytest
 import pytz
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ValidationError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -17,6 +18,8 @@ from b2b.api import (
     create_contract_run,
     ensure_enrollment_codes_exist,
     get_active_contracts_from_basket_items,
+    reconcile_keycloak_orgs,
+    reconcile_single_keycloak_org,
     reconcile_user_orgs,
     validate_basket_for_b2b_purchase,
 )
@@ -26,7 +29,7 @@ from b2b.constants import (
     CONTRACT_INTEGRATION_SSO,
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
-from b2b.factories import ContractPageFactory
+from b2b.models import OrganizationIndexPage, OrganizationPage
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.factories import CourseFactory, CourseRunFactory
 from courses.models import CourseRunEnrollment
@@ -153,7 +156,7 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
     discount.products.add(discount_product)
 
     if run_contract:
-        contract = ContractPageFactory.create()
+        contract = factories.ContractPageFactory.create()
 
         product.purchasable_object.b2b_contract = contract
         product.purchasable_object.save()
@@ -357,7 +360,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 
-    contract = ContractPageFactory.create(
+    contract = factories.ContractPageFactory.create(
         integration_type=CONTRACT_INTEGRATION_SSO,
         enrollment_fixed_price=Decimal(0)
         if price_is_zero
@@ -468,7 +471,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     also queue up a course clone in edX.
     """
 
-    contract = ContractPageFactory.create()
+    contract = factories.ContractPageFactory.create()
     course = CourseFactory.create()
     source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
     mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
@@ -517,13 +520,13 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     mocked_clone_run.assert_called()
 
 
-def test_reconcile_b2b_orgs():
+def test_b2b_reconcile_user_orgs():
     """Test that we can get a list of B2B orgs from somewhere and fix a user's associations."""
 
-    contracts = ContractPageFactory.create_batch(
+    contracts = factories.ContractPageFactory.create_batch(
         2, integration_type=CONTRACT_INTEGRATION_NONSSO
     )
-    sso_contracts = ContractPageFactory.create_batch(
+    sso_contracts = factories.ContractPageFactory.create_batch(
         2, integration_type=CONTRACT_INTEGRATION_SSO
     )
     user = UserFactory.create()
@@ -554,3 +557,96 @@ def test_reconcile_b2b_orgs():
         ).count()
         == 0
     )
+
+
+@pytest.mark.parametrize(
+    "update_an_org",
+    [
+        True,
+        False,
+    ],
+)
+def test_b2b_reconcile_keycloak_orgs(mocker, update_an_org):
+    """Test reconciliation of Keycloak orgs to OrganizationPages."""
+
+    class MockedOrgModel:
+        """A mocked organization model."""
+
+        orgs = []
+
+        def list(self):
+            """Return a list of fake orgs."""
+
+            return self.orgs
+
+    org_model = MockedOrgModel()
+    org_model.orgs = factories.OrganizationRepresentationFactory.create_batch(3)
+
+    if update_an_org:
+        existing_org = factories.OrganizationPageFactory.create()
+        org_model.orgs.append(
+            factories.OrganizationRepresentationFactory(
+                id=existing_org.sso_organization_id,
+                name="We changed the name",
+                alias="changedKey",
+                description="A new description",
+            )
+        )
+
+    if not OrganizationIndexPage.objects.exists():
+        factories.OrganizationIndexPageFactory.create()
+    mocker.patch(
+        "b2b.keycloak_admin_api.KeycloakAdminModel",
+        return_value=org_model,
+        autospec=True,
+    )
+    mocker.patch("b2b.keycloak_admin_api.bootstrap_client")
+
+    created, updated = reconcile_keycloak_orgs()
+
+    assert created == 3
+    assert updated == (0 if not update_an_org else 1)
+
+    org_pages = OrganizationPage.objects.filter(
+        sso_organization_id__in=[mocked_org.id for mocked_org in org_model.orgs]
+    ).all()
+
+    assert len(org_pages) == (3 if not update_an_org else 4)
+
+    found_count = 0
+
+    for org_page in org_pages:
+        for org in org_model.orgs:
+            if str(org.id) == str(org_page.sso_organization_id):
+                assert org_page.title == org.name
+                if not update_an_org:
+                    assert org_page.org_key == org.alias
+                assert org_page.description == org.description
+                found_count += 1
+
+            if update_an_org and str(org_page.sso_organization_id) == str(
+                existing_org.sso_organization_id
+            ):
+                assert org_page.title == "We changed the name"
+                assert org_page.org_key != "changedKey"
+
+    assert found_count == (3 if not update_an_org else 4)
+
+
+def test_reconcile_bad_keycloak_org(mocker):
+    """Test that reconciliation works when there's bad data"""
+
+    existing_org_page = factories.OrganizationPageFactory.create()
+    org = factories.OrganizationRepresentationFactory.create(
+        alias=existing_org_page.org_key
+    )
+
+    if not OrganizationIndexPage.objects.exists():
+        factories.OrganizationIndexPageFactory.create()
+
+    page, _ = reconcile_single_keycloak_org(org)
+
+    with pytest.raises(ValidationError) as exc:
+        page.save()
+
+    assert "Organization with this Org key already exists." in str(exc)
