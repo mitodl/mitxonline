@@ -92,6 +92,7 @@ python-redis-lock = "^4.0.0"
 django-object-actions = "^5.0.0"
 requests-oauthlib = "^2.0.0"
 authlib = "^1.6.3"
+trino = "^0.336.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -119,7 +120,7 @@ pytest-xdist = {extras = ["psutil"], version = "^3.6.1"}
 [tool.ruff]
 target-version = "py310"
 line-length = 88
-extend-exclude = [ "b2b/keycloak_admin_dataclasses.py" ]
+extend-exclude = ["b2b/keycloak_admin_dataclasses.py"]
 
 [tool.ruff.lint]
 select = [
