@@ -1895,7 +1895,7 @@ class SignatoryPage(Page):
         max_length=250,
         null=True,
         blank=True,
-        help_text="Specify signatory thrid title in organization.",
+        help_text="Specify signatory third title in organization.",
     )
     organization = models.CharField(  # noqa: DJ001
         max_length=250,
