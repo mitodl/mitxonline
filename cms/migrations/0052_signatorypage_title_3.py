@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='signatorypage',
             name='title_3',
-            field=models.CharField(blank=True, help_text='Specify signatory thrid title in organization.', max_length=250, null=True),
+            field=models.CharField(blank=True, help_text='Specify signatory third title in organization.', max_length=250, null=True),
         ),
     ]
