@@ -2,11 +2,9 @@ import logging
 from urllib.parse import urljoin, urlparse
 
 import requests
-from django.core.cache import caches
 from mitol.common.decorators import single_task
 
 from cms.api import create_featured_items
-from cms.constants import ONE_MINUTE
 from cms.models import Page
 from main.celery import app
 from main.settings import (
@@ -109,12 +107,5 @@ def refresh_featured_homepage_items():
     """
     logger = logging.getLogger("refresh_featured_homepage_items__task")
     logger.info("Refreshing featured homepage items...")
-    # if the key is not found, the ttl will be 0 per their docs
-    # https://github.com/jazzband/django-redis?tab=readme-ov-file#get-ttl-time-to-live-from-key
-    redis_cache = caches["redis"]
-    if redis_cache.ttl("CMS_homepage_featured_courses") > (10 * ONE_MINUTE):
-        logger.info("Featured courses found in cache, moving on")
-        return
-    logger.info("No featured courses found in cache, refreshing")
     create_featured_items()
-    logger.info("New featured items created")
+    logger.info("Featured items refreshed")
