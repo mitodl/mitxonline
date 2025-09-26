@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.130.5
+---------------
+
+- Fix openedx user sync issues (#2970)
+- chore: upgrade hubspot-api-client and mitol-django-hubspot-api (#2949)
+- Add Keycloak organization sync (#2948)
+- make first_name / last_name not required in legal_address updates (#2967)
+- Update the B2B course run creation code to explicitly look for a source course (#2959)
+
 Version 0.130.4 (Released September 25, 2025)
 ---------------
 
