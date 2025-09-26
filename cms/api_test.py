@@ -360,18 +360,18 @@ def test_create_featured_items():
 
     assert len(cache_value) == 4
     assert set(cache_value) == {
-        enrollable_future_course,
-        enrollable_other_future_course,
-        enrollable_self_paced_course,
-        in_progress_course,
+        enrollable_future_course.id,
+        enrollable_other_future_course.id,
+        enrollable_self_paced_course.id,
+        in_progress_course.id,
     }
 
-    assert cache_value[0] == enrollable_self_paced_course
-    assert cache_value[1] == enrollable_future_course
-    assert cache_value[2] == enrollable_other_future_course
-    assert cache_value[3] == in_progress_course
+    assert cache_value[0] == enrollable_self_paced_course.id
+    assert cache_value[1] == enrollable_future_course.id
+    assert cache_value[2] == enrollable_other_future_course.id
+    assert cache_value[3] == in_progress_course.id
 
-    assert unenrollable_course not in cache_value
+    assert unenrollable_course.id not in cache_value
 
 
 @pytest.mark.django_db
@@ -496,7 +496,7 @@ def test_create_featured_items_course_run_at_exact_time():
 
     assert len(result) == 1
     assert result[0] == exact_time_course
-    assert exact_time_course in cache_value
+    assert exact_time_course.id in cache_value
 
 
 @pytest.mark.django_db
