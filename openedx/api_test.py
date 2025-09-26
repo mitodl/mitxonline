@@ -298,12 +298,12 @@ def test_create_edx_user_dupe_email_username(settings):
             False,
         ),
         (
-                [],
-                "José",
-                lambda username: username.startswith("José_")
-                                 and len(username) > len("José"),
-                "with empty suggestions (non-ASCII fallback)",
-                True,
+            [],
+            "José",
+            lambda username: username.startswith("José_")
+            and len(username) > len("José"),
+            "with empty suggestions (non-ASCII fallback)",
+            True,
         ),
     ],
 )
