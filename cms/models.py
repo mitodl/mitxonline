@@ -806,25 +806,29 @@ class HomePage(VideoPlayerConfigMixin):
                 )
                 .values_list("course__id", flat=True)
             )
-            
+
             # Create ordering to maintain the sequence from the cache
             ordering = models.Case(
-                *[models.When(id=cid, then=pos) for pos, cid in enumerate(cached_featured_course_ids)],
+                *[
+                    models.When(id=cid, then=pos)
+                    for pos, cid in enumerate(cached_featured_course_ids)
+                ],
                 output_field=models.IntegerField(),
             )
 
-            valid_course_ids = set(cached_featured_course_ids) & set(relevant_run_course_ids)
-            
+            valid_course_ids = set(cached_featured_course_ids) & set(
+                relevant_run_course_ids
+            )
+
             featured_courses = (
-                Course.objects.filter(
-                    id__in=valid_course_ids,
-                    page__live=True
-                )
+                Course.objects.filter(id__in=valid_course_ids, page__live=True)
                 .select_related("page")
                 .order_by(ordering)
             )
-            
-            featured_products = [course.page for course in featured_courses if course.page is not None]
+
+            featured_products = [
+                course.page for course in featured_courses if course.page is not None
+            ]
             featured_product_pages = []
             for page in featured_products:
                 run = page.product.first_unexpired_run
