@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0051_alter_formfield_field_type'),
+        ("cms", "0051_alter_formfield_field_type"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='signatorypage',
-            name='title_3',
-            field=models.CharField(blank=True, help_text='Specify signatory third title in organization.', max_length=250, null=True),
+            model_name="signatorypage",
+            name="title_3",
+            field=models.CharField(
+                blank=True,
+                help_text="Specify signatory third title in organization.",
+                max_length=250,
+                null=True,
+            ),
         ),
     ]
