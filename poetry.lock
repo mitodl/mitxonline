@@ -108,6 +108,21 @@ tests = ["cloudpickle ; platform_python_implementation == \"CPython\"", "hypothe
 tests-mypy = ["mypy (>=1.11.1) ; platform_python_implementation == \"CPython\" and python_version >= \"3.10\"", "pytest-mypy-plugins ; platform_python_implementation == \"CPython\" and python_version >= \"3.10\""]
 
 [[package]]
+name = "authlib"
+version = "1.6.4"
+description = "The ultimate Python library in building OAuth and OpenID Connect servers and clients."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    { file = "authlib-1.6.4-py2.py3-none-any.whl", hash = "sha256:39313d2a2caac3ecf6d8f95fbebdfd30ae6ea6ae6a6db794d976405fdd9aa796" },
+    { file = "authlib-1.6.4.tar.gz", hash = "sha256:104b0442a43061dc8bc23b133d1d06a2b0a9c2e3e33f34c4338929e816287649" },
+]
+
+[package.dependencies]
+cryptography = "*"
+
+[[package]]
 name = "backoff"
 version = "2.2.1"
 description = "Function decoration for backoff and retry"
@@ -2132,21 +2147,22 @@ pyparsing = {version = ">=2.4.2,<3.0.0 || >3.0.0,<3.0.1 || >3.0.1,<3.0.2 || >3.0
 
 [[package]]
 name = "hubspot-api-client"
-version = "6.1.0"
+version = "12.0.0"
 description = "HubSpot API client"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "hubspot-api-client-6.1.0.tar.gz", hash = "sha256:eb5a59a56900a1c57291d3b939469174307d2fd9cfabfc61568650a990582f80"},
-    {file = "hubspot_api_client-6.1.0-py3-none-any.whl", hash = "sha256:c90414a45559fc12aef294995e6001c2b007cb98a74879208d5abe07d90a6144"},
+    { file = "hubspot_api_client-12.0.0-py3-none-any.whl", hash = "sha256:5426627ff808fdf259d5b5e4791667a323a2a82d36a834e7e43ec8e8f021aa08" },
+    { file = "hubspot_api_client-12.0.0.tar.gz", hash = "sha256:ddfc60f3a80565dd5bf7fc7554d0d2dabad37926f547436158258772f1a04e69" },
 ]
 
 [package.dependencies]
-certifi = "*"
-python-dateutil = "*"
-six = ">=1.10"
-urllib3 = ">=1.15"
+certifi = ">=2023.1.1"
+python-dateutil = ">=2.8.2"
+requests = ">=2.31.0"
+six = ">=1.10,<2.0"
+urllib3 = ">=1.15,<3.0"
 
 [package.extras]
 dev = ["black", "pytest"]
@@ -2857,24 +2873,24 @@ pluggy = ">0.13.1"
 
 [[package]]
 name = "mitol-django-hubspot-api"
-version = "2023.12.19"
+version = "2025.9.16"
 description = "Django application for Hubspot API integration"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol-django-hubspot-api-2023.12.19.tar.gz", hash = "sha256:cdec5eb5ddd20dccdd6dca9a1bfee7cb04f70874367691da24017556f9b4bb58"},
-    {file = "mitol_django_hubspot_api-2023.12.19-py3-none-any.whl", hash = "sha256:5a761a238474bd5e2c20b4d72a31f7298b6196e453f6e2047cc67590d995068b"},
+    { file = "mitol_django_hubspot_api-2025.9.16-py3-none-any.whl", hash = "sha256:7e88d19eb036c50edfd82a34ce8d7f55a7ecca056b1ae4dd5553cb967450f9ca" },
+    { file = "mitol_django_hubspot_api-2025.9.16.tar.gz", hash = "sha256:d8beaf476ab519cfbcbf6940620ac23efe5c206af32dc83b6ff9f5be0f8ede3d" },
 ]
 
 [package.dependencies]
 django = ">=3.0"
+django-stubs = ">=1.13.1"
 djangorestframework = ">=3.0.0"
 factory-boy = ">=3.2,<4.0"
-hubspot-api-client = "6.1.0"
+hubspot-api-client = "12.0.0"
 mitol-django-common = "*"
 requests = ">=2.20.0"
-setuptools = "*"
 urllib3 = ">=1.26.5"
 
 [[package]]
@@ -5931,4 +5947,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "65e8b8e5d030d2a87b2ae9d7cc9685fa78fe2b15d77bf1e7d015f9460e8f14ff"
+content-hash = "78f47c9d9f8dd254f17ebdb8e4bb3b39c9252240dfe1eaf74babed077cab1e8e"

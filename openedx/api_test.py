@@ -234,12 +234,52 @@ def test_create_edx_user(  # noqa: PLR0913
 
 @responses.activate
 @pytest.mark.usefixtures("application")
+def test_create_edx_user_dupe_email_username(settings):
+    """Test that create_edx_user handles a 409 response from the edX API"""
+    user = UserFactory.create(
+        openedx_user__has_been_synced=False,
+    )
+    error_data = {
+        "error_code": "duplicate-email-username",
+        "username_suggestions": [],
+    }
+
+    resp1 = responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/mobile/v0.5/my_user_info",
+        json={},
+        status=status.HTTP_200_OK,
+    )
+    resp2 = responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
+        json=error_data,
+        status=status.HTTP_409_CONFLICT,
+    )
+
+    create_edx_user(user)
+
+    assert resp1.call_count == 0
+    assert resp2.call_count == 1
+
+    user.refresh_from_db()
+
+    edx_user = user.openedx_users.first()
+
+    assert edx_user.has_been_synced is False
+    assert edx_user.has_sync_error is True
+    assert edx_user.sync_error_data == error_data
+
+
+@responses.activate
+@pytest.mark.usefixtures("application")
 @pytest.mark.parametrize(
     (
         "username_suggestions",
         "base_username",
         "expected_username_pattern",
         "test_description",
+        "edx_username_conflicts",
     ),
     [
         (
@@ -247,6 +287,7 @@ def test_create_edx_user(  # noqa: PLR0913
             "testuser",
             lambda username: username == "openedx-generated-username",
             "with OpenEdX suggestions",
+            False,
         ),
         (
             [],
@@ -254,21 +295,35 @@ def test_create_edx_user(  # noqa: PLR0913
             lambda username: username.startswith("José_")
             and len(username) > len("José"),
             "with empty suggestions (non-ASCII fallback)",
+            False,
+        ),
+        (
+                [],
+                "José",
+                lambda username: username.startswith("José_")
+                                 and len(username) > len("José"),
+                "with empty suggestions (non-ASCII fallback)",
+                True,
         ),
     ],
 )
-def test_create_edx_user_conflict(
+def test_create_edx_user_conflict(  # noqa: PLR0913
     settings,
     username_suggestions,
     base_username,
     expected_username_pattern,
     test_description,
+    edx_username_conflicts,
 ):
     """Test that create_edx_user handles a 409 response from the edX API"""
     user = UserFactory.create(
         openedx_user__has_been_synced=False,
         openedx_user__desired_edx_username=base_username,
     )
+    if edx_username_conflicts:
+        UserFactory.create(
+            openedx_user__edx_username=base_username,
+        )
 
     resp1 = responses.add(
         responses.GET,

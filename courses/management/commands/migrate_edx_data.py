@@ -22,7 +22,7 @@ class Command(BaseCommand):
                 user=settings.TRINO_USER,
                 auth=BasicAuthentication(settings.TRINO_USER, settings.TRINO_PASSWORD),
                 catalog=settings.TRINO_CATALOG,
-                schema=settings.TRINO_SCHEMA,
+                schema="ol_warehouse_production_migration",
             )
             self.stdout.write(self.style.SUCCESS("Successfully connected to Trino"))
         except Exception as e:

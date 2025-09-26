@@ -589,6 +589,41 @@ KEYCLOAK_CLIENT_ID = get_string(
     description="The client name for mitxonline.",
 )
 
+KEYCLOAK_CLIENT_SECRET = get_string(
+    name="KEYCLOAK_CLIENT_SECRET",
+    default=None,
+    description="The client secret for mitxonline.",
+)
+
+KEYCLOAK_DISCOVERY_URL = get_string(
+    name="KEYCLOAK_DISCOVERY_URL",
+    default=None,
+    description="The OpenID discovery URL for the Keycloak realm.",
+)
+
+KEYCLOAK_ADMIN_CLIENT_ID = get_string(
+    name="KEYCLOAK_ADMIN_CLIENT_ID",
+    default=None,
+    description="The client name for the admin client.",
+)
+
+KEYCLOAK_ADMIN_CLIENT_SECRET = get_string(
+    name="KEYCLOAK_ADMIN_CLIENT_SECRET",
+    default=None,
+    description="The client secret for the admin client.",
+)
+
+KEYCLOAK_ADMIN_CLIENT_SCOPES = get_string(
+    name="KEYCLOAK_ADMIN_CLIENT_SCOPES",
+    default=None,
+    description="The OpenID scopes to use for the admin client.",
+)
+
+KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL = get_bool(
+    name="KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL",
+    default=False,
+    description="If true, do not verify SSL certificates for the admin client.",
+)
 
 # Social Auth Configuration end
 
@@ -1017,6 +1052,18 @@ REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ = get_int(
 
 REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET = int(REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ / 2)
 
+KEYCLOAK_ORG_SYNC_FREQUENCY = get_int(
+    name="KEYCLOAK_ORG_SYNC_FREQUENCY",
+    default=86400,
+    description="How many seconds to wait between refreshing organization data from the Keycloak API",
+)
+
+KEYCLOAK_ORG_SYNC_OFFSET = get_int(
+    name="KEYCLOAK_ORG_SYNC_OFFSET",
+    default=int(KEYCLOAK_ORG_SYNC_FREQUENCY / 2),
+    description="Offset for the Keycloak org sync",
+)
+
 CELERY_BEAT_SCHEDULE = {
     "retry-failed-edx-enrollments": {
         "task": "openedx.tasks.retry_failed_edx_enrollments",
@@ -1062,6 +1109,13 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": OffsettingSchedule(
             run_every=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ),
             offset=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET),
+        ),
+    },
+    "sync-keycloak": {
+        "task": "b2b.tasks.queue_organization_sync",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=KEYCLOAK_ORG_SYNC_FREQUENCY),
+            offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
         ),
     },
 }
@@ -1556,12 +1610,6 @@ TRINO_CATALOG = get_string(
     name="TRINO_CATALOG",
     default=None,
     description="Catalog name for Trino queries",
-)
-
-TRINO_SCHEMA = get_string(
-    name="TRINO_SCHEMA",
-    default=None,
-    description="Schema name for Trino queries",
 )
 
 TRINO_USER = get_string(

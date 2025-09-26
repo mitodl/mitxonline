@@ -61,7 +61,7 @@ class OrganizationPage(Page):
 
     name = models.CharField(max_length=255, help_text="The name of the organization")
     org_key = models.CharField(
-        max_length=10,
+        max_length=30,
         help_text="The short key used for the organization (for edX).",
         unique=True,
     )
@@ -113,6 +113,17 @@ class OrganizationPage(Page):
         """Return a reasonable representation of the org as a string."""
 
         return f"{self.name} <{self.org_key}>"
+
+    class Meta:
+        """Meta options for the OrganizationPage."""
+
+        verbose_name = "Organization"
+        verbose_name_plural = "Organizations"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sso_organization_id"], name="unique_sso_organization_id"
+            )
+        ]
 
 
 class ContractPage(Page):
@@ -313,6 +324,12 @@ class ContractPage(Page):
         self.programs.add(program)
 
         return (managed, skipped)
+
+    class Meta:
+        """Meta options for the ContractPage."""
+
+        verbose_name = "Contract"
+        verbose_name_plural = "Contracts"
 
 
 class DiscountContractAttachmentRedemption(TimestampedModel):

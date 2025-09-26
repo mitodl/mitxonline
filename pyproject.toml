@@ -43,13 +43,13 @@ djoser = "^2.1.0"
 drf-extensions = "^0.7.1"
 drf-spectacular = "^0.28.0"
 edx-api-client = "^1.12.0"
-hubspot-api-client = "^6.1.0"
+hubspot-api-client = "^12.0.0"
 hypothesis = "4.23.9"
 ipython = "^8.0.0"
 mitol-django-apigateway = "2025.8.7"
 mitol-django-authentication = "^2025.2.12"
 mitol-django-common = ">=2025.5.23"
-mitol-django-hubspot-api = "2023.12.19"
+mitol-django-hubspot-api = "2025.09.16"
 mitol-django-mail = "2023.12.19"
 mitol-django-olposthog = "^2024.5.14"
 mitol-django-openedx = "2023.12.19"
@@ -90,6 +90,8 @@ pytest-lazy-fixtures = "^1.1.4"
 tabulate = "^0.9.0"
 python-redis-lock = "^4.0.0"
 django-object-actions = "^5.0.0"
+requests-oauthlib = "^2.0.0"
+authlib = "^1.6.3"
 trino = "^0.336.0"
 
 
@@ -118,6 +120,7 @@ pytest-xdist = {extras = ["psutil"], version = "^3.6.1"}
 [tool.ruff]
 target-version = "py310"
 line-length = 88
+extend-exclude = ["b2b/keycloak_admin_dataclasses.py"]
 
 [tool.ruff.lint]
 select = [
