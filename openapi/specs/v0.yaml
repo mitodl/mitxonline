@@ -3459,6 +3459,8 @@ components:
           type: string
         title_2:
           type: string
+        title_3:
+          type: string
         organization:
           type: string
         signature_image:
@@ -3469,6 +3471,7 @@ components:
       - signature_image
       - title_1
       - title_2
+      - title_3
     StaffDashboardUser:
       type: object
       description: Serializer for data we care about in the staff dashboard
