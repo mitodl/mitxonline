@@ -149,6 +149,43 @@ const findStates = (country: string, countries: Array<Country>) => {
     null
 }
 
+const renderFirstNameField = errors => {
+  const hasError =
+    errors && errors.legal_address && errors.legal_address.first_name
+  return (
+    <div>
+      <CardLabel
+        htmlFor="legal_address.first_name"
+        isRequired={true}
+        label="First Name"
+        subLabel="Name that will appear on emails"
+      />
+      <Field
+        type="text"
+        name="legal_address.first_name"
+        id="legal_address.first_name"
+        className="form-control"
+        autoComplete="given-name"
+        aria-invalid={
+          hasError ? "true" : null
+        }
+        aria-describedby={
+          hasError ?
+            "first-name-error" :
+            null
+        }
+        aria-description="Name cannot start with, or contain, a special character"
+        title="Name cannot start with, or contain, a special character."
+        required
+      />
+      <ErrorMessage
+        id="first-name-error"
+        name="legal_address.first_name"
+        component={FormError}
+      />
+    </div>)
+}
+
 const renderYearOfBirthField = errors => {
   const hasError =
     errors && errors.user_profile && errors.user_profile.year_of_birth
@@ -202,8 +239,14 @@ export const LegalAddressCountryFields = ({
         values.legal_address.country === "CA") &&
         !values.legal_address.state)
   )
+  const [showFirstNameField, setshowFirstNameField] = React.useState(
+    values.legal_address.first_name === ""
+  )
 
   React.useEffect(() => {
+    if (values.legal_address.first_name === "") {
+      setshowFirstNameField(true)
+    }
     if (values.user_profile.year_of_birth === "") {
       setShowYearOfBirthField(true)
     }
@@ -219,6 +262,9 @@ export const LegalAddressCountryFields = ({
 
   return (
     <React.Fragment>
+      {showFirstNameField ? (
+        <div className="form-group">{renderFirstNameField(errors)}</div>
+      ) : null}
       {showYearOfBirthField ? (
         <div className="form-group">{renderYearOfBirthField(errors)}</div>
       ) : null}
