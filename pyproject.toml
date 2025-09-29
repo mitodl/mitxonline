@@ -93,6 +93,7 @@ django-object-actions = "^5.0.0"
 requests-oauthlib = "^2.0.0"
 authlib = "^1.6.3"
 trino = "^0.336.0"
+granian = "^2.5.4"
 
 
 [tool.poetry.group.dev.dependencies]
