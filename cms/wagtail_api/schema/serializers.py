@@ -17,6 +17,7 @@ class SignatoryItemSerializer(serializers.Serializer):
     name = serializers.CharField()
     title_1 = serializers.CharField()
     title_2 = serializers.CharField()
+    title_3 = serializers.CharField()
     organization = serializers.CharField()
     signature_image = serializers.CharField()  # or serializers.URLField() if full URLs
 
