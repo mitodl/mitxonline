@@ -42,7 +42,6 @@ from openedx.exceptions import (
     EdxApiUserUpdateError,
     NoEdxApiAuthError,
     OpenEdXOAuth2Error,
-    OpenEdxUserCreateError,
     OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
@@ -113,19 +112,11 @@ def _is_duplicate_username_error(resp, data):
     )
 
 
-def _is_duplicate_email_username_error(resp, data):
-    """Check if the response indicates a duplicate username error."""
-    return (
-        resp.status_code == status.HTTP_409_CONFLICT
-        and data.get("error_code") == "duplicate-email-username"
-    )
-
-
-def _is_bad_request(resp, data):
+def _is_bad_request(resp):
     """Check if the response indicates a bad request."""
-    return (
-        resp.status_code == status.HTTP_400_BAD_REQUEST
-        or _is_duplicate_email_username_error(resp, data)
+    return resp.status_code in (
+        status.HTTP_400_BAD_REQUEST,
+        status.HTTP_409_CONFLICT,
     )
 
 
@@ -265,7 +256,7 @@ def _set_edx_error(open_edx_user, data):
     open_edx_user.save()
 
 
-def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
+def _create_edx_user_request(open_edx_user, user, access_token):
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
 
@@ -276,9 +267,6 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
 
     Returns:
         bool: True if user was created successfully, False otherwise
-
-    Raises:
-        OpenEdxUserCreateError: if user creation fails
     """
     req_session = requests.Session()
     if settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN is not None:
@@ -316,6 +304,7 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
 
     try:
         resp = None
+        data = None
 
         while attempt < max_attempts:
             attempt += 1
@@ -353,18 +342,15 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
                 if should_reset_attempts:
                     attempt = 0
                 continue
-            elif _is_bad_request(resp, data):
-                _set_edx_error(open_edx_user, data)
-                return False
             else:
                 break
 
-        if attempt >= max_attempts:
-            log.error("Failed to create Open edX user after %d attempts.", max_attempts)
+        if _is_bad_request(resp):
+            # this is a known type of error dependent on user input
+            _set_edx_error(open_edx_user, data)
+            return False
 
-        raise OpenEdxUserCreateError(
-            f"Error creating Open edX user. {get_error_response_summary(resp)}"  # noqa: EM102
-        )
+        resp.raise_for_status()
     finally:
         lock.release()
 
