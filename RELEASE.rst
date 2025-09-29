@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.131.0
+---------------
+
+- Capture all 400/409 errors from openedx (#2974)
+- fix(deps): update dependency deepdiff to v8 [security] (#2921)
+- Add third title to SignatoryPage (#2954)
+- Create a management command to run edx courserun migration (#2922)
+- chore(deps): update dependency authlib to v1.6.4 [security] (#2971)
+- Fix openedx user sync issues (#2970)
+- chore: upgrade hubspot-api-client and mitol-django-hubspot-api (#2949)
+- Add Keycloak organization sync (#2948)
+- make first_name / last_name not required in legal_address updates (#2967)
+- Update the B2B course run creation code to explicitly look for a source course (#2959)
+
 Version 0.130.4 (Released September 25, 2025)
 ---------------
 
