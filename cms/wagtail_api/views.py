@@ -54,7 +54,7 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
         """
         Returns the appropriate permissions based on the 'type' query parameter.
         """
-        page_type = self.request.query_params.get("type")
+        page_type = self.request.query_params.get("type", "").lower()
         if page_type in PageType.anonymous_access_allowed_types():
             return [AllowAny()]
         return [IsAuthenticated()]
