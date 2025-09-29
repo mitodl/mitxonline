@@ -271,10 +271,11 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         if qp.get("include_approved_financial_aid"):
             added_context["include_approved_financial_aid"] = True
         if qp.get("org_id"):
+            user = self.request.user
             added_context["org_id"] = qp.get("org_id")
             added_context["user_contracts"] = (
-                self.request.user.b2b_contracts.values_list("id", flat=True).all()
-                if self.request.user.b2b_contracts
+                user.b2b_contracts.values_list("id", flat=True).all()
+                if user.is_authenticated and user.b2b_contracts
                 else []
             )
         return {**super().get_serializer_context(), **added_context}
