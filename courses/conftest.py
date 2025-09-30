@@ -83,7 +83,7 @@ def _create_course(n):
 
 
 def _create_program(courses, program_index=0):
-    program = ProgramFactory.create()
+    program = ProgramFactory.create(title=f"Test Program {program_index:02d}")
     ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
     required_courses_node = root_node.add_child(
