@@ -11,12 +11,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import F
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
-from hubspot.crm.objects import (
-    ApiException,
-)
-from hubspot.crm.objects import (
-    BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate,
-)
+from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
 from mitol.common.decorators import single_task
 from mitol.common.utils.collections import chunks
 from mitol.common.utils.datetime import now_in_utc
@@ -259,7 +254,7 @@ def batch_create_hubspot_objects_chunked(
         try:
             response = HubspotApi().crm.objects.batch_api.create(
                 hubspot_type,
-                BatchInputCreate(
+                BatchInputSimplePublicObjectInput(
                     inputs=api.MODEL_CREATE_FUNCTION_MAPPING[ct_model_name](chunk)
                 ),
             )
@@ -325,7 +320,7 @@ def batch_update_hubspot_objects_chunked(
         inputs = api.MODEL_UPDATE_FUNCTION_MAPPING[ct_model_name](chunk)
         try:
             response = HubspotApi().crm.objects.batch_api.update(
-                hubspot_type, BatchInputCreate(inputs=inputs)
+                hubspot_type, BatchInputSimplePublicObjectInput(inputs=inputs)
             )
             chunk_updated_ids = [result.id for result in response.results]
             for result in response.results:
