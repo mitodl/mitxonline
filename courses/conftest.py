@@ -68,8 +68,8 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
         course, course_runs_for_course = _create_course(n)
         courses.append(course)
         course_runs.append(course_runs_for_course)
-    for n in range(course_catalog_program_count):  # noqa: B007
-        program = _create_program(courses)
+    for n in range(course_catalog_program_count):
+        program = _create_program(courses, n)
         programs.append(program)
     return courses, programs, course_runs
 
@@ -82,7 +82,7 @@ def _create_course(n):
     return test_course, [cr1, cr2, cr3]
 
 
-def _create_program(courses):
+def _create_program(courses, program_index=0):
     program = ProgramFactory.create()
     ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
@@ -99,13 +99,19 @@ def _create_program(courses):
         elective_flag=True,
     )
     if len(courses) > 3:  # noqa: PLR2004
-        for c in random.sample(courses, 3):
+        # Use deterministic selection based on program index to ensure each 
+        # program gets different but predictable courses
+        start_idx = (program_index * 2) % len(courses)
+        required_course_indices = [(start_idx + i) % len(courses) for i in range(3)]
+        elective_course_indices = [(start_idx + 3 + i) % len(courses) for i in range(3)]
+        
+        for idx in required_course_indices:
             required_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=c
+                node_type=ProgramRequirementNodeType.COURSE, course=courses[idx]
             )
-        for c in random.sample(courses, 3):
+        for idx in elective_course_indices:
             elective_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=c
+                node_type=ProgramRequirementNodeType.COURSE, course=courses[idx]
             )
     else:
         required_courses_node.add_child(
