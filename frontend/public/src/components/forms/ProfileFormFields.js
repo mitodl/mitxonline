@@ -166,14 +166,8 @@ const renderFirstNameField = errors => {
         id="legal_address.first_name"
         className="form-control"
         autoComplete="given-name"
-        aria-invalid={
-          hasError ? "true" : null
-        }
-        aria-describedby={
-          hasError ?
-            "first-name-error" :
-            null
-        }
+        aria-invalid={hasError ? "true" : null}
+        aria-describedby={hasError ? "first-name-error" : null}
         aria-description="Name cannot start with, or contain, a special character"
         title="Name cannot start with, or contain, a special character."
         required
@@ -183,7 +177,8 @@ const renderFirstNameField = errors => {
         name="legal_address.first_name"
         component={FormError}
       />
-    </div>)
+    </div>
+  )
 }
 
 const renderLastNameField = errors => {
@@ -203,14 +198,8 @@ const renderLastNameField = errors => {
         id="legal_address.last_name"
         className="form-control"
         autoComplete="family-name"
-        aria-invalid={
-          hasError ? "true" : null
-        }
-        aria-describedby={
-          hasError ?
-            "last-name-error" :
-            null
-        }
+        aria-invalid={hasError ? "true" : null}
+        aria-describedby={hasError ? "last-name-error" : null}
         aria-description="Name cannot start with, or contain, a special character"
         title="Name cannot start with, or contain, a special character."
         required
@@ -220,7 +209,8 @@ const renderLastNameField = errors => {
         name="legal_address.last_name"
         component={FormError}
       />
-    </div>)
+    </div>
+  )
 }
 
 const renderYearOfBirthField = errors => {
@@ -280,7 +270,7 @@ export const LegalAddressCountryFields = ({
     values.legal_address.first_name === ""
   )
   const [showLastNameField, setShowLastNameField] = React.useState(
-    values.legal_address.first_name === ""
+    values.legal_address.last_name === ""
   )
 
   React.useEffect(() => {
@@ -408,12 +398,8 @@ export const LegalAddressFields = ({
   const addressErrors = errors && errors.legal_address
   return (
     <React.Fragment>
-      <div className="form-group">
-        {renderFirstNameField(errors)}
-      </div>
-      <div className="form-group">
-        {renderLastNameField(errors)}
-      </div>
+      <div className="form-group">{renderFirstNameField(errors)}</div>
+      <div className="form-group">{renderLastNameField(errors)}</div>
       <div className="form-group">
         <CardLabel
           htmlFor="name"
