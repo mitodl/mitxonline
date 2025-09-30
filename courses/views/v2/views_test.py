@@ -287,6 +287,21 @@ def test_get_course(
 
 
 @pytest.mark.django_db
+def test_filter_with_org_id_anonymous():
+    org = OrganizationPageFactory(name="Test Org")
+
+    client = APIClient()
+
+    unrelated_course = Course.objects.create(title="Other Course")
+    CourseRunFactory(course=unrelated_course)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    assert response.data["results"] == []
+
+
+@pytest.mark.django_db
 def test_filter_with_org_id_returns_contracted_course(
     mocker, contract_ready_course, mock_course_run_clone
 ):

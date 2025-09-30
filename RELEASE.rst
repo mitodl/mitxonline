@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.131.2
+---------------
+
+- Wagtail permissions and url fix (#2975)
+- 8621-featured-items-celery-task-is-not-robust (#2973)
+- get_topics_from_page unit tests (#2978)
+- Courses API w/ org= handle anonymous (#2979)
+
 Version 0.131.1 (Released September 30, 2025)
 ---------------
 

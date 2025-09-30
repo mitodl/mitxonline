@@ -1130,9 +1130,9 @@ paths:
                 - $ref: '#/components/schemas/CertificatePage'
                 - $ref: '#/components/schemas/Page'
           description: Returns a page of any known Wagtail page type
-  /api/v2/pages/?fields=*&type=cms.CertificatePage:
+  /api/v2/pages/?fields=*&type=cms.certificatepage:
     get:
-      operationId: pages_?fields=*&type=cms.CertificatePage_retrieve
+      operationId: pages_?fields=*&type=cms.certificatepage_retrieve
       description: Returns pages of type cms.CertificatePage
       summary: List all Certificate Pages
       tags:
@@ -1144,9 +1144,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/CertificatePageList'
           description: ''
-  /api/v2/pages/?fields=*&type=cms.CoursePage:
+  /api/v2/pages/?fields=*&type=cms.coursepage:
     get:
-      operationId: pages_?fields=*&type=cms.CoursePage_retrieve
+      operationId: pages_?fields=*&type=cms.coursepage_retrieve
       description: Returns pages of type cms.CoursePage
       summary: List all Course Pages
       parameters:
@@ -1164,9 +1164,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/CoursePageList'
           description: ''
-  /api/v2/pages/?fields=*&type=cms.ProgramPage:
+  /api/v2/pages/?fields=*&type=cms.programpage:
     get:
-      operationId: pages_?fields=*&type=cms.ProgramPage_retrieve
+      operationId: pages_?fields=*&type=cms.programpage_retrieve
       description: Returns pages of type cms.ProgramPage
       summary: List all Program Pages
       parameters:

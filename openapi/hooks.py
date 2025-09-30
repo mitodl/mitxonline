@@ -169,24 +169,24 @@ def insert_wagtail_pages_schema(endpoints):
     )
     endpoints.append(
         (
-            "/api/v2/pages/?fields=*&type=cms.CertificatePage",
-            "^api/v2/pages/?fields=*&type=cms.CertificatePage$",
+            "/api/v2/pages/?fields=*&type=cms.certificatepage",
+            "^api/v2/pages/?fields=*&type=cms.certificatepage$",
             "GET",
             certificate_view,
         )
     )
     endpoints.append(
         (
-            "/api/v2/pages/?fields=*&type=cms.CoursePage",
-            "^api/v2/pages/?fields=*&type=cms.CoursePage$",
+            "/api/v2/pages/?fields=*&type=cms.coursepage",
+            "^api/v2/pages/?fields=*&type=cms.coursepage$",
             "GET",
             course_view,
         )
     )
     endpoints.append(
         (
-            "/api/v2/pages/?fields=*&type=cms.ProgramPage",
-            "^api/v2/pages/?fields=*&type=cms.ProgramPage$",
+            "/api/v2/pages/?fields=*&type=cms.programpage",
+            "^api/v2/pages/?fields=*&type=cms.programpage$",
             "GET",
             program_view,
         )

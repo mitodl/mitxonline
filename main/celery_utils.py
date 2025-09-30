@@ -24,7 +24,6 @@ class OffsettingSchedule(schedule):
         if self._apply_offset is not None and retval.is_due:
             self._apply_offset = False
             self.run_every = self._run_every
-            retval = super().is_due(last_run_at)
         return retval
 
     def __reduce__(self):
