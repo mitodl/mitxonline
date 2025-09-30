@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.131.1
+Version 0.131.1 (Released September 30, 2025)
 ---------------
 
 - feat: Install granian. (#2976)
