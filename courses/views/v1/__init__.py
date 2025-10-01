@@ -479,8 +479,21 @@ class UserEnrollmentsApiViewSet(
                     HTTPError,
                     RequestsConnectionError,
                 ) as exc:
-                    log.exception(str(exc))  # noqa: TRY401
-                    return Response(data=str(exc), status=status.HTTP_400_BAD_REQUEST)
+                    # Log full details for debugging
+                    log.exception(
+                        "Failed to update email subscription for user %s, enrollment %s, receive_emails=%s",
+                        request.user.id,
+                        enrollment.id,
+                        receive_emails,
+                    )
+
+                    # Return user-friendly error
+                    return Response(
+                        data={
+                            "error": "Unable to update email preferences at this time. Please try again later or contact support."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
         else:
             # only designed to update edx_emails_subscription field
             # TODO: In the future please add the implementation  # noqa: FIX002, TD002, TD003

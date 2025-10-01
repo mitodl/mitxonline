@@ -736,6 +736,10 @@ def test_update_user_enrollment_failure(
         data={"receive_emails": "on" if receive_emails else ""},
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    # Update assertion to check for the new generic error message
+    assert resp.json() == {
+        "error": "Unable to update email preferences at this time. Please try again later or contact support."
+    }
     patched_email_subscription.assert_called_once_with(user, run_enrollment.run)
     patched_log_exception.assert_called_once()
 
