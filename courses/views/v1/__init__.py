@@ -478,7 +478,7 @@ class UserEnrollmentsApiViewSet(
                     NoEdxApiAuthError,
                     HTTPError,
                     RequestsConnectionError,
-                ) as exc:
+                ):
                     # Log full details for debugging
                     log.exception(
                         "Failed to update email subscription for user %s, enrollment %s, receive_emails=%s",
