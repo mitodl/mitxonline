@@ -7,7 +7,13 @@ from django.core.management import BaseCommand, CommandError
 from django.db.models import Q
 
 from b2b.api import create_contract_run
-from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
+from b2b.constants import (
+    CONTRACT_MEMBERSHIP_AUTO,
+    CONTRACT_MEMBERSHIP_CODE,
+    CONTRACT_MEMBERSHIP_MANAGED,
+    CONTRACT_MEMBERSHIP_NONSSO,
+    CONTRACT_MEMBERSHIP_SSO,
+)
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from courses.api import resolve_courseware_object_from_id
 
@@ -63,14 +69,17 @@ class Command(BaseCommand):
             help="The name of the contract.",
         )
         create_parser.add_argument(
-            "integration_type",
+            "membership_type",
             type=str,
-            help="The type of integration for this contract.",
+            help="The mmebership type for this contract.",
             choices=[
-                CONTRACT_INTEGRATION_SSO,
-                CONTRACT_INTEGRATION_NONSSO,
+                CONTRACT_MEMBERSHIP_SSO,
+                CONTRACT_MEMBERSHIP_NONSSO,
+                CONTRACT_MEMBERSHIP_MANAGED,
+                CONTRACT_MEMBERSHIP_CODE,
+                CONTRACT_MEMBERSHIP_AUTO,
             ],
-            default=CONTRACT_INTEGRATION_NONSSO,
+            default=CONTRACT_MEMBERSHIP_MANAGED,
         )
         create_parser.add_argument(
             "--description",
@@ -208,7 +217,7 @@ class Command(BaseCommand):
         """Handle the create subcommand."""
         organization_name = kwargs.pop("organization")
         contract_name = kwargs.pop("contract_name")
-        integration_type = kwargs.pop("integration_type")
+        membership_type = kwargs.pop("membership_type")
         description = kwargs.pop("description")
         start_date = kwargs.pop("start")
         end_date = kwargs.pop("end")
@@ -246,7 +255,7 @@ class Command(BaseCommand):
         contract = ContractPage(
             name=contract_name,
             description=description or "",
-            integration_type=integration_type,
+            membership_type=membership_type,
             organization=org,
             contract_start=start_date,
             contract_end=end_date,
