@@ -27,6 +27,7 @@ from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.permissions import IsAdminOrReadOnly
+from users.models import UserOrganization
 
 
 class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -141,6 +142,9 @@ class AttachContractApi(APIView):
             if contract.is_full():
                 continue
 
+            UserOrganization.process_add_membership(
+                request.user, contract.organization, keep_until_seen=True
+            )
             request.user.b2b_contracts.add(contract)
             DiscountContractAttachmentRedemption.objects.create(
                 user=request.user, discount=code, contract=contract
