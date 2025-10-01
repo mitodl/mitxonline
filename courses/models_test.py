@@ -22,7 +22,6 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
 )
@@ -1028,7 +1027,6 @@ def test_program_minimum_elective_courses_requirement():
     """Tests to make sure the related programs functionality in the model works."""
     minimum_elective_required = 5
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1050,7 +1048,6 @@ def test_program_minimum_elective_courses_requirement():
 def test_program_minimum_elective_courses_requirement_no_elective_node():
     """Tests to make sure the related programs functionality in the model works."""
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(

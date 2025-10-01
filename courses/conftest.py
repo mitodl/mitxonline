@@ -8,7 +8,6 @@ from courses.factories import (
     CourseFactory,
     CourseRunFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
 )
 from courses.models import (
     ProgramRequirement,
@@ -84,7 +83,6 @@ def _create_course(n):
 
 def _create_program(courses):
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
     required_courses_node = root_node.add_child(
         node_type=ProgramRequirementNodeType.OPERATOR,

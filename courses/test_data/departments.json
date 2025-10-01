@@ -1,0 +1,90 @@
+[
+  {
+    "name": "Aeronautics and Astronautics",
+    "slug": "aeronautics-and-astronautics"
+  },
+  {
+    "name": "Anthropology",
+    "slug": "anthropology"
+  },
+  {
+    "name": "Biology",
+    "slug": "biology"
+  },
+  {
+    "name": "Brain and Cognitive Sciences",
+    "slug": "brain-and-cognitive-sciences"
+  },
+  {
+    "name": "Center for Transportation and Logistics",
+    "slug": "center-for-transportation-and-logistics"
+  },
+  {
+    "name": "Chemical Engineering",
+    "slug": "chemical-engineering"
+  },
+  {
+    "name": "Chemistry",
+    "slug": "chemistry"
+  },
+  {
+    "name": "Economics",
+    "slug": "economics"
+  },
+  {
+    "name": "Electrical Engineering and Computer Science",
+    "slug": "electrical-engineering-and-computer-science"
+  },
+  {
+    "name": "Global Studies and Languages",
+    "slug": "global-studies-and-languages"
+  },
+  {
+    "name": "History",
+    "slug": "history"
+  },
+  {
+    "name": "Humanities",
+    "slug": "humanities"
+  },
+  {
+    "name": "Linguistics and Philosophy",
+    "slug": "linguistics-and-philosophy"
+  },
+  {
+    "name": "Literature",
+    "slug": "literature"
+  },
+  {
+    "name": "Management",
+    "slug": "management"
+  },
+  {
+    "name": "Materials Science and Engineering",
+    "slug": "materials-science-and-engineering"
+  },
+  {
+    "name": "Mathematics",
+    "slug": "mathematics"
+  },
+  {
+    "name": "Mechanical Engineering",
+    "slug": "mechanical-engineering"
+  },
+  {
+    "name": "Music and Theater Arts",
+    "slug": "music-and-theater-arts"
+  },
+  {
+    "name": "Physics",
+    "slug": "physics"
+  },
+  {
+    "name": "Political Science",
+    "slug": "political-science"
+  },
+  {
+    "name": "Urban Studies and Planning",
+    "slug": "urban-studies-and-planning"
+  }
+]

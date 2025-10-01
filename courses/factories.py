@@ -1,6 +1,8 @@
 """Factories for creating course data in tests"""
 
+import json
 import string  # noqa: F401
+from pathlib import Path
 from types import SimpleNamespace
 
 import factory
@@ -34,12 +36,21 @@ from users.factories import UserFactory
 
 FAKE = faker.Factory.create()
 
+# stub data that mirrors production
+DEPARTMENTS = {
+    dept["slug"]: dept["name"]
+    for dept in json.loads(Path("courses/test_data/departments.json").read_text())
+}
+
 
 class DepartmentFactory(DjangoModelFactory):
-    name = factory.Sequence(lambda x: f"Testing - {x} Department")
+    name = factory.LazyAttribute(lambda dept: DEPARTMENTS[dept.slug])
+    slug = factory.Iterator(DEPARTMENTS.keys())
 
     class Meta:
         model = Department
+
+        django_get_or_create = ("slug",)
 
 
 class ProgramFactory(DjangoModelFactory):
@@ -55,7 +66,7 @@ class ProgramFactory(DjangoModelFactory):
     def departments(self, create, extracted, **kwargs):  # noqa: ARG002
         if not create or not extracted:
             return
-        self.departments.add(*extracted)
+        self.departments.set(extracted)
 
     class Meta:
         model = Program
@@ -166,14 +177,6 @@ class ProgramRequirementFactory(DjangoModelFactory):
     class Meta:
         model = ProgramRequirement
 
-    @classmethod
-    def add_root(cls, program):
-        if not ProgramRequirement.get_root_nodes().filter(program=program).exists():
-            return ProgramRequirement.add_root(
-                program=program, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
-            )
-        return program.get_requirements_root()
-
 
 class BlockedCountryFactory(DjangoModelFactory):
     """Factory for BlockedCountry"""
@@ -272,7 +275,6 @@ class LearnerProgramRecordShareFactory(DjangoModelFactory):
 @pytest.fixture
 def program_with_empty_requirements():
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(
