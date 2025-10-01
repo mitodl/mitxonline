@@ -15,6 +15,7 @@ def products():
         return ProductFactory.create_batch(5)
 
 
+@pytest.mark.skip_nplusone_check
 def test_mail_api_task_called(  # noqa: PLR0913
     settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
@@ -36,6 +37,7 @@ def test_mail_api_task_called(  # noqa: PLR0913
     assert mock_delayed_send_ecommerce_order_receipt.call_args[0][0] == order.id
 
 
+@pytest.mark.skip_nplusone_check
 def test_mail_api_receipt_generation(  # noqa: PLR0913
     settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
@@ -64,6 +66,7 @@ def test_mail_api_receipt_generation(  # noqa: PLR0913
     assert str(lines[0].unit_price) in rendered_template.body
 
 
+@pytest.mark.skip_nplusone_check
 def test_mail_api_refund_email_generation(
     settings, mocker, user, products, user_client
 ):

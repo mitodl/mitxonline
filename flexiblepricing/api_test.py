@@ -22,7 +22,6 @@ from courses.factories import (
     CourseFactory,
     CourseRunFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
     ProgramRunFactory,
 )
 from courses.models import (
@@ -170,7 +169,6 @@ def create_courseware(create_tiers=True, past=False):  # noqa: FBT002
     """
     end_date = None
     program = ProgramFactory.create(live=True)
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(

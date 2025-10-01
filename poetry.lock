@@ -205,18 +205,6 @@ jinxed = {version = ">=1.1.0", markers = "platform_system == \"Windows\""}
 wcwidth = ">=0.1.4"
 
 [[package]]
-name = "blinker"
-version = "1.9.0"
-description = "Fast, simple object-to-object and broadcast signaling"
-optional = false
-python-versions = ">=3.9"
-groups = ["dev"]
-files = [
-    {file = "blinker-1.9.0-py3-none-any.whl", hash = "sha256:ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc"},
-    {file = "blinker-1.9.0.tar.gz", hash = "sha256:b4ce2265a7abece45e7cc896e98dbebe6cead56bcf805a3d23136d145f5445bf"},
-]
-
-[[package]]
 name = "boto3"
 version = "1.38.34"
 description = "The AWS SDK for Python"
@@ -1494,6 +1482,18 @@ groups = ["main"]
 files = [
     {file = "django_webpack_loader-3.2.0-py2.py3-none-any.whl", hash = "sha256:a626e2aa5cf2664d565539ac7523c934c92943d5442f692f98ae357d74371bf0"},
     {file = "django_webpack_loader-3.2.0.tar.gz", hash = "sha256:af2b634ea11973d093ffb48a402b8838c6201d0e4e4ba9216f97b74e57791e76"},
+]
+
+[[package]]
+name = "django-zeal"
+version = "2.0.4"
+description = "Detect N+1s in your Django app"
+optional = false
+python-versions = ">=3.9"
+groups = ["dev"]
+files = [
+    {file = "django_zeal-2.0.4-py3-none-any.whl", hash = "sha256:c37b0a7d203572d8eb8462a601f19dedfdf82324a25c7eb7273afdc52fc519fa"},
+    {file = "django_zeal-2.0.4.tar.gz", hash = "sha256:934cd3968c1ede3f3ec5314c4da285ef4796f4b6de1f95870c5999370280e17e"},
 ]
 
 [[package]]
@@ -3177,22 +3177,6 @@ files = [
     {file = "nodeenv-1.9.1-py2.py3-none-any.whl", hash = "sha256:ba11c9782d29c27c70ffbdda2d7415098754709be8a7056d79a737cd901155c9"},
     {file = "nodeenv-1.9.1.tar.gz", hash = "sha256:6ec12890a2dab7946721edbfbcd91f3319c6ccc9aec47be7c7e6b7011ee6645f"},
 ]
-
-[[package]]
-name = "nplusone"
-version = "1.0.0"
-description = "Detecting the n+1 queries problem in Python"
-optional = false
-python-versions = "*"
-groups = ["dev"]
-files = [
-    {file = "nplusone-1.0.0-py2.py3-none-any.whl", hash = "sha256:96b1e6e29e6af3e71b67d0cc012a5ec8c97c6a2f5399f4ba41a2bbe0e253a9ac"},
-    {file = "nplusone-1.0.0.tar.gz", hash = "sha256:1726c0a10c0aa7eabb04e24db2882ff97b6b7ee29d729a8d97dcbd12ef5a5651"},
-]
-
-[package.dependencies]
-blinker = ">=1.3"
-six = ">=1.9.0"
 
 [[package]]
 name = "oauthlib"
@@ -6077,4 +6061,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "87193b31ee2ae7b2526393a01626780387a8e774b752a6690489e62e75ad85ed"
+content-hash = "c65d0b14142bb53a33f340edd0f168145ae6d9d03b35066f0905a9d9915750a6"

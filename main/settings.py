@@ -353,10 +353,13 @@ MIDDLEWARE = (
     "django_scim.middleware.SCIMAuthCheckMiddleware",
 )
 
-# enable the nplusone profiler only in debug mode
-if DEBUG:
-    INSTALLED_APPS += ("nplusone.ext.django",)
-    MIDDLEWARE += ("nplusone.ext.django.NPlusOneMiddleware",)
+# enable the zeal nplusone profiler only in debug mode or under pytest
+if DEBUG or ENVIRONMENT == "pytest":
+    INSTALLED_APPS += ("zeal",)
+    # this should be the first middleware so we catch any issues in our own middleware
+    MIDDLEWARE += ("zeal.middleware.zeal_middleware",)
+
+ZEAL_ALLOWLIST = []
 
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
@@ -793,10 +796,6 @@ DJANGO_LOG_LEVEL = get_string(
 
 HOSTNAME = platform.node().split(".")[0]
 
-# nplusone profiler logger configuration
-NPLUSONE_LOGGER = logging.getLogger("nplusone")
-NPLUSONE_LOG_LEVEL = logging.ERROR
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -834,7 +833,7 @@ LOGGING = {
             "level": DJANGO_LOG_LEVEL,
             "propagate": True,
         },
-        "nplusone": {"handlers": ["console"], "level": "ERROR"},
+        "zeal": {"handlers": ["console"], "level": "ERROR"},
     },
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }

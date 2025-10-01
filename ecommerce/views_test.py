@@ -89,6 +89,7 @@ def mock_create_run_enrollments(request, mocker):
     )
 
 
+@pytest.mark.skip_nplusone_check
 def test_list_products(user_drf_client, products):
     resp = user_drf_client.get(reverse("products_api-list"), {"l": 10, "o": 0})
     resp_products = sorted(resp.json()["results"], key=op.itemgetter("id"))
@@ -438,6 +439,7 @@ def test_redeem_time_limited_discount(  # noqa: PLR0913
         assert "not found" in resp_json
 
 
+@pytest.mark.skip_nplusone_check
 def test_start_checkout(user, user_drf_client, products):
     """
     Hits the start checkout view, which should create an Order record
@@ -455,6 +457,7 @@ def test_start_checkout(user, user_drf_client, products):
     assert order.state == OrderStatus.PENDING
 
 
+@pytest.mark.skip_nplusone_check
 def test_start_checkout_with_discounts(user, user_drf_client, products, discounts):
     """
     Applies a discount, then hits the start checkout view, which should create
@@ -499,6 +502,7 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
     assert resp.status_code == 302
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "apply_discount",
     [
@@ -549,6 +553,7 @@ def test_start_checkout_with_discounts_and_b2b(
         assert resp.status_code == 302
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "decision, expected_redirect_url, expected_state, basket_exists",  # noqa: PT006
     [
@@ -811,6 +816,7 @@ def test_discount_rest_api(admin_drf_client, user_drf_client):
     assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
 
 
+@pytest.mark.skip_nplusone_check
 def test_discount_redemptions_api(
     user, products, discounts, admin_drf_client, user_drf_client
 ):
@@ -895,6 +901,7 @@ def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
     assert data["count"] > 0
 
 
+@pytest.mark.skip_nplusone_check
 def test_paid_and_unpaid_courserun_checkout(
     settings, user, user_client, user_drf_client, products
 ):
@@ -931,6 +938,7 @@ def test_paid_and_unpaid_courserun_checkout(
     assert resp.status_code == 200
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "decision, expected_state, basket_exists",  # noqa: PT006
     [
@@ -1011,6 +1019,7 @@ def test_checkout_api_result(  # noqa: PLR0913
     assert Basket.objects.filter(id=basket.id).exists() is basket_exists
 
 
+@pytest.mark.skip_nplusone_check
 def test_checkout_api_result_verification_failure(
     user_client,
     api_client,
@@ -1043,6 +1052,7 @@ def test_checkout_api_result_verification_failure(
     assert resp.status_code == 403
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "upgrade_deadline, status_code",  # noqa: PT006
     [
@@ -1077,6 +1087,7 @@ def test_non_upgradable_courserun_checkout(  # noqa: PLR0913
         )
 
 
+@pytest.mark.skip_nplusone_check
 def test_start_checkout_with_zero_value(settings, user, user_client, products):
     """
     Check that the checkout redirects the user to dashboard when basket price is zero
@@ -1101,6 +1112,7 @@ def test_start_checkout_with_zero_value(settings, user, user_client, products):
     )
 
 
+@pytest.mark.skip_nplusone_check
 def test_start_checkout_and_ensure_edx_username_created(mocker, settings, products):
     """
     Check that checking out with a user that doesn't have an edx username

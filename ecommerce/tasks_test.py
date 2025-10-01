@@ -15,6 +15,7 @@ def products():
         return ProductFactory.create_batch(5)
 
 
+@pytest.mark.skip_nplusone_check
 def test_delayed_order_receipt_sends_email(  # noqa: PLR0913
     settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
@@ -35,6 +36,7 @@ def test_delayed_order_receipt_sends_email(  # noqa: PLR0913
     mock_send_ecommerce_order_receipt.assert_called()
 
 
+@pytest.mark.skip_nplusone_check
 def test_delayed_order_refund_sends_email(
     settings, mocker, user, products, user_client
 ):

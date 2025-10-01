@@ -52,7 +52,7 @@ from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from main.utils import encode_json_cookie_value
 from openedx.exceptions import NoEdxApiAuthError
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
+pytestmark = [pytest.mark.django_db]
 
 
 EXAMPLE_URL = "http://example.com"
@@ -146,6 +146,7 @@ def test_delete_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
 def test_get_courses(
@@ -301,6 +302,7 @@ def test_delete_course(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 def test_get_course_runs(user_drf_client, course_runs, django_assert_max_num_queries):
     """Test the view that handles requests for all CourseRuns"""
     with django_assert_max_num_queries(38) as context:
@@ -419,6 +421,7 @@ def test_delete_course_run(user_drf_client, course_runs, django_assert_max_num_q
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 def test_user_enrollments_list(user_drf_client, user):
     """The user enrollments view should return serialized enrollments for the logged-in user"""
     assert UserEnrollmentsApiViewSet.serializer_class == CourseRunEnrollmentSerializer
@@ -740,6 +743,7 @@ def test_update_user_enrollment_failure(
     patched_log_exception.assert_called_once()
 
 
+@pytest.mark.skip_nplusone_check
 def test_program_enrollments(user_drf_client, user, programs):
     """
     Tests the program enrollments API, which should show the user's enrollment

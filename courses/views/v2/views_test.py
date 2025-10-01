@@ -50,11 +50,12 @@ from courses.views.v2 import Pagination, ProgramFilterSet
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from users.factories import UserFactory
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
+pytestmark = [pytest.mark.django_db]
 logger = logging.getLogger(__name__)
 faker = Faker()
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
 def test_get_programs(
@@ -81,6 +82,7 @@ def test_get_programs(
         )
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
 def test_get_departments(
@@ -194,6 +196,7 @@ def test_delete_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.usefixtures("course_catalog_data")
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
@@ -351,6 +354,7 @@ def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses(
 
 
 @pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
 def test_filter_without_org_id_authenticated_user(user_drf_client):
     course_with_contract = CourseFactory(title="Contract Course")
     contract = ContractPageFactory(active=True)
@@ -573,6 +577,7 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     assert resp.status_code == 404
 
 
+@pytest.mark.skip_nplusone_check
 def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     """Test that user enrollments can be filtered by B2B organization ID"""
 
