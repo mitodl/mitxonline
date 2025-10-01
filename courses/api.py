@@ -78,6 +78,7 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+from users.models import UserOrganization
 
 if TYPE_CHECKING:
     from django.db.models.query import QuerySet
@@ -214,8 +215,11 @@ def create_run_enrollments(  # noqa: C901
             _enroll_learner_into_associated_programs()
 
             # If the run is associated with a B2B contract, add the contract
-            # to the user's contract list
+            # to the user's contract list and update their org memberships
             if run.b2b_contract:
+                UserOrganization.process_add_membership(
+                    user, run.b2b_contract.organization, keep_until_seen=True
+                )
                 user.b2b_contracts.add(run.b2b_contract)
                 user.save()
 

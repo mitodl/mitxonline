@@ -11,7 +11,7 @@ from mitol.common.utils.datetime import now_in_utc
 from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run, ensure_enrollment_codes_exist
-from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
+from b2b.constants import CONTRACT_MEMBERSHIP_NONSSO, CONTRACT_MEMBERSHIP_SSO
 from b2b.factories import ContractPageFactory
 from b2b.models import DiscountContractAttachmentRedemption
 from courses.factories import CourseRunFactory
@@ -43,7 +43,7 @@ def test_b2b_contract_attachment(user):
     """Ensure a supplied code results in attachment for the user."""
 
     contract = ContractPageFactory.create(
-        integration_type=CONTRACT_INTEGRATION_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
         max_learners=10,
     )
 
@@ -82,7 +82,7 @@ def test_b2b_contract_attachment_invalid_code_dates(user, bad_start_or_end):
     """Test that the attachment fails properly if the code has invalid dates."""
 
     contract = ContractPageFactory.create(
-        integration_type=CONTRACT_INTEGRATION_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
         max_learners=1,
     )
 
@@ -135,7 +135,7 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
     """Test that the attachment fails properly if the contract has invalid dates."""
 
     contract = ContractPageFactory.create(
-        integration_type=CONTRACT_INTEGRATION_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
         max_learners=1,
     )
 
@@ -181,7 +181,7 @@ def test_b2b_contract_attachment_full_contract():
     """Test that the attachment fails properly if the contract is full."""
 
     contract = ContractPageFactory.create(
-        integration_type=CONTRACT_INTEGRATION_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
         max_learners=1,
     )
 
@@ -234,7 +234,7 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price):
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
 
     contract = ContractPageFactory.create(
-        integration_type=CONTRACT_INTEGRATION_SSO,
+        membership_type=CONTRACT_MEMBERSHIP_SSO,
         enrollment_fixed_price=100 if has_price else 0,
     )
     source_courserun = CourseRunFactory.create(is_source_run=True)

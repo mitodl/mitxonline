@@ -25,10 +25,11 @@ from b2b.api import (
 )
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
-    CONTRACT_INTEGRATION_NONSSO,
-    CONTRACT_INTEGRATION_SSO,
+    CONTRACT_MEMBERSHIP_NONSSO,
+    CONTRACT_MEMBERSHIP_SSO,
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
+from b2b.factories import OrganizationPageFactory
 from b2b.models import OrganizationIndexPage, OrganizationPage
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.factories import CourseFactory, CourseRunFactory
@@ -52,6 +53,7 @@ from main.constants import (
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
+from users.models import UserOrganization
 
 FAKE = faker.Faker()
 pytestmark = [
@@ -260,9 +262,9 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
     assert_price = price if price else Decimal(0)
 
     contract = factories.ContractPageFactory(
-        integration_type=CONTRACT_INTEGRATION_SSO
+        membership_type=CONTRACT_MEMBERSHIP_SSO
         if is_sso
-        else CONTRACT_INTEGRATION_NONSSO,
+        else CONTRACT_MEMBERSHIP_NONSSO,
         enrollment_fixed_price=price,
         max_learners=max_learners,
     )
@@ -304,8 +306,8 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
         if update_no_price:
             contract.enrolment_fixed_price = None
         if update_sso:
-            contract.integration_type = (
-                CONTRACT_INTEGRATION_NONSSO if is_sso else CONTRACT_INTEGRATION_SSO
+            contract.membership_type = (
+                CONTRACT_MEMBERSHIP_NONSSO if is_sso else CONTRACT_MEMBERSHIP_SSO
             )
 
         contract.save()
@@ -361,7 +363,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 
     contract = factories.ContractPageFactory.create(
-        integration_type=CONTRACT_INTEGRATION_SSO,
+        membership_type=CONTRACT_MEMBERSHIP_SSO,
         enrollment_fixed_price=Decimal(0)
         if price_is_zero
         else FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
@@ -520,43 +522,129 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     mocked_clone_run.assert_called()
 
 
-def test_b2b_reconcile_user_orgs():
+def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     """Test that we can get a list of B2B orgs from somewhere and fix a user's associations."""
 
-    contracts = factories.ContractPageFactory.create_batch(
-        2, integration_type=CONTRACT_INTEGRATION_NONSSO
-    )
-    sso_contracts = factories.ContractPageFactory.create_batch(
-        2, integration_type=CONTRACT_INTEGRATION_SSO
-    )
     user = UserFactory.create()
+    organization_to_add = OrganizationPageFactory.create()
+    organization_to_ignore = OrganizationPageFactory.create()
+    organization_to_remove = OrganizationPageFactory.create()
+    weird_organization = OrganizationPageFactory.create(sso_organization_id=None)
 
     assert user.b2b_contracts.count() == 0
+    assert user.b2b_organizations.count() == 0
 
-    user.b2b_contracts.add(contracts[0])
-    user.b2b_contracts.add(contracts[1])
-    user.b2b_contracts.add(sso_contracts[0])
-    user.save()
+    # Step 1: pass in an org to a user that's not in anything
+    # We should get back one addition, which is the org we're adding
 
-    assert user.b2b_contracts.count() == 3
-
-    sso_required_org = sso_contracts[1].organization.sso_organization_id
-
-    added, removed = reconcile_user_orgs(user, [sso_required_org])
+    added, removed = reconcile_user_orgs(
+        user, [organization_to_add.sso_organization_id]
+    )
 
     assert added == 1
+    assert removed == 0
+
+    user.refresh_from_db()
+    assert user.b2b_organizations.count() == 1
+    assert user.b2b_organizations.filter(organization=organization_to_add).exists()
+    assert not user.b2b_organizations.filter(
+        organization=organization_to_ignore
+    ).exists()
+    assert not user.b2b_organizations.filter(
+        organization=organization_to_remove
+    ).exists()
+
+    # Step 2: Add an org through a back channel, and then reconcile
+    # The org should be removed
+
+    UserOrganization.objects.create(
+        user=user, organization=organization_to_remove, keep_until_seen=False
+    )
+
+    assert user.b2b_organizations.count() == 2
+
+    added, removed = reconcile_user_orgs(
+        user, [organization_to_add.sso_organization_id]
+    )
+
+    assert added == 0
     assert removed == 1
 
     user.refresh_from_db()
-    assert user.b2b_contracts.count() == 3
-    assert (
-        user.b2b_contracts.filter(
-            organization__sso_organization_id=sso_contracts[
-                0
-            ].organization.sso_organization_id
-        ).count()
-        == 0
+    assert user.b2b_organizations.count() == 1
+    assert user.b2b_organizations.filter(organization=organization_to_add).exists()
+    assert not user.b2b_organizations.filter(
+        organization=organization_to_ignore
+    ).exists()
+    assert not user.b2b_organizations.filter(
+        organization=organization_to_remove
+    ).exists()
+
+    # Step 3: Add the remove org, but set the flag so it should be kept now.
+
+    UserOrganization.objects.create(
+        user=user, organization=organization_to_remove, keep_until_seen=True
     )
+
+    assert user.b2b_organizations.count() == 2
+
+    added, removed = reconcile_user_orgs(
+        user, [organization_to_add.sso_organization_id]
+    )
+
+    assert added == 0
+    assert removed == 0
+
+    user.refresh_from_db()
+    assert user.b2b_organizations.count() == 2
+    assert user.b2b_organizations.filter(organization=organization_to_add).exists()
+    assert not user.b2b_organizations.filter(
+        organization=organization_to_ignore
+    ).exists()
+    assert user.b2b_organizations.filter(organization=organization_to_remove).exists()
+
+    # Step 3.5: now reconcile with the remove org, we should clear the flag
+
+    added, removed = reconcile_user_orgs(
+        user,
+        [
+            organization_to_add.sso_organization_id,
+            organization_to_remove.sso_organization_id,
+        ],
+    )
+
+    assert added == 0
+    assert removed == 0
+
+    user.refresh_from_db()
+    assert user.b2b_organizations.count() == 2
+    assert user.b2b_organizations.filter(organization=organization_to_add).exists()
+    assert not user.b2b_organizations.filter(
+        organization=organization_to_ignore
+    ).exists()
+    assert user.b2b_organizations.filter(organization=organization_to_remove).exists()
+
+    # Step 4: add the weird org that doesn't have a UUID
+    # Legacy non-manged orgs won't have a UUID, so we should leave them alone
+
+    UserOrganization.objects.create(
+        user=user, organization=weird_organization, keep_until_seen=False
+    )
+
+    added, removed = reconcile_user_orgs(
+        user,
+        [
+            organization_to_add.sso_organization_id,
+            organization_to_remove.sso_organization_id,
+        ],
+    )
+
+    assert added == 0
+    assert removed == 0
+
+    user.refresh_from_db()
+    assert user.b2b_organizations.count() == 3
+    assert user.b2b_organizations.filter(organization=weird_organization).exists()
 
 
 @pytest.mark.parametrize(

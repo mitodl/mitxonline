@@ -17,7 +17,7 @@ from requests import HTTPError
 from reversion.models import Version
 
 from b2b.api import create_b2b_enrollment
-from b2b.constants import CONTRACT_INTEGRATION_NONSSO
+from b2b.constants import CONTRACT_MEMBERSHIP_NONSSO
 from b2b.factories import (
     ContractPageFactory,
     OrganizationIndexPageFactory,
@@ -1807,7 +1807,7 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
     contract = ContractPageFactory.create(
         organization=org,
         enrollment_fixed_price=Decimal("0.00"),
-        integration_type=CONTRACT_INTEGRATION_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
     )
     course_run = CourseRunFactory.create(b2b_contract=contract)
     with reversion.create_revision():
