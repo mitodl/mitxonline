@@ -51,7 +51,6 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
 )
@@ -239,7 +238,6 @@ def test_create_run_enrollments_multiple_programs(
     )
     program_with_empty_requirements.add_requirement(test_enrollment.run.course)
     program2 = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program2)
     root_node = program2.requirements_root
 
     root_node.add_child(
@@ -1213,7 +1211,6 @@ def test_generate_program_certificate_failure_missing_certificates(
     """
     course = CourseFactory.create()
     CourseRunFactory.create_batch(3, course=course)
-    ProgramRequirementFactory.add_root(program_with_requirements.program)
     program_with_requirements.program.add_requirement(course)
 
     result = generate_program_certificate(
@@ -1262,7 +1259,6 @@ def test_generate_program_certificate_success_single_requirement_course(user, mo
     )
     course = CourseFactory.create()
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1295,7 +1291,6 @@ def test_generate_program_certificate_success_multiple_required_courses(user, mo
     )
     courses = CourseFactory.create_batch(3)
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1328,7 +1323,6 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user, mo
 
     # Create Program with 2 minimum elective courses.
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1457,7 +1451,6 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     )
     # Create Program
     program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1544,12 +1537,10 @@ def test_generate_program_certificate_with_subprogram_requirement(user, mocker):
     # Create a sub-program that the user will complete
     sub_program = ProgramFactory.create()
     sub_course = CourseFactory.create()
-    ProgramRequirementFactory.add_root(sub_program)
     sub_program.add_requirement(sub_course)
 
     # Create the main program that requires the sub-program
     main_program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(main_program)
     main_program.add_program_requirement(sub_program)
 
     # User completes the sub-program course and gets a certificate
@@ -1591,12 +1582,10 @@ def test_generate_program_certificate_with_subprogram_requirement_missing_certif
     # Create a sub-program
     sub_program = ProgramFactory.create()
     sub_course = CourseFactory.create()
-    ProgramRequirementFactory.add_root(sub_program)
     sub_program.add_requirement(sub_course)
 
     # Create the main program that requires the sub-program
     main_program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(main_program)
     main_program.add_program_requirement(sub_program)
 
     # User does NOT complete the sub-program course (no certificate)
@@ -1622,12 +1611,10 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(user, 
     # Create a sub-program
     sub_program = ProgramFactory.create()
     sub_course = CourseFactory.create()
-    ProgramRequirementFactory.add_root(sub_program)
     sub_program.add_requirement(sub_course)
 
     # Create the main program that requires the sub-program
     main_program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(main_program)
     main_program.add_program_requirement(sub_program)
 
     # User completes the sub-program and gets a certificate, but it gets revoked

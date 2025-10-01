@@ -710,7 +710,7 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Department.objects.annotate(
-            courses=Count("course"), programs=Count("program")
+            course_count=Count("courses"), program_count=Count("programs")
         )
 
     @extend_schema(

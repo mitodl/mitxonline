@@ -11,12 +11,12 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.db.models.constraints import CheckConstraint, UniqueConstraint
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django_countries.fields import CountryField
-from mitol.common.models import TimestampedModel
+from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from modelcluster.fields import ParentalManyToManyField
@@ -182,6 +182,32 @@ validate_url_path_field = RegexValidator(
 )
 
 
+class DepartmentQuerySet(TimestampedModelQuerySet):
+    """QuerySet for Department"""
+
+    def for_serialization(self):
+        return self.prefetch_related(
+            Prefetch(
+                "courses",
+                queryset=Course.objects.annotate(
+                    has_enrollable_courserun=Exists(
+                        CourseRun.objects.enrollable().filter(course_id=OuterRef("pk"))
+                    ),
+                )
+                .filter(
+                    live=True,
+                    page__live=True,
+                    has_enrollable_courserun=True,
+                )
+                .only("id"),
+            ),
+            Prefetch(
+                "programs",
+                queryset=Program.objects.filter(live=True, page__live=True).only("id"),
+            ),
+        )
+
+
 class Department(TimestampedModel):
     """
     Departments.
@@ -189,6 +215,8 @@ class Department(TimestampedModel):
 
     name = models.CharField(max_length=128, unique=True)
     slug = models.SlugField(max_length=128, unique=True)
+
+    objects = DepartmentQuerySet.as_manager()
 
     def __str__(self):
         return self.name
@@ -222,7 +250,9 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         blank=True,
         null=True,
     )
-    departments = models.ManyToManyField(Department, blank=False)
+    departments = models.ManyToManyField(
+        Department, blank=False, related_name="programs"
+    )
     availability = models.CharField(
         choices=AVAILABILITY_CHOICES, default=AVAILABILITY_ANYTIME, max_length=255
     )
@@ -821,7 +851,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False, db_index=True)
-    departments = models.ManyToManyField(Department, blank=False)
+    departments = models.ManyToManyField(
+        Department, blank=False, related_name="courses"
+    )
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",

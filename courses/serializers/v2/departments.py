@@ -1,7 +1,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from courses.models import CourseRun, Department
+from courses.models import Department
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -18,7 +18,7 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
     course_ids = serializers.SerializerMethodField()
     program_ids = serializers.SerializerMethodField()
 
-    @extend_schema_field(serializers.ListField)
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_course_ids(self, instance):
         """
         Returns a list of course IDs associated with courses which are live and
@@ -32,19 +32,9 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
         Returns:
             list: Course IDs associated with the Department.
         """
-        related_courses = instance.course_set.filter(live=True, page__live=True)
-        relevant_courseruns = (
-            CourseRun.objects.enrollable()
-            .filter(course__in=related_courses)
-            .values_list("id", flat=True)
-        )
-        return (
-            related_courses.filter(courseruns__id__in=relevant_courseruns)
-            .distinct()
-            .values_list("id", flat=True)
-        )
+        return [course.id for course in instance.courses.all()]
 
-    @extend_schema_field(serializers.ListField)
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_program_ids(self, instance):
         """
         Returns a list of program IDs associated with the department
@@ -56,11 +46,7 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
         Returns:
             list: Program IDs associated with the Department.
         """
-        return (
-            instance.program_set.filter(live=True, page__live=True)
-            .distinct()
-            .values_list("id", flat=True)
-        )
+        return [program.id for program in instance.programs.all()]
 
     class Meta:
         model = Department
