@@ -12,6 +12,7 @@ from rest_framework import serializers
 from social_django.models import UserSocialAuth
 
 from b2b.serializers.v0 import ContractPageSerializer
+from cms.api import get_wagtail_img_src
 from hubspot_sync.task_helpers import sync_hubspot_user
 
 # from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
@@ -252,9 +253,17 @@ class UserOrganizationSerializer(serializers.ModelSerializer):
         """Get description"""
         return instance.organization.description
 
+    @extend_schema_field(str)
     def get_logo(self, instance):
         """Get logo"""
-        return instance.organization.logo if instance.organization.logo else None
+
+        if hasattr(instance.organization, "logo"):
+            try:
+                return get_wagtail_img_src(instance.organization.logo)
+            except AttributeError:
+                pass
+
+        return None
 
     @extend_schema_field(str)
     def get_slug(self, instance):
