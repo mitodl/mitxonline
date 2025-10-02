@@ -39,8 +39,12 @@ def test_b2b_contract_attachment_bad_code(user):
     assert user.b2b_contracts.count() == 0
 
 
-def test_b2b_contract_attachment(user):
+def test_b2b_contract_attachment(mocker, user):
     """Ensure a supplied code results in attachment for the user."""
+
+    mocked_attach_user = mocker.patch(
+        "b2b.models.OrganizationPage.attach_user", return_value=True
+    )
 
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_NONSSO,
@@ -62,8 +66,10 @@ def test_b2b_contract_attachment(user):
     resp = client.post(url)
 
     assert resp.status_code == 200
+    mocked_attach_user.assert_called()
 
     user.refresh_from_db()
+    assert user.b2b_organizations.filter(organization=contract.organization).exists()
     assert user.b2b_contracts.filter(pk=contract.id).exists()
 
     assert DiscountContractAttachmentRedemption.objects.filter(
@@ -177,8 +183,12 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
     ).exists()
 
 
-def test_b2b_contract_attachment_full_contract():
+def test_b2b_contract_attachment_full_contract(mocker):
     """Test that the attachment fails properly if the contract is full."""
+
+    mocked_attach_user = mocker.patch(
+        "b2b.models.OrganizationPage.attach_user", return_value=True
+    )
 
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_NONSSO,
@@ -201,6 +211,7 @@ def test_b2b_contract_attachment_full_contract():
     resp = client.post(url)
 
     assert resp.status_code == 200
+    mocked_attach_user.assert_called()
 
     user.refresh_from_db()
     assert user.b2b_contracts.filter(pk=contract.id).exists()
@@ -209,14 +220,20 @@ def test_b2b_contract_attachment_full_contract():
     client = APIClient()
     client.force_login(user)
 
+    mocked_attach_user.reset_mock()
+
     url = reverse(
         "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
     )
     resp = client.post(url)
 
     assert resp.status_code == 200
+    mocked_attach_user.assert_not_called()
 
     user.refresh_from_db()
+    assert not user.b2b_organizations.filter(
+        organization=contract.organization
+    ).exists()
     assert not user.b2b_contracts.filter(pk=contract.id).exists()
     assert not DiscountContractAttachmentRedemption.objects.filter(
         contract=contract, user=user, discount=contract_code
