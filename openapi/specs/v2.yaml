@@ -1510,19 +1510,22 @@ components:
           type: string
           readOnly: true
           description: Any useful extra information about the contract.
-        integration_type:
+        membership_type:
           allOf:
-          - $ref: '#/components/schemas/IntegrationTypeEnum'
+          - $ref: '#/components/schemas/MembershipTypeEnum'
           readOnly: true
           description: |-
-            The type of integration for this contract.
+            The method to use to manage membership in the contract.
 
             * `sso` - SSO
             * `non-sso` - Non-SSO
+            * `managed` - Managed
+            * `code` - Enrollment Code
+            * `auto` - Auto Enrollment
         organization:
           type: integer
           readOnly: true
-          description: The organization this contract is with.
+          description: The organization that owns this contract.
         contract_start:
           type: string
           format: date
@@ -1550,7 +1553,7 @@ components:
       - contract_start
       - description
       - id
-      - integration_type
+      - membership_type
       - name
       - organization
       - slug
@@ -2534,17 +2537,6 @@ components:
       - Elementary/primary school
       - No formal education
       - Other education
-    IntegrationTypeEnum:
-      enum:
-      - sso
-      - non-sso
-      type: string
-      description: |-
-        * `sso` - SSO
-        * `non-sso` - Non-SSO
-      x-enum-descriptions:
-      - SSO
-      - Non-SSO
     LearnerProgramRecordShare:
       type: object
       properties:
@@ -2648,6 +2640,26 @@ components:
           maxLength: 10
       required:
       - country
+    MembershipTypeEnum:
+      enum:
+      - sso
+      - non-sso
+      - managed
+      - code
+      - auto
+      type: string
+      description: |-
+        * `sso` - SSO
+        * `non-sso` - Non-SSO
+        * `managed` - Managed
+        * `code` - Enrollment Code
+        * `auto` - Auto Enrollment
+      x-enum-descriptions:
+      - SSO
+      - Non-SSO
+      - Managed
+      - Enrollment Code
+      - Auto Enrollment
     NullEnum:
       enum:
       - null
@@ -3602,31 +3614,31 @@ components:
       description: |-
         Serializer for user organization data.
 
-        Slightly different from the OrganizationPageSerializer; we only need
-        the user's orgs and contracts.
+        Return the user's organizations in a manner that makes them look like
+        OrganizationPage objects. (Previously, the user organizations were a queryset
+        of OrganizationPages that related to the user, but now we have a through
+        table.)
       properties:
         id:
           type: integer
+          description: Get id
           readOnly: true
         name:
           type: string
+          description: Get name
           readOnly: true
-          description: The name of the organization
         description:
           type: string
+          description: Get description
           readOnly: true
-          description: Any useful extra information about the organization
         logo:
           type: string
-          format: uri
+          description: Get logo
           readOnly: true
-          description: The organization's logo. Will be displayed in the app in various
-            places.
         slug:
           type: string
+          description: Get slug
           readOnly: true
-          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
-          pattern: ^[-\w]+$
         contracts:
           type: array
           items:
