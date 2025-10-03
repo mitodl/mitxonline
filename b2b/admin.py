@@ -51,11 +51,11 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         "slug",
         "title",
         "organization",
-        "integration_type",
+        "membership_type",
         "contract_start",
         "contract_end",
     ]
-    list_filter = ["integration_type", "organization", "contract_start", "contract_end"]
+    list_filter = ["membership_type", "organization", "contract_start", "contract_end"]
     date_hierarchy = "contract_start"
     fields = [
         "id",
@@ -64,7 +64,7 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         "organization",
         "title",
         "description",
-        "integration_type",
+        "membership_type",
         "contract_start",
         "contract_end",
         "max_learners",
