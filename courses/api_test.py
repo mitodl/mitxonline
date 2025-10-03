@@ -24,6 +24,7 @@ from b2b.factories import (
     OrganizationPageFactory,
 )
 from courses.api import (
+    check_course_modes,
     create_program_enrollments,
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -1847,3 +1848,82 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
 
     enrollment.refresh_from_db()
     assert enrollment.active is True
+
+
+@pytest.mark.parametrize(
+    "audit_exists",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "verified_exists",
+    [
+        True,
+        False,
+    ],
+)
+def test_check_course_modes(mocker, audit_exists, verified_exists):
+    """Test that the course mode check function works properly."""
+
+    run = CourseRunFactory.create()
+
+    return_modes = []
+    audit_mode = CourseMode(
+        {
+            "course_id": run.courseware_id,
+            "mode_slug": "audit",
+            "mode_display_name": "Audit",
+        }
+    )
+    verified_mode = CourseMode(
+        {
+            "course_id": run.courseware_id,
+            "mode_slug": "verified",
+            "mode_display_name": "Verified",
+        }
+    )
+
+    if audit_exists:
+        return_modes.append(audit_mode)
+
+    if verified_exists:
+        return_modes.append(verified_mode)
+
+    mocked_get_modes = mocker.patch(
+        "edx_api.course_detail.CourseModes.get_course_modes", return_value=return_modes
+    )
+
+    mocked_create_mode = mocker.patch(
+        "edx_api.course_detail.CourseModes.create_course_mode",
+        side_effect=lambda mode_slug, *args, **kwargs: audit_mode  # noqa: ARG005
+        if mode_slug == "audit"
+        else verified_mode,
+    )
+
+    audit_created, verified_created = check_course_modes(run)
+
+    mocked_get_modes.assert_called()
+    assert audit_created != audit_exists
+    assert verified_created != verified_exists
+
+    if not audit_exists:
+        mocked_create_mode.assert_any_call(
+            course_id=run.courseware_id,
+            mode_slug="audit",
+            mode_display_name="Audit",
+            description="Audit",
+            currency="USD",
+            expiration_datetime=None,
+        )
+
+    if not verified_exists:
+        mocked_create_mode.assert_any_call(
+            course_id=run.courseware_id,
+            mode_slug="verified",
+            mode_display_name="Verified",
+            description="Verified",
+            currency="USD",
+            expiration_datetime=run.upgrade_deadline,
+        )
