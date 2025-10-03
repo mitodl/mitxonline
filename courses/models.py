@@ -16,7 +16,7 @@ from django.db.models.constraints import CheckConstraint, UniqueConstraint
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django_countries.fields import CountryField
-from mitol.common.models import TimestampedModel
+from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from modelcluster.fields import ParentalManyToManyField
@@ -182,6 +182,26 @@ validate_url_path_field = RegexValidator(
 )
 
 
+class DepartmentQuerySet(TimestampedModelQuerySet):
+    """QuerySet for Department"""
+
+    def for_serialization(self):
+        return self.prefetch_related(
+            Prefetch(
+                "courses",
+                queryset=(
+                    Course.objects.filter(
+                        live=True,
+                        page__live=True,
+                        courseruns__in=CourseRun.objects.enrollable().filter(
+                            course_id=OuterRef("pk")
+                        ),
+                    )
+                ),
+            )
+        )
+
+
 class Department(TimestampedModel):
     """
     Departments.
@@ -189,6 +209,8 @@ class Department(TimestampedModel):
 
     name = models.CharField(max_length=128, unique=True)
     slug = models.SlugField(max_length=128, unique=True)
+
+    objects = DepartmentQuerySet.as_manager()
 
     def __str__(self):
         return self.name
