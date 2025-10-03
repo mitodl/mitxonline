@@ -6,8 +6,8 @@ import os
 import pytest
 import responses
 from django.test.client import Client
-from nplusone.core import profiler
 from rest_framework.test import APIClient
+from zeal import zeal_ignore
 
 from users.factories import UserFactory
 
@@ -136,12 +136,6 @@ def user_profile_dict():
     )
 
 
-@pytest.fixture
-def nplusone_fail(settings):
-    """Configures the nplusone app to raise errors"""
-    settings.NPLUSONE_RAISE = True
-
-
 @pytest.fixture(autouse=True)
 def webpack_stats(settings):
     """Mocks out webpack stats"""
@@ -156,10 +150,12 @@ def webpack_stats(settings):
         )
 
 
-@pytest.fixture
-def raise_nplusone(request):
-    if request.node.get_closest_marker("skip_nplusone"):
-        yield
-    else:
-        with profiler.Profiler():
+@pytest.fixture(autouse=True)
+def check_nplusone(request, settings):
+    """Raise nplusone errors"""
+    settings.ZEAL_RAISE = True
+    if request.node.get_closest_marker("skip_nplusone_check"):
+        with zeal_ignore():
             yield
+    else:
+        yield

@@ -81,6 +81,7 @@ def test_basic_exchange_rates(user_drf_client, exchange_rate):
     assert len(resp.json()) >= 2
 
 
+@pytest.mark.skip_nplusone_check
 def test_basic_flex_payments(
     user_drf_client, admin_drf_client, user, flexible_price_application, mocker
 ):

@@ -23,7 +23,7 @@ from main.constants import (
 )
 from users.factories import UserFactory
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
+pytestmark = [pytest.mark.django_db]
 
 
 def test_b2b_contract_attachment_bad_code(user):
@@ -223,6 +223,7 @@ def test_b2b_contract_attachment_full_contract():
     ).exists()
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("user_has_edx_user", [True, False])
 @pytest.mark.parametrize("has_price", [True, False])
 def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price):

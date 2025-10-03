@@ -410,6 +410,7 @@ def test_unenrollment_unenrolls_learner(mocker, user):
     unenroll_mock.assert_called()
 
 
+@pytest.mark.skip_nplusone_check
 def test_process_cybersource_payment_response(  # noqa: PLR0913
     settings, rf, mocker, user_client, user, products
 ):
@@ -446,6 +447,7 @@ def test_process_cybersource_payment_response(  # noqa: PLR0913
     assert result == OrderStatus.FULFILLED
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("include_discount", [True, False])
 def test_process_cybersource_payment_decline_response(  # noqa: PLR0913
     rf, mocker, user_client, user, products, include_discount
