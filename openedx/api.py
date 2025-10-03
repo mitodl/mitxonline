@@ -1651,6 +1651,7 @@ def create_edx_course_mode(  # noqa: PLR0913
     currency: str = "USD",
     expiration_datetime: datetime | None = None,
     client: EdxApi | None = None,
+    min_price: int | None = None,
 ) -> CourseMode:
     """Create a course mode for the given edX course."""
 
@@ -1663,6 +1664,7 @@ def create_edx_course_mode(  # noqa: PLR0913
         description=description,
         currency=currency,
         expiration_datetime=expiration_datetime,
+        min_price=min_price,
     )
 
 
@@ -1675,6 +1677,7 @@ def update_edx_course_mode(  # noqa: PLR0913
     currency: str = "USD",
     expiration_datetime: datetime | None = None,
     client: EdxApi | None = None,
+    min_price: int | None = None,
 ) -> CourseMode:
     """Create a course mode for the given edX course."""
 
@@ -1687,6 +1690,7 @@ def update_edx_course_mode(  # noqa: PLR0913
         description=description,
         currency=currency,
         expiration_datetime=expiration_datetime,
+        min_price=min_price,
     )
 
 
