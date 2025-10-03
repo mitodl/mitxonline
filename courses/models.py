@@ -11,7 +11,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
-from django.db.models import Q
+from django.db.models import OuterRef, Prefetch, Q
 from django.db.models.constraints import CheckConstraint, UniqueConstraint
 from django.utils.functional import cached_property
 from django.utils.text import slugify
