@@ -663,6 +663,7 @@ def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
             mode_display_name="Verified",
             description="Verified",
             currency="USD",
+            min_price=10,
             expiration_datetime=run.upgrade_deadline if run.upgrade_deadline else None,
         )
 
