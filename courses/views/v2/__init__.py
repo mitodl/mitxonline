@@ -148,6 +148,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
                     queryset=ProgramCollection.objects.only("id", "title"),
                 ),
             )
+            .order_by("title")
         )
 
     @extend_schema(
