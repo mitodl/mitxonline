@@ -1939,4 +1939,5 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
             description="Verified",
             currency="USD",
             expiration_datetime=run.upgrade_deadline,
+            min_price=10,
         )
