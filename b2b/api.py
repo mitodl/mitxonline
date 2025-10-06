@@ -602,7 +602,7 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     log.info("Checking enrollment codes for contract %s", contract)
 
     if (
-        contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+        contract.integration_type in CONTRACT_MEMBERSHIP_AUTOS
         and not contract.enrollment_fixed_price
     ):
         # SSO contracts w/out price don't need discounts.

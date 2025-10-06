@@ -16,6 +16,13 @@ pytestmark = [pytest.mark.django_db]
 FAKE = faker.Faker()
 
 
+@pytest.fixture
+def mocked_b2b_org_attach(mocker):
+    """Mock the org attachment call."""
+
+    return mocker.patch("b2b.api.add_user_org_membership", return_value=True)
+
+
 def test_add_program_courses_to_contract(mocker):
     """Test that adding a program to a contract works as expected."""
 
@@ -68,18 +75,21 @@ def test_user_add_b2b_org(mocked_b2b_org_attach):
     contract_auto = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="auto",
+        integration_type="auto",
         title="Contract Auto",
         name="Contract Auto",
     )
     contract_managed = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="managed",
+        integration_type="managed",
         title="Contract Managed",
         name="Contract Managed",
     )
     contract_code = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="code",
+        integration_type="code",
         title="Contract Enrollment Code",
         name="Contract Enrollment Code",
     )
@@ -87,12 +97,14 @@ def test_user_add_b2b_org(mocked_b2b_org_attach):
     contract_sso = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="sso",
+        integration_type="sso",
         title="Contract SSO",
         name="Contract SSO",
     )
     contract_non_sso = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="non-sso",
+        integration_type="non-sso",
         title="Contract NonSSO",
         name="Contract NonSSO",
     )
@@ -136,18 +148,21 @@ def test_user_remove_b2b_org(mocked_b2b_org_attach):
     contract_auto = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="auto",
+        integration_type="auto",
         title="Contract Auto",
         name="Contract Auto",
     )
     contract_managed = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="managed",
+        integration_type="managed",
         title="Contract Managed",
         name="Contract Managed",
     )
     contract_code = ContractPageFactory.create(
         organization=orgs[1],
         membership_type="code",
+        integration_type="code",
         title="Contract Enrollment Code",
         name="Contract Enrollment Code",
     )
@@ -155,12 +170,14 @@ def test_user_remove_b2b_org(mocked_b2b_org_attach):
     contract_sso = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="sso",
+        integration_type="sso",
         title="Contract SSO",
         name="Contract SSO",
     )
     contract_non_sso = ContractPageFactory.create(
         organization=orgs[1],
         membership_type="non-sso",
+        integration_type="non-sso",
         title="Contract NonSSO",
         name="Contract NonSSO",
     )
@@ -207,6 +224,7 @@ def test_b2b_contract_removal_keeps_enrollments(mocked_b2b_org_attach):
     contract_auto = ContractPageFactory.create(
         organization=org,
         membership_type="auto",
+        integration_type="auto",
         title="Contract Auto",
         name="Contract Auto",
     )

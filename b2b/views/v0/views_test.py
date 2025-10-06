@@ -48,6 +48,7 @@ def test_b2b_contract_attachment(mocker, user):
 
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
         max_learners=10,
     )
 
@@ -89,6 +90,7 @@ def test_b2b_contract_attachment_invalid_code_dates(user, bad_start_or_end):
 
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
         max_learners=1,
     )
 
@@ -142,6 +144,7 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
 
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
         max_learners=1,
     )
 
@@ -192,6 +195,7 @@ def test_b2b_contract_attachment_full_contract(mocker):
 
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
         max_learners=1,
     )
 
@@ -252,6 +256,7 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price):
 
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_SSO,
+        integration_type=CONTRACT_MEMBERSHIP_SSO,
         enrollment_fixed_price=100 if has_price else 0,
     )
     source_courserun = CourseRunFactory.create(is_source_run=True)

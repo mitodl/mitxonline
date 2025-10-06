@@ -252,7 +252,7 @@ class Command(BaseCommand):
                 contract.name,
                 contract.slug,
                 contract.organization.name,
-                contract.membership_type,
+                contract.integration_type,
                 contract.contract_start.strftime("%Y-%m-%d\n%H:%M")
                 if contract.contract_start
                 else "",

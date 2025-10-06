@@ -18,6 +18,7 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
     CONTRACT_MEMBERSHIP_CHOICES,
     CONTRACT_MEMBERSHIP_MANAGED,
+    CONTRACT_MEMBERSHIP_TYPE_CHOICES,
     ORG_INDEX_SLUG,
 )
 from b2b.exceptions import TargetCourseRunExistsError
@@ -143,7 +144,7 @@ class OrganizationPage(Page):
         """
 
         contracts_qs = self.contracts.filter(
-            membership_type__in=CONTRACT_MEMBERSHIP_AUTOS, active=True
+            integration_type__in=CONTRACT_MEMBERSHIP_AUTOS, active=True
         )
 
         for contract in contracts_qs.all():
@@ -191,9 +192,16 @@ class ContractPage(Page):
     description = RichTextField(
         blank=True, help_text="Any useful extra information about the contract."
     )
-    membership_type = models.CharField(
+    integration_type = models.CharField(
         max_length=255,
         choices=CONTRACT_MEMBERSHIP_CHOICES,
+        help_text="The type of integration for this contract.",
+    )
+    # This doesn't have a choices setting because you can't re-use a constant.
+    #
+    membership_type = models.CharField(
+        max_length=255,
+        choices=CONTRACT_MEMBERSHIP_TYPE_CHOICES,
         help_text="The method to use to manage membership in the contract.",
         default=CONTRACT_MEMBERSHIP_MANAGED,
     )
@@ -247,6 +255,7 @@ class ContractPage(Page):
         ),
         MultiFieldPanel(
             [
+                FieldPanel("integration_type"),
                 FieldPanel("membership_type"),
                 FieldPanel("max_learners"),
                 FieldPanel("enrollment_fixed_price"),

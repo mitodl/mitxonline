@@ -48,9 +48,9 @@ class Command(BaseCommand):
             help="The name of the contract.",
         )
         create_parser.add_argument(
-            "membership_type",
+            "integration_type",
             type=str,
-            help="The mmebership type for this contract.",
+            help="The membership type for this contract.",
             choices=[value[0] for value in CONTRACT_MEMBERSHIP_CHOICES],
         )
         create_parser.add_argument(
@@ -161,7 +161,7 @@ class Command(BaseCommand):
         """Handle the create subcommand."""
         organization_name = kwargs.pop("organization")
         contract_name = kwargs.pop("contract_name")
-        membership_type = kwargs.pop("membership_type")
+        integration_type = kwargs.pop("integration_type")
         description = kwargs.pop("description")
         start_date = kwargs.pop("start")
         end_date = kwargs.pop("end")
@@ -199,7 +199,8 @@ class Command(BaseCommand):
         contract = ContractPage(
             name=contract_name,
             description=description or "",
-            membership_type=membership_type,
+            integration_type=integration_type,
+            membership_type=integration_type,
             organization=org,
             contract_start=start_date,
             contract_end=end_date,

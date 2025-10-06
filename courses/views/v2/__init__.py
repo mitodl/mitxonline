@@ -114,7 +114,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return (
             Program.objects.filter()
-            .select_related("page")
+            .select_related("page", "page__feature_image")
             .prefetch_related(
                 Prefetch("departments", queryset=Department.objects.only("id", "name")),
                 Prefetch(

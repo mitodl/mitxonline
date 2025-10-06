@@ -261,6 +261,9 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
     assert_price = price if price else Decimal(0)
 
     contract = factories.ContractPageFactory(
+        integration_type=CONTRACT_MEMBERSHIP_SSO
+        if is_sso
+        else CONTRACT_MEMBERSHIP_NONSSO,
         membership_type=CONTRACT_MEMBERSHIP_SSO
         if is_sso
         else CONTRACT_MEMBERSHIP_NONSSO,
@@ -305,6 +308,9 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
         if update_no_price:
             contract.enrolment_fixed_price = None
         if update_sso:
+            contract.integration_type = (
+                CONTRACT_MEMBERSHIP_NONSSO if is_sso else CONTRACT_MEMBERSHIP_SSO
+            )
             contract.membership_type = (
                 CONTRACT_MEMBERSHIP_NONSSO if is_sso else CONTRACT_MEMBERSHIP_SSO
             )
@@ -362,6 +368,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 
     contract = factories.ContractPageFactory.create(
+        integration_type=CONTRACT_MEMBERSHIP_SSO,
         membership_type=CONTRACT_MEMBERSHIP_SSO,
         enrollment_fixed_price=Decimal(0)
         if price_is_zero

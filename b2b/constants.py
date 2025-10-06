@@ -37,6 +37,25 @@ CONTRACT_MEMBERSHIP_CHOICES = zip(
         CONTRACT_MEMBERSHIP_AUTO_NAME,
     ],
 )
+# When the integration_type field is removed, this should be removed as well.
+# It is just here so we can have the same choices in both integration_type and
+# membership_type fields. (Using the constant for `choices` consumes it.)
+CONTRACT_MEMBERSHIP_TYPE_CHOICES = zip(
+    [
+        CONTRACT_MEMBERSHIP_SSO,
+        CONTRACT_MEMBERSHIP_NONSSO,
+        CONTRACT_MEMBERSHIP_MANAGED,
+        CONTRACT_MEMBERSHIP_CODE,
+        CONTRACT_MEMBERSHIP_AUTO,
+    ],
+    [
+        CONTRACT_MEMBERSHIP_SSO_NAME,
+        CONTRACT_MEMBERSHIP_NONSSO_NAME,
+        CONTRACT_MEMBERSHIP_MANAGED_NAME,
+        CONTRACT_MEMBERSHIP_CODE_NAME,
+        CONTRACT_MEMBERSHIP_AUTO_NAME,
+    ],
+)
 
 B2B_RUN_TAG_FORMAT = "{year}_C{contract_id}"
 

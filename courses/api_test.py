@@ -1808,6 +1808,7 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
         organization=org,
         enrollment_fixed_price=Decimal("0.00"),
         membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
     )
     course_run = CourseRunFactory.create(b2b_contract=contract)
     with reversion.create_revision():
