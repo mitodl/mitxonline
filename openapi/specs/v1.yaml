@@ -1510,6 +1510,18 @@ components:
           type: string
           readOnly: true
           description: Any useful extra information about the contract.
+        integration_type:
+          allOf:
+          - $ref: '#/components/schemas/IntegrationTypeEnum'
+          readOnly: true
+          description: |-
+            The type of integration for this contract.
+
+            * `sso` - SSO
+            * `non-sso` - Non-SSO
+            * `managed` - Managed
+            * `code` - Enrollment Code
+            * `auto` - Auto Enrollment
         membership_type:
           allOf:
           - $ref: '#/components/schemas/MembershipTypeEnum'
@@ -1553,6 +1565,7 @@ components:
       - contract_start
       - description
       - id
+      - integration_type
       - membership_type
       - name
       - organization
@@ -2537,6 +2550,26 @@ components:
       - Elementary/primary school
       - No formal education
       - Other education
+    IntegrationTypeEnum:
+      enum:
+      - sso
+      - non-sso
+      - managed
+      - code
+      - auto
+      type: string
+      description: |-
+        * `sso` - SSO
+        * `non-sso` - Non-SSO
+        * `managed` - Managed
+        * `code` - Enrollment Code
+        * `auto` - Auto Enrollment
+      x-enum-descriptions:
+      - SSO
+      - Non-SSO
+      - Managed
+      - Enrollment Code
+      - Auto Enrollment
     LearnerProgramRecordShare:
       type: object
       properties:
@@ -3621,24 +3654,16 @@ components:
       properties:
         id:
           type: integer
-          description: Get id
-          readOnly: true
         name:
           type: string
-          description: Get name
-          readOnly: true
         description:
           type: string
-          description: Get description
-          readOnly: true
         logo:
           type: string
           description: Get logo
           readOnly: true
         slug:
           type: string
-          description: Get slug
-          readOnly: true
         contracts:
           type: array
           items:
