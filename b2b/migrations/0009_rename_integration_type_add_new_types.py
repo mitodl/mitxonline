@@ -4,30 +4,18 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
-def copy_integration_type_to_membership_type(apps, schema_editor):
-    """Copy existing values from integration_type to membership_type."""
-    ContractPage = apps.get_model("b2b", "ContractPage")
-    for contract in ContractPage.objects.all():
-        if contract.integration_type == "sso":
-            contract.membership_type = "sso"
-        elif contract.integration_type == "non-sso":
-            contract.membership_type = "non-sso"
-        else:
-            contract.membership_type = "managed"  # Default to managed for other cases
-        contract.save()
-
-
-def noop(apps, schema_editor):
-    """No operation (placeholder for reverse migration)."""
-
-
 class Migration(migrations.Migration):
     dependencies = [
         ("b2b", "0008_increase_length_on_org_key_field"),
     ]
 
     operations = [
-        migrations.AddField(
+        migrations.RenameField(
+            model_name="contractpage",
+            old_name="integration_type",
+            new_name="membership_type",
+        ),
+        migrations.AlterField(
             model_name="contractpage",
             name="membership_type",
             field=models.CharField(
@@ -42,13 +30,6 @@ class Migration(migrations.Migration):
                 help_text="The method to use to manage membership in the contract.",
                 max_length=255,
             ),
-        ),
-        migrations.RunPython(
-            copy_integration_type_to_membership_type, reverse_code=noop
-        ),
-        migrations.RemoveField(
-            model_name="contractpage",
-            name="integration_type",
         ),
         migrations.AlterField(
             model_name="contractpage",
