@@ -359,6 +359,7 @@ if DEBUG or ENVIRONMENT == "pytest":
     # this should be the first middleware so we catch any issues in our own middleware
     MIDDLEWARE += ("zeal.middleware.zeal_middleware",)
 
+ZEAL_RAISE = False
 ZEAL_ALLOWLIST = []
 
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
