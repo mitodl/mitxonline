@@ -23,7 +23,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
-from b2b.models import UserOrganization
+from b2b.api import process_add_org_membership
 from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
@@ -206,7 +206,7 @@ def create_run_enrollments(  # noqa: C901
             # If the run is associated with a B2B contract, add the contract
             # to the user's contract list and update their org memberships
             if run.b2b_contract:
-                UserOrganization.process_add_membership(
+                process_add_org_membership(
                     user, run.b2b_contract.organization, keep_until_seen=True
                 )
                 user.b2b_contracts.add(run.b2b_contract)

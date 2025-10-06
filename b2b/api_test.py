@@ -18,6 +18,8 @@ from b2b.api import (
     create_contract_run,
     ensure_enrollment_codes_exist,
     get_active_contracts_from_basket_items,
+    process_add_org_membership,
+    process_remove_org_membership,
     reconcile_keycloak_orgs,
     reconcile_single_keycloak_org,
     reconcile_user_orgs,
@@ -29,10 +31,14 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_SSO,
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
-from b2b.factories import OrganizationPageFactory
+from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import OrganizationIndexPage, OrganizationPage, UserOrganization
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
-from courses.factories import CourseFactory, CourseRunFactory
+from courses.factories import (
+    CourseFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+)
 from courses.models import CourseRunEnrollment
 from ecommerce.api_test import create_basket
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
@@ -58,6 +64,13 @@ FAKE = faker.Faker()
 pytestmark = [
     pytest.mark.django_db,
 ]
+
+
+@pytest.fixture
+def mocked_b2b_org_attach(mocker):
+    """Mock the org attachment call."""
+
+    return mocker.patch("b2b.api.add_user_org_membership", return_value=True)
 
 
 @pytest.mark.parametrize(
@@ -744,3 +757,196 @@ def test_reconcile_bad_keycloak_org(mocker):
         page.save()
 
     assert "Organization with this Org key already exists." in str(exc)
+
+
+def test_user_add_b2b_org(mocked_b2b_org_attach):
+    """Ensure adding a user to an organization works as expected."""
+
+    orgs = OrganizationPageFactory.create_batch(2)
+    user = UserFactory.create()
+
+    # New-style ones
+    contract_auto = ContractPageFactory.create(
+        organization=orgs[0],
+        membership_type="auto",
+        integration_type="auto",
+        title="Contract Auto",
+        name="Contract Auto",
+    )
+    contract_managed = ContractPageFactory.create(
+        organization=orgs[0],
+        membership_type="managed",
+        integration_type="managed",
+        title="Contract Managed",
+        name="Contract Managed",
+    )
+    contract_code = ContractPageFactory.create(
+        organization=orgs[0],
+        membership_type="code",
+        integration_type="code",
+        title="Contract Enrollment Code",
+        name="Contract Enrollment Code",
+    )
+    # Legacy ones - these will migrate to "managed" and "code"
+    contract_sso = ContractPageFactory.create(
+        organization=orgs[0],
+        membership_type="sso",
+        integration_type="sso",
+        title="Contract SSO",
+        name="Contract SSO",
+    )
+    contract_non_sso = ContractPageFactory.create(
+        organization=orgs[0],
+        membership_type="non-sso",
+        integration_type="non-sso",
+        title="Contract NonSSO",
+        name="Contract NonSSO",
+    )
+
+    process_add_org_membership(user, orgs[0])
+
+    # We should now be in the SSO, auto, and managed contracts
+    # but not the other two.
+
+    user.refresh_from_db()
+    assert user.b2b_contracts.count() == 3
+    assert user.b2b_organizations.filter(organization=orgs[0]).exists()
+    assert (
+        user.b2b_contracts.filter(
+            pk__in=[
+                contract_auto.id,
+                contract_sso.id,
+                contract_managed.id,
+            ]
+        ).count()
+        == 3
+    )
+    assert (
+        user.b2b_contracts.filter(
+            pk__in=[
+                contract_code.id,
+                contract_non_sso.id,
+            ]
+        ).count()
+        == 0
+    )
+
+
+def test_user_remove_b2b_org(mocked_b2b_org_attach):
+    """Ensure removing a user from an org also clears the appropriate contracts."""
+
+    orgs = OrganizationPageFactory.create_batch(2)
+    user = UserFactory.create()
+
+    # New-style ones
+    contract_auto = ContractPageFactory.create(
+        organization=orgs[0],
+        membership_type="auto",
+        integration_type="auto",
+        title="Contract Auto",
+        name="Contract Auto",
+    )
+    contract_managed = ContractPageFactory.create(
+        organization=orgs[0],
+        membership_type="managed",
+        integration_type="managed",
+        title="Contract Managed",
+        name="Contract Managed",
+    )
+    contract_code = ContractPageFactory.create(
+        organization=orgs[1],
+        membership_type="code",
+        integration_type="code",
+        title="Contract Enrollment Code",
+        name="Contract Enrollment Code",
+    )
+    # Legacy ones - these will migrate to "managed" and "code"
+    contract_sso = ContractPageFactory.create(
+        organization=orgs[0],
+        membership_type="sso",
+        integration_type="sso",
+        title="Contract SSO",
+        name="Contract SSO",
+    )
+    contract_non_sso = ContractPageFactory.create(
+        organization=orgs[1],
+        membership_type="non-sso",
+        integration_type="non-sso",
+        title="Contract NonSSO",
+        name="Contract NonSSO",
+    )
+
+    managed_ids = [
+        contract_auto.id,
+        contract_managed.id,
+        contract_sso.id,
+    ]
+    unmanaged_ids = [
+        contract_code.id,
+        contract_non_sso.id,
+    ]
+
+    process_add_org_membership(user, orgs[0])
+    process_add_org_membership(user, orgs[1])
+
+    user.b2b_contracts.add(contract_code)
+    user.b2b_contracts.add(contract_non_sso)
+    user.save()
+
+    user.refresh_from_db()
+
+    assert user.b2b_contracts.count() == 5
+
+    process_remove_org_membership(user, orgs[1])
+
+    assert user.b2b_contracts.filter(id__in=managed_ids).count() == 3
+    assert user.b2b_contracts.filter(id__in=unmanaged_ids).count() == 0
+
+    process_remove_org_membership(user, orgs[0])
+
+    # we should have no contracts now since we're no longer in any orgs
+
+    assert user.b2b_contracts.count() == 0
+
+
+def test_b2b_contract_removal_keeps_enrollments(mocked_b2b_org_attach):
+    """Ensure that removing a user from a B2B contract leaves their enrollments alone."""
+
+    org = OrganizationPageFactory.create()
+    user = UserFactory.create()
+
+    contract_auto = ContractPageFactory.create(
+        organization=org,
+        membership_type="auto",
+        integration_type="auto",
+        title="Contract Auto",
+        name="Contract Auto",
+    )
+
+    courserun = CourseRunFactory.create(b2b_contract=contract_auto)
+
+    process_add_org_membership(user, org)
+
+    CourseRunEnrollmentFactory(
+        user=user,
+        run=courserun,
+    )
+
+    user.refresh_from_db()
+
+    assert courserun.enrollments.filter(user=user).count() == 1
+
+    process_remove_org_membership(user, org)
+
+    assert courserun.enrollments.filter(user=user).count() == 1
+
+
+def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach):
+    """Test that attaching a user to an org calls Keycloak successfully."""
+
+    org = OrganizationPageFactory.create()
+    user = UserFactory.create()
+
+    process_add_org_membership(user, org)
+
+    mocked_b2b_org_attach.assert_called()

@@ -11,12 +11,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
 
-from b2b.api import create_b2b_enrollment
+from b2b.api import create_b2b_enrollment, process_add_org_membership
 from b2b.models import (
     ContractPage,
     DiscountContractAttachmentRedemption,
     OrganizationPage,
-    UserOrganization,
 )
 from b2b.serializers.v0 import (
     ContractPageSerializer,
@@ -142,7 +141,7 @@ class AttachContractApi(APIView):
             if contract.is_full():
                 continue
 
-            UserOrganization.process_add_membership(
+            process_add_org_membership(
                 request.user, contract.organization, keep_until_seen=True
             )
             request.user.b2b_contracts.add(contract)
