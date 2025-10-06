@@ -8,11 +8,7 @@ from django.db.models import Q
 
 from b2b.api import create_contract_run
 from b2b.constants import (
-    CONTRACT_MEMBERSHIP_AUTO,
-    CONTRACT_MEMBERSHIP_CODE,
-    CONTRACT_MEMBERSHIP_MANAGED,
-    CONTRACT_MEMBERSHIP_NONSSO,
-    CONTRACT_MEMBERSHIP_SSO,
+    CONTRACT_MEMBERSHIP_CHOICES,
 )
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from courses.api import resolve_courseware_object_from_id
@@ -72,14 +68,7 @@ class Command(BaseCommand):
             "membership_type",
             type=str,
             help="The mmebership type for this contract.",
-            choices=[
-                CONTRACT_MEMBERSHIP_SSO,
-                CONTRACT_MEMBERSHIP_NONSSO,
-                CONTRACT_MEMBERSHIP_MANAGED,
-                CONTRACT_MEMBERSHIP_CODE,
-                CONTRACT_MEMBERSHIP_AUTO,
-            ],
-            default=CONTRACT_MEMBERSHIP_MANAGED,
+            choices=[value[0] for value in CONTRACT_MEMBERSHIP_CHOICES],
         )
         create_parser.add_argument(
             "--description",
