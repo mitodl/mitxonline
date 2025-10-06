@@ -673,12 +673,7 @@ def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
 
 def sync_course_mode(runs: list[CourseRun]) -> list[int]:
     """
-    Ensure the course run has the proper modes, and sync the expiration dates.
-
-    If the course run doesn't have an audit and a verified mode, this will create
-    them. It will also sync the upgrade deadline with the verified mode's
-    expiration date (to the run if the mode exists, or to the mode when we create
-    it).
+    Sync the course runs' upgrade deadline with the expiration date in its verified mode.
 
     Args:
         runs ([CourseRun]): list of CourseRun objects.

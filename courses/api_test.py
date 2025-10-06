@@ -849,7 +849,9 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
     responding with an error.
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
-    mocker.patch.object(CourseModes, "get_mode", side_effect=[mocked_api_response])
+    mocker.patch.object(
+        CourseModes, "get_course_modes", side_effect=[mocked_api_response]
+    )
     course_run = CourseRunFactory.create()
 
     success_count, failure_count = sync_course_mode([course_run])
@@ -1916,6 +1918,7 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
             description="Audit",
             currency="USD",
             expiration_datetime=None,
+            min_price=None,
         )
 
     if not verified_exists:
