@@ -981,3 +981,55 @@ def add_user_org_membership(org, user):
         return False
 
     return org_model.associate("members", org.sso_organization_id, user.global_id)
+
+
+def process_add_org_membership(user, organization, *, keep_until_seen=False):
+    """
+    Add a user to an org, and kick off contract processing.
+
+    This allows us to manage UserOrganization records without necessarily
+    being forced to process contract memberships at the same time.
+
+    Args:
+    - user (users.models.User): the user to add
+    - organization (b2b.models.OrganizationPage): the organization to add the user to
+    - keep_until_seen (bool): if True, the user will be kept in the org until the
+        organization is seen in their SSO data.
+    """
+
+    obj, created = UserOrganization.objects.get_or_create(
+        user=user,
+        organization=organization,
+    )
+    if created:
+        obj.keep_until_seen = keep_until_seen
+        obj.save()
+        try:
+            organization.attach_user(user)
+        except ConnectionError:
+            log.exception(
+                "Could not attach %s to Keycloak org for %s", user, organization
+            )
+        organization.add_user_contracts(user)
+
+    return obj
+
+
+def process_remove_org_membership(user, organization):
+    """
+    Remove a user from an org, and kick off contract processing.
+
+    Other side of the process_add_org_membership function - removes the membership
+    and associated managed contracts.
+
+    Args:
+    - user (users.models.User): the user to remove
+    - organization (b2b.models.OrganizationPage): the organization to remove the user from
+    """
+
+    organization.remove_user_contracts(user)
+
+    UserOrganization.objects.filter(
+        user=user,
+        organization=organization,
+    ).get().delete()
