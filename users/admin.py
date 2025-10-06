@@ -11,8 +11,9 @@ from django_object_actions import DjangoObjectActions, action
 from hijack.contrib.admin import HijackUserAdminMixin
 from mitol.common.admin import TimestampedModelAdmin
 
+from b2b.models import UserOrganization
 from openedx.models import OpenEdxUser
-from users.models import BlockList, LegalAddress, User, UserOrganization, UserProfile
+from users.models import BlockList, LegalAddress, User, UserProfile
 
 
 class UserLegalAddressInline(admin.StackedInline):
