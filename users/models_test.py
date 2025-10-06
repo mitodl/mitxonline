@@ -23,13 +23,6 @@ from users.models import (
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture
-def mocked_b2b_org_attach(mocker):
-    """Mock the org attachment call."""
-
-    return mocker.patch("b2b.api.add_user_org_membership", return_value=True)
-
-
 @pytest.mark.parametrize(
     "create_func,exp_staff,exp_superuser,exp_is_active",  # noqa: PT006
     [

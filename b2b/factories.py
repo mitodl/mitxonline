@@ -55,11 +55,12 @@ class ContractPageFactory(wagtail_factories.PageFactory):
     description = LazyAttribute(lambda _: FAKE.unique.text())
     organization = SubFactory(OrganizationPageFactory)
     parent = LazyAttribute(lambda o: o.organization)
-    membership_type = LazyFunction(
+    integration_type = LazyFunction(
         lambda: CONTRACT_MEMBERSHIP_NONSSO
         if FAKE.boolean()
         else CONTRACT_MEMBERSHIP_SSO
     )
+    membership_type = LazyAttribute(lambda o: o.integration_type)
 
     class Meta:
         model = ContractPage
