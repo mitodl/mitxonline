@@ -352,9 +352,12 @@ MIDDLEWARE = (
     "oauth2_provider.middleware.OAuth2TokenMiddleware",
     "django_scim.middleware.SCIMAuthCheckMiddleware",
 )
+ZEAL_ENABLE = get_bool(
+    name="ZEAL_ENABLE", default=False, description="Whether to enable zeal or not"
+)
 
 # enable the zeal nplusone profiler only in debug mode or under pytest
-if DEBUG or ENVIRONMENT == "pytest":
+if ZEAL_ENABLE or ENVIRONMENT == "pytest":
     INSTALLED_APPS += ("zeal",)
     # this should be the first middleware so we catch any issues in our own middleware
     MIDDLEWARE += ("zeal.middleware.zeal_middleware",)
