@@ -76,7 +76,7 @@ def queue_fastly_purge_url(page_id):
         logger.info("Purge request processed OK.")
         return True
 
-    logger.error("Purge request failed.")  # noqa: RET503
+    logger.error("Purge request failed.")
 
 
 @app.task()
@@ -96,7 +96,7 @@ def queue_fastly_full_purge():
         logger.info("Purge request processed OK.")
         return True
 
-    logger.error("Purge request failed.")  # noqa: RET503
+    logger.error("Purge request failed.")
 
 
 @app.task
