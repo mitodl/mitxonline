@@ -30,7 +30,7 @@ from b2b.constants import (
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.factories import OrganizationPageFactory
-from b2b.models import OrganizationIndexPage, OrganizationPage
+from b2b.models import OrganizationIndexPage, OrganizationPage, UserOrganization
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.factories import CourseFactory, CourseRunFactory
 from courses.models import CourseRunEnrollment
@@ -53,7 +53,6 @@ from main.constants import (
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
-from users.models import UserOrganization
 
 FAKE = faker.Faker()
 pytestmark = [

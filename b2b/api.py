@@ -25,7 +25,12 @@ from b2b.constants import (
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
-from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
+from b2b.models import (
+    ContractPage,
+    OrganizationIndexPage,
+    OrganizationPage,
+    UserOrganization,
+)
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun
@@ -47,7 +52,6 @@ from main import constants as main_constants
 from main.utils import date_to_datetime
 from openedx.api import create_user
 from openedx.tasks import clone_courserun
-from users.models import UserOrganization
 
 log = logging.getLogger(__name__)
 
@@ -828,39 +832,22 @@ def reconcile_user_orgs(user, organizations):
     # we've checked the cached org membership, so now figure out what orgs
     # we're in but aren't in the list, and vice versa
 
-    orgs_to_add = (
-        OrganizationPage.objects.filter(
-            Q(sso_organization_id__in=organizations) & ~Q(organization_users__user=user)
-        )
-        .filter(sso_organization_id__isnull=False)
-        .all()
-    )
+    orgs_to_add = OrganizationPage.objects.filter(
+        Q(sso_organization_id__in=organizations) & ~Q(organization_users__user=user)
+    ).filter(sso_organization_id__isnull=False)
 
-    orgs_to_remove = (
-        UserOrganization.objects.filter(
-            ~Q(organization__sso_organization_id__in=organizations)
-            & Q(user=user, keep_until_seen=False)
-        )
-        .filter(organization__sso_organization_id__isnull=False)
-        .all()
-    )
+    orgs_to_remove = UserOrganization.objects.filter(
+        ~Q(organization__sso_organization_id__in=organizations)
+        & Q(user=user, keep_until_seen=False)
+    ).filter(organization__sso_organization_id__isnull=False)
 
     for add_org in orgs_to_add:
         # add org, add contracts, clear flag if we need to
-        new_membership, created = UserOrganization.objects.get_or_create(
+        UserOrganization.objects.update_or_create(
             user=user,
             organization=add_org,
             defaults={"keep_until_seen": False},
         )
-
-        if not created and new_membership.keep_until_seen:
-            new_membership.keep_until_seen = False
-            new_membership.save()
-            log.info(
-                "reconcile_user_orgs: cleared keep_until_seen for user %s org %s",
-                user.id,
-                add_org,
-            )
 
         add_org.add_user_contracts(user)
         log.info("reconcile_user_orgs: added user %s to org %s", user.id, add_org)

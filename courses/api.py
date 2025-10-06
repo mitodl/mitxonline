@@ -28,6 +28,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
+from b2b.models import UserOrganization
 from cms.api import create_default_courseware_page
 from courses import mail_api
 from courses.constants import (
@@ -78,7 +79,6 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
-from users.models import UserOrganization
 
 if TYPE_CHECKING:
     from django.db.models.query import QuerySet

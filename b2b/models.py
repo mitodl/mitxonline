@@ -1,5 +1,7 @@
 """Models for B2B data."""
 
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
@@ -20,6 +22,8 @@ from b2b.constants import (
 )
 from b2b.exceptions import TargetCourseRunExistsError
 from b2b.tasks import queue_enrollment_code_check
+
+log = logging.getLogger(__name__)
 
 
 class OrganizationObjectIndexPage(Page):
@@ -144,8 +148,6 @@ class OrganizationPage(Page):
 
         for contract in contracts_qs.all():
             user.b2b_contracts.add(contract)
-
-        user.save()
 
         return contracts_qs.count()
 
@@ -408,3 +410,82 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
         on_delete=models.DO_NOTHING,
         help_text="The contract that the user was attached to.",
     )
+
+
+class UserOrganization(models.Model):
+    """The user's organizations memberships."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="b2b_organizations",
+    )
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="organization_users",
+    )
+    keep_until_seen = models.BooleanField(
+        default=False,
+        help_text="If True, the user will be kept in the organization until the organization is seen in their SSO data.",
+    )
+
+    class Meta:
+        unique_together = ("user", "organization")
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"UserOrganization: {self.user} in {self.organization}"
+
+    @staticmethod
+    def process_add_membership(user, organization, *, keep_until_seen=False):
+        """
+        Add a user to an org, and kick off contract processing.
+
+        This allows us to manage UserOrganization records without necessarily
+        being forced to process contract memberships at the same time.
+
+        Args:
+        - user (users.models.User): the user to add
+        - organization (b2b.models.OrganizationPage): the organization to add the user to
+        - keep_until_seen (bool): if True, the user will be kept in the org until the
+          organization is seen in their SSO data.
+        """
+
+        obj, created = UserOrganization.objects.get_or_create(
+            user=user,
+            organization=organization,
+        )
+        if created:
+            obj.keep_until_seen = keep_until_seen
+            obj.save()
+            try:
+                organization.attach_user(user)
+            except ConnectionError:
+                log.exception(
+                    "Could not attach %s to Keycloak org for %s", user, organization
+                )
+            organization.add_user_contracts(user)
+
+        return obj
+
+    @staticmethod
+    def process_remove_membership(user, organization):
+        """
+        Remove a user from an org, and kick off contract processing.
+
+        Other side of the process_add_membership function - removes the membership
+        and associated managed contracts.
+
+        Args:
+        - user (users.models.User): the user to remove
+        - organization (b2b.models.OrganizationPage): the organization to remove the user from
+        """
+
+        organization.remove_user_contracts(user)
+
+        UserOrganization.objects.filter(
+            user=user,
+            organization=organization,
+        ).get().delete()

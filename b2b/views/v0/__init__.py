@@ -16,6 +16,7 @@ from b2b.models import (
     ContractPage,
     DiscountContractAttachmentRedemption,
     OrganizationPage,
+    UserOrganization,
 )
 from b2b.serializers.v0 import (
     ContractPageSerializer,
@@ -27,7 +28,6 @@ from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.permissions import IsAdminOrReadOnly
-from users.models import UserOrganization
 
 
 class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
