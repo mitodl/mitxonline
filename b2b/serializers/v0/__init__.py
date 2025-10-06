@@ -3,6 +3,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from b2b.constants import CONTRACT_MEMBERSHIP_CHOICES, CONTRACT_MEMBERSHIP_TYPE_CHOICES
 from b2b.models import ContractPage, OrganizationPage, UserOrganization
 from cms.api import get_wagtail_img_src
 from main.constants import USER_MSG_TYPE_B2B_CHOICES
@@ -12,6 +13,9 @@ class ContractPageSerializer(serializers.ModelSerializer):
     """
     Serializer for the ContractPage model.
     """
+
+    integration_type = serializers.CharField(choices=CONTRACT_MEMBERSHIP_CHOICES)
+    membership_type = serializers.CharField(choices=CONTRACT_MEMBERSHIP_TYPE_CHOICES)
 
     class Meta:
         model = ContractPage
