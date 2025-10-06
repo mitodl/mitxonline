@@ -1523,17 +1523,7 @@ components:
             * `code` - Enrollment Code
             * `auto` - Auto Enrollment
         membership_type:
-          allOf:
-          - $ref: '#/components/schemas/MembershipTypeEnum'
-          readOnly: true
-          description: |-
-            The method to use to manage membership in the contract.
-
-            * `sso` - SSO
-            * `non-sso` - Non-SSO
-            * `managed` - Managed
-            * `code` - Enrollment Code
-            * `auto` - Auto Enrollment
+          type: string
         organization:
           type: integer
           readOnly: true
@@ -2673,26 +2663,6 @@ components:
           maxLength: 10
       required:
       - country
-    MembershipTypeEnum:
-      enum:
-      - sso
-      - non-sso
-      - managed
-      - code
-      - auto
-      type: string
-      description: |-
-        * `sso` - SSO
-        * `non-sso` - Non-SSO
-        * `managed` - Managed
-        * `code` - Enrollment Code
-        * `auto` - Auto Enrollment
-      x-enum-descriptions:
-      - SSO
-      - Non-SSO
-      - Managed
-      - Enrollment Code
-      - Auto Enrollment
     NullEnum:
       enum:
       - null
