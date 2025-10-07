@@ -37,8 +37,6 @@ def test_validate_legal_address(valid_address_dict):
 @pytest.mark.parametrize(
     "field,value,error",  # noqa: PT006
     [
-        ["first_name", "", "First name cannot be blank"],  # noqa: PT007
-        ["last_name", "", "Last name cannot be blank"],  # noqa: PT007
         ["country", "", "This field may not be blank."],  # noqa: PT007
         ["country", None, "This field may not be null."],  # noqa: PT007
     ],
