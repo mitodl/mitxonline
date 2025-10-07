@@ -102,16 +102,12 @@ class LegalAddressSerializer(serializers.ModelSerializer):
 
     def validate_first_name(self, value):
         """Validates the first name of the user"""
-        if value == "":
-            raise serializers.ValidationError("First name cannot be blank")  # noqa: EM101
         if value and not USER_GIVEN_NAME_RE.match(value):
             raise serializers.ValidationError("First name is not valid")  # noqa: EM101
         return value
 
     def validate_last_name(self, value):
         """Validates the last name of the user"""
-        if value == "":
-            raise serializers.ValidationError("Last name cannot be blank")  # noqa: EM101
         if value and not USER_GIVEN_NAME_RE.match(value):
             raise serializers.ValidationError("Last name is not valid")  # noqa: EM101
         return value
