@@ -4,7 +4,9 @@ import qs from "query-string"
 
 const LoginSso = () => {
   useEffect(() => {
-    const nextUrl = new URLSearchParams(window.location.search).get('next') || window.location.pathname
+    const nextUrl =
+      new URLSearchParams(window.location.search).get("next") ||
+      window.location.pathname
     const params = qs.stringify({ next: nextUrl })
 
     window.location.href = `/login/?${params}`
