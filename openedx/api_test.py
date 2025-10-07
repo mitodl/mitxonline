@@ -1238,8 +1238,6 @@ def test_reconcile_edx_username_conflict():
     user = UserFactory.create(
         username="bobjones@place.email",
         name="Bob Jones",
-        legal_address__first_name="Bob",
-        legal_address__last_name="Jones",
         openedx_user=None,
     )
     assert reconcile_edx_username(user)
@@ -1250,8 +1248,6 @@ def test_reconcile_edx_username_conflict():
         username="bobjones@other.place.email",
         openedx_user=None,
         name="Bob Jones",
-        legal_address__first_name=user.legal_address.first_name,
-        legal_address__last_name=user.legal_address.last_name,
     )
     assert reconcile_edx_username(new_user)
 

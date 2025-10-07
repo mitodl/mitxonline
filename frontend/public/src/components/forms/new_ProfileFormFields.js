@@ -38,16 +38,6 @@ export const legalAddressValidation = yup.object().shape({
       "Username cannot contain any of these !@#$%^&*()+=[]{};':\"\\|,<>/?~ symbols"
     ),
   legal_address: yup.object().shape({
-    first_name: yup
-      .string()
-      .required()
-      .label("First Name")
-      .matches(NAME_REGEX, NAME_REGEX_FAIL_MESSAGE),
-    last_name: yup
-      .string()
-      .required()
-      .label("Last Name")
-      .matches(NAME_REGEX, NAME_REGEX_FAIL_MESSAGE),
     country: yup
       .string()
       .required()
@@ -168,60 +158,6 @@ export const LegalAddressFields = ({
   const addressErrors = errors && errors.legal_address
   return (
     <React.Fragment>
-      <div className="form-group">
-        <CardLabel
-          htmlFor="legal_address.first_name"
-          isRequired={true}
-          label="First Name"
-          subLabel="Name that will appear on emails"
-        />
-        <Field
-          type="text"
-          name="legal_address.first_name"
-          id="legal_address.first_name"
-          className="form-control"
-          autoComplete="given-name"
-          aria-invalid={
-            addressErrors && addressErrors.first_name ? "true" : null
-          }
-          aria-describedby={
-            addressErrors && addressErrors.first_name ?
-              "first-name-error" :
-              null
-          }
-          aria-description="Name cannot start with, or contain, a special character"
-          title="Name cannot start with, or contain, a special character."
-          required
-        />
-        <ErrorMessage
-          id="first-name-error"
-          name="legal_address.first_name"
-          component={FormError}
-        />
-      </div>
-      <div className="form-group">
-        <CardLabel
-          htmlFor="legal_address.last_name"
-          isRequired={true}
-          label="Last Name"
-        />
-        <Field
-          type="text"
-          name="legal_address.last_name"
-          id="legal_address.last_name"
-          className="form-control"
-          autoComplete="family-name"
-          aria-invalid={
-            addressErrors && addressErrors.last_name ? "true" : null
-          }
-          aria-describedby={
-            addressErrors && addressErrors.last_name ? "last-name-error" : null
-          }
-          aria-description="Name cannot start with, or contain, a special character"
-          required
-        />
-        <ErrorMessage name="legal_address.last_name" component={FormError} />
-      </div>
       <div className="form-group">
         <CardLabel
           htmlFor="name"

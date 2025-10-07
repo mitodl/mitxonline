@@ -98,36 +98,14 @@ class LegalAddressSerializer(serializers.ModelSerializer):
 
     # NOTE: the model defines these as allowing empty values for backwards compatibility
     #       so we override them here to require them for new writes
-    first_name = serializers.CharField(max_length=60, required=False, allow_blank=True)
-    last_name = serializers.CharField(max_length=60, required=False, allow_blank=True)
     country = serializers.CharField(max_length=2)
     state = serializers.CharField(
         max_length=10, required=False, allow_blank=True, allow_null=True
     )
 
-    def validate_first_name(self, value):
-        """Validates the first name of the user"""
-        if value and not USER_GIVEN_NAME_RE.match(value):
-            raise serializers.ValidationError("First name is not valid")  # noqa: EM101
-        return value
-
-    def validate_last_name(self, value):
-        """Validates the last name of the user"""
-        if value and not USER_GIVEN_NAME_RE.match(value):
-            raise serializers.ValidationError("Last name is not valid")  # noqa: EM101
-        return value
-
     def validate(self, data):
         """Validate the legal address data"""
         errors = {}
-
-        # For POST operations (not partial updates), require first_name and last_name
-        request = self.context.get("request", None)
-        if request and request.method == "POST":
-            if "first_name" not in data or data.get("first_name") is None:
-                errors["first_name"] = "This field is required."
-            if "last_name" not in data or data.get("last_name") is None:
-                errors["last_name"] = "This field is required."
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -152,8 +130,6 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = LegalAddress
         fields = (
-            "first_name",
-            "last_name",
             "country",
             "state",
         )

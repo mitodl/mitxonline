@@ -41,8 +41,6 @@ describe("EditProfileForm", () => {
     const form = wrapper.find("Formik")
     assert.ok(findFormikFieldByName(form, "name").exists())
     assert.isNotOk(findFormikFieldByName(form, "password").exists())
-    assert.ok(findFormikFieldByName(form, "legal_address.first_name").exists())
-    assert.ok(findFormikFieldByName(form, "legal_address.last_name").exists())
     assert.ok(findFormikFieldByName(form, "legal_address.country").exists())
     assert.ok(
       findFormikFieldByName(form, "user_profile.year_of_birth").exists()

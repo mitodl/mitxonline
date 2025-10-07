@@ -40,8 +40,6 @@ describe("RegisterDetailsForm", () => {
   //
   ;[
     ["name", "name"],
-    ["legal_address.first_name", "given-name"],
-    ["legal_address.last_name", "family-name"],
     ["legal_address.country", "country"]
   ].forEach(([formFieldName, autoCompleteName]) => {
     it(`validates that autoComplete=${autoCompleteName} for field ${formFieldName}`, async () => {

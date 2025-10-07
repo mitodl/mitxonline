@@ -51,12 +51,7 @@ def send_ecommerce_order_receipt(order_record):
                     },
                     "receipt": receipt,
                     "purchaser": {
-                        "name": " ".join(
-                            [
-                                purchaser.get("first_name"),
-                                purchaser.get("last_name"),
-                            ]
-                        ),
+                        "name": purchaser.get("name"),
                         "email": purchaser.get("email"),
                         "street_address": purchaser.get("street_address"),
                         "state_code": purchaser.get("state_or_territory").split("-")[
