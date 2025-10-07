@@ -94,8 +94,7 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
             <dl>
               <dt>Name:</dt>
               <dd id="purchaserName">
-                {orderReceipt.purchaser.first_name}{" "}
-                {orderReceipt.purchaser.last_name}
+                {orderReceipt.purchaser.name}
               </dd>
             </dl>
             <dl>
