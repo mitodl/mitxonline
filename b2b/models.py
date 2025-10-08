@@ -88,14 +88,15 @@ class OrganizationPage(Page):
         FieldPanel("sso_organization_id"),
     ]
 
-    promote_panels = []
+    # Use default promote_panels from Page to allow manual slug editing
 
     def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
         """Save the page, and update the slug and title appropriately."""
 
         self.title = str(self.name)
 
-        self.slug = slugify(f"org-{self.name}")
+        if not self.slug:
+            self.slug = slugify(f"org-{self.name}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
 
     def get_learners(self):
