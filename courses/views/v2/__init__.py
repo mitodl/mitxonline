@@ -302,7 +302,7 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
 
     def get_queryset(self):
-        return Department.objects.all().order_by("name")
+        return Department.objects.for_serialization().order_by("name")
 
     @extend_schema(
         operation_id="departments_retrieve_v2",

@@ -151,9 +151,8 @@ def webpack_stats(settings):
 
 
 @pytest.fixture(autouse=True)
-def check_nplusone(request, settings):
+def check_nplusone(request):
     """Raise nplusone errors"""
-    settings.ZEAL_RAISE = True
     if request.node.get_closest_marker("skip_nplusone_check"):
         with zeal_ignore():
             yield
