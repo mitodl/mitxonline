@@ -56,12 +56,12 @@ def test_organization_page_slug_preserved_on_name_change():
     """Test that the slug is not regenerated when only the name changes."""
     org = OrganizationPageFactory.create(name="MIT")
     original_slug = org.slug
-    
+
     # Change the name
     org.name = "MIT - Universal AI"
     org.save()
     org.refresh_from_db()
-    
+
     # The slug should not have changed
     assert org.slug == original_slug
     # But the title should reflect the new name
@@ -71,7 +71,7 @@ def test_organization_page_slug_preserved_on_name_change():
 def test_organization_page_slug_generated_on_create():
     """Test that the slug is generated when creating a new organization."""
     org = OrganizationPageFactory.create(name="Test Organization", slug="")
-    
+
     # The slug should have been generated
     assert org.slug == "org-test-organization"
     assert org.title == "Test Organization"
@@ -80,15 +80,15 @@ def test_organization_page_slug_generated_on_create():
 def test_organization_page_slug_not_overwritten_if_set():
     """Test that a manually set slug is not overwritten."""
     org = OrganizationPageFactory.create(name="Test Org", slug="custom-slug")
-    
+
     # The slug should be the custom one
     assert org.slug == "custom-slug"
-    
+
     # Change the name
     org.name = "Test Org Updated"
     org.save()
     org.refresh_from_db()
-    
+
     # The slug should still be the custom one
     assert org.slug == "custom-slug"
     assert org.title == "Test Org Updated"
