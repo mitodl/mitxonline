@@ -91,7 +91,7 @@ def test_mail_api_refund_email_generation(
     rendered_template = mock_send_message.call_args[0][0]
 
     assert (
-        f"{order.purchaser.legal_address.first_name} {order.purchaser.legal_address.last_name}"
+        f"{order.purchaser.name}"
         in rendered_template.body
     )
     assert order.reference_number in rendered_template.body

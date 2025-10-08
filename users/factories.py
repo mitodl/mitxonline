@@ -65,8 +65,6 @@ class LegalAddressFactory(DjangoModelFactory):
 
     user = SubFactory("users.factories.UserFactory")
 
-    first_name = Faker("first_name")
-    last_name = Faker("last_name")
     country = Faker("country_code", representation="alpha-2")
 
     class Meta:

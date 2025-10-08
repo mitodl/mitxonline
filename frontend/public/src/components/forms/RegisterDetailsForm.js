@@ -22,8 +22,6 @@ const INITIAL_VALUES = {
   password:      "",
   username:      "",
   legal_address: {
-    first_name: "",
-    last_name:  "",
     country:    "",
     state:      ""
   },

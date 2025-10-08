@@ -26,7 +26,6 @@ class UserLegalAddressInline(admin.StackedInline):
             None,
             {
                 "fields": (
-                    ("first_name", "last_name"),
                     ("country", "state"),
                 )
             },

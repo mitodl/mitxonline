@@ -501,8 +501,6 @@ class AuthStateMachine(RuleBasedStateMachine):
             "name": "Sally Smith",
             "username": "custom-username",
             "legal_address": {
-                "first_name": "Sally",
-                "last_name": "Smith",
                 "country": "US",
                 "state": "US-MA",
             },
