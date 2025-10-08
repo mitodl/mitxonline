@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS base
+FROM python:3.10-slim AS base
 
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
