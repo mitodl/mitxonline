@@ -863,10 +863,10 @@ def reconcile_user_orgs(user, organizations):
     user.refresh_from_db()
     orgs = [
         (str(org.organization.sso_organization_id), not org.keep_until_seen)
-        for org in user.b2b_organizations.all()
+        for org in user.user_organizations.all()
     ]
 
-    user.b2b_organizations.filter(
+    user.user_organizations.filter(
         organization__sso_organization_id__in=organizations, keep_until_seen=True
     ).update(keep_until_seen=False)
 

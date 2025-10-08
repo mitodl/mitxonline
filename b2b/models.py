@@ -427,7 +427,7 @@ class UserOrganization(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="b2b_organizations",
+        related_name="user_organizations",
     )
     organization = models.ForeignKey(
         "b2b.OrganizationPage",

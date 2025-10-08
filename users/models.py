@@ -308,6 +308,12 @@ class User(
         related_name="users",
         help_text="The contracts the user is associated with.",
     )
+    b2b_organizations = models.ManyToManyField(
+        "b2b.OrganizationPage",
+        through="b2b.UserOrganization",
+        related_name="+",
+        help_text="The organizations the user is associated with.",
+    )
 
     objects = UserManager()
     faulty_openedx_users = FaultyOpenEdxUserManager()
@@ -366,11 +372,11 @@ class User(
 
     @cached_property
     def b2b_organization_sso_ids(self):
-        """Similar to b2b_organizations, but returns just the UUIDs."""
+        """Just the UUIDs for the organizations the user is in."""
         return list(
-            self.b2b_organizations.filter(
-                sso_organization_id__isnull=False
-            ).values_list("organization__sso_organization_id", flat=True)
+            self.organizations.filter(sso_organization_id__isnull=False).values_list(
+                "sso_organization_id", flat=True
+            )
         )
 
     @property
