@@ -410,8 +410,6 @@ class Command(BaseCommand):
             self.handle_create(**kwargs)
         elif subcommand == "modify":
             self.handle_modify(**kwargs)
-        elif subcommand == "courseware":
-            self.handle_courseware(**kwargs)
         else:
             log.error("Unknown subcommand: %s", subcommand)
             return 1
