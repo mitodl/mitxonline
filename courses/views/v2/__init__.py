@@ -71,7 +71,7 @@ def user_has_org_access(user, org_id):
         user
         and user.is_authenticated
         and org_id
-        and user.b2b_organizations.filter(organization__id=org_id).exists()
+        and user.b2b_organizations.filter(id=org_id).exists()
     )
 
 
