@@ -603,8 +603,8 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
 
     if (
         contract.integration_type in CONTRACT_MEMBERSHIP_AUTOS
-        and not contract.enrollment_fixed_price
-    ):
+        or contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+    ) and not contract.enrollment_fixed_price:
         # SSO contracts w/out price don't need discounts.
         return _handle_sso_free_contract(contract)
 

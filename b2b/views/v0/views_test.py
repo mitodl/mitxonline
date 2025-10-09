@@ -70,7 +70,7 @@ def test_b2b_contract_attachment(mocker, user):
     mocked_attach_user.assert_called()
 
     user.refresh_from_db()
-    assert user.b2b_organizations.filter(organization=contract.organization).exists()
+    assert user.b2b_organizations.filter(pk=contract.organization.id).exists()
     assert user.b2b_contracts.filter(pk=contract.id).exists()
 
     assert DiscountContractAttachmentRedemption.objects.filter(
@@ -235,9 +235,7 @@ def test_b2b_contract_attachment_full_contract(mocker):
     mocked_attach_user.assert_not_called()
 
     user.refresh_from_db()
-    assert not user.b2b_organizations.filter(
-        organization=contract.organization
-    ).exists()
+    assert not user.b2b_organizations.filter(pk=contract.organization.id).exists()
     assert not user.b2b_contracts.filter(pk=contract.id).exists()
     assert not DiscountContractAttachmentRedemption.objects.filter(
         contract=contract, user=user, discount=contract_code
