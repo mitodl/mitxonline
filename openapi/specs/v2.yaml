@@ -3598,7 +3598,7 @@ components:
         b2b_organizations:
           type: array
           items:
-            $ref: '#/components/schemas/UserOrganization'
+            $ref: '#/components/schemas/OrganizationPage'
           readOnly: true
       required:
       - b2b_organizations
@@ -3612,40 +3612,6 @@ components:
       - is_superuser
       - legal_address
       - updated_on
-    UserOrganization:
-      type: object
-      description: |-
-        Serializer for user organization data.
-
-        Return the user's organizations in a manner that makes them look like
-        OrganizationPage objects. (Previously, the user organizations were a queryset
-        of OrganizationPages that related to the user, but now we have a through
-        table.)
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        description:
-          type: string
-        logo:
-          type: string
-          description: Get logo
-          readOnly: true
-        slug:
-          type: string
-        contracts:
-          type: array
-          items:
-            $ref: '#/components/schemas/ContractPage'
-          readOnly: true
-      required:
-      - contracts
-      - description
-      - id
-      - logo
-      - name
-      - slug
     UserProfile:
       type: object
       description: Serializer for profile
