@@ -6,10 +6,8 @@ from decimal import Decimal
 from django.core.management import BaseCommand, CommandError
 from django.db.models import Q
 
-from b2b.api import create_contract_run
 from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
-from courses.api import resolve_courseware_object_from_id
 
 log = logging.getLogger(__name__)
 
@@ -18,26 +16,6 @@ class Command(BaseCommand):
     """Manage B2B contracts."""
 
     help = "Manage B2B contracts."
-
-    def create_run(self, contract, courseware):
-        """Create a run for the specified contract."""
-        run_tuple = create_contract_run(contract=contract, course=courseware)
-
-        if not run_tuple:
-            self.stdout.write(
-                self.style.ERROR(
-                    f"Failed to create run for course {courseware} for contract {contract}."
-                )
-            )
-            return False
-
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Created run {run_tuple[0]} and product {run_tuple[1]} for course {courseware} for contract {contract}."
-            )
-        )
-
-        return True
 
     def add_arguments(self, parser):
         """Add command line arguments."""
@@ -174,34 +152,6 @@ class Command(BaseCommand):
             help="Clear the end date.",
         )
 
-        courseware_parser = subparsers.add_parser(
-            "courseware",
-            help="Manage courseware assigned to a contract.",
-        )
-        courseware_parser.add_argument(
-            "contract_id",
-            type=int,
-            help="The ID of the contract to courseware courseware to.",
-        )
-        courseware_parser.add_argument(
-            "--remove",
-            action="store_true",
-            help="Remove courseware from the contract. (Default is to add.)",
-            dest="remove",
-        )
-        courseware_parser.add_argument(
-            "--no-create-runs",
-            action="store_false",
-            help="Don't create new runs for this contract.",
-            dest="create_runs",
-        )
-        courseware_parser.add_argument(
-            "courseware_id",
-            type=str,
-            help="The ID of the courseware to courseware.",
-            action="append",
-        )
-
         return super().add_arguments(parser)
 
     def handle_create(self, *args, **kwargs):  # noqa: ARG002
@@ -302,106 +252,6 @@ class Command(BaseCommand):
 
         contract.save()
         self.stdout.write(f"Modified contract with ID '{contract_id}'")
-
-    def handle_courseware(self, *args, **kwargs):  # noqa: ARG002, C901
-        """Add/remove courseware in a contract."""
-        contract_id = kwargs.pop("contract_id")
-        remove = kwargs.pop("remove")
-        create_runs = kwargs.pop("create_runs")
-        courseware_ids = kwargs.pop("courseware_id")
-
-        contract = ContractPage.objects.filter(id=contract_id).first()
-        if not contract:
-            msg = f"Contract with ID '{contract_id}' does not exist."
-            raise CommandError(msg)
-
-        managed = skipped = 0
-
-        for courseware_id in courseware_ids:
-            courseware = resolve_courseware_object_from_id(courseware_id)
-            if not courseware:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Courseware with ID '{courseware_id}' does not exist, skipping."
-                    )
-                )
-                skipped += 1
-            elif courseware.is_program:
-                # If you're specifying a program, we will always make new runs
-                # since we won't be able to tell which existing ones to use.
-
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"'{courseware_id}' is a program, so creating runs for all of its courses."
-                    )
-                )
-
-                prog_add, prog_skip = contract.add_program_courses(courseware)
-                contract.save()
-                managed += prog_add
-                skipped += prog_skip
-            elif courseware.is_run:
-                # This run already exists, so just add/remove it.
-                # - If the run is owned by a different contract, skip it.
-                # - If remove is True, remove the run from the contract.
-                # - If remove is False, add the run to the contract.
-
-                if courseware.b2b_contract and courseware.b2b_contract != contract:
-                    # Already owned by another contract, so skip
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Run '{courseware_id}' is already owned by {courseware.b2b_contract}."
-                        )
-                    )
-                    skipped += 1
-                    continue
-
-                if remove:
-                    # Remove the run from the contract
-                    courseware.b2b_contract = None
-                    courseware.save()
-                    managed += 1
-                elif courseware.b2b_contract == contract:
-                    # Already owned by this contract, so skip
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Run '{courseware_id}' is already owned by this contract."
-                        )
-                    )
-                    skipped += 1
-                else:
-                    # Add the run to the contract
-                    courseware.b2b_contract = contract
-                    courseware.save()
-                    managed += 1
-            elif remove:
-                # If we're removing courseware, skip it if it's not a run.
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Skipping removal of courseware '{courseware_id}' for contract {contract} because it is not a run. Removals must specify runs."
-                    )
-                )
-                skipped += 1
-            elif create_runs:
-                # This is a course, so create a run (unless we've been told not to).
-
-                if self.create_run(contract, courseware):
-                    managed += 1
-                else:
-                    skipped += 1
-            else:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Skipped run creation for for course {courseware} for contract {contract}."
-                    )
-                )
-                skipped += 1
-
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Managed {managed} courseware items and skipped {skipped} courseware items for {len(courseware_ids)} specified courseware IDs."
-            )
-        )
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
         """Handle the command."""

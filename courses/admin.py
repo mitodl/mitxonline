@@ -35,6 +35,13 @@ from main.utils import get_field_names
 from openedx.tasks import retry_failed_edx_enrollments
 
 
+class ProgramContractPageInline(admin.TabularInline):
+    """Inline for contract pages"""
+
+    model = Program.contracts.through
+    extra = 0
+
+
 @admin.register(Program)
 class ProgramAdmin(admin.ModelAdmin):
     """Admin for Program"""
@@ -44,6 +51,7 @@ class ProgramAdmin(admin.ModelAdmin):
     search_fields = ["title", "readable_id", "program_type"]
     list_display = ("id", "title", "live", "readable_id", "program_type")
     list_filter = ["live", "program_type", "departments"]
+    inlines = [ProgramContractPageInline]
 
 
 @admin.register(ProgramRun)
