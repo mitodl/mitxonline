@@ -20,8 +20,8 @@ const INITIAL_VALUES = {
   name:          "",
   username:      "",
   legal_address: {
-    country:    "",
-    state:      ""
+    country: "",
+    state:   ""
   },
   user_profile: {
     year_of_birth: ""
