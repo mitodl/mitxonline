@@ -392,6 +392,7 @@ def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments  # noqa: 
                     is_active=True,
                     email__contains="@",
                     global_id__isnull=False,
+                    last_login__isnull=False,
                 )
                 .order_by(F("hubspot_sync_datetime").asc(nulls_first=True))
             )
