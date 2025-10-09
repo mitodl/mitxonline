@@ -7,6 +7,7 @@ from b2b.models import (
     DiscountContractAttachmentRedemption,
     OrganizationPage,
 )
+from courses.models import CourseRun
 
 
 class ReadOnlyModelAdmin(admin.ModelAdmin):
@@ -42,6 +43,59 @@ class DiscountContractAttachmentRedemptionAdmin(ReadOnlyModelAdmin):
     readonly_fields = ["user", "contract", "discount", "created_on"]
 
 
+class ContractPageProgramInline(admin.TabularInline):
+    """Inline to display programs for contract pages."""
+
+    model = ContractPage.programs.through
+    extra = 0
+    verbose_name = "Contract Program"
+    verbose_name_plural = "Contract Programs"
+
+    def has_add_permission(self, request, obj):  # noqa: ARG002
+        """Turn off add permission. These admins are supposed to be read-only."""
+
+        return False
+
+    def has_delete_permission(self, request, obj):  # noqa: ARG002
+        """Turn off delete permission. These admins are supposed to be read-only."""
+
+        return False
+
+    def has_change_permission(self, request, obj):  # noqa: ARG002
+        """Turn off change permission. These admins are supposed to be read-only."""
+
+        return False
+
+
+class ContractPageCourseRunInline(admin.TabularInline):
+    """Inline to display course runs for contract pages."""
+
+    model = CourseRun
+    fk_name = "b2b_contract"
+    extra = 0
+    fields = [
+        "courseware_id",
+        "title",
+    ]
+    verbose_name = "Contract Course Run"
+    verbose_name_plural = "Contract Course Runs"
+
+    def has_add_permission(self, request, obj):  # noqa: ARG002
+        """Turn off add permission. These admins are supposed to be read-only."""
+
+        return False
+
+    def has_delete_permission(self, request, obj):  # noqa: ARG002
+        """Turn off delete permission. These admins are supposed to be read-only."""
+
+        return False
+
+    def has_change_permission(self, request, obj):  # noqa: ARG002
+        """Turn off change permission. These admins are supposed to be read-only."""
+
+        return False
+
+
 @admin.register(ContractPage)
 class ContractPageAdmin(ReadOnlyModelAdmin):
     """Admin for contract pages."""
@@ -70,6 +124,7 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         "max_learners",
         "enrollment_fixed_price",
     ]
+    inlines = [ContractPageCourseRunInline, ContractPageProgramInline]
 
 
 @admin.register(OrganizationPage)

@@ -12,6 +12,7 @@ from django.core.management import BaseCommand, CommandError
 from b2b.api import create_contract_run
 from b2b.models import ContractPage
 from courses.api import resolve_courseware_object_from_id
+from courses.models import CourseRun
 
 log = logging.getLogger(__name__)
 
@@ -41,69 +42,62 @@ class Command(BaseCommand):
 
         return True
 
-    def add_arugments(self, parser):
+    def add_arguments(self, parser):
         """Add command line arguments."""
-
-        parser.add_argument(
-            "contract",
-            type=str,
-            help="The contract to work on (slug or ID)."
-        )
-
-        parser.add_argument(
-            "courseware",
-            type=str,
-            help="The courseware object (readable ID) to work with. Can be a program, course, or course run.",
-        )
-
-        parser.add_argument(
-            "--also",
-            type=str,
-            action="append",
-            target="additional_courseware",
-            help="Additional courseware objects (readable IDs) to work with.",
-        )
 
         subparsers = parser.add_subparsers(
             title="Task",
             dest="subcommand",
             required=True,
-            help="The task to perform - add or remove."
+            help="The task to perform - add or remove.",
+        )
+        parser.add_argument(
+            "contract", type=str, help="The contract to work on (slug or ID)."
+        )
+        parser.add_argument(
+            "courseware",
+            type=str,
+            help="The courseware object (readable ID) to work with. Can be a program, course, or course run.",
+        )
+        parser.add_argument(
+            "--also",
+            type=str,
+            action="append",
+            dest="additional_courseware",
+            help="Additional courseware objects (readable IDs) to work with.",
         )
 
         add_subparser = subparsers.add_parser(
             "add",
             help="Add courseware to a contract.",
         )
-        remove_subparser = subparsers.add_parser(
-            "remove",
-            "del",
-            "rm",
-            help="Remove courseware from a contract.",
-        )
-
         add_subparser.add_argument(
             "--no-create-runs",
             help="Don't create contract runs for the specified course, just add it to the contract.",
-            target="create_runs",
+            dest="create_runs",
             action="store_false",
         )
         add_subparser.add_argument(
             "--force",
             help="Force adding any specified runs to the contract (overwrite existing contract associations).",
-            target="force",
+            dest="force",
             action="store_true",
         )
 
+        remove_subparser = subparsers.add_parser(
+            "remove",
+            help="Remove courseware from a contract.",
+        )
+
         remove_subparser.add_argument(
-            "--program-only",
-            help="Only unlink the program from the contract, don't modify course runs. (Only applies if a program is specified.)",
+            "--remove-program-runs",
+            help="For programs, unlink the program's contract runs as well as the program.",
             action="store_true",
         )
 
         return super().add_arguments(parser)
 
-    def handle_add(self, contract, coursewares, **kwargs): # noqa: ARG002
+    def handle_add(self, contract, coursewares, **kwargs):
         """Handle the add subcommand."""
 
         create_runs = kwargs.pop("create_runs")
@@ -112,15 +106,13 @@ class Command(BaseCommand):
         managed = skipped = 0
 
         for courseware in coursewares:
-            courseware_id = courseware.readable_id if hasattr(courseware, "readable_id") else courseware.courseware_id
-
             if courseware.is_program:
                 # If you're specifying a program, we will always make new runs
                 # since we won't be able to tell which existing ones to use.
 
                 self.stdout.write(
                     self.style.WARNING(
-                        f"'{courseware_id}' is a program, so creating runs for all of its courses."
+                        f"'{courseware.readable_id}' is a program, so creating runs for all of its courses."
                     )
                 )
 
@@ -128,17 +120,25 @@ class Command(BaseCommand):
                 contract.save()
                 managed += prog_add
                 skipped += prog_skip
+                contract.programs.add(courseware)
+                self.stdout.write(
+                    self.style.SUCCESS(f"Added {courseware.readable_id} to {contract}.")
+                )
             elif courseware.is_run:
-                # This run already exists, so just add/remove it.
-                # - If the run is owned by a different contract, skip it.
-                # - If remove is True, remove the run from the contract.
-                # - If remove is False, add the run to the contract.
+                # This run already exists, so:
+                # - If it's in a contract already and we're not forcing it, skip it.
+                # - If it's in a contract already and we *are* forcing it, set it to be in this contract.
+                # - If it's not in a contract, add it to this contract.
 
-                if not force_associate and courseware.b2b_contract and courseware.b2b_contract != contract:
+                if (
+                    not force_associate
+                    and courseware.b2b_contract
+                    and courseware.b2b_contract != contract
+                ):
                     # Already owned by another contract, so skip
                     self.stdout.write(
                         self.style.WARNING(
-                            f"Run '{courseware_id}' is already owned by {courseware.b2b_contract}."
+                            f"Run '{courseware.courseware_id}' is already owned by {courseware.b2b_contract}."
                         )
                     )
                     skipped += 1
@@ -147,15 +147,16 @@ class Command(BaseCommand):
                     # Already owned by this contract, so skip
                     self.stdout.write(
                         self.style.WARNING(
-                            f"Run '{courseware_id}' is already owned by this contract."
+                            f"Run '{courseware.courseware_id}' is already owned by this contract."
                         )
                     )
                     skipped += 1
-                else:
-                    # Add the run to the contract
-                    courseware.b2b_contract = contract
-                    courseware.save()
-                    managed += 1
+                    continue
+
+                # Add the run to the contract
+                courseware.b2b_contract = contract
+                courseware.save()
+                managed += 1
             elif create_runs:
                 # This is a course, so create a run (unless we've been told not to).
 
@@ -166,7 +167,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"Skipped run creation for for course {courseware} for contract {contract}."
+                        f"Skipped run creation for for course {courseware.readable_id} for contract {contract}."
                     )
                 )
                 skipped += 1
@@ -177,8 +178,71 @@ class Command(BaseCommand):
             )
         )
 
+        return True
 
-    def handle(self, *args, **kwargs):
+    def handle_remove(self, contract, coursewares, **kwargs):
+        """Handle removing courseware from a contract."""
+
+        remove_runs = kwargs.pop("remove_program_runs")
+
+        for courseware in coursewares:
+            if courseware.is_program:
+                # If we have a program, unlink the program from the contract.
+                # Then, if we're told to, unlink any contract runs that are
+                # part of the program too.
+
+                if remove_runs:
+                    program_courses = courseware.courses
+                    program_runs = CourseRun.objects.filter(
+                        b2b_contract=contract,
+                        course__in=[course for (course, _) in program_courses],
+                    ).all()
+
+                    coursewares.extend(program_runs)
+
+                    self.stdout.write(
+                        self.style.NOTICE(
+                            f"{courseware.readable_id} is a program and --remove-program-runs set, so adding {len(program_runs)} course runs"
+                        )
+                    )
+
+                contract.programs.remove(courseware)
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Removed program {courseware.readable_id} from contract {contract}."
+                    )
+                )
+            elif not courseware.is_run:
+                # If we have a course, find and add the contract runs for the
+                # course to the list. We don't link courses to contracts, so
+                # there's nothing else to do here.
+
+                course_contract_runs = courseware.courseruns.filter(
+                    b2b_contract=contract
+                ).all()
+
+                coursewares.extend(course_contract_runs)
+
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Added {len(course_contract_runs)} course runs from course {courseware.readable_id} to remove from contract {contract}."
+                    )
+                )
+            else:
+                # We're actually at a course run now.
+
+                courseware.b2b_contract = None
+                courseware.save()
+
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Unlinked {courseware.courseware_id} from {contract}."
+                    )
+                )
+
+        return True
+
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         """Dispatch the requested task."""
 
         contract_id = kwargs.pop("contract")
@@ -186,18 +250,27 @@ class Command(BaseCommand):
         additional_courseware_ids = kwargs.pop("additional_courseware")
         subcommand = kwargs.pop("subcommand")
 
-        contract = ContractPage.objects.filter(slug=contract_id).first()
-        if not contract:
+        if contract_id.isdecimal():
             contract = ContractPage.objects.filter(id=contract_id).first()
+        else:
+            contract = ContractPage.objects.filter(slug=contract_id).first()
 
         if not contract:
             msg = f"Contract with ID/slug '{contract_id}' does not exist."
             raise CommandError(msg)
 
-        coursewares = [ resolve_courseware_object_from_id(courseware_id) for courseware_id in [ courseware_id, *additional_courseware_ids ] ]
+        courseware_ids = [courseware_id]
+        if additional_courseware_ids:
+            courseware_ids.extend(additional_courseware_ids)
+
+        coursewares = [
+            resolve_courseware_object_from_id(courseware_id)
+            for courseware_id in courseware_ids
+        ]
 
         if subcommand == "add":
-            return self.handle_add(contract, coursewares, **kwargs)
-
-        self.stderr.write(self.style.ERROR(f"Unknown command {subcommand}"))
-        return False
+            self.handle_add(contract, coursewares, **kwargs)
+        elif subcommand == "remove":
+            self.handle_remove(contract, coursewares, **kwargs)
+        else:
+            self.stderr.write(self.style.ERROR(f"Unknown command {subcommand}"))
