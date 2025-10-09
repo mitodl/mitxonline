@@ -6,11 +6,22 @@ import modelcluster.fields
 
 
 def copy_order_to_sort_order(apps, schema_editor):
-    """Copy data from order field to sort_order field"""
+    """Copy data from order field to sort_order field and set alphabetical ordering"""
     ProgramCollectionItem = apps.get_model('courses', 'ProgramCollectionItem')
-    for item in ProgramCollectionItem.objects.all():
-        item.sort_order = item.order
-        item.save(update_fields=['sort_order'])
+    ProgramCollection = apps.get_model('courses', 'ProgramCollection')
+
+    # For each collection, get its items and order them alphabetically by program title
+    for collection in ProgramCollection.objects.all():
+        # Get all items for this collection and order by program title
+        items = list(ProgramCollectionItem.objects.filter(collection=collection).select_related('program'))
+
+        # Sort items alphabetically by program title
+        items.sort(key=lambda item: item.program.title.lower())
+
+        # Update sort_order with alphabetical ordering
+        for index, item in enumerate(items):
+            item.sort_order = index
+            item.save(update_fields=['sort_order'])
 
 
 def reverse_copy_order_to_sort_order(apps, schema_editor):
