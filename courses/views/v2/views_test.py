@@ -310,7 +310,7 @@ def test_filter_with_org_id_returns_contracted_course(
     org = OrganizationPageFactory(name="Test Org")
     contract = ContractPageFactory(organization=org, active=True)
     user = UserFactory()
-    user.b2b_organizations.create(organization=org)
+    user.b2b_organizations.add(org)
     user.b2b_contracts.add(contract)
     user.refresh_from_db()
 
@@ -501,7 +501,7 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     contract = ContractPageFactory.create(organization=orgs[0])
     second_contract = ContractPageFactory.create(organization=orgs[1])
     test_user = UserFactory()
-    test_user.b2b_organizations.create(organization=contract.organization)
+    test_user.b2b_organizations.add(contract.organization)
     test_user.b2b_contracts.add(contract)
     test_user.save()
     test_user.refresh_from_db()
@@ -643,7 +643,7 @@ def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     contract.add_program_courses(b2b_program)
     contract.save()
 
-    user.b2b_organizations.create(organization=org)
+    user.b2b_organizations.add(org)
     user.b2b_contracts.add(contract)
     user.save()
 

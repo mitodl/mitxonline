@@ -565,13 +565,9 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     user.refresh_from_db()
     assert user.b2b_organizations.count() == 1
-    assert user.b2b_organizations.filter(organization=organization_to_add).exists()
-    assert not user.b2b_organizations.filter(
-        organization=organization_to_ignore
-    ).exists()
-    assert not user.b2b_organizations.filter(
-        organization=organization_to_remove
-    ).exists()
+    assert user.b2b_organizations.filter(pk=organization_to_add.id).exists()
+    assert not user.b2b_organizations.filter(pk=organization_to_ignore.id).exists()
+    assert not user.b2b_organizations.filter(pk=organization_to_remove.id).exists()
 
     # Step 2: Add an org through a back channel, and then reconcile
     # The org should be removed
@@ -591,13 +587,9 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     user.refresh_from_db()
     assert user.b2b_organizations.count() == 1
-    assert user.b2b_organizations.filter(organization=organization_to_add).exists()
-    assert not user.b2b_organizations.filter(
-        organization=organization_to_ignore
-    ).exists()
-    assert not user.b2b_organizations.filter(
-        organization=organization_to_remove
-    ).exists()
+    assert user.b2b_organizations.filter(pk=organization_to_add.id).exists()
+    assert not user.b2b_organizations.filter(pk=organization_to_ignore.id).exists()
+    assert not user.b2b_organizations.filter(pk=organization_to_remove.id).exists()
 
     # Step 3: Add the remove org, but set the flag so it should be kept now.
 
@@ -616,11 +608,9 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     user.refresh_from_db()
     assert user.b2b_organizations.count() == 2
-    assert user.b2b_organizations.filter(organization=organization_to_add).exists()
-    assert not user.b2b_organizations.filter(
-        organization=organization_to_ignore
-    ).exists()
-    assert user.b2b_organizations.filter(organization=organization_to_remove).exists()
+    assert user.b2b_organizations.filter(pk=organization_to_add.id).exists()
+    assert not user.b2b_organizations.filter(pk=organization_to_ignore.id).exists()
+    assert user.b2b_organizations.filter(pk=organization_to_remove.id).exists()
 
     # Step 3.5: now reconcile with the remove org, we should clear the flag
 
@@ -637,11 +627,9 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     user.refresh_from_db()
     assert user.b2b_organizations.count() == 2
-    assert user.b2b_organizations.filter(organization=organization_to_add).exists()
-    assert not user.b2b_organizations.filter(
-        organization=organization_to_ignore
-    ).exists()
-    assert user.b2b_organizations.filter(organization=organization_to_remove).exists()
+    assert user.b2b_organizations.filter(pk=organization_to_add.id).exists()
+    assert not user.b2b_organizations.filter(pk=organization_to_ignore.id).exists()
+    assert user.b2b_organizations.filter(pk=organization_to_remove.id).exists()
 
     # Step 4: add the weird org that doesn't have a UUID
     # Legacy non-manged orgs won't have a UUID, so we should leave them alone
@@ -663,7 +651,7 @@ def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
 
     user.refresh_from_db()
     assert user.b2b_organizations.count() == 3
-    assert user.b2b_organizations.filter(organization=weird_organization).exists()
+    assert user.b2b_organizations.filter(pk=weird_organization.id).exists()
 
 
 @pytest.mark.parametrize(
@@ -810,7 +798,7 @@ def test_user_add_b2b_org(mocked_b2b_org_attach):
 
     user.refresh_from_db()
     assert user.b2b_contracts.count() == 3
-    assert user.b2b_organizations.filter(organization=orgs[0]).exists()
+    assert user.b2b_organizations.filter(pk=orgs[0].id).exists()
     assert (
         user.b2b_contracts.filter(
             pk__in=[

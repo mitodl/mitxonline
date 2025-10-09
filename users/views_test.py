@@ -58,7 +58,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
 
         if has_orgs:
             contract = ContractPageFactory.create()
-            user.b2b_organizations.create(organization=contract.organization)
+            user.b2b_organizations.add(contract.organization)
             user.b2b_contracts.add(contract)
             user.save()
             b2b_orgs = [
@@ -66,7 +66,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
                     "id": contract.organization.id,
                     "name": contract.organization.name,
                     "description": contract.organization.description,
-                    "logo": "",
+                    "logo": None,
                     "slug": contract.organization.slug,
                     "contracts": [
                         {
