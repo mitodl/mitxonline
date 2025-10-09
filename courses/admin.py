@@ -25,6 +25,7 @@ from courses.models import (
     PartnerSchool,
     Program,
     ProgramCertificate,
+    ProgramCollectionItem,
     ProgramEnrollment,
     ProgramEnrollmentAudit,
     ProgramRun,
@@ -561,6 +562,17 @@ class RelatedProgramAdmin(admin.ModelAdmin):
     model = RelatedProgram
     list_display = ("id", "first_program", "second_program")
     list_filter = ["first_program", "second_program"]
+
+
+@admin.register(ProgramCollectionItem)
+class ProgramCollectionItemAdmin(admin.ModelAdmin):
+    """Admin for ProgramCollectionItem"""
+
+    model = ProgramCollectionItem
+    list_display = ("id", "collection", "program", "order")
+    list_filter = ["collection"]
+    ordering = ("collection", "order")
+    list_editable = ("order",)
 
 
 # ProgramCollection is now a Page, managed through Wagtail admin
