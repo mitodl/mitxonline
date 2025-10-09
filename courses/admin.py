@@ -569,10 +569,9 @@ class ProgramCollectionItemAdmin(admin.ModelAdmin):
     """Admin for ProgramCollectionItem"""
 
     model = ProgramCollectionItem
-    list_display = ("id", "collection", "program", "order")
+    list_display = ("id", "collection", "program", "sort_order")
     list_filter = ["collection"]
-    ordering = ("collection", "order")
-    list_editable = ("order",)
+    ordering = ("collection", "sort_order")
 
 
 # ProgramCollection is now a Page, managed through Wagtail admin

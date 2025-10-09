@@ -20,9 +20,10 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from treebeard.mp_tree import MP_Node
-from wagtail.admin.panels import FieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.fields import RichTextField
-from wagtail.models import Page, Revision
+from wagtail.models import Page, Revision, Orderable, ClusterableModel
+from modelcluster.fields import ParentalKey
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
@@ -2000,10 +2001,10 @@ class LearnerProgramRecordShare(TimestampedModel):
         ]
 
 
-class ProgramCollectionItem(models.Model):
+class ProgramCollectionItem(Orderable):
     """Intermediate model to store programs in a collection with ordering"""
 
-    collection = models.ForeignKey(
+    collection = ParentalKey(
         'ProgramCollection',
         on_delete=models.CASCADE,
         related_name='collection_items'
@@ -2013,22 +2014,22 @@ class ProgramCollectionItem(models.Model):
         on_delete=models.CASCADE,
         related_name='collection_memberships'
     )
-    order = models.PositiveIntegerField(
-        default=0,
-        help_text="Order of this program within the collection (lower numbers appear first)"
-    )
+
+    panels = [
+        FieldPanel('program'),
+    ]
 
     class Meta:
-        ordering = ['order']
+        ordering = ['sort_order']
         unique_together = ('collection', 'program')
         verbose_name = "Program Collection Item"
         verbose_name_plural = "Program Collection Items"
 
     def __str__(self):
-        return f"{self.collection.title} - {self.program.title} (order: {self.order})"
+        return f"{self.collection.title} - {self.program.title} (order: {self.sort_order})"
 
 
-class ProgramCollection(Page):
+class ProgramCollection(Page, ClusterableModel):
     """Model for a collection of programs with title and description"""
 
     description = RichTextField(
@@ -2038,6 +2039,7 @@ class ProgramCollection(Page):
     content_panels = [
         *Page.content_panels,
         FieldPanel("description"),
+        InlinePanel('collection_items', label="Programs", help_text="Add and order programs in this collection"),
     ]
 
     @property
@@ -2047,14 +2049,14 @@ class ProgramCollection(Page):
         """
         return Program.objects.filter(
             collection_memberships__collection=self
-        ).order_by('collection_memberships__order')
+        ).order_by('collection_memberships__sort_order')
 
     @property
     def ordered_collection_items(self):
         """
         Returns ProgramCollectionItem objects ordered by their order field
         """
-        return self.collection_items.all().order_by('order')
+        return self.collection_items.all().order_by('sort_order')
 
     def add_program(self, program, order=None):
         """
@@ -2066,18 +2068,18 @@ class ProgramCollection(Page):
         """
         if order is None:
             # Get the highest order value and add 1
-            last_item = self.collection_items.order_by('-order').first()
-            order = (last_item.order + 1) if last_item else 0
+            last_item = self.collection_items.order_by('-sort_order').first()
+            order = (last_item.sort_order + 1) if last_item else 0
 
         collection_item, created = ProgramCollectionItem.objects.get_or_create(
             collection=self,
             program=program,
-            defaults={'order': order}
+            defaults={'sort_order': order}
         )
 
         if not created:
             # Update order if item already exists
-            collection_item.order = order
+            collection_item.sort_order = order
             collection_item.save()
 
         return collection_item
@@ -2105,7 +2107,7 @@ class ProgramCollection(Page):
             ProgramCollectionItem.objects.filter(
                 collection=self,
                 program_id=program_id
-            ).update(order=order)
+            ).update(sort_order=order)
 
     class Meta:
         verbose_name = "Program Collection"
