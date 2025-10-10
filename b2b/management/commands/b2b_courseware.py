@@ -1,11 +1,11 @@
 """
 Manage courseware objects for B2B contracts.
 
-This takes some of the functionality that the b2b_contract command had and moves
-it here, since the b2b_contract command was getting a bit unwiedly.
+Allows you to
 """
 
 import logging
+from argparse import RawTextHelpFormatter
 
 from django.core.management import BaseCommand, CommandError
 
@@ -20,11 +20,40 @@ log = logging.getLogger(__name__)
 class Command(BaseCommand):
     """Manage B2B contract courseware objects."""
 
-    help = "Manage B2B contract courseware objects."
+    help = """Add or remove a B2B contract's courseware objects.
 
-    def create_run(self, contract, courseware):
+Courseware objects can be course runs, courses, or programs. specified by their readable ID (i.e. course-v1:MITxT+12.345s+3T2022). Contract should be specified by either their numeric ID or their slug.
+
+Specifying courseware: You must specify one courseware item (of any type). You can specify more than one by adding "--also <courseware id>" to the end of the command. You can repeat this as many times as necessary.
+
+To add courseware:
+   b2b_courseware add [--no-create-runs] [--force] contract courseware [--also courseware] [--also courseware...]
+
+Example: b2b_courseware add contract-100-101 program-v1:UAI+Fundamentals --also course-v1:UAI_C100+14.314x+2025_C101
+
+Specifying a course run will attach it to the contract unless the contract is already attached to a contract. Specify "--force" to override any existing contract attachment.
+
+Specifying a course will attempt to create a course run for the contract for the specified course. It will try to create a course run in edX as well unless "--no-create-runs" is specified.
+
+Specifying a program will iterate through the program's courses and create runs for each. It will also link the program to the contract.
+
+To remove:
+    b2b_courseware remove [--remove-program-runs] contract courseware [--also courseware] [--also courseware...]
+
+Example: b2b_courseware remove --remove-program-runs contract-100-101 program-v1:UAI+Fundamentals --also course-v1:UAI_C100+14.314x+2025_C101
+
+Specifying a course run will unlink the run from the contract.
+
+Specifying a course will unlink any of the course's runs that are attached to the contract from the contract.
+
+Specifying a program will only unlink the program from the contract, unless "--remove-program-runs" is set. If it is, then all the runs that belong to both the contract and the program's courses will be removed from the contract. Note that doing this and then re-adding the program will *not* re-attach the existing runs to the contract - you will need to do that manually.
+    """
+
+    def create_run(self, contract, courseware, *, skip_edx=False):
         """Create a run for the specified contract."""
-        run_tuple = create_contract_run(contract=contract, course=courseware)
+        run_tuple = create_contract_run(
+            contract=contract, course=courseware, skip_edx=skip_edx
+        )
 
         if not run_tuple:
             self.stdout.write(
@@ -44,6 +73,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         """Add command line arguments."""
+
+        parser.formatter_class = RawTextHelpFormatter
 
         subparsers = parser.add_subparsers(
             title="Task",
@@ -73,7 +104,7 @@ class Command(BaseCommand):
         )
         add_subparser.add_argument(
             "--no-create-runs",
-            help="Don't create contract runs for the specified course, just add it to the contract.",
+            help="Don't create contract runs in edX for the specified course, just add it to the contract.",
             dest="create_runs",
             action="store_false",
         )
@@ -160,7 +191,7 @@ class Command(BaseCommand):
             elif create_runs:
                 # This is a course, so create a run (unless we've been told not to).
 
-                if self.create_run(contract, courseware):
+                if self.create_run(contract, courseware, skip_edx=create_runs):
                     managed += 1
                 else:
                     skipped += 1
