@@ -4,18 +4,17 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0037_add_global_id_default'),
+        ("users", "0037_add_global_id_default"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='first_name',
+            model_name="legaladdress",
+            name="first_name",
         ),
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='last_name',
+            model_name="legaladdress",
+            name="last_name",
         ),
     ]
