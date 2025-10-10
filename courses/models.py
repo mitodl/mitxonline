@@ -19,11 +19,11 @@ from django_countries.fields import CountryField
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
+from modelcluster.fields import ParentalKey
 from treebeard.mp_tree import MP_Node
 from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.fields import RichTextField
-from wagtail.models import Page, Revision, Orderable, ClusterableModel
-from modelcluster.fields import ParentalKey
+from wagtail.models import ClusterableModel, Orderable, Page, Revision
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
@@ -2005,28 +2005,26 @@ class ProgramCollectionItem(Orderable):
     """Intermediate model to store programs in a collection with ordering"""
 
     collection = ParentalKey(
-        'ProgramCollection',
-        on_delete=models.CASCADE,
-        related_name='collection_items'
+        "ProgramCollection", on_delete=models.CASCADE, related_name="collection_items"
     )
     program = models.ForeignKey(
-        Program,
-        on_delete=models.CASCADE,
-        related_name='collection_memberships'
+        Program, on_delete=models.CASCADE, related_name="collection_memberships"
     )
 
     panels = [
-        FieldPanel('program'),
+        FieldPanel("program"),
     ]
 
     class Meta:
-        ordering = ['sort_order']
-        unique_together = ('collection', 'program')
+        ordering = ["sort_order"]
+        unique_together = ("collection", "program")
         verbose_name = "Program Collection Item"
         verbose_name_plural = "Program Collection Items"
 
     def __str__(self):
-        return f"{self.collection.title} - {self.program.title} (order: {self.sort_order})"
+        return (
+            f"{self.collection.title} - {self.program.title} (order: {self.sort_order})"
+        )
 
 
 class ProgramCollection(Page, ClusterableModel):
@@ -2039,7 +2037,11 @@ class ProgramCollection(Page, ClusterableModel):
     content_panels = [
         *Page.content_panels,
         FieldPanel("description"),
-        InlinePanel('collection_items', label="Programs", help_text="Add and order programs in this collection"),
+        InlinePanel(
+            "collection_items",
+            label="Programs",
+            help_text="Add and order programs in this collection",
+        ),
     ]
 
     @property
@@ -2047,16 +2049,16 @@ class ProgramCollection(Page, ClusterableModel):
         """
         Returns programs in the collection ordered by their order field
         """
-        return Program.objects.filter(
-            collection_memberships__collection=self
-        ).order_by('collection_memberships__sort_order')
+        return Program.objects.filter(collection_memberships__collection=self).order_by(
+            "collection_memberships__sort_order"
+        )
 
     @property
     def ordered_collection_items(self):
         """
         Returns ProgramCollectionItem objects ordered by their order field
         """
-        return self.collection_items.all().order_by('sort_order')
+        return self.collection_items.all().order_by("sort_order")
 
     def add_program(self, program, order=None):
         """
@@ -2071,9 +2073,7 @@ class ProgramCollection(Page, ClusterableModel):
             order = (last_item.sort_order + 1) if last_item else 0
 
         collection_item, created = ProgramCollectionItem.objects.get_or_create(
-            collection=self,
-            program=program,
-            defaults={'sort_order': order}
+            collection=self, program=program, defaults={"sort_order": order}
         )
 
         if not created:
@@ -2089,10 +2089,7 @@ class ProgramCollection(Page, ClusterableModel):
         Args:
             program: Program instance to remove
         """
-        ProgramCollectionItem.objects.filter(
-            collection=self,
-            program=program
-        ).delete()
+        ProgramCollectionItem.objects.filter(collection=self, program=program).delete()
 
     def reorder_programs(self, program_order_list):
         """
@@ -2103,8 +2100,7 @@ class ProgramCollection(Page, ClusterableModel):
         """
         for program_id, order in program_order_list:
             ProgramCollectionItem.objects.filter(
-                collection=self,
-                program_id=program_id
+                collection=self, program_id=program_id
             ).update(sort_order=order)
 
     class Meta:

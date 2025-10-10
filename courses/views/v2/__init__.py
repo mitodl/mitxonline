@@ -350,8 +350,7 @@ class ProgramCollectionViewSet(viewsets.ReadOnlyModelViewSet):
         return (
             ProgramCollection.objects.select_related()
             .prefetch_related(
-                "collection_items__program",
-                "collection_items__program__departments"
+                "collection_items__program", "collection_items__program__departments"
             )
             .order_by("title")
         )
