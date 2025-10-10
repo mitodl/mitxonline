@@ -14,15 +14,6 @@ class Migration(migrations.Migration):
             name='programcollectionitem',
             options={'ordering': ['sort_order'], 'verbose_name': 'Program Collection Item', 'verbose_name_plural': 'Program Collection Items'},
         ),
-        migrations.AddField(
-            model_name='programcollectionitem',
-            name='sort_order',
-            field=models.IntegerField(blank=True, editable=False, null=True),
-        ),
-        migrations.RemoveField(
-            model_name='programcollectionitem',
-            name='order',
-        ),
         migrations.AlterField(
             model_name='programcollectionitem',
             name='collection',
