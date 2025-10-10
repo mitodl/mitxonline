@@ -23,13 +23,15 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     """Serializer for ProgramRequirement data"""
 
     node_type = serializers.ChoiceField(
-        choices=(
-            ProgramRequirementNodeType.OPERATOR,
-            ProgramRequirementNodeType.COURSE,
-        )
+        choices=[x.value for x in ProgramRequirementNodeType]
     )
-    course = serializers.CharField(source="course_id", allow_null=True, default=None)
-    program = serializers.CharField(source="program_id", required=False)
+    course = serializers.IntegerField(source="course_id", allow_null=True, default=None)
+    program = serializers.IntegerField(
+        source="program_id", allow_null=True, default=None
+    )
+    required_program = serializers.IntegerField(
+        source="required_program_id", allow_null=True, default=None
+    )
     title = serializers.CharField(allow_null=True, default=None)
     operator = serializers.CharField(allow_null=True, default=None)
     operator_value = serializers.CharField(allow_null=True, default=None)
@@ -40,7 +42,7 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
 class ProgramRequirementSerializer(StrictFieldsSerializer):
     """Serializer for a ProgramRequirement"""
 
-    id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    id = serializers.IntegerField()
     data = ProgramRequirementDataSerializer()
 
     def get_fields(self):

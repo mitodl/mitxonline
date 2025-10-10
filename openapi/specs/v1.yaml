@@ -4867,7 +4867,6 @@ components:
       properties:
         id:
           type: integer
-          nullable: true
         data:
           $ref: '#/components/schemas/V2ProgramRequirementData'
         children:
@@ -4877,6 +4876,7 @@ components:
           default: []
       required:
       - data
+      - id
     V2ProgramRequirementData:
       type: object
       description: Serializer for ProgramRequirement data
@@ -4884,10 +4884,14 @@ components:
         node_type:
           $ref: '#/components/schemas/V2ProgramRequirementDataNodeTypeEnum'
         course:
-          type: string
+          type: integer
           nullable: true
         program:
-          type: string
+          type: integer
+          nullable: true
+        required_program:
+          type: integer
+          nullable: true
         title:
           type: string
           nullable: true
@@ -4905,15 +4909,21 @@ components:
       - node_type
     V2ProgramRequirementDataNodeTypeEnum:
       enum:
+      - program_root
       - operator
       - course
+      - program
       type: string
       description: |-
+        * `program_root` - program_root
         * `operator` - operator
         * `course` - course
+        * `program` - program
       x-enum-descriptions:
+      - program_root
       - operator
       - course
+      - program
     YearsExperienceEnum:
       enum:
       - 2
