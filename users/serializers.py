@@ -125,8 +125,6 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = LegalAddress
         fields = (
-            "first_name",
-            "last_name",
             "country",
             "state",
         )
