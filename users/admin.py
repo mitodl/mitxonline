@@ -24,12 +24,7 @@ class UserLegalAddressInline(admin.StackedInline):
     fieldsets = (
         (
             None,
-            {
-                "fields": (
-                    ("first_name", "last_name"),
-                    ("country", "state"),
-                )
-            },
+            {"fields": (("country", "state"),)},
         ),
     )
 

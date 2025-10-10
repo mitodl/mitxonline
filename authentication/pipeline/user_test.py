@@ -68,8 +68,6 @@ def mock_create_user_strategy(mocker):
         "password": "password1",
         "username": "custom-username",
         "legal_address": {
-            "first_name": "Jane",
-            "last_name": "Doe",
             "country": "US",
             "state": "US-MA",
         },
@@ -344,8 +342,6 @@ def test_create_user_via_email_with_shorter_name(mocker, mock_email_backend):
         "password": "password1",
         "username": "custom-username",
         "legal_address": {
-            "first_name": "Jane",
-            "last_name": "Doe",
             "country": "US",
         },
     }
@@ -589,7 +585,6 @@ def test_create_ol_oidc_user(  # noqa: PLR0913
     }
     details = {
         **base_details,
-        "first_name": "Test",
         "fullname": "Test Admin",
         "last_name": "Admin",
         "profile": {

@@ -48,8 +48,6 @@ def test_make_contact_sync_message(user, mocker):
         "country": user.legal_address.country,
         "state": user.legal_address.state or "",
         "email": user.email,
-        "firstname": user.legal_address.first_name,
-        "lastname": user.legal_address.last_name,
         "name": user.name,
         "yearofbirth": user.user_profile.year_of_birth,
         "gender": user.user_profile.gender,
