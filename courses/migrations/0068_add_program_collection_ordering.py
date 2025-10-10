@@ -66,7 +66,6 @@ class Migration(migrations.Migration):
                     name="programs",
                 ),
             ],
-            database_operations=[
-            ],
+            database_operations=[],
         ),
     ]

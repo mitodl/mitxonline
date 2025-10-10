@@ -63,7 +63,7 @@ def test_serialize_program(
     ProgramCollectionItem.objects.create(
         collection=program_collection,
         program=program_with_empty_requirements,
-        sort_order=0
+        sort_order=0,
     )
     required_program = ProgramFactory.create(
         page=None,
