@@ -11,7 +11,7 @@ from courses.factories import (  # noqa: F401
     ProgramFactory,
     program_with_empty_requirements,
 )
-from courses.models import CoursesTopic, Department
+from courses.models import CoursesTopic, Department, ProgramCollectionItem
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.programs import (
     ProgramRequirementTreeSerializer,
@@ -60,8 +60,11 @@ def test_serialize_program(
     program_collection = ProgramCollectionFactory.create(
         title="Test Collection",
     )
-    program_collection.programs.add(program_with_empty_requirements)
-    program_collection.save()
+    ProgramCollectionItem.objects.create(
+        collection=program_collection,
+        program=program_with_empty_requirements,
+        sort_order=0
+    )
     required_program = ProgramFactory.create(
         page=None,
         title="Required Program",

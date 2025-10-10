@@ -127,7 +127,7 @@ class ProgramSerializer(serializers.ModelSerializer):
         # Fallback to database query
         return [
             collection.id
-            for collection in ProgramCollection.objects.filter(programs__id=instance.id)
+            for collection in ProgramCollection.objects.filter(collection_items__program__id=instance.id)
         ]
 
     @extend_schema_field(

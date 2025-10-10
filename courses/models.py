@@ -715,7 +715,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             list: List of ProgramCollection objects
         """
-        return list(ProgramCollection.objects.filter(programs__id=self.id).distinct())
+        return list(ProgramCollection.objects.filter(collection_items__program__id=self.id).distinct())
 
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
@@ -2067,7 +2067,6 @@ class ProgramCollection(Page, ClusterableModel):
             order: Optional order position. If None, adds at the end
         """
         if order is None:
-            # Get the highest order value and add 1
             last_item = self.collection_items.order_by('-sort_order').first()
             order = (last_item.sort_order + 1) if last_item else 0
 
@@ -2078,7 +2077,6 @@ class ProgramCollection(Page, ClusterableModel):
         )
 
         if not created:
-            # Update order if item already exists
             collection_item.sort_order = order
             collection_item.save()
 

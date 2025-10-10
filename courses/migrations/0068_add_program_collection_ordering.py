@@ -11,7 +11,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # First create the new model
         migrations.CreateModel(
             name='ProgramCollectionItem',
             fields=[
@@ -27,8 +26,6 @@ class Migration(migrations.Migration):
                 'unique_together': {('collection', 'program')},
             },
         ),
-        # Copy data from the old relationship to the new one (using correct table name)
-        # Order programs alphabetically by title within each collection
         migrations.RunSQL(
             "INSERT INTO courses_programcollectionitem (collection_id, program_id, sort_order) "
             "SELECT programcollection_id, program_id, "
@@ -37,12 +34,10 @@ class Migration(migrations.Migration):
             "JOIN courses_program p ON pcp.program_id = p.id",
             reverse_sql="DELETE FROM courses_programcollectionitem"
         ),
-        # Manually drop the old table
         migrations.RunSQL(
             "DROP TABLE courses_programcollection_programs CASCADE",
             reverse_sql="CREATE TABLE courses_programcollection_programs (id serial PRIMARY KEY, programcollection_id integer, program_id integer)"
         ),
-        # Remove the field from the model state without trying to drop any database tables
         migrations.SeparateDatabaseAndState(
             state_operations=[
                 migrations.RemoveField(
@@ -51,7 +46,6 @@ class Migration(migrations.Migration):
                 ),
             ],
             database_operations=[
-                # No database operations needed since we already dropped the table manually
             ],
         ),
     ]

@@ -573,5 +573,3 @@ class ProgramCollectionItemAdmin(admin.ModelAdmin):
     list_filter = ["collection"]
     ordering = ("collection", "sort_order")
 
-
-# ProgramCollection is now a Page, managed through Wagtail admin
