@@ -387,11 +387,12 @@ def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments  # noqa: 
             id__in=[id[0] for id in synced_object_ids]  # noqa: A001
         )
         if model_name == "user":
-            unsynced_objects = (
-                unsynced_objects.filter(is_active=True, email__contains="@")
-                .exclude(social_auth__isnull=True)
-                .order_by(F("hubspot_sync_datetime").asc(nulls_first=True))
-            )
+            unsynced_objects = unsynced_objects.filter(
+                is_active=True,
+                email__contains="@",
+                global_id__isnull=False,
+                last_login__isnull=False,
+            ).order_by(F("hubspot_sync_datetime").asc(nulls_first=True))
         unsynced_object_ids = unsynced_objects.values_list("id", flat=True)
         object_ids = unsynced_object_ids if create else synced_object_ids
     elif not create:
