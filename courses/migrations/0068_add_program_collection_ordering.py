@@ -16,27 +16,31 @@ class Migration(migrations.Migration):
             name='ProgramCollectionItem',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('order', models.PositiveIntegerField(default=0, help_text='Order of this program within the collection (lower numbers appear first)')),
+                ('sort_order', models.PositiveIntegerField(default=0)),
                 ('collection', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='collection_items', to='courses.programcollection')),
                 ('program', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='collection_memberships', to='courses.program')),
             ],
             options={
                 'verbose_name': 'Program Collection Item',
                 'verbose_name_plural': 'Program Collection Items',
-                'ordering': ['order'],
+                'ordering': ['sort_order'],
                 'unique_together': {('collection', 'program')},
             },
         ),
         # Copy data from the old relationship to the new one (using correct table name)
+        # Order programs alphabetically by title within each collection
         migrations.RunSQL(
-            "INSERT INTO courses_programcollectionitem (collection_id, program_id, \"order\") "
-            "SELECT collection_id, program_id, 0 FROM courses_programcollectionprogram",
+            "INSERT INTO courses_programcollectionitem (collection_id, program_id, sort_order) "
+            "SELECT programcollection_id, program_id, "
+            "ROW_NUMBER() OVER (PARTITION BY programcollection_id ORDER BY p.title) - 1 as sort_order "
+            "FROM courses_programcollection_programs pcp "
+            "JOIN courses_program p ON pcp.program_id = p.id",
             reverse_sql="DELETE FROM courses_programcollectionitem"
         ),
-        # Manually drop the old table 
+        # Manually drop the old table
         migrations.RunSQL(
-            "DROP TABLE courses_programcollectionprogram CASCADE",
-            reverse_sql="CREATE TABLE courses_programcollectionprogram (id serial PRIMARY KEY, collection_id integer, program_id integer)"
+            "DROP TABLE courses_programcollection_programs CASCADE",
+            reverse_sql="CREATE TABLE courses_programcollection_programs (id serial PRIMARY KEY, programcollection_id integer, program_id integer)"
         ),
         # Remove the field from the model state without trying to drop any database tables
         migrations.SeparateDatabaseAndState(

@@ -57,10 +57,7 @@ class ProgramCollectionSerializer(StrictFieldsSerializer):
     id = serializers.IntegerField(read_only=True)
     title = serializers.CharField()
     description = serializers.CharField()
-    programs = serializers.PrimaryKeyRelatedField(
-        many=True,
-        read_only=True,
-    )
+    programs = serializers.SerializerMethodField()
     created_on = serializers.DateTimeField(read_only=True)
     updated_on = serializers.DateTimeField(read_only=True)
 
@@ -73,6 +70,19 @@ class ProgramCollectionSerializer(StrictFieldsSerializer):
             "programs",
             "created_on",
             "updated_on",
+        ]
+
+    def get_programs(self, instance):
+        """
+        Returns programs in the collection ordered by their order field
+        """
+        return [
+            {
+                "id": item.program.id,
+                "title": item.program.title,
+                "order": item.sort_order,
+            }
+            for item in instance.ordered_collection_items
         ]
 
 
