@@ -72,7 +72,7 @@ def ensure_b2b_organization_index() -> OrganizationIndexPage:
 
 
 def create_contract_run(
-    contract: ContractPage, course: Course
+    contract: ContractPage, course: Course, *, skip_edx=False
 ) -> tuple[CourseRun, Product]:
     """
     Create a run for the specified contract.
@@ -111,6 +111,8 @@ def create_contract_run(
     Args:
         contract (ContractPage): The contract to create the run for.
         course (Course): The course for which we should create a run.
+    Keyword Args:
+        skip_edx (bool): Don't try to create a course run in edX.
     Returns:
         CourseRun: The created CourseRun object.
         Product: The created Product object.
@@ -175,7 +177,9 @@ def create_contract_run(
         ),
     )
     course_run.save()
-    clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)
+
+    if not skip_edx:
+        clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)
 
     log.debug(
         "Created run %s for course %s in contract %s from course run %s",
