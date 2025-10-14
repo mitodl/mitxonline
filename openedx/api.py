@@ -1584,7 +1584,6 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
     )
 
     # Ensure the new course has the proper modes in it.
-
     check_course_modes(target_course)
 
     # Set the ingestion flag on the course run to True
@@ -1608,7 +1607,7 @@ def get_edx_course_modes(
     Get the current modes for a given course.
 
     Args:
-    - course_id: the readable ID of the course to use as the base
+    - course_id (str): the readable ID of the course to use as the base
     Keyword Args:
     - client (EdxApi): edX client (if you want to reuse one)
     Returns:
@@ -1651,7 +1650,7 @@ def create_edx_course_mode(  # noqa: PLR0913
     currency: str = "USD",
     expiration_datetime: datetime | None = None,
     client: EdxApi | None = None,
-    min_price: int | None = None,
+    min_price: int = 0,
 ) -> CourseMode:
     """Create a course mode for the given edX course."""
 
@@ -1663,7 +1662,7 @@ def create_edx_course_mode(  # noqa: PLR0913
         mode_display_name=mode_display_name,
         description=description,
         currency=currency,
-        expiration_datetime=expiration_datetime,
+        expiration_datetime=str(expiration_datetime),
         min_price=min_price,
     )
 
@@ -1677,7 +1676,7 @@ def update_edx_course_mode(  # noqa: PLR0913
     currency: str = "USD",
     expiration_datetime: datetime | None = None,
     client: EdxApi | None = None,
-    min_price: int | None = None,
+    min_price: int = 0,
 ) -> CourseMode:
     """Create a course mode for the given edX course."""
 
@@ -1689,7 +1688,7 @@ def update_edx_course_mode(  # noqa: PLR0913
         mode_display_name=mode_display_name,
         description=description,
         currency=currency,
-        expiration_datetime=expiration_datetime,
+        expiration_datetime=str(expiration_datetime),
         min_price=min_price,
     )
 

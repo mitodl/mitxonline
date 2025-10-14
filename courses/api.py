@@ -640,16 +640,16 @@ def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
     found_audit, found_verified = (False, False)
 
     for mode in modes:
-        if mode.mode_slug == "audit":
+        if mode.mode_slug == EDX_ENROLLMENT_AUDIT_MODE:
             found_audit = True
 
-        if mode.mode_slug == "verified":
+        if mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE:
             found_verified = True
 
     if not found_audit:
         create_edx_course_mode(
             course_id=run.courseware_id,
-            mode_slug="audit",
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE,
             mode_display_name="Audit",
             description="Audit",
             expiration_datetime=None,
@@ -659,7 +659,7 @@ def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
     if not found_verified:
         create_edx_course_mode(
             course_id=run.courseware_id,
-            mode_slug="verified",
+            mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
             mode_display_name="Verified",
             description="Verified",
             currency="USD",
@@ -707,7 +707,7 @@ def sync_course_mode(runs: list[CourseRun]) -> list[int]:
         else:
             for course_mode in course_modes:
                 if (
-                    course_mode.mode_slug == "verified"
+                    course_mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
                     and run.upgrade_deadline != course_mode.expiration_datetime
                 ):
                     run.upgrade_deadline = course_mode.expiration_datetime
