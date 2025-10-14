@@ -72,7 +72,20 @@ class ProgramCollectionSerializer(StrictFieldsSerializer):
             "updated_on",
         ]
 
-    def get_programs(self, instance):
+    @extend_schema_field(
+        field={
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "order": {"type": "integer"},
+                },
+            },
+        }
+    )
+    def get_programs(self, instance) -> list[dict[str, int | str]]:
         """
         Returns programs in the collection ordered by their order field
         """
