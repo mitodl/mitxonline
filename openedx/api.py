@@ -12,6 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.shortcuts import reverse
 from edx_api.client import EdxApi
+from edx_api.course_detail.models import CourseMode
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from edx_api.course_runs.models import CourseRun, CourseRunList
 from mitol.common.utils import (
@@ -1514,6 +1515,8 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
     Returns:
     bool, whether or not it worked
     """
+    from courses.api import check_course_modes
+
     edx_client = get_edx_api_jwt_client(
         settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
         settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET,
@@ -1580,6 +1583,9 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
         client=edx_client,
     )
 
+    # Ensure the new course has the proper modes in it.
+    check_course_modes(target_course)
+
     # Set the ingestion flag on the course run to True
     # All B2B courses should be flagged for content file ingestion - we can
     # toggle it off manually if necessary.
@@ -1592,3 +1598,109 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
             "Warning: processed course run clone for %s but can't set the ingestion flag because there's no CoursePage",
             target_course,
         )
+
+
+def get_edx_course_modes(
+    course_id: str, *, client: EdxApi | None = None
+) -> list[CourseMode]:
+    """
+    Get the current modes for a given course.
+
+    Args:
+    - course_id (str): the readable ID of the course to use as the base
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - list(edx_api.course_detail.models.CourseMode): the modes configured for the course
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return edx_client.course_mode.get_course_modes(course_id=course_id)
+
+
+def get_edx_course_mode(
+    course_id: str, mode_slug: str, *, client: EdxApi | None = None
+) -> CourseMode:
+    """
+    Get the specified mode for a given course.
+
+    Args:
+    - course_id: the readable ID of the course to use as the base
+    - mode_slug: the slug of the mode you want to retrieve (audit, verified, etc)
+    Keyword Args:
+    - client (EdxApi): edX client (if you want to reuse one)
+    Returns:
+    - list(edx_api.course_detail.models.CourseMode): the modes configured for the course
+    """
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return edx_client.course_mode.get_course_mode(
+        course_id=course_id, mode_slug=mode_slug
+    )
+
+
+def create_edx_course_mode(  # noqa: PLR0913
+    course_id: str,
+    mode_slug: str,
+    mode_display_name: str,
+    *,
+    description: str = "",
+    currency: str = "USD",
+    expiration_datetime: datetime | None = None,
+    client: EdxApi | None = None,
+    min_price: int = 0,
+) -> CourseMode:
+    """Create a course mode for the given edX course."""
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return edx_client.course_mode.create_course_mode(
+        course_id=course_id,
+        mode_slug=mode_slug,
+        mode_display_name=mode_display_name,
+        description=description,
+        currency=currency,
+        expiration_datetime=str(expiration_datetime) if expiration_datetime else None,
+        min_price=min_price,
+    )
+
+
+def update_edx_course_mode(  # noqa: PLR0913
+    course_id: str,
+    mode_slug: str,
+    mode_display_name: str,
+    *,
+    description: str = "",
+    currency: str = "USD",
+    expiration_datetime: datetime | None = None,
+    client: EdxApi | None = None,
+    min_price: int = 0,
+) -> CourseMode:
+    """Create a course mode for the given edX course."""
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return edx_client.course_mode.update_course_mode(
+        course_id=course_id,
+        mode_slug=mode_slug,
+        mode_display_name=mode_display_name,
+        description=description,
+        currency=currency,
+        expiration_datetime=str(expiration_datetime) if expiration_datetime else None,
+        min_price=min_price,
+    )
+
+
+def delete_edx_course_mode(
+    course_id: str, mode_slug: str, *, client: EdxApi | None = None
+):
+    """Delete the specified course mode from the edX course."""
+
+    edx_client = client if client else get_edx_api_service_client()
+
+    return edx_client.course_mode.delete_course_mode(
+        course_id=course_id,
+        mode_slug=mode_slug,
+    )

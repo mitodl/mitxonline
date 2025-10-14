@@ -51,9 +51,11 @@ from courses.utils import (
 )
 from ecommerce.models import OrderStatus
 from openedx.api import (
+    create_edx_course_mode,
     enroll_in_edx_course_runs,
     get_edx_api_course_list_client,
     get_edx_api_course_mode_client,
+    get_edx_course_modes,
     get_edx_grades_with_users,
     unenroll_edx_course_run,
 )
@@ -619,15 +621,65 @@ def sync_course_runs(runs):
     return success_count, failure_count
 
 
-def sync_course_mode(runs: list[CourseRun]) -> list[str]:
+def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
     """
-    Updates course run upgrade expiration dates from Open edX
+    Check that the course has the course modes we expect.
+
+    We expect an `audit` and a `verified` mode in our course runs. If these don't
+    exist for the given course, this will create them.
 
     Args:
         runs ([CourseRun]): list of CourseRun objects.
 
     Returns:
-        [str], [str]: Lists of success and error logs respectively
+        (audit_created: bool, verified_created: bool): Tuple of mode status - true for created, false for found
+    """
+
+    modes = get_edx_course_modes(course_id=run.courseware_id)
+
+    found_audit, found_verified = (False, False)
+
+    for mode in modes:
+        if mode.mode_slug == EDX_ENROLLMENT_AUDIT_MODE:
+            found_audit = True
+
+        if mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE:
+            found_verified = True
+
+    if not found_audit:
+        create_edx_course_mode(
+            course_id=run.courseware_id,
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE,
+            mode_display_name="Audit",
+            description="Audit",
+            expiration_datetime=None,
+            currency="USD",
+        )
+
+    if not found_verified:
+        create_edx_course_mode(
+            course_id=run.courseware_id,
+            mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            mode_display_name="Verified",
+            description="Verified",
+            currency="USD",
+            min_price=10,
+            expiration_datetime=run.upgrade_deadline if run.upgrade_deadline else None,
+        )
+
+    # these are created flags, not found flags
+    return (not found_audit, not found_verified)
+
+
+def sync_course_mode(runs: list[CourseRun]) -> list[int]:
+    """
+    Sync the course runs' upgrade deadline with the expiration date in its verified mode.
+
+    Args:
+        runs ([CourseRun]): list of CourseRun objects.
+
+    Returns:
+        [int, int]: Count of successful and failed operations
     """
     api_client = get_edx_api_course_mode_client()
 
@@ -637,7 +689,7 @@ def sync_course_mode(runs: list[CourseRun]) -> list[str]:
     # Iterate all eligible runs and sync if possible
     for run in runs:
         try:
-            course_modes = api_client.get_mode(
+            course_modes = api_client.get_course_modes(
                 course_id=run.courseware_id,
             )
         except HTTPError as e:  # noqa: PERF203
@@ -655,7 +707,7 @@ def sync_course_mode(runs: list[CourseRun]) -> list[str]:
         else:
             for course_mode in course_modes:
                 if (
-                    course_mode.mode_slug == "verified"
+                    course_mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
                     and run.upgrade_deadline != course_mode.expiration_datetime
                 ):
                     run.upgrade_deadline = course_mode.expiration_datetime
@@ -671,7 +723,7 @@ def sync_course_mode(runs: list[CourseRun]) -> list[str]:
                         log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                         failure_count += 1
 
-    return success_count, failure_count
+    return [success_count, failure_count]
 
 
 def is_program_text_id(item_text_id):
