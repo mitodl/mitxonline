@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.131.2
+Version 0.131.2 (Released October 14, 2025)
 ---------------
 
 - Wagtail permissions and url fix (#2975)
