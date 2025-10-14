@@ -572,4 +572,3 @@ class ProgramCollectionItemAdmin(admin.ModelAdmin):
     list_display = ("id", "collection", "program", "sort_order")
     list_filter = ["collection"]
     ordering = ("collection", "sort_order")
-
