@@ -4842,7 +4842,14 @@ components:
         programs:
           type: array
           items:
-            type: integer
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              order:
+                type: integer
           readOnly: true
         created_on:
           type: string
