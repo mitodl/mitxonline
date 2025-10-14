@@ -1662,7 +1662,7 @@ def create_edx_course_mode(  # noqa: PLR0913
         mode_display_name=mode_display_name,
         description=description,
         currency=currency,
-        expiration_datetime=str(expiration_datetime),
+        expiration_datetime=str(expiration_datetime) if expiration_datetime else None,
         min_price=min_price,
     )
 
@@ -1688,7 +1688,7 @@ def update_edx_course_mode(  # noqa: PLR0913
         mode_display_name=mode_display_name,
         description=description,
         currency=currency,
-        expiration_datetime=str(expiration_datetime),
+        expiration_datetime=str(expiration_datetime) if expiration_datetime else None,
         min_price=min_price,
     )
 

@@ -1918,7 +1918,7 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
             description="Audit",
             currency="USD",
             expiration_datetime=None,
-            min_price=None,
+            min_price=0,
         )
 
     if not verified_exists:
@@ -1928,6 +1928,6 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
             mode_display_name="Verified",
             description="Verified",
             currency="USD",
-            expiration_datetime=run.upgrade_deadline,
+            expiration_datetime=str(run.upgrade_deadline),
             min_price=10,
         )
