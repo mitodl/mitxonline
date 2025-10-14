@@ -1106,7 +1106,7 @@ class CourseRun(TimestampedModel):
     )
     is_source_run = models.BooleanField(
         default=False,
-        help_text="Designate this run as a \"source\" run for contract re-runs of the course.",
+        help_text='Designate this run as a "source" run for contract re-runs of the course.',
     )
 
     class Meta:

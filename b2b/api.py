@@ -92,8 +92,13 @@ def import_and_create_contract_run(contract: ContractPage, course_run_id: str):
         Product: The created Product object.
     """
 
+
 def create_contract_run(
-    contract: ContractPage, course: Course, *, skip_edx=False, require_designated_source_run=True
+    contract: ContractPage,
+    course: Course,
+    *,
+    skip_edx=False,
+    require_designated_source_run=True,
 ) -> tuple[CourseRun, Product]:
     """
     Create a run for the specified contract.
