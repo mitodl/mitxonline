@@ -188,9 +188,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/CreateB2BEnrollment'
           description: ''
-  /api/v0/b2b/organizations/:
+  /api/v0/b2b/organizations/by-id/:
     get:
-      operationId: b2b_organizations_list
+      operationId: b2b_organizations_by_id_list
       description: Viewset for the OrganizationPage model.
       tags:
       - b2b
@@ -203,9 +203,44 @@ paths:
                 items:
                   $ref: '#/components/schemas/OrganizationPage'
           description: ''
-  /api/v0/b2b/organizations/{organization_slug}/:
+  /api/v0/b2b/organizations/by-id/{id}/:
     get:
-      operationId: b2b_organizations_retrieve
+      operationId: b2b_organizations_by_id_retrieve
+      description: Viewset for the OrganizationPage model.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Organization.
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationPage'
+          description: ''
+  /api/v0/b2b/organizations/by-slug/:
+    get:
+      operationId: b2b_organizations_by_slug_list
+      description: Viewset for the OrganizationPage model.
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationPage'
+          description: ''
+  /api/v0/b2b/organizations/by-slug/{organization_slug}/:
+    get:
+      operationId: b2b_organizations_by_slug_retrieve
       description: Viewset for the OrganizationPage model.
       parameters:
       - in: path

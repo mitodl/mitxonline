@@ -7,16 +7,22 @@ from b2b.views.v0 import (
     AttachContractApi,
     ContractPageViewSet,
     Enroll,
-    OrganizationPageViewSet,
+    OrganizationByIDPageViewSet,
+    OrganizationBySlugPageViewSet,
 )
 
 app_name = "b2b"
 
 v0_router = SimpleRouter()
 v0_router.register(
-    r"organizations",
-    OrganizationPageViewSet,
-    basename="b2b-organization",
+    r"organizations/by-id",
+    OrganizationByIDPageViewSet,
+    basename="b2b-organization-by-id",
+)
+v0_router.register(
+    r"organizations/by-slug",
+    OrganizationBySlugPageViewSet,
+    basename="b2b-organization-by-slug",
 )
 v0_router.register(
     r"contracts",

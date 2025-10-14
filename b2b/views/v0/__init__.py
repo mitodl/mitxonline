@@ -29,7 +29,17 @@ from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.permissions import IsAdminOrReadOnly
 
 
-class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
+class OrganizationByIDPageViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Viewset for the OrganizationPage model.
+    """
+
+    queryset = OrganizationPage.objects.all()
+    serializer_class = OrganizationPageSerializer
+    permission_classes = [IsAdminOrReadOnly | HasAPIKey]
+
+
+class OrganizationBySlugPageViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Viewset for the OrganizationPage model.
     """
