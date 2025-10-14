@@ -144,7 +144,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
                     ),
                 ),
                 Prefetch(
-                    "programcollection_set",
+                    "collection_memberships__collection",
                     queryset=ProgramCollection.objects.only("id", "title"),
                 ),
             )
