@@ -6,23 +6,29 @@ import logging
 import re
 from collections import namedtuple
 from datetime import timedelta
+from decimal import Decimal
 from traceback import format_exc
 from typing import TYPE_CHECKING
+from urllib.parse import urljoin
 
+import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django_countries import countries
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
 )
+from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
+from cms.api import create_default_courseware_page
 from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
@@ -31,11 +37,13 @@ from courses.constants import (
     PROGRAM_TEXT_ID_PREFIX,
 )
 from courses.models import (
+    BlockedCountry,
     Course,
     CourseRun,
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    Department,
     PaidCourseRun,
     Program,
     ProgramCertificate,
@@ -49,9 +57,10 @@ from courses.utils import (
     is_grade_valid,
     is_letter_grade_valid,
 )
-from ecommerce.models import OrderStatus
+from ecommerce.models import OrderStatus, Product
 from openedx.api import (
     enroll_in_edx_course_runs,
+    get_edx_api_course_detail_client,
     get_edx_api_course_list_client,
     get_edx_api_course_mode_client,
     get_edx_grades_with_users,
@@ -1044,3 +1053,165 @@ def resolve_courseware_object_from_id(
         CourseRun.objects.filter(courseware_id=courseware_id).first()
         or Course.objects.filter(readable_id=courseware_id).first()
     )
+
+
+def import_courserun_from_edx(  # noqa: C901, PLR0913
+    course_key: str,
+    *,
+    live: bool = False,
+    use_specific_course: str | None = None,
+    departments: list[Department | str] | None = None,
+    create_depts: bool = False,
+    block_countries: list[str] | None = None,
+    price: Decimal | None = None,
+    create_cms_page: bool = False,
+    publish_cms_page: bool = False,
+    include_in_learn_catalog: bool = False,
+    ingest_content_files_for_ai: bool = False,
+):
+    """
+    Import a course run from edX.
+
+    This checks for the course run in edX, and imports it if it exists. If
+    necessary, it creates:
+    - The underlying Course object
+    - Any necessary Departments (if the flag for this is set)
+    - A Product (if a price is set)
+    - A CMS page (if the flag is set; will publish if the flag is set)
+
+    It will also add the blocked countries for the course if those are set.
+
+    If the course does need to be created, departments must be supplied. The
+    function will throw an AttributeError if there aren't any. An empty list can
+    be supplied if the course exists.
+
+    A specific course can be specified. This is to cover cases where the run you
+    may want to import doesn't technically "live" under the course that is
+    specified in its key. (This happens with B2B/UAI courses - the course will
+    be in the UAI_SOURCE org, but the runs all use an org that matches up with
+    the contract on the MITx Online side. E.g. course-v1:UAI_SOURCE+UAI.0 is the
+    root course for course-v1:UAI_MIT+UAI.0+2025_C999.)
+
+    If the specified course run exists, then this won't do anything. There are
+    separate processes to update an existing run from edX data.
+
+    This will not add the course to any programs - you can do that later.
+
+    Args:
+    - course_key (str): The readable ID of the course run to import.
+    - live (bool): Make the new course run live, and the course if one is created.
+    - use_specific_course (str|None): Readable ID of a specific course to use as the base course.
+    - departments (list[Department | str] | None): Departments to add to the new course. Only required if creating a new course.
+    - create_depts (bool): Create departments.
+    - block_countries (list[str] | None): Country codes to add to the block list for the course.
+    - price (Decimal | None): Price for the course product, if any. If no price is set, a product won't be created.
+    - create_cms_page (bool): Create a CMS page for the course. Only applies if a course is being created.
+    - publish_cms_page (bool): Publish the new CMS page. Only takes effect if creating a CMS page.
+    - include_in_learn_catalog (bool): Set the "include_in_learn_catalog" flag on the new page.
+    - ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
+    Returns:
+    tuple of (CourseRun, CoursePage|None, Product|None) - relevant objects for the imported run
+    """
+
+    if CourseRun.objects.filter(courseware_id=course_key).exists():
+        return False
+
+    processed_course_key = CourseKey(course_key)
+
+    edx_course_detail = get_edx_api_course_detail_client()
+
+    edx_course_run = edx_course_detail.get_detail(
+        course_id=course_key,
+        username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
+    )
+
+    processed_run_key = CourseKey(edx_course_run.course_id)
+
+    if use_specific_course:
+        root_course = Course.objects.get(readable_id=use_specific_course)
+    else:
+        # edX doesn't have the concept of a "Course", so there's not an opaque
+        # key type for it.
+        root_course_id = (
+            f"course-v1:{processed_course_key.org}+{processed_course_key.course}"
+        )
+        root_course = Course.objects.filter(readable_id=root_course_id).first()
+
+        if not root_course:
+            if not departments or len(departments) == 0:
+                msg = f"Course {root_course_id} would be created, so departments are required."
+                raise AttributeError(msg)
+
+            root_course = Course.objects.create(
+                readable_id=root_course_id,
+                title=edx_course_run.name,
+                live=live,
+            )
+
+            for department in departments:
+                if isinstance(department, str) and create_depts:
+                    dept = Department.objects.get_or_create(name=department)
+                else:
+                    dept = department
+
+                root_course.departments.add(dept)
+
+    new_run = CourseRun.objects.create(
+        course=root_course,
+        run_tag=processed_run_key.run,
+        courseware_id=edx_course_run.course_id,
+        start_date=edx_course_run.start,
+        end_date=edx_course_run.end,
+        enrollment_start=edx_course_run.enrollment_start,
+        enrollment_end=edx_course_run.enrollment_end,
+        title=edx_course_run.name,
+        live=live,
+        is_self_paced=edx_course_run.is_self_paced(),
+        courseware_url_path=urljoin(
+            settings.OPENEDX_COURSE_BASE_URL,
+            f"/{edx_course_run.course_id}/course",
+        ),
+    )
+
+    course_page = None
+    if create_cms_page:
+        course_page = create_default_courseware_page(
+            courseware=new_run.course,
+            live=publish_cms_page,
+        )
+
+        course_page.ingest_content_files_for_ai = ingest_content_files_for_ai
+        course_page.include_in_learn_catalog = include_in_learn_catalog
+        course_page.save()
+
+    course_product = None
+    if price:
+        content_type = ContentType.objects.get_for_model(CourseRun)
+        with reversion.create_revision():
+            course_product, _ = Product.objects.update_or_create(
+                content_type=content_type,
+                object_id=new_run.id,
+                defaults={
+                    "price": Decimal(price),
+                    "description": new_run.courseware_id,
+                    "is_active": True,
+                },
+            )
+
+            course_product.save()
+
+    if block_countries:
+        for block_country in block_countries:
+            country_code = countries.by_name(block_country)
+            if not country_code:
+                country_name = countries.countries.get(block_country, None)
+                country_code = block_country if country_name else None
+            else:
+                country_name = block_country
+
+            if country_code:
+                BlockedCountry.objects.get_or_create(
+                    course=new_run.course, country=country_code
+                )
+
+    return (new_run, course_page, course_product)
