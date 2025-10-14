@@ -1104,6 +1104,10 @@ class CourseRun(TimestampedModel):
         on_delete=models.DO_NOTHING,
         related_name="course_runs",
     )
+    is_source_run = models.BooleanField(
+        default=False,
+        help_text="Designate this run as a \"source\" run for contract re-runs of the course.",
+    )
 
     class Meta:
         unique_together = ("course", "courseware_id", "run_tag")
