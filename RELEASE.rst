@@ -1,6 +1,28 @@
 Release Notes
 =============
 
+Version 0.131.3 (Released October 15, 2025)
+---------------
+
+- fix(deps): update dependency ramda to v0.32.0 (#2531)
+- chore(deps): update dependency authlib to v1.6.5 [security] (#3008)
+- fix: use global id for user sync filtering (#2992)
+- Revert "chore(deps): update dependency python (#2031)" (#3003)
+- Fix perf issues with the departments API (#3001)
+- Removing first and last name requirement for a PATCH request (#2998)
+- fix(deps): update django-health-check digest to 592f6a8 (#2916)
+- Revert "fix(deps): update dependency webpack-dev-server to v5 [securi… (#2999)
+- fix(deps): update dependency serialize-javascript to v6 [security] (#2538)
+- fix(deps): update dependency webpack-dev-server to v5 [security] (#2706)
+- login button redirect not working with apisix (#2996)
+- feat: management commands to create signatories in bulk and delete a signatory (#2986)
+- Add escape hatch to be able to disable zeal (#2995)
+- Don't raise zeal exceptions normally (#2994)
+- chore(deps): update dependency python (#2031)
+- Fix flaky test regarding v2 program api (#2987)
+- Switch from nplusone to django-zeal (#2990)
+- fix(deps): update dependency django to v4.2.25 [security] (#2991)
+
 Version 0.131.2 (Released October 14, 2025)
 ---------------
 
