@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0069_update_program_collection_for_wagtail'),
+        ("courses", "0069_update_program_collection_for_wagtail"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='programcollectionitem',
-            name='sort_order',
+            model_name="programcollectionitem",
+            name="sort_order",
             field=models.IntegerField(blank=True, editable=False, null=True),
         ),
     ]
