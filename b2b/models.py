@@ -314,7 +314,10 @@ class ContractPage(Page):
         if hasattr(program, "_courses_with_requirements_data"):
             delattr(program, "_courses_with_requirements_data")
 
-        for course, _ in program.courses:
+        for course in program.courses_qset.filter(
+            models.Q(courseruns__is_source_run=True)
+            | models.Q(courseruns__run_tag="SOURCE")
+        ).all():
             try:
                 create_contract_run(self, course)
                 managed += 1
