@@ -29,7 +29,7 @@ axiosInterface.interceptors.request.use((config: any) => {
 
   if (token !== null) {
     token = JSON.parse(token).access_token;
-    
+
     if (config && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
