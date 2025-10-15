@@ -4867,6 +4867,7 @@ components:
       properties:
         id:
           type: integer
+          nullable: true
         data:
           $ref: '#/components/schemas/V2ProgramRequirementData'
         children:
@@ -4876,7 +4877,6 @@ components:
           default: []
       required:
       - data
-      - id
     V2ProgramRequirementData:
       type: object
       description: Serializer for ProgramRequirement data

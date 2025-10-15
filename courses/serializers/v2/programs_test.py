@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import ANY
 
 import pytest
 from django.utils.timezone import now
@@ -6,6 +7,7 @@ from django.utils.timezone import now
 from cms.factories import CoursePageFactory
 from cms.serializers import ProgramPageSerializer
 from courses.factories import (  # noqa: F401
+    CourseFactory,
     CourseRunFactory,
     ProgramCollectionFactory,
     ProgramFactory,
@@ -144,3 +146,114 @@ def test_serialize_program(
             "max_price": program_with_empty_requirements.page.max_price,
         },
     )
+
+
+def test_program_requirement_tree_serializer_save():
+    """Verify that the ProgramRequirementTreeSerializer validates data"""
+    program = ProgramFactory.create()
+    course1, course2, course3 = CourseFactory.create_batch(3)
+    root = program.requirements_root
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=root,
+        data=[
+            {
+                "data": {
+                    "node_type": "operator",
+                    "title": "Required Courses",
+                    "operator": "all_of",
+                },
+                "children": [
+                    {"id": None, "data": {"node_type": "course", "course": course1.id}}
+                ],
+            },
+            {
+                "data": {
+                    "node_type": "operator",
+                    "title": "Elective Courses",
+                    "operator": "min_number_of",
+                    "operator_value": "1",
+                },
+                "children": [
+                    {"id": None, "data": {"node_type": "course", "course": course2.id}},
+                    {"id": None, "data": {"node_type": "course", "course": course3.id}},
+                ],
+            },
+        ],
+        context={"program": program},
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+
+    root.refresh_from_db()
+    assert ProgramRequirementTreeSerializer(instance=root).data == [
+        {
+            "data": {
+                "node_type": "operator",
+                "operator": "all_of",
+                "operator_value": None,
+                "program": program.id,
+                "course": None,
+                "required_program": None,
+                "title": "Required Courses",
+                "elective_flag": False,
+            },
+            "id": ANY,
+            "children": [
+                {
+                    "data": {
+                        "node_type": "course",
+                        "operator": None,
+                        "operator_value": None,
+                        "program": program.id,
+                        "course": course1.id,
+                        "required_program": None,
+                        "title": None,
+                        "elective_flag": False,
+                    },
+                    "id": ANY,
+                }
+            ],
+        },
+        {
+            "data": {
+                "node_type": "operator",
+                "operator": "min_number_of",
+                "operator_value": "1",
+                "program": program.id,
+                "course": None,
+                "required_program": None,
+                "title": "Elective Courses",
+                "elective_flag": False,
+            },
+            "id": ANY,
+            "children": [
+                {
+                    "data": {
+                        "node_type": "course",
+                        "operator": None,
+                        "operator_value": None,
+                        "program": program.id,
+                        "course": course2.id,
+                        "required_program": None,
+                        "title": None,
+                        "elective_flag": False,
+                    },
+                    "id": ANY,
+                },
+                {
+                    "data": {
+                        "node_type": "course",
+                        "operator": None,
+                        "operator_value": None,
+                        "program": program.id,
+                        "course": course3.id,
+                        "required_program": None,
+                        "title": None,
+                        "elective_flag": False,
+                    },
+                    "id": ANY,
+                },
+            ],
+        },
+    ]

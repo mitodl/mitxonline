@@ -42,7 +42,7 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
 class ProgramRequirementSerializer(StrictFieldsSerializer):
     """Serializer for a ProgramRequirement"""
 
-    id = serializers.IntegerField()
+    id = serializers.IntegerField(required=False, allow_null=True, default=None)
     data = ProgramRequirementDataSerializer()
 
     def get_fields(self):
@@ -80,6 +80,14 @@ class ProgramCollectionSerializer(StrictFieldsSerializer):
 
 class ProgramRequirementTreeSerializer(BaseProgramRequirementTreeSerializer):
     child = ProgramRequirementSerializer()
+
+    @property
+    def data(self):
+        """Return children of root node directly, or empty array if no children"""
+        # BaseProgramRequirementTreeSerializer overrides the data property
+        # to bypass to_implementation, so we do also.
+        full_data = super().data
+        return full_data[0].get("children", []) if full_data else []
 
 
 @extend_schema_serializer(
