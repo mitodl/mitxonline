@@ -4909,21 +4909,18 @@ components:
       - node_type
     V2ProgramRequirementDataNodeTypeEnum:
       enum:
-      - program_root
-      - operator
       - course
       - program
+      - operator
       type: string
       description: |-
-        * `program_root` - program_root
-        * `operator` - operator
         * `course` - course
         * `program` - program
+        * `operator` - operator
       x-enum-descriptions:
-      - program_root
-      - operator
       - course
       - program
+      - operator
     YearsExperienceEnum:
       enum:
       - 2

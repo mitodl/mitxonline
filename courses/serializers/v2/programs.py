@@ -23,7 +23,11 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     """Serializer for ProgramRequirement data"""
 
     node_type = serializers.ChoiceField(
-        choices=[x.value for x in ProgramRequirementNodeType]
+        choices=(
+            ProgramRequirementNodeType.COURSE,
+            ProgramRequirementNodeType.PROGRAM,
+            ProgramRequirementNodeType.OPERATOR,
+        )
     )
     course = serializers.IntegerField(source="course_id", allow_null=True, default=None)
     program = serializers.IntegerField(
