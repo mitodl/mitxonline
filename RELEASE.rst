@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.131.3
+Version 0.131.3 (Released October 15, 2025)
 ---------------
 
 - fix(deps): update dependency ramda to v0.32.0 (#2531)
