@@ -299,7 +299,7 @@ def get_test_order_data(order, receipt_data):
             "reference_number": order.reference_number,
         },
         "purchaser": {
-            "full_name": order.purchaser.name,
+            "name": order.purchaser.name,
             "email": order.purchaser.email,
             "country": order.purchaser.legal_address.country,
             "state_or_territory": "",

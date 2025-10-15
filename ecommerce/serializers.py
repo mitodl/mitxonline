@@ -722,7 +722,7 @@ class TransactionPurchaserSerializer(TransactionDataSerializer):
         transaction = super().to_representation(instance).data
 
         fields = {
-            "full_name": instance.purchaser.name,
+            "name": instance.purchaser.name,
             "country": instance.purchaser.legal_address.country,
             "email": instance.purchaser.email,
             "street_address": [],
