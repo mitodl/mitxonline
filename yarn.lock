@@ -3225,7 +3225,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pankod/refine-core@npm:3.103.0, @pankod/refine-core@npm:^3.103.0, @pankod/refine-core@npm:^3.22.1":
+"@pankod/refine-core@npm:3.103.0, @pankod/refine-core@npm:^3.103.0":
   version: 3.103.0
   resolution: "@pankod/refine-core@npm:3.103.0"
   dependencies:
@@ -3264,16 +3264,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pankod/refine-simple-rest@npm:3.22.1":
-  version: 3.22.1
-  resolution: "@pankod/refine-simple-rest@npm:3.22.1"
+"@pankod/refine-simple-rest@npm:3.39.0":
+  version: 3.39.0
+  resolution: "@pankod/refine-simple-rest@npm:3.39.0"
   dependencies:
-    "@pankod/refine-core": ^3.22.1
-    axios: ^0.21.4
-    query-string: ^7.0.1
+    axios: ^0.26.1
+    query-string: ^7.1.1
   peerDependencies:
-    "@pankod/refine-core": ^3.18.0
-  checksum: d2006389ca5d50953573c38e116884c196e9de692e9055531152fcfa26daa357eebc9721d46dd8800ec993ed7af00b3d8336c112cf175a8dc653fe5f1c4c0021
+    "@pankod/refine-core": ^3.23.2
+  checksum: 2a15d2369ced99f8bd20d0523d5dfc377fccc3734a7125dd37581f870394a19c079db2761ef8321f4b0d6e69a8d70d4b023b790f94eda75520567b381186055f
   languageName: node
   linkType: hard
 
@@ -6061,12 +6060,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"axios@npm:^0.21.4":
-  version: 0.21.4
-  resolution: "axios@npm:0.21.4"
+"axios@npm:^0.26.1":
+  version: 0.26.1
+  resolution: "axios@npm:0.26.1"
   dependencies:
-    follow-redirects: ^1.14.0
-  checksum: 44245f24ac971e7458f3120c92f9d66d1fc695e8b97019139de5b0cc65d9b8104647db01e5f46917728edfc0cfd88eb30fc4c55e6053eef4ace76768ce95ff3c
+    follow-redirects: ^1.14.8
+  checksum: d9eb58ff4bc0b36a04783fc9ff760e9245c829a5a1052ee7ca6013410d427036b1d10d04e7380c02f3508c5eaf3485b1ae67bd2adbfec3683704745c8d7a6e1a
   languageName: node
   linkType: hard
 
@@ -10266,13 +10265,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"follow-redirects@npm:^1.0.0, follow-redirects@npm:^1.14.0":
+"follow-redirects@npm:^1.0.0":
   version: 1.15.9
   resolution: "follow-redirects@npm:1.15.9"
   peerDependenciesMeta:
     debug:
       optional: true
   checksum: 859e2bacc7a54506f2bf9aacb10d165df78c8c1b0ceb8023f966621b233717dab56e8d08baadc3ad3b9db58af290413d585c999694b7c146aaf2616340c3d2a6
+  languageName: node
+  linkType: hard
+
+"follow-redirects@npm:^1.14.8":
+  version: 1.15.11
+  resolution: "follow-redirects@npm:1.15.11"
+  peerDependenciesMeta:
+    debug:
+      optional: true
+  checksum: 20bf55e9504f59e6cc3743ba27edb2ebf41edea1baab34799408f2c050f73f0c612728db21c691276296d2795ea8a812dc532a98e8793619fcab91abe06d017f
   languageName: node
   linkType: hard
 
@@ -14906,7 +14915,7 @@ __metadata:
     "@pankod/refine-antd": 4.9.0
     "@pankod/refine-core": 3.103.0
     "@pankod/refine-react-router-v6": 3.40.0
-    "@pankod/refine-simple-rest": 3.22.1
+    "@pankod/refine-simple-rest": 3.39.0
     "@testing-library/jest-dom": 5.16.4
     "@testing-library/react": 13.0.1
     "@testing-library/user-event": 14.1.0
@@ -17430,7 +17439,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"query-string@npm:^7.0.1":
+"query-string@npm:^7.1.1":
   version: 7.1.3
   resolution: "query-string@npm:7.1.3"
   dependencies:
