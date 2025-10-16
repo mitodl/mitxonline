@@ -650,3 +650,29 @@ def test_reconcile_bad_keycloak_org(mocker):
         page.save()
 
     assert "Organization with this Org key already exists." in str(exc)
+
+
+def test_reconcile_keycloak_org_without_description():
+    """Test that reconciliation works when Keycloak org has no description"""
+
+    if not OrganizationIndexPage.objects.exists():
+        factories.OrganizationIndexPageFactory.create()
+
+    # Test with None description (new org)
+    org = factories.OrganizationRepresentationFactory.create(description=None)
+    page, created = reconcile_single_keycloak_org(org)
+    assert created is True
+    assert page.description == ""
+
+    parent_org_page = OrganizationIndexPage.objects.first()
+    parent_org_page.add_child(instance=page)
+    page.save()  # Should not raise IntegrityError
+
+    # Test updating an existing org with None description
+    org_update = factories.OrganizationRepresentationFactory.create(
+        id=org.id, name="Updated Name", description=None
+    )
+    page_updated, created_update = reconcile_single_keycloak_org(org_update)
+    assert created_update is False
+    assert page_updated.description == ""
+    page_updated.save()  # Should not raise IntegrityError
