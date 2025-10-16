@@ -628,7 +628,7 @@ def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     regular_program.save()
 
     b2b_course = CourseFactory.create()
-    CourseRunFactory.create(course=b2b_course)
+    CourseRunFactory.create(course=b2b_course, is_source_run=True)
     b2b_program.add_requirement(b2b_course)
     b2b_program.add_requirement(regular_course)
     b2b_program.b2b_only = True

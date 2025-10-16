@@ -71,8 +71,34 @@ def ensure_b2b_organization_index() -> OrganizationIndexPage:
     return org_index_page
 
 
+def import_and_create_contract_run(contract: ContractPage, course_run_id: str):
+    """
+    Create a contract run for the given course, importing it from edX if necessary.
+
+    Check for the specified course run. If it exists, create the contract run in
+    the usual fashion. If it doesn't, check for it in edX and import it into
+    MITx Online first, then create the contract run.
+
+    If the specified run is imported, it will have the "is_source_run" flag set.
+
+    Args:
+        contract (ContractPage): The contract to create the run for.
+        course_run_id (str): The readable ID for the source course run.
+    Keyword Args:
+        skip_edx (bool): Don't try to create a course run in edX.
+        require_designated_source_run (bool): Require a flagged source run.
+    Returns:
+        CourseRun: The created CourseRun object.
+        Product: The created Product object.
+    """
+
+
 def create_contract_run(
-    contract: ContractPage, course: Course
+    contract: ContractPage,
+    course: Course,
+    *,
+    skip_edx=False,
+    require_designated_source_run=True,
 ) -> tuple[CourseRun, Product]:
     """
     Create a run for the specified contract.
@@ -84,24 +110,24 @@ def create_contract_run(
       source course run in edX.
     - Create a product for the run.
 
-    Source course runs are identified by looking for the most recent course run
-    for the given course. This code expects you to pass in an MITx Online course
-    that has a readable ID like 'course-v1:UAI_SOURCE+number` and that it has a
-    run of some sort. This should just be a single run. If there's multiple runs,
-    this will look for a run tag of "SOURCE". Failing that, it will try to use
-    the _first_ run in the list.
+    Source course runs are runs that have the "is_source_run" flag set. If one
+    cannot be found, this will also check for a run with the run tag "SOURCE".
+    If neither of those are found, it will throw an error. However, setting
+    "require_designated_source_run" to False will add a third attempt, which will
+    try to use whatever the first course run is for the specified course. This
+    may not be what you want, so this functionality is disabled by default.
 
     The MITx Online course run will belong to the source course. They will get a
     course key that is modified to represent the organization they belong to,
     the current year, and the contract ID. This means that the source course will
     have runs that have readable IDs that do not match the course ID.
 
-    The course key is changed according to a set algorithm. For more information,
-    see this discussion post: https://github.com/mitodl/hq/discussions/7525
-    In general, this expects a course run that is in org `UAI_SOURCE` and then
-    will create a new run that is `UAI_orgkey`, with a run tag that reflects
-    the year we're creating the run in and the contract ID (`2025_C19` for
-    instance).
+    The course key is generated according to a set algorithm. The new course key
+    will have the organization part set to "UAI_orgkey" and the run tag set to
+    "year_Cid" where orgkey is the organization key (set in the organization
+    record), year is the current year, and id is the ID of the contract. For more
+    information on the key format, see this discussion post:
+    https://github.com/mitodl/hq/discussions/7525
 
     A product will be created for the new contract course run, and its price will
     either be zero or the amount specified by the contract. (Free courses still
@@ -111,18 +137,23 @@ def create_contract_run(
     Args:
         contract (ContractPage): The contract to create the run for.
         course (Course): The course for which we should create a run.
+    Keyword Args:
+        skip_edx (bool): Don't try to create a course run in edX.
+        require_designated_source_run (bool): Require a flagged source run.
     Returns:
         CourseRun: The created CourseRun object.
         Product: The created Product object.
     """
 
-    clone_course_run = course.courseruns.filter(run_tag="SOURCE").first()
+    clone_course_run = course.courseruns.filter(
+        Q(is_source_run=True) | Q(run_tag="SOURCE")
+    ).first()
 
-    if not clone_course_run:
+    if not clone_course_run and not require_designated_source_run:
         try:
             clone_course_run = course.courseruns.order_by("-id").first()
             log.warning(
-                "create_contract_run: No SOURCE run for %s, using %s",
+                "create_contract_run: Couldn't find an appropriate source run for %s, using %s",
                 course,
                 clone_course_run,
             )
@@ -175,7 +206,9 @@ def create_contract_run(
         ),
     )
     course_run.save()
-    clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)
+
+    if not skip_edx:
+        clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)
 
     log.debug(
         "Created run %s for course %s in contract %s from course run %s",
@@ -424,7 +457,7 @@ def _handle_unlimited_seats(
 ) -> tuple[int, int, int]:
     """Handle unlimited seat contracts by creating/updating one discount per product."""
     created = updated = errors = 0
-    discount_amount = contract.enrollment_fixed_price or 0
+    discount_amount = contract.enrollment_fixed_price or Decimal(0)
 
     if len(product_discounts) == 0:
         discount = _create_discount_with_product(
