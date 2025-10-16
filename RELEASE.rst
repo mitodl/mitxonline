@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.131.4 (Released October 16, 2025)
+---------------
+
+- Add functionality to verify course modes exist when cloning a course run (#2993)
+- fix(deps): update dependency @sentry/browser to v10 (#2656)
+
 Version 0.131.3 (Released October 15, 2025)
 ---------------
 
