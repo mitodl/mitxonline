@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.131.4
+Version 0.131.4 (Released October 16, 2025)
 ---------------
 
 - Add functionality to verify course modes exist when cloning a course run (#2993)
