@@ -4884,10 +4884,14 @@ components:
         node_type:
           $ref: '#/components/schemas/V2ProgramRequirementDataNodeTypeEnum'
         course:
-          type: string
+          type: integer
           nullable: true
         program:
-          type: string
+          type: integer
+          nullable: true
+        required_program:
+          type: integer
+          nullable: true
         title:
           type: string
           nullable: true
@@ -4905,15 +4909,18 @@ components:
       - node_type
     V2ProgramRequirementDataNodeTypeEnum:
       enum:
-      - operator
       - course
+      - program
+      - operator
       type: string
       description: |-
-        * `operator` - operator
         * `course` - course
+        * `program` - program
+        * `operator` - operator
       x-enum-descriptions:
-      - operator
       - course
+      - program
+      - operator
     YearsExperienceEnum:
       enum:
       - 2

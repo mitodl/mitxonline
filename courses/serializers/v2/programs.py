@@ -24,12 +24,18 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
 
     node_type = serializers.ChoiceField(
         choices=(
-            ProgramRequirementNodeType.OPERATOR,
             ProgramRequirementNodeType.COURSE,
+            ProgramRequirementNodeType.PROGRAM,
+            ProgramRequirementNodeType.OPERATOR,
         )
     )
-    course = serializers.CharField(source="course_id", allow_null=True, default=None)
-    program = serializers.CharField(source="program_id", required=False)
+    course = serializers.IntegerField(source="course_id", allow_null=True, default=None)
+    program = serializers.IntegerField(
+        source="program_id", allow_null=True, default=None
+    )
+    required_program = serializers.IntegerField(
+        source="required_program_id", allow_null=True, default=None
+    )
     title = serializers.CharField(allow_null=True, default=None)
     operator = serializers.CharField(allow_null=True, default=None)
     operator_value = serializers.CharField(allow_null=True, default=None)
@@ -78,6 +84,14 @@ class ProgramCollectionSerializer(StrictFieldsSerializer):
 
 class ProgramRequirementTreeSerializer(BaseProgramRequirementTreeSerializer):
     child = ProgramRequirementSerializer()
+
+    @property
+    def data(self):
+        """Return children of root node directly, or empty array if no children"""
+        # BaseProgramRequirementTreeSerializer overrides the data property
+        # to bypass to_implementation, so we do also.
+        full_data = super().data
+        return full_data[0].get("children", []) if full_data else []
 
 
 @extend_schema_serializer(
