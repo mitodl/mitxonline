@@ -13,7 +13,6 @@ from rich.console import Console
 from rich.table import Table
 
 from b2b.models import ContractPage, OrganizationPage
-from courses.models import CourseRun
 
 log = logging.getLogger(__name__)
 
@@ -275,8 +274,7 @@ class Command(BaseCommand):
         org_text = kwargs.pop("org_text")
         contract_id = kwargs.pop("contract_id")
 
-        # We only link course runs to contracts. This will need to be updated
-        # if we ever have other types (like program runs or something).
+        # We now attach course runs and programs to contracts.
 
         contract_page_qs = ContractPage.objects
 
@@ -295,13 +293,7 @@ class Command(BaseCommand):
         if contract_id:
             contract_page_qs = contract_page_qs.filter(id=contract_id)
 
-        contracts = contract_page_qs.all()
-
-        courseware = (
-            CourseRun.objects.prefetch_related("b2b_contract")
-            .filter(b2b_contract__in=contracts)
-            .all()
-        )
+        contracts = contract_page_qs.prefetch_related("programs", "course_runs").all()
 
         courseware_table = Table(title="Courseware")
         courseware_table.add_column("ID", justify="right")
@@ -312,16 +304,31 @@ class Command(BaseCommand):
         courseware_table.add_column("Start", justify="left")
         courseware_table.add_column("End", justify="left")
 
-        for cw in courseware:
-            courseware_table.add_row(
-                str(cw.id),
-                f"{cw.b2b_contract.organization.name}\n{cw.b2b_contract.name}",
-                "CR",
-                cw.readable_id,
-                cw.title,
-                cw.start_date.strftime("%Y-%m-%d\n%H:%M") if cw.start_date else "",
-                cw.end_date.strftime("%Y-%m-%d\n%H:%M") if cw.end_date else "",
-            )
+        for contract in contracts:
+            # We'll start by listing out the associated programs, and then listing
+            # out the course runs.
+
+            for prog in contract.programs.all():
+                courseware_table.add_row(
+                    str(prog.id),
+                    f"{contract.organization.name}\n{contract.name}",
+                    "PROG",
+                    prog.readable_id,
+                    prog.title,
+                    "---",
+                    "---",
+                )
+
+            for cw in contract.course_runs.all():
+                courseware_table.add_row(
+                    str(cw.id),
+                    f"{contract.organization.name}\n{contract.name}",
+                    "CR",
+                    cw.readable_id,
+                    cw.title,
+                    cw.start_date.strftime("%Y-%m-%d\n%H:%M") if cw.start_date else "",
+                    cw.end_date.strftime("%Y-%m-%d\n%H:%M") if cw.end_date else "",
+                )
 
         self.console.print(courseware_table)
 

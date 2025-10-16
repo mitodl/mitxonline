@@ -137,6 +137,7 @@ class CourseRunFactory(DjangoModelFactory):
 
     live = True
     b2b_contract = None
+    is_source_run = False
 
     class Meta:
         model = CourseRun

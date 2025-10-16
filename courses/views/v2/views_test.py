@@ -310,7 +310,10 @@ def test_filter_with_org_id_returns_contracted_course(
     org = OrganizationPageFactory(name="Test Org")
     contract = ContractPageFactory(organization=org, active=True)
     user = UserFactory()
+    user.b2b_organizations.add(org)
     user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
     (course, _) = contract_ready_course
     create_contract_run(contract, course)
 
@@ -498,7 +501,10 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     contract = ContractPageFactory.create(organization=orgs[0])
     second_contract = ContractPageFactory.create(organization=orgs[1])
     test_user = UserFactory()
+    test_user.b2b_organizations.add(contract.organization)
     test_user.b2b_contracts.add(contract)
+    test_user.save()
+    test_user.refresh_from_db()
     auth_api_client = APIClient()
     auth_api_client.force_authenticate(user=test_user)
 
@@ -628,7 +634,7 @@ def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     regular_program.save()
 
     b2b_course = CourseFactory.create()
-    CourseRunFactory.create(course=b2b_course)
+    CourseRunFactory.create(course=b2b_course, is_source_run=True)
     b2b_program.add_requirement(b2b_course)
     b2b_program.add_requirement(regular_course)
     b2b_program.b2b_only = True
@@ -637,6 +643,7 @@ def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     contract.add_program_courses(b2b_program)
     contract.save()
 
+    user.b2b_organizations.add(org)
     user.b2b_contracts.add(contract)
     user.save()
 
