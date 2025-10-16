@@ -29,7 +29,6 @@ from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
 
 from b2b.api import process_add_org_membership
-from b2b.models import UserOrganization
 from cms.api import create_default_courseware_page
 from courses import mail_api
 from courses.constants import (

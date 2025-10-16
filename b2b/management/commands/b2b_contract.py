@@ -6,14 +6,9 @@ from decimal import Decimal
 from django.core.management import BaseCommand, CommandError
 from django.db.models import Q
 
-<<<<<<< HEAD
-from b2b.constants import CONTRACT_INTEGRATION_NONSSO, CONTRACT_INTEGRATION_SSO
-=======
-from b2b.api import create_contract_run
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_CHOICES,
 )
->>>>>>> 0528cf9f (Update integration type field to membership type, update org/contract attachment points, update org membership in Keycloak where approrpiate)
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 
 log = logging.getLogger(__name__)
