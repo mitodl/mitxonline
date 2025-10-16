@@ -841,7 +841,7 @@ def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
             name=keycloak_org.name,
             sso_organization_id=keycloak_org.id,
             org_key=keycloak_org.alias[:ORG_KEY_MAX_LENGTH],
-            description=keycloak_org.description,
+            description=keycloak_org.description or "",
         )
         log.info("Created organization %s from Keycloak", page)
         created_flag = True
@@ -849,7 +849,7 @@ def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
         # Don't update the org_key, because course keys are tied to it.
         page.name = keycloak_org.name
         page.title = keycloak_org.name
-        page.description = keycloak_org.description
+        page.description = keycloak_org.description or ""
         log.info("Updated organization %s from Keycloak", page)
 
     return (page, created_flag)
