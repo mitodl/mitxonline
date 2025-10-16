@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.131.5
+---------------
+
+- Add ability to manage the link between programs and contracts (#3006)
+
 Version 0.131.4 (Released October 16, 2025)
 ---------------
 
