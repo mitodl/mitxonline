@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
 
-from b2b.api import create_b2b_enrollment
+from b2b.api import create_b2b_enrollment, process_add_org_membership
 from b2b.models import (
     ContractPage,
     DiscountContractAttachmentRedemption,
@@ -141,6 +141,9 @@ class AttachContractApi(APIView):
             if contract.is_full():
                 continue
 
+            process_add_org_membership(
+                request.user, contract.organization, keep_until_seen=True
+            )
             request.user.b2b_contracts.add(contract)
             DiscountContractAttachmentRedemption.objects.create(
                 user=request.user, discount=code, contract=contract

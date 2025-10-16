@@ -19,13 +19,18 @@ from wagtail.models import Page
 
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
-    CONTRACT_INTEGRATION_SSO,
+    CONTRACT_MEMBERSHIP_AUTOS,
     ORG_KEY_MAX_LENGTH,
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
-from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
+from b2b.models import (
+    ContractPage,
+    OrganizationIndexPage,
+    OrganizationPage,
+    UserOrganization,
+)
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun
@@ -596,7 +601,10 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     """
     log.info("Checking enrollment codes for contract %s", contract)
 
-    if contract.integration_type == "sso" and not contract.enrollment_fixed_price:
+    if (
+        contract.integration_type in CONTRACT_MEMBERSHIP_AUTOS
+        or contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+    ) and not contract.enrollment_fixed_price:
         # SSO contracts w/out price don't need discounts.
         return _handle_sso_free_contract(contract)
 
@@ -762,19 +770,30 @@ def create_b2b_enrollment(request, product: Product):
 
 def reconcile_user_orgs(user, organizations):
     """
-    Reconcile the specified users with the provided organization list.
+    Reconcile the specified user with the provided organization list.
 
-    When we get a list of organizations from an authoritative source, we need to
-    be able to parse that list and make sure the user's org attachments match.
-    This will pull the contracts that the user belongs to that are also
-    SSO-enabled, and will remove the user from the contract if they're not
-    supposed to be in them. It will also add the user to any SSO-enabled contract
-    that the org has.
+    When we get a list of organizations from a source (so, in the user payload
+    from APISIX) for a particular user, we need to ensure that the user's
+    organization membership in MITx Online matches up with what we're given. In
+    addition, once we've done that, we need to ensure they're also in the
+    contracts that are marked as "managed". If the user is in an organization
+    that isn't in the list we've received, we need to remove them; in addition,
+    they should be removed from any "managed" contracts for the org they're in
+    as well.
 
-    This only considers contracts that are SSO-enabled and zero-cost. If the
-    contract is seat limited, we will only add the user if there's room.
-    (If there isn't, we will log an error.) Only SSO-enabled contracts are
-    considered; any that the user is in that aren't SSO-enabled will be left alone.
+    There is a special case where the user may be in an organization that isn't
+    represented in the payload we're given. This happens when the user uses an
+    enrollment code. We update the org membership here and in Keycloak, but the
+    payload from APISIX won't include their updated org membership until their
+    APISIX session expires. We have a flag on the many-to-many table that
+    indicates that we should leave those memberships alone - otherwise, we'll
+    inadvertently add them to the org and then immediately remove them. (Once
+    the org _does_ show up in the list, we should clear the flag.)
+
+    We cache the user's org membership in redis to save some hits to the
+    database. This gets hit on every authenticated request, so probably good to
+    try to keep the query count low. The cache is a list of tuples of (org_uuid,
+    not_expected_in_payload).
 
     If the user is enrolled in any courses that are in a contract they'll be
     removed from, they will be left there. Not real sure what we should do in
@@ -791,61 +810,70 @@ def reconcile_user_orgs(user, organizations):
     user_org_cache_key = f"org-membership-cache-{user.id}"
     cached_org_membership = caches["redis"].get(user_org_cache_key, False)
 
-    if cached_org_membership and sorted(cached_org_membership) == sorted(organizations):
-        log.info("reconcile_user_orgs: skipping reconcilation for %s", user.id)
-        return (
-            0,
-            0,
-        )
+    if cached_org_membership:
+        cached_expected_org_membership = [
+            str(org_id)
+            for org_id, not_expected_in_payload in cached_org_membership
+            if not_expected_in_payload
+        ]
+
+        if sorted(cached_expected_org_membership) == sorted(organizations):
+            log.info(
+                "reconcile_user_orgs: everything OK, skipping reconcilation for %s",
+                user.id,
+            )
+            return (
+                0,
+                0,
+            )
 
     log.info("reconcile_user_orgs: running reconcilation for %s", user.id)
 
-    user_contracts_qs = user.b2b_contracts.filter(
-        integration_type=CONTRACT_INTEGRATION_SSO
-    )
+    # we've checked the cached org membership, so now figure out what orgs
+    # we're in but aren't in the list, and vice versa
 
-    if len(organizations) == 0:
-        # User has no orgs, so we should clear them from all SSO contracts.
-        contracts_to_remove = user_contracts_qs.all()
-        [user.b2b_contracts.remove(contract) for contract in contracts_to_remove]
-        user.save()
-        return (0, len(contracts_to_remove))
+    orgs_to_add = OrganizationPage.objects.filter(
+        Q(sso_organization_id__in=organizations) & ~Q(organization_users__user=user)
+    ).filter(sso_organization_id__isnull=False)
 
-    orgs = OrganizationPage.objects.filter(sso_organization_id__in=organizations).all()
-    no_orgs = OrganizationPage.objects.exclude(
-        sso_organization_id__in=organizations
-    ).all()
+    orgs_to_remove = UserOrganization.objects.filter(
+        ~Q(organization__sso_organization_id__in=organizations)
+        & Q(user=user, keep_until_seen=False)
+    ).filter(organization__sso_organization_id__isnull=False)
 
-    contracts_to_remove = user_contracts_qs.filter(organization__in=no_orgs).all()
-
-    if contracts_to_remove.count() > 0:
-        [
-            user.b2b_contracts.remove(contract_to_remove)
-            for contract_to_remove in contracts_to_remove
-        ]
-
-    contracts_to_add = (
-        ContractPage.objects.filter(
-            integration_type=CONTRACT_INTEGRATION_SSO, organization__in=orgs
+    for add_org in orgs_to_add:
+        # add org, add contracts, clear flag if we need to
+        UserOrganization.objects.update_or_create(
+            user=user,
+            organization=add_org,
+            defaults={"keep_until_seen": False},
         )
-        .exclude(pk__in=user_contracts_qs.all().values_list("id", flat=True))
-        .all()
-    )
 
-    if contracts_to_add.count() > 0:
-        [
-            user.b2b_contracts.add(contract_to_add)
-            for contract_to_add in contracts_to_add
-        ]
+        add_org.add_user_contracts(user)
+        log.info("reconcile_user_orgs: added user %s to org %s", user.id, add_org)
 
-    user.save()
+    for remove_org in orgs_to_remove:
+        # remove org, remove contracts
+        remove_org.organization.remove_user_contracts(user)
+        log.info(
+            "reconcile_user_orgs: removed user %s from org %s", user.id, remove_org
+        )
+        remove_org.delete()
+
     user.refresh_from_db()
-    orgs = [str(org_id) for org_id in user.b2b_organization_sso_ids]
+    orgs = [
+        (str(org.organization.sso_organization_id), not org.keep_until_seen)
+        for org in user.user_organizations.all()
+    ]
+
+    user.user_organizations.filter(
+        organization__sso_organization_id__in=organizations, keep_until_seen=True
+    ).update(keep_until_seen=False)
 
     user_org_cache_key = f"org-membership-cache-{user.id}"
     caches["redis"].set(user_org_cache_key, sorted(orgs))
 
-    return (len(contracts_to_add), len(contracts_to_remove))
+    return (len(orgs_to_add), len(orgs_to_remove))
 
 
 def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
@@ -925,3 +953,83 @@ def reconcile_keycloak_orgs():
             )
 
     return (created_count, updated_count)
+
+
+def add_user_org_membership(org, user):
+    """
+    Add a given user to a Keycloak organization.
+
+    If we're adding a user to a contract, and they're not in that contract's
+    organization, we need to do that and update Keycloak as well. Since the user
+    won't have the org in their user data list initially, we'll also need to
+    flag the membership so we don't remove it immediately later in the
+    middleware.
+
+    Args:
+    - org (OrganizationPage): The organization to add the user to.
+    - user (User): The user to add to the organization.
+    Returns:
+    - bool: True if the user was added, False otherwise.
+    """
+
+    org_model = get_keycloak_model(OrganizationRepresentation, "organizations")
+
+    kc_org = org_model.get(org.sso_organization_id)
+
+    if not kc_org:
+        log.warning("No Keycloak organization found for %s", org.sso_organization_id)
+        return False
+
+    return org_model.associate("members", org.sso_organization_id, user.global_id)
+
+
+def process_add_org_membership(user, organization, *, keep_until_seen=False):
+    """
+    Add a user to an org, and kick off contract processing.
+
+    This allows us to manage UserOrganization records without necessarily
+    being forced to process contract memberships at the same time.
+
+    Args:
+    - user (users.models.User): the user to add
+    - organization (b2b.models.OrganizationPage): the organization to add the user to
+    - keep_until_seen (bool): if True, the user will be kept in the org until the
+        organization is seen in their SSO data.
+    """
+
+    obj, created = UserOrganization.objects.get_or_create(
+        user=user,
+        organization=organization,
+    )
+    if created:
+        obj.keep_until_seen = keep_until_seen
+        obj.save()
+        try:
+            organization.attach_user(user)
+        except ConnectionError:
+            log.exception(
+                "Could not attach %s to Keycloak org for %s", user, organization
+            )
+        organization.add_user_contracts(user)
+
+    return obj
+
+
+def process_remove_org_membership(user, organization):
+    """
+    Remove a user from an org, and kick off contract processing.
+
+    Other side of the process_add_org_membership function - removes the membership
+    and associated managed contracts.
+
+    Args:
+    - user (users.models.User): the user to remove
+    - organization (b2b.models.OrganizationPage): the organization to remove the user from
+    """
+
+    organization.remove_user_contracts(user)
+
+    UserOrganization.objects.filter(
+        user=user,
+        organization=organization,
+    ).get().delete()

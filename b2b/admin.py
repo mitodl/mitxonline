@@ -119,6 +119,7 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         "title",
         "description",
         "integration_type",
+        "membership_type",
         "contract_start",
         "contract_end",
         "max_learners",

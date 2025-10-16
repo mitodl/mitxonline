@@ -11,7 +11,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
 from social_django.models import UserSocialAuth
 
-from b2b.serializers.v0 import ContractPageSerializer, OrganizationPageSerializer
+from b2b.serializers.v0 import OrganizationPageSerializer
 from hubspot_sync.task_helpers import sync_hubspot_user
 
 # from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
@@ -22,7 +22,12 @@ from openedx.constants import OPENEDX_USERNAME_MAX_LEN
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.models import OpenEdxUser
 from openedx.tasks import change_edx_user_email_async
-from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
+from users.models import (
+    ChangeEmailRequest,
+    LegalAddress,
+    User,
+    UserProfile,
+)
 
 log = logging.getLogger()
 
@@ -202,33 +207,6 @@ class StaffDashboardUserSerializer(serializers.ModelSerializer):
         )
 
 
-class UserOrganizationSerializer(OrganizationPageSerializer):
-    """
-    Serializer for user organization data.
-
-    Slightly different from the OrganizationPageSerializer; we only need
-    the user's orgs and contracts.
-    """
-
-    contracts = serializers.SerializerMethodField()
-
-    @extend_schema_field(ContractPageSerializer(many=True))
-    def get_contracts(self, instance):
-        """Get the contracts for the organization for the user"""
-        contracts = (
-            self.context["user"]
-            .b2b_contracts.filter(
-                organization=instance,
-            )
-            .all()
-        )
-        return ContractPageSerializer(contracts, many=True).data
-
-    class Meta(OrganizationPageSerializer.Meta):
-        fields = (*OrganizationPageSerializer.Meta.fields, "contracts")
-        read_only_fields = (*OrganizationPageSerializer.Meta.fields, "contracts")
-
-
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for users"""
 
@@ -268,15 +246,15 @@ class UserSerializer(serializers.ModelSerializer):
     def get_grants(self, instance):
         return instance.get_all_permissions()
 
-    @extend_schema_field(UserOrganizationSerializer(many=True))
+    @extend_schema_field(OrganizationPageSerializer(many=True))
     def get_b2b_organizations(self, instance):
         """Get the organizations for the user"""
         if instance.is_anonymous:
             return []
 
-        organizations = instance.b2b_organizations
-        return UserOrganizationSerializer(
-            organizations, many=True, context={"user": instance}
+        return OrganizationPageSerializer(
+            instance.b2b_organizations,
+            many=True,
         ).data
 
     def validate(self, data):

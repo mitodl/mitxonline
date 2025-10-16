@@ -4,7 +4,10 @@ import faker
 import pytest
 
 from b2b.factories import ContractPageFactory
-from courses.factories import CourseRunFactory, ProgramFactory
+from courses.factories import (
+    CourseRunFactory,
+    ProgramFactory,
+)
 
 pytestmark = [pytest.mark.django_db]
 FAKE = faker.Faker()
