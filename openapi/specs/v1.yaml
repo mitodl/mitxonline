@@ -2628,12 +2628,6 @@ components:
       type: object
       description: Serializer for legal address
       properties:
-        first_name:
-          type: string
-          maxLength: 60
-        last_name:
-          type: string
-          maxLength: 60
         country:
           type: string
           maxLength: 2
@@ -2647,12 +2641,6 @@ components:
       type: object
       description: Serializer for legal address
       properties:
-        first_name:
-          type: string
-          maxLength: 60
-        last_name:
-          type: string
-          maxLength: 60
         country:
           type: string
           minLength: 1

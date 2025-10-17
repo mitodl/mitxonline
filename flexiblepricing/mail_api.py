@@ -62,7 +62,7 @@ def generate_flexible_price_email(flexible_price):
                 flexible_price.user.email,
                 {
                     "subject": subject,
-                    "first_name": flexible_price.user.legal_address.first_name,
+                    "first_name": flexible_price.user.name,
                     "message": message,
                     "program_name": program_name,
                 },
@@ -83,7 +83,7 @@ def send_financial_assistance_request_denied_email(
                 financial_assistance_request.user.email,
                 {
                     "subject": email_subject,
-                    "first_name": financial_assistance_request.user.legal_address.first_name,
+                    "first_name": financial_assistance_request.user.name,
                     "message": email_body,
                     "program_name": financial_assistance_request.courseware_object.title,
                 },

@@ -111,8 +111,6 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "email": user.email,
             "name": user.name,
             "legal_address": {
-                "first_name": user.legal_address.first_name,
-                "last_name": user.legal_address.last_name,
                 "country": user.legal_address.country,
                 "state": user.legal_address.state,
             },
@@ -188,8 +186,6 @@ def test_get_userinfo(client, user, is_anonymous, has_openedx_user, has_edx_user
             "email": user.email,
             "name": user.name,
             "legal_address": {
-                "first_name": user.legal_address.first_name,
-                "last_name": user.legal_address.last_name,
                 "country": user.legal_address.country,
                 "state": user.legal_address.state,
             },

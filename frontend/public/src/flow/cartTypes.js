@@ -19,8 +19,7 @@ export type BasketItem = {
 }
 
 export type Purchaser = {
-  first_name: ?string,
-  last_name: ?string,
+  name: ?string,
   email: ?string,
   country: ?string
 }
