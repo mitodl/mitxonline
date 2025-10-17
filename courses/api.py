@@ -77,6 +77,7 @@ from openedx.constants import (
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
+    OpenEdxUserMissingError,
     UnknownEdxApiEnrollException,
 )
 
@@ -186,6 +187,7 @@ def create_run_enrollments(  # noqa: C901
         except (
             UnknownEdxApiEnrollException,
             NoEdxApiAuthError,
+            OpenEdxUserMissingError,
             RequestsConnectionError,
             EdxApiEnrollErrorException,
             HTTPError,
