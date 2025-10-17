@@ -10,6 +10,20 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.AlterField(
+            model_name="course",
+            name="departments",
+            field=models.ManyToManyField(
+                related_name="courses", to="courses.department"
+            ),
+        ),
+        migrations.AlterField(
+            model_name="program",
+            name="departments",
+            field=models.ManyToManyField(
+                related_name="programs", to="courses.department"
+            ),
+        ),
         migrations.CreateModel(
             name="ProgramCollectionItem",
             fields=[
