@@ -459,16 +459,7 @@ class CertificatePage(CourseProgramChildPage):
                 "uuid": "fake-uuid",
                 "learner_name": "Anthony M. Stark",
                 "product_name": product_name,
-                "start_date": (
-                    self.parent.product.first_unexpired_run.start_date
-                    if self.parent.product.first_unexpired_run
-                    else datetime.now()  # noqa: DTZ005
-                ),
-                "end_date": (
-                    self.parent.product.first_unexpired_run.end_date
-                    if self.parent.product.first_unexpired_run
-                    else datetime.now() + timedelta(days=45)  # noqa: DTZ005
-                ),
+                "issue_date": self.issue_date,
                 "CEUs": self.CEUs,
                 "is_program_certificate": is_program_certificate,
             }

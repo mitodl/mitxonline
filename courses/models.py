@@ -1286,6 +1286,7 @@ class BaseCertificate(models.Model):
         help_text="Indicates whether or not the certificate is revoked",
         verbose_name="revoked",
     )
+    issue_date = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         abstract = True
