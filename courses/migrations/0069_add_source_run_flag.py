@@ -17,4 +17,21 @@ class Migration(migrations.Migration):
                 help_text='Designate this run as a "source" run for contract re-runs of the course.',
             ),
         ),
+        migrations.AlterModelOptions(
+            name="programcollectionitem",
+            options={
+                "ordering": ["sort_order"],
+                "verbose_name": "Program Collection Item",
+                "verbose_name_plural": "Program Collection Items",
+            },
+        ),
+        migrations.AlterField(
+            model_name="programcollectionitem",
+            name="collection",
+            field=modelcluster.fields.ParentalKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="collection_items",
+                to="courses.programcollection",
+            ),
+        ),
     ]
