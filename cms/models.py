@@ -550,9 +550,12 @@ class FlexiblePricingFormBuilder(FormBuilder):
 
     def create_number_field(self, field, options):  # noqa: ARG002
         options["error_messages"] = {
-            "required": f"{options['label']} is a required field."
+            "required": f"{options['label']} is a required field.",
+            "invalid": f"{options['label']} must be a whole number."
         }
-        return DecimalField(**options)
+        # Use IntegerField for integer-only validation
+        from django.forms import IntegerField
+        return IntegerField(**options)
 
     def create_country_field(self, field, options):  # noqa: ARG002
         exchange_rates = []
@@ -1822,7 +1825,7 @@ class FlexiblePricingRequestForm(AbstractForm):
     def process_form_submission(self, form):
         try:
             converted_income = determine_income_usd(
-                float(form.cleaned_data["your_income"]),
+                int(form.cleaned_data["your_income"]),
                 form.cleaned_data["income_currency"],
             )
         except NotSupportedException:
