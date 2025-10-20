@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.131.6 (Released October 20, 2025)
+---------------
+
+- B2B: Update Keycloak org membership when a user redeems an enrollment code (#2989)
+- Change v2 req_tree to not return root node, improve OpenAPI spec (#3010)
+- Add ability to manage the link between programs and contracts (#3006)
+
 Version 0.131.4 (Released October 16, 2025)
 ---------------
 
