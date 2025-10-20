@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0069_update_program_collection_for_wagtail"),
+        ("courses", "0071_update_program_collection_for_wagtail"),
     ]
 
     operations = [
