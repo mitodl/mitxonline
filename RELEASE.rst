@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.131.6
+Version 0.131.6 (Released October 20, 2025)
 ---------------
 
 - B2B: Update Keycloak org membership when a user redeems an enrollment code (#2989)
