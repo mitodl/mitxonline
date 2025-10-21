@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.131.7 (Released October 21, 2025)
+---------------
+
+- fix(deps): update dependency mini-css-extract-plugin to v2.9.4 (#3020)
+- fix(deps): update dependency bootstrap to v5.3.8 (#3019)
+- Add backfill of user organizations (#3022)
+- chore(deps): update redis docker tag to v7.4.6 (#3018)
+- Fix conflicting migrations (bump numbers) (#3021)
+- Order program collection programs (#3007)
+- fix(deps): update dependency @pankod/refine-simple-rest to v3.39.0 (#2398)
+
 Version 0.131.6 (Released October 20, 2025)
 ---------------
 
