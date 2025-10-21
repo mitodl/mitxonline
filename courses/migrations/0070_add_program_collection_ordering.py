@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0067_program_courses_pro_live_e5a870_idx_and_more"),
+        ("courses", "0069_add_source_run_flag"),
     ]
 
     operations = [

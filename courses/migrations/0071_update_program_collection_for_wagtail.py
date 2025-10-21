@@ -7,7 +7,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0068_add_program_collection_ordering"),
+        ("courses", "0070_add_program_collection_ordering"),
     ]
 
     operations = [
