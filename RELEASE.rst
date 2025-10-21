@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.131.7
+Version 0.131.7 (Released October 21, 2025)
 ---------------
 
 - fix(deps): update dependency mini-css-extract-plugin to v2.9.4 (#3020)
