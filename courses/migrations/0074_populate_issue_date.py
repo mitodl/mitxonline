@@ -16,12 +16,14 @@ def populate_issue_date(apps, schema):
             certificate.issue_date = certificate.created_on
             certificate.save(update_fields=["issue_date"])
 
-class Migration(migrations.Migration):
 
+class Migration(migrations.Migration):
     dependencies = [
-        ('courses', '0073_courseruncertificate_issue_date_and_more'),
+        ("courses", "0073_courseruncertificate_issue_date_and_more"),
     ]
 
     operations = [
-        migrations.RunPython(populate_issue_date, reverse_code=migrations.RunPython.noop),
+        migrations.RunPython(
+            populate_issue_date, reverse_code=migrations.RunPython.noop
+        ),
     ]
