@@ -373,7 +373,7 @@ MITXONLINE_NEW_USER_LOGIN_URL = get_string(
     description="URL to redirect new users to after login",
 )
 LOGIN_REDIRECT_URL = "/"
-LOGIN_URL = "/signin"
+LOGIN_URL = "gateway-login"
 LOGOUT_REDIRECT_URL = get_string(
     name="LOGOUT_REDIRECT_URL",
     default="/",
@@ -469,7 +469,7 @@ AUTHENTICATION_BACKENDS = (
     "django.contrib.auth.backends.ModelBackend",
 )
 
-SOCIAL_AUTH_LOGIN_ERROR_URL = "login"
+SOCIAL_AUTH_LOGIN_ERROR_URL = "gateway-login"
 SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [urlparse(SITE_BASE_URL).netloc]
 SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = [
     "global_id",
