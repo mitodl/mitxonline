@@ -15,7 +15,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.forms import ChoiceField, DecimalField
+from django.forms import ChoiceField
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -551,10 +551,11 @@ class FlexiblePricingFormBuilder(FormBuilder):
     def create_number_field(self, field, options):  # noqa: ARG002
         options["error_messages"] = {
             "required": f"{options['label']} is a required field.",
-            "invalid": f"{options['label']} must be a whole number."
+            "invalid": f"{options['label']} must be a whole number.",
         }
         # Use IntegerField for integer-only validation
         from django.forms import IntegerField
+
         return IntegerField(**options)
 
     def create_country_field(self, field, options):  # noqa: ARG002
