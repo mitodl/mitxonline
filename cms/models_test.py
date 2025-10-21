@@ -10,7 +10,7 @@ from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import caches
 from django.test.client import RequestFactory
-from django.urls import resolve
+from django.urls import resolve, reverse
 from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
 
@@ -99,6 +99,7 @@ def test_custom_detail_page_urls_handled(fully_configured_wagtail):
     ],
 )
 def test_course_page_context(  # noqa: PLR0913
+    settings,
     staff_user,
     fully_configured_wagtail,
     is_authenticated,
@@ -159,7 +160,7 @@ def test_course_page_context(  # noqa: PLR0913
         "request": request,
         "run": run,
         "course_runs": relevant_runs,
-        "sign_in_url": f"/signin/?next={quote_plus(course_page.get_url())}"
+        "sign_in_url": f"{reverse(settings.LOGIN_URL)}?next={quote_plus(course_page.get_url())}"
         if exp_sign_in_url
         else None,
         "start_date": getattr(run, "start_date", None),
