@@ -97,8 +97,7 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
 
         if include_b2b:
             return self.filter(q_filter)
-        else:
-            return self.exclude_b2b().filter(q_filter)
+        return self.exclude_b2b().filter(q_filter)
 
     def enrollable(self, enrollment_end_date=None):
         """
