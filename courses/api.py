@@ -801,7 +801,7 @@ def get_certificate_grade_eligible_runs(now):
     # For a valid run it would be live, certificate_available_date would be in future or within a month of passing
     # the certificate_available_date.
 
-    course_runs = CourseRun.objects.live().filter(
+    course_runs = CourseRun.objects.live(include_b2b=True).filter(
         Q(certificate_available_date__isnull=True)
         | Q(
             certificate_available_date__gt=now

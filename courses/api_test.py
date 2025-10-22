@@ -31,6 +31,7 @@ from courses.api import (
     defer_enrollment,
     generate_course_run_certificates,
     generate_program_certificate,
+    get_certificate_grade_eligible_runs,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
@@ -1932,3 +1933,20 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
             expiration_datetime=str(run.upgrade_deadline),
             min_price=10,
         )
+
+
+def test_get_certificate_grade_eligible_runs():
+    """Test that the eligible run call returns B2B courses as well as regular ones."""
+
+    b2b_contract = ContractPageFactory.create()
+
+    run = CourseRunFactory.create(certificate_available_date=None)
+    b2b_run = CourseRunFactory.create(
+        certificate_available_date=None, b2b_contract=b2b_contract
+    )
+
+    eligible_courses = get_certificate_grade_eligible_runs(now=now_in_utc())
+
+    assert len(eligible_courses) == 2
+    assert run in eligible_courses
+    assert b2b_run in eligible_courses

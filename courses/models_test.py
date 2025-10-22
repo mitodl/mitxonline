@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 
+from b2b.factories import ContractPageFactory
 from cms.factories import (
     CertificatePageFactory,
     CoursePageFactory,
@@ -27,6 +28,7 @@ from courses.factories import (
 )
 from courses.models import (
     Course,
+    CourseRun,
     CourseRunEnrollment,
     PaidCourseRun,
     Program,
@@ -1057,3 +1059,26 @@ def test_program_minimum_elective_courses_requirement_no_elective_node():
     )
 
     assert program.minimum_elective_courses_requirement is None
+
+
+def test_courserun_qs_b2b_flags():
+    """Test that the CourseRunQuerySet B2B flags work as expected."""
+
+    past_start_date = now_in_utc() - timedelta(days=1)
+
+    b2b_contract = ContractPageFactory.create()
+    CourseRunFactory.create_batch(
+        3, start_date=past_start_date, end_date=None, live=True
+    )
+    CourseRunFactory.create_batch(
+        3,
+        start_date=past_start_date,
+        end_date=None,
+        live=True,
+        b2b_contract=b2b_contract,
+    )
+
+    assert CourseRun.objects.live().count() == 3
+    assert CourseRun.objects.live(include_b2b=True).count() == 6
+    assert CourseRun.objects.available().count() == 3
+    assert CourseRun.objects.available(include_b2b=True).count() == 6
