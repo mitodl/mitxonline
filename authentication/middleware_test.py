@@ -36,8 +36,9 @@ def test_process_exception(mocker, rf, settings):
     error = AuthAlreadyAssociated(backend)
     result = middleware.process_exception(request, error)
     assert result.status_code == status.HTTP_302_FOUND
-    assert result.url == "{}?message={}&backend={}".format(
-        reverse("login"), quote(error.__str__()), backend.name
+    assert (
+        result.url
+        == f"{reverse(settings.LOGIN_URL)}?message={quote(error.__str__())}&backend={backend.name}"
     )
 
 

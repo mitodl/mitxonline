@@ -1387,7 +1387,7 @@ class CoursePage(ProductPage):
         sign_in_url = (
             None
             if request.user.is_authenticated
-            else f"{reverse('login')}?next={quote_plus(self.get_url())}"
+            else f"{reverse(settings.LOGIN_URL)}?next={quote_plus(self.get_url())}"
         )
         start_date = relevant_run.start_date if relevant_run else None
         can_access_edx_course = (
@@ -1473,7 +1473,7 @@ class ProgramPage(ProductPage):
         sign_in_url = (
             None
             if request.user.is_authenticated
-            else f"{reverse('login')}?next={quote_plus(self.get_url())}"
+            else f"{reverse(settings.LOGIN_URL)}?next={quote_plus(self.get_url())}"
         )
         start_date = None
         can_access_edx_course = False
