@@ -364,7 +364,7 @@ class Command(BaseCommand):
         for learner in learners:
             learners_table.add_row(
                 learner.email,
-                f"{learner.first_name} {learner.last_name}",
+                f"{learner.name}",
             )
         self.console.print(learners_table)
 

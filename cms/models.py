@@ -4,7 +4,7 @@ import json
 import logging
 import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from json import dumps
 from urllib.parse import quote_plus
 
@@ -15,7 +15,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.forms import ChoiceField, DecimalField
+from django.forms import ChoiceField
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -459,16 +459,7 @@ class CertificatePage(CourseProgramChildPage):
                 "uuid": "fake-uuid",
                 "learner_name": "Anthony M. Stark",
                 "product_name": product_name,
-                "start_date": (
-                    self.parent.product.first_unexpired_run.start_date
-                    if self.parent.product.first_unexpired_run
-                    else datetime.now()  # noqa: DTZ005
-                ),
-                "end_date": (
-                    self.parent.product.first_unexpired_run.end_date
-                    if self.parent.product.first_unexpired_run
-                    else datetime.now() + timedelta(days=45)  # noqa: DTZ005
-                ),
+                "issue_date": self.issue_date,
                 "CEUs": self.CEUs,
                 "is_program_certificate": is_program_certificate,
             }
@@ -550,9 +541,13 @@ class FlexiblePricingFormBuilder(FormBuilder):
 
     def create_number_field(self, field, options):  # noqa: ARG002
         options["error_messages"] = {
-            "required": f"{options['label']} is a required field."
+            "required": f"{options['label']} is a required field.",
+            "invalid": f"{options['label']} must be a whole number.",
         }
-        return DecimalField(**options)
+        # Use IntegerField for integer-only validation
+        from django.forms import IntegerField
+
+        return IntegerField(**options)
 
     def create_country_field(self, field, options):  # noqa: ARG002
         exchange_rates = []
@@ -1387,7 +1382,7 @@ class CoursePage(ProductPage):
         sign_in_url = (
             None
             if request.user.is_authenticated
-            else f"{reverse('login')}?next={quote_plus(self.get_url())}"
+            else f"{reverse(settings.LOGIN_URL)}?next={quote_plus(self.get_url())}"
         )
         start_date = relevant_run.start_date if relevant_run else None
         can_access_edx_course = (
@@ -1473,7 +1468,7 @@ class ProgramPage(ProductPage):
         sign_in_url = (
             None
             if request.user.is_authenticated
-            else f"{reverse('login')}?next={quote_plus(self.get_url())}"
+            else f"{reverse(settings.LOGIN_URL)}?next={quote_plus(self.get_url())}"
         )
         start_date = None
         can_access_edx_course = False
@@ -1822,7 +1817,7 @@ class FlexiblePricingRequestForm(AbstractForm):
     def process_form_submission(self, form):
         try:
             converted_income = determine_income_usd(
-                float(form.cleaned_data["your_income"]),
+                int(form.cleaned_data["your_income"]),
                 form.cleaned_data["income_currency"],
             )
         except NotSupportedException:

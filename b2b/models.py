@@ -296,8 +296,12 @@ class ContractPage(Page):
         """Save the page, and update the slug and title appropriately."""
 
         self.title = str(self.name)
-
         self.slug = slugify(f"contract-{self.organization.id}-{self.title}")
+
+        # This should be removed once we're done migrating orgs into Keycloak.
+        # The integration type field should also be removed at that time.
+        self.membership_type = self.integration_type
+
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
         queue_enrollment_code_check.delay(self.id)
 
