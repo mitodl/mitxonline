@@ -8,9 +8,8 @@ def set_current_certificate_revision(apps, schema_editor):
     """
     Fetch all CourseRunCertificates and update certificate_page_revision to latest revision
     """
-    from cms.models import CertificatePage
-    from courses.models import CourseRunCertificate
-
+    CertificatePage = apps.get_model("cms", "CertificatePage")
+    CourseRunCertificate = apps.get_model("courses", "CourseRunCertificate")
     course_run_certificates = CourseRunCertificate.objects.all()
     for cert in course_run_certificates:
         certificate_page = (
