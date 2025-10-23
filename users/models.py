@@ -346,22 +346,6 @@ class User(
         return getattr(self.openedx_user, "edx_username", None)
 
     @property
-    def first_name(self):
-        return self.legal_address.first_name
-
-    @first_name.setter
-    def first_name(self, value):
-        self.legal_address.first_name = value
-
-    @property
-    def last_name(self):
-        return self.legal_address.last_name
-
-    @last_name.setter
-    def last_name(self, value):
-        self.legal_address.last_name = value
-
-    @property
     def is_editor(self) -> bool:
         """Returns True if the user has editor permissions for the CMS"""
         return (
@@ -466,9 +450,6 @@ class LegalAddress(TimestampedModel):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="legal_address"
     )
-
-    first_name = models.CharField(max_length=60, blank=True)
-    last_name = models.CharField(max_length=60, blank=True)
     country = models.CharField(
         max_length=2, blank=True, validators=[validate_iso_3166_1_code]
     )  # ISO-3166-1

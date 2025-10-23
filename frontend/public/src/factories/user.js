@@ -55,8 +55,6 @@ export const makeUser = (username: ?string): LoggedInUser => ({
   },
   legal_address: {
     street_address:     [casual.street],
-    first_name:         casual.first_name,
-    last_name:          casual.last_name,
     city:               casual.city,
     state_or_territory: "US-MA",
     country:            "US",

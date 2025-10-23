@@ -105,8 +105,6 @@ class Command(BaseCommand):
         new_account.is_superuser = False
         new_account.save()
 
-        new_account.legal_address.first_name = kwargs["firstname"]
-        new_account.legal_address.last_name = kwargs["lastname"]
         new_account.legal_address.country = kwargs["countrycode"]
 
         self.stdout.write(

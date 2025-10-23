@@ -40,8 +40,6 @@ export type AuthResponse = {
 }
 
 export type LegalAddress = {
-  first_name: string,
-  last_name: string,
   country: string,
   street_address?: Array<string>,
   state?: string,
