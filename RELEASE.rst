@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.131.10
+----------------
+
+- Don't remove users from contracts for now (#3033)
+
 Version 0.131.9 (Released October 23, 2025)
 ---------------
 
