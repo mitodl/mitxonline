@@ -163,7 +163,8 @@ class OrganizationPage(Page):
         """
 
         return user.b2b_contracts.through.objects.filter(
-            contractpage_id__in=self.contracts.all().values_list("id", flat=True)
+            contractpage_id__in=self.contracts.all().values_list("id", flat=True),
+            user=user,
         ).delete()
 
     def __str__(self):
