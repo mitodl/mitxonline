@@ -11,7 +11,7 @@ def set_current_certificate_revision(apps, schema_editor):
     CourseRunCertificate = apps.get_model("courses", "CourseRunCertificate")
     CertificatePage = apps.get_model("cms", "CertificatePage")
     course_run_certificates = CourseRunCertificate.objects.only(
-        'id', 'course_run', 'certificate_page_revision'
+        "id", "course_run", "certificate_page_revision"
     ).all()
     for cert in course_run_certificates:
         certificate_page = (
