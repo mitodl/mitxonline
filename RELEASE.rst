@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.131.9
+Version 0.131.9 (Released October 23, 2025)
 ---------------
 
 - Force membership_type to be the same as integration_type (#3029)
