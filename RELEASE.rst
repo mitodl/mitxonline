@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.131.8
+Version 0.131.8 (Released October 23, 2025)
 ---------------
 
 - Fix login so it preserves the next url (#3026)
