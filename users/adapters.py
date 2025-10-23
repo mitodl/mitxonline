@@ -65,14 +65,6 @@ class LearnUserAdapter(UserAdapter):
 
         self.obj.name = d.get("fullName", self.obj.name)  # name's default is ""
 
-        first_name = d.get("name", {}).get("given_name", "")
-        if first_name:
-            self.legal_address.first_name = first_name
-
-        last_name = d.get("name", {}).get("last_name", "")
-        if last_name:
-            self.legal_address.last_name = last_name
-
     def _save_related(self):
         self.user_profile.user = self.obj
         self.user_profile.save()
