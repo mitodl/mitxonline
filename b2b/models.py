@@ -163,6 +163,7 @@ class OrganizationPage(Page):
         """
 
         return user.b2b_contracts.through.objects.filter(
+            user_id=user.id,
             contractpage_id__in=self.contracts.all().values_list("id", flat=True)
         ).delete()
 
