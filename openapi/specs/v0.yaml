@@ -1519,10 +1519,15 @@ components:
 
             * `sso` - SSO
             * `non-sso` - Non-SSO
+            * `managed` - Managed
+            * `code` - Enrollment Code
+            * `auto` - Auto Enrollment
+        membership_type:
+          type: string
         organization:
           type: integer
           readOnly: true
-          description: The organization this contract is with.
+          description: The organization that owns this contract.
         contract_start:
           type: string
           format: date
@@ -1551,6 +1556,7 @@ components:
       - description
       - id
       - integration_type
+      - membership_type
       - name
       - organization
       - slug
@@ -2538,13 +2544,22 @@ components:
       enum:
       - sso
       - non-sso
+      - managed
+      - code
+      - auto
       type: string
       description: |-
         * `sso` - SSO
         * `non-sso` - Non-SSO
+        * `managed` - Managed
+        * `code` - Enrollment Code
+        * `auto` - Auto Enrollment
       x-enum-descriptions:
       - SSO
       - Non-SSO
+      - Managed
+      - Enrollment Code
+      - Auto Enrollment
     LearnerProgramRecordShare:
       type: object
       properties:
@@ -3583,7 +3598,7 @@ components:
         b2b_organizations:
           type: array
           items:
-            $ref: '#/components/schemas/UserOrganization'
+            $ref: '#/components/schemas/OrganizationPage'
           readOnly: true
       required:
       - b2b_organizations
@@ -3597,48 +3612,6 @@ components:
       - is_superuser
       - legal_address
       - updated_on
-    UserOrganization:
-      type: object
-      description: |-
-        Serializer for user organization data.
-
-        Slightly different from the OrganizationPageSerializer; we only need
-        the user's orgs and contracts.
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        name:
-          type: string
-          readOnly: true
-          description: The name of the organization
-        description:
-          type: string
-          readOnly: true
-          description: Any useful extra information about the organization
-        logo:
-          type: string
-          format: uri
-          readOnly: true
-          description: The organization's logo. Will be displayed in the app in various
-            places.
-        slug:
-          type: string
-          readOnly: true
-          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
-          pattern: ^[-\w]+$
-        contracts:
-          type: array
-          items:
-            $ref: '#/components/schemas/ContractPage'
-          readOnly: true
-      required:
-      - contracts
-      - description
-      - id
-      - logo
-      - name
-      - slug
     UserProfile:
       type: object
       description: Serializer for profile
@@ -4844,7 +4817,14 @@ components:
         programs:
           type: array
           items:
-            type: integer
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              order:
+                type: integer
           readOnly: true
         created_on:
           type: string
@@ -4884,10 +4864,14 @@ components:
         node_type:
           $ref: '#/components/schemas/V2ProgramRequirementDataNodeTypeEnum'
         course:
-          type: string
+          type: integer
           nullable: true
         program:
-          type: string
+          type: integer
+          nullable: true
+        required_program:
+          type: integer
+          nullable: true
         title:
           type: string
           nullable: true
@@ -4905,15 +4889,18 @@ components:
       - node_type
     V2ProgramRequirementDataNodeTypeEnum:
       enum:
-      - operator
       - course
+      - program
+      - operator
       type: string
       description: |-
-        * `operator` - operator
         * `course` - course
+        * `program` - program
+        * `operator` - operator
       x-enum-descriptions:
-      - operator
       - course
+      - program
+      - operator
     YearsExperienceEnum:
       enum:
       - 2

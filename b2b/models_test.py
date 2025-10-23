@@ -16,7 +16,7 @@ def test_add_program_courses_to_contract(mocker):
     mocker.patch("openedx.tasks.clone_courserun.delay")
 
     program = ProgramFactory.create()
-    courseruns = CourseRunFactory.create_batch(3)
+    courseruns = CourseRunFactory.create_batch(3, is_source_run=True)
     contract = ContractPageFactory.create()
 
     for courserun in courseruns:
@@ -35,7 +35,7 @@ def test_add_program_courses_to_contract(mocker):
     assert contract.programs.count() == 1
     assert contract.get_course_runs().count() == 3
 
-    new_courserun = CourseRunFactory.create()
+    new_courserun = CourseRunFactory.create(is_source_run=True)
     program.add_requirement(new_courserun.course)
     program.save()
     program.refresh_from_db()

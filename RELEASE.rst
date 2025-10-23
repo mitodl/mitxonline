@@ -1,6 +1,60 @@
 Release Notes
 =============
 
+Version 0.131.7 (Released October 21, 2025)
+---------------
+
+- fix(deps): update dependency mini-css-extract-plugin to v2.9.4 (#3020)
+- fix(deps): update dependency bootstrap to v5.3.8 (#3019)
+- Add backfill of user organizations (#3022)
+- chore(deps): update redis docker tag to v7.4.6 (#3018)
+- Fix conflicting migrations (bump numbers) (#3021)
+- Order program collection programs (#3007)
+- fix(deps): update dependency @pankod/refine-simple-rest to v3.39.0 (#2398)
+
+Version 0.131.6 (Released October 20, 2025)
+---------------
+
+- B2B: Update Keycloak org membership when a user redeems an enrollment code (#2989)
+- Change v2 req_tree to not return root node, improve OpenAPI spec (#3010)
+- Add ability to manage the link between programs and contracts (#3006)
+
+Version 0.131.4 (Released October 16, 2025)
+---------------
+
+- Add functionality to verify course modes exist when cloning a course run (#2993)
+- fix(deps): update dependency @sentry/browser to v10 (#2656)
+
+Version 0.131.3 (Released October 15, 2025)
+---------------
+
+- fix(deps): update dependency ramda to v0.32.0 (#2531)
+- chore(deps): update dependency authlib to v1.6.5 [security] (#3008)
+- fix: use global id for user sync filtering (#2992)
+- Revert "chore(deps): update dependency python (#2031)" (#3003)
+- Fix perf issues with the departments API (#3001)
+- Removing first and last name requirement for a PATCH request (#2998)
+- fix(deps): update django-health-check digest to 592f6a8 (#2916)
+- Revert "fix(deps): update dependency webpack-dev-server to v5 [securi… (#2999)
+- fix(deps): update dependency serialize-javascript to v6 [security] (#2538)
+- fix(deps): update dependency webpack-dev-server to v5 [security] (#2706)
+- login button redirect not working with apisix (#2996)
+- feat: management commands to create signatories in bulk and delete a signatory (#2986)
+- Add escape hatch to be able to disable zeal (#2995)
+- Don't raise zeal exceptions normally (#2994)
+- chore(deps): update dependency python (#2031)
+- Fix flaky test regarding v2 program api (#2987)
+- Switch from nplusone to django-zeal (#2990)
+- fix(deps): update dependency django to v4.2.25 [security] (#2991)
+
+Version 0.131.2 (Released October 14, 2025)
+---------------
+
+- Wagtail permissions and url fix (#2975)
+- 8621-featured-items-celery-task-is-not-robust (#2973)
+- get_topics_from_page unit tests (#2978)
+- Courses API w/ org= handle anonymous (#2979)
+
 Version 0.131.1 (Released September 30, 2025)
 ---------------
 

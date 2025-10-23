@@ -11,6 +11,7 @@ from django_object_actions import DjangoObjectActions, action
 from hijack.contrib.admin import HijackUserAdminMixin
 from mitol.common.admin import TimestampedModelAdmin
 
+from b2b.models import UserOrganization
 from openedx.models import OpenEdxUser
 from users.models import BlockList, LegalAddress, User, UserProfile
 
@@ -109,6 +110,13 @@ class UserContractPageInline(admin.TabularInline):
     extra = 0
 
 
+class UserOrganizationInline(admin.TabularInline):
+    """Inline to allow modifying the contracts associated with a user"""
+
+    model = UserOrganization
+    extra = 0
+
+
 @admin.register(User)
 class UserAdmin(
     DjangoObjectActions, ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin
@@ -165,6 +173,7 @@ class UserAdmin(
         OpenEdxUserInline,
         UserLegalAddressInline,
         UserProfileInline,
+        UserOrganizationInline,
         UserContractPageInline,
     ]
 

@@ -1,5 +1,7 @@
 """Models for B2B data."""
 
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
@@ -12,9 +14,17 @@ from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page
 
-from b2b.constants import CONTRACT_INTEGRATION_CHOICES, ORG_INDEX_SLUG
+from b2b.constants import (
+    CONTRACT_MEMBERSHIP_AUTOS,
+    CONTRACT_MEMBERSHIP_CHOICES,
+    CONTRACT_MEMBERSHIP_MANAGED,
+    CONTRACT_MEMBERSHIP_TYPE_CHOICES,
+    ORG_INDEX_SLUG,
+)
 from b2b.exceptions import TargetCourseRunExistsError
 from b2b.tasks import queue_enrollment_code_check
+
+log = logging.getLogger(__name__)
 
 
 class OrganizationObjectIndexPage(Page):
@@ -110,6 +120,53 @@ class OrganizationPage(Page):
             .distinct()
         )
 
+    def attach_user(self, user):
+        """
+        Attach the given user to the org in Keycloak.
+
+        Args:
+        - user (User): the user to add to the org
+        Returns:
+        - bool: success flag
+        """
+
+        from b2b.api import add_user_org_membership
+
+        return add_user_org_membership(self, user)
+
+    def add_user_contracts(self, user):
+        """
+        Add contracts that the user should get automatically to the user.
+
+        Args:
+        - user (User): the user to add contracts to
+        Returns:
+        - int: number of contracts added
+        """
+
+        contracts_qs = self.contracts.filter(
+            integration_type__in=CONTRACT_MEMBERSHIP_AUTOS, active=True
+        )
+
+        for contract in contracts_qs.all():
+            user.b2b_contracts.add(contract)
+
+        return contracts_qs.count()
+
+    def remove_user_contracts(self, user):
+        """
+        Remove managed contracts from the given user.
+
+        Args:
+        - user (User): the user to remove contracts from
+        Returns:
+        - int: number of contracts removed
+        """
+
+        return user.b2b_contracts.through.objects.filter(
+            contractpage_id__in=self.contracts.all().values_list("id", flat=True)
+        ).delete()
+
     def __str__(self):
         """Return a reasonable representation of the org as a string."""
 
@@ -138,14 +195,22 @@ class ContractPage(Page):
     )
     integration_type = models.CharField(
         max_length=255,
-        choices=CONTRACT_INTEGRATION_CHOICES,
+        choices=CONTRACT_MEMBERSHIP_CHOICES,
         help_text="The type of integration for this contract.",
+    )
+    # This doesn't have a choices setting because you can't re-use a constant.
+    #
+    membership_type = models.CharField(
+        max_length=255,
+        choices=CONTRACT_MEMBERSHIP_TYPE_CHOICES,
+        help_text="The method to use to manage membership in the contract.",
+        default=CONTRACT_MEMBERSHIP_MANAGED,
     )
     organization = models.ForeignKey(
         OrganizationPage,
         on_delete=models.PROTECT,
         related_name="contracts",
-        help_text="The organization this contract is with.",
+        help_text="The organization that owns this contract.",
     )
     contract_start = models.DateField(
         blank=True,
@@ -192,6 +257,7 @@ class ContractPage(Page):
         MultiFieldPanel(
             [
                 FieldPanel("integration_type"),
+                FieldPanel("membership_type"),
                 FieldPanel("max_learners"),
                 FieldPanel("enrollment_fixed_price"),
             ],
@@ -232,7 +298,7 @@ class ContractPage(Page):
 
         self.title = str(self.name)
 
-        self.slug = slugify(f"contract-{self.organization.id}-{self.id}")
+        self.slug = slugify(f"contract-{self.organization.id}-{self.title}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
         queue_enrollment_code_check.delay(self.id)
 
@@ -315,7 +381,10 @@ class ContractPage(Page):
         if hasattr(program, "_courses_with_requirements_data"):
             delattr(program, "_courses_with_requirements_data")
 
-        for course, _ in program.courses:
+        for course in program.courses_qset.filter(
+            models.Q(courseruns__is_source_run=True)
+            | models.Q(courseruns__run_tag="SOURCE")
+        ).all():
             try:
                 create_contract_run(self, course)
                 managed += 1
@@ -351,3 +420,30 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
         on_delete=models.DO_NOTHING,
         help_text="The contract that the user was attached to.",
     )
+
+
+class UserOrganization(models.Model):
+    """The user's organizations memberships."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_organizations",
+    )
+    organization = models.ForeignKey(
+        "b2b.OrganizationPage",
+        on_delete=models.CASCADE,
+        related_name="organization_users",
+    )
+    keep_until_seen = models.BooleanField(
+        default=False,
+        help_text="If True, the user will be kept in the organization until the organization is seen in their SSO data.",
+    )
+
+    class Meta:
+        unique_together = ("user", "organization")
+
+    def __str__(self):
+        """Return a reasonable representation of the object as a string."""
+
+        return f"UserOrganization: {self.user} in {self.organization}"

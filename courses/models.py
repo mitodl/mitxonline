@@ -19,11 +19,11 @@ from django_countries.fields import CountryField
 from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
-from modelcluster.fields import ParentalManyToManyField
+from modelcluster.fields import ParentalKey
 from treebeard.mp_tree import MP_Node
-from wagtail.admin.panels import FieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.fields import RichTextField
-from wagtail.models import Page, Revision
+from wagtail.models import ClusterableModel, Orderable, Page, Revision
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
@@ -745,7 +745,11 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             list: List of ProgramCollection objects
         """
-        return list(ProgramCollection.objects.filter(programs__id=self.id).distinct())
+        return list(
+            ProgramCollection.objects.filter(
+                collection_items__program__id=self.id
+            ).distinct()
+        )
 
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
@@ -1103,6 +1107,10 @@ class CourseRun(TimestampedModel):
         blank=True,
         on_delete=models.DO_NOTHING,
         related_name="course_runs",
+    )
+    is_source_run = models.BooleanField(
+        default=False,
+        help_text='Designate this run as a "source" run for contract re-runs of the course.',
     )
 
     class Meta:
@@ -2033,20 +2041,107 @@ class LearnerProgramRecordShare(TimestampedModel):
         ]
 
 
-class ProgramCollection(Page):
+class ProgramCollectionItem(Orderable):
+    """Intermediate model to store programs in a collection with ordering"""
+
+    collection = ParentalKey(
+        "ProgramCollection", on_delete=models.CASCADE, related_name="collection_items"
+    )
+    program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="collection_memberships"
+    )
+
+    panels = [
+        FieldPanel("program"),
+    ]
+
+    class Meta:
+        ordering = ["sort_order"]
+        unique_together = ("collection", "program")
+        verbose_name = "Program Collection Item"
+        verbose_name_plural = "Program Collection Items"
+
+    def __str__(self):
+        return (
+            f"{self.collection.title} - {self.program.title} (order: {self.sort_order})"
+        )
+
+
+class ProgramCollection(Page, ClusterableModel):
     """Model for a collection of programs with title and description"""
 
     description = RichTextField(
         blank=True, help_text="Description of the program collection"
     )
-    programs = ParentalManyToManyField(
-        Program, blank=True, help_text="Programs included in this collection"
-    )
+
     content_panels = [
         *Page.content_panels,
         FieldPanel("description"),
-        FieldPanel("programs"),
+        InlinePanel(
+            "collection_items",
+            label="Programs",
+            help_text="Add and order programs in this collection",
+        ),
     ]
+
+    @property
+    def programs(self):
+        """
+        Returns programs in the collection ordered by their order field
+        """
+        return Program.objects.filter(collection_memberships__collection=self).order_by(
+            "collection_memberships__sort_order"
+        )
+
+    @property
+    def ordered_collection_items(self):
+        """
+        Returns ProgramCollectionItem objects ordered by their order field
+        """
+        return self.collection_items.all().order_by("sort_order")
+
+    def add_program(self, program, order=None):
+        """
+        Add a program to this collection with optional order
+
+        Args:
+            program: Program instance to add
+            order: Optional order position. If None, adds at the end
+        """
+        if order is None:
+            last_item = self.collection_items.order_by("-sort_order").first()
+            order = (last_item.sort_order + 1) if last_item else 0
+
+        collection_item, created = ProgramCollectionItem.objects.get_or_create(
+            collection=self, program=program, defaults={"sort_order": order}
+        )
+
+        if not created:
+            collection_item.sort_order = order
+            collection_item.save()
+
+        return collection_item
+
+    def remove_program(self, program):
+        """
+        Remove a program from this collection
+
+        Args:
+            program: Program instance to remove
+        """
+        ProgramCollectionItem.objects.filter(collection=self, program=program).delete()
+
+    def reorder_programs(self, program_order_list):
+        """
+        Reorder programs in the collection
+
+        Args:
+            program_order_list: List of (program_id, order) tuples
+        """
+        for program_id, order in program_order_list:
+            ProgramCollectionItem.objects.filter(
+                collection=self, program_id=program_id
+            ).update(sort_order=order)
 
     class Meta:
         verbose_name = "Program Collection"

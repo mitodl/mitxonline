@@ -24,12 +24,18 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
 
     node_type = serializers.ChoiceField(
         choices=(
-            ProgramRequirementNodeType.OPERATOR,
             ProgramRequirementNodeType.COURSE,
+            ProgramRequirementNodeType.PROGRAM,
+            ProgramRequirementNodeType.OPERATOR,
         )
     )
-    course = serializers.CharField(source="course_id", allow_null=True, default=None)
-    program = serializers.CharField(source="program_id", required=False)
+    course = serializers.IntegerField(source="course_id", allow_null=True, default=None)
+    program = serializers.IntegerField(
+        source="program_id", allow_null=True, default=None
+    )
+    required_program = serializers.IntegerField(
+        source="required_program_id", allow_null=True, default=None
+    )
     title = serializers.CharField(allow_null=True, default=None)
     operator = serializers.CharField(allow_null=True, default=None)
     operator_value = serializers.CharField(allow_null=True, default=None)
@@ -57,10 +63,7 @@ class ProgramCollectionSerializer(StrictFieldsSerializer):
     id = serializers.IntegerField(read_only=True)
     title = serializers.CharField()
     description = serializers.CharField()
-    programs = serializers.PrimaryKeyRelatedField(
-        many=True,
-        read_only=True,
-    )
+    programs = serializers.SerializerMethodField()
     created_on = serializers.DateTimeField(read_only=True)
     updated_on = serializers.DateTimeField(read_only=True)
 
@@ -75,9 +78,43 @@ class ProgramCollectionSerializer(StrictFieldsSerializer):
             "updated_on",
         ]
 
+    @extend_schema_field(
+        field={
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "order": {"type": "integer"},
+                },
+            },
+        }
+    )
+    def get_programs(self, instance) -> list[dict[str, int | str]]:
+        """
+        Returns programs in the collection ordered by their order field
+        """
+        return [
+            {
+                "id": item.program.id,
+                "title": item.program.title,
+                "order": item.sort_order,
+            }
+            for item in instance.ordered_collection_items
+        ]
+
 
 class ProgramRequirementTreeSerializer(BaseProgramRequirementTreeSerializer):
     child = ProgramRequirementSerializer()
+
+    @property
+    def data(self):
+        """Return children of root node directly, or empty array if no children"""
+        # BaseProgramRequirementTreeSerializer overrides the data property
+        # to bypass to_implementation, so we do also.
+        full_data = super().data
+        return full_data[0].get("children", []) if full_data else []
 
 
 @extend_schema_serializer(
@@ -117,7 +154,9 @@ class ProgramSerializer(serializers.ModelSerializer):
         # Fallback to database query
         return [
             collection.id
-            for collection in ProgramCollection.objects.filter(programs__id=instance.id)
+            for collection in ProgramCollection.objects.filter(
+                collection_items__program__id=instance.id
+            )
         ]
 
     @extend_schema_field(

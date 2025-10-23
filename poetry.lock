@@ -109,14 +109,14 @@ tests-mypy = ["mypy (>=1.11.1) ; platform_python_implementation == \"CPython\" a
 
 [[package]]
 name = "authlib"
-version = "1.6.4"
+version = "1.6.5"
 description = "The ultimate Python library in building OAuth and OpenID Connect servers and clients."
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "authlib-1.6.4-py2.py3-none-any.whl", hash = "sha256:39313d2a2caac3ecf6d8f95fbebdfd30ae6ea6ae6a6db794d976405fdd9aa796"},
-    {file = "authlib-1.6.4.tar.gz", hash = "sha256:104b0442a43061dc8bc23b133d1d06a2b0a9c2e3e33f34c4338929e816287649"},
+    {file = "authlib-1.6.5-py2.py3-none-any.whl", hash = "sha256:3e0e0507807f842b02175507bdee8957a1d5707fd4afb17c32fb43fee90b6e3a"},
+    {file = "authlib-1.6.5.tar.gz", hash = "sha256:6aaf9c79b7cc96c900f0b284061691c5d4e61221640a948fe690b556a6d6d10b"},
 ]
 
 [package.dependencies]
@@ -1651,14 +1651,14 @@ sidecar = ["drf-spectacular-sidecar"]
 
 [[package]]
 name = "edx-api-client"
-version = "1.12.0"
+version = "1.13.0"
 description = "Python interface to the edX REST APIs"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "edx_api_client-1.12.0-py2.py3-none-any.whl", hash = "sha256:4d34e2fa09ede004d1232ee04c9bc0a5135533da9ffaa8d4bf3d62ebfa40eb85"},
-    {file = "edx_api_client-1.12.0.tar.gz", hash = "sha256:982dd89ba6ef83f9b4abd0d3beaf4d68c31206afe5d0d0fd10f767caa16be602"},
+    {file = "edx_api_client-1.13.0-py2.py3-none-any.whl", hash = "sha256:60a949eb31ddf3f8b0ddb63189d58bc9e7057117dfad032c9416a1ff1a401fae"},
+    {file = "edx_api_client-1.13.0.tar.gz", hash = "sha256:d52f3267e0af0d4bb60982d31fd792c4edf10bb935ab0389c7b47c9dd8737e27"},
 ]
 
 [package.dependencies]
@@ -2293,33 +2293,6 @@ urllib3 = ">=1.15"
 
 [package.extras]
 dev = ["black", "pytest"]
-
-[[package]]
-name = "hypothesis"
-version = "4.23.9"
-description = "A library for property based testing"
-optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
-groups = ["main"]
-files = [
-    {file = "hypothesis-4.23.9-py2-none-any.whl", hash = "sha256:54eea352c89eee8a0c4a74607b275471033f380dad27c33be5a9b647dd8680fa"},
-    {file = "hypothesis-4.23.9-py3-none-any.whl", hash = "sha256:7905eaf59be8ff599b0122a582b196751ce63ba40f6e9b4c70d878873f48f51d"},
-    {file = "hypothesis-4.23.9.tar.gz", hash = "sha256:a0e756dbd9042403d7d3fa8b281c4b0bd0bd621011a79259fb36b219861238af"},
-]
-
-[package.dependencies]
-attrs = ">=16.0.0"
-
-[package.extras]
-all = ["django (>=1.11)", "dpcontracts (>=0.4)", "lark-parser (>=0.6.5)", "numpy (>=1.9.0)", "pandas (>=0.19)", "pytest (>=3.0)", "python-dateutil (>=1.4)", "pytz", "pytz (>=2014.1)"]
-dateutil = ["python-dateutil (>=1.4)"]
-django = ["django (>=1.11)", "pytz"]
-dpcontracts = ["dpcontracts (>=0.4)"]
-lark = ["lark-parser (>=0.6.5)"]
-numpy = ["numpy (>=1.9.0)"]
-pandas = ["pandas (>=0.19)"]
-pytest = ["pytest (>=3.0)"]
-pytz = ["pytz (>=2014.1)"]
 
 [[package]]
 name = "identify"
@@ -6062,4 +6035,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "a591f2e9ed75bfbbe0892a19d588f951f14a5e3d262dc77d97377f7c207e51bc"
+content-hash = "fc9eee23bbc6e1b93c94dda33c51f89b906c7fbc691015862f59cd8ce58b0afc"

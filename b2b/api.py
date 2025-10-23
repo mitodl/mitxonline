@@ -19,13 +19,18 @@ from wagtail.models import Page
 
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
-    CONTRACT_INTEGRATION_SSO,
+    CONTRACT_MEMBERSHIP_AUTOS,
     ORG_KEY_MAX_LENGTH,
 )
 from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
-from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
+from b2b.models import (
+    ContractPage,
+    OrganizationIndexPage,
+    OrganizationPage,
+    UserOrganization,
+)
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun
@@ -71,8 +76,34 @@ def ensure_b2b_organization_index() -> OrganizationIndexPage:
     return org_index_page
 
 
+def import_and_create_contract_run(contract: ContractPage, course_run_id: str):
+    """
+    Create a contract run for the given course, importing it from edX if necessary.
+
+    Check for the specified course run. If it exists, create the contract run in
+    the usual fashion. If it doesn't, check for it in edX and import it into
+    MITx Online first, then create the contract run.
+
+    If the specified run is imported, it will have the "is_source_run" flag set.
+
+    Args:
+        contract (ContractPage): The contract to create the run for.
+        course_run_id (str): The readable ID for the source course run.
+    Keyword Args:
+        skip_edx (bool): Don't try to create a course run in edX.
+        require_designated_source_run (bool): Require a flagged source run.
+    Returns:
+        CourseRun: The created CourseRun object.
+        Product: The created Product object.
+    """
+
+
 def create_contract_run(
-    contract: ContractPage, course: Course
+    contract: ContractPage,
+    course: Course,
+    *,
+    skip_edx=False,
+    require_designated_source_run=True,
 ) -> tuple[CourseRun, Product]:
     """
     Create a run for the specified contract.
@@ -84,24 +115,24 @@ def create_contract_run(
       source course run in edX.
     - Create a product for the run.
 
-    Source course runs are identified by looking for the most recent course run
-    for the given course. This code expects you to pass in an MITx Online course
-    that has a readable ID like 'course-v1:UAI_SOURCE+number` and that it has a
-    run of some sort. This should just be a single run. If there's multiple runs,
-    this will look for a run tag of "SOURCE". Failing that, it will try to use
-    the _first_ run in the list.
+    Source course runs are runs that have the "is_source_run" flag set. If one
+    cannot be found, this will also check for a run with the run tag "SOURCE".
+    If neither of those are found, it will throw an error. However, setting
+    "require_designated_source_run" to False will add a third attempt, which will
+    try to use whatever the first course run is for the specified course. This
+    may not be what you want, so this functionality is disabled by default.
 
     The MITx Online course run will belong to the source course. They will get a
     course key that is modified to represent the organization they belong to,
     the current year, and the contract ID. This means that the source course will
     have runs that have readable IDs that do not match the course ID.
 
-    The course key is changed according to a set algorithm. For more information,
-    see this discussion post: https://github.com/mitodl/hq/discussions/7525
-    In general, this expects a course run that is in org `UAI_SOURCE` and then
-    will create a new run that is `UAI_orgkey`, with a run tag that reflects
-    the year we're creating the run in and the contract ID (`2025_C19` for
-    instance).
+    The course key is generated according to a set algorithm. The new course key
+    will have the organization part set to "UAI_orgkey" and the run tag set to
+    "year_Cid" where orgkey is the organization key (set in the organization
+    record), year is the current year, and id is the ID of the contract. For more
+    information on the key format, see this discussion post:
+    https://github.com/mitodl/hq/discussions/7525
 
     A product will be created for the new contract course run, and its price will
     either be zero or the amount specified by the contract. (Free courses still
@@ -111,18 +142,23 @@ def create_contract_run(
     Args:
         contract (ContractPage): The contract to create the run for.
         course (Course): The course for which we should create a run.
+    Keyword Args:
+        skip_edx (bool): Don't try to create a course run in edX.
+        require_designated_source_run (bool): Require a flagged source run.
     Returns:
         CourseRun: The created CourseRun object.
         Product: The created Product object.
     """
 
-    clone_course_run = course.courseruns.filter(run_tag="SOURCE").first()
+    clone_course_run = course.courseruns.filter(
+        Q(is_source_run=True) | Q(run_tag="SOURCE")
+    ).first()
 
-    if not clone_course_run:
+    if not clone_course_run and not require_designated_source_run:
         try:
             clone_course_run = course.courseruns.order_by("-id").first()
             log.warning(
-                "create_contract_run: No SOURCE run for %s, using %s",
+                "create_contract_run: Couldn't find an appropriate source run for %s, using %s",
                 course,
                 clone_course_run,
             )
@@ -175,7 +211,9 @@ def create_contract_run(
         ),
     )
     course_run.save()
-    clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)
+
+    if not skip_edx:
+        clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)
 
     log.debug(
         "Created run %s for course %s in contract %s from course run %s",
@@ -424,7 +462,7 @@ def _handle_unlimited_seats(
 ) -> tuple[int, int, int]:
     """Handle unlimited seat contracts by creating/updating one discount per product."""
     created = updated = errors = 0
-    discount_amount = contract.enrollment_fixed_price or 0
+    discount_amount = contract.enrollment_fixed_price or Decimal(0)
 
     if len(product_discounts) == 0:
         discount = _create_discount_with_product(
@@ -563,7 +601,10 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     """
     log.info("Checking enrollment codes for contract %s", contract)
 
-    if contract.integration_type == "sso" and not contract.enrollment_fixed_price:
+    if (
+        contract.integration_type in CONTRACT_MEMBERSHIP_AUTOS
+        or contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+    ) and not contract.enrollment_fixed_price:
         # SSO contracts w/out price don't need discounts.
         return _handle_sso_free_contract(contract)
 
@@ -729,19 +770,30 @@ def create_b2b_enrollment(request, product: Product):
 
 def reconcile_user_orgs(user, organizations):
     """
-    Reconcile the specified users with the provided organization list.
+    Reconcile the specified user with the provided organization list.
 
-    When we get a list of organizations from an authoritative source, we need to
-    be able to parse that list and make sure the user's org attachments match.
-    This will pull the contracts that the user belongs to that are also
-    SSO-enabled, and will remove the user from the contract if they're not
-    supposed to be in them. It will also add the user to any SSO-enabled contract
-    that the org has.
+    When we get a list of organizations from a source (so, in the user payload
+    from APISIX) for a particular user, we need to ensure that the user's
+    organization membership in MITx Online matches up with what we're given. In
+    addition, once we've done that, we need to ensure they're also in the
+    contracts that are marked as "managed". If the user is in an organization
+    that isn't in the list we've received, we need to remove them; in addition,
+    they should be removed from any "managed" contracts for the org they're in
+    as well.
 
-    This only considers contracts that are SSO-enabled and zero-cost. If the
-    contract is seat limited, we will only add the user if there's room.
-    (If there isn't, we will log an error.) Only SSO-enabled contracts are
-    considered; any that the user is in that aren't SSO-enabled will be left alone.
+    There is a special case where the user may be in an organization that isn't
+    represented in the payload we're given. This happens when the user uses an
+    enrollment code. We update the org membership here and in Keycloak, but the
+    payload from APISIX won't include their updated org membership until their
+    APISIX session expires. We have a flag on the many-to-many table that
+    indicates that we should leave those memberships alone - otherwise, we'll
+    inadvertently add them to the org and then immediately remove them. (Once
+    the org _does_ show up in the list, we should clear the flag.)
+
+    We cache the user's org membership in redis to save some hits to the
+    database. This gets hit on every authenticated request, so probably good to
+    try to keep the query count low. The cache is a list of tuples of (org_uuid,
+    not_expected_in_payload).
 
     If the user is enrolled in any courses that are in a contract they'll be
     removed from, they will be left there. Not real sure what we should do in
@@ -758,61 +810,70 @@ def reconcile_user_orgs(user, organizations):
     user_org_cache_key = f"org-membership-cache-{user.id}"
     cached_org_membership = caches["redis"].get(user_org_cache_key, False)
 
-    if cached_org_membership and sorted(cached_org_membership) == sorted(organizations):
-        log.info("reconcile_user_orgs: skipping reconcilation for %s", user.id)
-        return (
-            0,
-            0,
-        )
+    if cached_org_membership:
+        cached_expected_org_membership = [
+            str(org_id)
+            for org_id, not_expected_in_payload in cached_org_membership
+            if not_expected_in_payload
+        ]
+
+        if sorted(cached_expected_org_membership) == sorted(organizations):
+            log.info(
+                "reconcile_user_orgs: everything OK, skipping reconcilation for %s",
+                user.id,
+            )
+            return (
+                0,
+                0,
+            )
 
     log.info("reconcile_user_orgs: running reconcilation for %s", user.id)
 
-    user_contracts_qs = user.b2b_contracts.filter(
-        integration_type=CONTRACT_INTEGRATION_SSO
-    )
+    # we've checked the cached org membership, so now figure out what orgs
+    # we're in but aren't in the list, and vice versa
 
-    if len(organizations) == 0:
-        # User has no orgs, so we should clear them from all SSO contracts.
-        contracts_to_remove = user_contracts_qs.all()
-        [user.b2b_contracts.remove(contract) for contract in contracts_to_remove]
-        user.save()
-        return (0, len(contracts_to_remove))
+    orgs_to_add = OrganizationPage.objects.filter(
+        Q(sso_organization_id__in=organizations) & ~Q(organization_users__user=user)
+    ).filter(sso_organization_id__isnull=False)
 
-    orgs = OrganizationPage.objects.filter(sso_organization_id__in=organizations).all()
-    no_orgs = OrganizationPage.objects.exclude(
-        sso_organization_id__in=organizations
-    ).all()
+    orgs_to_remove = UserOrganization.objects.filter(
+        ~Q(organization__sso_organization_id__in=organizations)
+        & Q(user=user, keep_until_seen=False)
+    ).filter(organization__sso_organization_id__isnull=False)
 
-    contracts_to_remove = user_contracts_qs.filter(organization__in=no_orgs).all()
-
-    if contracts_to_remove.count() > 0:
-        [
-            user.b2b_contracts.remove(contract_to_remove)
-            for contract_to_remove in contracts_to_remove
-        ]
-
-    contracts_to_add = (
-        ContractPage.objects.filter(
-            integration_type=CONTRACT_INTEGRATION_SSO, organization__in=orgs
+    for add_org in orgs_to_add:
+        # add org, add contracts, clear flag if we need to
+        UserOrganization.objects.update_or_create(
+            user=user,
+            organization=add_org,
+            defaults={"keep_until_seen": False},
         )
-        .exclude(pk__in=user_contracts_qs.all().values_list("id", flat=True))
-        .all()
-    )
 
-    if contracts_to_add.count() > 0:
-        [
-            user.b2b_contracts.add(contract_to_add)
-            for contract_to_add in contracts_to_add
-        ]
+        add_org.add_user_contracts(user)
+        log.info("reconcile_user_orgs: added user %s to org %s", user.id, add_org)
 
-    user.save()
+    for remove_org in orgs_to_remove:
+        # remove org, remove contracts
+        remove_org.organization.remove_user_contracts(user)
+        log.info(
+            "reconcile_user_orgs: removed user %s from org %s", user.id, remove_org
+        )
+        remove_org.delete()
+
     user.refresh_from_db()
-    orgs = [str(org_id) for org_id in user.b2b_organization_sso_ids]
+    orgs = [
+        (str(org.organization.sso_organization_id), not org.keep_until_seen)
+        for org in user.user_organizations.all()
+    ]
+
+    user.user_organizations.filter(
+        organization__sso_organization_id__in=organizations, keep_until_seen=True
+    ).update(keep_until_seen=False)
 
     user_org_cache_key = f"org-membership-cache-{user.id}"
     caches["redis"].set(user_org_cache_key, sorted(orgs))
 
-    return (len(contracts_to_add), len(contracts_to_remove))
+    return (len(orgs_to_add), len(orgs_to_remove))
 
 
 def reconcile_single_keycloak_org(keycloak_org: OrganizationRepresentation):
@@ -892,3 +953,83 @@ def reconcile_keycloak_orgs():
             )
 
     return (created_count, updated_count)
+
+
+def add_user_org_membership(org, user):
+    """
+    Add a given user to a Keycloak organization.
+
+    If we're adding a user to a contract, and they're not in that contract's
+    organization, we need to do that and update Keycloak as well. Since the user
+    won't have the org in their user data list initially, we'll also need to
+    flag the membership so we don't remove it immediately later in the
+    middleware.
+
+    Args:
+    - org (OrganizationPage): The organization to add the user to.
+    - user (User): The user to add to the organization.
+    Returns:
+    - bool: True if the user was added, False otherwise.
+    """
+
+    org_model = get_keycloak_model(OrganizationRepresentation, "organizations")
+
+    kc_org = org_model.get(org.sso_organization_id)
+
+    if not kc_org:
+        log.warning("No Keycloak organization found for %s", org.sso_organization_id)
+        return False
+
+    return org_model.associate("members", org.sso_organization_id, user.global_id)
+
+
+def process_add_org_membership(user, organization, *, keep_until_seen=False):
+    """
+    Add a user to an org, and kick off contract processing.
+
+    This allows us to manage UserOrganization records without necessarily
+    being forced to process contract memberships at the same time.
+
+    Args:
+    - user (users.models.User): the user to add
+    - organization (b2b.models.OrganizationPage): the organization to add the user to
+    - keep_until_seen (bool): if True, the user will be kept in the org until the
+        organization is seen in their SSO data.
+    """
+
+    obj, created = UserOrganization.objects.get_or_create(
+        user=user,
+        organization=organization,
+    )
+    if created:
+        obj.keep_until_seen = keep_until_seen
+        obj.save()
+        try:
+            organization.attach_user(user)
+        except ConnectionError:
+            log.exception(
+                "Could not attach %s to Keycloak org for %s", user, organization
+            )
+        organization.add_user_contracts(user)
+
+    return obj
+
+
+def process_remove_org_membership(user, organization):
+    """
+    Remove a user from an org, and kick off contract processing.
+
+    Other side of the process_add_org_membership function - removes the membership
+    and associated managed contracts.
+
+    Args:
+    - user (users.models.User): the user to remove
+    - organization (b2b.models.OrganizationPage): the organization to remove the user from
+    """
+
+    organization.remove_user_contracts(user)
+
+    UserOrganization.objects.filter(
+        user=user,
+        organization=organization,
+    ).get().delete()
