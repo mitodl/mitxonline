@@ -160,7 +160,7 @@ class OrganizationPage(Page):
 
         return contracts_qs.count()
 
-    def remove_user_contracts(self, user):  # noqa: ARG002
+    def remove_user_contracts(self, user):
         """
         Remove managed contracts from the given user.
 
@@ -169,7 +169,11 @@ class OrganizationPage(Page):
         Returns:
         - int: number of contracts removed
         """
-        return 0
+
+        return user.b2b_contracts.through.objects.filter(
+            user_id=user.id,
+            contractpage_id__in=self.contracts.all().values_list("id", flat=True),
+        ).delete()
 
     def __str__(self):
         """Return a reasonable representation of the org as a string."""
