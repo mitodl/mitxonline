@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import ANY
 
 import pytest
 from django.utils.timezone import now
@@ -108,7 +109,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
     )
 
 
-def test_program_requirement_tree_serializer_valid():
+def test_program_requirement_tree_serializer_save():
     """Verify that the ProgramRequirementTreeSerializer validates data"""
     program = ProgramFactory.create()
     course1, course2, course3 = CourseFactory.create_batch(3)
@@ -141,6 +142,66 @@ def test_program_requirement_tree_serializer_valid():
     )
     serializer.is_valid(raise_exception=True)
     serializer.save()
+
+    root.refresh_from_db()
+    assert ProgramRequirementTreeSerializer(instance=root).data == [
+        {
+            "data": {
+                "node_type": "program_root",
+                "operator": None,
+                "operator_value": None,
+                "program": program.id,
+                "course": None,
+                "required_program": None,
+                "title": "",
+                "elective_flag": False,
+            },
+            "id": ANY,
+            "children": [
+                {
+                    "data": {
+                        "node_type": "operator",
+                        "operator": "all_of",
+                        "operator_value": None,
+                        "program": program.id,
+                        "course": None,
+                        "required_program": None,
+                        "title": "Required Courses",
+                        "elective_flag": False,
+                    },
+                    "id": ANY,
+                    "children": [
+                        {
+                            "data": {
+                                "node_type": "course",
+                                "operator": None,
+                                "operator_value": None,
+                                "program": program.id,
+                                "course": course1.id,
+                                "required_program": None,
+                                "title": None,
+                                "elective_flag": False,
+                            },
+                            "id": ANY,
+                        }
+                    ],
+                },
+                {
+                    "data": {
+                        "node_type": "operator",
+                        "operator": "min_number_of",
+                        "operator_value": "1",
+                        "program": program.id,
+                        "course": None,
+                        "required_program": None,
+                        "title": "Elective Courses",
+                        "elective_flag": False,
+                    },
+                    "id": ANY,
+                },
+            ],
+        }
+    ]
 
 
 def test_program_requirement_deletion():

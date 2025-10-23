@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 
+from ecommerce.constants import ALL_DISCOUNT_TYPES
 from ecommerce.discounts import (
     DiscountType,
     DollarsOffDiscount,
@@ -85,14 +86,17 @@ def test_discount_factory_adjustment(discounts, products):
             )
 
 
-def test_discounted_price(products):
+@pytest.mark.parametrize("discount_type", ALL_DISCOUNT_TYPES)
+def test_discounted_price(products, discount_type):
     """
     Tests the get_discounted_price call with some products to make sure the
     discount is applied successfully.
     """
     product = products[random.randrange(0, len(products), 1)]  # noqa: S311
 
-    applied_discounts = [UnlimitedUseDiscountFactory.create()]
+    applied_discounts = [
+        UnlimitedUseDiscountFactory.create(discount_type=discount_type)
+    ]
 
     manually_discounted_prices = DiscountType.for_discount(
         applied_discounts[0]

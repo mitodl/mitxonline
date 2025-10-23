@@ -25,6 +25,7 @@ from courses.models import (
     PartnerSchool,
     Program,
     ProgramCertificate,
+    ProgramCollectionItem,
     ProgramEnrollment,
     ProgramEnrollmentAudit,
     ProgramRun,
@@ -33,6 +34,13 @@ from courses.models import (
 from main.admin import AuditableModelAdmin, ModelAdminRunActionsForAllMixin
 from main.utils import get_field_names
 from openedx.tasks import retry_failed_edx_enrollments
+
+
+class ProgramContractPageInline(admin.TabularInline):
+    """Inline for contract pages"""
+
+    model = Program.contracts.through
+    extra = 0
 
 
 @admin.register(Program)
@@ -44,6 +52,7 @@ class ProgramAdmin(admin.ModelAdmin):
     search_fields = ["title", "readable_id", "program_type"]
     list_display = ("id", "title", "live", "readable_id", "program_type")
     list_filter = ["live", "program_type", "departments"]
+    inlines = [ProgramContractPageInline]
 
 
 @admin.register(ProgramRun)
@@ -563,4 +572,11 @@ class RelatedProgramAdmin(admin.ModelAdmin):
     list_filter = ["first_program", "second_program"]
 
 
-# ProgramCollection is now a Page, managed through Wagtail admin
+@admin.register(ProgramCollectionItem)
+class ProgramCollectionItemAdmin(admin.ModelAdmin):
+    """Admin for ProgramCollectionItem"""
+
+    model = ProgramCollectionItem
+    list_display = ("id", "collection", "program", "sort_order")
+    list_filter = ["collection"]
+    ordering = ("collection", "sort_order")

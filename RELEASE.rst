@@ -1,6 +1,35 @@
 Release Notes
 =============
 
+Version 0.131.8 (Released October 23, 2025)
+---------------
+
+- Fix login so it preserves the next url (#3026)
+
+Version 0.131.7 (Released October 21, 2025)
+---------------
+
+- fix(deps): update dependency mini-css-extract-plugin to v2.9.4 (#3020)
+- fix(deps): update dependency bootstrap to v5.3.8 (#3019)
+- Add backfill of user organizations (#3022)
+- chore(deps): update redis docker tag to v7.4.6 (#3018)
+- Fix conflicting migrations (bump numbers) (#3021)
+- Order program collection programs (#3007)
+- fix(deps): update dependency @pankod/refine-simple-rest to v3.39.0 (#2398)
+
+Version 0.131.6 (Released October 20, 2025)
+---------------
+
+- B2B: Update Keycloak org membership when a user redeems an enrollment code (#2989)
+- Change v2 req_tree to not return root node, improve OpenAPI spec (#3010)
+- Add ability to manage the link between programs and contracts (#3006)
+
+Version 0.131.4 (Released October 16, 2025)
+---------------
+
+- Add functionality to verify course modes exist when cloning a course run (#2993)
+- fix(deps): update dependency @sentry/browser to v10 (#2656)
+
 Version 0.131.3 (Released October 15, 2025)
 ---------------
 

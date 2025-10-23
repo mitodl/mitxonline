@@ -114,7 +114,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return (
             Program.objects.filter()
-            .select_related("page")
+            .select_related("page", "page__feature_image")
             .prefetch_related(
                 Prefetch("departments", queryset=Department.objects.only("id", "name")),
                 Prefetch(
@@ -144,7 +144,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
                     ),
                 ),
                 Prefetch(
-                    "programcollection_set",
+                    "collection_memberships__collection",
                     queryset=ProgramCollection.objects.only("id", "title"),
                 ),
             )
@@ -345,10 +345,13 @@ class ProgramCollectionViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """
         Returns all ProgramCollection objects ordered by title.
+        Prefetches collection_items and related programs for efficient serialization.
         """
         return (
             ProgramCollection.objects.select_related()
-            .prefetch_related("programs")
+            .prefetch_related(
+                "collection_items__program", "collection_items__program__departments"
+            )
             .order_by("title")
         )
 

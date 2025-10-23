@@ -41,7 +41,7 @@ services:
       - ./config/db:/docker-entrypoint-initdb.d
 
   redis:
-    image: redis:7.4.3
+    image: redis:7.4.6
     ports:
       - "6379"
 
