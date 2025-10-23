@@ -771,6 +771,8 @@ def test_reconcile_keycloak_org_without_description():
     assert created_update is False
     assert page_updated.description == ""
     page_updated.save()  # Should not raise IntegrityError
+
+
 def test_user_add_b2b_org(mocked_b2b_org_attach):
     """Ensure adding a user to an organization works as expected."""
 
