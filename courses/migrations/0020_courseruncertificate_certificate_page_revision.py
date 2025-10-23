@@ -35,6 +35,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("wagtailcore", "0070_rename_pagerevision_revision"),
         ("courses", "0019_add_is_self_paced_course_run"),
+        ("cms", "__first__"),
     ]
 
     operations = [
