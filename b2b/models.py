@@ -375,12 +375,16 @@ class ContractPage(Page):
 
         from b2b.api import create_contract_run
 
-        managed = 0
-        skipped = 0
-
         # Clear any cached properties to ensure fresh data
         if hasattr(program, "_courses_with_requirements_data"):
             delattr(program, "_courses_with_requirements_data")
+
+        managed = 0
+        skipped_run_creation = 0
+        no_source = program.courses_qset.exclude(
+            models.Q(courseruns__is_source_run=True)
+            | models.Q(courseruns__run_tag="SOURCE")
+        ).count()
 
         for course in program.courses_qset.filter(
             models.Q(courseruns__is_source_run=True)
@@ -390,11 +394,11 @@ class ContractPage(Page):
                 create_contract_run(self, course)
                 managed += 1
             except TargetCourseRunExistsError:  # noqa: PERF203
-                skipped += 1
+                skipped_run_creation += 1
 
         self.programs.add(program)
 
-        return (managed, skipped)
+        return (managed, skipped_run_creation, no_source)
 
     class Meta:
         """Meta options for the ContractPage."""

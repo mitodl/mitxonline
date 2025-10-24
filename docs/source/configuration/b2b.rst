@@ -14,6 +14,7 @@ The management commands you will need to use are:
 
 * ``b2b_contracts`` - manages organizations and contracts
 * ``b2b_list`` - lists data about B2B resources
+* ``b2b_courseware`` - manages courseware assignments to contracts
 
 Quick Setup
 -----------
@@ -27,13 +28,18 @@ This is how UAI contracts that have SSO integration with the host organization a
 
 
 #. Create a contract with a new organization:
-   ``b2b_contract create UniversityX "UniversityX Contract" sso --description "Test uncapped SSO contract"``
+   ``b2b_contract create "University X" "Contract Name" sso --description "Test uncapped SSO contract"``
+
+   - if organization does not yet exist, add ``--create`` and ``--org-key <org key>`` to set the organization key
 #. List the details about your new organization:
    ``b2b_list organizations``
 #. List the details about your new contract: *(You'll need the ID from the output for the next step.)*
    ``b2b_list contracts``
-#. Add the course to the contract. This will also create a course run for the course:
-   ``b2b_contract courseware <contract ID> <course readable ID>``
+#. Add courseware (course or program) to the contract. This will also create a course run for the course:
+   ``b2b_courseware add <contract ID> <courseware readable ID>``
+
+   - Courses must have a *source run* in order to create contract-specific runs; see the "Courseware Setup in edX" section below for more details.
+   - Program readable_ids must begin with ``program-v1``.
 #. List the details about the contract's courseware:
    ``b2b_list courseware --contract <contract ID>``
 
@@ -52,7 +58,7 @@ This is how a B2B contract would be set up typically.
 #. List the details about your new contract: *(You'll need the ID from the output for the next step.)*
    ``b2b_list contracts``
 #. Add the course to the contract. This will also create a course run for the course:
-   ``b2b_contract courseware <contract ID> <course readable ID>``
+   ``b2b_courseware add <contract ID> <course readable ID>``
 #. List the details about the contract's courseware:
    ``b2b_list courseware --contract <contract ID>``
 #. Get the enrollment codes for the contract:
@@ -183,9 +189,10 @@ Courseware Setup in edX
 
 B2B courses in edX should be set up in a particular fashion, both to make sure we can identify them within edX easily, and to allow the system to automatically create runs for new contracts.
 
-Each B2B course starts with a source course. Usually, these are separate courses and runs, but not always. If you're creating a new course, it should be created in edX with the organization ``UAI_SOURCE`` and the run tag ``SOURCE``. A corresponding course run in MITx Online should also be created. The ``import_courserun`` command can be used to help facilitate this. If you want to use an existing course, you should create a ``SOURCE`` run for it from the run you want to use as the source course in edX.
+Each B2B course starts with a source course. Usually, these are separate courses and runs, but not always. If you're creating a new course, it should be created in edX with the organization ``UAI_SOURCE`` and the run tag ``SOURCE``. A corresponding course run in MITx Online should also be created. The ``import_courserun`` command can be used to help facilitate this. If you want to use an existing course, you should create a ``SOURCE`` run for it from the run you want to use as the source course in edX. Alternatively, an existing run can be flagged as the source run in Django Admin via the ``is_source_run`` flag.
 
-When associating a course or program with a contract, the ``b2b_contract courseware`` command will try to create a contract-specific run for each source course (either the one you've specified or the ones that are in the specified program). It does this by trying to find an appropriate source course run for the course in MITx Online. It will look first for a course run with the run tag ``SOURCE`` - if it can't find this, it will use whatever the first course run is in database order. **This is probably not what you want** - you should try to have a ``SOURCE`` course run if at all possible.
+When associating a course or program with a contract, the ``b2b_contract courseware`` command will try to create a contract-specific run for each source course (either the one you've specified or the ones that are in the specified program).
+
 
 Course runs will be created using the start/end date of the contract, if those dates are set. If the contract is open-ended, the runs will be created with the current time/date as the course and enrollment start date and no end date. The runs will be created with the organization set to ``UAI_`` and the organization key set in the org record, and the run key will be set to the current year, ``C``, and the ID of the new contract.
 

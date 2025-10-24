@@ -147,7 +147,15 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     )
                 )
 
-                prog_add, prog_skip = contract.add_program_courses(courseware)
+                prog_add, prog_skip, prog_no_source = contract.add_program_courses(
+                    courseware
+                )
+                if prog_no_source > 0:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Program '{courseware.readable_id}' has {prog_no_source} courses with no source runs; cannot create contract runs for these courses."
+                        )
+                    )
                 contract.save()
                 managed += prog_add
                 skipped += prog_skip
