@@ -10,6 +10,7 @@ from django.http import Http404
 from django.utils.text import slugify
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
+from requests.exceptions import HTTPError
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page
@@ -115,7 +116,7 @@ class OrganizationPage(Page):
         return (
             get_user_model()
             .objects.filter(
-                b2b_contracts__organization=self,
+                b2b_organizations=self,
             )
             .distinct()
         )
@@ -132,7 +133,13 @@ class OrganizationPage(Page):
 
         from b2b.api import add_user_org_membership
 
-        return add_user_org_membership(self, user)
+        try:
+            return add_user_org_membership(self, user)
+        except HTTPError:
+            log.exception(
+                "Got HTTP error attempting to attach %s to org %s, skipping", user, self
+            )
+            return False
 
     def add_user_contracts(self, user):
         """
