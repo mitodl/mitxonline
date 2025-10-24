@@ -137,3 +137,52 @@ def test_remove_user_contracts_only_affects_specified_user():
     assert user2.b2b_contracts.count() == 2
     assert user2.b2b_contracts.filter(id=contract1.id).exists()
     assert user2.b2b_contracts.filter(id=contract2.id).exists()
+
+
+def test_remove_user_contracts_only_removes_managed_contracts():
+    """Test that remove_user_contracts only removes automatically managed contracts."""
+
+    # Create an organization with both managed and non-managed contracts
+    organization = OrganizationPageFactory.create()
+
+    # Automatically managed contracts (should be removed)
+    auto_contract = ContractPageFactory.create(
+        organization=organization,
+        membership_type="auto",
+        integration_type="auto",
+    )
+    managed_contract = ContractPageFactory.create(
+        organization=organization,
+        membership_type="managed",
+        integration_type="managed",
+    )
+    sso_contract = ContractPageFactory.create(
+        organization=organization,
+        membership_type="sso",
+        integration_type="sso",
+    )
+
+    # Non-managed contract (should NOT be removed)
+    code_contract = ContractPageFactory.create(
+        organization=organization,
+        membership_type="code",
+        integration_type="code",
+    )
+
+    # Create a user and add all contracts
+    user = UserFactory.create()
+    user.b2b_contracts.add(auto_contract, managed_contract, sso_contract, code_contract)
+
+    # Verify user has all 4 contracts
+    assert user.b2b_contracts.count() == 4
+
+    # Remove managed contracts from user
+    organization.remove_user_contracts(user)
+
+    # Verify only managed contracts are removed, code contract remains
+    user.refresh_from_db()
+    assert user.b2b_contracts.count() == 1
+    assert not user.b2b_contracts.filter(id=auto_contract.id).exists()
+    assert not user.b2b_contracts.filter(id=managed_contract.id).exists()
+    assert not user.b2b_contracts.filter(id=sso_contract.id).exists()
+    assert user.b2b_contracts.filter(id=code_contract.id).exists()
