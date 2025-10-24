@@ -1085,6 +1085,14 @@ def enroll_in_edx_course_runs(
                             force_enrollment=force_enrollment,
                         )
                         results.append(enrollment)
+                    else:
+                        raise UnknownEdxApiEnrollException(  # noqa: TRY301
+                            user,
+                            course_run,
+                            Exception(
+                                f"Failed to repair OpenEdX user {user.edx_username}"
+                            ),
+                        )
                 except Exception as exc:
                     log.exception("Failed to create user %s in edX.", user.edx_username)
                     raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
