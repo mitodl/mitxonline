@@ -238,6 +238,7 @@ def test_get_dated_courseruns():
     enrollable_course = CourseFactory.create()
     unenrollable_course = CourseFactory.create()
     self_paced_course = CourseFactory.create()
+    instructor_paced_course = CourseFactory.create()
     enrollable_courserun = CourseRunFactory.create(
         course=enrollable_course,
         live=True,
@@ -260,7 +261,16 @@ def test_get_dated_courseruns():
         enrollment_start=past_date,
         enrollment_end=future_date,
     )
+    # This a "dated" course run, but has missing enrollment end date
+    instructor_paced_course_run = CourseRunFactory.create(
+        course=instructor_paced_course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=None,
+    )
     dated_courseruns = get_dated_courseruns(CourseRun.objects.all())
     assert enrollable_courserun in dated_courseruns
     assert unenrollable_courserun not in dated_courseruns
     assert self_paced_courserun not in dated_courseruns
+    assert instructor_paced_course_run in dated_courseruns

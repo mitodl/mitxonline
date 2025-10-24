@@ -156,15 +156,11 @@ def get_archived_courseruns(queryset):
 def get_dated_courseruns(queryset):
     """
     Returns course runs that are dated meaning they are
+    - Enrollable (see get_enrollable_filter for more details)
     - Not self-paced
-    - Have a start date
-    - End date can be dated and greater than now or null
-    - Enrollable (enrollment start is in the past and enrollment end is in the future or null)
     """
     return queryset.filter(
-        CourseRunQuerySet.get_enrollable_filter()
-        & Q(is_self_paced=False)
-        & Q(enrollment_end__isnull=False)
+        CourseRunQuerySet.get_enrollable_filter() & Q(is_self_paced=False)
     )
 
 
