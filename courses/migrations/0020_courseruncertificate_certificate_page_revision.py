@@ -8,10 +8,11 @@ def set_current_certificate_revision(apps, schema_editor):
     """
     Fetch all CourseRunCertificates and update certificate_page_revision to latest revision
     """
-    from cms.models import CertificatePage
-    from courses.models import CourseRunCertificate
-
-    course_run_certificates = CourseRunCertificate.objects.all()
+    CourseRunCertificate = apps.get_model("courses", "CourseRunCertificate")
+    CertificatePage = apps.get_model("cms", "CertificatePage")
+    course_run_certificates = CourseRunCertificate.objects.only(
+        "id", "course_run", "certificate_page_revision"
+    ).all()
     for cert in course_run_certificates:
         certificate_page = (
             cert.course_run.course.page.get_children()
@@ -34,6 +35,10 @@ class Migration(migrations.Migration):
     dependencies = [
         ("wagtailcore", "0070_rename_pagerevision_revision"),
         ("courses", "0019_add_is_self_paced_course_run"),
+        (
+            "cms",
+            "0023_certificateindexpage_certificatepage_signatoryindexpage_signatorypage",
+        ),
     ]
 
     operations = [
