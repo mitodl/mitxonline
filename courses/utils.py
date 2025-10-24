@@ -160,8 +160,7 @@ def get_dated_courseruns(queryset):
     - Not self-paced
     """
     return queryset.filter(
-        CourseRunQuerySet.get_enrollable_filter()
-        & Q(is_self_paced=False)
+        CourseRunQuerySet.get_enrollable_filter() & Q(is_self_paced=False)
     )
 
 
