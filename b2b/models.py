@@ -152,7 +152,7 @@ class OrganizationPage(Page):
 
         return contracts_qs.count()
 
-    def remove_user_contracts(self, user):
+    def remove_user_contracts(self, user):  # noqa: ARG002
         """
         Remove managed contracts from the given user.
 
