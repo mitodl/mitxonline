@@ -53,7 +53,7 @@
     "express": "4.21.2",
     "fetch-mock": "5.13.1",
     "flow": "0.2.3",
-    "flow-bin": "0.95.1",
+    "flow-bin": "0.289.0",
     "flow-typed": "3.9.0",
     "focus-formik-error": "^1.1.0",
     "formik": "^2.4.5",
