@@ -2843,14 +2843,14 @@ files = [
 
 [[package]]
 name = "mitol-django-apigateway"
-version = "2025.8.7"
+version = "2025.8.14"
 description = "MIT Open Learning Django app for API Gateway support"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol_django_apigateway-2025.8.7-py3-none-any.whl", hash = "sha256:7c71017b7e92bac70a0fca000e55dfcdcb471ba9b826248ebaaa48db506a59bf"},
-    {file = "mitol_django_apigateway-2025.8.7.tar.gz", hash = "sha256:9b69849755514a5a02d66388f5d7b00795f97f6b3620c1560d4831a02e846d45"},
+    {file = "mitol_django_apigateway-2025.8.14-py3-none-any.whl", hash = "sha256:858ea8aa6e6f345ef80ececf9ec374689ab1ef2024d40ab30f0c33ecfa7158f9"},
+    {file = "mitol_django_apigateway-2025.8.14.tar.gz", hash = "sha256:f4c6476b4fca2614d4f9d956e3470b7f0facb76a181030cbc5f397264b48c84f"},
 ]
 
 [package.dependencies]
@@ -6035,4 +6035,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "fc9eee23bbc6e1b93c94dda33c51f89b906c7fbc691015862f59cd8ce58b0afc"
+content-hash = "950b8fc7739f94c172e1b326133e2a27ac751c9e647688d5c1754c998853b417"
