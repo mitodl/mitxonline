@@ -75,7 +75,11 @@ def user_has_org_access(user, org_id):
     )
 
 
+class IdInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
+    pass
+
 class ProgramFilterSet(django_filters.FilterSet):
+    id = IdInFilter(field_name="id", lookup_expr="in", label="Program ID")
     org_id = django_filters.NumberFilter(method="filter_by_org_id")
 
     class Meta:

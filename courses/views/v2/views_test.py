@@ -674,6 +674,52 @@ def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     assert data["id"] == b2b_program.id
 
 
+def test_program_filter_multiple_ids(user_drf_client):
+    """Test that filtering programs by multiple IDs works as expected."""
+    # Create several programs
+    program1 = ProgramFactory.create(title="Program 1")
+    program2 = ProgramFactory.create(title="Program 2")
+    program3 = ProgramFactory.create(title="Program 3")
+    program4 = ProgramFactory.create(title="Program 4")
+
+    # Test fetching multiple programs by IDs
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-list"),
+        data={"id": f"{program1.id},{program3.id},{program4.id}"}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["count"] == 3
+    
+    # Extract IDs from response
+    returned_ids = [result["id"] for result in data["results"]]
+    
+    # Verify that only the requested programs are returned
+    assert program1.id in returned_ids
+    assert program2.id not in returned_ids
+    assert program3.id in returned_ids
+    assert program4.id in returned_ids
+
+    # Test with single ID (should still work)
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-list"),
+        data={"id": str(program2.id)}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["count"] == 1
+    assert data["results"][0]["id"] == program2.id
+
+    # Test with non-existent ID
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-list"),
+        data={"id": "99999"}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["count"] == 0
+
+
 def test_get_course_certificate():
     """
     Test that the get_course_certificate handles valid, invalid, and not-found
