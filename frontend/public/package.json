@@ -118,7 +118,7 @@
     "style-loader": "3.3.4",
     "styled-components": "4.4.1",
     "url-join": "4.0.1",
-    "validator": "13.7.0",
+    "validator": "13.15.20",
     "video.js": "7.21.7",
     "videojs-youtube": "2.6.1",
     "waait": "1.0.5",
