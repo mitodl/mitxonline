@@ -685,15 +685,15 @@ def test_program_filter_multiple_ids(user_drf_client):
     # Test fetching multiple programs by IDs
     resp = user_drf_client.get(
         reverse("v2:programs_api-list"),
-        data={"id": f"{program1.id},{program3.id},{program4.id}"}
+        data={"id": f"{program1.id},{program3.id},{program4.id}"},
     )
     assert resp.status_code == status.HTTP_200_OK
     data = resp.json()
     assert data["count"] == 3
-    
+
     # Extract IDs from response
     returned_ids = [result["id"] for result in data["results"]]
-    
+
     # Verify that only the requested programs are returned
     assert program1.id in returned_ids
     assert program2.id not in returned_ids
@@ -702,8 +702,7 @@ def test_program_filter_multiple_ids(user_drf_client):
 
     # Test with single ID (should still work)
     resp = user_drf_client.get(
-        reverse("v2:programs_api-list"),
-        data={"id": str(program2.id)}
+        reverse("v2:programs_api-list"), data={"id": str(program2.id)}
     )
     assert resp.status_code == status.HTTP_200_OK
     data = resp.json()
@@ -711,10 +710,7 @@ def test_program_filter_multiple_ids(user_drf_client):
     assert data["results"][0]["id"] == program2.id
 
     # Test with non-existent ID
-    resp = user_drf_client.get(
-        reverse("v2:programs_api-list"),
-        data={"id": "99999"}
-    )
+    resp = user_drf_client.get(reverse("v2:programs_api-list"), data={"id": "99999"})
     assert resp.status_code == status.HTTP_200_OK
     data = resp.json()
     assert data["count"] == 0
