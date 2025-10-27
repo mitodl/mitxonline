@@ -80,12 +80,6 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
         """Applies a filter for Course runs with live=True"""
         return self.filter(live=True, b2b_contract__isnull=True)
 
-    def available(self):
-        """Applies a filter for Course runs with end_date in future"""
-        return self.filter(
-            models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
-        ).filter(b2b_contract__isnull=True)
-
     def enrollable(self, enrollment_end_date=None):
         """
         Applies a filter for Course runs that are open for enrollment.
@@ -130,7 +124,7 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
             enrollment_end_date = now
 
         return (
-            # Check if enrollment period is still open
+            # Check if enrollment has not ended
             (
                 models.Q(enrollment_end__isnull=True)
                 | models.Q(enrollment_end__gt=enrollment_end_date)
@@ -1286,6 +1280,7 @@ class BaseCertificate(models.Model):
         help_text="Indicates whether or not the certificate is revoked",
         verbose_name="revoked",
     )
+    issue_date = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         abstract = True

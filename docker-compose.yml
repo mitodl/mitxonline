@@ -31,7 +31,7 @@ x-extra-hosts:
 
 services:
   db:
-    image: postgres:15.10
+    image: postgres:15.14
     ports:
       - "5432"
     environment:
