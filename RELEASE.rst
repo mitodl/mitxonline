@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.132.1
+---------------
+
+- Should return Dated course runs correctly (#3038)
+- chore(deps): update postgres docker tag to v15.14 (#3046)
+- chore(deps): update nginx docker tag to v1.29 (#3045)
+- chore(deps): update dependency ruff to ^0.14 (#3044)
+- fix(deps): update dependency mitol-django-apigateway to v2025.8.14 (#3041)
+- Fix OrganizationPage slug regeneration on name changes (#3002)
+- Fix IntegrityError when syncing Keycloak organizations without descriptions (#3013)
+- Adding issue date to CertificateBase (#3025)
+
 Version 0.132.0 (Released October 27, 2025)
 ---------------
 
