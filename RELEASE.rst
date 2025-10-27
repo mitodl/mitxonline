@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.132.1
+Version 0.132.1 (Released October 27, 2025)
 ---------------
 
 - Should return Dated course runs correctly (#3038)
