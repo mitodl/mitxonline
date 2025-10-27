@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.132.0
+Version 0.132.0 (Released October 27, 2025)
 ---------------
 
 - Skip tests broken due to expedited hotfix (#3036)
