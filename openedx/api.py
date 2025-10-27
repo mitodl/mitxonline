@@ -1047,6 +1047,18 @@ def enroll_in_edx_course_runs(
 
     username = user.edx_username
 
+    try:
+        created_user, _ = repair_faulty_edx_user(user)
+        if created_user is False:
+            raise OpenEdxUserMissingError(
+                f"User {user.edx_username} does not exist in OpenEdX and could not be created"
+            )
+    except Exception as exc:
+        log.exception("Failed to verify/create user %s in edX.", user.edx_username)
+        raise OpenEdxUserMissingError(
+            f"Failed to verify/create user {user.edx_username} in OpenEdX"
+        ) from exc
+
     results = []
     for course_run in course_runs:
         try:
@@ -1069,39 +1081,13 @@ def enroll_in_edx_course_runs(
                     )
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
-            if exc.response.status_code == 406:  # noqa: PLR2004
-                log.warning(
-                    "User %s does not exist in edX, attempting to create user.",
-                    user.edx_username,
-                )
-                # If the user doesn't exist, we need to create them first
-                try:
-                    created_user, _ = repair_faulty_edx_user(user)
-                    if created_user:
-                        enrollment = edx_client.enrollments.create_student_enrollment(
-                            course_run.courseware_id,
-                            mode=mode,
-                            username=username,
-                            force_enrollment=force_enrollment,
-                        )
-                        results.append(enrollment)
-                    else:
-                        raise UnknownEdxApiEnrollException(  # noqa: TRY301
-                            user,
-                            course_run,
-                            Exception(f"Failed to repair OpenEdX user {user.edx_username}"),  # noqa: TRY002
-                        )
-                except Exception as exc:
-                    log.exception("Failed to create user %s in edX.", user.edx_username)
-                    raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
-            else:
-                log.exception(
-                    "Failed to enroll user %s in course run %s with mode %s.",
-                    user.edx_username,
-                    course_run.courseware_id,
-                    mode,
-                )
-                raise EdxApiEnrollErrorException(user, course_run, exc) from exc
+            log.exception(
+                "Failed to enroll user %s in course run %s with mode %s.",
+                user.edx_username,
+                course_run.courseware_id,
+                mode,
+            )
+            raise EdxApiEnrollErrorException(user, course_run, exc) from exc
         except Exception as exc:  # pylint: disable=broad-except
             raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
     return results
