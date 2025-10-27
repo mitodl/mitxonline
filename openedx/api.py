@@ -1050,14 +1050,12 @@ def enroll_in_edx_course_runs(
     try:
         created_user, _ = repair_faulty_edx_user(user)
         if created_user is False:
-            raise OpenEdxUserMissingError(
-                f"User {user.edx_username} does not exist in OpenEdX and could not be created"
-            )
+            msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
+            raise OpenEdxUserMissingError(msg)  # noqa: TRY301
     except Exception as exc:
         log.exception("Failed to verify/create user %s in edX.", user.edx_username)
-        raise OpenEdxUserMissingError(
-            f"Failed to verify/create user {user.edx_username} in OpenEdX"
-        ) from exc
+        msg = f"Failed to verify/create user {user.edx_username} in OpenEdX"
+        raise OpenEdxUserMissingError(msg) from exc
 
     results = []
     for course_run in course_runs:
