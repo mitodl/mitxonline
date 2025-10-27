@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.132.0 (Released October 27, 2025)
+---------------
+
+- Skip tests broken due to expedited hotfix (#3036)
+- Don't remove users from contracts for now (#3033)
+- Removing First and Last name (#2997)
+
 Version 0.131.9 (Released October 23, 2025)
 ---------------
 
