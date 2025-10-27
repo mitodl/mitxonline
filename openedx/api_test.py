@@ -654,6 +654,7 @@ def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
     )
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
+    mocker.patch("openedx.api.repair_faulty_edx_user", return_value=(None, None))
     course_runs = CourseRunFactory.build_batch(2)
 
     # Test to make sure reconcile_edx_username runs as expected.
@@ -696,6 +697,7 @@ def test_enroll_api_fail(mocker, user):
     )
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
+    mocker.patch("openedx.api.repair_faulty_edx_user", return_value=(None, None))
     course_run = CourseRunFactory.build()
 
     with pytest.raises(EdxApiEnrollErrorException):
@@ -713,6 +715,7 @@ def test_enroll_pro_unknown_fail(settings, mocker, user):
         side_effect=ValueError("Unexpected error")
     )
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mocker.patch("openedx.api.repair_faulty_edx_user", return_value=(None, None))
     course_run = CourseRunFactory.build()
 
     with pytest.raises(UnknownEdxApiEnrollException):
