@@ -26,7 +26,7 @@ def sync_courseruns_data():
 
     now = now_in_utc()
     runs = (
-        CourseRun.objects.live()
+        CourseRun.objects.live(include_b2b=True)
         .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gt=now))
         .exclude(run_tag__startswith="fake-")
     )

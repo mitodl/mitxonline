@@ -1935,18 +1935,48 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
         )
 
 
-def test_get_certificate_grade_eligible_runs():
+@pytest.mark.parametrize(
+    "has_live",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    (
+        "has_b2b",
+        "has_b2b_live",
+    ),
+    [
+        (True, False),
+        (True, True),
+        (False, False),
+    ],
+)
+def test_get_certificate_grade_eligible_runs(has_live, has_b2b, has_b2b_live):
     """Test that the eligible run call returns B2B courses as well as regular ones."""
 
-    b2b_contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(certificate_available_date=None, live=has_live)
 
-    run = CourseRunFactory.create(certificate_available_date=None)
-    b2b_run = CourseRunFactory.create(
-        certificate_available_date=None, b2b_contract=b2b_contract
-    )
+    if has_b2b:
+        b2b_contract = ContractPageFactory.create()
+        b2b_run = CourseRunFactory.create(
+            certificate_available_date=None,
+            b2b_contract=b2b_contract,
+            live=has_b2b_live,
+        )
 
     eligible_courses = get_certificate_grade_eligible_runs(now=now_in_utc())
 
-    assert len(eligible_courses) == 2
-    assert run in eligible_courses
-    assert b2b_run in eligible_courses
+    if has_live and has_b2b and has_b2b_live:
+        assert eligible_courses.count() == 2
+        assert run in eligible_courses
+        assert b2b_run in eligible_courses
+    elif has_live and ((has_b2b and not has_b2b_live) or not has_b2b):
+        assert eligible_courses.count() == 1
+        assert run in eligible_courses
+    elif has_b2b and has_b2b_live and not has_live:
+        assert eligible_courses.count() == 1
+        assert b2b_run in eligible_courses
+    else:
+        assert eligible_courses.count() == 0

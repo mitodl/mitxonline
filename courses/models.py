@@ -84,11 +84,8 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
     def live(self, *, include_b2b=False):
         """Applies a filter for Course runs with live=True"""
 
-        return (
-            self.filter(live=True)
-            if include_b2b
-            else self.exclude_b2b().filter(live=True)
-        )
+        queryset = self.filter(live=True)
+        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
 
     def available(self, *, include_b2b=False):
         """Applies a filter for Course runs with end_date in future"""
@@ -97,7 +94,7 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
 
         if include_b2b:
             return self.filter(q_filter)
-        return self.exclude_b2b().filter(q_filter)
+        return self.filter(b2b_contract__isnull=True).filter(q_filter)
 
     def enrollable(self, enrollment_end_date=None):
         """

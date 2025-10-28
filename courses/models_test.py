@@ -1082,3 +1082,5 @@ def test_courserun_qs_b2b_flags():
     assert CourseRun.objects.live(include_b2b=True).count() == 6
     assert CourseRun.objects.available().count() == 3
     assert CourseRun.objects.available(include_b2b=True).count() == 6
+    assert CourseRun.objects.count() == 6
+    assert CourseRun.objects.exclude_b2b().count() == 3
