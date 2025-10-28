@@ -75,12 +75,12 @@ def user_has_org_access(user, org_id):
     )
 
 
-class IdInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
+class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
     pass
 
 
 class ProgramFilterSet(django_filters.FilterSet):
-    id = IdInFilter(field_name="id", lookup_expr="in", label="Program ID")
+    id = NumberInFilter(field_name="id", lookup_expr="in", label="Program ID")
     org_id = django_filters.NumberFilter(method="filter_by_org_id")
 
     class Meta:
@@ -175,7 +175,7 @@ class CourseFilterSet(django_filters.FilterSet):
         label="Course Run Is Enrollable",
         field_name="courserun_is_enrollable",
     )
-    id = IdInFilter(field_name="id", lookup_expr="in", label="Course ID")
+    id = NumberInFilter(field_name="id", lookup_expr="in", label="Course ID")
     org_id = django_filters.NumberFilter(
         method="filter_org_id",
         label="Only show courses belonging to this B2B/UAI organization",
