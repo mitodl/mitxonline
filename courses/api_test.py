@@ -31,6 +31,7 @@ from courses.api import (
     defer_enrollment,
     generate_course_run_certificates,
     generate_program_certificate,
+    get_certificate_grade_eligible_runs,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
@@ -1932,3 +1933,50 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
             expiration_datetime=str(run.upgrade_deadline),
             min_price=10,
         )
+
+
+@pytest.mark.parametrize(
+    "has_live",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    (
+        "has_b2b",
+        "has_b2b_live",
+    ),
+    [
+        (True, False),
+        (True, True),
+        (False, False),
+    ],
+)
+def test_get_certificate_grade_eligible_runs(has_live, has_b2b, has_b2b_live):
+    """Test that the eligible run call returns B2B courses as well as regular ones."""
+
+    run = CourseRunFactory.create(certificate_available_date=None, live=has_live)
+
+    if has_b2b:
+        b2b_contract = ContractPageFactory.create()
+        b2b_run = CourseRunFactory.create(
+            certificate_available_date=None,
+            b2b_contract=b2b_contract,
+            live=has_b2b_live,
+        )
+
+    eligible_courses = get_certificate_grade_eligible_runs(now=now_in_utc())
+
+    if has_live and has_b2b and has_b2b_live:
+        assert eligible_courses.count() == 2
+        assert run in eligible_courses
+        assert b2b_run in eligible_courses
+    elif has_live and ((has_b2b and not has_b2b_live) or not has_b2b):
+        assert eligible_courses.count() == 1
+        assert run in eligible_courses
+    elif has_b2b and has_b2b_live and not has_live:
+        assert eligible_courses.count() == 1
+        assert b2b_run in eligible_courses
+    else:
+        assert eligible_courses.count() == 0
