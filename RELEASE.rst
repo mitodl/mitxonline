@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.132.2
+---------------
+
+- Add some flags to the CourseRunQuerySet to allow B2B filtering to be toggle-able (#3027)
+- fix(deps): update dependency validator to v13.15.20 [security] (#3048)
+- Catch errors hitting Keycloak API when attaching users to orgs (#3039)
+
 Version 0.132.1 (Released October 27, 2025)
 ---------------
 
