@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.132.2
+Version 0.132.2 (Released October 28, 2025)
 ---------------
 
 - Add some flags to the CourseRunQuerySet to allow B2B filtering to be toggle-able (#3027)
