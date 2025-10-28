@@ -548,9 +548,9 @@ export class CourseProductDetailEnroll extends React.Component<
       <h2>
         <button
           onClick={() =>
-            (window.location = `${routes.apiGatewayLogin}?next=${encodeURIComponent(
-              window.location.pathname
-            )}`)
+            (window.location = `${
+              routes.apiGatewayLogin
+            }?next=${encodeURIComponent(window.location.pathname)}`)
           }
           className="btn btn-primary btn-enrollment-button btn-lg highlight"
           disabled={true}
