@@ -169,6 +169,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
         """List the available programs."""
         return super().list(request, *args, **kwargs)
 
+
 class CourseFilterSet(django_filters.FilterSet):
     courserun_is_enrollable = django_filters.BooleanFilter(
         method="filter_courserun_is_enrollable",
