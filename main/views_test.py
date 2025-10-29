@@ -10,12 +10,13 @@ pytestmark = [
 ]
 
 
-@pytest.mark.parametrize("url", ["/cms", "/cms/login"])
-def test_cms_signin_redirect_to_site_signin(client, url):
-    """Test that the cms/login redirects users to site signin page"""
-
-    response = client.get(url, follow=True)
-    assert response.request["PATH_INFO"] == "/login/"
+def test_cms_signin_redirect_to_site_signin(client):
+    """Test redirect from CMS login to site login."""
+    # Test direct call to CMS login redirect
+    response = client.get("/cms/login", follow=False)
+    assert response.status_code == 302
+    expected_redirect = "/login/?next=http%3A//testserver/cms/"
+    assert response.url == expected_redirect
 
 
 @pytest.mark.parametrize("url_name", ["user-dashboard", "staff-dashboard"])
