@@ -1264,7 +1264,12 @@ paths:
       - in: query
         name: id
         schema:
-          type: integer
+          type: array
+          items:
+            type: integer
+        description: Multiple values may be separated by commas.
+        explode: false
+        style: form
       - in: query
         name: live
         schema:
