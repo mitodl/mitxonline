@@ -477,7 +477,7 @@ SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = [
 
 # Email backend settings
 
-SOCIAL_AUTH_EMAIL_FORM_URL = "login"
+SOCIAL_AUTH_EMAIL_FORM_URL = "gateway-login"
 SOCIAL_AUTH_EMAIL_FORM_HTML = "login.html"
 
 SOCIAL_AUTH_EMAIL_USER_FIELDS = ["username", "email", "name", "password"]

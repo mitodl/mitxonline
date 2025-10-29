@@ -61,9 +61,16 @@ def handler500(request):
     )
 
 
-def cms_signin_redirect_to_site_signin(request):  # noqa: ARG001
-    """Redirect wagtail admin signin to site signin page"""
-    return redirect_to_login(reverse("wagtailadmin_home"), login_url="/signin")
+def cms_signin_redirect_to_site_signin(request):
+    """CMS signin redirect to site signin page."""
+    return redirect_to_login(reverse("wagtailadmin_home"), login_url=reverse("gateway-login"))
+
+
+def staff_dashboard_signin_redirect_to_site_signin(request):
+    """Staff dashboard signin redirect to site signin page."""
+    # For staff dashboard, we want to redirect to the staff dashboard main page after login
+    staff_dashboard_url = request.build_absolute_uri('/staff-dashboard/')
+    return redirect_to_login(staff_dashboard_url, login_url=reverse("gateway-login"))
 
 
 class RefinePagination(LimitOffsetPagination):
