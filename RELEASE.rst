@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.132.3
+Version 0.132.3 (Released October 29, 2025)
 ---------------
 
 - Enroll now button should go to login (#3051)
