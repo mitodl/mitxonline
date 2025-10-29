@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.132.3 (Released October 29, 2025)
+---------------
+
+- Enroll now button should go to login (#3051)
+- Support multiple id filter on v2/programs api (#3049)
+
 Version 0.132.2 (Released October 28, 2025)
 ---------------
 
