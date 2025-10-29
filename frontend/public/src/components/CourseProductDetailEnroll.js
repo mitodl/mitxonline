@@ -532,7 +532,7 @@ export class CourseProductDetailEnroll extends React.Component<
     return (
       <h2>
         <a
-          href={`${routes.login}?next=${encodeURIComponent(
+          href={`${routes.apiGatewayLogin}?next=${encodeURIComponent(
             window.location.pathname
           )}`}
           className="btn btn-primary btn-enrollment-button btn-lg  btn-gradient-red-to-blue highlight"
@@ -548,9 +548,9 @@ export class CourseProductDetailEnroll extends React.Component<
       <h2>
         <button
           onClick={() =>
-            (window.location = `${routes.login}?next=${encodeURIComponent(
-              window.location.pathname
-            )}`)
+            (window.location = `${
+              routes.apiGatewayLogin
+            }?next=${encodeURIComponent(window.location.pathname)}`)
           }
           className="btn btn-primary btn-enrollment-button btn-lg highlight"
           disabled={true}
