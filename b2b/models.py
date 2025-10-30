@@ -370,7 +370,10 @@ class ContractPage(Page):
         - program (courses.Program): the program to add
 
         Returns:
-        - tuple, courses created and skipped
+        - tuple: Tuple with three integers:
+            - number of course runs created
+            - number of course runs skipped (already existed)
+            - number of courses with no source run
         """
 
         from b2b.api import create_contract_run
