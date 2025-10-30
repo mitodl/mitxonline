@@ -74,6 +74,8 @@ def test_get_programs(
     programs_data = resp.json()["results"]
     assert len(programs_data) == Pagination.page_size
 
+    print([obj["title"] for obj in programs_data])
+    print([obj.title for obj in programs])
     assert [obj["id"] for obj in programs_data] == [obj.id for obj in programs]
     for program, program_data in zip(programs, programs_data):
         # Clear cached property to ensure consistent data between API and serializer
