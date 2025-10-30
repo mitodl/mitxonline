@@ -33,7 +33,7 @@ from b2b.models import (
 )
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
-from courses.models import Course, CourseRun
+from courses.models import Course, CourseRun, Department
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     PAYMENT_TYPE_SALES,
@@ -76,26 +76,110 @@ def ensure_b2b_organization_index() -> OrganizationIndexPage:
     return org_index_page
 
 
-def import_and_create_contract_run(contract: ContractPage, course_run_id: str):
+def import_and_create_contract_run(  # noqa: PLR0913
+    contract: ContractPage,
+    course_run_id: str,
+    departments: list[Department | str],
+    *,
+    live: bool = True,
+    use_specific_course: str | None = None,
+    create_depts: bool = False,
+    block_countries: list[str] | None = None,
+    create_cms_page: bool = True,
+    publish_cms_page: bool = False,
+    include_in_learn_catalog: bool = False,
+    ingest_content_files_for_ai: bool = True,
+    skip_edx: bool = False,
+    require_designated_source_run: bool = False,
+):
     """
     Create a contract run for the given course, importing it from edX if necessary.
 
-    Check for the specified course run. If it exists, create the contract run in
-    the usual fashion. If it doesn't, check for it in edX and import it into
-    MITx Online first, then create the contract run.
+    Wraps the create_contract_run function in some logic to check for the specified
+    course, and then import it. If the course is imported from edX, this will set
+    a few flags to reasonable values and call the import_courserun_from_edx
+    function, then call create_contract_run using the imported run as the source
+    course. If the course is already in the system, this just calls
+    create_contract_run with the source run and the use_specific_course flag set
+    to force it to use the specified run.
 
-    If the specified run is imported, it will have the "is_source_run" flag set.
+    The kwargs combine the set from import_courserun_from_edx and
+    create_contract_run. Some of the defaults are different, owning to the use case
+    for this function. Those differences are:
+    - You must pass in a list of departments.
+    - By default, the live flag is set to True.
+    - Learn AI ingestion will be set to True.
+    - require_designated_source_run is set to False. (We assume you want the
+      specified course, regardless of the source flag.)
+
+    In addition, if the course is imported, the corresponding run that is created
+    for it will have the is_source_run flag set to True. This cannot be
+    overridden. By using this function, we are assuming you really want the
+    specified run as the source.
+
+    This won't pass a price to the import call, so the imported run won't have a
+    product. This _will_ set a price on the contract run, because the contract
+    run must have a price, even if that price is zero. The price will be whatever
+    is specified in the contract (or zero).
+
+    Calling this function will result in a contract course run being created. If
+    the course is imported, then you will end up with a course with two runs:
+    the one that was imported and the new contract run.
 
     Args:
         contract (ContractPage): The contract to create the run for.
         course_run_id (str): The readable ID for the source course run.
-    Keyword Args:
+        departments (list[Department | str]): Departments to add to the new course.
+    Keyword Args (passed to import_courserun_from_edx and create_contract_run):
+        live (bool): Make the new course run live, and the course if one is created.
+        use_specific_course (str|None): Readable ID of a specific course to use as the base course.
+        create_depts (bool): Create departments.
+        block_countries (list[str] | None): Country codes to add to the block list for the course.
+        create_cms_page (bool): Create a CMS page for the course. Only applies if a course is being created.
+        publish_cms_page (bool): Publish the new CMS page. Only takes effect if creating a CMS page.
+        include_in_learn_catalog (bool): Set the "include_in_learn_catalog" flag on the new page.
+        ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
         skip_edx (bool): Don't try to create a course run in edX.
         require_designated_source_run (bool): Require a flagged source run.
     Returns:
         CourseRun: The created CourseRun object.
         Product: The created Product object.
     """
+
+    run_qs = CourseRun.objects.filter(courseware_id=course_run_id)
+
+    if run_qs.exists():
+        run = run_qs.get()
+    else:
+        from courses.api import import_courserun_from_edx
+
+        rundata = import_courserun_from_edx(
+            course_key=course_run_id,
+            live=live,
+            use_specific_course=use_specific_course,
+            departments=departments,
+            create_depts=create_depts,
+            block_countries=block_countries,
+            price=None,
+            create_cms_page=create_cms_page,
+            publish_cms_page=publish_cms_page,
+            include_in_learn_catalog=include_in_learn_catalog,
+            ingest_content_files_for_ai=ingest_content_files_for_ai,
+            is_source_run=True,
+        )
+
+        if not rundata:
+            msg = f"Import and create contract run for {course_run_id} failed - could not import from edX."
+            raise ValueError(msg)
+
+        run = rundata[0]
+
+    return create_contract_run(
+        contract,
+        run.course,
+        skip_edx=skip_edx,
+        require_designated_source_run=require_designated_source_run,
+    )
 
 
 def create_contract_run(
