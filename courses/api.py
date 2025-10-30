@@ -295,6 +295,7 @@ def create_program_enrollments(user, programs):
             successful_enrollments.append(enrollment)
     return successful_enrollments
 
+
 def downgrade_learner(enrollment):
     """
     Downgrades given enrollment from verified to audit.
@@ -302,12 +303,13 @@ def downgrade_learner(enrollment):
 
     # Forcing the enrollment here - if the refund comes after the end date
     # for the course for whatever reason, we still want to revert the mode.
-    return  create_run_enrollments(
+    return create_run_enrollments(
         user=enrollment.user,
         runs=[enrollment.run],
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
     )
+
 
 def deactivate_run_enrollment(
     run_enrollment,

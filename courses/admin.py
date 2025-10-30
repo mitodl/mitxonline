@@ -307,16 +307,21 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         )
 
     @admin.action(description="Downgrade users enrollment")
-    def downgrade_enrollment(self, request, queryset):  # noqa: ARG002
+    def downgrade_enrollment(self, request, queryset):
         """Admin action to change the status of users enrollment from verified to audit"""
         enrollment = queryset.first()
         enrollments, enroll_success = downgrade_learner(enrollment)
         if not enroll_success:
-            self.message_user(request, f'Failed to downgrade enrollment for user {enrollment.user.email}')
+            self.message_user(
+                request,
+                f"Failed to downgrade enrollment for user {enrollment.user.email}",
+            )
         else:
             self.message_user(
-                request, f'Successfully downgraded users enrollment from verified to audit: {enrollment.user.email}.'
+                request,
+                f"Successfully downgraded users enrollment from verified to audit: {enrollment.user.email}.",
             )
+
 
 @admin.register(CourseRunEnrollmentAudit)
 class CourseRunEnrollmentAuditAdmin(TimestampedModelAdmin):
