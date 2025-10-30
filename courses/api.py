@@ -1227,7 +1227,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
                 else:
                     dept = department
 
-                root_course.departments.add(dept)
+                root_course.departments.add(dept.id)
 
     new_run = CourseRun.objects.create(
         course=root_course,
