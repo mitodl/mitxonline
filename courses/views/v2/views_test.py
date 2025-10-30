@@ -74,9 +74,25 @@ def test_get_programs(
     programs_data = resp.json()["results"]
     assert len(programs_data) == Pagination.page_size
     for program, program_data in zip(programs, programs_data):
-        # Clear cached property to ensure consistent data between API and serializer
-        if hasattr(program, "_courses_with_requirements_data"):
-            delattr(program, "_courses_with_requirements_data")
+        # Clear all cached properties to ensure consistent data between API and serializer
+        cached_properties = [
+            "_courses_with_requirements_data",
+            "page",
+            "num_courses",
+            "requirements_root",
+            "required_courses",
+            "required_title",
+            "elective_courses",
+            "elective_title",
+            "minimum_elective_courses_requirement",
+        ]
+        for prop in cached_properties:
+            if hasattr(program, prop):
+                try:
+                    delattr(program, prop)
+                except AttributeError:
+                    # Some cached properties may not be deletable, skip them
+                    pass
         assert_drf_json_equal(
             program_data, ProgramSerializer(program).data, ignore_order=True
         )
