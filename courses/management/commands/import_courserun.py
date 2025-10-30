@@ -18,17 +18,12 @@ create_courseware_page command for the course run.
 """
 
 from decimal import Decimal, InvalidOperation
-from urllib import parse
 
-import reversion
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
-from django_countries import countries
 
-from cms.api import create_default_courseware_page
-from courses.models import BlockedCountry, Course, CourseRun, Department, Program
-from ecommerce.models import Product
+from courses.api import import_courserun_from_edx
+from courses.models import Program
 from openedx.api import get_edx_api_course_detail_client
 
 try:
@@ -102,6 +97,12 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--create-depts",
+            action="store_true",
+            help="Create any departments that need to be created.",
+        )
+
+        parser.add_argument(
             "--include-in-learn-catalog",
             action="store_true",
             help="Include this course in the Learn catalog (sets include_in_learn_catalog flag on CMS page).",
@@ -131,6 +132,12 @@ class Command(BaseCommand):
             help="Assign the resulting course run to the specified B2B contract (contract ID or slug).",
         )
 
+        parser.add_argument(
+            "--source-course",
+            action="store_true",
+            help="Designate the course run(s) to import as source course runs.",
+        )
+
     def _resolve_contract(self, contract_identifier):
         """
         Resolve a contract by ID or slug.
@@ -157,7 +164,7 @@ class Command(BaseCommand):
 
         return None
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915, ARG002
         if kwargs.get("publish_cms_page") and kwargs.get("draft_cms_page"):
             self.stderr.write(
                 self.style.ERROR(
@@ -193,6 +200,14 @@ class Command(BaseCommand):
                     )
                 )
                 price = None
+
+        publish_cms_page = False
+
+        if kwargs.get("live") or kwargs.get("publish_cms_page"):
+            publish_cms_page = True
+
+        if kwargs.get("live") and kwargs.get("draft_cms_page"):
+            publish_cms_page = False
 
         if kwargs.get("courserun") is not None:
             try:
@@ -249,154 +264,38 @@ class Command(BaseCommand):
         success_count = 0
 
         for edx_course in edx_courses:
-            courserun_tag = edx_course.course_id.split("+")[-1]
-            course_readable_id = edx_course.course_id.removesuffix(f"+{courserun_tag}")
-            course = Course.objects.filter(readable_id=course_readable_id)
-            if kwargs.get("depts") and len(kwargs.get("depts")) > 0:
-                add_depts = Department.objects.filter(
-                    name__in=kwargs.get("depts")
-                ).all()
-
-            if "add_depts" not in locals() or not add_depts:
-                self.stdout.write(
-                    self.style.ERROR(
-                        "Departments must exist and be specified with the --dept argument prior to running this command to create courses."
-                    )
-                )
-                return False
-
-            (course, created) = Course.objects.get_or_create(
-                readable_id=course_readable_id,
-                defaults={
-                    "title": edx_course.name,
-                    "readable_id": course_readable_id,
-                    "live": kwargs.get("live", False),
-                },
-            )
-            course.departments.set(add_depts)
-            course.save()
-
-            if created:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Created course for {course_readable_id}: {course}"
-                    )
-                )
-
-            new_run = CourseRun.objects.create(
-                course=course,
-                run_tag=courserun_tag,
-                courseware_id=edx_course.course_id,
-                start_date=edx_course.start,
-                end_date=edx_course.end,
-                enrollment_start=edx_course.enrollment_start,
-                enrollment_end=edx_course.enrollment_end,
-                title=edx_course.name,
+            run_data = import_courserun_from_edx(
+                course_key=edx_course.course_id,
                 live=kwargs.get("live", False),
-                is_self_paced=edx_course.is_self_paced(),
-                courseware_url_path=parse.urljoin(
-                    settings.OPENEDX_API_BASE_URL,
-                    f"/courses/{edx_course.course_id}/course",
+                price=price,
+                block_countries=kwargs.get("block_countries"),
+                departments=kwargs.get("depts"),
+                create_depts=kwargs.get("create_depts", False),
+                create_cms_page=kwargs.get("create_cms_page", False),
+                publish_cms_page=publish_cms_page,
+                include_in_learn_catalog=kwargs.get("include_in_learn_catalog", False),
+                ingest_content_files_for_ai=kwargs.get(
+                    "ingest_content_files_for_ai", False
                 ),
-                b2b_contract=contract,
+                is_source_run=kwargs.get("source_course", False),
             )
 
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Created course run for {edx_course.course_id}: id {new_run.id}"
-                )
-            )
+            if run_data:
+                (run, page, product) = run_data
 
-            if contract:
+                success_count += 1
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"Assigned course run to contract: {contract.name} (ID: {contract.id})"
+                        f"Created new run {run.courseware_id} in course {run.course.readable_id}"
                     )
                 )
 
-            success_count += 1
+                if page:
+                    self.stdout.write(self.style.SUCCESS(f"\t --> Created page {page}"))
 
-            if kwargs.get("create_cms_page"):
-                try:
-                    # Determine whether to publish the CMS page
-                    cms_page_live = kwargs.get("live", False)
-
-                    if kwargs.get("publish_cms_page"):
-                        cms_page_live = True
-                    elif kwargs.get("draft_cms_page"):
-                        cms_page_live = False
-
-                    course_page = create_default_courseware_page(
-                        new_run.course, live=cms_page_live
-                    )
-
-                    if kwargs.get("include_in_learn_catalog") or kwargs.get(
-                        "ingest_content_files_for_ai"
-                    ):
-                        if kwargs.get("include_in_learn_catalog"):
-                            course_page.include_in_learn_catalog = True
-                        if kwargs.get("ingest_content_files_for_ai"):
-                            course_page.ingest_content_files_for_ai = True
-                        course_page.save()
-
-                    status_msg = "live" if cms_page_live else "draft"
+                if product:
                     self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Created {status_msg} CMS page for {new_run.course.readable_id}"
-                        )
-                    )
-                except Exception as e:  # noqa: BLE001
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Could not create CMS page {new_run.course.readable_id}, skipping it: {e}"
-                        )
-                    )
-
-            if price:
-                content_type = ContentType.objects.get_for_model(CourseRun)
-                with reversion.create_revision():
-                    (course_product, created) = Product.objects.update_or_create(
-                        content_type=content_type,
-                        object_id=new_run.id,
-                        defaults={
-                            "price": Decimal(price),
-                            "description": new_run.courseware_id,
-                            "is_active": True,
-                        },
-                    )
-
-                    course_product.save()
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Created product {course_product} for {new_run.courseware_id}"
-                        )
-                    )
-
-            if kwargs.get("block_countries"):
-                for code_or_name in kwargs.get("block_countries").split(","):
-                    country_code = countries.by_name(code_or_name)
-                    if not country_code:
-                        country_name = countries.countries.get(code_or_name, None)
-                        country_code = code_or_name if country_name else None
-                    else:
-                        country_name = code_or_name
-
-                    if country_code:
-                        BlockedCountry.objects.get_or_create(
-                            course=course, country=country_code
-                        )
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f"Blocked Enrollments for {country_name} ({country_code})."
-                            )
-                        )
-                        continue
-
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Could not block country {code_or_name}. "
-                            f"Please verify that it is a valid country name or code."
-                        )
+                        self.style.SUCCESS(f"\t --> Created product {product}")
                     )
 
         self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))

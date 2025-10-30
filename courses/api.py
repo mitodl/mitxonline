@@ -1124,6 +1124,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     publish_cms_page: bool = False,
     include_in_learn_catalog: bool = False,
     ingest_content_files_for_ai: bool = False,
+    is_source_run: bool = False,
 ):
     """
     Import a course run from edX.
@@ -1165,6 +1166,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     - publish_cms_page (bool): Publish the new CMS page. Only takes effect if creating a CMS page.
     - include_in_learn_catalog (bool): Set the "include_in_learn_catalog" flag on the new page.
     - ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
+    - is_source_run (bool): Set the "is_source_run" flag on the course run to designate it as a B2B source course.
     Returns:
     tuple of (CourseRun, CoursePage|None, Product|None) - relevant objects for the imported run
     """
@@ -1172,7 +1174,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     if CourseRun.objects.filter(courseware_id=course_key).exists():
         return False
 
-    processed_course_key = CourseKey(course_key)
+    processed_course_key = CourseKey.from_string(course_key)
 
     edx_course_detail = get_edx_api_course_detail_client()
 
@@ -1181,7 +1183,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
     )
 
-    processed_run_key = CourseKey(edx_course_run.course_id)
+    processed_run_key = CourseKey.from_string(edx_course_run.course_id)
 
     if use_specific_course:
         root_course = Course.objects.get(readable_id=use_specific_course)
@@ -1210,7 +1212,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
                 else:
                     dept = department
 
-                root_course.departments.add(dept)
+                root_course.departments.add(dept.id)
 
     new_run = CourseRun.objects.create(
         course=root_course,
@@ -1223,6 +1225,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         title=edx_course_run.name,
         live=live,
         is_self_paced=edx_course_run.is_self_paced(),
+        is_source_run=is_source_run,
         courseware_url_path=urljoin(
             settings.OPENEDX_COURSE_BASE_URL,
             f"/{edx_course_run.course_id}/course",
