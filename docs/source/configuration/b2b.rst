@@ -189,7 +189,14 @@ Courseware Setup in edX
 
 B2B courses in edX should be set up in a particular fashion, both to make sure we can identify them within edX easily, and to allow the system to automatically create runs for new contracts.
 
-Each B2B course starts with a source course. Usually, these are separate courses and runs, but not always. If you're creating a new course, it should be created in edX with the organization ``UAI_SOURCE`` and the run tag ``SOURCE``. A corresponding course run in MITx Online should also be created. The ``import_courserun`` command can be used to help facilitate this. If you want to use an existing course, you should create a ``SOURCE`` run for it from the run you want to use as the source course in edX. Alternatively, an existing run can be flagged as the source run in Django Admin via the ``is_source_run`` flag.
+Each B2B course starts with a source course and courserun. Usually, these are separate courses and runs, but not always.
+
+
+* If using a separate course & courserun,  it should be created in edX with the organization ``UAI_SOURCE`` and run tag ``SOURCE``. The ``import courserun`` command can assist in importing the course from OpenEdx into MITxOnline.
+* If reusing an existing course, create a new courserunw with run tag ``SOURCE``.
+
+
+**In both cases:** The courserun should have the `is_source_run` flag set to `True` in MITxOnline (this can be done via Django Admin).
 
 When associating a course or program with a contract, the ``b2b_contract courseware`` command will try to create a contract-specific run for each source course (either the one you've specified or the ones that are in the specified program).
 
