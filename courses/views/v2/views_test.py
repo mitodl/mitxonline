@@ -73,6 +73,8 @@ def test_get_programs(
     duplicate_queries_check(context)
     programs_data = resp.json()["results"]
     assert len(programs_data) == Pagination.page_size
+
+    assert [obj["id"] for obj in programs_data] == [obj.id for obj in programs]
     for program, program_data in zip(programs, programs_data):
         # Clear cached property to ensure consistent data between API and serializer
         if hasattr(program, "_courses_with_requirements_data"):
