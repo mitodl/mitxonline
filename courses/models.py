@@ -1996,11 +1996,11 @@ class ProgramRequirement(MP_Node):
             ),
         )
         indexes = [
-            models.Index(fields=("program", "course")),
-            models.Index(fields=("course", "program")),
-            models.Index(fields=("program", "required_program")),
-            models.Index(fields=("required_program", "program")),
-            models.Index(fields=("program", "node_type", "depth")),
+            models.Index(fields=["program", "course"], name="courses_pro_program_c8ff7c_idx"),
+            models.Index(fields=["course", "program"], name="courses_pro_course__fdcdb6_idx"),
+            models.Index(fields=["program", "required_program"], name="courses_pro_program_18e9ef_idx"),
+            models.Index(fields=["required_program", "program"], name="courses_pro_require_99b956_idx"),
+            models.Index(fields=["program", "node_type", "depth"], name="courses_pro_program_4f3727_idx"),
         ]
 
 
