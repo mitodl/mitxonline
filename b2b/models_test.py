@@ -24,10 +24,11 @@ def test_add_program_courses_to_contract(mocker):
 
     program.refresh_from_db()
 
-    created, skipped = contract.add_program_courses(program)
+    created, skipped, no_source = contract.add_program_courses(program)
 
     assert created == 3
     assert skipped == 0
+    assert no_source == 0
 
     contract.save()
     contract.refresh_from_db()
@@ -40,10 +41,11 @@ def test_add_program_courses_to_contract(mocker):
     program.save()
     program.refresh_from_db()
 
-    created, skipped = contract.add_program_courses(program)
+    created, skipped, no_source = contract.add_program_courses(program)
 
     assert created == 1
     assert skipped == 3
+    assert no_source == 0
 
     contract.save()
     contract.refresh_from_db()
