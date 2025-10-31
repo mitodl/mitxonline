@@ -197,6 +197,12 @@ class ContractPage(Page):
     description = RichTextField(
         blank=True, help_text="Any useful extra information about the contract."
     )
+    welcome_message = models.CharField(
+        max_length=255, blank=True, help_text="A welcome message for learners."
+    )
+    welcome_message_extra = RichTextField(
+        blank=True, help_text="Additional welcome message content for learners."
+    )
     integration_type = models.CharField(
         max_length=255,
         choices=CONTRACT_MEMBERSHIP_CHOICES,
@@ -253,6 +259,8 @@ class ContractPage(Page):
         MultiFieldPanel(
             [
                 FieldPanel("description"),
+                FieldPanel("welcome_message"),
+                FieldPanel("welcome_message_extra"),
                 FieldPanel("organization"),
             ],
             heading="Basic Information",
