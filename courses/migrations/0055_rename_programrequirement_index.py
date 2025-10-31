@@ -4,17 +4,6 @@
 from django.db import migrations, models
 
 
-def rename_indexes_safe(apps, schema_editor):
-    """Safely rename indexes, handling cases where they may not exist."""
-    # Skip this - indexes will be created with proper names
-    pass
-
-
-def reverse_rename_indexes(apps, schema_editor):
-    """Reverse operation for index renaming."""
-    pass
-
-
 class Migration(migrations.Migration):
     dependencies = [
         ("courses", "0054_add_program_availability"),
