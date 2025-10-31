@@ -49,7 +49,7 @@ export function useAuthProvider(): AuthProvider {
         return Promise.resolve();
       }
       return Promise.reject({
-        redirectPath: (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + "/signin"
+        redirectPath: (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + "/login"
       });
     },
     getPermissions: async () => {

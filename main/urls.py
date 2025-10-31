@@ -26,7 +26,12 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from cms.views import instructor_page
 from cms.wagtail_api.urls import api_router as wagtail_api_router
-from main.views import cms_signin_redirect_to_site_signin, index, refine
+from main.views import (
+    cms_signin_redirect_to_site_signin,
+    index,
+    refine,
+    staff_dashboard_signin_redirect_to_site_signin,
+)
 
 urlpatterns = [
     # NOTE: we only bring in base_urlpatterns so applications can only be created via django-admin
@@ -59,6 +64,12 @@ urlpatterns = [
     re_path(r"^dashboard/", index, name="user-dashboard"),
     # social django needs to be here to preempt the login
     path("", include("social_django.urls", namespace="social")),
+    # Staff dashboard authentication redirect
+    re_path(
+        r"^staff-dashboard/$",
+        staff_dashboard_signin_redirect_to_site_signin,
+        name="staff-dashboard-login",
+    ),
     re_path(r"^staff-dashboard/.*", refine, name="staff-dashboard"),
     path("create-account/", index, name="signup"),
     path("create-account/confirm-sent/", index, name="confirm-sent"),
