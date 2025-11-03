@@ -1,6 +1,7 @@
 """Authentication serializers"""
 
 import logging
+import re
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -8,7 +9,10 @@ from rest_framework import serializers
 
 from hubspot_sync.task_helpers import sync_hubspot_user
 from openedx.api import create_user
+from openedx.constants import OPENEDX_USERNAME_MAX_LEN
 from users.serializers import (
+    USERNAME_ERROR_MSG,
+    USERNAME_RE_PARTIAL,
     LegalAddressSerializer,
     UserProfileSerializer,
 )
@@ -24,6 +28,29 @@ class RegisterDetailsSerializer(serializers.Serializer):
     username = serializers.CharField(write_only=True)
     legal_address = LegalAddressSerializer(write_only=True)
     user_profile = UserProfileSerializer(write_only=True)
+
+    def validate_username(self, value):
+        """Validate username format and length"""
+        trimmed_value = value.strip()
+
+        # Check length constraints
+        if len(trimmed_value) > OPENEDX_USERNAME_MAX_LEN:
+            msg = (
+                f"Username must be no more than {OPENEDX_USERNAME_MAX_LEN} characters."
+            )
+            raise serializers.ValidationError(msg)
+
+        min_username_length = 3
+        if len(trimmed_value) < min_username_length:
+            msg = "Username must be at least 3 characters."
+            raise serializers.ValidationError(msg)
+
+        # Check character constraints using the same pattern as users.serializers
+        username_pattern = re.compile(rf"^{USERNAME_RE_PARTIAL}$")
+        if not username_pattern.match(trimmed_value):
+            raise serializers.ValidationError(USERNAME_ERROR_MSG)
+
+        return trimmed_value
 
     def create(self, validated_data):
         """Save user legal address and user profile"""
