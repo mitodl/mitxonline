@@ -129,6 +129,7 @@ class CourseRunAdmin(TimestampedModelAdmin):
     )
     list_filter = [
         "live",
+        "is_source_run",
         "course",
         "b2b_contract",
     ]

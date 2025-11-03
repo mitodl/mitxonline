@@ -39,17 +39,33 @@ def test_b2b_contract_attachment_bad_code(user):
     assert user.b2b_contracts.count() == 0
 
 
-def test_b2b_contract_attachment(mocker, user):
+@pytest.mark.parametrize(
+    "max_learners",
+    [
+        10,
+        None,
+    ],
+)
+@pytest.mark.parametrize(
+    "code_used",
+    [
+        True,
+        False,
+    ],
+)
+def test_b2b_contract_attachment(mocker, max_learners, code_used):
     """Ensure a supplied code results in attachment for the user."""
 
     mocked_attach_user = mocker.patch(
         "b2b.models.OrganizationPage.attach_user", return_value=True
     )
 
+    user = UserFactory.create()
+
     contract = ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_NONSSO,
         integration_type=CONTRACT_MEMBERSHIP_NONSSO,
-        max_learners=10,
+        max_learners=max_learners,
     )
 
     courserun = CourseRunFactory.create(b2b_contract=contract)
@@ -57,6 +73,14 @@ def test_b2b_contract_attachment(mocker, user):
 
     ensure_enrollment_codes_exist(contract)
     contract_codes = contract.get_discounts().all()
+
+    if code_used:
+        other_user = UserFactory.create()
+        DiscountContractAttachmentRedemption.objects.create(
+            discount=contract_codes[0],
+            user=other_user,
+            contract=contract,
+        )
 
     client = APIClient()
     client.force_login(user)
@@ -67,15 +91,25 @@ def test_b2b_contract_attachment(mocker, user):
     resp = client.post(url)
 
     assert resp.status_code == 200
-    mocked_attach_user.assert_called()
 
     user.refresh_from_db()
-    assert user.b2b_organizations.filter(pk=contract.organization.id).exists()
-    assert user.b2b_contracts.filter(pk=contract.id).exists()
 
-    assert DiscountContractAttachmentRedemption.objects.filter(
-        contract=contract, user=user, discount=contract_codes[0]
-    ).exists()
+    if code_used and max_learners:
+        assert not user.b2b_organizations.filter(pk=contract.organization.id).exists()
+        assert not user.b2b_contracts.filter(pk=contract.id).exists()
+
+        assert not DiscountContractAttachmentRedemption.objects.filter(
+            contract=contract, user=user, discount=contract_codes[0]
+        ).exists()
+    else:
+        mocked_attach_user.assert_called()
+
+        assert user.b2b_organizations.filter(pk=contract.organization.id).exists()
+        assert user.b2b_contracts.filter(pk=contract.id).exists()
+
+        assert DiscountContractAttachmentRedemption.objects.filter(
+            contract=contract, user=user, discount=contract_codes[0]
+        ).exists()
 
 
 @pytest.mark.parametrize(
