@@ -29,7 +29,6 @@ class CourseSerializer(BaseCourseSerializer):
 
     departments = DepartmentSerializer(many=True, read_only=True)
     next_run_id = serializers.SerializerMethodField()
-    page = CoursePageSerializer(read_only=True)
     programs = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance) -> int | None:
@@ -72,7 +71,6 @@ class CourseSerializer(BaseCourseSerializer):
             "readable_id",
             "next_run_id",
             "departments",
-            "page",
             "programs",
         ]
 

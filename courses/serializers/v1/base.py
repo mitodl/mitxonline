@@ -33,6 +33,7 @@ class BaseCourseSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "title",
+            "readable_id",
             "type",
         ]
 
