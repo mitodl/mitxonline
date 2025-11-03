@@ -18,14 +18,22 @@ jobs:
         id: oasdif_changelog
         run: | # Capture changelog as a multiline output
           echo "changelog<<EOF" > $GITHUB_OUTPUT
-          docker run --rm \
-            --workdir ${{ github.workspace }} \
-            --volume ${{ github.workspace }}:${{ github.workspace }}:rw \
-            -e GITHUB_WORKSPACE=${{ github.workspace }} \
-            tufin/oasdiff changelog --composed \
-            'base/openapi/specs/*.yaml' \
-            'head/openapi/specs/*.yaml' \
-            >> $GITHUB_OUTPUT
+          for spec in base/openapi/specs/*.yaml; do
+            base_spec="$spec"
+            head_spec="head/openapi/specs/$(basename "$spec")"
+            if [ -f "$head_spec" ]; then
+              echo "## Changes for $(basename "$spec"):" >> $GITHUB_OUTPUT
+              docker run --rm \
+                --workdir ${{ github.workspace }} \
+                --volume ${{ github.workspace }}:${{ github.workspace }}:rw \
+                -e GITHUB_WORKSPACE=${{ github.workspace }} \
+                tufin/oasdiff changelog \
+                "$base_spec" \
+                "$head_spec" \
+                >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+            fi
+          done
           echo "EOF" >> $GITHUB_OUTPUT
       - name: Get summary
         id: oasdif_summary
@@ -65,13 +73,19 @@ jobs:
       - name: Check for breaking changes
         id: oasdif_breaking
         run: |
-          docker run --rm \
-            --workdir ${{ github.workspace }} \
-            --volume ${{ github.workspace }}:${{ github.workspace }}:ro \
-            -e GITHUB_WORKSPACE=${{ github.workspace }} \
-            tufin/oasdiff breaking \
-            --fail-on ERR \
-            --format githubactions \
-            --composed \
-            'base/openapi/specs/*.yaml' \
-            'head/openapi/specs/*.yaml'
+          for spec in base/openapi/specs/*.yaml; do
+            base_spec="$spec"
+            head_spec="head/openapi/specs/$(basename "$spec")"
+            if [ -f "$head_spec" ]; then
+              echo "Checking $(basename "$spec") for breaking changes..."
+              docker run --rm \
+                --workdir ${{ github.workspace }} \
+                --volume ${{ github.workspace }}:${{ github.workspace }}:ro \
+                -e GITHUB_WORKSPACE=${{ github.workspace }} \
+                tufin/oasdiff breaking \
+                --fail-on ERR \
+                --format githubactions \
+                "$base_spec" \
+                "$head_spec"
+            fi
+          done
