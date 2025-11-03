@@ -22,10 +22,14 @@ class Migration(migrations.Migration):
         # Add properly named indexes
         migrations.AddIndex(
             model_name="programrequirement",
-            index=models.Index(fields=["course", "program"], name="courses_pro_course__fdcdb6_idx"),
+            index=models.Index(
+                fields=["course", "program"], name="courses_pro_course__fdcdb6_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="programrequirement",
-            index=models.Index(fields=["program", "course"], name="courses_pro_program_c8ff7c_idx"),
+            index=models.Index(
+                fields=["program", "course"], name="courses_pro_program_c8ff7c_idx"
+            ),
         ),
     ]

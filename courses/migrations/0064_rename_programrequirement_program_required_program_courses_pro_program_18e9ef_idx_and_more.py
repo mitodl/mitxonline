@@ -18,10 +18,16 @@ class Migration(migrations.Migration):
         # Add named indexes explicitly
         migrations.AddIndex(
             model_name="programrequirement",
-            index=models.Index(fields=["program", "required_program"], name="courses_pro_program_18e9ef_idx"),
+            index=models.Index(
+                fields=["program", "required_program"],
+                name="courses_pro_program_18e9ef_idx",
+            ),
         ),
         migrations.AddIndex(
             model_name="programrequirement",
-            index=models.Index(fields=["required_program", "program"], name="courses_pro_require_99b956_idx"),
+            index=models.Index(
+                fields=["required_program", "program"],
+                name="courses_pro_require_99b956_idx",
+            ),
         ),
     ]

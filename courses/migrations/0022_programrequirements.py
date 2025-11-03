@@ -110,10 +110,14 @@ class Migration(migrations.Migration):
         # Changed to use named indexes for Django 5 compatibility
         migrations.AddIndex(
             model_name="programrequirement",
-            index=models.Index(fields=["program", "course"], name="courses_pro_program_temp_idx"),
+            index=models.Index(
+                fields=["program", "course"], name="courses_pro_program_temp_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="programrequirement",
-            index=models.Index(fields=["course", "program"], name="courses_pro_course__temp_idx"),
+            index=models.Index(
+                fields=["course", "program"], name="courses_pro_course__temp_idx"
+            ),
         ),
     ]
