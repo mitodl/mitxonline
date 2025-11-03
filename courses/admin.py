@@ -9,6 +9,7 @@ from django.forms import TextInput
 from django.urls import reverse
 from mitol.common.admin import TimestampedModelAdmin
 
+from courses.api import downgrade_learner
 from courses.forms import ProgramAdminForm
 from courses.models import (
     BlockedCountry,
@@ -266,7 +267,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
     inlines = [
         CourseRunEnrollmentAuditInline,
     ]
-    actions = ["retry_all_failed_edx_enrollment"]
+    actions = ["retry_all_failed_edx_enrollment", "downgrade_enrollment"]
     run_for_all_actions = ["retry_all_failed_edx_enrollment"]
 
     def get_queryset(self, request):
@@ -304,6 +305,22 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         self.message_user(
             request, "Retry all failed Open edX enrollments successfully requested."
         )
+
+    @admin.action(description="Downgrade users enrollment")
+    def downgrade_enrollment(self, request, queryset):
+        """Admin action to change the status of users enrollment from verified to audit"""
+        enrollment = queryset.first()
+        enrollments, enroll_success = downgrade_learner(enrollment)
+        if not enroll_success:
+            self.message_user(
+                request,
+                f"Failed to downgrade enrollment for user {enrollment.user.email}",
+            )
+        else:
+            self.message_user(
+                request,
+                f"Successfully downgraded users enrollment from verified to audit: {enrollment.user.email}.",
+            )
 
 
 @admin.register(CourseRunEnrollmentAudit)
