@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.133.0
+---------------
+
+- Add admin action to downgrade learners enrollment (#3055)
+- fix(deps): update dependency moment-timezone to ^0.6.0 (#3063)
+- Update b2b docs (#3040)
+- Update mitxonline wagtail CMS and staff dashboard login redirects (#3054)
+- fix(deps): update dependency postcss to v8.5.6 (#3042)
+- fix(deps): update babel monorepo (#3047)
+- fix(deps): update react monorepo (#3043)
+
 Version 0.132.3 (Released October 29, 2025)
 ---------------
 
