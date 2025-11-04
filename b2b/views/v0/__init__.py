@@ -46,11 +46,16 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
     Viewset for the ContractPage model.
     """
 
-    queryset = ContractPage.objects.all()
     serializer_class = ContractPageSerializer
     permission_classes = [IsAdminOrReadOnly | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "contract_slug"
+
+    def get_queryset(self):
+        """Filter to only return active contracts by default."""
+        return ContractPage.objects.filter(
+            active=True
+        )
 
 
 class Enroll(APIView):
@@ -116,6 +121,15 @@ class AttachContractApi(APIView):
         """
 
         now = now_in_utc()
+        
+        def get_active_user_contracts(user):
+            """Helper to get active contracts for a user."""
+            return user.b2b_contracts.filter(
+                active=True
+            ).exclude(
+                Q(contract_start__gt=now) | Q(contract_end__lt=now)
+            )
+        
         try:
             code = (
                 Discount.objects.filter(
@@ -126,7 +140,7 @@ class AttachContractApi(APIView):
             )
         except Discount.DoesNotExist:
             return Response(
-                ContractPageSerializer(request.user.b2b_contracts.all(), many=True).data
+                ContractPageSerializer(get_active_user_contracts(request.user), many=True).data
             )
 
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
@@ -152,5 +166,5 @@ class AttachContractApi(APIView):
         request.user.save()
 
         return Response(
-            ContractPageSerializer(request.user.b2b_contracts.all(), many=True).data
+            ContractPageSerializer(get_active_user_contracts(request.user), many=True).data
         )

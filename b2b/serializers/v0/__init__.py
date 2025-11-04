@@ -141,6 +141,7 @@ class UserOrganizationSerializer(serializers.ModelSerializer):
             self.context["user"]
             .b2b_contracts.filter(
                 organization=instance.organization,
+                active=True,
             )
             .all()
         )
