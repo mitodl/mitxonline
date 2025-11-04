@@ -1256,81 +1256,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2ProgramCertificate'
           description: ''
-  /api/v2/programs/:
-    get:
-      operationId: programs_list_v2
-      description: List Programs - v2
-      parameters:
-      - in: query
-        name: id
-        schema:
-          type: array
-          items:
-            type: integer
-        description: Multiple values may be separated by commas.
-        explode: false
-        style: form
-      - in: query
-        name: live
-        schema:
-          type: boolean
-      - in: query
-        name: org_id
-        schema:
-          type: number
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - in: query
-        name: page__live
-        schema:
-          type: boolean
-      - name: page_size
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      - in: query
-        name: readable_id
-        schema:
-          type: string
-      tags:
-      - programs
-      security:
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedV2ProgramList'
-          description: ''
-  /api/v2/programs/{id}/:
-    get:
-      operationId: programs_retrieve_v2
-      description: API view set for Programs - v2
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this program.
-        required: true
-      tags:
-      - programs
-      security:
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/V2Program'
-          description: ''
   /enrollments/:
     post:
       operationId: api_enrollments_create
@@ -2986,29 +2911,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/V2ProgramCollection'
-    PaginatedV2ProgramList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/V2Program'
     PartnerSchool:
       type: object
       properties:
