@@ -26,7 +26,7 @@ django-anymail = {extras = ["mailgun"], version = "^11.1"}
 django-cors-headers = "^4.0.0"
 django-countries = "^7.2.1"
 django-filter = "^24.3"
-django-health-check = { git = "https://github.com/revsys/django-health-check", rev="592f6a8fc2a8481f4f810678461db52bd1b0e3d6" }  # pragma: allowlist secret
+django-health-check = { git = "https://github.com/revsys/django-health-check", rev="53f9bdc3a7acc8a577319987fef0bd3040eef4b4" }  # pragma: allowlist secret
 django-hijack = "^3.6.0"
 django-ipware = "^7.0.0"
 django-oauth-toolkit = "^1.7.0"
