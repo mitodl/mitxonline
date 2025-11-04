@@ -1223,8 +1223,9 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
 
             for department in departments:
                 if isinstance(department, str) and create_depts:
-                    dept = Department.objects.get_or_create(name=department)
-                else:
+                    dept, _ = Department.objects.get_or_create(name=department)
+                    dept.save()
+                elif isinstance(department, Department):
                     dept = department
 
                 root_course.departments.add(dept.id)
@@ -1248,7 +1249,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     )
 
     course_page = None
-    if create_cms_page:
+    if create_cms_page and not use_specific_course:
         course_page = create_default_courseware_page(
             courseware=new_run.course,
             live=publish_cms_page,
