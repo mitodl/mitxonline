@@ -246,14 +246,14 @@ crt = ["awscrt (==0.23.8)"]
 
 [[package]]
 name = "bpython"
-version = "0.25"
-description = ""
+version = "0.26"
+description = "A fancy curses interface to the Python interactive interpreter"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "bpython-0.25-py3-none-any.whl", hash = "sha256:28fd86008ca5ef6100ead407c9743aa60c51293a18ba5b18fcacea7f5b7f2257"},
-    {file = "bpython-0.25.tar.gz", hash = "sha256:c246fc909ef6dcc26e9d8cb4615b0e6b1613f3543d12269b19ffd0782166c65b"},
+    {file = "bpython-0.26-py3-none-any.whl", hash = "sha256:91bdbbe667078677dc6b236493fc03e47a04cd099630a32ca3f72d6d49b71e20"},
+    {file = "bpython-0.26.tar.gz", hash = "sha256:f79083e1e3723be9b49c9994ad1dd3a19ccb4d0d4f9a6f5b3a73bef8bc327433"},
 ]
 
 [package.dependencies]
@@ -268,7 +268,7 @@ typing_extensions = {version = "*", markers = "python_version < \"3.11\""}
 [package.extras]
 clipboard = ["pyperclip"]
 jedi = ["jedi (>=0.16)"]
-urwid = ["urwid"]
+urwid = ["urwid (<3.0)"]
 watch = ["watchdog"]
 
 [[package]]
@@ -6038,4 +6038,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "75faae1d27772614abed7ac774d5e34fee7e0625e9e673a97354b34bf87cd807"
+content-hash = "dd33b607521ae3a5434f1c2cbb85e00635566802507ca9f66ca67260f6b328b5"
