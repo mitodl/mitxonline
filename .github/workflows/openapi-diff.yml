@@ -1,5 +1,8 @@
 name: OpenAPI Diff
 on: [pull_request]
+permissions:
+  contents: read
+  pull-requests: write
 jobs:
   openapi-diff:
     runs-on: ubuntu-22.04
