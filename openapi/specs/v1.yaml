@@ -1515,6 +1515,14 @@ components:
           type: string
           readOnly: true
           description: Any useful extra information about the contract.
+        welcome_message:
+          type: string
+          readOnly: true
+          description: A welcome message for learners.
+        welcome_message_extra:
+          type: string
+          readOnly: true
+          description: Additional welcome message content for learners.
         integration_type:
           allOf:
           - $ref: '#/components/schemas/IntegrationTypeEnum'
@@ -1565,6 +1573,8 @@ components:
       - name
       - organization
       - slug
+      - welcome_message
+      - welcome_message_extra
     Country:
       type: object
       description: Serializer for pycountry countries, with states for US/CA

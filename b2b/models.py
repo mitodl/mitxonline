@@ -197,6 +197,12 @@ class ContractPage(Page):
     description = RichTextField(
         blank=True, help_text="Any useful extra information about the contract."
     )
+    welcome_message = models.CharField(
+        max_length=255, blank=True, help_text="A welcome message for learners."
+    )
+    welcome_message_extra = RichTextField(
+        blank=True, help_text="Additional welcome message content for learners."
+    )
     integration_type = models.CharField(
         max_length=255,
         choices=CONTRACT_MEMBERSHIP_CHOICES,
@@ -253,6 +259,8 @@ class ContractPage(Page):
         MultiFieldPanel(
             [
                 FieldPanel("description"),
+                FieldPanel("welcome_message"),
+                FieldPanel("welcome_message_extra"),
                 FieldPanel("organization"),
             ],
             heading="Basic Information",
@@ -424,16 +432,19 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
         "ecommerce.Discount",
         on_delete=models.DO_NOTHING,
         help_text="The discount that was redemeed.",
+        related_name="contract_redemptions",
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.DO_NOTHING,
         help_text="The user that redeemed the discount.",
+        related_name="+",
     )
     contract = models.ForeignKey(
         ContractPage,
         on_delete=models.DO_NOTHING,
         help_text="The contract that the user was attached to.",
+        related_name="code_redemptions",
     )
 
 
