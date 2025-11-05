@@ -319,7 +319,7 @@ def batch_create_hubspot_objects_chunked(
             still_failed = handle_failed_batch_chunk(chunk, hubspot_type)
             if still_failed:
                 errored_chunks.append(still_failed)
-                log.error(
+                log.error(  # noqa: TRY400
                     "Chunk %d/%d: %d %s(s) still failed after individual retries",
                     chunk_index,
                     total_chunks,
