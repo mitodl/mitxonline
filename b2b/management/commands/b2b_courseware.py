@@ -9,7 +9,7 @@ from argparse import RawTextHelpFormatter
 
 from django.core.management import BaseCommand, CommandError
 
-from b2b.api import create_contract_run
+from b2b.api import create_contract_run, import_and_create_contract_run
 from b2b.models import ContractPage
 from courses.api import resolve_courseware_object_from_id
 from courses.models import CourseRun
@@ -27,13 +27,17 @@ Courseware objects can be course runs, courses, or programs. specified by their 
 Specifying courseware: You must specify one courseware item (of any type). You can specify more than one by adding "--also <courseware id>" to the end of the command. You can repeat this as many times as necessary.
 
 To add courseware:
-   b2b_courseware add [--no-create-runs] [--force] contract courseware [--also courseware] [--also courseware...]
+   b2b_courseware add [--import <departments>] [--no-create-runs] [--force] <contract> <courseware> [--also <courseware>] [--also <courseware>...]
 
 Example: b2b_courseware add contract-100-101 program-v1:UAI+Fundamentals --also course-v1:UAI_C100+14.314x+2025_C101
 
+Specifying "--import" will attempt to import the course run from edX if it can't be found in MITx Online. A corresponding course and course run will be created in MITx Online, and the run will be flagged as a source run. A new contract run will be created for the contract specified. The "--import" flag is ignored if a course is specified, as edX only has course runs. The "--import" flag is also ignored if a program is specified, as the command won't be able to determine what to import (again, because programs have courses, and edX doesn't have courses).
+
+If "--import" is specified, it expects a list of departments for the new courses to be added to. This should be a list of names, separated by commas. You must specify at least one department as courses must belong to at least one department. The departments must exist; it won't create them for you.
+
 Specifying a course run will attach it to the contract unless the contract is already attached to a contract. Specify "--force" to override any existing contract attachment.
 
-Specifying a course will attempt to create a course run for the contract for the specified course. It will try to create a course run in edX as well unless "--no-create-runs" is specified.
+Specifying a course will attempt to create a course run for the contract for the specified course. It will try to create a course run in edX as well unless "--no-create-runs" is specified. This flag is ignored if "--import" is specified.
 
 Specifying a program will iterate through the program's courses and create runs for each. It will also link the program to the contract.
 
@@ -114,6 +118,12 @@ Specifying a program will only unlink the program from the contract, unless "--r
             dest="force",
             action="store_true",
         )
+        add_subparser.add_argument(
+            "--import",
+            help="Attempt to import course runs specified into the department(s), if they don't exist in MITx Online.",
+            dest="can_import",
+            type=str,
+        )
 
         remove_subparser = subparsers.add_parser(
             "remove",
@@ -128,15 +138,57 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         return super().add_arguments(parser)
 
-    def handle_add(self, contract, coursewares, **kwargs):
+    def handle_add(self, contract, coursewares, **kwargs):  # noqa: PLR0915, C901
         """Handle the add subcommand."""
 
         create_runs = kwargs.pop("create_runs")
         force_associate = kwargs.pop("force")
+        can_import = kwargs.pop("import")
 
         managed = skipped = 0
 
+        if can_import:
+            # Get the courseware IDs we got passed in that weren't matched to
+            # system records. We will try to pull these in from edX.
+
+            importable_ids = [kwargs.get("courseware", "")]
+            importable_extras = kwargs.get("additional_courseware")
+            if importable_extras:
+                importable_ids.extend(importable_extras)
+
+            non_importable_ids = [
+                courseware.readable_id for courseware in coursewares if courseware
+            ]
+
+            for importable_id in importable_ids:
+                if importable_id in non_importable_ids:
+                    continue
+
+                self.stdout.write(f"Attempting to import {importable_id} from edX...")
+
+                imported_run, _ = import_and_create_contract_run(
+                    contract=contract,
+                    course_run_id=importable_id,
+                    departments=can_import.split(sep=","),
+                    create_cms_page=True,
+                )
+
+                if not imported_run:
+                    self.stdout.write(
+                        self.style.ERROR(f"Importing {importable_id} failed. Skipping")
+                    )
+                    continue
+
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Importing {importable_id} succeeded: {imported_run} created."
+                    )
+                )
+
         for courseware in coursewares:
+            if not courseware:
+                continue
+
             if courseware.is_program:
                 # If you're specifying a program, we will always make new runs
                 # since we won't be able to tell which existing ones to use.
@@ -285,8 +337,8 @@ Specifying a program will only unlink the program from the contract, unless "--r
         """Dispatch the requested task."""
 
         contract_id = kwargs.pop("contract")
-        courseware_id = kwargs.pop("courseware")
-        additional_courseware_ids = kwargs.pop("additional_courseware")
+        courseware_id = kwargs.get("courseware", "")
+        additional_courseware_ids = kwargs.get("additional_courseware")
         subcommand = kwargs.pop("subcommand")
 
         if contract_id.isdecimal():
