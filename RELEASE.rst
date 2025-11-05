@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.133.1
+Version 0.133.1 (Released November 05, 2025)
 ---------------
 
 - fix(deps): update django-health-check digest to 53f9bdc (#3009)
