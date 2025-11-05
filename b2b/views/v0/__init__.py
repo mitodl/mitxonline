@@ -108,7 +108,8 @@ class AttachContractApi(APIView):
 
         This will respect the activation and expiration dates (of both the contract
         and the discount), and will make sure there's sufficient available seats
-        in the contract.
+        in the contract. It will also make sure the code hasn't been used for
+        attachment purposes before.
 
         If the user is already in the contract, then we skip it.
 
