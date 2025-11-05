@@ -432,16 +432,19 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
         "ecommerce.Discount",
         on_delete=models.DO_NOTHING,
         help_text="The discount that was redemeed.",
+        related_name="contract_redemptions",
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.DO_NOTHING,
         help_text="The user that redeemed the discount.",
+        related_name="+",
     )
     contract = models.ForeignKey(
         ContractPage,
         on_delete=models.DO_NOTHING,
         help_text="The contract that the user was attached to.",
+        related_name="code_redemptions",
     )
 
 
