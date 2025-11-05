@@ -1053,7 +1053,6 @@ def enroll_in_edx_course_runs(
             msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
             raise OpenEdxUserMissingError(msg)  # noqa: TRY301
     except Exception as exc:
-        log.exception("Failed to verify/create user %s in edX.", user.edx_username)
         msg = f"Failed to verify/create user {user.edx_username} in OpenEdX"
         raise OpenEdxUserMissingError(msg) from exc
 
@@ -1079,7 +1078,7 @@ def enroll_in_edx_course_runs(
                     )
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
-            log.exception(
+            log.error(
                 "Failed to enroll user %s in course run %s with mode %s.",
                 user.edx_username,
                 course_run.courseware_id,
