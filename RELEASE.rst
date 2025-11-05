@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.133.0
+Version 0.133.0 (Released November 05, 2025)
 ---------------
 
 - Add admin action to downgrade learners enrollment (#3055)
