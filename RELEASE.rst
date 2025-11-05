@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.133.1
+---------------
+
+- fix(deps): update django-health-check digest to 53f9bdc (#3009)
+- chore(deps): update dependency bpython to ^0.26 (#3060)
+- fix(deps): update dependency drf-extensions to ^0.8.0 (#3062)
+- Add ContractPage welcome message (#3059)
+
 Version 0.133.0 (Released November 05, 2025)
 ---------------
 
