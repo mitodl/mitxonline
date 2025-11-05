@@ -1078,7 +1078,7 @@ def enroll_in_edx_course_runs(
                     )
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
-            log.error(
+            log.error(  # noqa: TRY400
                 "Failed to enroll user %s in course run %s with mode %s.",
                 user.edx_username,
                 course_run.courseware_id,
