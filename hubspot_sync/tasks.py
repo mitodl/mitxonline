@@ -247,7 +247,7 @@ def batch_create_hubspot_objects_chunked(
     content_type = ContentType.objects.exclude(app_label="auth").get(
         model=ct_model_name
     )
-    chunked_ids = _batched_chunks(hubspot_type, object_ids)
+    chunked_ids = list(_batched_chunks(hubspot_type, object_ids))
     total_chunks = len(chunked_ids)
     total_objects = len(object_ids)
     
