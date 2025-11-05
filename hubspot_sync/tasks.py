@@ -248,9 +248,32 @@ def batch_create_hubspot_objects_chunked(
         model=ct_model_name
     )
     chunked_ids = _batched_chunks(hubspot_type, object_ids)
+    total_chunks = len(chunked_ids)
+    total_objects = len(object_ids)
+    
+    log.info(
+        "Starting batch create for %s: %d %s(s) split into %d chunk(s)",
+        hubspot_type,
+        total_objects,
+        ct_model_name,
+        total_chunks,
+    )
+    
     errored_chunks = []
     last_error_status = None
-    for chunk in chunked_ids:
+    for chunk_index, chunk in enumerate(chunked_ids, start=1):
+        chunk_size = len(chunk)
+        log.info(
+            "Processing chunk %d/%d: %d %s(s) (Total progress: %d/%d, %.1f%%)",
+            chunk_index,
+            total_chunks,
+            chunk_size,
+            ct_model_name,
+            len(created_ids),
+            total_objects,
+            (len(created_ids) / total_objects * 100) if total_objects > 0 else 0,
+        )
+        
         try:
             response = HubspotApi().crm.objects.batch_api.create(
                 hubspot_type,
@@ -258,6 +281,7 @@ def batch_create_hubspot_objects_chunked(
                     inputs=api.MODEL_CREATE_FUNCTION_MAPPING[ct_model_name](chunk)
                 ),
             )
+            chunk_created_count = 0
             for result in response.results:
                 if ct_model_name == "user":
                     user = User.objects.filter(
@@ -274,13 +298,52 @@ def batch_create_hubspot_objects_chunked(
                     object_id=object_id,
                 )
                 created_ids.append(result.id)
+                chunk_created_count += 1
+            
+            log.info(
+                "Successfully created %d %s(s) in chunk %d/%d",
+                chunk_created_count,
+                ct_model_name,
+                chunk_index,
+                total_chunks,
+            )
         except ApiException as ae:
             last_error_status = ae.status
+            log.warning(
+                "ApiException (status %s) in chunk %d/%d for %s, attempting individual retries",
+                ae.status,
+                chunk_index,
+                total_chunks,
+                hubspot_type,
+            )
             still_failed = handle_failed_batch_chunk(chunk, hubspot_type)
             if still_failed:
                 errored_chunks.append(still_failed)
+                log.error(
+                    "Chunk %d/%d: %d %s(s) still failed after individual retries",
+                    chunk_index,
+                    total_chunks,
+                    len(still_failed),
+                    ct_model_name,
+                )
         wait_for_hubspot_rate_limit()
+    
+    log.info(
+        "Completed batch create for %s: %d/%d %s(s) successfully created",
+        hubspot_type,
+        len(created_ids),
+        total_objects,
+        ct_model_name,
+    )
+    
     if errored_chunks:
+        total_failed = sum(len(chunk) for chunk in errored_chunks)
+        log.error(
+            "Batch create completed with errors: %d %s(s) failed across %d chunk(s)",
+            total_failed,
+            ct_model_name,
+            len(errored_chunks),
+        )
         raise ApiException(
             status=last_error_status,
             reason=f"Batch hubspot create failed for the following chunks: {errored_chunks}",
