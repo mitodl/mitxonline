@@ -11,7 +11,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
 from social_django.models import UserSocialAuth
 
-from b2b.serializers.v0 import OrganizationPageSerializer
+from b2b.serializers.v0 import UserOrganizationSerializer
 from hubspot_sync.task_helpers import sync_hubspot_user
 
 # from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
@@ -222,15 +222,16 @@ class UserSerializer(serializers.ModelSerializer):
     def get_grants(self, instance):
         return instance.get_all_permissions()
 
-    @extend_schema_field(OrganizationPageSerializer(many=True))
+    @extend_schema_field(UserOrganizationSerializer(many=True))
     def get_b2b_organizations(self, instance):
         """Get the organizations for the user"""
         if instance.is_anonymous:
             return []
 
-        return OrganizationPageSerializer(
-            instance.b2b_organizations,
+        return UserOrganizationSerializer(
+            instance.user_organizations.all(),
             many=True,
+            context={"user": instance},
         ).data
 
     def validate(self, data):
