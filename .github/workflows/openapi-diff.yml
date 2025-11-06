@@ -1,0 +1,94 @@
+name: OpenAPI Diff
+on: [pull_request]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  openapi-diff:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout HEAD
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          ref: ${{ github.head_ref }}
+          path: head
+      - name: Checkout BASE
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+      - name: Generate oasdiff changelog
+        id: oasdif_changelog
+        run: | # Capture changelog as a multiline output
+          echo "changelog<<EOF" > $GITHUB_OUTPUT
+          for spec in base/openapi/specs/*.yaml; do
+            base_spec="$spec"
+            head_spec="head/openapi/specs/$(basename "$spec")"
+            if [ -f "$head_spec" ]; then
+              echo "## Changes for $(basename "$spec"):" >> $GITHUB_OUTPUT
+              docker run --rm \
+                --workdir ${{ github.workspace }} \
+                --volume ${{ github.workspace }}:${{ github.workspace }}:rw \
+                -e GITHUB_WORKSPACE=${{ github.workspace }} \
+                tufin/oasdiff changelog \
+                "$base_spec" \
+                "$head_spec" \
+                >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+            fi
+          done
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Get summary
+        id: oasdif_summary
+        run: |
+          echo summary=$(echo "${{ steps.oasdif_changelog.outputs.changelog }}" | head -1 ) \
+          >> $GITHUB_OUTPUT
+      - name: Find existing comment
+        id: find_comment
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: "## OpenAPI Changes"
+      - name: Post changes as comment
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        # Even if no changes, make sure to update old comment if it was found.
+        if: steps.oasdif_summary.outputs.summary || steps.find_comment.outputs.comment-id
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          edit-mode: "replace"
+          repository: ${{ github.repository }}
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          body: |
+            ## OpenAPI Changes
+
+            <details>
+            <summary>Show/hide ${{ steps.oasdif_summary.outputs.summary || 'No detectable change.' }}</summary>
+
+            ```
+            ${{ steps.oasdif_changelog.outputs.changelog }}
+            ```
+
+            Unexpected changes? Ensure your branch is up-to-date with `main` (consider rebasing).
+            </details>
+      - name: Check for breaking changes
+        id: oasdif_breaking
+        run: |
+          for spec in base/openapi/specs/*.yaml; do
+            base_spec="$spec"
+            head_spec="head/openapi/specs/$(basename "$spec")"
+            if [ -f "$head_spec" ]; then
+              echo "Checking $(basename "$spec") for breaking changes..."
+              docker run --rm \
+                --workdir ${{ github.workspace }} \
+                --volume ${{ github.workspace }}:${{ github.workspace }}:ro \
+                -e GITHUB_WORKSPACE=${{ github.workspace }} \
+                tufin/oasdiff breaking \
+                --fail-on ERR \
+                --format githubactions \
+                "$base_spec" \
+                "$head_spec"
+            fi
+          done

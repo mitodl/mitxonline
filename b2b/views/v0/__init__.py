@@ -1,7 +1,7 @@
 """Views for the B2B API (v0)."""
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from mitol.common.utils.datetime import now_in_utc
@@ -23,6 +23,7 @@ from b2b.serializers.v0 import (
     OrganizationPageSerializer,
 )
 from courses.models import CourseRun
+from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
 from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
@@ -112,7 +113,8 @@ class AttachContractApi(APIView):
 
         This will respect the activation and expiration dates (of both the contract
         and the discount), and will make sure there's sufficient available seats
-        in the contract.
+        in the contract. It will also make sure the code hasn't been used for
+        attachment purposes before.
 
         If the user is already in the contract, then we skip it.
 
@@ -132,10 +134,13 @@ class AttachContractApi(APIView):
         
         try:
             code = (
-                Discount.objects.filter(
-                    Q(activation_date__isnull=True) | Q(activation_date__lte=now)
-                )
+                Discount.objects.annotate(Count("contract_redemptions"))
+                .filter(Q(activation_date__isnull=True) | Q(activation_date__lte=now))
                 .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
+                .filter(
+                    Q(redemption_type=REDEMPTION_TYPE_UNLIMITED)
+                    | Q(contract_redemptions__count__lt=1)
+                )
                 .get(discount_code=enrollment_code)
             )
         except Discount.DoesNotExist:
