@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.134.0
+---------------
+
+- fix migration conflict (#3073)
+- Enrollment Item menu label (#3067)
+- open api diff action (#3064)
+- Update attach user endpoint to check redemptions more closely (#3066)
+
 Version 0.133.1 (Released November 05, 2025)
 ---------------
 
