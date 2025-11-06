@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("ecommerce", "0036_alter_order_state"),
-        ("b2b", "0011_sync_contract_type_fields"),
+        ("b2b", "0012_contractpage_welcome_message_and_more"),
     ]
 
     operations = [
