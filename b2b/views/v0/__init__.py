@@ -54,9 +54,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter to only return active contracts by default."""
-        return ContractPage.objects.filter(
-            active=True
-        )
+        return ContractPage.objects.filter(active=True)
 
 
 class Enroll(APIView):
@@ -123,15 +121,13 @@ class AttachContractApi(APIView):
         """
 
         now = now_in_utc()
-        
+
         def get_active_user_contracts(user):
             """Helper to get active contracts for a user."""
-            return user.b2b_contracts.filter(
-                active=True
-            ).exclude(
+            return user.b2b_contracts.filter(active=True).exclude(
                 Q(contract_start__gt=now) | Q(contract_end__lt=now)
             )
-        
+
         try:
             code = (
                 Discount.objects.annotate(Count("contract_redemptions"))
@@ -145,7 +141,9 @@ class AttachContractApi(APIView):
             )
         except Discount.DoesNotExist:
             return Response(
-                ContractPageSerializer(get_active_user_contracts(request.user), many=True).data
+                ContractPageSerializer(
+                    get_active_user_contracts(request.user), many=True
+                ).data
             )
 
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
@@ -171,5 +169,7 @@ class AttachContractApi(APIView):
         request.user.save()
 
         return Response(
-            ContractPageSerializer(get_active_user_contracts(request.user), many=True).data
+            ContractPageSerializer(
+                get_active_user_contracts(request.user), many=True
+            ).data
         )
