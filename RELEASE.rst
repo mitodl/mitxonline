@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.134.0
+Version 0.134.0 (Released November 06, 2025)
 ---------------
 
 - fix migration conflict (#3073)
