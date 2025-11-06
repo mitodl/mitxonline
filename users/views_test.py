@@ -154,8 +154,7 @@ def test_get_user_by_me_excludes_inactive_contracts(client, user):
     # Create active and inactive contracts in the same organization
     active_contract = ContractPageFactory.create(active=True)
     inactive_contract = ContractPageFactory.create(
-        active=False,
-        organization=active_contract.organization
+        active=False, organization=active_contract.organization
     )
 
     # Add user to the organization
