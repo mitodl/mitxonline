@@ -10,7 +10,6 @@ import { connectRequest } from "redux-query-react"
 import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import Loader from "./Loader"
-import { routes } from "../lib/urls"
 import { formatLocalePrice } from "../lib/util"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
@@ -418,7 +417,7 @@ export class ProgramProductDetailEnroll extends React.Component<
                 <Fragment>
                   {currentUser && !currentUser.id ? (
                     <a
-                      href={`${routes.login}?next=${encodeURIComponent(
+                      href={`/login/?next=${encodeURIComponent(
                         window.location.pathname
                       )}`}
                       className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight"
