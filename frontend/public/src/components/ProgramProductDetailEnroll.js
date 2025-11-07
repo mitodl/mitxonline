@@ -418,7 +418,7 @@ export class ProgramProductDetailEnroll extends React.Component<
                 <Fragment>
                   {currentUser && !currentUser.id ? (
                     <a
-                      href={`${routes.login}?next=${encodeURIComponent(
+                      href={`${routes.apiGatewayLogin}?next=${encodeURIComponent(
                         window.location.pathname
                       )}`}
                       className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight"
