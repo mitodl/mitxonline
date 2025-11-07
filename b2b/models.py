@@ -215,6 +215,26 @@ class ContractProgramItem(Orderable):
             f"{self.contract.title} - {self.program.title} (order: {self.sort_order})"
         )
 
+    def save(self, *args, skip_run_creation=False, **kwargs):
+        """
+        Queue async task to create contract runs for new program associations.
+
+        Args:
+            skip_run_creation: Skip task if runs are created synchronously.
+        """
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        if is_new and not skip_run_creation:
+            from b2b.tasks import create_program_contract_runs
+
+            create_program_contract_runs.delay(self.contract.id, self.program.id)
+            log.info(
+                "Queued contract run creation for program %s in contract %s",
+                self.program.id,
+                self.contract.id,
+            )
+
 
 class ContractPage(Page, ClusterableModel):
     """Stores information about a contract with an organization."""
@@ -452,13 +472,17 @@ class ContractPage(Page, ClusterableModel):
             except TargetCourseRunExistsError:  # noqa: PERF203
                 skipped_run_creation += 1
 
-        # Add program to contract via the intermediate model
         if order is None:
             last_item = self.contract_programs.order_by("-sort_order").first()
             order = (last_item.sort_order + 1) if last_item else 0
-        ContractProgramItem.objects.get_or_create(
-            contract=self, program=program, defaults={"sort_order": order}
-        )
+
+        existing_item = ContractProgramItem.objects.filter(
+            contract=self, program=program
+        ).first()
+
+        if not existing_item:
+            item = ContractProgramItem(contract=self, program=program, sort_order=order)
+            item.save(skip_run_creation=True)
 
         return (managed, skipped_run_creation, no_source)
 
