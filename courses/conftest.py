@@ -60,6 +60,8 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
         course_catalog_course_count(int): number of courses to generate.
         course_catalog_program_count(int): number of programs to generate.
     """
+    # Seed random to ensure deterministic test data
+    random.seed(42)
     programs = []
     courses = []
     course_runs = []
