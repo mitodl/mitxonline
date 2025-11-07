@@ -10,10 +10,11 @@ from django.http import Http404
 from django.utils.text import slugify
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
+from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
-from wagtail.models import Page
+from wagtail.models import ClusterableModel, Orderable, Page
 
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
@@ -24,6 +25,7 @@ from b2b.constants import (
 )
 from b2b.exceptions import TargetCourseRunExistsError
 from b2b.tasks import queue_enrollment_code_check
+from courses.models import Program
 
 log = logging.getLogger(__name__)
 
@@ -188,7 +190,33 @@ class OrganizationPage(Page):
         ]
 
 
-class ContractPage(Page):
+class ContractProgramItem(Orderable):
+    """Intermediate model to store programs in a contract with ordering"""
+
+    contract = ParentalKey(
+        "ContractPage", on_delete=models.CASCADE, related_name="contract_programs"
+    )
+    program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="contract_memberships"
+    )
+
+    panels = [
+        FieldPanel("program"),
+    ]
+
+    class Meta:
+        ordering = ["sort_order"]
+        unique_together = ("contract", "program")
+        verbose_name = "Contract Program Item"
+        verbose_name_plural = "Contract Program Items"
+
+    def __str__(self):
+        return (
+            f"{self.contract.title} - {self.program.title} (order: {self.sort_order})"
+        )
+
+
+class ContractPage(Page, ClusterableModel):
     """Stores information about a contract with an organization."""
 
     parent_page_types = ["b2b.OrganizationPage"]
@@ -248,11 +276,16 @@ class ContractPage(Page):
         null=True,
         help_text="The fixed price for enrollment under this contract. (Set to zero or leave blank for free.)",
     )
-    programs = models.ManyToManyField(
-        "courses.Program",
-        help_text="The programs associated with this contract.",
-        related_name="contracts",
-    )
+
+    @property
+    def programs(self):
+        """
+        Returns programs in the contract ordered by their order field.
+        This replaces the old ManyToManyField with ordered access via ContractProgramItem.
+        """
+        return Program.objects.filter(contract_memberships__contract=self).order_by(
+            "contract_memberships__sort_order"
+        )
 
     content_panels = [
         FieldPanel("name"),
@@ -284,6 +317,11 @@ class ContractPage(Page):
             ],
             heading="Availability",
             icon="calendar-alt",
+        ),
+        InlinePanel(
+            "contract_programs",
+            heading="Programs",
+            help_text="Add and order programs in this contract",
         ),
     ]
 
@@ -377,7 +415,7 @@ class ContractPage(Page):
 
         return Discount.objects.filter(products__product__in=self.get_products()).all()
 
-    def add_program_courses(self, program):
+    def add_program_courses(self, program, order=None):
         """
         Add a program, and then queue adding all its courses.
 
@@ -414,7 +452,13 @@ class ContractPage(Page):
             except TargetCourseRunExistsError:  # noqa: PERF203
                 skipped_run_creation += 1
 
-        self.programs.add(program)
+        # Add program to contract via the intermediate model
+        if order is None:
+            last_item = self.contract_programs.order_by("-sort_order").first()
+            order = (last_item.sort_order + 1) if last_item else 0
+        ContractProgramItem.objects.get_or_create(
+            contract=self, program=program, defaults={"sort_order": order}
+        )
 
         return (managed, skipped_run_creation, no_source)
 

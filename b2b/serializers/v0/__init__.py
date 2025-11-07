@@ -14,6 +14,12 @@ class ContractPageSerializer(serializers.ModelSerializer):
     """
 
     membership_type = serializers.CharField()
+    programs = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
+    def get_programs(self, instance):
+        """Get the ordered list of program IDs for this contract"""
+        return list(instance.programs.values_list("id", flat=True))
 
     class Meta:
         model = ContractPage
@@ -31,6 +37,7 @@ class ContractPageSerializer(serializers.ModelSerializer):
             "active",
             "slug",
             "organization",
+            "programs",
         ]
         read_only_fields = [
             "id",
@@ -46,6 +53,7 @@ class ContractPageSerializer(serializers.ModelSerializer):
             "active",
             "slug",
             "organization",
+            "programs",
         ]
 
 
