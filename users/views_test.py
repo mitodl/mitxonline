@@ -82,6 +82,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
                             "active": True,
                             "slug": contract.slug,
                             "organization": contract.organization.id,
+                            "programs": [],
                         }
                     ],
                 }
