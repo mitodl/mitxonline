@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.134.1
+---------------
+
+- Enroll Now on program page fix (#3077)
+
 Version 0.134.0 (Released November 06, 2025)
 ---------------
 
