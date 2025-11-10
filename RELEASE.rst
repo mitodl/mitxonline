@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.135.0
+---------------
+
+- ordered ContractPage programs (#3079)
+- Inactive contracts should not appear in API results by default (#3074)
+
 Version 0.134.1 (Released November 07, 2025)
 ---------------
 
