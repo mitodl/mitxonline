@@ -1,6 +1,6 @@
 """Shared pytest configuration for courses application"""
 
-import random
+from random import Random
 
 import pytest
 
@@ -60,8 +60,8 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
         course_catalog_course_count(int): number of courses to generate.
         course_catalog_program_count(int): number of programs to generate.
     """
-    # Seed random to ensure deterministic test data
-    random.seed(42)
+    # Use a local Random instance with fixed seed for deterministic test data
+    rng = Random(42)  # noqa: S311
     programs = []
     courses = []
     course_runs = []
@@ -70,7 +70,7 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
         courses.append(course)
         course_runs.append(course_runs_for_course)
     for n in range(course_catalog_program_count):  # noqa: B007
-        program = _create_program(courses)
+        program = _create_program(courses, rng)
         programs.append(program)
     return courses, programs, course_runs
 
@@ -83,7 +83,7 @@ def _create_course(n):
     return test_course, [cr1, cr2, cr3]
 
 
-def _create_program(courses):
+def _create_program(courses, rng):
     program = ProgramFactory.create()
     root_node = program.requirements_root
     required_courses_node = root_node.add_child(
@@ -99,11 +99,11 @@ def _create_program(courses):
         elective_flag=True,
     )
     if len(courses) > 3:  # noqa: PLR2004
-        for c in random.sample(courses, 3):
+        for c in rng.sample(courses, 3):
             required_courses_node.add_child(
                 node_type=ProgramRequirementNodeType.COURSE, course=c
             )
-        for c in random.sample(courses, 3):
+        for c in rng.sample(courses, 3):
             elective_courses_node.add_child(
                 node_type=ProgramRequirementNodeType.COURSE, course=c
             )
