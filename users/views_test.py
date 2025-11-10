@@ -146,6 +146,44 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
         }
 
 
+@pytest.mark.django_db
+def test_get_user_by_me_excludes_inactive_contracts(client, user):
+    """Test that /api/v0/users/me only returns active contracts"""
+    client.force_login(user)
+
+    # Create active and inactive contracts in the same organization
+    active_contract = ContractPageFactory.create(active=True)
+    inactive_contract = ContractPageFactory.create(
+        active=False, organization=active_contract.organization
+    )
+
+    # Add user to the organization
+    user.b2b_organizations.add(active_contract.organization)
+    # Add user to both contracts
+    user.b2b_contracts.add(active_contract)
+    user.b2b_contracts.add(inactive_contract)
+    user.save()
+
+    resp = client.get(reverse("users_api-me"))
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    response_data = resp.json()
+    assert len(response_data["b2b_organizations"]) == 1
+
+    org_data = response_data["b2b_organizations"][0]
+    assert org_data["id"] == active_contract.organization.id
+
+    # Should only include the active contract
+    assert len(org_data["contracts"]) == 1
+    assert org_data["contracts"][0]["id"] == active_contract.id
+    assert org_data["contracts"][0]["active"] is True
+
+    # Should not include the inactive contract
+    contract_ids = [contract["id"] for contract in org_data["contracts"]]
+    assert inactive_contract.id not in contract_ids
+
+
 @pytest.mark.parametrize(
     ("is_anonymous", "has_openedx_user", "has_edx_username"),
     [

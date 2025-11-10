@@ -54,7 +54,13 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
     Serializer for the OrganizationPage model.
     """
 
-    contracts = ContractPageSerializer(many=True, read_only=True)
+    contracts = serializers.SerializerMethodField()
+
+    @extend_schema_field(ContractPageSerializer(many=True))
+    def get_contracts(self, instance):
+        """Get only active contracts for the organization"""
+        active_contracts = instance.contracts.filter(active=True)
+        return ContractPageSerializer(active_contracts, many=True).data
 
     class Meta:
         model = OrganizationPage
@@ -145,6 +151,7 @@ class UserOrganizationSerializer(serializers.ModelSerializer):
             self.context["user"]
             .b2b_contracts.filter(
                 organization=instance.organization,
+                active=True,
             )
             .all()
         )
