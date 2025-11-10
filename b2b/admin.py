@@ -4,6 +4,7 @@ from django.contrib import admin
 
 from b2b.models import (
     ContractPage,
+    ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationPage,
 )
@@ -46,10 +47,12 @@ class DiscountContractAttachmentRedemptionAdmin(ReadOnlyModelAdmin):
 class ContractPageProgramInline(admin.TabularInline):
     """Inline to display programs for contract pages."""
 
-    model = ContractPage.programs.through
+    model = ContractProgramItem
     extra = 0
     verbose_name = "Contract Program"
     verbose_name_plural = "Contract Programs"
+    fields = ["program", "sort_order"]
+    readonly_fields = ["program", "sort_order"]
 
     def has_add_permission(self, request, obj):  # noqa: ARG002
         """Turn off add permission. These admins are supposed to be read-only."""

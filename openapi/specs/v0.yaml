@@ -111,7 +111,8 @@ paths:
 
         This will respect the activation and expiration dates (of both the contract
         and the discount), and will make sure there's sufficient available seats
-        in the contract.
+        in the contract. It will also make sure the code hasn't been used for
+        attachment purposes before.
 
         If the user is already in the contract, then we skip it.
 
@@ -1562,6 +1563,11 @@ components:
           readOnly: true
           description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
           pattern: ^[-\w]+$
+        programs:
+          type: array
+          items:
+            type: integer
+          readOnly: true
       required:
       - active
       - contract_end
@@ -1572,6 +1578,7 @@ components:
       - membership_type
       - name
       - organization
+      - programs
       - slug
       - welcome_message
       - welcome_message_extra

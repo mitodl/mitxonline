@@ -10,7 +10,7 @@ from argparse import RawTextHelpFormatter
 from django.core.management import BaseCommand, CommandError
 
 from b2b.api import create_contract_run
-from b2b.models import ContractPage
+from b2b.models import ContractPage, ContractProgramItem
 from courses.api import resolve_courseware_object_from_id
 from courses.models import CourseRun
 
@@ -159,7 +159,6 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 contract.save()
                 managed += prog_add
                 skipped += prog_skip
-                contract.programs.add(courseware)
                 self.stdout.write(
                     self.style.SUCCESS(f"Added {courseware.readable_id} to {contract}.")
                 )
@@ -245,7 +244,9 @@ Specifying a program will only unlink the program from the contract, unless "--r
                         )
                     )
 
-                contract.programs.remove(courseware)
+                ContractProgramItem.objects.filter(
+                    contract=contract, program=courseware
+                ).delete()
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"Removed program {courseware.readable_id} from contract {contract}."
