@@ -4,9 +4,13 @@ from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
+from urllib.parse import quote
 
 import factory
+import faker
 import pytest
+import pytz
+import responses
 import reversion
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory
@@ -14,6 +18,7 @@ from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
+from rest_framework import status
 from reversion.models import Version
 
 from b2b.api import create_b2b_enrollment
@@ -23,6 +28,7 @@ from b2b.factories import (
     OrganizationIndexPageFactory,
     OrganizationPageFactory,
 )
+from cms.factories import CourseIndexPageFactory
 from courses.api import (
     check_course_modes,
     create_program_enrollments,
@@ -32,6 +38,7 @@ from courses.api import (
     generate_course_run_certificates,
     generate_program_certificate,
     get_certificate_grade_eligible_runs,
+    import_courserun_from_edx,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
@@ -50,6 +57,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
+    DepartmentFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -82,6 +90,7 @@ from openedx.exceptions import (
 )
 
 pytestmark = pytest.mark.django_db
+FAKE = faker.Factory.create()
 
 
 @pytest.fixture
@@ -124,6 +133,37 @@ def passed_grade_with_enrollment(user):
 def courses_api_logs(mocker):
     """Logger fixture for tasks"""
     return mocker.patch("courses.api.log")
+
+
+def _mock_edx_course_detail(coursekey, settings):
+    """Make a fake course detail record for the given key."""
+
+    fake_date = FAKE.date_time(tzinfo=pytz.timezone(settings.TIME_ZONE))
+
+    return {
+        "blocks_url": f"http://192.168.33.10:8000/api/courses/v1/blocks/?course_id={quote(coursekey)}",
+        "effort": "7 hours",
+        "end": str(fake_date + timedelta(days=90)),
+        "enrollment_start": str(fake_date - timedelta(days=45)),
+        "enrollment_end": None,
+        "id": coursekey,
+        "media": {
+            "course_image": {
+                "uri": "/asset-v1:edX+DemoX+Demo_Course+type@asset+block@images_course_image.jpg"
+            },
+            "course_video": {"uri": None},
+        },
+        "name": FAKE.words(nb=3),
+        "number": "DemoX",
+        "org": "edX",
+        "short_description": "",
+        "start": str(fake_date - timedelta(days=30)),
+        "start_display": (fake_date - timedelta(days=30)).strftime("%B %w, %Y"),
+        "start_type": "timestamp",
+        "course_id": coursekey,
+        "overview": "<h2>About This Course</h2>\n   <p>Include your long course description here. The long course description should contain 150-400 words.</p>\n",
+        "pacing": "self",
+    }
 
 
 @pytest.mark.parametrize(
@@ -1980,3 +2020,192 @@ def test_get_certificate_grade_eligible_runs(has_live, has_b2b, has_b2b_live):
         assert b2b_run in eligible_courses
     else:
         assert eligible_courses.count() == 0
+
+
+@responses.activate
+def _run_test_import_courserun_from_edx(  # noqa: PLR0913
+    settings,
+    live,
+    use_specific_course,
+    create_depts,
+    block_countries,
+    price,
+    create_cms_page,
+    publish_cms_page,
+    include_in_learn_catalog,
+    ingest_content_files_for_ai,
+    is_source_run,
+):
+    """
+    Test that importing a course run from edX works as expected.
+
+    This is the test body - there's some grouping functions below that test
+    groups of related functionality, so the test is easier to read/comprehend,
+    and so we can run less total tests. (Parametrizing all of these individually
+    ended up with 2^10 tests.)
+    """
+
+    test_course_key = "course-v1:MITxT+123.45"
+    test_course_run_key = f"{test_course_key}+2T2022"
+    mocked_detail = _mock_edx_course_detail(test_course_run_key, settings)
+    department = "FakeDepartment" if create_depts else DepartmentFactory.create()
+    price = Decimal(FAKE.random_number(digits=3)) if price else None
+    block_countries = (
+        [
+            "US",
+            "CA",
+        ]
+        if block_countries
+        else None
+    )
+
+    if create_cms_page:
+        CourseIndexPageFactory.create()
+
+    if use_specific_course:
+        use_specific_course = CourseFactory.create().readable_id
+
+    responses.get(
+        f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}/",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+
+    (courserun, page, product) = import_courserun_from_edx(
+        course_key=test_course_run_key,
+        live=live,
+        use_specific_course=use_specific_course,
+        create_depts=create_depts,
+        block_countries=block_countries,
+        price=price,
+        create_cms_page=create_cms_page,
+        publish_cms_page=publish_cms_page,
+        include_in_learn_catalog=include_in_learn_catalog,
+        ingest_content_files_for_ai=ingest_content_files_for_ai,
+        is_source_run=is_source_run,
+        departments=[department],
+    )  # pyright: ignore[reportGeneralTypeIssues]
+
+    assert courserun.courseware_id == test_course_run_key
+    assert (
+        courserun.course.readable_id == use_specific_course
+        if use_specific_course
+        else test_course_key
+    )
+    assert courserun.live == live
+    assert courserun.is_source_run == is_source_run
+
+    if not use_specific_course:
+        if create_depts:
+            assert courserun.course.departments.filter(name=department).exists()
+        else:
+            course_dept = courserun.course.departments.first()
+            assert course_dept == department
+
+        if create_cms_page:
+            assert page
+            assert page.ingest_content_files_for_ai == ingest_content_files_for_ai
+            assert page.include_in_learn_catalog == include_in_learn_catalog
+            assert page.live == publish_cms_page
+
+    if price:
+        assert product
+        assert product.price == price
+
+    if block_countries:
+        for blocked_country in courserun.course.blocked_countries.all():
+            assert blocked_country.country.code in block_countries
+
+
+@pytest.mark.parametrize(
+    (
+        "live",
+        "is_source_run",
+        "create_depts",
+        "block_countries",
+        "price",
+    ),
+    [
+        (True, True, True, True, True),
+        (False, False, False, False, False),
+    ],
+)
+def test_import_courserun_from_edx_basic(  # noqa: PLR0913
+    settings, live, is_source_run, create_depts, block_countries, price
+):
+    """
+    Test the more basic options for import_courserun_from_edx.
+
+    These are all unrelated, so setting these flags or specifying these values
+    don't affect anything else in the import.
+    """
+
+    _run_test_import_courserun_from_edx(
+        settings=settings,
+        live=live,
+        use_specific_course=False,
+        create_depts=create_depts,
+        block_countries=block_countries,
+        price=price,
+        create_cms_page=False,
+        publish_cms_page=False,
+        include_in_learn_catalog=False,
+        ingest_content_files_for_ai=False,
+        is_source_run=is_source_run,
+    )
+
+
+@pytest.mark.parametrize(
+    (
+        "use_specific_course",
+        "create_cms_page",
+        "publish_cms_page",
+        "include_in_learn_catalog",
+        "ingest_content_files_for_ai",
+    ),
+    [
+        (True, False, False, False, False),
+        (
+            False,
+            True,
+            False,
+            False,
+            False,
+        ),
+        (
+            False,
+            True,
+            True,
+            True,
+            True,
+        ),
+    ],
+)
+def test_import_courserun_from_edx_specific_course_pages(  # noqa: PLR0913
+    settings,
+    use_specific_course,
+    create_cms_page,
+    publish_cms_page,
+    include_in_learn_catalog,
+    ingest_content_files_for_ai,
+):
+    """
+    Test the specific course functionality and the page creation functionality.
+
+    These are related - if you specify a specific course, it should ignore any
+    of the CMS-related flags.
+    """
+
+    _run_test_import_courserun_from_edx(
+        settings=settings,
+        live=True,
+        use_specific_course=use_specific_course,
+        create_depts=False,
+        block_countries=False,
+        price=False,
+        create_cms_page=create_cms_page,
+        publish_cms_page=publish_cms_page,
+        include_in_learn_catalog=include_in_learn_catalog,
+        ingest_content_files_for_ai=ingest_content_files_for_ai,
+        is_source_run=False,
+    )
