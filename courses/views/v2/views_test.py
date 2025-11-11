@@ -65,8 +65,12 @@ def test_get_programs(
     course_catalog_data  # noqa: B018
 
     # Fetch programs after running the fixture so they're in the right order
-    programs = Program.objects.order_by("title").prefetch_related("departments").all()
-
+    programs = (
+        Program.objects.filter(b2b_only=False)
+        .order_by("title")
+        .prefetch_related("departments")
+        .all()
+    )
     num_queries = num_queries_from_programs(programs, "v2")
     with django_assert_max_num_queries(num_queries) as context:
         resp = user_drf_client.get(reverse("v2:programs_api-list"))
