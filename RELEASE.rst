@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.135.1
+Version 0.135.1 (Released November 12, 2025)
 ---------------
 
 - add proper response codes to attach endpoint (#3084)
