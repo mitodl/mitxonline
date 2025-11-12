@@ -60,7 +60,11 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
         course_catalog_course_count(int): number of courses to generate.
         course_catalog_program_count(int): number of programs to generate.
     """
-    # Use a local Random instance with fixed seed for deterministic test data
+    import random
+
+    # Seed both local and global random for full determinism
+    # Factory Boy's FuzzyText uses the global random module
+    random.seed(42)
     rng = Random(42)  # noqa: S311
     programs = []
     courses = []
