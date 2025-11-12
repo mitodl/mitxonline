@@ -2,8 +2,8 @@
 
 from django.conf import settings
 from django.db import migrations
-from django.db.models import F, Value, CharField
-from django.db.models.functions import Concat, Cast
+from django.db.models import CharField, F, Value
+from django.db.models.functions import Cast, Concat
 
 from ecommerce.constants import REFERENCE_NUMBER_PREFIX
 
