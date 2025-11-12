@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.135.1
+---------------
+
+- add proper response codes to attach endpoint (#3084)
+- Fix remove_user_contracts to maintain user filtering and only remove managed contracts (#3031)
+
 Version 0.135.0 (Released November 12, 2025)
 ---------------
 
