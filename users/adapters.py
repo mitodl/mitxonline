@@ -90,7 +90,6 @@ class LearnUserAdapter(UserAdapter):
         self.obj.global_id = self.obj.scim_external_id or ""
         self.obj.name = d.get("fullName", self.obj.name)
 
-
     def _save_related(self):
         self.user_profile.user = self.obj
         self.user_profile.save()
