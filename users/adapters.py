@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from mitol.scim.adapters import UserAdapter
+from mitol.scim.constants import SchemaURI
 
 from openedx.models import OpenEdxUser
 from users.models import LegalAddress, UserProfile
@@ -16,7 +17,9 @@ class LearnUserAdapter(UserAdapter):
     django_scim library.
     """
 
-    ATTR_MAP = UserAdapter.ATTR_MAP | {
+    ATTR_MAP = {
+        ("active", None, None): "is_active",
+        ("userName", None, None): "username",
         ("fullName", None, None): "name",
     }
 
@@ -49,6 +52,23 @@ class LearnUserAdapter(UserAdapter):
         """
         return self.obj.name
 
+    def to_dict(self):
+        """
+        Return a ``dict`` conforming to the SCIM User Schema,
+        ready for conversion to a JSON object.
+        """
+        return {
+            "id": self.id,
+            "externalId": self.obj.scim_external_id,
+            "schemas": [SchemaURI.USER],
+            "userName": self.obj.username,
+            "displayName": self.display_name,
+            "emails": self.emails,
+            "active": self.obj.is_active,
+            "groups": [],
+            "meta": self.meta,
+        }
+
     def from_dict(self, d):
         """
         Consume a ``dict`` conforming to the SCIM User Schema, updating the
@@ -61,9 +81,15 @@ class LearnUserAdapter(UserAdapter):
             scim_user.from_dict(d)
             scim_user.save()
         """
-        super().from_dict(d)
+        self.parse_emails(d.get("emails"))
 
-        self.obj.name = d.get("fullName", self.obj.name)  # name's default is ""
+        self.obj.is_active = d.get("active", True)
+        self.obj.username = d.get("userName")
+        self.obj.scim_username = d.get("userName")
+        self.obj.scim_external_id = d.get("externalId")
+        self.obj.global_id = self.obj.scim_external_id or ""
+        self.obj.name = d.get("fullName", self.obj.name)
+
 
     def _save_related(self):
         self.user_profile.user = self.obj
