@@ -117,6 +117,9 @@ paths:
         If the user is already in the contract, then we skip it.
 
         Returns:
+        - 201: Code successfully redeemed and user attached to new contract(s)
+        - 200: Code valid but user already attached to all associated contracts
+        - 404: Invalid or expired enrollment code
         - list of ContractPageSerializer - the contracts for the user
       parameters:
       - in: path
