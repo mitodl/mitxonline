@@ -60,7 +60,11 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
         course_catalog_course_count(int): number of courses to generate.
         course_catalog_program_count(int): number of programs to generate.
     """
-    # Use a local Random instance with fixed seed for deterministic test data
+    import random
+
+    # Seed both local and global random for full determinism
+    # Factory Boy's FuzzyText uses the global random module
+    random.seed(42)
     rng = Random(42)  # noqa: S311
     programs = []
     courses = []
@@ -99,13 +103,22 @@ def _create_program(courses, rng):
         elective_flag=True,
     )
     if len(courses) > 3:  # noqa: PLR2004
-        for c in rng.sample(courses, 3):
+        # Use deterministic indices instead of random sampling
+        # This ensures the same courses are selected regardless of test execution order
+        indices = list(range(len(courses)))
+        rng.shuffle(indices)
+
+        # Select 3 courses for required
+        for idx in indices[:3]:
             required_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=c
+                node_type=ProgramRequirementNodeType.COURSE, course=courses[idx]
             )
-        for c in rng.sample(courses, 3):
+
+        # Select 3 courses for electives (reuse the shuffled indices)
+        elective_indices = indices[3:6] if len(indices) >= 6 else indices[:3]  # noqa: PLR2004
+        for idx in elective_indices:
             elective_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=c
+                node_type=ProgramRequirementNodeType.COURSE, course=courses[idx]
             )
     else:
         required_courses_node.add_child(

@@ -117,6 +117,9 @@ class AttachContractApi(APIView):
         If the user is already in the contract, then we skip it.
 
         Returns:
+        - 201: Code successfully redeemed and user attached to new contract(s)
+        - 200: Code valid but user already attached to all associated contracts
+        - 404: Invalid or expired enrollment code
         - list of ContractPageSerializer - the contracts for the user
         """
 
@@ -141,9 +144,8 @@ class AttachContractApi(APIView):
             )
         except Discount.DoesNotExist:
             return Response(
-                ContractPageSerializer(
-                    get_active_user_contracts(request.user), many=True
-                ).data
+                {"detail": "Invalid or expired enrollment code."},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
@@ -154,6 +156,7 @@ class AttachContractApi(APIView):
             .all()
         )
 
+        contracts_attached = False
         for contract in contracts:
             if contract.is_full():
                 continue
@@ -165,11 +168,17 @@ class AttachContractApi(APIView):
             DiscountContractAttachmentRedemption.objects.create(
                 user=request.user, discount=code, contract=contract
             )
+            contracts_attached = True
 
         request.user.save()
+
+        response_status = (
+            status.HTTP_201_CREATED if contracts_attached else status.HTTP_200_OK
+        )
 
         return Response(
             ContractPageSerializer(
                 get_active_user_contracts(request.user), many=True
-            ).data
+            ).data,
+            status=response_status,
         )
