@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.135.0
+Version 0.135.0 (Released November 12, 2025)
 ---------------
 
 - ordered ContractPage programs (#3079)
