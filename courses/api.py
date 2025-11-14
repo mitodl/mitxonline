@@ -437,10 +437,6 @@ def defer_enrollment(  # noqa: C901
             f"Cannot defer to a course run of a different course ('{from_enrollment.run.course.title}' -> '{to_run.course.title}'). "  # noqa: EM102
             "Set force=True to defer anyway."
         )
-    if to_run.upgrade_deadline and to_run.upgrade_deadline < now_in_utc():
-        raise ValidationError(
-            f"Cannot defer to a course run whose upgrade deadline has passed (run: {to_run.courseware_id})."  # noqa: EM102
-        )
 
     if already_deferred_from:
         # check if user was already enrolled in verified track
