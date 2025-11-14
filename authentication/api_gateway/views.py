@@ -5,12 +5,12 @@ from urllib.parse import urlencode, urljoin
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.shortcuts import redirect
+from django.http.request import HttpRequest
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views import View
 from django.views.generic.base import RedirectView
 from drf_spectacular.utils import extend_schema
+from mitol.authentication.views.auth import AuthRedirectView
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
@@ -114,22 +114,15 @@ def get_redirect_url(request):
     )
 
 
-class GatewayLoginView(View):
+class LoginWithOnboardingView(AuthRedirectView):
     """
     Redirect the user to the appropriate url after login
     """
 
-    def get(
-        self,
-        request,
-        *args,  # noqa: ARG002
-        **kwargs,  # noqa: ARG002
-    ):
-        """
-        GET endpoint for logging a user in.
-        """
-        redirect_url = get_redirect_url(request)
+    def get_redirect_url(self, request: HttpRequest) -> tuple[str, bool]:
+        redirect_url = super().get_redirect_url(request)
         user = request.user
+
         if (
             not user.is_anonymous
             and not user.should_skip_onboarding
@@ -141,10 +134,11 @@ class GatewayLoginView(View):
             profile = user.user_profile
             profile.completed_onboarding = True
             profile.save()
-        return redirect(redirect_url)
+
+        return redirect_url
 
 
-class OpenedxAndApiGatewayLogoutView(RedirectView):
+class OpenedxAndApiGatewayLogoutView(AuthRedirectView):
     """
     Custom view to support logout under APISIX
 
@@ -157,13 +151,13 @@ class OpenedxAndApiGatewayLogoutView(RedirectView):
         - redirect to http://mitxonline/logout/oidc
     """
 
-    def get_redirect_url(self, *args, **kwargs):  # noqa: ARG002
-        no_redirect = self.request.GET.get("no_redirect")
+    def get_redirect_url(self, request: HttpRequest):
+        no_redirect = request.GET.get("no_redirect")
 
         if no_redirect and no_redirect[0] == "1":
             # This is openedx's /logout interstitial page calling us in an iframe
             # so we redirect into the API gatewat logout but ONLY if the user is authenticated
-            if self.request.user.is_authenticated:
+            if request.user.is_authenticated:
                 return urljoin(settings.SITE_BASE_URL, "/logout/oidc")
             return settings.SITE_BASE_URL
         else:

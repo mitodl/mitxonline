@@ -45,8 +45,10 @@ drf-spectacular = "^0.28.0"
 edx-api-client = "^1.13.0"
 hubspot-api-client = "^6.1.0"
 ipython = "^8.0.0"
-mitol-django-apigateway = "2025.8.14"
-mitol-django-authentication = "^2025.2.12"
+# mitol-django-apigateway = "2025.8.14"
+# mitol-django-authentication = "^2025.2.12"
+mitol-django-apigateway = {git = "https://github.com/mitodl/ol-django", branch = "nl/fix-logout-quirks", subdirectory="src/apigateway"}
+mitol-django-authentication = {git = "https://github.com/mitodl/ol-django", branch = "nl/fix-logout-quirks", subdirectory="src/authentication"}
 mitol-django-common = ">=2025.5.23"
 mitol-django-hubspot-api = "2023.12.19"
 mitol-django-mail = "2023.12.19"

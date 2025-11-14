@@ -5,7 +5,7 @@ from django.urls import path, re_path
 from authentication.api_gateway.views import (
     AccountActionCallbackView,
     AccountActionStartView,
-    GatewayLoginView,
+    LoginWithOnboardingView,
     OpenedxAndApiGatewayLogoutView,
     RegisterDetailsView,
     RegisterExtraDetailsView,
@@ -23,7 +23,7 @@ urlpatterns = [
         RegisterExtraDetailsView.as_view(),
         name="profile-extra-api",
     ),
-    path("login/", GatewayLoginView.as_view(), name="gateway-login"),
+    path("login/", LoginWithOnboardingView.as_view(), name="gateway-login"),
     re_path(
         r"^logout\/?$",
         OpenedxAndApiGatewayLogoutView.as_view(),

@@ -1554,18 +1554,19 @@ test = ["cryptography", "freezegun", "pytest", "pytest-cov", "pytest-django", "p
 
 [[package]]
 name = "djoser"
-version = "2.3.1"
+version = "2.3.3"
 description = "REST implementation of Django authentication system."
 optional = false
-python-versions = "<4.0,>=3.8"
+python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "djoser-2.3.1-py3-none-any.whl", hash = "sha256:386f337b9e05cb82354525fe2b6fec19fb1743e93e53b5b4b9dfaffccc38789f"},
-    {file = "djoser-2.3.1.tar.gz", hash = "sha256:4e7e2716b5b961f1289b5e49b2216ba5c18eb2a3b4b597dd6430638716ff5107"},
+    {file = "djoser-2.3.3-py3-none-any.whl", hash = "sha256:b97d233b626c26ebccb09f5614420873ad78b8b1fb1459c76475b05319bae567"},
+    {file = "djoser-2.3.3.tar.gz", hash = "sha256:6ceeea9898cbdd585f1daa1ee9d46270600c0401dcd2d1db6f7894782006f6a6"},
 ]
 
 [package.dependencies]
-django = ">=3.0.0"
+django = ">=3.2"
+djangorestframework = ">=3.14"
 djangorestframework-simplejwt = ">=5.0,<6.0"
 social-auth-app-django = ">=5.0.0,<6.0.0"
 
@@ -2850,16 +2851,21 @@ description = "MIT Open Learning Django app for API Gateway support"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
-files = [
-    {file = "mitol_django_apigateway-2025.8.14-py3-none-any.whl", hash = "sha256:858ea8aa6e6f345ef80ececf9ec374689ab1ef2024d40ab30f0c33ecfa7158f9"},
-    {file = "mitol_django_apigateway-2025.8.14.tar.gz", hash = "sha256:f4c6476b4fca2614d4f9d956e3470b7f0facb76a181030cbc5f397264b48c84f"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 channels = ">=4.2.0"
 django = ">=3.0"
 django-stubs = ">=1.13.1"
 edx-opaque-keys = "2.2.2"
+
+[package.source]
+type = "git"
+url = "https://github.com/mitodl/ol-django"
+reference = "nl/fix-logout-quirks"
+resolved_reference = "53d7d0abe1a12517d2f48af45e976c4b26f6d324"
+subdirectory = "src/apigateway"
 
 [[package]]
 name = "mitol-django-authentication"
@@ -2868,23 +2874,28 @@ description = "MIT Open Learning django app extensions for oauth toolkit"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
-files = [
-    {file = "mitol_django_authentication-2025.3.17-py3-none-any.whl", hash = "sha256:f3849bc2469bcbe78fed9b0e999dfed2bf6c9d2923c4e2420d6d54a71f8a99bb"},
-    {file = "mitol_django_authentication-2025.3.17.tar.gz", hash = "sha256:296f3f4ef03722560da5435fc16d5844fc6bbbb8685fdce325dbc95044354952"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 django = ">=3.0"
 django-anymail = ">=6.0"
 django-stubs = ">=1.13.1"
 djangorestframework = ">=3.0.0"
-djoser = "2.3.1"
+djoser = "2.3.3"
 mitol-django-common = "*"
 mitol-django-mail = "*"
 social-auth-app-django = ">=5.4.0"
 
 [package.extras]
-touchstone = ["python3-saml (>=1.10.1) ; python_version < \"3.13\""]
+touchstone = ["python3-saml (>=1.10.1) ; python_version < \"3.13\"", "xmlsec (<1.3.15) ; python_version < \"3.13\""]
+
+[package.source]
+type = "git"
+url = "https://github.com/mitodl/ol-django"
+reference = "nl/fix-logout-quirks"
+resolved_reference = "53d7d0abe1a12517d2f48af45e976c4b26f6d324"
+subdirectory = "src/authentication"
 
 [[package]]
 name = "mitol-django-common"
@@ -6038,4 +6049,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "8cb0b37ab063ac0cd946abac719c50c4ce7534f752cae54214d8b507b3f25340"
+content-hash = "ed25e64457ada67b87e0b4c3c6dee41851b34e8d54e373db405d7b59c427645a"
