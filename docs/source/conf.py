@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = "MITx Online"
-copyright = "2023, OL Engineering"  # noqa: A001
+copyright = "2025, OL Engineering"  # noqa: A001
 author = "OL Engineering"
 
 
@@ -29,6 +29,7 @@ author = "OL Engineering"
 # ones.
 extensions = [
     "sphinxcontrib.mermaid",
+    "myst_parser",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
