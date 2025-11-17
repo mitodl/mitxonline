@@ -66,6 +66,7 @@ def test_get_programs(
 
     # Fetch programs after running the fixture so they're in the right order
     programs = Program.objects.order_by("title").prefetch_related("departments").all()
+    program_ids = programs.order_by("id").values_list("id", flat=True).all()
 
     num_queries = num_queries_from_programs(programs, "v2")
     with django_assert_max_num_queries(num_queries) as context:
@@ -73,6 +74,7 @@ def test_get_programs(
     duplicate_queries_check(context)
     programs_data = resp.json()["results"]
     assert len(programs_data) == Pagination.page_size
+    assert sorted([result["id"] for result in programs_data]) == list(program_ids)
     for program, program_data in zip(programs, programs_data):
         # Clear cached property to ensure consistent data between API and serializer
         if hasattr(program, "_courses_with_requirements_data"):
