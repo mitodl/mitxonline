@@ -5,7 +5,7 @@ Course API Views version 2
 import contextlib
 
 import django_filters
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -33,6 +33,7 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramCollection,
+    ProgramEnrollment,
     ProgramRequirement,
 )
 from courses.serializers.v2.certificates import (
@@ -50,8 +51,13 @@ from courses.serializers.v2.departments import (
 from courses.serializers.v2.programs import (
     ProgramCollectionSerializer,
     ProgramSerializer,
+    UserProgramEnrollmentDetailSerializer,
 )
-from courses.utils import get_enrollable_courses, get_unenrollable_courses
+from courses.utils import (
+    get_enrollable_courses,
+    get_program_certificate_by_enrollment,
+    get_unenrollable_courses,
+)
 from main import features
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
@@ -499,3 +505,96 @@ def get_program_certificate(request, cert_uuid):
     return Response(
         ProgramCertificateSerializer(cert, context={"request": request}).data
     )
+
+
+class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
+    """ViewSet for user program enrollments with v2 serializers."""
+
+    permission_classes = [IsAuthenticated]
+
+    id_parameter = OpenApiParameter(
+        name="id",
+        type=OpenApiTypes.INT,
+        location=OpenApiParameter.PATH,
+        description="Program enrollment ID",
+        required=True,
+    )
+
+    @extend_schema(
+        operation_id="v2_program_enrollments_list",
+        responses={200: UserProgramEnrollmentDetailSerializer(many=True)},
+        parameters=[],
+    )
+    def list(self, request):
+        """
+        Returns a unified set of program and course enrollments for the current
+        user using v2 serializers.
+        """
+        program_enrollments = (
+            ProgramEnrollment.objects.select_related(
+                "program",
+                "program__page",
+            )
+            .filter(user=request.user)
+            .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+            .all()
+        )
+
+        program_list = []
+
+        for enrollment in program_enrollments:
+            courses = [course[0] for course in enrollment.program.courses]
+
+            program_list.append(
+                {
+                    "enrollments": CourseRunEnrollment.objects.filter(
+                        user=request.user, run__course__in=courses
+                    )
+                    .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+                    .select_related("run__course__page", "run__b2b_contract")
+                    .all(),
+                    "program": enrollment.program,
+                    "certificate": get_program_certificate_by_enrollment(enrollment),
+                }
+            )
+
+        return Response(
+            UserProgramEnrollmentDetailSerializer(program_list, many=True).data
+        )
+
+    @extend_schema(
+        operation_id="v2_program_enrollments_retrieve",
+        responses={200: UserProgramEnrollmentDetailSerializer},
+        parameters=[id_parameter],
+    )
+    def retrieve(self, request, pk=None):
+        """
+        Retrieve a specific program enrollment using v2 serializers.
+        """
+        program = Program.objects.get(pk=pk)
+        enrollment = ProgramEnrollment.objects.get(user=request.user, program=program)
+        serializer = UserProgramEnrollmentDetailSerializer(
+            enrollment, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(
+        operation_id="v2_program_enrollments_destroy",
+        responses={200: UserProgramEnrollmentDetailSerializer(many=True)},
+        parameters=[id_parameter],
+    )
+    def destroy(self, request, pk=None):
+        """
+        Unenroll the user from this program. This is simpler than the corresponding
+        function for CourseRunEnrollments; edX doesn't really know what programs
+        are so there's nothing to process there.
+        """
+
+        program = Program.objects.get(pk=pk)
+        ProgramEnrollment.objects.update_or_create(
+            user=request.user,
+            program=program,
+            defaults={"change_status": ENROLL_CHANGE_STATUS_UNENROLLED},
+        )
+
+        return self.list(request)
