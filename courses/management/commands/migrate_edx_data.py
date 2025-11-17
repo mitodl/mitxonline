@@ -1,11 +1,13 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 from trino.auth import BasicAuthentication
 from trino.dbapi import connect
 
 from cms.api import create_default_courseware_page
 from cms.models import CertificatePage, SignatoryPage
 from courses.models import Course, CourseRun, Department
+from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
 
 class Command(BaseCommand):
@@ -220,6 +222,106 @@ class Command(BaseCommand):
             self.style.SUCCESS(f"{run_success_count} course runs created")
         )
 
+    @staticmethod
+    def _bulk_create_users(rows, existing_emails, batch_size):
+        new_users = []
+        for row in rows:
+            email = row.get("user_email")
+            if not email or email in existing_emails:
+                continue
+            user = User(
+                username=email,
+                email=email,
+                name=row.get("user_full_name"),
+                is_staff=False,
+                is_active=True,
+                is_superuser=False,
+            )
+            user.set_unusable_password()
+            new_users.append(user)
+        return User.objects.bulk_create(new_users, batch_size=batch_size)
+
+    @staticmethod
+    def _bulk_create_legal_addresses(created_users, row_lookup, batch_size):
+        legal_addresses = []
+        for user in created_users:
+            user_data = row_lookup.get(user.email)
+            if not user_data:
+                continue
+            country = user_data.get("user_address_country")
+            if not country:
+                continue
+            legal_addresses.append(LegalAddress(user=user, country=country))
+        if legal_addresses:
+            LegalAddress.objects.bulk_create(legal_addresses, batch_size=batch_size)
+
+    @staticmethod
+    def _bulk_create_user_profiles(created_users, row_lookup, batch_size, gender_map):
+        user_profiles = []
+        for user in created_users:
+            user_data = row_lookup.get(user.email)
+            if not user_data:
+                continue
+            gender = user_data.get("user_gender")
+            birth_year = user_data.get("user_birth_year")
+            if not gender and not birth_year:
+                continue
+            user_profiles.append(
+                UserProfile(
+                    user=user, year_of_birth=birth_year, gender=gender_map.get(gender)
+                )
+            )
+        if user_profiles:
+            UserProfile.objects.bulk_create(user_profiles, batch_size=batch_size)
+
+    def _migrate_users(self, conn, options):
+        """
+        Migrate users from edX to MITx Online
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+
+        cur = conn.cursor()
+
+        query = "SELECT * FROM edxorg_to_mitxonline_users"
+        if limit is not None:
+            query += f" LIMIT {int(limit)}"
+        cur.execute(query)
+        columns = [desc[0] for desc in cur.description]
+
+        # e.g. {"Male": "m", "Female": "f"}
+        GENDER_MAP = {label: code for code, label in GENDER_CHOICES}
+
+        user_creation_count = 0
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            rows = [dict(zip(columns, r)) for r in results]
+
+            row_lookup = {
+                row["user_email"]: row for row in rows if row.get("user_email")
+            }
+            emails = list(row_lookup.keys())
+
+            # Preload existing users once per batch
+            existing_emails = set(
+                User.objects.filter(
+                    Q(username__in=emails) | Q(email__in=emails)
+                ).values_list("email", flat=True)
+            )
+
+            created_users = self._bulk_create_users(rows, existing_emails, batch_size)
+            user_creation_count += len(created_users)
+
+            self._bulk_create_legal_addresses(created_users, row_lookup, batch_size)
+            self._bulk_create_user_profiles(
+                created_users, row_lookup, batch_size, GENDER_MAP
+            )
+
+        self.stdout.write(self.style.SUCCESS(f"{user_creation_count} users created"))
+
     def add_arguments(self, parser) -> None:
         parser.add_argument(
             "--use-default-signatory",
@@ -237,8 +339,22 @@ class Command(BaseCommand):
             default=1000,
             help="Number of rows to fetch per batch from Trino (default: 1000)",
         )
+        parser.add_argument(
+            "--type",
+            choices=["course_runs", "users"],
+            default="course_runs",
+            help="Choose which migration to run: course_runs, users (default: course_runs)",
+        )
 
     def handle(self, *args, **options):  # pylint: disable=unused-argument # noqa: ARG002
         conn = self._connect_to_trino()
 
-        self._migrate_course_runs(conn, options)
+        migrate_type = options.get("type")
+
+        if migrate_type == "course_runs":
+            self.stdout.write("Migrating the edX course runs ...")
+            self._migrate_course_runs(conn, options)
+
+        if migrate_type == "users":
+            self.stdout.write("Migrating the edX users ...")
+            self._migrate_users(conn, options)
