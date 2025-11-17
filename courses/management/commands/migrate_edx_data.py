@@ -224,6 +224,9 @@ class Command(BaseCommand):
 
     @staticmethod
     def _bulk_create_users(rows, existing_emails, batch_size):
+        """
+        Create users in bulk, skipping those with existing emails.
+        """
         new_users = []
         for row in rows:
             email = row.get("user_email")
@@ -243,6 +246,9 @@ class Command(BaseCommand):
 
     @staticmethod
     def _bulk_create_legal_addresses(created_users, row_lookup, batch_size):
+        """
+        Create legal addresses in bulk for the created users.
+        """
         legal_addresses = []
         for user in created_users:
             user_data = row_lookup.get(user.email)
@@ -257,6 +263,10 @@ class Command(BaseCommand):
 
     @staticmethod
     def _bulk_create_user_profiles(created_users, row_lookup, batch_size, gender_map):
+        """
+        Create user profiles in bulk for the created users.
+        """
+
         user_profiles = []
         for user in created_users:
             user_data = row_lookup.get(user.email)
@@ -276,7 +286,7 @@ class Command(BaseCommand):
 
     def _migrate_users(self, conn, options):
         """
-        Migrate users from edX to MITx Online
+        Migrate users from edX to MITx Online. Create User, LegalAddress, and UserProfile instances.
         """
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
@@ -305,7 +315,6 @@ class Command(BaseCommand):
             }
             emails = list(row_lookup.keys())
 
-            # Preload existing users once per batch
             existing_emails = set(
                 User.objects.filter(
                     Q(username__in=emails) | Q(email__in=emails)
