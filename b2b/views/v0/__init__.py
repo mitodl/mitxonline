@@ -1,7 +1,7 @@
 """Views for the B2B API (v0)."""
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from mitol.common.utils.datetime import now_in_utc
@@ -23,6 +23,7 @@ from b2b.serializers.v0 import (
     OrganizationPageSerializer,
 )
 from courses.models import CourseRun
+from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
 from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
@@ -46,11 +47,14 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
     Viewset for the ContractPage model.
     """
 
-    queryset = ContractPage.objects.all()
     serializer_class = ContractPageSerializer
     permission_classes = [IsAdminOrReadOnly | HasAPIKey]
     lookup_field = "slug"
     lookup_url_kwarg = "contract_slug"
+
+    def get_queryset(self):
+        """Filter to only return active contracts by default."""
+        return ContractPage.objects.filter(active=True)
 
 
 class Enroll(APIView):
@@ -107,26 +111,41 @@ class AttachContractApi(APIView):
 
         This will respect the activation and expiration dates (of both the contract
         and the discount), and will make sure there's sufficient available seats
-        in the contract.
+        in the contract. It will also make sure the code hasn't been used for
+        attachment purposes before.
 
         If the user is already in the contract, then we skip it.
 
         Returns:
+        - 201: Code successfully redeemed and user attached to new contract(s)
+        - 200: Code valid but user already attached to all associated contracts
+        - 404: Invalid or expired enrollment code
         - list of ContractPageSerializer - the contracts for the user
         """
 
         now = now_in_utc()
+
+        def get_active_user_contracts(user):
+            """Helper to get active contracts for a user."""
+            return user.b2b_contracts.filter(active=True).exclude(
+                Q(contract_start__gt=now) | Q(contract_end__lt=now)
+            )
+
         try:
             code = (
-                Discount.objects.filter(
-                    Q(activation_date__isnull=True) | Q(activation_date__lte=now)
-                )
+                Discount.objects.annotate(Count("contract_redemptions"))
+                .filter(Q(activation_date__isnull=True) | Q(activation_date__lte=now))
                 .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
+                .filter(
+                    Q(redemption_type=REDEMPTION_TYPE_UNLIMITED)
+                    | Q(contract_redemptions__count__lt=1)
+                )
                 .get(discount_code=enrollment_code)
             )
         except Discount.DoesNotExist:
             return Response(
-                ContractPageSerializer(request.user.b2b_contracts.all(), many=True).data
+                {"detail": "Invalid or expired enrollment code."},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
@@ -137,6 +156,7 @@ class AttachContractApi(APIView):
             .all()
         )
 
+        contracts_attached = False
         for contract in contracts:
             if contract.is_full():
                 continue
@@ -148,9 +168,17 @@ class AttachContractApi(APIView):
             DiscountContractAttachmentRedemption.objects.create(
                 user=request.user, discount=code, contract=contract
             )
+            contracts_attached = True
 
         request.user.save()
 
+        response_status = (
+            status.HTTP_201_CREATED if contracts_attached else status.HTTP_200_OK
+        )
+
         return Response(
-            ContractPageSerializer(request.user.b2b_contracts.all(), many=True).data
+            ContractPageSerializer(
+                get_active_user_contracts(request.user), many=True
+            ).data,
+            status=response_status,
         )

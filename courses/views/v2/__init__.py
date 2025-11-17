@@ -102,7 +102,9 @@ class ProgramFilterSet(django_filters.FilterSet):
     def filter_by_org_id(self, queryset, _, org_id):
         """Filter according to org_id. If the user is in org_id, return only related programs."""
         if self.request and user_has_org_access(self.request.user, org_id):
-            return queryset.filter(contracts__organization__id=org_id)
+            return queryset.filter(
+                contract_memberships__contract__organization__id=org_id
+            )
         else:
             return queryset.filter(b2b_only=False)
 

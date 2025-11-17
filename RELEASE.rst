@@ -1,6 +1,50 @@
 Release Notes
 =============
 
+Version 0.135.1 (Released November 12, 2025)
+---------------
+
+- add proper response codes to attach endpoint (#3084)
+- Fix remove_user_contracts to maintain user filtering and only remove managed contracts (#3031)
+
+Version 0.135.0 (Released November 12, 2025)
+---------------
+
+- ordered ContractPage programs (#3079)
+- Inactive contracts should not appear in API results by default (#3074)
+
+Version 0.134.1 (Released November 07, 2025)
+---------------
+
+- Enroll Now on program page fix (#3077)
+
+Version 0.134.0 (Released November 06, 2025)
+---------------
+
+- fix migration conflict (#3073)
+- Enrollment Item menu label (#3067)
+- open api diff action (#3064)
+- Update attach user endpoint to check redemptions more closely (#3066)
+
+Version 0.133.1 (Released November 05, 2025)
+---------------
+
+- fix(deps): update django-health-check digest to 53f9bdc (#3009)
+- chore(deps): update dependency bpython to ^0.26 (#3060)
+- fix(deps): update dependency drf-extensions to ^0.8.0 (#3062)
+- Add ContractPage welcome message (#3059)
+
+Version 0.133.0 (Released November 05, 2025)
+---------------
+
+- Add admin action to downgrade learners enrollment (#3055)
+- fix(deps): update dependency moment-timezone to ^0.6.0 (#3063)
+- Update b2b docs (#3040)
+- Update mitxonline wagtail CMS and staff dashboard login redirects (#3054)
+- fix(deps): update dependency postcss to v8.5.6 (#3042)
+- fix(deps): update babel monorepo (#3047)
+- fix(deps): update react monorepo (#3043)
+
 Version 0.132.3 (Released October 29, 2025)
 ---------------
 

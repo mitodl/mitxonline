@@ -111,11 +111,15 @@ paths:
 
         This will respect the activation and expiration dates (of both the contract
         and the discount), and will make sure there's sufficient available seats
-        in the contract.
+        in the contract. It will also make sure the code hasn't been used for
+        attachment purposes before.
 
         If the user is already in the contract, then we skip it.
 
         Returns:
+        - 201: Code successfully redeemed and user attached to new contract(s)
+        - 200: Code valid but user already attached to all associated contracts
+        - 404: Invalid or expired enrollment code
         - list of ContractPageSerializer - the contracts for the user
       parameters:
       - in: path
@@ -1562,6 +1566,11 @@ components:
           readOnly: true
           description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
           pattern: ^[-\w]+$
+        programs:
+          type: array
+          items:
+            type: integer
+          readOnly: true
       required:
       - active
       - contract_end
@@ -1572,6 +1581,7 @@ components:
       - membership_type
       - name
       - organization
+      - programs
       - slug
       - welcome_message
       - welcome_message_extra
@@ -4632,26 +4642,46 @@ components:
                 required:
                   type: array
                   items:
-                    type: integer
-                  description: List of required course IDs
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of required courses with id and readable_id
                 electives:
                   type: array
                   items:
-                    type: integer
-                  description: List of elective course IDs
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of elective courses with id and readable_id
             programs:
               type: object
               properties:
                 required:
                   type: array
                   items:
-                    type: integer
-                  description: List of required program IDs
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of required programs with id and readable_id
                 electives:
                   type: array
                   items:
-                    type: integer
-                  description: List of elective program IDs
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of elective programs with id and readable_id
           readOnly: true
         req_tree:
           type: array

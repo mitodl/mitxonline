@@ -14,6 +14,12 @@ class ContractPageSerializer(serializers.ModelSerializer):
     """
 
     membership_type = serializers.CharField()
+    programs = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
+    def get_programs(self, instance):
+        """Get the ordered list of program IDs for this contract"""
+        return list(instance.programs.values_list("id", flat=True))
 
     class Meta:
         model = ContractPage
@@ -31,6 +37,7 @@ class ContractPageSerializer(serializers.ModelSerializer):
             "active",
             "slug",
             "organization",
+            "programs",
         ]
         read_only_fields = [
             "id",
@@ -46,6 +53,7 @@ class ContractPageSerializer(serializers.ModelSerializer):
             "active",
             "slug",
             "organization",
+            "programs",
         ]
 
 
@@ -54,7 +62,13 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
     Serializer for the OrganizationPage model.
     """
 
-    contracts = ContractPageSerializer(many=True, read_only=True)
+    contracts = serializers.SerializerMethodField()
+
+    @extend_schema_field(ContractPageSerializer(many=True))
+    def get_contracts(self, instance):
+        """Get only active contracts for the organization"""
+        active_contracts = instance.contracts.filter(active=True)
+        return ContractPageSerializer(active_contracts, many=True).data
 
     class Meta:
         model = OrganizationPage
@@ -145,6 +159,7 @@ class UserOrganizationSerializer(serializers.ModelSerializer):
             self.context["user"]
             .b2b_contracts.filter(
                 organization=instance.organization,
+                active=True,
             )
             .all()
         )

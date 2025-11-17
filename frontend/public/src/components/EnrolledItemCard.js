@@ -536,6 +536,7 @@ export class EnrolledItemCard extends React.Component<
                 data-bs-toggle="dropdown"
                 aria-haspopup="true"
                 aria-expanded="false"
+                aria-label="Course options menu"
                 type="button"
                 id={`enrollmentDropdown-${enrollment.id}`}
               >
@@ -661,6 +662,7 @@ export class EnrolledItemCard extends React.Component<
                 data-bs-toggle="dropdown"
                 aria-haspopup="true"
                 aria-expanded="false"
+                aria-label="Program options menu"
                 type="button"
                 id={`enrollmentDropdown-${enrollment.id}`}
               >

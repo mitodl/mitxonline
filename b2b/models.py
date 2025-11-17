@@ -10,10 +10,11 @@ from django.http import Http404
 from django.utils.text import slugify
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
+from modelcluster.fields import ParentalKey
 from requests.exceptions import HTTPError
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
 from wagtail.fields import RichTextField
-from wagtail.models import Page
+from wagtail.models import ClusterableModel, Orderable, Page
 
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
@@ -24,6 +25,7 @@ from b2b.constants import (
 )
 from b2b.exceptions import TargetCourseRunExistsError
 from b2b.tasks import queue_enrollment_code_check
+from courses.models import Program
 
 log = logging.getLogger(__name__)
 
@@ -160,7 +162,7 @@ class OrganizationPage(Page):
 
         return contracts_qs.count()
 
-    def remove_user_contracts(self, user):  # noqa: ARG002
+    def remove_user_contracts(self, user):
         """
         Remove managed contracts from the given user.
 
@@ -169,7 +171,13 @@ class OrganizationPage(Page):
         Returns:
         - int: number of contracts removed
         """
-        return 0
+
+        return user.b2b_contracts.through.objects.filter(
+            user_id=user.id,
+            contractpage_id__in=self.contracts.filter(
+                integration_type__in=CONTRACT_MEMBERSHIP_AUTOS
+            ).values_list("id", flat=True),
+        ).delete()
 
     def __str__(self):
         """Return a reasonable representation of the org as a string."""
@@ -188,7 +196,53 @@ class OrganizationPage(Page):
         ]
 
 
-class ContractPage(Page):
+class ContractProgramItem(Orderable):
+    """Intermediate model to store programs in a contract with ordering"""
+
+    contract = ParentalKey(
+        "ContractPage", on_delete=models.CASCADE, related_name="contract_programs"
+    )
+    program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="contract_memberships"
+    )
+
+    panels = [
+        FieldPanel("program"),
+    ]
+
+    class Meta:
+        ordering = ["sort_order"]
+        unique_together = ("contract", "program")
+        verbose_name = "Contract Program Item"
+        verbose_name_plural = "Contract Program Items"
+
+    def __str__(self):
+        return (
+            f"{self.contract.title} - {self.program.title} (order: {self.sort_order})"
+        )
+
+    def save(self, *args, skip_run_creation=False, **kwargs):
+        """
+        Queue async task to create contract runs for new program associations.
+
+        Args:
+            skip_run_creation: Skip task if runs are created synchronously.
+        """
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        if is_new and not skip_run_creation:
+            from b2b.tasks import create_program_contract_runs
+
+            create_program_contract_runs.delay(self.contract.id, self.program.id)
+            log.info(
+                "Queued contract run creation for program %s in contract %s",
+                self.program.id,
+                self.contract.id,
+            )
+
+
+class ContractPage(Page, ClusterableModel):
     """Stores information about a contract with an organization."""
 
     parent_page_types = ["b2b.OrganizationPage"]
@@ -248,11 +302,16 @@ class ContractPage(Page):
         null=True,
         help_text="The fixed price for enrollment under this contract. (Set to zero or leave blank for free.)",
     )
-    programs = models.ManyToManyField(
-        "courses.Program",
-        help_text="The programs associated with this contract.",
-        related_name="contracts",
-    )
+
+    @property
+    def programs(self):
+        """
+        Returns programs in the contract ordered by their order field.
+        This replaces the old ManyToManyField with ordered access via ContractProgramItem.
+        """
+        return Program.objects.filter(contract_memberships__contract=self).order_by(
+            "contract_memberships__sort_order"
+        )
 
     content_panels = [
         FieldPanel("name"),
@@ -284,6 +343,11 @@ class ContractPage(Page):
             ],
             heading="Availability",
             icon="calendar-alt",
+        ),
+        InlinePanel(
+            "contract_programs",
+            heading="Programs",
+            help_text="Add and order programs in this contract",
         ),
     ]
 
@@ -377,7 +441,7 @@ class ContractPage(Page):
 
         return Discount.objects.filter(products__product__in=self.get_products()).all()
 
-    def add_program_courses(self, program):
+    def add_program_courses(self, program, order=None):
         """
         Add a program, and then queue adding all its courses.
 
@@ -414,7 +478,17 @@ class ContractPage(Page):
             except TargetCourseRunExistsError:  # noqa: PERF203
                 skipped_run_creation += 1
 
-        self.programs.add(program)
+        if order is None:
+            last_item = self.contract_programs.order_by("-sort_order").first()
+            order = (last_item.sort_order + 1) if last_item else 0
+
+        existing_item = ContractProgramItem.objects.filter(
+            contract=self, program=program
+        ).first()
+
+        if not existing_item:
+            item = ContractProgramItem(contract=self, program=program, sort_order=order)
+            item.save(skip_run_creation=True)
 
         return (managed, skipped_run_creation, no_source)
 
@@ -432,16 +506,19 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
         "ecommerce.Discount",
         on_delete=models.DO_NOTHING,
         help_text="The discount that was redemeed.",
+        related_name="contract_redemptions",
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.DO_NOTHING,
         help_text="The user that redeemed the discount.",
+        related_name="+",
     )
     contract = models.ForeignKey(
         ContractPage,
         on_delete=models.DO_NOTHING,
         help_text="The contract that the user was attached to.",
+        related_name="code_redemptions",
     )
 
 

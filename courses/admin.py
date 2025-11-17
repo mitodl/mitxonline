@@ -40,7 +40,10 @@ from openedx.tasks import retry_failed_edx_enrollments
 class ProgramContractPageInline(admin.TabularInline):
     """Inline for contract pages"""
 
-    model = Program.contracts.through
+    # Import here to avoid circular dependency at module load time
+    from b2b.models import ContractProgramItem
+
+    model = ContractProgramItem
     extra = 0
 
 
@@ -129,6 +132,7 @@ class CourseRunAdmin(TimestampedModelAdmin):
     )
     list_filter = [
         "live",
+        "is_source_run",
         "course",
         "b2b_contract",
     ]
