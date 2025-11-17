@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.135.2
+---------------
+
+- Expose readable ids on requirements objects (#3088)
+- Remove name from UserAdapter (#3086)
+- fix: raise error on enrollment retry failure (#3016)
+
 Version 0.135.1 (Released November 12, 2025)
 ---------------
 
