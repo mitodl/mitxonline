@@ -66,7 +66,7 @@ def test_get_programs(
 
     # Fetch programs after running the fixture so they're in the right order
     programs = Program.objects.order_by("title").prefetch_related("departments").all()
-    program_ids = programs.order_by("id").values_list("id", flat=True).all()
+    program_ids = programs.values_list("id", flat=True).all()
 
     num_queries = num_queries_from_programs(programs, "v2")
     with django_assert_max_num_queries(num_queries) as context:
@@ -74,7 +74,8 @@ def test_get_programs(
     duplicate_queries_check(context)
     programs_data = resp.json()["results"]
     assert len(programs_data) == Pagination.page_size
-    assert sorted([result["id"] for result in programs_data]) == list(program_ids)
+    # Assert that things are in the correct order by checking the IDs
+    assert [result["id"] for result in programs_data] == list(program_ids)
 
     for program_data in programs_data:
         program = programs.get(pk=program_data["id"])
