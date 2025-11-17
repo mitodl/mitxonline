@@ -75,7 +75,9 @@ def test_get_programs(
     programs_data = resp.json()["results"]
     assert len(programs_data) == Pagination.page_size
     assert sorted([result["id"] for result in programs_data]) == list(program_ids)
-    for program, program_data in zip(programs, programs_data):
+
+    for program_data in programs_data:
+        program = programs.get(pk=program_data["id"])
         # Clear cached property to ensure consistent data between API and serializer
         if hasattr(program, "_courses_with_requirements_data"):
             delattr(program, "_courses_with_requirements_data")
