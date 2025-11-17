@@ -540,3 +540,35 @@ class ProgramSerializer(serializers.ModelSerializer):
             "min_weekly_hours",
             "max_weekly_hours",
         ]
+
+
+@extend_schema_serializer(component_name="V2UserProgramEnrollmentDetail")
+class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
+    """
+    Serializer for user program enrollments with associated course enrollments.
+
+    This aggregates a program, its course enrollments for the user, and any
+    program certificate that has been earned.
+    """
+
+    program = ProgramSerializer()
+    enrollments = serializers.SerializerMethodField()
+    certificate = serializers.SerializerMethodField(read_only=True)
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_enrollments(self, instance):
+        """Get course run enrollments using v2 serializer."""
+        from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
+
+        enrollments = instance.get("enrollments", [])
+        return CourseRunEnrollmentSerializer(enrollments, many=True).data
+
+    @extend_schema_field(serializers.DictField(allow_null=True))
+    def get_certificate(self, instance):
+        """
+        Resolve a certificate for this enrollment if it exists.
+        """
+        from courses.serializers.v2.certificates import ProgramCertificateSerializer
+
+        certificate = instance.get("certificate")
+        return ProgramCertificateSerializer(certificate).data if certificate else None

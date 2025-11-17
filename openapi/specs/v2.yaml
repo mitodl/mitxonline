@@ -1260,6 +1260,67 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2ProgramCertificate'
           description: ''
+  /api/v2/program_enrollments/:
+    get:
+      operationId: program_enrollments_list_2
+      description: |-
+        Returns a unified set of program and course enrollments for the current
+        user using v2 serializers.
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/V2UserProgramEnrollmentDetail'
+          description: ''
+  /api/v2/program_enrollments/{id}/:
+    get:
+      operationId: program_enrollments_retrieve_2
+      description: Retrieve a specific program enrollment using v2 serializers.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Program enrollment ID
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2UserProgramEnrollmentDetail'
+          description: ''
+    delete:
+      operationId: program_enrollments_destroy_2
+      description: |-
+        Unenroll the user from this program. This is simpler than the corresponding
+        function for CourseRunEnrollments; edX doesn't really know what programs
+        are so there's nothing to process there.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Program enrollment ID
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/V2UserProgramEnrollmentDetail'
+          description: ''
   /api/v2/programs/:
     get:
       operationId: programs_list_v2
@@ -4934,6 +4995,31 @@ components:
       - course
       - program
       - operator
+    V2UserProgramEnrollmentDetail:
+      type: object
+      description: |-
+        Serializer for user program enrollments with associated course enrollments.
+
+        This aggregates a program, its course enrollments for the user, and any
+        program certificate that has been earned.
+      properties:
+        program:
+          $ref: '#/components/schemas/V2Program'
+        enrollments:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
+        certificate:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          readOnly: true
+      required:
+      - certificate
+      - enrollments
+      - program
     YearsExperienceEnum:
       enum:
       - 2
