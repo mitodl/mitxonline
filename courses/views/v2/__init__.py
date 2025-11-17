@@ -521,6 +521,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     )
 
     @extend_schema(
+        operation_id="v2_program_enrollments_list",
         responses={200: UserProgramEnrollmentDetailSerializer(many=True)},
         parameters=[],
     )
@@ -562,6 +563,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         )
 
     @extend_schema(
+        operation_id="v2_program_enrollments_retrieve",
         responses={200: UserProgramEnrollmentDetailSerializer},
         parameters=[id_parameter],
     )
@@ -577,6 +579,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
     @extend_schema(
+        operation_id="v2_program_enrollments_destroy",
         responses={200: UserProgramEnrollmentDetailSerializer(many=True)},
         parameters=[id_parameter],
     )

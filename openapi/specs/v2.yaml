@@ -1262,7 +1262,7 @@ paths:
           description: ''
   /api/v2/program_enrollments/:
     get:
-      operationId: program_enrollments_list_2
+      operationId: v2_program_enrollments_list
       description: |-
         Returns a unified set of program and course enrollments for the current
         user using v2 serializers.
@@ -1279,7 +1279,7 @@ paths:
           description: ''
   /api/v2/program_enrollments/{id}/:
     get:
-      operationId: program_enrollments_retrieve_2
+      operationId: v2_program_enrollments_retrieve
       description: Retrieve a specific program enrollment using v2 serializers.
       parameters:
       - in: path
@@ -1298,7 +1298,7 @@ paths:
                 $ref: '#/components/schemas/V2UserProgramEnrollmentDetail'
           description: ''
     delete:
-      operationId: program_enrollments_destroy_2
+      operationId: v2_program_enrollments_destroy
       description: |-
         Unenroll the user from this program. This is simpler than the corresponding
         function for CourseRunEnrollments; edX doesn't really know what programs
