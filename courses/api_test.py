@@ -1,5 +1,6 @@
 """Courses API tests"""
 
+import re
 from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
@@ -2066,7 +2067,9 @@ def _run_test_import_courserun_from_edx(  # noqa: PLR0913
         use_specific_course = CourseFactory.create().readable_id
 
     responses.get(
-        f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}/",
+        url=re.compile(
+            rf"{re.escape(settings.OPENEDX_API_BASE_URL)}/api/courses/v1/courses/{re.escape(test_course_run_key)}/"
+        ),
         json=mocked_detail,
         status=status.HTTP_200_OK,
     )
