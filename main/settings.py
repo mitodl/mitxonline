@@ -1151,6 +1151,7 @@ OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
 OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"  # noqa: S105
 
 OAUTH2_PROVIDER = {
+    "PKCE_REQUIRED": False,
     "OIDC_ENABLED": True,
     "OIDC_RSA_PRIVATE_KEY": get_string(
         name="OIDC_RSA_PRIVATE_KEY",
