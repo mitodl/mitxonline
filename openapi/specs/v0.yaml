@@ -3839,7 +3839,7 @@ components:
             $ref: '#/components/schemas/CourseRunEnrollment'
         certificate:
           allOf:
-          - $ref: '#/components/schemas/ProgramCertificate'
+          - $ref: '#/components/schemas/V1ProgramCertificate'
           nullable: true
           readOnly: true
       required:
@@ -4248,6 +4248,24 @@ components:
       - req_tree
       - requirements
       - title
+    V1ProgramCertificate:
+      type: object
+      description: ProgramCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/program/<uuid>/
+            Example: /certificate/program/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+          readOnly: true
+      required:
+      - link
+      - uuid
     V1ProgramRequirement:
       type: object
       description: Serializer for a ProgramRequirement
@@ -5005,15 +5023,15 @@ components:
       properties:
         program:
           $ref: '#/components/schemas/V2Program'
-        certificate:
-          allOf:
-          - $ref: '#/components/schemas/V2ProgramCertificate'
-          nullable: true
-          readOnly: true
         enrollments:
           type: array
           items:
             $ref: '#/components/schemas/CourseRunEnrollmentRequestV2'
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/ProgramCertificate'
+          nullable: true
+          readOnly: true
       required:
       - certificate
       - enrollments

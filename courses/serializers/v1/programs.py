@@ -220,6 +220,7 @@ class FullProgramSerializer(ProgramSerializer):
         ]
 
 
+@extend_schema_serializer(component_name="V1ProgramCertificate")
 class ProgramCertificateSerializer(serializers.ModelSerializer):
     """ProgramCertificate model serializer"""
 

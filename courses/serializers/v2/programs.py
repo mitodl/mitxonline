@@ -6,7 +6,12 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from cms.serializers import ProgramPageSerializer
-from courses.models import Program, ProgramCollection, ProgramRequirementNodeType
+from courses.models import (
+    Program,
+    ProgramCertificate,
+    ProgramCollection,
+    ProgramRequirementNodeType,
+)
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
@@ -543,6 +548,14 @@ class ProgramSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProgramCertificateSerializer(serializers.ModelSerializer):
+    """ProgramCertificate model serializer"""
+
+    class Meta:
+        model = ProgramCertificate
+        fields = ["uuid", "link"]
+
+
 @extend_schema_serializer(component_name="V2UserProgramEnrollmentDetail")
 class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     """
@@ -553,25 +566,13 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     """
 
     program = ProgramSerializer()
+    enrollments = CourseRunEnrollmentSerializer(many=True)
     certificate = serializers.SerializerMethodField(read_only=True)
 
-    def get_fields(self):
-        """Import serializers here to avoid circular imports."""
-        fields = super().get_fields()
-        fields["enrollments"] = CourseRunEnrollmentSerializer(many=True)
-        return fields
-
-    @extend_schema_field(
-        {
-            "allOf": [{"$ref": "#/components/schemas/V2ProgramCertificate"}],
-            "nullable": True,
-        }
-    )
+    @extend_schema_field(ProgramCertificateSerializer(allow_null=True))
     def get_certificate(self, instance):
         """
         Resolve a certificate for this enrollment if it exists.
         """
-        from courses.serializers.v2.certificates import ProgramCertificateSerializer
-
         certificate = instance.get("certificate")
         return ProgramCertificateSerializer(certificate).data if certificate else None
