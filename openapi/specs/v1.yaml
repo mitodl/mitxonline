@@ -5005,17 +5005,15 @@ components:
       properties:
         program:
           $ref: '#/components/schemas/V2Program'
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/V2ProgramCertificate'
+          nullable: true
+          readOnly: true
         enrollments:
           type: array
           items:
-            type: object
-            additionalProperties: {}
-          readOnly: true
-        certificate:
-          type: object
-          additionalProperties: {}
-          nullable: true
-          readOnly: true
+            $ref: '#/components/schemas/CourseRunEnrollmentRequestV2'
       required:
       - certificate
       - enrollments

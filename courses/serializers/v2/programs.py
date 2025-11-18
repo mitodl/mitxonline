@@ -13,6 +13,7 @@ from courses.serializers.base import (
 )
 from courses.serializers.utils import get_unique_topics_from_courses
 from courses.serializers.v1.departments import DepartmentSerializer
+from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
 from main.serializers import StrictFieldsSerializer
 
 logger = logging.getLogger(__name__)
@@ -552,18 +553,20 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     """
 
     program = ProgramSerializer()
-    enrollments = serializers.SerializerMethodField()
     certificate = serializers.SerializerMethodField(read_only=True)
 
-    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
-    def get_enrollments(self, instance):
-        """Get course run enrollments using v2 serializer."""
-        from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
+    def get_fields(self):
+        """Import serializers here to avoid circular imports."""
+        fields = super().get_fields()
+        fields["enrollments"] = CourseRunEnrollmentSerializer(many=True)
+        return fields
 
-        enrollments = instance.get("enrollments", [])
-        return CourseRunEnrollmentSerializer(enrollments, many=True).data
-
-    @extend_schema_field(serializers.DictField(allow_null=True))
+    @extend_schema_field(
+        {
+            "allOf": [{"$ref": "#/components/schemas/V2ProgramCertificate"}],
+            "nullable": True,
+        }
+    )
     def get_certificate(self, instance):
         """
         Resolve a certificate for this enrollment if it exists.
