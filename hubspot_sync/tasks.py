@@ -250,7 +250,7 @@ def batch_create_hubspot_objects_chunked(
     chunked_ids = list(_batched_chunks(hubspot_type, object_ids))
     total_chunks = len(chunked_ids)
     total_objects = len(object_ids)
-    
+
     log.info(
         "Starting batch create for %s: %d %s(s) split into %d chunk(s)",
         hubspot_type,
@@ -258,7 +258,7 @@ def batch_create_hubspot_objects_chunked(
         ct_model_name,
         total_chunks,
     )
-    
+
     errored_chunks = []
     last_error_status = None
     for chunk_index, chunk in enumerate(chunked_ids, start=1):
@@ -273,7 +273,7 @@ def batch_create_hubspot_objects_chunked(
             total_objects,
             (len(created_ids) / total_objects * 100) if total_objects > 0 else 0,
         )
-        
+
         try:
             response = HubspotApi().crm.objects.batch_api.create(
                 hubspot_type,
@@ -299,7 +299,7 @@ def batch_create_hubspot_objects_chunked(
                 )
                 created_ids.append(result.id)
                 chunk_created_count += 1
-            
+
             log.info(
                 "Successfully created %d %s(s) in chunk %d/%d",
                 chunk_created_count,
@@ -327,7 +327,7 @@ def batch_create_hubspot_objects_chunked(
                     ct_model_name,
                 )
         wait_for_hubspot_rate_limit()
-    
+
     log.info(
         "Completed batch create for %s: %d/%d %s(s) successfully created",
         hubspot_type,
@@ -335,7 +335,7 @@ def batch_create_hubspot_objects_chunked(
         total_objects,
         ct_model_name,
     )
-    
+
     if errored_chunks:
         total_failed = sum(len(chunk) for chunk in errored_chunks)
         log.error(
