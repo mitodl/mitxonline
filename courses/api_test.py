@@ -2070,6 +2070,12 @@ def _run_test_import_courserun_from_edx(  # noqa: PLR0913
         json=mocked_detail,
         status=status.HTTP_200_OK,
     )
+    # sometimes in CI this gets run without the trailing slash
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
 
     (courserun, page, product) = import_courserun_from_edx(
         course_key=test_course_run_key,
