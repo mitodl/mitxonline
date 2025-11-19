@@ -1260,6 +1260,67 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2ProgramCertificate'
           description: ''
+  /api/v2/program_enrollments/:
+    get:
+      operationId: v2_program_enrollments_list
+      description: |-
+        Returns a unified set of program and course enrollments for the current
+        user using v2 serializers.
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/V2UserProgramEnrollmentDetail'
+          description: ''
+  /api/v2/program_enrollments/{id}/:
+    get:
+      operationId: v2_program_enrollments_retrieve
+      description: Retrieve a specific program enrollment using v2 serializers.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Program enrollment ID
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2UserProgramEnrollmentDetail'
+          description: ''
+    delete:
+      operationId: v2_program_enrollments_destroy
+      description: |-
+        Unenroll the user from this program. This is simpler than the corresponding
+        function for CourseRunEnrollments; edX doesn't really know what programs
+        are so there's nothing to process there.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Program enrollment ID
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/V2UserProgramEnrollmentDetail'
+          description: ''
   /api/v2/programs/:
     get:
       operationId: programs_list_v2
@@ -3778,7 +3839,7 @@ components:
             $ref: '#/components/schemas/CourseRunEnrollment'
         certificate:
           allOf:
-          - $ref: '#/components/schemas/ProgramCertificate'
+          - $ref: '#/components/schemas/V1ProgramCertificate'
           nullable: true
           readOnly: true
       required:
@@ -4187,6 +4248,24 @@ components:
       - req_tree
       - requirements
       - title
+    V1ProgramCertificate:
+      type: object
+      description: ProgramCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/program/<uuid>/
+            Example: /certificate/program/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+          readOnly: true
+      required:
+      - link
+      - uuid
     V1ProgramRequirement:
       type: object
       description: Serializer for a ProgramRequirement
@@ -4642,26 +4721,46 @@ components:
                 required:
                   type: array
                   items:
-                    type: integer
-                  description: List of required course IDs
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of required courses with id and readable_id
                 electives:
                   type: array
                   items:
-                    type: integer
-                  description: List of elective course IDs
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of elective courses with id and readable_id
             programs:
               type: object
               properties:
                 required:
                   type: array
                   items:
-                    type: integer
-                  description: List of required program IDs
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of required programs with id and readable_id
                 electives:
                   type: array
                   items:
-                    type: integer
-                  description: List of elective program IDs
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of elective programs with id and readable_id
           readOnly: true
         req_tree:
           type: array
@@ -4914,6 +5013,29 @@ components:
       - course
       - program
       - operator
+    V2UserProgramEnrollmentDetail:
+      type: object
+      description: |-
+        Serializer for user program enrollments with associated course enrollments.
+
+        This aggregates a program, its course enrollments for the user, and any
+        program certificate that has been earned.
+      properties:
+        program:
+          $ref: '#/components/schemas/V2Program'
+        enrollments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseRunEnrollmentRequestV2'
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/ProgramCertificate'
+          nullable: true
+          readOnly: true
+      required:
+      - certificate
+      - enrollments
+      - program
     YearsExperienceEnum:
       enum:
       - 2

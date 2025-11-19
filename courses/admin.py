@@ -101,7 +101,7 @@ class CourseAdmin(admin.ModelAdmin):
         """
         if getattr(obj, "page", None):
             product_page_edit_url = (
-                f"{reverse('wagtailadmin_home')}/pages/{obj.page.id}/edit"
+                f"{reverse('wagtailadmin_home').rstrip('/')}/pages/{obj.page.id}/edit"
             )
             product_page_edit_link = (
                 f"<a href={product_page_edit_url} target='_blank'>CMS Product Page</a>"

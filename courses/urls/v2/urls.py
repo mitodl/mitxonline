@@ -18,6 +18,11 @@ router.register(r"departments", v2.DepartmentViewSet, basename="departments_api"
 router.register(
     r"enrollments", v2.UserEnrollmentsApiViewSet, basename="user-enrollments-api"
 )
+router.register(
+    r"program_enrollments",
+    v2.UserProgramEnrollmentsViewSet,
+    basename="user_program_enrollments_api",
+)
 
 urlpatterns = [
     *router.urls,

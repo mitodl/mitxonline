@@ -83,16 +83,20 @@ def test_serialize_program(
         program_with_empty_requirements.add_requirement(course2)
         program_with_empty_requirements.add_requirement(required_program)
         formatted_reqs["courses"]["required"] = [
-            course.id for course in program_with_empty_requirements.required_courses
+            {"id": course.id, "readable_id": course.readable_id}
+            for course in program_with_empty_requirements.required_courses
         ]
         formatted_reqs["courses"]["electives"] = [
-            course.id for course in program_with_empty_requirements.elective_courses
+            {"id": course.id, "readable_id": course.readable_id}
+            for course in program_with_empty_requirements.elective_courses
         ]
         formatted_reqs["programs"]["required"] = [
-            program.id for program in program_with_empty_requirements.required_programs
+            {"id": program.id, "readable_id": program.readable_id}
+            for program in program_with_empty_requirements.required_programs
         ]
         formatted_reqs["programs"]["electives"] = [
-            program.id for program in program_with_empty_requirements.elective_programs
+            {"id": program.id, "readable_id": program.readable_id}
+            for program in program_with_empty_requirements.elective_programs
         ]
         topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
         course1.page.topics.set([topics[0], topics[1]])

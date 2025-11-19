@@ -6,13 +6,19 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from cms.serializers import ProgramPageSerializer
-from courses.models import Program, ProgramCollection, ProgramRequirementNodeType
+from courses.models import (
+    Program,
+    ProgramCertificate,
+    ProgramCollection,
+    ProgramRequirementNodeType,
+)
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
 )
 from courses.serializers.utils import get_unique_topics_from_courses
 from courses.serializers.v1.departments import DepartmentSerializer
+from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
 from main.serializers import StrictFieldsSerializer
 
 logger = logging.getLogger(__name__)
@@ -231,13 +237,25 @@ class ProgramSerializer(serializers.ModelSerializer):
                     "properties": {
                         "required": {
                             "type": "array",
-                            "items": {"type": "integer"},
-                            "description": "List of required course IDs",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "integer"},
+                                    "readable_id": {"type": "string"},
+                                },
+                            },
+                            "description": "List of required courses with id and readable_id",
                         },
                         "electives": {
                             "type": "array",
-                            "items": {"type": "integer"},
-                            "description": "List of elective course IDs",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "integer"},
+                                    "readable_id": {"type": "string"},
+                                },
+                            },
+                            "description": "List of elective courses with id and readable_id",
                         },
                     },
                 },
@@ -246,13 +264,25 @@ class ProgramSerializer(serializers.ModelSerializer):
                     "properties": {
                         "required": {
                             "type": "array",
-                            "items": {"type": "integer"},
-                            "description": "List of required program IDs",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "integer"},
+                                    "readable_id": {"type": "string"},
+                                },
+                            },
+                            "description": "List of required programs with id and readable_id",
                         },
                         "electives": {
                             "type": "array",
-                            "items": {"type": "integer"},
-                            "description": "List of elective program IDs",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "integer"},
+                                    "readable_id": {"type": "string"},
+                                },
+                            },
+                            "description": "List of elective programs with id and readable_id",
                         },
                     },
                 },
@@ -273,15 +303,27 @@ class ProgramSerializer(serializers.ModelSerializer):
                 )
             )
         else:
-            # Fallback to  using model properties
+            # Fallback to using model properties
             return {
                 "courses": {
-                    "required": [course.id for course in instance.required_courses],
-                    "electives": [course.id for course in instance.elective_courses],
+                    "required": [
+                        {"id": course.id, "readable_id": course.readable_id}
+                        for course in instance.required_courses
+                    ],
+                    "electives": [
+                        {"id": course.id, "readable_id": course.readable_id}
+                        for course in instance.elective_courses
+                    ],
                 },
                 "programs": {
-                    "required": [program.id for program in instance.required_programs],
-                    "electives": [program.id for program in instance.elective_programs],
+                    "required": [
+                        {"id": program.id, "readable_id": program.readable_id}
+                        for program in instance.required_programs
+                    ],
+                    "electives": [
+                        {"id": program.id, "readable_id": program.readable_id}
+                        for program in instance.elective_programs
+                    ],
                 },
             }
 
@@ -297,32 +339,40 @@ class ProgramSerializer(serializers.ModelSerializer):
         }
 
     def _process_course_requirements_from_all(self, requirements):
-        """Process course requirements from all_requirements and return required/elective course IDs"""
+        """Process course requirements and return dicts with id and readable_id"""
         required_courses = []
         elective_courses = []
         for req in requirements:
-            # Check node_type and course_id first to avoid unnecessary queries
-            if req.node_type == ProgramRequirementNodeType.COURSE and req.course_id:
+            # Check node_type and course first to avoid unnecessary queries
+            if req.node_type == ProgramRequirementNodeType.COURSE and req.course:
+                course_data = {
+                    "id": req.course.id,
+                    "readable_id": req.course.readable_id,
+                }
                 if self._is_requirement_elective(req):
-                    elective_courses.append(req.course_id)
+                    elective_courses.append(course_data)
                 else:
-                    required_courses.append(req.course_id)
+                    required_courses.append(course_data)
         return required_courses, elective_courses
 
     def _process_program_requirements_from_all(self, requirements):
-        """Process program requirements from all_requirements and return required/elective program IDs"""
+        """Process program requirements and return dicts with id and readable_id"""
         required_programs = []
         elective_programs = []
         for req in requirements:
-            # Check node_type and required_program_id first to avoid unnecessary queries
+            # Check node_type and required_program first to avoid unnecessary queries
             if (
                 req.node_type == ProgramRequirementNodeType.PROGRAM
-                and req.required_program_id
+                and req.required_program
             ):
+                program_data = {
+                    "id": req.required_program.id,
+                    "readable_id": req.required_program.readable_id,
+                }
                 if self._is_requirement_elective(req):
-                    elective_programs.append(req.required_program_id)
+                    elective_programs.append(program_data)
                 else:
-                    required_programs.append(req.required_program_id)
+                    required_programs.append(program_data)
         return required_programs, elective_programs
 
     def get_required_prerequisites(self, instance) -> bool:
@@ -496,3 +546,33 @@ class ProgramSerializer(serializers.ModelSerializer):
             "min_weekly_hours",
             "max_weekly_hours",
         ]
+
+
+class ProgramCertificateSerializer(serializers.ModelSerializer):
+    """ProgramCertificate model serializer"""
+
+    class Meta:
+        model = ProgramCertificate
+        fields = ["uuid", "link"]
+
+
+@extend_schema_serializer(component_name="V2UserProgramEnrollmentDetail")
+class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
+    """
+    Serializer for user program enrollments with associated course enrollments.
+
+    This aggregates a program, its course enrollments for the user, and any
+    program certificate that has been earned.
+    """
+
+    program = ProgramSerializer()
+    enrollments = CourseRunEnrollmentSerializer(many=True)
+    certificate = serializers.SerializerMethodField(read_only=True)
+
+    @extend_schema_field(ProgramCertificateSerializer(allow_null=True))
+    def get_certificate(self, instance):
+        """
+        Resolve a certificate for this enrollment if it exists.
+        """
+        certificate = instance.get("certificate")
+        return ProgramCertificateSerializer(certificate).data if certificate else None

@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+import faker
 import pytz
 from factory import Faker, LazyAttribute, SelfAttribute, SubFactory, Trait
 from factory.django import DjangoModelFactory
@@ -10,6 +11,8 @@ from mitol.common.utils import now_in_utc
 
 from openedx.constants import PLATFORM_EDX
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
+
+FAKE = faker.Factory.create()
 
 
 class OpenEdxUserFactory(DjangoModelFactory):
