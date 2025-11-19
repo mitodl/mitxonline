@@ -6,13 +6,19 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from cms.serializers import ProgramPageSerializer
-from courses.models import Program, ProgramCollection, ProgramRequirementNodeType
+from courses.models import (
+    Program,
+    ProgramCertificate,
+    ProgramCollection,
+    ProgramRequirementNodeType,
+)
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
 )
 from courses.serializers.utils import get_unique_topics_from_courses
 from courses.serializers.v1.departments import DepartmentSerializer
+from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
 from main.serializers import StrictFieldsSerializer
 
 logger = logging.getLogger(__name__)
@@ -542,6 +548,14 @@ class ProgramSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProgramCertificateSerializer(serializers.ModelSerializer):
+    """ProgramCertificate model serializer"""
+
+    class Meta:
+        model = ProgramCertificate
+        fields = ["uuid", "link"]
+
+
 @extend_schema_serializer(component_name="V2UserProgramEnrollmentDetail")
 class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     """
@@ -552,23 +566,13 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     """
 
     program = ProgramSerializer()
-    enrollments = serializers.SerializerMethodField()
+    enrollments = CourseRunEnrollmentSerializer(many=True)
     certificate = serializers.SerializerMethodField(read_only=True)
 
-    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
-    def get_enrollments(self, instance):
-        """Get course run enrollments using v2 serializer."""
-        from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
-
-        enrollments = instance.get("enrollments", [])
-        return CourseRunEnrollmentSerializer(enrollments, many=True).data
-
-    @extend_schema_field(serializers.DictField(allow_null=True))
+    @extend_schema_field(ProgramCertificateSerializer(allow_null=True))
     def get_certificate(self, instance):
         """
         Resolve a certificate for this enrollment if it exists.
         """
-        from courses.serializers.v2.certificates import ProgramCertificateSerializer
-
         certificate = instance.get("certificate")
         return ProgramCertificateSerializer(certificate).data if certificate else None
