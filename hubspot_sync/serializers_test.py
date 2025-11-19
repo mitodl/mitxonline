@@ -209,3 +209,85 @@ def test_serialize_contact(settings, user, mocker):
         serialized_data["course_run_certificates"]
         == f"{course_run_cert_1.course_run!s};{course_run_cert_2.course_run!s}"
     )
+
+def test_serialize_contact_removes_semicolons_from_program_names(settings, user, mocker):
+    """Test that HubspotContactSerializer removes semicolons from program certificate names"""
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
+    # Create a program certificate where the program's string representation contains a semicolon
+    program_cert = ProgramCertificateFactory.create(user=user)
+    
+    # Mock the program's __str__ method to return a value with semicolons
+    mocker.patch.object(
+        program_cert.program, '__str__', return_value="Test Program; With Semicolon"
+    )
+    
+    serialized_data = HubspotContactSerializer(instance=user).data
+    
+    # Verify that semicolons are removed from the program name
+    assert serialized_data["program_certificates"] == "Test Program With Semicolon"
+    # Ensure no semicolons remain in the final string
+    assert ";" not in serialized_data["program_certificates"].replace(";", "")
+
+
+def test_serialize_contact_removes_semicolons_from_course_run_names(settings, user, mocker):
+    """Test that HubspotContactSerializer removes semicolons from course run certificate names"""
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
+    # Create a course run certificate where the course run's string representation contains a semicolon
+    course_run_cert = CourseRunCertificateFactory.create(user=user)
+    
+    # Mock the course run's __str__ method to return a value with semicolons
+    mocker.patch.object(
+        course_run_cert.course_run, '__str__', return_value="Test Course; Run With Semicolon"
+    )
+    
+    serialized_data = HubspotContactSerializer(instance=user).data
+    
+    # Verify that semicolons are removed from the course run name
+    assert serialized_data["course_run_certificates"] == "Test Course Run With Semicolon"
+    # Ensure no semicolons remain in the final string except for joining
+    assert ";" not in serialized_data["course_run_certificates"].replace(";", "")
+
+
+def test_serialize_contact_multiple_certificates_with_semicolons(settings, user, mocker):
+    """Test that HubspotContactSerializer properly handles multiple certificates with semicolons"""
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
+    
+    # Create multiple certificates
+    program_cert_1 = ProgramCertificateFactory.create(user=user)
+    program_cert_2 = ProgramCertificateFactory.create(user=user)
+    course_run_cert_1 = CourseRunCertificateFactory.create(user=user)
+    course_run_cert_2 = CourseRunCertificateFactory.create(user=user)
+    
+    # Mock the string representations to include semicolons
+    mocker.patch.object(
+        program_cert_1.program, '__str__', return_value="Program; One"
+    )
+    mocker.patch.object(
+        program_cert_2.program, '__str__', return_value="Program; Two"
+    )
+    mocker.patch.object(
+        course_run_cert_1.course_run, '__str__', return_value="Course; Run One"
+    )
+    mocker.patch.object(
+        course_run_cert_2.course_run, '__str__', return_value="Course; Run Two"
+    )
+    
+    serialized_data = HubspotContactSerializer(instance=user).data
+    
+    # Verify that semicolons are removed from individual names but preserved as separators
+    assert serialized_data["program_certificates"] == "Program One;Program Two"
+    assert serialized_data["course_run_certificates"] == "Course Run One;Course Run Two"
+    
+    # Count semicolons to ensure only separator semicolons remain
+    program_semicolons = serialized_data["program_certificates"].count(";")
+    course_run_semicolons = serialized_data["course_run_certificates"].count(";")
+    
+    # Should have exactly 1 separator semicolon (2 items = 1 separator)
+    assert program_semicolons == 1
+    assert course_run_semicolons == 1

@@ -289,7 +289,7 @@ class HubspotContactSerializer(UserSerializer):
             user=instance, is_revoked=False
         ).select_related("program")
         program_name_array = [
-            str(program_cert.program) for program_cert in programs_user_has_cert
+            str(program_cert.program).replace(";", "") for program_cert in programs_user_has_cert
         ]
         return ";".join(program_name_array)
 
@@ -299,7 +299,7 @@ class HubspotContactSerializer(UserSerializer):
             user=instance, is_revoked=False
         ).select_related("course_run")
         course_run_name_array = [
-            str(course_run_cert.course_run)
+            str(course_run_cert.course_run).replace(";", "")
             for course_run_cert in course_runs_user_has_cert
         ]
         return ";".join(course_run_name_array)
