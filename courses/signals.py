@@ -11,6 +11,7 @@ from courses.models import (
     CourseRunCertificate,
     Program,
 )
+from hubspot_sync.api import upsert_custom_properties
 from hubspot_sync.task_helpers import sync_hubspot_user
 
 
@@ -40,4 +41,5 @@ def handle_create_course_run_certificate(
             transaction.on_commit(
                 lambda: generate_multiple_programs_certificate(user, programs)
             )
+        upsert_custom_properties()
         sync_hubspot_user(instance.user)
