@@ -1,6 +1,24 @@
 Release Notes
 =============
 
+Version 0.135.3
+---------------
+
+- Fix enrollments for existing users (#3099)
+- Adding batch import of edX users to migrate_edx_data management command (#3091)
+- fix program enrollments v2 api types (#3094)
+- fix(deps): update dependency django to v4.2.26 [security] (#3071)
+- Fix broken link for CMS Product Page in admin (#3097)
+- Fix test errors in the import_courserun command tests (#3095)
+- Fix flaky programs test (#3092)
+- fix: improved logging on hubspot batch create (#3069)
+- add v2 program_enrollments endpoint (#3093)
+- Don't restrict deferrals after the upgrade deadline (#3087)
+- Add import-to-contract-courserun workflow (#3057)
+- Expose readable ids on requirements objects (#3088)
+- Remove name from UserAdapter (#3086)
+- fix: raise error on enrollment retry failure (#3016)
+
 Version 0.135.1 (Released November 12, 2025)
 ---------------
 
