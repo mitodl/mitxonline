@@ -289,7 +289,8 @@ class HubspotContactSerializer(UserSerializer):
             user=instance, is_revoked=False
         ).select_related("program")
         program_name_array = [
-            str(program_cert.program).replace(";", "") for program_cert in programs_user_has_cert
+            str(program_cert.program).replace(";", "")
+            for program_cert in programs_user_has_cert
         ]
         return ";".join(program_name_array)
 
