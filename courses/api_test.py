@@ -966,7 +966,9 @@ def test_course_run_certificate(  # noqa: PLR0913
 
 
 @patch("courses.signals.upsert_custom_properties")
-def test_course_run_certificate_idempotent(mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user):
+def test_course_run_certificate_idempotent(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user
+):
     """
     Test that the certificate generation is idempotent
     """
@@ -996,7 +998,9 @@ def test_course_run_certificate_idempotent(mock_upsert_custom_properties, passed
 
 
 @patch("courses.signals.upsert_custom_properties")
-def test_course_run_certificate_not_passing(mock_upsert_custom_properties, passed_grade_with_enrollment, mocker):
+def test_course_run_certificate_not_passing(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker
+):
     """
     Test that the certificate is not generated if the grade is set to not passed
     """
@@ -1045,7 +1049,10 @@ def test_generate_course_certificates_no_valid_course_run(settings, courses_api_
 
 @patch("courses.signals.upsert_custom_properties")
 def test_generate_course_certificates_self_paced_course(
-    mock_upsert_custom_properties, mocker, courses_api_logs, passed_grade_with_enrollment
+    mock_upsert_custom_properties,
+    mocker,
+    courses_api_logs,
+    passed_grade_with_enrollment,
 ):
     """Test that certificates are generated for self paced course runs independent of course run end date"""
     course_run = passed_grade_with_enrollment.course_run
@@ -1121,7 +1128,11 @@ def test_course_certificates_with_course_end_date_self_paced_combination(  # noq
 
 @patch("courses.signals.upsert_custom_properties")
 def test_generate_course_certificates_with_course_end_date(
-    mock_upsert_custom_properties, mocker, courses_api_logs, passed_grade_with_enrollment, settings
+    mock_upsert_custom_properties,
+    mocker,
+    courses_api_logs,
+    passed_grade_with_enrollment,
+    settings,
 ):
     """Test that certificates are generated for passed grades when there are valid course runs for certificates"""
     course_run = passed_grade_with_enrollment.course_run
@@ -1303,7 +1314,9 @@ def test_generate_program_certificate_failure_not_all_passed(
 
 
 @patch("courses.signals.upsert_custom_properties")
-def test_generate_program_certificate_success_single_requirement_course(mock_upsert_custom_properties, user, mocker):
+def test_generate_program_certificate_success_single_requirement_course(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate generates a program certificate for a Program with a single required Course.
     """
@@ -1336,7 +1349,9 @@ def test_generate_program_certificate_success_single_requirement_course(mock_ups
 
 
 @patch("courses.signals.upsert_custom_properties")
-def test_generate_program_certificate_success_multiple_required_courses(mock_upsert_custom_properties, user, mocker):
+def test_generate_program_certificate_success_multiple_required_courses(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate generate a program certificate
     """
@@ -1370,7 +1385,9 @@ def test_generate_program_certificate_success_multiple_required_courses(mock_ups
 
 
 @patch("courses.signals.upsert_custom_properties")
-def test_generate_program_certificate_success_minimum_electives_not_met(mock_upsert_custom_properties, user, mocker):
+def test_generate_program_certificate_success_minimum_electives_not_met(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate does not generate a program certificate if minimum electives have not been met.
     """
@@ -1585,7 +1602,9 @@ def test_program_enrollment_unenrollment_re_enrollment(
 
 
 @patch("courses.signals.upsert_custom_properties")
-def test_generate_program_certificate_with_subprogram_requirement(mock_upsert_custom_properties, user, mocker):
+def test_generate_program_certificate_with_subprogram_requirement(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate considers sub-program (nested program) requirements
     when determining if a user has earned a program certificate.
@@ -1663,7 +1682,9 @@ def test_generate_program_certificate_with_subprogram_requirement_missing_certif
 
 
 @patch("courses.signals.upsert_custom_properties")
-def test_generate_program_certificate_with_revoked_subprogram_certificate(mock_upsert_custom_properties, user, mocker):
+def test_generate_program_certificate_with_revoked_subprogram_certificate(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate does NOT consider revoked sub-program certificates
     when determining if a user has earned a program certificate.
