@@ -57,7 +57,7 @@ export default {
     ...DEFAULT_OPTIONS,
     transform: transformCurrentUser,
     update:    updateResult,
-    url:       "/api/users/current_user",
+    url:       "/api/v0/users/current_user",
     body:      {
       ...profileData
     }
