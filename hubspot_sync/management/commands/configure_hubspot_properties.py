@@ -2,7 +2,6 @@
 Management command to configure custom Hubspot properties for Contacts, Deals, Products, and Line Items
 """
 
-
 from django.core.management import BaseCommand
 from mitol.hubspot_api.api import (
     delete_object_property,
