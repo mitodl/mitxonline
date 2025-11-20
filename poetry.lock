@@ -1659,10 +1659,8 @@ description = "Python interface to the edX REST APIs"
 optional = false
 python-versions = "*"
 groups = ["main"]
-files = [
-    {file = "edx_api_client-1.13.0-py2.py3-none-any.whl", hash = "sha256:60a949eb31ddf3f8b0ddb63189d58bc9e7057117dfad032c9416a1ff1a401fae"},
-    {file = "edx_api_client-1.13.0.tar.gz", hash = "sha256:d52f3267e0af0d4bb60982d31fd792c4edf10bb935ab0389c7b47c9dd8737e27"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 python-dateutil = ">=2.5.3,<4.0.0"
@@ -1670,6 +1668,12 @@ requests = ">=2.20.0"
 
 [package.extras]
 dev = ["flake8"]
+
+[package.source]
+type = "git"
+url = "https://github.com/mitodl/edx-api-client"
+reference = "arslan/8853-fix-lti-dup-users"
+resolved_reference = "624c7fe864d7f2df487ef6a0d670881ead44e113"
 
 [[package]]
 name = "edx-opaque-keys"
@@ -6065,4 +6069,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "5bbba276cc7f7e838f12fd15e17b07661430e605f177ae472426ad5087746ae6"
+content-hash = "61c6c8202dd15922a558b2eac7fe3e820b5ee9e285db063bf7b712b2d5c8c214"
