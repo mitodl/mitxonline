@@ -23,7 +23,7 @@ The basic flow for rolling out an affiliation with an organization is:
 2. We enter into an agreement (contract) with the organization to provide them access to these courses. The agreement sets what courses are to be provided, deliniates who should be allowed to access the courses, and provides other metadata that we need.
 3. We set up the organization within the B2B system. (In addition, we take some steps to set the organization up within the Keycloak SSO system as well.)
 4. We set up the contract for the organization, which contains the metadata relevant to MITx Online, and we add the courses to the contract.
-5. We provide access to the courses to the organization's learners in one of two ways - either automatically on login, based on their credentials; or via codes the learners can redeem for access.
+5. Learners gain access to the contract in one of two ways - either automatically on login, based on their credentials; or via codes the learners can redeem for access.
 6. Learners are able to see the content they've been given access to on their dashboards in the Learn app, and are able to enroll in and take courses through MITx Online.
 
 The B2B system contains a few key pieces that make this workflow function:
