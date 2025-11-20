@@ -269,7 +269,7 @@ def test_serialize_contact_multiple_certificates_with_semicolons(
     # Count semicolons to ensure only separator semicolons remain
     program_semicolons = serialized_data["program_certificates"].count(";")
     course_run_semicolons = serialized_data["course_run_certificates"].count(";")
-    
+
     # Should have exactly 1 separator semicolon (2 items = 1 separator)
     assert program_semicolons == 1
     assert course_run_semicolons == 1
