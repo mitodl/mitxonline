@@ -47,7 +47,7 @@ def handle_create_course_run_certificate(
         try:
             upsert_custom_properties()
             sync_hubspot_user(instance.user)
-        except Exception:  # pylint: disable=broad-except  # noqa: BLE001
+        except Exception:  # pylint: disable=broad-except
             logger = logging.getLogger(__name__)
             logger.exception("Error syncing Hubspot user")
             # avoid blocking certificate creation
