@@ -2,17 +2,16 @@
 Management command to configure custom Hubspot properties for Contacts, Deals, Products, and Line Items
 """
 
-import sys
 
 from django.core.management import BaseCommand
-from hubspot_sync.api import CUSTOM_ECOMMERCE_PROPERTIES, upsert_custom_properties
-from hubspot_sync.api import upsert_custom_properties
 from mitol.hubspot_api.api import (
     delete_object_property,
     delete_property_group,
     object_property_exists,
     property_group_exists,
 )
+
+from hubspot_sync.api import CUSTOM_ECOMMERCE_PROPERTIES, upsert_custom_properties
 
 
 def _delete_custom_properties():

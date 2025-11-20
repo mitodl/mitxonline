@@ -2,25 +2,17 @@
 
 import logging
 import re
-from decimal import Decimal
 import sys
+from decimal import Decimal
 from typing import List  # noqa: UP035
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from courses.constants import ALL_ENROLL_CHANGE_STATUSES
-from courses.models import CourseRun, Program
-from ecommerce import models
-from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_FIXED_PRICE, DISCOUNT_TYPE_PERCENT_OFF
 from hubspot.crm.objects import (
     SimplePublicObject,
     SimplePublicObjectInput,
 )
 from mitol.common.utils.datetime import now_in_utc
-from mitol.hubspot_api.api import (
-    sync_object_property,
-    sync_property_group,
-)
 from mitol.hubspot_api.api import (
     HubspotAssociationType,
     HubspotObjectType,
@@ -33,15 +25,31 @@ from mitol.hubspot_api.api import (
     get_all_objects,
     get_line_items_for_deal,
     make_object_properties_message,
+    sync_object_property,
+    sync_property_group,
     transform_object_properties,
     upsert_object_request,
 )
 from mitol.hubspot_api.models import HubspotObject
 
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from courses.models import CourseRun, Program
+from ecommerce import models
+from ecommerce.constants import (
+    DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PERCENT_OFF,
+)
 from ecommerce.models import Line, Order, Product
 from hubspot_sync.rate_limiter import wait_for_hubspot_rate_limit
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
-from users.models import COMPANY_SIZE_CHOICES, GENDER_CHOICES, HIGHEST_EDUCATION_CHOICES, YRS_EXPERIENCE_CHOICES, User
+from users.models import (
+    COMPANY_SIZE_CHOICES,
+    GENDER_CHOICES,
+    HIGHEST_EDUCATION_CHOICES,
+    YRS_EXPERIENCE_CHOICES,
+    User,
+)
 
 log = logging.getLogger(__name__)
 
@@ -709,6 +717,7 @@ def _get_program_certificate_hubspot_property():
         "fieldType": "checkbox",
         "options": options_array,
     }
+
 
 def upsert_custom_properties():
     """Create or update all custom properties and groups"""
