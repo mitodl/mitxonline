@@ -2,10 +2,11 @@
 Signals for mitxonline course certificates
 """
 
+import logging
+
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-import logging
 
 from courses.api import generate_multiple_programs_certificate
 from courses.models import (
@@ -42,7 +43,7 @@ def handle_create_course_run_certificate(
             transaction.on_commit(
                 lambda: generate_multiple_programs_certificate(user, programs)
             )
-            
+
         try:
             upsert_custom_properties()
             sync_hubspot_user(instance.user)
