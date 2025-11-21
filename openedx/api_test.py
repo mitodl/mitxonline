@@ -287,14 +287,12 @@ def test_create_edx_user_409_errors(settings, error_data, lti_fix_response_statu
 
     assert resp1.call_count == 0
     if is_duplicate_email:
-        if lti_fix_response_status == status.HTTP_200_OK:
-            # The registration will be retried again after the LTI fix and since the loops
-            # runs 4 times it will run 4 times
-            assert resp2.call_count == 4
-            assert resp3.call_count == 4
-        else:
-            assert resp2.call_count == 1
-            assert resp3.call_count == 1
+        assert (
+            resp2.call_count == 2
+            if lti_fix_response_status == status.HTTP_200_OK
+            else 1
+        )
+        assert resp3.call_count == 1
     else:
         assert resp2.call_count == 1
         assert resp3.call_count == 0
