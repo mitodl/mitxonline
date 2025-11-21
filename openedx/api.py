@@ -265,7 +265,7 @@ def _set_edx_error(open_edx_user, data):
     open_edx_user.save()
 
 
-def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
+def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901, PLR0915
     """
     Handle the actual user creation request to Open edX with retry logic for duplicate usernames.
 
@@ -314,7 +314,7 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
     try:
         resp = None
         data = None
-
+        tried_duplicate_email_fix = False
         while attempt < max_attempts:
             attempt += 1
 
@@ -335,6 +335,16 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
 
             data = _parse_openedx_response(resp)
 
+            # Only try for LTI user duplicate email error fix if the response error was duplicate-email
+            if _is_duplicate_email_error(resp, data) and not tried_duplicate_email_fix:
+                tried_duplicate_email_fix = True
+                client = get_edx_api_lti_dup_email_client()
+                dup_email_fix_resp = client.fix_lti_user(email=user.email)
+                # If the LTI API fixed the duplicate email issue, Retry account creation
+                if dup_email_fix_resp.status_code == status.HTTP_200_OK:
+                    continue
+                break
+
             new_username, should_continue, should_reset_attempts = (
                 _handle_username_collision(
                     resp,
@@ -351,17 +361,6 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901
                 if should_reset_attempts:
                     attempt = 0
                 continue
-
-            # Only try for LTI user duplicate email error fix if the response error was duplicate-email
-            if _is_duplicate_email_error(resp, data):
-                client = get_edx_api_lti_dup_email_client()
-                dup_email_fix_resp = client.fix_lti_user(
-                    email=user.email, username=current_username
-                )
-                # If the LTI API fixed the duplicate email issue, Retry account creation
-                if dup_email_fix_resp.status_code == status.HTTP_200_OK:
-                    continue
-                break
             break
 
         if _is_bad_request(resp):
