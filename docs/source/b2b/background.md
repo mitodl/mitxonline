@@ -1,4 +1,4 @@
-# B2B System: Background and Theory of Operation
+# Background and Theory of Operation
 
 The Universal AI project required us to build out the ability to grant access to specified programs and courses within MITx Online to other organizations, with the goal of allowing those organizations to allow their members to complete the AI-focused courses that we offer. This required a few pieces: we needed to be able to define who those organizations were; we needed to be able to determine what courses should be offered to each organization; we needed some reasonably self-service ways for learners to take these courses; and we needed to be able to have a federated login system, so those learners could authenticate with their organization credentials.
 

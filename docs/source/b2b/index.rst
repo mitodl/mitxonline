@@ -11,4 +11,7 @@ Universal AI is essentially just another set of organizations and contracts with
    :maxdepth: 2
 
    background
+   commands
+   common_workflows
    configuration
+   troubleshooting

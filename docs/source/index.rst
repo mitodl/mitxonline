@@ -11,6 +11,7 @@ Welcome to MITx Online Documentation's documentation!
    :caption: Contents:
 
    authentication
+   b2b/index
    configuration/index
    ecommerce/index
    commands/index

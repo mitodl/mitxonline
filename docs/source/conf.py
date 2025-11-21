@@ -40,6 +40,15 @@ templates_path = ["_templates"]
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
+# -- Options for MyST parser -------------------------------------------------
+
+# Extensions to enable.
+myst_enable_extensions = [
+    "colon_fence",
+    "fieldlist",
+]
+# Header anchors. Use auto-generating header anchors for headers up to X deep.
+myst_heading_anchors = 4
 
 # -- Options for HTML output -------------------------------------------------
 

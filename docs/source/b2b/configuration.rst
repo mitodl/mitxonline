@@ -1,5 +1,5 @@
-B2B Contract Management
-=======================
+Contract Management
+===================
 
 B2B contracts can be managed via the command line and Django Admin.
 
