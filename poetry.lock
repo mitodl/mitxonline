@@ -1673,7 +1673,7 @@ dev = ["flake8"]
 type = "git"
 url = "https://github.com/mitodl/edx-api-client"
 reference = "arslan/8853-fix-lti-dup-users"
-resolved_reference = "624c7fe864d7f2df487ef6a0d670881ead44e113"
+resolved_reference = "8a960039efe823ef7647cb530824ebf8360e1c58"
 
 [[package]]
 name = "edx-opaque-keys"
