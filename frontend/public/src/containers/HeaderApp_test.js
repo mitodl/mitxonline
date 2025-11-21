@@ -52,14 +52,22 @@ describe("Top-level HeaderApp", () => {
     inner.update()
     // So we look to be sure the next child is there, which is <Header />
     assert.exists(inner.find("Header"))
-    sinon.assert.calledWith(helper.handleRequestStub, "/api/v0/users/current_user/", "GET")
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/v0/users/current_user/",
+      "GET"
+    )
   })
 
   it("tries to fetch user data and no response or an incorrect response renders nothing", async () => {
     helper.handleRequestStub.returns({})
     const { inner } = await renderPage()
     assert.notExists(inner.find("div").prop("children"))
-    sinon.assert.calledWith(helper.handleRequestStub, "/api/v0/users/current_user/", "GET")
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/v0/users/current_user/",
+      "GET"
+    )
   })
 
   it("adds a user notification if a stored message is found in cookies", async () => {
@@ -98,7 +106,11 @@ describe("Top-level HeaderApp", () => {
     })
     await renderPage()
     // Should call /api/users/me to get user data
-    sinon.assert.calledWith(helper.handleRequestStub, "/api/v0/users/current_user/", "GET")
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/v0/users/current_user/",
+      "GET"
+    )
     // Should NOT call the cart items count API for unauthenticated users
     sinon.assert.neverCalledWith(
       helper.handleRequestStub,
