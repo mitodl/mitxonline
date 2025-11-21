@@ -125,7 +125,7 @@ def test_certificate_management_revoke_unrevoke_invalid_args(
 def test_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke, mocker):
     """Test that certificate revoke, un-revoke work as expected and manage the certificate access properly"""
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     course_run = CourseRunFactory.create()
     certificate = CourseRunCertificateFactory(
@@ -150,7 +150,7 @@ def test_certificate_management_create(mocker, user, edx_grade_json, revoked):
     when a user is provided
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     edx_grade = CurrentGrade(edx_grade_json)
     course_run = CourseRunFactory.create()
@@ -192,7 +192,7 @@ def test_certificate_management_create_no_user(mocker, edx_grade_json, user):
     enrolled users in a run when no user is provided
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     passed_edx_grade = CurrentGrade(edx_grade_json)
     course_run = CourseRunFactory.create()

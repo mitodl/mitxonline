@@ -37,7 +37,7 @@ pytestmark = [pytest.mark.django_db]
 def test_make_contact_sync_message(user, mocker):
     """Test make_contact_sync_message serializes a user and returns a properly formatted sync message"""
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     course_certificate_1 = CourseRunCertificateFactory.create(user=user)
     course_certificate_2 = CourseRunCertificateFactory.create(user=user)

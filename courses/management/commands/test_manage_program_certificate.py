@@ -130,7 +130,7 @@ def test_program_certificate_management_create(
     creates the program certificate for a user
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     courses = CourseFactory.create_batch(2)
     program_with_empty_requirements.add_requirement(courses[0])
@@ -162,7 +162,7 @@ def test_program_certificate_management_force_create(
     forcefully creates the certificate for a user
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
