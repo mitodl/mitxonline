@@ -2071,7 +2071,7 @@ components:
         grade:
           type: number
           format: double
-          maximum: 1.0
+          maximum: 2.0
           minimum: 0.0
         letter_grade:
           type: string
@@ -2084,6 +2084,7 @@ components:
         grade_percent:
           type: number
           format: double
+          nullable: true
           description: Returns the grade field value as a number out of 100 (or None
             if the value is None)
           readOnly: true
