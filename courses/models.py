@@ -1710,7 +1710,7 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
     user = models.ForeignKey(User, null=False, on_delete=models.CASCADE)
     course_run = models.ForeignKey(CourseRun, null=False, on_delete=models.CASCADE)
     grade = models.FloatField(
-        null=False, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+        null=False, validators=[MinValueValidator(0.0), MaxValueValidator(2.0)]
     )
     letter_grade = models.CharField(max_length=6, blank=True, null=True)  # noqa: DJ001
     passed = models.BooleanField(default=False)
@@ -1727,7 +1727,7 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
         return serialize_model_object(self)
 
     @property
-    def grade_percent(self) -> Decimal:
+    def grade_percent(self) -> Decimal | None:
         """Returns the grade field value as a number out of 100 (or None if the value is None)"""
         return (
             Decimal(self.grade * 100).quantize(exp=Decimal(1), rounding=ROUND_HALF_EVEN)
