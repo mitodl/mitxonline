@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.135.3
+Version 0.135.3 (Released November 24, 2025)
 ---------------
 
 - Fix enrollments for existing users (#3099)
