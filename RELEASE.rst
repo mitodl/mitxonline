@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.135.4
+Version 0.135.4 (Released November 24, 2025)
 ---------------
 
 - Fix issues with course certificate generation (#3106)
