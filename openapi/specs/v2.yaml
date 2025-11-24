@@ -2071,7 +2071,7 @@ components:
         grade:
           type: number
           format: double
-          maximum: 2.0
+          maximum: 1.0
           minimum: 0.0
         letter_grade:
           type: string
