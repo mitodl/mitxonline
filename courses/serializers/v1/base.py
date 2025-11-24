@@ -116,6 +116,8 @@ class CourseRunCertificateSerializer(serializers.ModelSerializer):
 class CourseRunGradeSerializer(serializers.ModelSerializer):
     """CourseRunGrade serializer"""
 
+    grade = serializers.FloatField(min_value=0.0, max_value=1.0)
+
     class Meta:
         model = models.CourseRunGrade
         fields = ["grade", "letter_grade", "passed", "set_by_admin", "grade_percent"]
