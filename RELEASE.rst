@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.135.4
+---------------
+
+- Fix issues with course certificate generation (#3106)
+- upgrade Django to 5.0.14 (#3096)
+- fix(deps): update dependency wagtail to v7.2 (#3103)
+
 Version 0.135.3 (Released November 24, 2025)
 ---------------
 
