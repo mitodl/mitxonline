@@ -253,7 +253,14 @@ def apply_user_discounts(request):
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
         return
 
-    product = BasketItem.objects.get(basket=basket).product
+    # For multiple items, check each item for flexible pricing discounts
+    basket_items = BasketItem.objects.filter(basket=basket)
+    if basket_items.count() == 0:
+        return
+        
+    # Use the first item's product for flexible pricing determination
+    # This maintains backward compatibility while supporting multiple items
+    product = basket_items.first().product
     flexible_price_discount = determine_courseware_flexible_price_discount(
         product, user
     )

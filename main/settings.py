@@ -946,6 +946,14 @@ FEATURES_DEFAULT = get_bool(
     dev_only=True,
     description="The default value for all feature flags",
 )
+
+# Multiple cart items feature flag
+ENABLE_MULTIPLE_CART_ITEMS = get_bool(
+    name="ENABLE_MULTIPLE_CART_ITEMS",
+    default=False,
+    description="Enable users to add multiple items to their cart/basket",
+)
+
 FEATURES = get_features()
 
 # Redis

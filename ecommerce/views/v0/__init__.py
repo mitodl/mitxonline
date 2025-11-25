@@ -642,22 +642,53 @@ class CheckoutApiViewSet(ViewSet):
         url_name="add_to_cart",
     )
     def add_to_cart(self, request):
-        """Add product to the cart"""
+        """Add product to the cart"""        
         with transaction.atomic():
             basket, _ = Basket.objects.select_for_update().get_or_create(
                 user=self.request.user
             )
-            basket.basket_items.all().delete()
-            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+            
+            # Check if multiple cart items feature is enabled
+            allow_multiple_items = getattr(settings, 'ENABLE_MULTIPLE_CART_ITEMS', False)
+            
+            if not allow_multiple_items:
+                # Legacy behavior: clear existing items and discounts
+                basket.basket_items.all().delete()
+                BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+            else:
+                # New behavior: only clear discounts, keep existing items
+                BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
-            all_product_ids = [request.data["product_id"]]
-
-            for product in Product.objects.filter(id__in=all_product_ids):
+            product_id = request.data["product_id"]
+            
+            try:
+                product = Product.objects.get(id=product_id)
+            except Product.DoesNotExist:
+                return Response(
+                    {"message": "Product not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            if allow_multiple_items:
+                # Check if product already exists in basket
+                existing_item = basket.basket_items.filter(product=product).first()
+                if existing_item:
+                    # Increment quantity for existing item
+                    existing_item.quantity += 1
+                    existing_item.save()
+                    message = "Product quantity updated in cart"
+                else:
+                    # Add new item to basket
+                    BasketItem.objects.create(basket=basket, product=product)
+                    message = "Product added to cart"
+            else:
+                # Legacy behavior: add single item
                 BasketItem.objects.create(basket=basket, product=product)
+                message = "Product added to cart"
 
         return Response(
             {
-                "message": "Product added to cart",
+                "message": message,
             }
         )
 
