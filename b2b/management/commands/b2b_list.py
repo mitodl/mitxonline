@@ -293,7 +293,9 @@ class Command(BaseCommand):
         if contract_id:
             contract_page_qs = contract_page_qs.filter(id=contract_id)
 
-        contracts = contract_page_qs.prefetch_related("programs", "course_runs").all()
+        contracts = contract_page_qs.prefetch_related(
+            "contract_programs__program", "course_runs"
+        ).all()
 
         courseware_table = Table(title="Courseware")
         courseware_table.add_column("ID", justify="right")
