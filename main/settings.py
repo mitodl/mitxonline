@@ -36,7 +36,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.135.4"
+VERSION = "0.135.6"
 
 log = logging.getLogger()
 
@@ -1174,6 +1174,7 @@ OAUTH2_PROVIDER = {
         default=["http", "https"],
         description="List of schemes allowed for oauth2 redirect URIs",
     ),
+    "PKCE_REQUIRED": False,
 }
 
 SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405

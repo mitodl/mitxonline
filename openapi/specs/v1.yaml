@@ -2084,7 +2084,7 @@ components:
         grade_percent:
           type: number
           format: double
-          description: Returns the grade field value as a number out of 100 (or None
+          description: Returns the grade field value as a number out of 100 (or Decimal(0)
             if the value is None)
           readOnly: true
       required:
