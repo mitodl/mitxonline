@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.135.5
+---------------
+
+- downgrade django-oauth-toolkit (#3109)
+
 Version 0.135.4 (Released November 24, 2025)
 ---------------
 
