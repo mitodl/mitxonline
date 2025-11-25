@@ -143,7 +143,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         create_runs = kwargs.pop("create_runs")
         force_associate = kwargs.pop("force")
-        can_import = kwargs.pop("import")
+        can_import = kwargs.pop("can_import")
 
         managed = skipped = 0
 
@@ -171,6 +171,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     course_run_id=importable_id,
                     departments=can_import.split(sep=","),
                     create_cms_page=True,
+                    create_depts=True,
                 )
 
                 if not imported_run:
