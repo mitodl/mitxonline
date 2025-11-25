@@ -1174,6 +1174,7 @@ OAUTH2_PROVIDER = {
         default=["http", "https"],
         description="List of schemes allowed for oauth2 redirect URIs",
     ),
+    "PKCE_REQUIRED": False,
 }
 
 SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
