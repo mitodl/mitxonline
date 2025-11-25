@@ -171,6 +171,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     course_run_id=importable_id,
                     departments=can_import.split(sep=","),
                     create_cms_page=True,
+                    create_depts=True,
                 )
 
                 if not imported_run:
