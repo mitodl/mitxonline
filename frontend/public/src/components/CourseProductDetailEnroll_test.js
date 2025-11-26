@@ -995,4 +995,47 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       }
     })
   })
+
+  it("closes add-to-cart confirmation dialog when Close button is clicked", async () => {
+    courseRun["products"] = [
+      {
+        id:    1,
+        price: 10
+      }
+    ]
+    course.next_run_id = courseRun.id
+    course.courseruns = [courseRun]
+    
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courses: [course]
+        },
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          }
+        }
+      },
+      { courseId: course.id }
+    )
+
+    inner.setState({ addedToCartDialogVisibility: true })
+    inner.update()
+
+    const modal = inner.find(".added-to-cart-modal")
+    assert.isTrue(modal.exists())
+    assert.isTrue(modal.prop("isOpen"))
+
+    const closeButton = modal.find(".close-dialog-btn")
+    assert.isTrue(closeButton.exists())
+    
+    await closeButton.prop("onClick")()
+    inner.update()
+
+    const updatedModal = inner.find(".added-to-cart-modal")
+    assert.isFalse(updatedModal.prop("isOpen"))
+    assert.isFalse(inner.state("addedToCartDialogVisibility"))
+  })
 })
