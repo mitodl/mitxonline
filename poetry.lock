@@ -1022,18 +1022,18 @@ files = [
 
 [[package]]
 name = "django"
-version = "5.0.14"
+version = "5.1.14"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "Django-5.0.14-py3-none-any.whl", hash = "sha256:e762bef8629ee704de215ebbd32062b84f4e56327eed412e5544f6f6eb1dfd74"},
-    {file = "Django-5.0.14.tar.gz", hash = "sha256:29019a5763dbd48da1720d687c3522ef40d1c61be6fb2fad27ed79e9f655bc11"},
+    {file = "django-5.1.14-py3-none-any.whl", hash = "sha256:2a4b9c20404fd1bf50aaaa5542a19d860594cba1354f688f642feb271b91df27"},
+    {file = "django-5.1.14.tar.gz", hash = "sha256:b98409fb31fdd6e8c3a6ba2eef3415cc5c0020057b43b21ba7af6eff5f014831"},
 ]
 
 [package.dependencies]
-asgiref = ">=3.7.0,<4"
+asgiref = ">=3.8.1,<4"
 sqlparse = ">=0.3.1"
 tzdata = {version = "*", markers = "sys_platform == \"win32\""}
 
@@ -1211,21 +1211,20 @@ taggit = ["django-taggit (>=3.1)"]
 
 [[package]]
 name = "django-oauth-toolkit"
-version = "2.4.0"
+version = "3.0.0"
 description = "OAuth2 Provider for Django"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "django_oauth_toolkit-2.4.0-py3-none-any.whl", hash = "sha256:4931d6bf64b6aee32a42f989f218769d1876f3daa53c6bf883d8ab793fb302ee"},
-    {file = "django_oauth_toolkit-2.4.0.tar.gz", hash = "sha256:8975eaf697413a8d54208ee068bc5ad6d1ed76f1df84e4882fbb25e7e6966e1b"},
+    {file = "django_oauth_toolkit-3.0.0-py3-none-any.whl", hash = "sha256:67f86180215b1ddecb096955bf9766b5f8b9dd306be0b2fe8a50c865c989933a"},
+    {file = "django_oauth_toolkit-3.0.0.tar.gz", hash = "sha256:6639f26d01d18dc3ab500fed533df2698443564c7b37c7a0990f7e81c27e5bb4"},
 ]
 
 [package.dependencies]
-django = ">=3.2,<4.0.0 || >4.0.0"
-jwcrypto = ">=0.8.0"
-oauthlib = ">=3.1.0"
-pytz = ">=2024.1"
+django = ">=4.2"
+jwcrypto = ">=1.5.0"
+oauthlib = ">=3.2.2"
 requests = ">=2.13.0"
 
 [[package]]
@@ -6065,4 +6064,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "44a47cb0e0b13e55a51419a5d16738e2419426e1f7e5214a3aca3e7ab2e5bbee"
+content-hash = "68b2051470c553aa1eb7d278672d744c4fbd76f3c5a1602510951d6d49affbfe"
