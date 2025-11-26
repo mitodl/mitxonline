@@ -925,7 +925,9 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
         [1.0, False, True, False, False, False],  # noqa: PT007
     ],
 )
+@patch("courses.signals.upsert_custom_properties")
 def test_course_run_certificate(  # noqa: PLR0913
+    mock_upsert_custom_properties,
     user,
     passed_grade_with_enrollment,
     grade,
@@ -943,7 +945,7 @@ def test_course_run_certificate(  # noqa: PLR0913
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     passed_grade_with_enrollment.grade = grade
     passed_grade_with_enrollment.passed = passed
@@ -963,7 +965,10 @@ def test_course_run_certificate(  # noqa: PLR0913
     assert deleted is exp_deleted
 
 
-def test_course_run_certificate_idempotent(passed_grade_with_enrollment, mocker, user):
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_idempotent(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user
+):
     """
     Test that the certificate generation is idempotent
     """
@@ -971,7 +976,7 @@ def test_course_run_certificate_idempotent(passed_grade_with_enrollment, mocker,
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     # Certificate is created the first time
     certificate, created, deleted = process_course_run_grade_certificate(
@@ -992,12 +997,15 @@ def test_course_run_certificate_idempotent(passed_grade_with_enrollment, mocker,
     assert not deleted
 
 
-def test_course_run_certificate_not_passing(passed_grade_with_enrollment, mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_not_passing(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker
+):
     """
     Test that the certificate is not generated if the grade is set to not passed
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     # Initially the certificate is created
     certificate, created, deleted = process_course_run_grade_certificate(
@@ -1039,8 +1047,12 @@ def test_generate_course_certificates_no_valid_course_run(settings, courses_api_
     )
 
 
+@patch("courses.signals.upsert_custom_properties")
 def test_generate_course_certificates_self_paced_course(
-    mocker, courses_api_logs, passed_grade_with_enrollment
+    mock_upsert_custom_properties,
+    mocker,
+    courses_api_logs,
+    passed_grade_with_enrollment,
 ):
     """Test that certificates are generated for self paced course runs independent of course run end date"""
     course_run = passed_grade_with_enrollment.course_run
@@ -1048,7 +1060,7 @@ def test_generate_course_certificates_self_paced_course(
     course_run.is_self_paced = True
     course_run.save()
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     mocker.patch(
         "courses.api.ensure_course_run_grade",
@@ -1073,7 +1085,9 @@ def test_generate_course_certificates_self_paced_course(
         (False, None),
     ],
 )
+@patch("courses.signals.upsert_custom_properties")
 def test_course_certificates_with_course_end_date_self_paced_combination(  # noqa: PLR0913
+    mock_upsert_custom_properties,
     mocker,
     settings,
     courses_api_logs,
@@ -1093,7 +1107,7 @@ def test_course_certificates_with_course_end_date_self_paced_combination(  # noq
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     mocker.patch(
         "courses.api.exception_logging_generator",
@@ -1112,8 +1126,13 @@ def test_course_certificates_with_course_end_date_self_paced_combination(  # noq
     )
 
 
+@patch("courses.signals.upsert_custom_properties")
 def test_generate_course_certificates_with_course_end_date(
-    mocker, courses_api_logs, passed_grade_with_enrollment, settings
+    mock_upsert_custom_properties,
+    mocker,
+    courses_api_logs,
+    passed_grade_with_enrollment,
+    settings,
 ):
     """Test that certificates are generated for passed grades when there are valid course runs for certificates"""
     course_run = passed_grade_with_enrollment.course_run
@@ -1122,7 +1141,7 @@ def test_generate_course_certificates_with_course_end_date(
 
     user = passed_grade_with_enrollment.user
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     mocker.patch(
         "courses.api.ensure_course_run_grade",
@@ -1139,10 +1158,11 @@ def test_generate_course_certificates_with_course_end_date(
     )
 
 
-def test_course_run_certificates_access(mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificates_access(mock_upsert_custom_properties, mocker):
     """Tests that the revoke and unrevoke for a course run certificates sets the states properly"""
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     test_certificate = CourseRunCertificateFactory.create(is_revoked=False)
 
@@ -1264,7 +1284,9 @@ def test_generate_program_certificate_failure_missing_certificates(
     assert len(ProgramCertificate.objects.all()) == 0
 
 
+@patch("courses.signals.upsert_custom_properties")
 def test_generate_program_certificate_failure_not_all_passed(
+    mock_upsert_custom_properties,
     user,
     program_with_requirements,  # noqa: F811
     mocker,
@@ -1274,7 +1296,7 @@ def test_generate_program_certificate_failure_not_all_passed(
     if there is not any course_run certificate for the given course.
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
@@ -1291,7 +1313,10 @@ def test_generate_program_certificate_failure_not_all_passed(
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_generate_program_certificate_success_single_requirement_course(user, mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_success_single_requirement_course(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate generates a program certificate for a Program with a single required Course.
     """
@@ -1299,7 +1324,7 @@ def test_generate_program_certificate_success_single_requirement_course(user, mo
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     course = CourseFactory.create()
     program = ProgramFactory.create()
@@ -1323,7 +1348,10 @@ def test_generate_program_certificate_success_single_requirement_course(user, mo
     patched_sync_hubspot_user.assert_called_once_with(user)
 
 
-def test_generate_program_certificate_success_multiple_required_courses(user, mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_success_multiple_required_courses(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate generate a program certificate
     """
@@ -1331,7 +1359,7 @@ def test_generate_program_certificate_success_multiple_required_courses(user, mo
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     courses = CourseFactory.create_batch(3)
     program = ProgramFactory.create()
@@ -1356,13 +1384,16 @@ def test_generate_program_certificate_success_multiple_required_courses(user, mo
     patched_sync_hubspot_user.assert_called_once_with(user)
 
 
-def test_generate_program_certificate_success_minimum_electives_not_met(user, mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_success_minimum_electives_not_met(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate does not generate a program certificate if minimum electives have not been met.
     """
     courses = CourseFactory.create_batch(3)
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
 
     # Create Program with 2 minimum elective courses.
@@ -1404,7 +1435,9 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user, mo
     assert len(ProgramCertificate.objects.all()) == 0
 
 
+@patch("courses.signals.upsert_custom_properties")
 def test_force_generate_program_certificate_success(
+    mock_upsert_custom_properties,
     user,
     program_with_requirements,  # noqa: F811
     mocker,
@@ -1417,7 +1450,7 @@ def test_force_generate_program_certificate_success(
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
@@ -1480,7 +1513,9 @@ def test_program_certificates_access():
     assert test_certificate.is_revoked is False
 
 
+@patch("courses.signals.upsert_custom_properties")
 def test_generate_program_certificate_failure_not_all_passed_nested_elective_stipulation(
+    mock_upsert_custom_properties,
     user,
     mocker,
 ):
@@ -1491,7 +1526,7 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
     # Create Program
     program = ProgramFactory.create()
@@ -1566,7 +1601,10 @@ def test_program_enrollment_unenrollment_re_enrollment(
     ).exists()
 
 
-def test_generate_program_certificate_with_subprogram_requirement(user, mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_with_subprogram_requirement(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate considers sub-program (nested program) requirements
     when determining if a user has earned a program certificate.
@@ -1575,7 +1613,7 @@ def test_generate_program_certificate_with_subprogram_requirement(user, mocker):
         "hubspot_sync.task_helpers.sync_hubspot_user",
     )
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
 
     # Create a sub-program that the user will complete
@@ -1620,7 +1658,7 @@ def test_generate_program_certificate_with_subprogram_requirement_missing_certif
     sub-program certificate is missing.
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
 
     # Create a sub-program
@@ -1643,13 +1681,16 @@ def test_generate_program_certificate_with_subprogram_requirement_missing_certif
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_generate_program_certificate_with_revoked_subprogram_certificate(user, mocker):
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_program_certificate_with_revoked_subprogram_certificate(
+    mock_upsert_custom_properties, user, mocker
+):
     """
     Test that generate_program_certificate does NOT consider revoked sub-program certificates
     when determining if a user has earned a program certificate.
     """
     mocker.patch(
-        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+        "hubspot_sync.api.upsert_custom_properties",
     )
 
     # Create a sub-program
