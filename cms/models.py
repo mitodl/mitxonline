@@ -459,7 +459,7 @@ class CertificatePage(CourseProgramChildPage):
                 "uuid": "fake-uuid",
                 "learner_name": "Anthony M. Stark",
                 "product_name": product_name,
-                "issue_date": self.issue_date,
+                "end_date": datetime.now(),  # noqa: DTZ005
                 "CEUs": self.CEUs,
                 "is_program_certificate": is_program_certificate,
             }
