@@ -24,20 +24,6 @@ router.register(
 router.register(r"user_search", UsersViewSet, basename="users_search_api")
 
 urlpatterns = [
-    path(
-        "api/users/me",
-        CurrentUserRetrieveUpdateViewSet.as_view(
-            {"patch": "update", "get": "retrieve"}
-        ),
-        name="users_api-me",
-    ),
-    path(
-        "api/users/current_user/",
-        NewCurrentUserRetrieveUpdateViewSet.as_view(
-            {"patch": "update", "get": "retrieve"}
-        ),
-        name="users_api-current_user",
-    ),
     path("api/", include(router.urls)),
     path(
         "api/v0/users/me",
