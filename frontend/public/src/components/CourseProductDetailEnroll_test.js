@@ -1005,7 +1005,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     ]
     course.next_run_id = courseRun.id
     course.courseruns = [courseRun]
-    
+
     const { inner } = await renderPage(
       {
         entities: {
@@ -1030,7 +1030,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
     const closeButton = modal.find(".close-dialog-btn")
     assert.isTrue(closeButton.exists())
-    
+
     await closeButton.prop("onClick")()
     inner.update()
 

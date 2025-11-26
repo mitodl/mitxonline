@@ -292,7 +292,7 @@ export class CourseProductDetailEnroll extends React.Component<
             <strong>{course && course.title}</strong> added to your cart.
           </div>
           <div className="float-container">
-            <button 
+            <button
               className="btn btn-gradient-white-to-blue btn-secondary close-dialog-btn"
               onClick={() => this.toggleCartConfirmationDialogVisibility()}
             >
