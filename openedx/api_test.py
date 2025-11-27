@@ -244,8 +244,20 @@ def test_create_edx_user(  # noqa: PLR0913
         },
     ],
 )
-def test_create_edx_user_409_errors(settings, error_data):
-    """Test that create_edx_user handles a 409 response from the edX API"""
+@pytest.mark.parametrize(
+    "lti_fix_response_status",
+    [
+        status.HTTP_200_OK,
+        status.HTTP_400_BAD_REQUEST,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ],
+)
+def test_create_edx_user_409_errors(settings, error_data, lti_fix_response_status):
+    """Test that create_edx_user handles a 409 response from the edX API
+    1. If the error is duplicate-email, it should call the LTI fix endpoint
+    2. If the LTI fix endpoint returns 200, the user should be marked as synced
+    3. If the LTI fix endpoint returns non-200, the user should be marked as having a sync error
+    """
     user = UserFactory.create(
         openedx_user__has_been_synced=False,
     )
@@ -262,11 +274,28 @@ def test_create_edx_user_409_errors(settings, error_data):
         json=error_data,
         status=status.HTTP_409_CONFLICT,
     )
+    resp3 = responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/api/lti-user-fix/",
+        json={},
+        status=lti_fix_response_status,
+    )
 
     create_edx_user(user)
 
+    is_duplicate_email = error_data.get("error_code") == "duplicate-email"
+
     assert resp1.call_count == 0
-    assert resp2.call_count == 1
+    if is_duplicate_email:
+        assert (
+            resp2.call_count == 2
+            if lti_fix_response_status == status.HTTP_200_OK
+            else 1
+        )
+        assert resp3.call_count == 1
+    else:
+        assert resp2.call_count == 1
+        assert resp3.call_count == 0
 
     user.refresh_from_db()
 
