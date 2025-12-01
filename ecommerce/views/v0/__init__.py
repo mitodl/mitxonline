@@ -668,16 +668,10 @@ class CheckoutApiViewSet(ViewSet):
                     {"message": "Product not found"},
                     status=status.HTTP_404_NOT_FOUND,
                 )
-            
+            message = "Product already in cart"
             if allow_multiple_items:
                 # Check if product already exists in basket
-                existing_item = basket.basket_items.filter(product=product).first()
-                if existing_item:
-                    # Increment quantity for existing item
-                    existing_item.quantity += 1
-                    existing_item.save()
-                    message = "Product quantity updated in cart"
-                else:
+                if not basket.basket_items.filter(product=product).exists():
                     # Add new item to basket
                     BasketItem.objects.create(basket=basket, product=product)
                     message = "Product added to cart"
