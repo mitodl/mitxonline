@@ -54,7 +54,8 @@ class Migration(migrations.Migration):
                 "indexes": [
                     models.Index(
                         fields=["expires_on", "confirmed", "code"],
-                        name="email_change_request_e_3f3b1d_idx",)
+                        name="email_change_request_e_3f3b1d_idx",
+                    )
                 ]
             },
         )
