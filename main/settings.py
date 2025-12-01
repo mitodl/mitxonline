@@ -421,13 +421,6 @@ DEFAULT_DATABASE_CONFIG["CONN_MAX_AGE"] = get_int(
     default=0,
     description="Maximum age of connection to Postgres in seconds",
 )
-# If True, disables server-side database cursors to prevent invalid cursor errors when using pgbouncer
-DEFAULT_DATABASE_CONFIG["DISABLE_SERVER_SIDE_CURSORS"] = get_bool(
-    name="MITX_ONLINE_DB_DISABLE_SS_CURSORS",
-    default=True,
-    description="Disables Postgres server side cursors",
-)
-
 
 if get_bool(
     name="MITX_ONLINE_DB_DISABLE_SSL",
