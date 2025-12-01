@@ -257,7 +257,7 @@ def apply_user_discounts(request):
     basket_items = BasketItem.objects.filter(basket=basket)
     if basket_items.count() == 0:
         return
-        
+
     # Use the first item's product for flexible pricing determination
     # This maintains backward compatibility while supporting multiple items
     product = basket_items.first().product
