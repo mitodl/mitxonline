@@ -642,15 +642,17 @@ class CheckoutApiViewSet(ViewSet):
         url_name="add_to_cart",
     )
     def add_to_cart(self, request):
-        """Add product to the cart"""        
+        """Add product to the cart"""
         with transaction.atomic():
             basket, _ = Basket.objects.select_for_update().get_or_create(
                 user=self.request.user
             )
-            
+
             # Check if multiple cart items feature is enabled
-            allow_multiple_items = getattr(settings, 'ENABLE_MULTIPLE_CART_ITEMS', False)
-            
+            allow_multiple_items = getattr(
+                settings, "ENABLE_MULTIPLE_CART_ITEMS", False
+            )
+
             if not allow_multiple_items:
                 # Legacy behavior: clear existing items and discounts
                 basket.basket_items.all().delete()
@@ -660,7 +662,7 @@ class CheckoutApiViewSet(ViewSet):
                 BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
             product_id = request.data["product_id"]
-            
+
             try:
                 product = Product.objects.get(id=product_id)
             except Product.DoesNotExist:

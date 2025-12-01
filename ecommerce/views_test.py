@@ -740,31 +740,33 @@ def test_checkout_product_with_program_id(user, user_client):
 
 
 @pytest.mark.parametrize("multiple_cart_enabled", [True, False])
-def test_add_to_cart_api_with_feature_flag(user_drf_client, user, multiple_cart_enabled, settings):
+def test_add_to_cart_api_with_feature_flag(
+    user_drf_client, user, multiple_cart_enabled, settings
+):
     """Test add_to_cart API behavior with and without multiple cart items feature"""
     settings.ENABLE_MULTIPLE_CART_ITEMS = multiple_cart_enabled
-    
+
     # Create products
     product1 = ProductFactory.create()
     product2 = ProductFactory.create()
-    
+
     # Add first product
     resp = user_drf_client.post(
         reverse("checkout_api-add_to_cart"),
         data={"product_id": product1.id},
     )
     assert resp.status_code == 200
-    
+
     basket = Basket.objects.get(user=user)
     assert basket.basket_items.count() == 1
-    
+
     # Add second product
     resp = user_drf_client.post(
         reverse("checkout_api-add_to_cart"),
         data={"product_id": product2.id},
     )
     assert resp.status_code == 200
-    
+
     basket.refresh_from_db()
     if multiple_cart_enabled:
         # Should have both products
