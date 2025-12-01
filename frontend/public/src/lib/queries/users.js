@@ -31,7 +31,7 @@ const DEFAULT_OPTIONS = {
 
 export default {
   currentUserQuery: () => ({
-    url:       "/api/users/me",
+    url:       "/api/v0/users/current_user/",
     transform: transformCurrentUser,
     update:    updateResult
   }),
@@ -48,7 +48,7 @@ export default {
     ...DEFAULT_OPTIONS,
     transform: transformCurrentUser,
     update:    updateResult,
-    url:       "/api/users/me",
+    url:       "/api/v0/users/me",
     body:      {
       ...profileData
     }
@@ -57,7 +57,7 @@ export default {
     ...DEFAULT_OPTIONS,
     transform: transformCurrentUser,
     update:    updateResult,
-    url:       "/api/users/current_user",
+    url:       "/api/v0/users/current_user",
     body:      {
       ...profileData
     }
