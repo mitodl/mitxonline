@@ -198,7 +198,7 @@ class Basket(TimestampedModel):
         Returns the products that have been added to the basket so far.
         """
 
-        return [item.product for item in self.basket_items.select_related('product')]
+        return [item.product for item in self.basket_items.select_related("product")]
 
 
 class BasketItem(TimestampedModel):
