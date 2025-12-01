@@ -4,7 +4,7 @@ from rest_framework_extensions.routers import NestedRouterMixin
 
 """ TODO: clean this up later (make the views look more like the courses one) """
 from ecommerce.admin import AdminRefundOrderView  # noqa: E402
-from ecommerce.views.v0 import (  # noqa: E402
+from ecommerce.views.legacy import (  # noqa: E402
     AllProductViewSet,
     BackofficeCallbackView,
     BasketDiscountViewSet,
