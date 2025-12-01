@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.135.6 (Released December 01, 2025)
+---------------
+
+- set pkce to false in oauth2 provider (#3111)
+- downgrade django-oauth-toolkit (#3109)
+
 Version 0.135.4 (Released November 24, 2025)
 ---------------
 
