@@ -178,7 +178,7 @@ class BasketSerializer(serializers.ModelSerializer):
         """Get items in the basket"""
         return [
             BasketItemSerializer(instance=basket, context=self.context).data
-            for basket in instance.basket_items.select_related('product')
+            for basket in instance.basket_items.select_related("product")
         ]
 
     class Meta:
@@ -263,14 +263,15 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         """
         return [
             BasketItemWithProductSerializer(instance=basket, context=self.context).data
-            for basket in instance.basket_items.select_related('product')
+            for basket in instance.basket_items.select_related("product")
         ]
 
     @extend_schema_field(Decimal)
     def get_total_price(self, instance) -> Decimal:
         """Get total price of all items in basket before discounts"""
         return sum(
-            basket_item.base_price for basket_item in instance.basket_items.select_related('product')
+            basket_item.base_price
+            for basket_item in instance.basket_items.select_related("product")
         )
 
     @extend_schema_field(Decimal)
@@ -280,7 +281,8 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         if discounts.count() == 0:
             return self.get_total_price(instance)
         return sum(
-            basket_item.discounted_price for basket_item in instance.basket_items.select_related('product')
+            basket_item.discounted_price
+            for basket_item in instance.basket_items.select_related("product")
         )
 
     @extend_schema_field(list[BasketDiscountSerializer])
