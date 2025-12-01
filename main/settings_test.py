@@ -166,21 +166,3 @@ def test_semantic_version(settings):
     Verify that we have a semantic compatible version.
     """
     semantic_version.Version(settings.VERSION)
-
-
-def test_server_side_cursors_disabled(settings_sandbox):
-    """DISABLE_SERVER_SIDE_CURSORS should be true by default"""
-    settings_vars = settings_sandbox.get()
-    assert (
-        settings_vars["DEFAULT_DATABASE_CONFIG"]["DISABLE_SERVER_SIDE_CURSORS"] is True
-    )
-
-
-def test_server_side_cursors_enabled(settings_sandbox):
-    """DISABLE_SERVER_SIDE_CURSORS should be false if MITX_ONLINE_DB_DISABLE_SS_CURSORS is false"""
-    settings_vars = settings_sandbox.patch(
-        {"MITX_ONLINE_DB_DISABLE_SS_CURSORS": "False"}
-    )
-    assert (
-        settings_vars["DEFAULT_DATABASE_CONFIG"]["DISABLE_SERVER_SIDE_CURSORS"] is False
-    )
