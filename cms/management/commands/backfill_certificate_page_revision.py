@@ -42,9 +42,23 @@ class Command(BaseCommand):
         ]
         signatory_pages = list(SignatoryPage.objects.filter(name__in=signatories_list))
 
-        if not certificate_page_id:
+        # Find missing signatories
+        found_names = {s.name for s in signatory_pages}
+        missing_names = [name for name in signatories_list if name not in found_names]
+
+        if missing_names:
             self.stderr.write(
-                self.style.ERROR(f"Row {row_num}: Missing certificate_page_id")
+                self.style.WARNING(
+                    f"Row {row_num}: The following signatories do not exist: {missing_names}"
+                )
+            )
+
+        # Skip this row if any signatories are missing
+        if not signatory_pages:
+            self.stderr.write(
+                self.style.ERROR(
+                    f"Row {row_num}: No valid SignatoryPage objects found, skipping."
+                )
             )
             return
 
