@@ -739,6 +739,46 @@ def test_checkout_product_with_program_id(user, user_client):
     assert [item.product for item in basket.basket_items.all()] == [product]
 
 
+@pytest.mark.parametrize("multiple_cart_enabled", [True, False])
+def test_add_to_cart_api_with_feature_flag(
+    user_drf_client, user, multiple_cart_enabled, settings
+):
+    """Test add_to_cart API behavior with and without multiple cart items feature"""
+    settings.ENABLE_MULTIPLE_CART_ITEMS = multiple_cart_enabled
+
+    # Create products
+    product1 = ProductFactory.create()
+    product2 = ProductFactory.create()
+
+    # Add first product
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product1.id},
+    )
+    assert resp.status_code == 200
+
+    basket = Basket.objects.get(user=user)
+    assert basket.basket_items.count() == 1
+
+    # Add second product
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product2.id},
+    )
+    assert resp.status_code == 200
+
+    basket.refresh_from_db()
+    if multiple_cart_enabled:
+        # Should have both products
+        assert basket.basket_items.count() == 2
+        products_in_basket = {item.product for item in basket.basket_items.all()}
+        assert products_in_basket == {product1, product2}
+    else:
+        # Should only have the second product (legacy behavior)
+        assert basket.basket_items.count() == 1
+        assert basket.basket_items.first().product == product2
+
+
 def test_discount_rest_api(admin_drf_client, user_drf_client):
     """
     Checks that the admin REST API is only accessible by an admin
