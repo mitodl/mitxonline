@@ -108,7 +108,7 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.AlterIndexTogether(
-                name="programrequirement",
-                index_together={("program", "course"), ("course", "program")},
+            name="programrequirement",
+            index_together={("program", "course"), ("course", "program")},
         ),
     ]

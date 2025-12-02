@@ -252,7 +252,6 @@ def test_send_message(mailoutbox):
         assert formataddr((user.name, user.email)) in recipients
 
 
-
 def test_send_message_failure(mocker):
     """Tests that send_messages logs all exceptions"""
     sendmail = mocker.patch("mail.api.AnymailMessage.send", side_effect=ConnectionError)
