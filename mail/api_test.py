@@ -247,8 +247,9 @@ def test_send_message(mailoutbox):
 
     send_messages(messages)
 
-    for message in mailoutbox:
-        assert message in messages
+    recipients = [message.to[0] for message in mailoutbox]
+    for user in users:
+        assert formataddr((user.name, user.email)) in recipients
 
 
 def test_send_message_failure(mocker):
