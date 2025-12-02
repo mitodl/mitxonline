@@ -33,8 +33,6 @@ class Command(BaseCommand):
 
         except FileNotFoundError:
             self.stdout.write(self.style.ERROR(f"CSV file not found: {csv_file_path}"))
-        except Exception as e:  # noqa: BLE001
-            self.stdout.write(self.style.ERROR(f"Error processing CSV: {e!s}"))
 
     def process_certificate_page_revision(self, row, row_num):
         certificate_page_id = row.get("certificate_page_id", "").strip()
@@ -50,16 +48,7 @@ class Command(BaseCommand):
             )
             return
 
-        # Look up the page
-        try:
-            certificate_page = CertificatePage.objects.get(id=certificate_page_id)
-        except CertificatePage.DoesNotExist:
-            self.stderr.write(
-                self.style.ERROR(
-                    f"Row {row_num}: No CertificatePage with ID {certificate_page_id}"
-                )
-            )
-            return
+        certificate_page = CertificatePage.objects.get(id=certificate_page_id).specific
 
         if not signatories_list:
             self.stderr.write(
@@ -67,28 +56,61 @@ class Command(BaseCommand):
             )
             return
 
-        certificate_page_for_revision = (
-            certificate_page.get_latest_revision().as_object()
-        )
-
-        signatory_blocks = [
-            {
-                "type": "signatory",
-                "value": signatory.id,
-            }
-            for signatory in signatory_pages
-        ]
-
-        certificate_page_for_revision.signatories = StreamValue(
-            certificate_page_for_revision.signatories.stream_block,
+        signatory_blocks = [("signatory", signatory) for signatory in signatory_pages]
+        backfill_signatories = StreamValue(
+            certificate_page.signatories.stream_block,
             signatory_blocks,
-            is_lazy=True,
+            is_lazy=False,
         )
 
-        revision = certificate_page_for_revision.save_revision()
+        # capture the current latest revision (before backfilling)
+        original_live_revision = certificate_page.get_latest_revision()
+
+        def revision_has_same_signatories(revision, new_signatories):
+            rev_page = revision.as_object()
+            rev_signatories = [
+                child.value
+                for child in rev_page.signatories
+                if child.block.name == "signatory"
+            ]
+            new_signatory_values = [child.value for child in new_signatories]
+            return rev_signatories == new_signatory_values
+
+        # Skip if an identical revision exists
+        if any(
+            revision_has_same_signatories(r, backfill_signatories)
+            for r in certificate_page.revisions.all()
+        ):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Row {row_num}: Backfill revision already exists for CertificatePage {certificate_page_id}"
+                )
+            )
+            return
+
+        certificate_page.signatories = backfill_signatories
+        # create the backfilled historical revision
+        backfill_revision = certificate_page.save_revision(
+            changed=True, log_action="wagtail.edit"
+        )
+        backfill_revision.publish()
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Row {row_num}: Created revision {revision.id} for CertificatePage {certificate_page_id}"
+                f"Row {row_num}: Created and published the backfill revision {backfill_revision.id} for CertificatePage {certificate_page_id}"
+            )
+        )
+
+        # Restore previous live version
+        restored_page = original_live_revision.as_object()
+        restored_page.pk = certificate_page.pk
+        restored_revision = restored_page.save_revision(
+            changed=False, log_action="wagtail.revert"
+        )
+        restored_revision.publish()
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Restored original revision {restored_revision.id} as latest for CertificatePage {certificate_page_id}"
             )
         )
