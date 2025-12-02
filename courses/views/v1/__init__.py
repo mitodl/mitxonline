@@ -43,6 +43,7 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
+from cms.models import InstructorPageLink
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
     CourseRunWithCourseSerializer,
@@ -196,6 +197,13 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .select_related("page")
             .prefetch_related("departments")
             .prefetch_related("courseruns__products")
+            .prefetch_related("page__feature_image")
+            .prefetch_related(
+                Prefetch(
+                    "page__linked_instructors",
+                    queryset=InstructorPageLink.objects.select_related("linked_instructor_page"),
+                )
+            )
             .all()
         )
 
