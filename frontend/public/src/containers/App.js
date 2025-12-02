@@ -67,6 +67,12 @@ export class App extends React.Component<Props, void> {
     }
   }
 
+  isEcomServiceMode() {
+    const { location } = this.props
+    const searchParams = new URLSearchParams(location.search)
+    return searchParams.has('ecom-service')
+  }
+
   render() {
     const { match, currentUser, cartItemsCount, location } = this.props
     if (!currentUser) {
@@ -76,11 +82,13 @@ export class App extends React.Component<Props, void> {
 
     return (
       <div className="app" aria-flowto="notifications-container">
-        <Header
-          currentUser={currentUser}
-          cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
-          location={location}
-        />
+        {!this.isEcomServiceMode() && (
+          <Header
+            currentUser={currentUser}
+            cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
+            location={location}
+          />
+        )}
         <div id="main" className="main-page-content">
           <Switch>
             <Route
