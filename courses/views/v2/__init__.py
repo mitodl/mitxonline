@@ -246,7 +246,7 @@ class CourseFilterSet(django_filters.FilterSet):
 
         if "courserun_is_enrollable" not in filter_keys:
             queryset = queryset.prefetch_related(
-                Prefetch("courseruns", queryset=CourseRun.objects.order_by("id")),
+                Prefetch("courseruns", queryset=CourseRun.objects.prefetch_related("products").order_by("id")),
             )
 
         return queryset
@@ -266,7 +266,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
         return (
             Course.objects.select_related("page")
-            .prefetch_related("departments")
+            .prefetch_related("departments", "courseruns")
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
             .annotate(count_courseruns=Count("courseruns"))
             .order_by("title")
@@ -419,6 +419,7 @@ class UserEnrollmentsApiViewSet(
                 "run__b2b_contract",
                 "run__b2b_contract__organization",
             )
+            .prefetch_related("run__products")
             .all()
         )
 

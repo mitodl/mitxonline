@@ -915,10 +915,14 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
+        # Use a fresh query to avoid N+1 issues with prefetched relations
+        from courses.models import CourseRun
+        
         # First try to find non-past enrollable runs (end_date is None or in the future)
         best_run = (
-            self.courseruns.filter(b2b_contract__isnull=True)
+            CourseRun.objects.select_related('course')
+            .prefetch_related('products')
+            .filter(course=self, b2b_contract__isnull=True)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
             .order_by("start_date")
@@ -928,7 +932,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
             best_run = (
-                self.courseruns.filter(b2b_contract__isnull=True)
+                CourseRun.objects.select_related('course')
+                .prefetch_related('products')
+                .filter(course=self, b2b_contract__isnull=True)
                 .enrollable()
                 .order_by("start_date")
                 .first()

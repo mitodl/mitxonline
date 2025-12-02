@@ -7,7 +7,7 @@ import django_filters
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Prefetch
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -158,6 +158,24 @@ class CourseFilterSet(django_filters.FilterSet):
             return get_enrollable_courses(queryset)
         return get_unenrollable_courses(queryset)
 
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        # perform additional filtering
+
+        filter_keys = self.form.cleaned_data.keys()
+
+        # Debug print to see what's happening
+        print(f"DEBUG filter_queryset: filter_keys = {list(filter_keys)}")
+        print(f"DEBUG filter_queryset: courserun_is_enrollable in filter_keys = {'courserun_is_enrollable' in filter_keys}")
+
+        if "courserun_is_enrollable" not in filter_keys:
+            print("DEBUG: Adding courseruns prefetch")
+            queryset = queryset.prefetch_related(
+                Prefetch("courseruns", queryset=CourseRun.objects.prefetch_related("products").order_by("id")),
+            )
+
+        return queryset
+
     class Meta:
         model = Course
         fields = ["id", "live", "readable_id", "page__live", "courserun_is_enrollable"]
@@ -173,24 +191,13 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        courserun_is_enrollable = self.request.query_params.get(
-            "courserun_is_enrollable", None
+        queryset = (
+            Course.objects.filter()
+            .select_related("page")
+            .prefetch_related("departments")
+            .prefetch_related("courseruns__products")
+            .all()
         )
-
-        if courserun_is_enrollable:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related("departments")
-                .all()
-            )
-        else:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related("courseruns", "departments")
-                .all()
-            )
 
         return queryset
 
@@ -252,7 +259,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             return (
                 CourseRun.objects.select_related("course")
-                .prefetch_related("course__departments", "course__page")
+                .prefetch_related("course__departments", "course__page", "products")
                 .filter(live=True)
             )
 
@@ -419,6 +426,7 @@ class UserEnrollmentsApiViewSet(
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
             .select_related("run__course__page", "user", "run")
+            .prefetch_related("run__products")
             .all()
         )
 
