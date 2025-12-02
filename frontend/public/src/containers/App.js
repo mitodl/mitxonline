@@ -70,7 +70,7 @@ export class App extends React.Component<Props, void> {
   isEcomServiceMode() {
     const { location } = this.props
     const searchParams = new URLSearchParams(location.search)
-    return searchParams.has('ecom-service')
+    return searchParams.has("ecom-service")
   }
 
   render() {
