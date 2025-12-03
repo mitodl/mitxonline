@@ -1654,13 +1654,15 @@ sidecar = ["drf-spectacular-sidecar"]
 
 [[package]]
 name = "edx-api-client"
-version = "1.13.0"
+version = "1.14.0"
 description = "Python interface to the edX REST APIs"
 optional = false
 python-versions = "*"
 groups = ["main"]
-files = []
-develop = false
+files = [
+    {file = "edx_api_client-1.14.0-py2.py3-none-any.whl", hash = "sha256:22cf76f434146e6397fae21811fdaea4ea05b99f96faaa0ef10f0e45c56ddafa"},
+    {file = "edx_api_client-1.14.0.tar.gz", hash = "sha256:b18c604c1499a9afb532893d82b508aa1bfb5b77f35e6e0403a536f2da72ba0f"},
+]
 
 [package.dependencies]
 python-dateutil = ">=2.5.3,<4.0.0"
@@ -1668,12 +1670,6 @@ requests = ">=2.20.0"
 
 [package.extras]
 dev = ["flake8"]
-
-[package.source]
-type = "git"
-url = "https://github.com/mitodl/edx-api-client"
-reference = "arslan/8853-fix-lti-dup-users"
-resolved_reference = "8a960039efe823ef7647cb530824ebf8360e1c58"
 
 [[package]]
 name = "edx-opaque-keys"
@@ -6069,4 +6065,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "61c6c8202dd15922a558b2eac7fe3e820b5ee9e285db063bf7b712b2d5c8c214"
+content-hash = "a99135327cb97c03224122338a61d83b82872deee16a3cb3c2fd3f682997d4c9"
