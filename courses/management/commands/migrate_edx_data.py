@@ -199,7 +199,8 @@ class Command(BaseCommand):
                 if not signatories and row.get("mitxonline_course_id") is None:
                     self.stdout.write(
                         self.style.ERROR(
-                            f"No valid signatories found for course {row.get('course_readable_id')}, skipping it."
+                            f"No valid signatories found with names {row.get('signatory_names')} for course "
+                            f"{row.get('course_readable_id')}, skipping it."
                         )
                     )
                     continue
