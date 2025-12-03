@@ -44,7 +44,11 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
         reconcile_user_orgs(user, org_uuids)
 
         if created:
-            log.info("New user created via APISIX/Keycloak, syncing to HubSpot: user_id=%s, email=%s", user.id, user.email)
+            log.info(
+                "New user created via APISIX/Keycloak, syncing to HubSpot: user_id=%s, email=%s",
+                user.id,
+                user.email,
+            )
             sync_hubspot_user(user)
 
         return user
