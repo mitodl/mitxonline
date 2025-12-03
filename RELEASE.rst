@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+Version 0.136.0
+---------------
+
+- fix: Fix LTI based duplicate email users (#3098)
+- fix: sync keycloak users to hubspot on create (#3119)
+- fix(deps): update dependency social-auth-app-django to v5.6.0 [security] (#3005)
+- Add multiple items to cart (#3117)
+- Upgrade django to 5.1.15 (#3108)
+- Removed option related to unused pgbouncer (#3118)
+- Fix close button on add to cart confirm modal (#3114)
+- Update retrieve user api to be versioned (#3102)
+- Fix a 500 error when previewing CertificatePage from CMS (#3116)
+- Hubspot course name fix (#3100)
+- Fix b2b management commands (#3113)
+
 Version 0.135.6 (Released December 01, 2025)
 ---------------
 
