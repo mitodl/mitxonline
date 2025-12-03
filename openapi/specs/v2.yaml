@@ -1030,8 +1030,12 @@ paths:
     get:
       operationId: program_enrollments_list
       description: |-
-        Returns a unified set of program and course enrollments for the current
-        user.
+        APIView mixin that derives prefetches from the serializer(s) used to
+        render responses.
+
+        This allows for the prefetches to be specific to what we intend to serialize
+        to JSON and it also allows this to vary if the serializer_class that is used
+        also varies.
       tags:
       - program_enrollments
       responses:
@@ -1043,16 +1047,27 @@ paths:
                 items:
                   $ref: '#/components/schemas/UserProgramEnrollmentDetail'
           description: ''
-  /api/v1/program_enrollments/{id}/:
+  /api/v1/program_enrollments/{program_id}/:
     get:
       operationId: program_enrollments_retrieve
-      description: Retrieve a specific program enrollment.
+      description: |-
+        APIView mixin that derives prefetches from the serializer(s) used to
+        render responses.
+
+        This allows for the prefetches to be specific to what we intend to serialize
+        to JSON and it also allows this to vary if the serializer_class that is used
+        also varies.
       parameters:
       - in: path
         name: id
         schema:
           type: integer
-        description: Program enrollment ID
+        description: Program ID
+        required: true
+      - in: path
+        name: program_id
+        schema:
+          type: integer
         required: true
       tags:
       - program_enrollments
@@ -1074,7 +1089,12 @@ paths:
         name: id
         schema:
           type: integer
-        description: Program enrollment ID
+        description: Program ID
+        required: true
+      - in: path
+        name: program_id
+        schema:
+          type: integer
         required: true
       tags:
       - program_enrollments
@@ -1083,7 +1103,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProgramEnrollmentDetail'
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserProgramEnrollmentDetail'
           description: ''
   /api/v1/programs/:
     get:
@@ -4313,6 +4335,19 @@ components:
             or educator)
     UserProgramEnrollmentDetail:
       type: object
+      description: |-
+        A serializer for serializing QuerySets.
+
+        This provides more functionality over ModelSerializer by implementing functionality
+        analogous to ViewSet's queryset and get_queryset. It recursively constructucts a
+        QuerySet that has been annotated and prefetched appropriately to fulfill serializers
+        without incurring further queries during serialization
+
+        Subclasses can set either queryset or override `get_queryset` if access
+        to `request` is needed.
+
+        Optionally when the `QuerySetSerializer` is initialized `queryset` can be passed
+        and this will override both `queryset` and `get_queryset`.
       properties:
         program:
           $ref: '#/components/schemas/V1Program'
@@ -4323,8 +4358,8 @@ components:
         certificate:
           allOf:
           - $ref: '#/components/schemas/V1ProgramCertificate'
-          nullable: true
           readOnly: true
+          nullable: true
       required:
       - certificate
       - enrollments
@@ -5491,8 +5526,8 @@ components:
         certificate:
           allOf:
           - $ref: '#/components/schemas/ProgramCertificate'
-          nullable: true
           readOnly: true
+          nullable: true
       required:
       - certificate
       - enrollments

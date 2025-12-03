@@ -458,8 +458,7 @@ class ContractPage(Page, ClusterableModel):
         from b2b.api import create_contract_run
 
         # Clear any cached properties to ensure fresh data
-        if hasattr(program, "_courses_with_requirements_data"):
-            delattr(program, "_courses_with_requirements_data")
+        program.refresh_from_db()
 
         managed = 0
         skipped_run_creation = 0

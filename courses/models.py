@@ -3,6 +3,7 @@
 Course models
 """
 
+import contextlib
 import logging
 import uuid
 from decimal import ROUND_HALF_EVEN, Decimal
@@ -30,9 +31,11 @@ from courses.constants import (
     AVAILABILITY_ANYTIME,
     AVAILABILITY_CHOICES,
     ENROLL_CHANGE_STATUS_CHOICES,
+    ENROLL_CHANGE_STATUS_UNENROLLED,
     ENROLLABLE_ITEM_ID_SEPARATOR,
     SYNCED_COURSE_RUN_FIELD_MSG,
 )
+from courses.program_requirements import Requirements
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
@@ -56,110 +59,6 @@ class ActiveCertificates(models.Manager):
         return super().get_queryset().filter(is_revoked=False)
 
 
-class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
-    def live(self):
-        """Applies a filter for Programs with live=True"""
-        return self.filter(live=True)
-
-    def with_text_id(self, text_id):
-        """Applies a filter for the Program's readable_id"""
-        return self.filter(readable_id=text_id)
-
-
-class CourseQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
-    def live(self):
-        """Applies a filter for Courses with live=True"""
-        return self.filter(live=True)
-
-    def courses_in_program(self, program):
-        """Return a list of courses that are required by a given program"""
-        return self.filter(in_programs__program=program)
-
-
-class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
-    def exclude_b2b(self):
-        """Exclude B2B course runs."""
-
-        return self.filter(b2b_contract__isnull=True)
-
-    def live(self, *, include_b2b=False):
-        """Applies a filter for Course runs with live=True"""
-
-        queryset = self.filter(live=True)
-        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
-
-    def available(self, *, include_b2b=False):
-        """Applies a filter for Course runs with end_date in future"""
-
-        q_filter = models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
-
-        if include_b2b:
-            return self.filter(q_filter)
-        return self.filter(b2b_contract__isnull=True).filter(q_filter)
-
-    def enrollable(self, enrollment_end_date=None):
-        """
-        Applies a filter for Course runs that are open for enrollment.
-
-        This mirrors the logic from CourseRun.is_enrollable property but allows
-        for custom enrollment_end_date parameter.
-
-        Args:
-            enrollment_end_date: datetime, the date to check for enrollment end.
-                               If None, uses current time.
-        """
-        return self.filter(self.get_enrollable_filter(enrollment_end_date))
-
-    def unenrollable(self):
-        """Applies a filter for Course runs that are closed for enrollment."""
-
-        now = now_in_utc()
-        return self.filter(
-            models.Q(live=False)
-            | models.Q(start_date__isnull=True)
-            | (models.Q(enrollment_end__lte=now) | models.Q(enrollment_start__gt=now))
-        )
-
-    @classmethod
-    def get_enrollable_filter(cls, enrollment_end_date=None):
-        """
-        Returns Q filter for enrollable course runs.
-
-        This allows other functions to use the same enrollment logic
-        while composing it with additional filters.
-
-        Args:
-            enrollment_end_date: datetime, the date to check for enrollment end.
-                               If None, uses current time.
-
-        Returns:
-            Q: Django Q filter for enrollable course runs
-        """
-
-        now = now_in_utc()
-        if enrollment_end_date is None:
-            enrollment_end_date = now
-
-        return (
-            # Check if enrollment has not ended
-            (
-                models.Q(enrollment_end__isnull=True)
-                | models.Q(enrollment_end__gt=enrollment_end_date)
-            )
-            # Ensure enrollment has started
-            & models.Q(enrollment_start__isnull=False)
-            & models.Q(enrollment_start__lte=now)
-            # Course run must be live
-            & models.Q(live=True)
-            # Course run must have started
-            & models.Q(start_date__isnull=False)
-        )
-
-    def with_text_id(self, text_id):
-        """Applies a filter for the CourseRun's courseware_id"""
-        return self.filter(courseware_id=text_id)
-
-
 class CoursesTopicQuerySet(models.QuerySet):
     """
     Custom QuerySet for `CoursesTopic`
@@ -176,14 +75,6 @@ class CoursesTopicQuerySet(models.QuerySet):
         Returns a list of all parent topic names.
         """
         return list(self.parent_topics().values_list("name", flat=True))
-
-
-class ActiveEnrollmentManager(models.Manager):
-    """Query manager for active enrollment model objects"""
-
-    def get_queryset(self):
-        """Manager queryset"""
-        return super().get_queryset().filter(active=True)
 
 
 detail_path_char_pattern = r"\w\-+:\."
@@ -238,6 +129,26 @@ class Department(TimestampedModel):
         super().save(*args, **kwargs)
 
 
+class ProgramQuerySet(models.QuerySet):
+    """QuerySet for Program"""
+
+    def for_serialization(self):
+        return self.prefetch_related(
+            Prefetch(
+                "all_requirements",
+                queryset=ProgramRequirement.objects.for_serialization(),
+            )
+        )
+
+    def live(self):
+        """Applies a filter for Programs with live=True"""
+        return self.filter(live=True)
+
+    def with_text_id(self, text_id):
+        """Applies a filter for the Program's readable_id"""
+        return self.filter(readable_id=text_id)
+
+
 class Program(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course program"""
 
@@ -273,6 +184,12 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     end_date = models.DateTimeField(null=True, blank=True, db_index=True)
     b2b_only = models.BooleanField(
         default=False, help_text="Indicates if the program is B2B only"
+    )
+
+    courses = models.ManyToManyField(
+        "Course",
+        through="ProgramRequirement",
+        through_fields=("program", "course"),
     )
 
     @cached_property
@@ -482,6 +399,19 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         return new_req  # noqa: RET504
 
+    def refresh_from_db(self, *args, **kwargs):
+        for cached_prop_name in (
+            "num_courses",
+            "page",
+            "requirement_nodes",
+            "requirements",
+            "requirements_root",
+        ):
+            with contextlib.suppress(AttributeError):
+                delattr(self, cached_prop_name)
+
+        super().refresh_from_db(*args, **kwargs)
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
@@ -503,183 +433,32 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             .prefetch_related("courseruns", "departments")
         )
 
-    def _get_operator_course_requirements(self, main_ops):
-        """
-        Helper method to fetch all course requirements under operator nodes.
-
-        Args:
-            main_ops: List of main operator nodes
-
-        Returns:
-            QuerySet of ProgramRequirement objects for courses
-        """
-        if not main_ops:
-            return ProgramRequirement.objects.none()
-
-        path_q = Q()
-        for op in main_ops:
-            path_q |= Q(path__startswith=op.path)
-
-        return (
-            ProgramRequirement.objects.filter(
-                program__id=self.id,
-                node_type=ProgramRequirementNodeType.COURSE,
-            )
-            .filter(path_q)
-            .prefetch_related(
-                "course",
-                Prefetch(
-                    "course__courseruns",
-                    queryset=CourseRun.objects.filter(live=True).order_by("id"),
-                ),
-            )
-        )
-
-    def _process_course_requirements(self, course_reqs, path_to_operator):
-        """
-        Helper method to process course requirements and categorize them.
-
-        Args:
-            course_reqs: QuerySet of course requirements
-            path_to_operator: Dict mapping operator paths to operators
-
-        Returns:
-            Dict with processed course data
-        """
-        courses = []
-        required_courses = []
-        elective_courses = []
-        required_title = "Required Courses"
-        elective_title = "Elective Courses"
-        minimum_elective_requirement = None
-
-        # First, check all operators for titles and minimum elective requirements
-        for op in path_to_operator.values():
-            # Store titles from actual operator nodes
-            if not op.elective_flag and required_title == "Required Courses":
-                required_title = op.title or required_title
-            elif op.elective_flag and elective_title == "Elective Courses":
-                elective_title = op.title or elective_title
-                if (
-                    op.is_min_number_of_operator
-                    and minimum_elective_requirement is None
-                ):
-                    minimum_elective_requirement = (
-                        int(op.operator_value) if op.operator_value else None
-                    )
-
-        for req in course_reqs:
-            if not req.course:
-                continue
-
-            # Find which operator this requirement belongs to
-            parent_op = self._find_parent_operator(req, path_to_operator)
-            if parent_op is None:
-                continue
-
-            requirement_type = (
-                "Required Courses"
-                if not parent_op.elective_flag
-                else "Elective Courses"
-            )
-
-            # Build course tuples and separate lists
-            course_tuple = (req.course, requirement_type)
-            courses.append(course_tuple)
-
-            if not parent_op.elective_flag:
-                required_courses.append(req.course)
-            else:
-                elective_courses.append(req.course)
-
-        return {
-            "courses": courses,
-            "required_courses": required_courses,
-            "elective_courses": elective_courses,
-            "required_title": required_title,
-            "elective_title": elective_title,
-            "minimum_elective_requirement": minimum_elective_requirement,
-        }
-
-    def _find_parent_operator(self, req, path_to_operator):
-        """
-        Helper method to find the parent operator for a course requirement.
-
-        Args:
-            req: Course requirement object
-            path_to_operator: Dict mapping operator paths to operators
-
-        Returns:
-            Parent operator object or None
-        """
-        for op_path, op in path_to_operator.items():
-            if req.path.startswith(op_path) and req.path != op_path:
-                return op
-        return None
-
     @cached_property
-    def _courses_with_requirements_data(self):
-        """
-        Internal method that efficiently fetches course requirements data.
-
-        Returns:
-        - dict: Contains 'courses', 'required_courses', 'elective_courses',
-                'required_title', 'elective_title', and 'minimum_elective_requirement'
-        """
-        # Get all operator nodes at depth 2 (direct children of root)
-        main_ops = ProgramRequirement.objects.filter(program=self, depth=2).all()
-
-        if not main_ops:
-            return {
-                "courses": [],
-                "required_courses": [],
-                "elective_courses": [],
-                "required_title": "Required Courses",
-                "elective_title": "Elective Courses",
-                "minimum_elective_requirement": None,
-            }
-
-        # Fetch all course requirements efficiently
-        course_reqs = self._get_operator_course_requirements(main_ops)
-
-        # Create a mapping from path prefix to operator for efficient lookup
-        path_to_operator = {op.path: op for op in main_ops}
-
-        # Process and categorize the requirements
-        return self._process_course_requirements(course_reqs, path_to_operator)
+    def requirements(self) -> Requirements:
+        """Get a Requirements object from the program's requirement nodes"""
+        return Requirements.from_nodes(self.all_requirements.all())
 
     @property
-    def courses(self):
-        """
-        Returns the courses associated with this program via the requirements
-        tree. This returns a flat list, not a QuerySet.
-
-        Returns:
-        - list of tuple (Course, string): courses that are either requirements or electives, plus the requirement type
-        """
-        return self._courses_with_requirements_data["courses"]
-
-    @cached_property
-    def required_courses(self) -> list:
+    def required_courses(self) -> list["Course"]:
         """
         Returns just the courses under the "Required Courses" node.
         """
-        return self._courses_with_requirements_data["required_courses"]
+        return self.requirements.courses.required
 
-    @cached_property
-    def required_title(self):
+    @property
+    def required_title(self) -> str:
         """
         Returns the title of the requirements node that holds the required
         courses (e.g. the one that has elective_flag = False).
         """
-        return self._courses_with_requirements_data["required_title"]
+        return self.requirements.required_title
 
-    @cached_property
-    def elective_courses(self) -> list:
+    @property
+    def elective_courses(self) -> list["Course"]:
         """
         Returns just the courses under the "Elective Courses" node.
         """
-        return self._courses_with_requirements_data["elective_courses"]
+        return self.requirements.courses.electives
 
     @property
     def required_programs(self):
@@ -689,52 +468,28 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns:
         - list of Program: programs that are requirements
         """
-        return [
-            req.required_program
-            for req in ProgramRequirement.objects.filter(
-                program=self,
-                node_type=ProgramRequirementNodeType.PROGRAM,
-                required_program__isnull=False,
-            )
-            .select_related("required_program")
-            .all()
-            if not req.get_parent().elective_flag
-        ]
+        return self.requirements.programs.required
 
     @property
-    def elective_programs(self):
+    def elective_programs(self) -> list["Program"]:
         """
         Returns the programs that are electives for this program.
 
         Returns:
         - list of Program: programs that are electives
         """
-        return [
-            req.required_program
-            for req in ProgramRequirement.objects.filter(
-                program=self,
-                node_type=ProgramRequirementNodeType.PROGRAM,
-                required_program__isnull=False,
-            )
-            .select_related("required_program")
-            .all()
-            if req.get_parent().elective_flag
-        ]
+        return self.requirements.programs.electives
 
-    def __str__(self):
-        title = f"{self.readable_id} | {self.title}"
-        return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
-
-    @cached_property
-    def elective_title(self):
+    @property
+    def elective_title(self) -> str:
         """
         Returns the title of the requirements node that holds the elective
         courses (e.g. the one that has elective_flag = True).
         """
-        return self._courses_with_requirements_data["elective_title"]
+        return self.requirements.elective_title
 
-    @cached_property
-    def minimum_elective_courses_requirement(self):
+    @property
+    def minimum_elective_courses_requirement(self) -> int:
         """
         Returns the (int) value defined for the minimum number of elective courses required to be completed by the Program
 
@@ -742,15 +497,15 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             int: Minimum number of elective courses required to be completed by the Program.
                 Returns None, if no value is defined or elective node is absent.
         """
-        return self._courses_with_requirements_data["minimum_elective_requirement"]
+        return self.requirements.minimum_elective_requirement
 
     @property
-    def is_program(self):
+    def is_program(self) -> bool:
         """Flag to indicate if this is a program"""
         return True
 
     @property
-    def is_run(self):
+    def is_run(self) -> bool:
         """Flag to indicate if this is a run"""
         return False
 
@@ -767,6 +522,10 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 collection_items__program__id=self.id
             ).distinct()
         )
+
+    def __str__(self):
+        title = f"{self.readable_id} | {self.title}"
+        return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
 
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
@@ -860,6 +619,33 @@ class CoursesTopic(TimestampedModel):
         return self.name
 
 
+class CourseQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
+    def for_serialization(self):
+        return self.prefetch_related(
+            "program",
+            "program__page",
+            "program__departments",
+            Prefetch(
+                "courseruns",
+                queryset=CourseRun.objects.unexpired(),
+                to_attr="_unexpired_runs",
+            ),
+            Prefetch(
+                "courseruns",
+                queryset=CourseRun.objects.future_unexpired(),
+                to_attr="_future_unexpired_runs",
+            ),
+        )
+
+    def live(self):
+        """Applies a filter for Courses with live=True"""
+        return self.filter(live=True)
+
+    def courses_in_program(self, program):
+        """Return a list of courses that are required by a given program"""
+        return self.filter(in_programs__program=program)
+
+
 class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
 
@@ -914,6 +700,20 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         )
 
     @cached_property
+    def future_unexpired_runs(self):
+        if hasattr(self, "_future_unexpired_runs"):
+            return self._future_unexpired_runs
+
+        return self.courseruns.future_unexpired()
+
+    @cached_property
+    def unexpired_runs(self):
+        if hasattr(self, "_unexpired_runs"):
+            return self._unexpired_runs
+
+        return self.courseruns.unexpired()
+
+    @cached_property
     def first_unexpired_run(self):
         """
         Gets the first unexpired/enrollable CourseRun associated with this Course. Giving preference to
@@ -922,26 +722,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
         # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__isnull=True)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .order_by("start_date")
-            .first()
-        )
-
         # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__isnull=True)
-                .enrollable()
-                .order_by("start_date")
-                .first()
-            )
-
-        return best_run
+        return self.future_unexpired_runs.first() or self.unexpired_runs.first()
 
     @cached_property
     def include_in_learn_catalog(self):
@@ -1050,6 +833,105 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
+
+
+class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
+    def exclude_b2b(self):
+        """Exclude B2B course runs."""
+
+        return self.filter(b2b_contract__isnull=True)
+
+    def live(self, *, include_b2b=False):
+        """Applies a filter for Course runs with live=True"""
+
+        queryset = self.filter(live=True)
+        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
+
+    def available(self, *, include_b2b=False):
+        """Applies a filter for Course runs with end_date in future"""
+        queryset = self
+
+        if not include_b2b:
+            queryset = queryset.exclude_b2b()
+
+        return queryset.filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
+        )
+
+    def enrollable(self, enrollment_end_date=None):
+        """
+        Applies a filter for Course runs that are open for enrollment.
+
+        This mirrors the logic from CourseRun.is_enrollable property but allows
+        for custom enrollment_end_date parameter.
+
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+        """
+        return self.filter(self.get_enrollable_filter(enrollment_end_date))
+
+    def unenrollable(self):
+        """Applies a filter for Course runs that are closed for enrollment."""
+
+        now = now_in_utc()
+        return self.filter(
+            models.Q(live=False)
+            | models.Q(start_date__isnull=True)
+            | (models.Q(enrollment_end__lte=now) | models.Q(enrollment_start__gt=now))
+        )
+
+    def unexpired(self, *, future_only=False, include_b2b=False):
+        """The list of unexpired runs"""
+        queryset = self.enrollable().order_by("start_date")
+
+        if future_only:
+            return queryset.available(include_b2b=include_b2b)
+        else:
+            return queryset if include_b2b else queryset.exclude_b2b()
+
+    def future_unexpired(self, *, include_b2b=False):
+        """The list of future unexpired runs"""
+        return self.unexpired(future_only=False, include_b2b=include_b2b)
+
+    @classmethod
+    def get_enrollable_filter(cls, enrollment_end_date=None):
+        """
+        Returns Q filter for enrollable course runs.
+
+        This allows other functions to use the same enrollment logic
+        while composing it with additional filters.
+
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+
+        Returns:
+            Q: Django Q filter for enrollable course runs
+        """
+
+        now = now_in_utc()
+        if enrollment_end_date is None:
+            enrollment_end_date = now
+
+        return (
+            # Check if enrollment has not ended
+            (
+                models.Q(enrollment_end__isnull=True)
+                | models.Q(enrollment_end__gt=enrollment_end_date)
+            )
+            # Ensure enrollment has started
+            & models.Q(enrollment_start__isnull=False)
+            & models.Q(enrollment_start__lte=now)
+            # Course run must be live
+            & models.Q(live=True)
+            # Course run must have started
+            & models.Q(start_date__isnull=False)
+        )
+
+    def with_text_id(self, text_id):
+        """Applies a filter for the CourseRun's courseware_id"""
+        return self.filter(courseware_id=text_id)
 
 
 class CourseRun(TimestampedModel):
@@ -1538,6 +1420,30 @@ class BlockedCountry(TimestampedModel):
         return f"course='{self.course.title}'; country='{self.country.name}'"
 
 
+class EnrollmentQuerySet(models.QuerySet):
+    """QuerySet for enrollments"""
+
+    def active(self):
+        """Only active enrollments"""
+        return self.filter(active=True)
+
+    def not_unenrolled(self):
+        """Only enrollments that aren't unenrolled"""
+        return self.filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+
+
+class EnrollmentManager(models.Manager.from_queryset(EnrollmentQuerySet)):
+    """Manager for enrollment base class"""
+
+
+class ActiveEnrollmentManager(EnrollmentManager):
+    """Query manager for active enrollment model objects"""
+
+    def get_queryset(self):
+        """Manager queryset"""
+        return super().get_queryset().filter(active=True)
+
+
 class EnrollmentModel(TimestampedModel, AuditableModel):
     """Abstract base model for enrollments"""
 
@@ -1557,7 +1463,7 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
     )
 
     objects = ActiveEnrollmentManager()
-    all_objects = models.Manager()
+    all_objects = EnrollmentManager()
 
     @classmethod
     def get_audit_class(cls):
@@ -1679,6 +1585,30 @@ class CourseRunEnrollmentAudit(AuditModel):
         return "enrollment"
 
 
+class ProgramEnrollmentQuerySet(models.QuerySet):
+    """QuerySet for ProgramEnrollment"""
+
+    def for_serialization(self):
+        return self.prefetch_related(
+            Prefetch(
+                "program",
+                queryset=Program.objects.for_serialization(),
+            ),
+        )
+
+
+class ProgramEnrollmentManager(
+    EnrollmentManager.from_queryset(ProgramEnrollmentQuerySet)
+):
+    """Manager for program enrollments"""
+
+
+class ActiveProgramEnrollmentManager(
+    ActiveEnrollmentManager.from_queryset(ProgramEnrollmentQuerySet)
+):
+    """Manager for active program enrollments"""
+
+
 class ProgramEnrollment(EnrollmentModel):
     """
     Link between User and Program indicating a user's enrollment
@@ -1688,6 +1618,9 @@ class ProgramEnrollment(EnrollmentModel):
         "courses.Program", on_delete=models.CASCADE, related_name="enrollments"
     )
 
+    objects = ActiveProgramEnrollmentManager()
+    all_objects = ProgramEnrollmentManager()
+
     class Meta:
         unique_together = ("user", "program")
 
@@ -1695,6 +1628,33 @@ class ProgramEnrollment(EnrollmentModel):
     def is_ended(self):
         """Return True, if runs associated with enrollment are ended."""
         return all(enrollment.run.is_past for enrollment in self.get_run_enrollments())
+
+    @property
+    def courses(self):
+        """The courses in the program, per requirements"""
+        return self.program.courses
+
+    @cached_property
+    def enrollments(self):
+        if hasattr(self, "_enrollments"):
+            return self._enrollments
+
+        return (
+            CourseRunEnrollment.objects.filter(
+                user=self.user, run__course__in=self.courses
+            )
+            .not_unenrolled()
+            .prefetch_related("run__course__page")
+        )
+
+    @cached_property
+    def certificate(self):
+        if hasattr(self, "_certificate"):
+            return self._certificate
+
+        from courses.utils import get_program_certificate_by_enrollment
+
+        return get_program_certificate_by_enrollment(self)
 
     @classmethod
     def get_audit_class(cls):
