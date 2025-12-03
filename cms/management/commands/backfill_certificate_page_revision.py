@@ -1,4 +1,5 @@
 import csv
+import json
 from pathlib import Path
 
 from django.core.management.base import BaseCommand
@@ -34,97 +35,119 @@ class Command(BaseCommand):
         except FileNotFoundError:
             self.stdout.write(self.style.ERROR(f"CSV file not found: {csv_file_path}"))
 
+    def revision_has_same_signatories(self, certificate_revision, signatory_blocks):
+        page_obj = certificate_revision.as_object()
+        rev_signatory_ids = [child.value.id for child in page_obj.signatories]
+        new_signatory_ids = [sp.id for _, sp in signatory_blocks]
+        return rev_signatory_ids == new_signatory_ids
+
     def process_certificate_page_revision(self, row, row_num):
         certificate_page_id = row.get("certificate_page_id", "").strip()
-        signatories = row.get("signatory_names", "").strip()
-        signatories_list = [
-            name.strip() for name in signatories.split(",") if name.strip()
-        ]
-        signatory_pages = list(SignatoryPage.objects.filter(name__in=signatories_list))
+        signatories_json = row.get("signatory_names", "").strip()
 
-        # Find missing signatories
-        found_names = {s.name for s in signatory_pages}
-        missing_names = [name for name in signatories_list if name not in found_names]
-
-        if missing_names:
+        if not certificate_page_id:
             self.stderr.write(
-                self.style.WARNING(
-                    f"Row {row_num}: The following signatories do not exist: {missing_names}"
-                )
+                self.style.ERROR(f"Row {row_num}: Missing certificate_page_id")
             )
+            return
 
-        # Skip this row if any signatories are missing
-        if not signatory_pages:
+        if not signatories_json:
+            self.stderr.write(
+                self.style.ERROR(f"Row {row_num}: Missing signatory_names JSON array")
+            )
+            return
+
+        try:
+            # Example: a list of pairs, e.g. [["Name1", "Name2"], ["Name3", "Name4"]]
+            signatory_pairs = json.loads(signatories_json)
+        except Exception:  # noqa: BLE001
             self.stderr.write(
                 self.style.ERROR(
-                    f"Row {row_num}: No valid SignatoryPage objects found, skipping."
+                    f"Row {row_num}: signatory_names is not valid JSON: {signatories_json}"
                 )
             )
             return
 
+        # Load the CertificatePage
         certificate_page = CertificatePage.objects.get(id=certificate_page_id).specific
 
-        if not signatories_list:
-            self.stderr.write(
-                self.style.WARNING(f"Row {row_num}: No signatories provided")
-            )
-            return
-
-        signatory_blocks = [("signatory", signatory) for signatory in signatory_pages]
-        backfill_signatories = StreamValue(
-            certificate_page.signatories.stream_block,
-            signatory_blocks,
-            is_lazy=False,
-        )
-
-        # capture the current latest revision (before backfilling)
+        # Copy the original live revision to restore later
         original_live_revision = certificate_page.get_latest_revision()
 
-        def revision_has_same_signatories(revision, new_signatories):
-            rev_page = revision.as_object()
-            rev_signatories = [
-                child.value
-                for child in rev_page.signatories
-                if child.block.name == "signatory"
-            ]
-            new_signatory_values = [child.value for child in new_signatories]
-            return rev_signatories == new_signatory_values
+        backfill_created = False
+        for index, signatory_names in enumerate(signatory_pairs, start=1):
+            if not isinstance(signatory_names, list) or not signatory_names:
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"Row {row_num}: Pair #{index} must be a non-empty list of names: {signatory_names}"
+                    )
+                )
+                continue
 
-        # Skip if an identical revision exists
-        if any(
-            revision_has_same_signatories(r, backfill_signatories)
-            for r in certificate_page.revisions.all()
-        ):
+            signatory_pages = list(
+                SignatoryPage.objects.filter(name__in=signatory_names)
+            )
+            found_names = {s.name for s in signatory_pages}
+            missing = [n for n in signatory_names if n not in found_names]
+
+            if missing:
+                self.stderr.write(
+                    self.style.WARNING(
+                        f"Row {row_num} Pair {index}: Missing SignatoryPage(s): {missing}"
+                    )
+                )
+                continue
+
+            signatory_blocks = [
+                ("signatory", signatory_page) for signatory_page in signatory_pages
+            ]
+
+            backfill_signatories = StreamValue(
+                certificate_page.signatories.stream_block,
+                signatory_blocks,
+                is_lazy=False,
+            )
+
+            if any(
+                self.revision_has_same_signatories(revision, signatory_blocks)
+                for revision in certificate_page.revisions.all()
+            ):
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Row {row_num} Pair {index}: Identical revision already exists"
+                    )
+                )
+                continue
+
+            # Apply new signatories
+            certificate_page.signatories = backfill_signatories
+
+            # create the backfilled historical revision
+            backfill_revision = certificate_page.save_revision(
+                changed=True,
+                log_action="wagtail.edit",
+            )
+            backfill_revision.publish()
+
+            backfill_created = True
             self.stdout.write(
-                self.style.WARNING(
-                    f"Row {row_num}: Backfill revision already exists for CertificatePage {certificate_page_id}"
+                self.style.SUCCESS(
+                    f"Row {row_num} Pair {index}: Created revision {backfill_revision.id} for CertificatePage {certificate_page_id}"
                 )
             )
-            return
 
-        certificate_page.signatories = backfill_signatories
-        # create the backfilled historical revision
-        backfill_revision = certificate_page.save_revision(
-            changed=True, log_action="wagtail.edit"
-        )
-        backfill_revision.publish()
-
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Row {row_num}: Created and published the backfill revision {backfill_revision.id} for CertificatePage {certificate_page_id}"
+        if backfill_created:
+            # Restore original live revision
+            restored_page = original_live_revision.as_object()
+            restored_page.pk = certificate_page.pk
+            restored_revision = restored_page.save_revision(
+                changed=False,
+                log_action="wagtail.revert",
             )
-        )
+            restored_revision.publish()
 
-        # Restore previous live version
-        restored_page = original_live_revision.as_object()
-        restored_page.pk = certificate_page.pk
-        restored_revision = restored_page.save_revision(
-            changed=False, log_action="wagtail.revert"
-        )
-        restored_revision.publish()
-
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Restored original revision {restored_revision.id} as latest for CertificatePage {certificate_page_id}"
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Row {row_num}: Restored original live revision {restored_revision.id} for CertificatePage {certificate_page_id}"
+                )
             )
-        )
