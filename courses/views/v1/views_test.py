@@ -4,6 +4,7 @@ Tests for course views
 
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
 import operator as op
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 import pytest
@@ -24,6 +25,7 @@ from courses.factories import (
     CourseRunFactory,
 )
 from courses.models import (
+    Course,
     CourseRun,
     ProgramEnrollment,
 )
@@ -38,7 +40,7 @@ from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_programs,
 )
-from courses.views.v1 import UserEnrollmentsApiViewSet
+from courses.views.v1 import CourseFilterSet, UserEnrollmentsApiViewSet
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order, OrderStatus
 from main import features
@@ -808,3 +810,54 @@ def test_create_enrollments_with_existing_fulfilled_order(
     else:
         assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
     patched_create_enrollments.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestCourseFilterSet:
+    """Test CourseFilterSet filtering methods"""
+
+    def test_filter_courserun_is_enrollable_true(self):
+        """Test filtering for enrollable courses"""
+        # Create courses with different enrollment status
+        enrollable_course = CourseFactory.create(live=True)
+        # Create an enrollable course run: live=True, has enrollment_start in past, no enrollment_end, has start_date
+        CourseRunFactory.create(
+            course=enrollable_course,
+            live=True,
+            enrollment_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            enrollment_end=None,
+            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc)
+        )
+
+        non_enrollable_course = CourseFactory.create(live=True)
+        CourseRunFactory.create(course=non_enrollable_course, live=False)
+
+        queryset = Course.objects.all()
+        filterset = CourseFilterSet()
+
+        # Test filtering for enrollable courses
+        result = filterset.filter_courserun_is_enrollable(queryset, None, value=True)
+        assert enrollable_course in result
+
+    def test_filter_courserun_is_enrollable_false(self):
+        """Test filtering for non-enrollable courses"""
+        # Create courses with different enrollment status
+        enrollable_course = CourseFactory.create(live=True)
+        # Create an enrollable course run: live=True, has enrollment_start in past, no enrollment_end, has start_date
+        CourseRunFactory.create(
+            course=enrollable_course,
+            live=True,
+            enrollment_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            enrollment_end=None,
+            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc)
+        )
+
+        non_enrollable_course = CourseFactory.create(live=True)
+        CourseRunFactory.create(course=non_enrollable_course, live=False)
+
+        queryset = Course.objects.all()
+        filterset = CourseFilterSet()
+
+        # Test filtering for non-enrollable courses
+        result = filterset.filter_courserun_is_enrollable(queryset, None, value=False)
+        assert non_enrollable_course in result
