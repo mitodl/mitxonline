@@ -193,8 +193,16 @@ class Command(BaseCommand):
                     continue
 
                 signatories = self._get_signatories(
-                    row.get("signatory_names", []), use_default_signatory
+                    row.get("signatory_names") or [], use_default_signatory
                 )
+
+                if not signatories and row.get("mitxonline_course_id") is None:
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"No valid signatories found for course {row.get('course_readable_id')}, skipping it."
+                        )
+                    )
+                    continue
 
                 (course, course_created) = self._create_course(row)
 
