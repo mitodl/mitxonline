@@ -1,9 +1,9 @@
-from rest_framework import serializers
+from mitol.common.serializers import QuerySetSerializer
 
 from courses import models
 
 
-class DepartmentSerializer(serializers.ModelSerializer):
+class DepartmentSerializer(QuerySetSerializer):
     """Department model serializer"""
 
     class Meta:

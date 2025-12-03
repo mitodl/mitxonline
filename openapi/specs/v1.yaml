@@ -809,7 +809,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProgramEnrollmentDetail'
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserProgramEnrollmentDetail'
           description: ''
   /api/v1/programs/:
     get:

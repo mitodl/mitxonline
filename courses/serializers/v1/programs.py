@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from mitol.common.serializers import QuerySetSerializer
 from mitol.common.utils import now_in_utc
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -78,7 +79,7 @@ class LearnerProgramRecordShareSerializer(serializers.ModelSerializer):
 
 
 @extend_schema_serializer(component_name="V1ProgramSerializer")
-class ProgramSerializer(serializers.ModelSerializer):
+class ProgramSerializer(QuerySetSerializer):
     """Program model serializer"""
 
     courses = serializers.SerializerMethodField()
@@ -91,7 +92,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     def get_courses(self, instance):
         """Serializer for courses"""
         return CourseWithCourseRunsSerializer(
-            [course[0] for course in instance.courses if course[0].live],
+            [course for course in instance.courses if course.live],
             many=True,
             context={"include_page_fields": True},
         ).data
@@ -229,18 +230,10 @@ class ProgramCertificateSerializer(serializers.ModelSerializer):
         fields = ["uuid", "link"]
 
 
-class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
+class UserProgramEnrollmentDetailSerializer(QuerySetSerializer):
     program = ProgramSerializer()
     enrollments = CourseRunEnrollmentSerializer(many=True)
-    certificate = serializers.SerializerMethodField(read_only=True)
-
-    @extend_schema_field(ProgramCertificateSerializer(allow_null=True))
-    def get_certificate(self, user_program_enrollment):
-        """
-        Resolve a certificate for this enrollment if it exists
-        """
-        certificate = user_program_enrollment.get("certificate")
-        return ProgramCertificateSerializer(certificate).data if certificate else None
+    certificate = ProgramCertificateSerializer(read_only=True, allow_null=True)
 
 
 class LearnerRecordSerializer(serializers.Serializer):
