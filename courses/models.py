@@ -1165,7 +1165,9 @@ class CourseRun(TimestampedModel):
         """
         return (
             self.live is True
-            and (self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc()))
+            and (
+                self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
+            )
             and self.products.count() > 0
         )
 
