@@ -743,7 +743,6 @@ def test_update_user_enrollment_failure(
     patched_log_exception.assert_called_once()
 
 
-@pytest.mark.skip_nplusone_check
 def test_program_enrollments(user_drf_client, user, programs):
     """
     Tests the program enrollments API, which should show the user's enrollment

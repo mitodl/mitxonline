@@ -65,100 +65,6 @@ class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
         return self.filter(readable_id=text_id)
 
 
-class CourseQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
-    def live(self):
-        """Applies a filter for Courses with live=True"""
-        return self.filter(live=True)
-
-    def courses_in_program(self, program):
-        """Return a list of courses that are required by a given program"""
-        return self.filter(in_programs__program=program)
-
-
-class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
-    def exclude_b2b(self):
-        """Exclude B2B course runs."""
-
-        return self.filter(b2b_contract__isnull=True)
-
-    def live(self, *, include_b2b=False):
-        """Applies a filter for Course runs with live=True"""
-
-        queryset = self.filter(live=True)
-        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
-
-    def available(self, *, include_b2b=False):
-        """Applies a filter for Course runs with end_date in future"""
-
-        q_filter = models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
-
-        if include_b2b:
-            return self.filter(q_filter)
-        return self.filter(b2b_contract__isnull=True).filter(q_filter)
-
-    def enrollable(self, enrollment_end_date=None):
-        """
-        Applies a filter for Course runs that are open for enrollment.
-
-        This mirrors the logic from CourseRun.is_enrollable property but allows
-        for custom enrollment_end_date parameter.
-
-        Args:
-            enrollment_end_date: datetime, the date to check for enrollment end.
-                               If None, uses current time.
-        """
-        return self.filter(self.get_enrollable_filter(enrollment_end_date))
-
-    def unenrollable(self):
-        """Applies a filter for Course runs that are closed for enrollment."""
-
-        now = now_in_utc()
-        return self.filter(
-            models.Q(live=False)
-            | models.Q(start_date__isnull=True)
-            | (models.Q(enrollment_end__lte=now) | models.Q(enrollment_start__gt=now))
-        )
-
-    @classmethod
-    def get_enrollable_filter(cls, enrollment_end_date=None):
-        """
-        Returns Q filter for enrollable course runs.
-
-        This allows other functions to use the same enrollment logic
-        while composing it with additional filters.
-
-        Args:
-            enrollment_end_date: datetime, the date to check for enrollment end.
-                               If None, uses current time.
-
-        Returns:
-            Q: Django Q filter for enrollable course runs
-        """
-
-        now = now_in_utc()
-        if enrollment_end_date is None:
-            enrollment_end_date = now
-
-        return (
-            # Check if enrollment has not ended
-            (
-                models.Q(enrollment_end__isnull=True)
-                | models.Q(enrollment_end__gt=enrollment_end_date)
-            )
-            # Ensure enrollment has started
-            & models.Q(enrollment_start__isnull=False)
-            & models.Q(enrollment_start__lte=now)
-            # Course run must be live
-            & models.Q(live=True)
-            # Course run must have started
-            & models.Q(start_date__isnull=False)
-        )
-
-    def with_text_id(self, text_id):
-        """Applies a filter for the CourseRun's courseware_id"""
-        return self.filter(courseware_id=text_id)
-
-
 class CoursesTopicQuerySet(models.QuerySet):
     """
     Custom QuerySet for `CoursesTopic`
@@ -853,6 +759,30 @@ class CoursesTopic(TimestampedModel):
         return self.name
 
 
+class CourseQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
+    def for_serialization(self):
+        return self.prefetch_related(
+            Prefetch(
+                "courseruns",
+                CourseRun.objects.unexpired(),
+                to_attr="_unexpired_runs",
+            ),
+            Prefetch(
+                "courseruns",
+                CourseRun.objects.future_unexpired(),
+                to_attr="_future_unexpired_runs",
+            ),
+        )
+
+    def live(self):
+        """Applies a filter for Courses with live=True"""
+        return self.filter(live=True)
+
+    def courses_in_program(self, program):
+        """Return a list of courses that are required by a given program"""
+        return self.filter(in_programs__program=program)
+
+
 class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
 
@@ -907,6 +837,20 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         )
 
     @cached_property
+    def future_unexpired_runs(self):
+        if hasattr(self, "_future_unexpired_runs"):
+            return self._future_unexpired_runs
+
+        return self.courseruns.future_unexpired()
+
+    @cached_property
+    def unexpired_runs(self):
+        if hasattr(self, "_unexpired_runs"):
+            return self._unexpired_runs
+
+        return self.courseruns.unexpired()
+
+    @cached_property
     def first_unexpired_run(self):
         """
         Gets the first unexpired/enrollable CourseRun associated with this Course. Giving preference to
@@ -915,26 +859,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
         # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__isnull=True)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .order_by("start_date")
-            .first()
-        )
-
         # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__isnull=True)
-                .enrollable()
-                .order_by("start_date")
-                .first()
-            )
-
-        return best_run
+        return self.future_unexpired_runs.first() or self.unexpired_runs.first()
 
     @cached_property
     def include_in_learn_catalog(self):
@@ -1043,6 +970,105 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
+
+
+class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
+    def exclude_b2b(self):
+        """Exclude B2B course runs."""
+
+        return self.filter(b2b_contract__isnull=True)
+
+    def live(self, *, include_b2b=False):
+        """Applies a filter for Course runs with live=True"""
+
+        queryset = self.filter(live=True)
+        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
+
+    def available(self, *, include_b2b=False):
+        """Applies a filter for Course runs with end_date in future"""
+        queryset = self
+
+        if not include_b2b:
+            queryset = queryset.exclude_b2b()
+
+        return queryset.filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
+        )
+
+    def enrollable(self, enrollment_end_date=None):
+        """
+        Applies a filter for Course runs that are open for enrollment.
+
+        This mirrors the logic from CourseRun.is_enrollable property but allows
+        for custom enrollment_end_date parameter.
+
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+        """
+        return self.filter(self.get_enrollable_filter(enrollment_end_date))
+
+    def unenrollable(self):
+        """Applies a filter for Course runs that are closed for enrollment."""
+
+        now = now_in_utc()
+        return self.filter(
+            models.Q(live=False)
+            | models.Q(start_date__isnull=True)
+            | (models.Q(enrollment_end__lte=now) | models.Q(enrollment_start__gt=now))
+        )
+
+    def unexpired(self, *, future_only=False, include_b2b=False):
+        """The list of unexpired runs"""
+        queryset = self.enrollable().order_by("start_date")
+
+        if future_only:
+            return queryset.available(include_b2b=include_b2b)
+        else:
+            return queryset if include_b2b else queryset.exclude_b2b()
+
+    def future_unexpired(self, *, include_b2b=False):
+        """The list of future unexpired runs"""
+        return self.unexpired_runs(future_only=False, include_b2b=include_b2b)
+
+    @classmethod
+    def get_enrollable_filter(cls, enrollment_end_date=None):
+        """
+        Returns Q filter for enrollable course runs.
+
+        This allows other functions to use the same enrollment logic
+        while composing it with additional filters.
+
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+
+        Returns:
+            Q: Django Q filter for enrollable course runs
+        """
+
+        now = now_in_utc()
+        if enrollment_end_date is None:
+            enrollment_end_date = now
+
+        return (
+            # Check if enrollment has not ended
+            (
+                models.Q(enrollment_end__isnull=True)
+                | models.Q(enrollment_end__gt=enrollment_end_date)
+            )
+            # Ensure enrollment has started
+            & models.Q(enrollment_start__isnull=False)
+            & models.Q(enrollment_start__lte=now)
+            # Course run must be live
+            & models.Q(live=True)
+            # Course run must have started
+            & models.Q(start_date__isnull=False)
+        )
+
+    def with_text_id(self, text_id):
+        """Applies a filter for the CourseRun's courseware_id"""
+        return self.filter(courseware_id=text_id)
 
 
 class CourseRun(TimestampedModel):

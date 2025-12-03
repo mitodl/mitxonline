@@ -511,13 +511,11 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         """
 
         program_enrollments = (
-            ProgramEnrollment.objects.select_related(
-                "program",
-                "program__page",
+            ProgramEnrollment.objects.prefetch_related(
+                "program", "program__page", "program__departments"
             )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-            .all()
         )
 
         program_list = []
