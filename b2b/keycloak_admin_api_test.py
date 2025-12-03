@@ -8,6 +8,7 @@ import faker
 import pytest
 import requests
 
+from b2b.exceptions import KeycloakAdminImproperlyConfiguredError
 from b2b.factories import RealmRepresentationFactory
 from b2b.keycloak_admin_api import (
     KeycloakAdminClient,
@@ -91,6 +92,306 @@ def test_client_init(settings, mocker):
         mocked_openid_config["token_endpoint"],
         grant_type="client_credentials",
     )
+
+
+def test_client_init_missing_base_url(settings):
+    """Test that client init raises exception when KEYCLOAK_BASE_URL is missing."""
+    settings.KEYCLOAK_BASE_URL = None
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_BASE_URL setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_empty_base_url(settings):
+    """Test that client init raises exception when KEYCLOAK_BASE_URL is empty."""
+    settings.KEYCLOAK_BASE_URL = ""
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_BASE_URL setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_missing_realm_name(settings):
+    """Test that client init raises exception when KEYCLOAK_REALM_NAME is missing."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = None
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_REALM_NAME setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_empty_realm_name(settings):
+    """Test that client init raises exception when KEYCLOAK_REALM_NAME is empty."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = ""
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_REALM_NAME setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_missing_discovery_url(settings):
+    """Test that client init raises exception when KEYCLOAK_DISCOVERY_URL is missing."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = None
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_DISCOVERY_URL setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_empty_discovery_url(settings):
+    """Test that client init raises exception when KEYCLOAK_DISCOVERY_URL is empty."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = ""
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_DISCOVERY_URL setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_missing_client_id(settings):
+    """Test that client init raises exception when KEYCLOAK_ADMIN_CLIENT_ID is missing."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = None
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_ADMIN_CLIENT_ID setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_empty_client_id(settings):
+    """Test that client init raises exception when KEYCLOAK_ADMIN_CLIENT_ID is empty."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = ""
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_ADMIN_CLIENT_ID setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_missing_client_secret(settings):
+    """Test that client init raises exception when KEYCLOAK_ADMIN_CLIENT_SECRET is missing."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_SECRET = None
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_ADMIN_CLIENT_SECRET setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_empty_client_secret(settings):
+    """Test that client init raises exception when KEYCLOAK_ADMIN_CLIENT_SECRET is empty."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_SECRET = ""
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=r"KEYCLOAK_ADMIN_CLIENT_SECRET setting is not configured\."
+    ):
+        KeycloakAdminClient()
+
+
+def test_client_init_ssl_verification_handling(settings, mocker):
+    """Test that SSL verification is handled correctly based on settings."""
+    # Test with SSL verification enabled (default)
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_SECRET = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
+    settings.KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL = False
+
+    mocked_openid_config = {"token_endpoint": FAKE.url()}
+    mocked_requests_get = mocker.patch(
+        "requests.get",
+        return_value=mocker.Mock(
+            status_code=200,
+            json=lambda: mocked_openid_config,
+        ),
+    )
+    mocker.patch(
+        "authlib.integrations.requests_client.OAuth2Session.fetch_token",
+        return_value={"access_token": FAKE.sha256(), "expires_in": 300, "token_type": "Bearer"},
+    )
+
+    client = KeycloakAdminClient()
+
+    # Verify SSL verification is enabled
+    assert client.skip_verify is False
+    mocked_requests_get.assert_called_once_with(
+        settings.KEYCLOAK_DISCOVERY_URL,
+        timeout=60,
+        verify=True,  # Should be True when SSL verification is enabled
+    )
+
+
+def test_client_init_ssl_verification_disabled(settings, mocker):
+    """Test that SSL verification can be disabled."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_SECRET = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
+    settings.KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL = True
+
+    mocked_openid_config = {"token_endpoint": FAKE.url()}
+    mocked_requests_get = mocker.patch(
+        "requests.get",
+        return_value=mocker.Mock(
+            status_code=200,
+            json=lambda: mocked_openid_config,
+        ),
+    )
+    mocker.patch(
+        "authlib.integrations.requests_client.OAuth2Session.fetch_token",
+        return_value={"access_token": FAKE.sha256(), "expires_in": 300, "token_type": "Bearer"},
+    )
+
+    client = KeycloakAdminClient()
+
+    # Verify SSL verification is disabled
+    assert client.skip_verify is True
+    mocked_requests_get.assert_called_once_with(
+        settings.KEYCLOAK_DISCOVERY_URL,
+        timeout=60,
+        verify=False,  # Should be False when SSL verification is disabled
+    )
+
+
+def test_client_init_openid_configuration_request_failure(settings, mocker):
+    """Test that client init handles OpenID configuration request failure."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_SECRET = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
+    
+    # Mock a failed HTTP request
+    mock_response = mocker.Mock()
+    mock_response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
+    mocker.patch("requests.get", return_value=mock_response)
+    
+    with pytest.raises(requests.HTTPError, match="404 Not Found"):
+        KeycloakAdminClient()
+
+
+def test_client_init_base_url_processing(settings, mocker):
+    """Test that base URL is properly processed with admin path."""
+    base_url = "https://keycloak.example.com"
+    expected_admin_url = "https://keycloak.example.com/admin/realms/"
+
+    settings.KEYCLOAK_BASE_URL = base_url
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_SECRET = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
+
+    mocked_openid_config = {"token_endpoint": FAKE.url()}
+    mocker.patch(
+        "requests.get",
+        return_value=mocker.Mock(status_code=200, json=lambda: mocked_openid_config),
+    )
+    mocker.patch(
+        "authlib.integrations.requests_client.OAuth2Session.fetch_token",
+        return_value={"access_token": FAKE.sha256(), "expires_in": 300, "token_type": "Bearer"},
+    )
+
+    client = KeycloakAdminClient()
+
+    assert client.base_url == expected_admin_url
+
+
+def test_client_init_oauth_session_configuration(settings, mocker):
+    """Test that OAuth session is properly configured."""
+    settings.KEYCLOAK_BASE_URL = FAKE.url()
+    settings.KEYCLOAK_REALM_NAME = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = FAKE.word()
+    settings.KEYCLOAK_ADMIN_CLIENT_SECRET = FAKE.word()
+    settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
+    settings.KEYCLOAK_ADMIN_CLIENT_SCOPES = ["admin", "openid"]
+
+    mocked_openid_config = {"token_endpoint": "https://keycloak.example.com/token"}
+    mocker.patch(
+        "requests.get",
+        return_value=mocker.Mock(status_code=200, json=lambda: mocked_openid_config),
+    )
+
+    mock_token = {"access_token": FAKE.sha256(), "expires_in": 300, "token_type": "Bearer"}
+
+    # Mock the OAuth2Session class directly instead of its constructor
+    mock_oauth_session = mocker.Mock()
+    mock_oauth_session.fetch_token.return_value = mock_token
+
+    # Mock the session property to prevent real requests
+    mock_oauth_session.session = mocker.Mock()
+
+    # Mock OAuth2Session constructor
+    mock_constructor = mocker.patch(
+        "b2b.keycloak_admin_api.OAuth2Session",
+        return_value=mock_oauth_session,
+    )
+
+    client = KeycloakAdminClient()
+
+    # Verify OAuth2Session was constructed with correct parameters
+    mock_constructor.assert_called_once_with(
+        client_id=settings.KEYCLOAK_ADMIN_CLIENT_ID,
+        client_secret=settings.KEYCLOAK_ADMIN_CLIENT_SECRET,
+        token_endpoint=mocked_openid_config["token_endpoint"],
+        scope=settings.KEYCLOAK_ADMIN_CLIENT_SCOPES,
+        verify=not client.skip_verify,
+    )
+
+    # Verify token was fetched
+    mock_oauth_session.fetch_token.assert_called_once_with(
+        mocked_openid_config["token_endpoint"],
+        grant_type="client_credentials",
+    )
+
+    # Verify client has the token and session
+    assert client.token == mock_token
+    assert client.oauth_session == mock_oauth_session    # Verify token was fetched
+    mock_oauth_session.fetch_token.assert_called_once_with(
+        mocked_openid_config["token_endpoint"],
+        grant_type="client_credentials",
+    )
+
+    # Verify client has the token and session
+    assert client.token == mock_token
+    assert client.oauth_session == mock_oauth_session
 
 
 def test_client_realmify(settings, mocker):
