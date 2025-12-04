@@ -451,6 +451,7 @@ ROBOTS_CACHE_TIMEOUT = get_int(
 )
 
 AUTHENTICATION_BACKENDS = (
+    "authentication.backends.apisix_remote_user_org.ApisixRemoteUserOrgBackend",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
 )
