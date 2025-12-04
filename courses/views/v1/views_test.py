@@ -15,6 +15,7 @@ from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
+from rest_framework.test import APIClient
 from reversion.models import Version
 from unittest.mock import patch, MagicMock
 from django.test import RequestFactory
@@ -925,3 +926,51 @@ class TestProgramViewSetPagination:
 
             mock_super.assert_called_once_with(queryset)
             assert result == "paginated_result"
+
+@pytest.mark.django_db
+class TestUserEnrollmentsApiViewSetSync:
+    """Test UserEnrollmentsApiViewSet sync functionality"""
+
+    def setup_method(self):
+        self.factory = RequestFactory()
+        self.user = UserFactory.create()
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.viewset = UserEnrollmentsApiViewSet()
+
+    @patch('courses.views.v1.sync_enrollments_with_edx')
+    @patch('courses.views.v1.is_enabled')
+    def test_list_with_sync_enabled_success(self, mock_is_enabled, mock_sync):
+        """Test list method when sync is enabled and succeeds"""
+        mock_is_enabled.return_value = True
+        mock_sync.return_value = None
+        
+        response = self.client.get(reverse('v1:user-enrollments-api-list'))
+        
+        assert response.status_code == status.HTTP_200_OK
+        mock_sync.assert_called_once_with(self.user)
+
+    @patch('courses.views.v1.sync_enrollments_with_edx')
+    @patch('courses.views.v1.is_enabled')
+    @patch('courses.views.v1.log.exception')
+    def test_list_with_sync_enabled_exception(self, mock_log, mock_is_enabled, mock_sync):
+        """Test list method when sync is enabled but fails"""
+        mock_is_enabled.return_value = True
+        mock_sync.side_effect = Exception("Sync failed")
+        
+        response = self.client.get(reverse('v1:user-enrollments-api-list'))
+        
+        assert response.status_code == status.HTTP_200_OK
+        mock_sync.assert_called_once_with(self.user)
+        mock_log.assert_called_once_with("Failed to sync user enrollments with edX")
+
+    @patch('courses.views.v1.sync_enrollments_with_edx')
+    @patch('courses.views.v1.is_enabled')
+    def test_list_with_sync_disabled(self, mock_is_enabled, mock_sync):
+        """Test list method when sync is disabled"""
+        mock_is_enabled.return_value = False
+        
+        response = self.client.get(reverse('v1:user-enrollments-api-list'))
+        
+        assert response.status_code == status.HTTP_200_OK
+        mock_sync.assert_not_called()
