@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.136.1
+Version 0.136.1 (Released December 04, 2025)
 ---------------
 
 - Remove social auth (#3127)
