@@ -8,7 +8,7 @@ from urllib.parse import urljoin
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
@@ -807,3 +807,24 @@ def generate_discount_code(**kwargs):  # noqa: C901
         generated_codes.append(discount)
 
     return generated_codes
+
+
+def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
+    """
+    Get the auto-apply discounts that can be applied to a basket.
+
+    Args:
+        basket_id (int): The ID of the basket to get the auto-apply discounts for.
+
+    Returns:
+        QuerySet: The auto-apply discounts that can be applied to the basket.
+    """
+    basket = Basket.objects.get(pk=basket_id)
+    products = basket.get_products()
+
+    return Discount.objects.filter(
+        Q(product__in=products) | Q(product__isnull=True),
+        Q(user_discount_user=basket.user) | Q(user_discount_user__isnull=True),
+        automatic=True,
+    )
+

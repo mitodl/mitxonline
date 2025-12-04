@@ -27,7 +27,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from ecommerce.api import establish_basket
+from ecommerce.api import establish_basket, get_auto_apply_discounts_for_basket
 from ecommerce.models import Basket, BasketDiscount, BasketItem, Discount, Product
 from ecommerce.serializers import BasketSerializer, BasketWithProductSerializer
 
@@ -103,7 +103,7 @@ def _create_basket_from_product(
     (_, created) = BasketItem.objects.update_or_create(
         basket=basket, product=product, defaults={"quantity": quantity}
     )
-    auto_apply_discount_discounts = api.get_auto_apply_discounts_for_basket(basket.id)
+    auto_apply_discount_discounts = get_auto_apply_discounts_for_basket(basket.id)
     for discount in auto_apply_discount_discounts:
         basket.apply_discount_to_basket(discount)
 
@@ -117,7 +117,7 @@ def _create_basket_from_product(
     basket.refresh_from_db()
 
     if checkout:
-        return redirect("checkout_interstitial_page", system_slug=system.slug)
+        return redirect("checkout_interstitial_page")
 
     return Response(
         BasketWithProductSerializer(basket).data,
