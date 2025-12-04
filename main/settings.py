@@ -13,6 +13,7 @@ from urllib.parse import urljoin
 import cssutils
 import dj_database_url
 from celery.schedules import crontab
+from django.conf import global_settings
 from django.core.exceptions import ImproperlyConfigured
 from mitol.apigateway.settings import *  # noqa: F403  # noqa: F403
 from mitol.common.envs import (
@@ -832,7 +833,9 @@ if MITX_ONLINE_USE_S3 and (
 if MITX_ONLINE_USE_S3:
     if CLOUDFRONT_DIST:
         AWS_S3_CUSTOM_DOMAIN = f"{CLOUDFRONT_DIST}.cloudfront.net"
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    # Override default storage backend to use S3 (Django 5.0+)
+    STORAGES = global_settings.STORAGES.copy()
+    STORAGES["default"]["BACKEND"] = "storages.backends.s3boto3.S3Boto3Storage"
 
 FEATURES_DEFAULT = get_bool(
     name="FEATURES_DEFAULT",
