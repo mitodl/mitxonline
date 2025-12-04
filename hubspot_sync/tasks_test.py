@@ -30,7 +30,7 @@ from hubspot_sync.tasks import (
     sync_deal_with_hubspot,
     sync_product_with_hubspot,
 )
-from users.factories import UserFactory, UserSocialAuthFactory
+from users.factories import UserFactory
 from users.models import User
 
 pytestmark = [pytest.mark.django_db]
@@ -112,7 +112,7 @@ def test_batch_upsert_hubspot_objects(settings, mocker, mocked_celery, create):
     mock_update = mocker.patch(
         "hubspot_sync.tasks.batch_update_hubspot_objects_chunked.s"
     )
-    unsynced_users = [social.user for social in UserSocialAuthFactory.create_batch(2)]
+    unsynced_users = UserFactory.create_batch(2)
     synced_users = UserFactory.create_batch(13)
     content_type = ContentType.objects.get_for_model(User)
     hs_objects = [

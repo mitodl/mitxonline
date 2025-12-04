@@ -6,9 +6,8 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from social_django.models import UserSocialAuth
 
-from users.factories import UserFactory, UserSocialAuthFactory
+from users.factories import UserFactory
 from users.management.commands import retire_users, unblock_users
 from users.models import BlockList
 
@@ -33,12 +32,10 @@ class TestUnblockUsers(TestCase):
         test_email = "test@email.com"
 
         user = UserFactory.create(email=test_email, is_active=True)
-        UserSocialAuthFactory.create(user=user, provider="edX")
         email = user.email
         hashed_email = hashlib.md5(email.lower().encode("utf-8")).hexdigest()  # noqa: S324
         assert user.is_active is True
         assert "retired_email" not in user.email
-        assert UserSocialAuth.objects.filter(user=user).count() == 1
         assert BlockList.objects.all().count() == 0
 
         mocked_bulk_retire_edx_users.return_value = {
@@ -51,7 +48,6 @@ class TestUnblockUsers(TestCase):
         user.refresh_from_db()
         assert user.is_active is False
         assert "retired_email" in user.email
-        assert UserSocialAuth.objects.filter(user=user).count() == 0
         assert BlockList.objects.all().count() == 1
         assert BlockList.objects.filter(hashed_email=hashed_email).count() == 1
 
@@ -74,11 +70,9 @@ class TestUnblockUsers(TestCase):
             user = UserFactory.create(
                 email=email, openedx_user__edx_username=username, is_active=True
             )
-            UserSocialAuthFactory.create(user=user, provider="not_edx")
 
             assert user.is_active is True
             assert "retired_email" not in user.email
-            assert UserSocialAuth.objects.filter(user=user).count() == 1
             assert BlockList.objects.all().count() == 0
 
         self.RETIRE_USER_COMMAND.handle(
