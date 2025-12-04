@@ -53,17 +53,6 @@ def valid_purchasable_objects_list():
     )
 
 
-class Company(TimestampedModel):
-    """Company model"""
-
-    name = models.CharField(max_length=255, unique=True)
-
-    def __str__(self):
-        """Return the company as a string."""
-
-        return self.name
-
-
 class ProductsQuerySet(models.QuerySet):
     """Queryset to block delete and instead mark the items in_active"""
 
