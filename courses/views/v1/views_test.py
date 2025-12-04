@@ -16,18 +16,32 @@ from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
 from reversion.models import Version
+from unittest.mock import patch, MagicMock
+from django.test import RequestFactory
+
+from courses.factories import (
+    CourseFactory, 
+    CourseRunFactory, 
+    CourseRunEnrollmentFactory,
+)
+from courses.models import (
+    Course, 
+    CourseRun, 
+    Program, 
+    ProgramEnrollment,
+)
+from courses.views.v1 import (
+    CourseFilterSet,
+    ProgramViewSet,
+    UserEnrollmentsApiViewSet,
+)
+from users.factories import UserFactory
+from main import features
+from openedx.exceptions import NoEdxApiAuthError
 
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     BlockedCountryFactory,
-    CourseFactory,
-    CourseRunEnrollmentFactory,
-    CourseRunFactory,
-)
-from courses.models import (
-    Course,
-    CourseRun,
-    ProgramEnrollment,
 )
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
@@ -53,6 +67,7 @@ from main.constants import (
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from main.utils import encode_json_cookie_value
 from openedx.exceptions import NoEdxApiAuthError
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -861,3 +876,52 @@ class TestCourseFilterSet:
         # Test filtering for non-enrollable courses
         result = filterset.filter_courserun_is_enrollable(queryset, None, value=False)
         assert non_enrollable_course in result
+
+@pytest.mark.django_db
+class TestProgramViewSetPagination:
+    """Test ProgramViewSet pagination edge cases"""
+
+    def setup_method(self):
+        self.factory = RequestFactory()
+        self.user = UserFactory.create()
+        self.viewset = ProgramViewSet()
+
+    def test_paginate_queryset_no_page_param(self):
+        """Test pagination when no page parameter is provided"""
+        # Create a mock request without page parameter
+        request = self.factory.get('/api/v1/programs/')
+        request.user = self.user
+        request.query_params = {}
+
+        # Set up the viewset
+        self.viewset.request = request
+
+        # Create a mock pagination class instance
+        mock_pagination_class = MagicMock()
+        # Mock the pagination_class attribute to return our mock
+        with patch.object(self.viewset, 'pagination_class', mock_pagination_class):
+            queryset = Program.objects.all()
+            result = self.viewset.paginate_queryset(queryset)
+
+            # Should return None when no page param and paginator exists
+            assert result is None
+
+    def test_paginate_queryset_with_page_param(self):
+        """Test pagination when page parameter is provided"""
+        request = self.factory.get('/api/v1/programs/?page=1')
+        request.user = self.user
+        request.query_params = {'page': '1'}
+
+        self.viewset.request = request
+
+        queryset = Program.objects.all()
+
+        # Mock both pagination_class and the parent's paginate_queryset method
+        mock_pagination_class = MagicMock()
+        with patch.object(self.viewset, 'pagination_class', mock_pagination_class), \
+             patch('rest_framework.viewsets.ReadOnlyModelViewSet.paginate_queryset') as mock_super:
+            mock_super.return_value = "paginated_result"
+            result = self.viewset.paginate_queryset(queryset)
+
+            mock_super.assert_called_once_with(queryset)
+            assert result == "paginated_result"
