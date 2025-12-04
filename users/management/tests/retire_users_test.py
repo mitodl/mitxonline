@@ -4,9 +4,8 @@ import hashlib
 
 import pytest
 from django.contrib.auth import get_user_model
-from social_django.models import UserSocialAuth
 
-from users.factories import UserFactory, UserSocialAuthFactory
+from users.factories import UserFactory
 from users.management.commands import retire_users
 from users.models import BlockList
 
@@ -26,18 +25,15 @@ def test_single_success(mocker):
     )
 
     user = UserFactory.create(openedx_user__edx_username=test_username, is_active=True)
-    UserSocialAuthFactory.create(user=user, provider="edX")
 
     assert user.is_active is True
     assert "retired_email" not in user.email
-    assert UserSocialAuth.objects.filter(user=user).count() == 1
 
     COMMAND.handle("retire_users", users=[test_username])
 
     user.refresh_from_db()
     assert user.is_active is False
     assert "retired_email" in user.email
-    assert UserSocialAuth.objects.filter(user=user).count() == 0
     mock_bulk_retire_edx_users.assert_called()
 
 
@@ -53,11 +49,9 @@ def test_multiple_success(mocker):
 
     for username in test_usernames:
         user = UserFactory.create(openedx_user__edx_username=username, is_active=True)
-        UserSocialAuthFactory.create(user=user, provider="not_edx")
 
         assert user.is_active is True
         assert "retired_email" not in user.email
-        assert UserSocialAuth.objects.filter(user=user).count() == 1
 
     COMMAND.handle("retire_users", users=test_usernames)
 
@@ -65,7 +59,6 @@ def test_multiple_success(mocker):
         user = User.objects.get(openedx_users__edx_username=user_name)
         assert user.is_active is False
         assert "retired_email" in user.email
-        assert UserSocialAuth.objects.filter(user=user).count() == 0
     mock_bulk_retire_edx_users.assert_called()
 
 
@@ -75,7 +68,6 @@ def test_retire_user_with_email(mocker):
     test_email = "test@email.com"
 
     user = UserFactory.create(email=test_email, is_active=True)
-    UserSocialAuthFactory.create(user=user, provider="edX")
 
     mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
@@ -84,14 +76,12 @@ def test_retire_user_with_email(mocker):
 
     assert user.is_active is True
     assert "retired_email" not in user.email
-    assert UserSocialAuth.objects.filter(user=user).count() == 1
 
     COMMAND.handle("retire_users", users=[test_email])
 
     user.refresh_from_db()
     assert user.is_active is False
     assert "retired_email" in user.email
-    assert UserSocialAuth.objects.filter(user=user).count() == 0
     mock_bulk_retire_edx_users.assert_called_with(user.edx_username)
 
 
@@ -101,12 +91,10 @@ def test_retire_user_blocking_with_email(mocker):
     test_email = "test@email.com"
 
     user = UserFactory.create(email=test_email, is_active=True)
-    UserSocialAuthFactory.create(user=user, provider="edX")
     email = user.email
     hashed_email = hashlib.md5(email.lower().encode("utf-8")).hexdigest()  # noqa: S324
     assert user.is_active is True
     assert "retired_email" not in user.email
-    assert UserSocialAuth.objects.filter(user=user).count() == 1
     assert BlockList.objects.all().count() == 0
 
     mock_bulk_retire_edx_users = mocker.patch(
@@ -118,7 +106,6 @@ def test_retire_user_blocking_with_email(mocker):
     user.refresh_from_db()
     assert user.is_active is False
     assert "retired_email" in user.email
-    assert UserSocialAuth.objects.filter(user=user).count() == 0
     assert BlockList.objects.all().count() == 1
     assert BlockList.objects.filter(hashed_email=hashed_email).count() == 1
     mock_bulk_retire_edx_users.assert_called_with(user.edx_username)
@@ -135,11 +122,9 @@ def test_multiple_success_blocking_user(mocker):
 
     for username in test_usernames:
         user = UserFactory.create(openedx_user__edx_username=username, is_active=True)
-        UserSocialAuthFactory.create(user=user, provider="not_edx")
 
         assert user.is_active is True
         assert "retired_email" not in user.email
-        assert UserSocialAuth.objects.filter(user=user).count() == 1
         assert BlockList.objects.all().count() == 0
 
     COMMAND.handle("retire_users", users=test_usernames, block_users=True)
@@ -148,7 +133,6 @@ def test_multiple_success_blocking_user(mocker):
         user = User.objects.get(openedx_users__edx_username=user_name)
         assert user.is_active is False
         assert "retired_email" in user.email
-        assert UserSocialAuth.objects.filter(user=user).count() == 0
 
     assert BlockList.objects.all().count() == 3
     mock_bulk_retire_edx_users.assert_called()
@@ -160,12 +144,10 @@ def test_user_blocking_if_not_requested(mocker):
     test_email = "test@email.com"
 
     user = UserFactory.create(email=test_email, is_active=True)
-    UserSocialAuthFactory.create(user=user, provider="edX")
     email = user.email
     hashed_email = hashlib.md5(email.lower().encode("utf-8")).hexdigest()  # noqa: S324, F841
     assert user.is_active is True
     assert "retired_email" not in user.email
-    assert UserSocialAuth.objects.filter(user=user).count() == 1
     assert BlockList.objects.all().count() == 0
 
     mock_bulk_retire_edx_users = mocker.patch(
@@ -177,6 +159,5 @@ def test_user_blocking_if_not_requested(mocker):
     user.refresh_from_db()
     assert user.is_active is False
     assert "retired_email" in user.email
-    assert UserSocialAuth.objects.filter(user=user).count() == 0
     assert BlockList.objects.all().count() == 0
     mock_bulk_retire_edx_users.assert_called_with(user.edx_username)

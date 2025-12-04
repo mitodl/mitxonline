@@ -8,7 +8,7 @@ import os
 import platform
 import sys
 from datetime import timedelta
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import cssutils
 import dj_database_url
@@ -222,7 +222,6 @@ INSTALLED_APPS = (
     "django.contrib.humanize",
     "django.contrib.sites",
     "django_user_agents",
-    "social_django",
     "oauth2_provider",
     "rest_framework",
     "anymail",
@@ -393,8 +392,6 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "social_django.context_processors.backends",
-                "social_django.context_processors.login_redirect",
                 "main.context_processors.api_keys",
                 "main.context_processors.configuration_context",
             ]
@@ -453,107 +450,10 @@ ROBOTS_CACHE_TIMEOUT = get_int(
     description="How long the robots.txt file should be cached",
 )
 
-# Social Auth Configuration
-
 AUTHENTICATION_BACKENDS = (
-    "authentication.backends.apisix_remote_user_org.ApisixRemoteUserOrgBackend",
-    "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
 )
-
-SOCIAL_AUTH_LOGIN_ERROR_URL = "gateway-login"
-SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [urlparse(SITE_BASE_URL).netloc]
-SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = [
-    "global_id",
-]
-
-# Email backend settings
-
-SOCIAL_AUTH_EMAIL_FORM_URL = "gateway-login"
-SOCIAL_AUTH_EMAIL_FORM_HTML = "login.html"
-
-SOCIAL_AUTH_EMAIL_USER_FIELDS = ["username", "email", "name", "password"]
-
-# Only validate emails for the email backend
-SOCIAL_AUTH_EMAIL_FORCE_EMAIL_VALIDATION = True
-
-# Configure social_core.pipeline.mail.mail_validation
-SOCIAL_AUTH_EMAIL_VALIDATION_FUNCTION = "mail.verification_api.send_verification_email"
-SOCIAL_AUTH_EMAIL_VALIDATION_URL = "/"
-
-SOCIAL_AUTH_PIPELINE = (
-    # Checks if an admin user attempts to login/register while hijacking another user.
-    "authentication.pipeline.user.forbid_hijack",
-    # Get the information we can about the user and return it in a simple
-    # format to create the user instance later. On some cases the details are
-    # already part of the auth response from the provider, but sometimes this
-    # could hit a provider API.
-    "social_core.pipeline.social_auth.social_details",
-    # Get the social uid from whichever service we're authing thru. The uid is
-    # the unique identifier of the given user in the provider.
-    "social_core.pipeline.social_auth.social_uid",
-    # Verifies that the current auth process is valid within the current
-    # project, this is where emails and domains whitelists are applied (if
-    # defined).
-    "social_core.pipeline.social_auth.auth_allowed",
-    # Checks if the current social-account is already associated in the site.
-    "social_core.pipeline.social_auth.social_user",
-    # Associates the current social details with another user account with the same email address.
-    "social_core.pipeline.social_auth.associate_by_email",
-    # validate an incoming email auth request
-    "authentication.pipeline.user.validate_email_auth_request",
-    # validate the user's email either it is blocked or not.
-    "authentication.pipeline.user.validate_email",
-    # require a password and profile if they're not set
-    "authentication.pipeline.user.validate_password",
-    # Send a validation email to the user to verify its email address.
-    # Disabled by default.
-    "social_core.pipeline.mail.mail_validation",
-    # Send the email address and hubspot cookie if it exists to hubspot.
-    # "authentication.pipeline.user.send_user_to_hubspot",
-    # Generate a username for the user
-    # NOTE: needs to be right before create_user so nothing overrides the username
-    "authentication.pipeline.user.get_username",
-    # Create a user if one doesn't exist, and require a password and name
-    "authentication.pipeline.user.create_user_via_email",
-    # If we're using the OIDC backend, create the user from the OIDC response
-    "authentication.pipeline.user.create_ol_oidc_user",
-    # verify the user against export compliance
-    # "authentication.pipeline.compliance.verify_exports_compliance",
-    # Create the record that associates the social account with the user.
-    "social_core.pipeline.social_auth.associate_user",
-    # create the user's edx user and auth
-    "authentication.pipeline.user.create_openedx_user",
-    # Populate the extra_data field in the social record with the values
-    # specified by settings (and the default ones like access_token, etc).
-    "social_core.pipeline.social_auth.load_extra_data",
-    # Update the user record with any changed info from the auth service.
-    "social_core.pipeline.user.user_details",
-)
-
-
-# Social Auth OIDC configuration
-
-SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT = get_string(
-    name="SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT",
-    default=None,
-    description="The configuration endpoint for the OIDC provider",
-)
-
-SOCIAL_AUTH_OL_OIDC_KEY = get_string(
-    name="SOCIAL_AUTH_OL_OIDC_KEY",
-    default="some available client id",
-    description="The client id for the OIDC provider",
-)
-
-SOCIAL_AUTH_OL_OIDC_SECRET = get_string(
-    name="SOCIAL_AUTH_OL_OIDC_SECRET",
-    default="some super secret key",
-    description="The client secret for the OIDC provider",
-)
-
-SOCIAL_AUTH_OL_OIDC_SCOPE = ["ol-profile"]
 
 AUTH_CHANGE_EMAIL_TTL_IN_MINUTES = get_int(
     name="AUTH_CHANGE_EMAIL_TTL_IN_MINUTES",
