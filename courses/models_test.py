@@ -85,10 +85,10 @@ def test_course_run_past(end_days, expected):
 
 
 @pytest.mark.parametrize(
-    "upgrade_deadline_days,expected",  # noqa: PT006
-    [[-1, False], [1, True], [None, True]],  # noqa: PT007
+    "upgrade_deadline_days,has_product, expected",  # noqa: PT006
+    [[-1, True, False], [1, True, True], [None, True, True], [None, False, False], [1, False, False]],  # noqa: PT007
 )
-def test_course_run_upgradeable(upgrade_deadline_days, expected):
+def test_course_run_upgradeable(upgrade_deadline_days, has_product, expected):
     """
     Test that CourseRun.is_upgradable returns the expected boolean value
     """
@@ -98,8 +98,12 @@ def test_course_run_upgradeable(upgrade_deadline_days, expected):
         if upgrade_deadline_days is None
         else (now + timedelta(days=upgrade_deadline_days))
     )
+    course_run = CourseRunFactory.create(upgrade_deadline=upgrade_deadline)
+    if has_product:
+        ProductFactory.create(purchasable_object=course_run)
+
     assert (
-        CourseRunFactory.create(upgrade_deadline=upgrade_deadline).is_upgradable
+        course_run.is_upgradable
         is expected
     )
 
