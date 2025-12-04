@@ -87,11 +87,11 @@ def test_course_run_past(end_days, expected):
 @pytest.mark.parametrize(
     "upgrade_deadline_days,has_product, expected",  # noqa: PT006
     [
-        [-1, True, False],
-        [1, True, True],
-        [None, True, True],
-        [None, False, False],
-        [1, False, False],
+        [-1, True, False], # noqa: PT007
+        [1, True, True], # noqa: PT007
+        [None, True, True], # noqa: PT007
+        [None, False, False], # noqa: PT007
+        [1, False, False], # noqa: PT007
     ],
 )
 def test_course_run_upgradeable(upgrade_deadline_days, has_product, expected):
