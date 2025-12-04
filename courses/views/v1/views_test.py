@@ -5,43 +5,32 @@ Tests for course views
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
 import operator as op
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 from urllib.parse import quote
 
 import pytest
 import reversion
 from django.db.models import Count, Q
+from django.test import RequestFactory
 from django.test.client import Client
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
 from reversion.models import Version
-from unittest.mock import patch, MagicMock
-from django.test import RequestFactory
-
-from courses.factories import (
-    CourseFactory, 
-    CourseRunFactory, 
-    CourseRunEnrollmentFactory,
-)
-from courses.models import (
-    Course, 
-    CourseRun, 
-    Program, 
-    ProgramEnrollment,
-)
-from courses.views.v1 import (
-    CourseFilterSet,
-    ProgramViewSet,
-    UserEnrollmentsApiViewSet,
-)
-from users.factories import UserFactory
-from main import features
-from openedx.exceptions import NoEdxApiAuthError
 
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     BlockedCountryFactory,
+    CourseFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+)
+from courses.models import (
+    Course,
+    CourseRun,
+    Program,
+    ProgramEnrollment,
 )
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
@@ -54,7 +43,11 @@ from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_programs,
 )
-from courses.views.v1 import CourseFilterSet, UserEnrollmentsApiViewSet
+from courses.views.v1 import (
+    CourseFilterSet,
+    ProgramViewSet,
+    UserEnrollmentsApiViewSet,
+)
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order, OrderStatus
 from main import features
@@ -841,7 +834,7 @@ class TestCourseFilterSet:
             live=True,
             enrollment_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
             enrollment_end=None,
-            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc)
+            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc),
         )
 
         non_enrollable_course = CourseFactory.create(live=True)
@@ -864,7 +857,7 @@ class TestCourseFilterSet:
             live=True,
             enrollment_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
             enrollment_end=None,
-            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc)
+            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc),
         )
 
         non_enrollable_course = CourseFactory.create(live=True)
@@ -876,6 +869,7 @@ class TestCourseFilterSet:
         # Test filtering for non-enrollable courses
         result = filterset.filter_courserun_is_enrollable(queryset, None, value=False)
         assert non_enrollable_course in result
+
 
 @pytest.mark.django_db
 class TestProgramViewSetPagination:
@@ -889,7 +883,7 @@ class TestProgramViewSetPagination:
     def test_paginate_queryset_no_page_param(self):
         """Test pagination when no page parameter is provided"""
         # Create a mock request without page parameter
-        request = self.factory.get('/api/v1/programs/')
+        request = self.factory.get("/api/v1/programs/")
         request.user = self.user
         request.query_params = {}
 
@@ -899,7 +893,7 @@ class TestProgramViewSetPagination:
         # Create a mock pagination class instance
         mock_pagination_class = MagicMock()
         # Mock the pagination_class attribute to return our mock
-        with patch.object(self.viewset, 'pagination_class', mock_pagination_class):
+        with patch.object(self.viewset, "pagination_class", mock_pagination_class):
             queryset = Program.objects.all()
             result = self.viewset.paginate_queryset(queryset)
 
@@ -908,9 +902,9 @@ class TestProgramViewSetPagination:
 
     def test_paginate_queryset_with_page_param(self):
         """Test pagination when page parameter is provided"""
-        request = self.factory.get('/api/v1/programs/?page=1')
+        request = self.factory.get("/api/v1/programs/?page=1")
         request.user = self.user
-        request.query_params = {'page': '1'}
+        request.query_params = {"page": "1"}
 
         self.viewset.request = request
 
@@ -918,8 +912,12 @@ class TestProgramViewSetPagination:
 
         # Mock both pagination_class and the parent's paginate_queryset method
         mock_pagination_class = MagicMock()
-        with patch.object(self.viewset, 'pagination_class', mock_pagination_class), \
-             patch('rest_framework.viewsets.ReadOnlyModelViewSet.paginate_queryset') as mock_super:
+        with (
+            patch.object(self.viewset, "pagination_class", mock_pagination_class),
+            patch(
+                "rest_framework.viewsets.ReadOnlyModelViewSet.paginate_queryset"
+            ) as mock_super,
+        ):
             mock_super.return_value = "paginated_result"
             result = self.viewset.paginate_queryset(queryset)
 
