@@ -1,7 +1,6 @@
 """URL routing for the B2B API."""
 
-from django.urls import path
-from django.urls import include
+from django.urls import include, path
 
 import b2b.views.v0.urls as urls_v0
 
