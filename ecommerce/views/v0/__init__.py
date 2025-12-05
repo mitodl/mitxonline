@@ -62,9 +62,7 @@ class BasketViewSet(ReadOnlyModelViewSet):
         return Basket.objects.filter(user=self.request.user).all()
 
 
-def _create_basket_from_product(
-    request, sku: str, discount_code: str|None = None
-):
+def _create_basket_from_product(request, sku: str, discount_code: str | None = None):
     """
     Create a new basket item from a product for the currently logged in user. Reuse
     the existing basket object if it exists.
