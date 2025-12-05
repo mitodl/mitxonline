@@ -1,6 +1,7 @@
 """Authentication serializers"""
 
 import logging
+import re
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -16,11 +17,28 @@ from users.serializers import (
 log = logging.getLogger()
 User = get_user_model()
 
+NAME_MIN_LENGTH = 2
+NAME_MAX_LENGTH = 254
+
+
+def validate_name_not_numbers_only(value):
+    """Validate that name is not only numbers"""
+    if value and re.match(r"^\d+$", value.strip()):
+        raise serializers.ValidationError(
+            "Full name cannot contain only numbers. Please enter a name with at least one letter."
+        )
+    return value
+
 
 class RegisterDetailsSerializer(serializers.Serializer):
     """Serializer for registration details"""
 
-    name = serializers.CharField(write_only=True)
+    name = serializers.CharField(
+        write_only=True,
+        min_length=NAME_MIN_LENGTH,
+        max_length=NAME_MAX_LENGTH,
+        validators=[validate_name_not_numbers_only],
+    )
     username = serializers.CharField(write_only=True)
     legal_address = LegalAddressSerializer(write_only=True)
     user_profile = UserProfileSerializer(write_only=True)
