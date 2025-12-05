@@ -196,7 +196,7 @@ class AccountActionStartView(RedirectView):
 
         if action not in self.ACTION_MAPPING:
             log.error("Received unexpected account action: %s", action)
-            redirect_url = self.request.META.get("HTTP_REFERER", settings.SITE_BASE_URL)
+            redirect_url = self.request.headers.get("referer", settings.SITE_BASE_URL)
             return (
                 redirect_url
                 if url_has_allowed_host_and_scheme(
