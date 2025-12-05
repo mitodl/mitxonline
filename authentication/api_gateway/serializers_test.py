@@ -129,6 +129,7 @@ def test_register_extra_details_serializer_valid_data(user):
     assert validated_data["birth_year"] == "1990"
     assert validated_data["company"] == "TechCorp"
 
+
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     "name",
