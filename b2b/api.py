@@ -291,7 +291,8 @@ def create_contract_run(
         live=True,
         b2b_contract=contract,
         courseware_url_path=urljoin(
-            settings.OPENEDX_COURSE_BASE_URL, quote(new_readable_id)
+            settings.OPENEDX_COURSE_BASE_URL,
+            f"{quote(new_readable_id)}{settings.OPENEDX_COURSE_BASE_URL_SUFFIX}",
         ),
     )
     course_run.save()

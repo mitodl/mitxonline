@@ -1247,7 +1247,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         is_source_run=is_source_run,
         courseware_url_path=urljoin(
             settings.OPENEDX_COURSE_BASE_URL,
-            f"/{edx_course_run.course_id}/course",
+            f"/{edx_course_run.course_id}{settings.OPENEDX_COURSE_BASE_URL_SUFFIX}",
         ),
     )
 
