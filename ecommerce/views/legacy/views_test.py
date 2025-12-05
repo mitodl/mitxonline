@@ -7,7 +7,7 @@ import freezegun
 import pytest
 import reversion
 from django.forms.models import model_to_dict
-from django.test.client import Client, RequestFactory
+from django.test import Client, RequestFactory
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
