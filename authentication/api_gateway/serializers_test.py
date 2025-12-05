@@ -128,3 +128,36 @@ def test_register_extra_details_serializer_valid_data(user):
     assert validated_data["gender"] == "Male"
     assert validated_data["birth_year"] == "1990"
     assert validated_data["company"] == "TechCorp"
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "name",
+    [
+        "12345",
+        "123",
+        "  12345  ",
+        "999999",
+        "12",
+    ],
+)
+def test_register_details_serializer_rejects_numeric_only_name(
+    name, user, valid_address_dict, user_profile_dict, rf
+):
+    """Test RegisterDetailsSerializer rejects names containing only numbers"""
+    request = rf.post("/api/profile/details/")
+    request.user = user
+
+    data = {
+        "name": name,
+        "username": "testuser",
+        "legal_address": valid_address_dict,
+        "user_profile": user_profile_dict,
+    }
+
+    serializer = RegisterDetailsSerializer(data=data, context={"request": request})
+    assert serializer.is_valid() is False
+    assert "name" in serializer.errors
+    assert (
+        "Full name cannot contain only numbers. Please enter a name with at least one letter."
+        in str(serializer.errors["name"])
+    )
