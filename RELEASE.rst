@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.136.2
+Version 0.136.2 (Released December 05, 2025)
 ---------------
 
 - set the storage backend properly to S3 if necessary for Django 5 (#3129)
