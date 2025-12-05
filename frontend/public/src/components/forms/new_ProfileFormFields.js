@@ -35,7 +35,7 @@ export const legalAddressValidation = yup.object().shape({
     .test(
       "not-numbers-only",
       "Full name cannot contain only numbers. Please enter a name with at least one letter.",
-      (value) => {
+      value => {
         if (!value) return true
         return !/^\d+$/.test(value.trim())
       }
