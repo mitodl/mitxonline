@@ -827,4 +827,3 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
         Q(user_discount_user=basket.user) | Q(user_discount_user__isnull=True),
         automatic=True,
     )
-
