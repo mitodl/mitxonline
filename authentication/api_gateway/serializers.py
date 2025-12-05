@@ -24,9 +24,8 @@ NAME_MAX_LENGTH = 254
 def validate_name_not_numbers_only(value):
     """Validate that name is not only numbers"""
     if value and re.match(r"^\d+$", value.strip()):
-        raise serializers.ValidationError(
-            "Full name cannot contain only numbers. Please enter a name with at least one letter."
-        )
+        error_msg = "Full name cannot contain only numbers. Please enter a name with at least one letter."
+        raise serializers.ValidationError(error_msg)
     return value
 
 
