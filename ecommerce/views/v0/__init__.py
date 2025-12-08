@@ -3,7 +3,6 @@ MITx Online API-ready views, migrated from Unified Ecommerce.
 """
 
 import logging
-from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -20,18 +19,43 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from mitol.payment_gateway.api import PaymentGateway
-from rest_framework import status, viewsets
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 
-from ecommerce.api import establish_basket, get_auto_apply_discounts_for_basket
+from ecommerce.api import (
+    apply_discount_to_basket,
+    establish_basket,
+    get_auto_apply_discounts_for_basket,
+)
+from ecommerce.exceptions import ProductBlockedError
 from ecommerce.models import Basket, BasketDiscount, BasketItem, Discount, Product
-from ecommerce.serializers import BasketSerializer, BasketWithProductSerializer
+from ecommerce.serializers import BasketItemSerializer, BasketWithProductSerializer
+from ecommerce.serializers.v0 import requests
 
 log = logging.getLogger(__name__)
+
+
+@extend_schema(
+    description="Returns the basket items for the current user.",
+    methods=["GET"],
+    request=None,
+    responses=BasketItemSerializer,
+)
+class BasketItemViewSet(ModelViewSet):
+    """ViewSet for handling BasketItem operations."""
+
+    permission_classes = (IsAuthenticated,)
+    serializer_class = BasketItemSerializer
+
+    def get_queryset(self):
+        """Return only basket items owned by this user."""
+        if getattr(self, "swagger_fake_view", False):
+            return BasketItem.objects.none()
+
+        return BasketItem.objects.filter(basket__user=self.request.user)
 
 
 @extend_schema_view(
@@ -62,7 +86,61 @@ class BasketViewSet(ReadOnlyModelViewSet):
         return Basket.objects.filter(user=self.request.user).all()
 
 
-def _create_basket_from_product(request, sku: str, discount_code: str | None = None):
+@extend_schema(
+    description=(
+        "Creates or updates a basket for the current user, "
+        "adding the discount if valid."
+    ),
+    methods=["POST"],
+    request=None,
+    responses=BasketWithProductSerializer,
+    parameters=[
+        OpenApiParameter("system_slug", OpenApiTypes.STR, OpenApiParameter.PATH),
+        OpenApiParameter(
+            "discount_code", OpenApiTypes.STR, OpenApiParameter.QUERY, required=True
+        ),
+    ],
+)
+@api_view(["POST"])
+@permission_classes((IsAuthenticated,))
+def add_discount_to_basket(request):
+    """
+    Add a discount to the basket for the currently logged in user.
+
+    POST Args:
+        discount_code (str): discount code to apply to the basket
+
+    Returns:
+        Response: HTTP response
+    """
+    basket = Basket.establish_basket(request)
+    discount_code = request.query_params.get("discount_code")
+
+    try:
+        discount = Discount.objects.get(discount_code=discount_code)
+    except Discount.DoesNotExist:
+        return Response(
+            {"error": f"Discount '{discount_code}' not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        apply_discount_to_basket(discount)
+    except ValueError:
+        return Response(
+            {"error": "An error occurred while applying the discount."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return Response(
+        BasketWithProductSerializer(basket).data,
+        status=status.HTTP_200_OK,
+    )
+
+
+def _create_basket_from_product(
+    request, product_id: int, discount_code: str | None = None
+):
     """
     Create a new basket item from a product for the currently logged in user. Reuse
     the existing basket object if it exists.
@@ -76,7 +154,7 @@ def _create_basket_from_product(request, sku: str, discount_code: str | None = N
 
     Args:
         request (Request): The request object.
-        sku (str): Product ID
+        product_id (int): Product ID
         discount_code (str): Discount code
     POST Args:
         quantity (int): quantity of the product to add to the basket (defaults to 1)
@@ -90,7 +168,7 @@ def _create_basket_from_product(request, sku: str, discount_code: str | None = N
     checkout = request.data.get("checkout", False)
 
     try:
-        product = Product.objects.get(id=sku)
+        product = Product.objects.get(id=product_id)
     except Product.DoesNotExist:
         return Response(
             {"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND
@@ -103,12 +181,12 @@ def _create_basket_from_product(request, sku: str, discount_code: str | None = N
     )
     auto_apply_discount_discounts = get_auto_apply_discounts_for_basket(basket.id)
     for discount in auto_apply_discount_discounts:
-        basket.apply_discount_to_basket(discount)
+        apply_discount_to_basket(discount)
 
     if discount_code:
         try:
             discount = Discount.objects.get(discount_code=discount_code)
-            basket.apply_discount_to_basket(discount)
+            apply_discount_to_basket(discount)
         except Discount.DoesNotExist:
             pass
 
@@ -132,17 +210,16 @@ def _create_basket_from_product(request, sku: str, discount_code: str | None = N
     responses=BasketWithProductSerializer,
     parameters=[
         OpenApiParameter(
-            "system_slug", OpenApiTypes.STR, OpenApiParameter.PATH, required=True
+            "product_id", OpenApiTypes.INT, OpenApiParameter.PATH, required=True
         ),
-        OpenApiParameter("sku", OpenApiTypes.STR, OpenApiParameter.PATH, required=True),
     ],
 )
 @api_view(["POST"])
 @permission_classes((IsAuthenticated,))
-def create_basket_from_product(request, system_slug: str, sku: str):
+def create_basket_from_product(request, product_id: int):
     """Run _create_basket_from_product."""
 
-    return _create_basket_from_product(request, system_slug, sku)
+    return _create_basket_from_product(request, product_id)
 
 
 @extend_schema(
@@ -156,9 +233,8 @@ def create_basket_from_product(request, system_slug: str, sku: str):
     responses=BasketWithProductSerializer,
     parameters=[
         OpenApiParameter(
-            "system_slug", OpenApiTypes.STR, OpenApiParameter.PATH, required=True
+            "product_id", OpenApiTypes.INT, OpenApiParameter.PATH, required=True
         ),
-        OpenApiParameter("sku", OpenApiTypes.STR, OpenApiParameter.PATH, required=True),
         OpenApiParameter(
             "discount_code", OpenApiTypes.STR, OpenApiParameter.PATH, required=True
         ),
@@ -167,11 +243,11 @@ def create_basket_from_product(request, system_slug: str, sku: str):
 @api_view(["POST"])
 @permission_classes((IsAuthenticated,))
 def create_basket_from_product_with_discount(
-    request, system_slug: str, sku: str, discount_code: Optional[str] = None
+    request, product_id: int, discount_code: str | None = None
 ):
     """Run _create_basket_from_product with the discount code."""
 
-    return _create_basket_from_product(request, system_slug, sku, discount_code)
+    return _create_basket_from_product(request, product_id, discount_code)
 
 
 @extend_schema(
@@ -180,7 +256,7 @@ def create_basket_from_product_with_discount(
     ),
     methods=["POST"],
     responses=BasketWithProductSerializer,
-    request=CreateBasketWithProductsSerializer,
+    request=requests.CreateBasketWithProductsSerializer,
 )
 @api_view(["POST"])
 @permission_classes((IsAuthenticated,))
@@ -198,31 +274,27 @@ def create_basket_with_products(request):
     will be logged, but the basket will still be updated.
 
     POST Args:
-        system_slug (str): system slug
-        quantity (int): quantity of the product to add to the basket (defaults to 1)
         checkout (bool): redirect to checkout interstitial (defaults to False)
-        skus (list[str]): list of product SKUs to add to the basket
+        product_ids (list[(str, int)]): list of product SKUs to add to the basket with quantity
         discount_code (str): discount code to apply to the basket
 
     Returns:
         Response: HTTP response
     """
-    system_slug = request.data.get("system_slug")
     checkout = request.data.get("checkout", False)
     discount_code = request.data.get("discount_code", None)
-    skus = request.data.get("skus", [])
+    product_ids = request.data.get("product_ids", [])
 
-    system = IntegratedSystem.objects.get(slug=system_slug)
-    basket = Basket.establish_basket(request, system)
+    basket = establish_basket(request)
     products = []
 
     try:
         products = [
             (
-                Product.objects.get(system=system, sku=sku["sku"]),
-                sku["quantity"],
+                Product.objects.get(id=product_id["product_id"]),
+                product_id["quantity"],
             )
-            for sku in skus
+            for product_id in product_ids
         ]
     except Product.DoesNotExist:
         return Response(
@@ -231,7 +303,7 @@ def create_basket_with_products(request):
 
     try:
         for product, quantity in products:
-            pm.hook.basket_add(request=request, basket=basket, basket_item=product)
+            # FUTURE: this is where the basket_add hook is called
             BasketItem.objects.update_or_create(
                 basket=basket, product=product, defaults={"quantity": quantity}
             )
@@ -241,21 +313,21 @@ def create_basket_with_products(request):
             status=status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS,
         )
 
-    auto_apply_discount_discounts = api.get_auto_apply_discounts_for_basket(basket.id)
-    for discount in auto_apply_discount_discounts:
-        basket.apply_discount_to_basket(discount)
+    auto_apply_discounts = get_auto_apply_discounts_for_basket(basket.id)
+    for discount in auto_apply_discounts:
+        apply_discount_to_basket(basket, discount, allow_finaid=True)
 
     if discount_code:
         try:
             discount = Discount.objects.get(discount_code=discount_code)
-            basket.apply_discount_to_basket(discount)
+            apply_discount_to_basket(basket, discount)
         except Discount.DoesNotExist:
             pass
 
     basket.refresh_from_db()
 
     if checkout:
-        return redirect("checkout_interstitial_page", system_slug=system.slug)
+        return redirect("checkout_interstitial_page")
 
     return Response(
         BasketWithProductSerializer(basket).data,
@@ -266,12 +338,12 @@ def create_basket_with_products(request):
 @extend_schema(
     description="Clears the basket for the current user.",
     methods=["DELETE"],
-    versions=["v0"],
-    responses=OpenApiResponse(Response(None, status=status.HTTP_204_NO_CONTENT)),
+    request=None,
+    responses={204: OpenApiResponse(description="Basket cleared successfully")},
 )
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
-def clear_basket(request, system_slug: str):
+def clear_basket(request):
     """
     Clear the basket for the current user.
 
@@ -281,8 +353,7 @@ def clear_basket(request, system_slug: str):
     Returns:
         Response: HTTP response
     """
-    system = IntegratedSystem.objects.get(slug=system_slug)
-    basket = Basket.establish_basket(request, system)
+    basket = establish_basket(request)
 
     basket.delete()
 
