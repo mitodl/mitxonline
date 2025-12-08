@@ -8,7 +8,7 @@ export function useAuthProvider(): AuthProvider {
   const _ = require("lodash");
 
   const getProfile = async () => {
-    const profile = await http.get('users/me');
+    const profile = await http.get('v0/users/me');
 
     return Promise.resolve(profile.data);
   }
@@ -39,7 +39,7 @@ export function useAuthProvider(): AuthProvider {
       return Promise.resolve();
     },
     checkAuth: async () => {
-      const profile = await http.get('users/me');
+      const profile = await http.get('v0/users/me');
 
       if (
         _.get(profile, "data.is_superuser") === true ||
