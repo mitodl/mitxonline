@@ -23,9 +23,9 @@ def queue_enrollment_code_check(contract_id: int):
 @app.task(acks_late=True)
 def queue_organization_sync():
     """Queue the sync_organizations call."""
-    from b2b.api import sync_organizations
+    from b2b.api import reconcile_keycloak_orgs
 
-    sync_organizations()
+    reconcile_keycloak_orgs()
 
 
 @app.task(bind=True)
