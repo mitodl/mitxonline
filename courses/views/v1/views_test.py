@@ -26,6 +26,8 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    ProgramEnrollmentFactory,
+    ProgramFactory,
 )
 from courses.models import (
     Course,
@@ -975,3 +977,38 @@ class TestUserEnrollmentsApiViewSetSync:
 
         assert response.status_code == status.HTTP_200_OK
         mock_sync.assert_not_called()
+
+@pytest.mark.django_db
+class TestUserProgramEnrollmentsViewSet:
+    """Test UserProgramEnrollmentsViewSet methods"""
+
+    def setup_method(self):
+        self.user = UserFactory.create()
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.program = ProgramFactory.create()
+        
+    def test_retrieve_program_enrollment(self):
+        """Test retrieving a specific program enrollment"""
+        enrollment = ProgramEnrollmentFactory.create(user=self.user, program=self.program)
+        
+        response = self.client.get(
+            reverse('v1:user-program-enrollments-api-detail', kwargs={'pk': self.program.id})
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['program']['id'] == self.program.id
+
+    def test_destroy_program_enrollment(self):
+        """Test unenrolling from a program"""
+        enrollment = ProgramEnrollmentFactory.create(user=self.user, program=self.program)
+        
+        response = self.client.delete(
+            reverse('v1:user-program-enrollments-api-detail', kwargs={'pk': self.program.id})
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        
+        # Check that the enrollment was marked as unenrolled
+        enrollment.refresh_from_db()
+        assert enrollment.change_status == "unenrolled"
