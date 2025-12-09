@@ -1083,10 +1083,7 @@ def test_fp_request_form_get_context_no_legal_address():
     request = rf.get("/")
 
     User = get_user_model()
-    user = User.objects.create_user(
-        username='testuser',
-        email='test@example.com'
-    )
+    user = User.objects.create_user(username="testuser", email="test@example.com")
     request.user = user
 
     course_page = CoursePageFactory.create()
