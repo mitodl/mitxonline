@@ -1087,8 +1087,7 @@ def test_fp_request_form_get_context_no_legal_address():
     User = get_user_model()
     user = User.objects.create_user(
         username='testuser',
-        email='test@example.com',
-        password='testpass123'
+        email='test@example.com'
     )
     request.user = user
 
