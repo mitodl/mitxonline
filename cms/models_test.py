@@ -6,6 +6,7 @@ from urllib.parse import quote_plus
 
 import factory
 import pytest
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import caches
@@ -13,8 +14,6 @@ from django.test.client import RequestFactory
 from django.urls import resolve, reverse
 from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
-
-from django.contrib.auth import get_user_model
 
 from cms.api import create_featured_items
 from cms.constants import CMS_EDITORS_GROUP_NAME
@@ -736,6 +735,7 @@ def test_homepage_featured_products(settings, mocker):
 
 # Additional comprehensive tests for FlexiblePricingRequestForm.get_context method
 
+
 def test_flexible_pricing_form_get_context_basic_structure():
     """Test that get_context returns the expected basic structure"""
     # Arrange
@@ -1026,14 +1026,14 @@ def test_fp_request_form_get_context_no_previous_submission():
     user.legal_address.save()
 
     context = flex_form.get_context(request)
-    
+
     # Should inherit from parent
     assert "prior_request" in context
     assert context["prior_request"] is None
-    
+
     assert context["country_of_income"] == "US"
     assert context["country_of_residence"] == "US"
-    
+
     assert context["product"] == product
     assert context["product_page"] == course_page.url
 
@@ -1069,11 +1069,9 @@ def test_fp_request_form_get_context_with_previous_submission():
     context = flex_form.get_context(request)
 
     assert context["prior_request"] == flexible_price
-    
 
     assert context["country_of_income"] == "CA"
     assert context["country_of_residence"] == "CA"
-    
 
     assert context["product"] == product
     assert context["product_page"] == course_page.url
@@ -1083,7 +1081,7 @@ def test_fp_request_form_get_context_no_legal_address():
     """Test get_context when user has no legal address."""
     rf = RequestFactory()
     request = rf.get("/")
-    
+
     User = get_user_model()
     user = User.objects.create_user(
         username='testuser',
@@ -1103,17 +1101,18 @@ def test_fp_request_form_get_context_no_legal_address():
 
     assert context["product"] == product
     assert context["product_page"] == course_page.url
-    
+
+
 def test_fp_request_form_get_context_program_page():
     """Test get_context when form is under a program page."""
     rf = RequestFactory()
     request = rf.get("/")
     user = UserFactory.create()
     request.user = user
-    
+
     program_page = ProgramPageFactory.create()
     flex_form = FlexiblePricingFormFactory(parent=program_page)
-    
+
     context = flex_form.get_context(request)
 
     assert context["product"] is None
@@ -1150,8 +1149,8 @@ def test_fp_request_form_get_context_absolute_last_submission():
         country_of_residence="MX",
         status=FlexiblePriceStatus.CREATED,
     )
-    
+
     context = flex_form2.get_context(request)
-    
+
     assert context["country_of_income"] == "MX"
     assert context["country_of_residence"] == "MX"
