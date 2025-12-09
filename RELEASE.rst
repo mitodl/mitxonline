@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.136.3
+---------------
+
+- Updates the URLs in the staff-dashboard auth provider to use the versioned "me" API (#3136)
+- Replace sync_organizations with reconcile_keycloak_orgs (#3135)
+- Course v1 unit tests (#3126)
+- Add a configurable suffix to Open edX course URLs (#3121)
+- Always disable S3 under pytest (#3132)
+
 Version 0.136.2 (Released December 05, 2025)
 ---------------
 
