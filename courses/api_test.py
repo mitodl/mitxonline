@@ -36,6 +36,7 @@ from courses.api import (
     deactivate_run_enrollment,
     defer_enrollment,
     generate_course_run_certificates,
+    generate_openedx_course_url,
     generate_program_certificate,
     get_certificate_grade_eligible_runs,
     import_courserun_from_edx,
@@ -2256,3 +2257,39 @@ def test_import_courserun_from_edx_specific_course_pages(  # noqa: PLR0913
         ingest_content_files_for_ai=ingest_content_files_for_ai,
         is_source_run=False,
     )
+
+
+@pytest.mark.parametrize(
+    "add_pre_path",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "add_suffix",
+    [
+        True,
+        False,
+    ],
+)
+def test_generate_openedx_course_url(settings, add_pre_path, add_suffix):
+    """Test that course home URL generation works as expected."""
+
+    course_key = "course-v1:TestX+12.345q+9T2199"
+    settings.OPENEDX_COURSE_BASE_URL = FAKE.url()
+
+    if add_pre_path:
+        settings.OPENEDX_COURSE_BASE_URL += FAKE.uri_path(3)
+
+    settings.OPENEDX_COURSE_BASE_URL_SUFFIX = FAKE.uri_path(1) if add_suffix else None
+
+    generated_url = generate_openedx_course_url(course_key)
+
+    assert course_key in generated_url
+    assert settings.OPENEDX_COURSE_BASE_URL in generated_url
+
+    if add_suffix and settings.OPENEDX_COURSE_BASE_URL_SUFFIX:
+        assert settings.OPENEDX_COURSE_BASE_URL_SUFFIX in generated_url
+    else:
+        assert not settings.OPENEDX_COURSE_BASE_URL_SUFFIX
