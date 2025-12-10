@@ -238,16 +238,13 @@ def test_create_program_contract_runs_exception_releases_lock(mocker):
     mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
 
     mock_get_contract = mocker.patch("b2b.models.ContractPage.objects.get")
-    mock_get_contract.side_effect = Exception("Database error")
+    mock_get_contract.side_effect = RuntimeError("Database error")
 
-    try:
-        result = create_program_contract_runs.apply(
+    with pytest.raises(RuntimeError):
+        create_program_contract_runs.apply(
             args=[contract.id, program.id],
             kwargs={},
         )
-        assert not result.successful()
-    except Exception:
-        pass
 
     expected_lock_key = f"create_program_contract_runs_lock:{contract.id}:{program.id}"
     mock_cache_delete.assert_called_once_with(expected_lock_key)
