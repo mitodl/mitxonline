@@ -4,12 +4,7 @@ MITx Online API-ready views, migrated from Unified Ecommerce.
 
 import logging
 
-from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
-from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -18,10 +13,9 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from mitol.payment_gateway.api import PaymentGateway
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 
@@ -31,7 +25,7 @@ from ecommerce.api import (
     get_auto_apply_discounts_for_basket,
 )
 from ecommerce.exceptions import ProductBlockedError
-from ecommerce.models import Basket, BasketDiscount, BasketItem, Discount, Product
+from ecommerce.models import Basket, BasketItem, Discount, Product
 from ecommerce.serializers import BasketItemSerializer, BasketWithProductSerializer
 from ecommerce.serializers.v0 import requests
 
@@ -125,7 +119,7 @@ def add_discount_to_basket(request):
         )
 
     try:
-        apply_discount_to_basket(discount)
+        apply_discount_to_basket(basket, discount)
     except ValueError:
         return Response(
             {"error": "An error occurred while applying the discount."},
@@ -181,12 +175,12 @@ def _create_basket_from_product(
     )
     auto_apply_discount_discounts = get_auto_apply_discounts_for_basket(basket.id)
     for discount in auto_apply_discount_discounts:
-        apply_discount_to_basket(discount)
+        apply_discount_to_basket(basket, discount)
 
     if discount_code:
         try:
             discount = Discount.objects.get(discount_code=discount_code)
-            apply_discount_to_basket(discount)
+            apply_discount_to_basket(basket, discount)
         except Discount.DoesNotExist:
             pass
 

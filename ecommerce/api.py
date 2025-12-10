@@ -823,8 +823,9 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
     products = basket.get_products()
 
     return Discount.objects.filter(
-        Q(product__in=products) | Q(product__isnull=True),
-        Q(user_discount_user=basket.user) | Q(user_discount_user__isnull=True),
+        Q(products__product__in=products) | Q(products__isnull=True),
+        Q(user_discount_discount__user=basket.user)
+        | Q(user_discount_discount__isnull=True),
         automatic=True,
     )
 
@@ -838,12 +839,10 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
     Keyword Args:
         allow_finaid (bool): Allow a financial assistance discount through.
     """
-    if discount.is_valid(basket, allow_finaid=True):
-        basket.discounts.add(
-            BasketDiscount(
-                redeemed_by=basket.user,
-                redeemed_discount=discount,
-                redemption_date=now_in_utc(),
-            )
+    if discount.is_valid(basket, allow_finaid=allow_finaid):
+        BasketDiscount.objects.create(
+            redeemed_by=basket.user,
+            redeemed_discount=discount,
+            redeemed_basket=basket,
+            redemption_date=now_in_utc(),
         )
-        basket.save()

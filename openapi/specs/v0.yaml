@@ -430,7 +430,7 @@ paths:
       responses:
         '204':
           description: Basket cleared successfully
-  /api/v0/baskets/create_from_product/{sku}/:
+  /api/v0/baskets/create_from_product/{product_id}/:
     post:
       operationId: baskets_create_from_product_create
       description: Creates or updates a basket for the current user, adding the selected
@@ -441,11 +441,6 @@ paths:
         schema:
           type: integer
         required: true
-      - in: path
-        name: sku
-        schema:
-          type: string
-        required: true
       tags:
       - baskets
       responses:
@@ -455,7 +450,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasketWithProduct'
           description: ''
-  /api/v0/baskets/create_from_product/{sku}/{discount_code}/:
+  /api/v0/baskets/create_from_product/{product_id}/{discount_code}/:
     post:
       operationId: create_basket_from_product_with_discount
       description: Creates or updates a basket for the current user, adding the selected
@@ -470,11 +465,6 @@ paths:
         name: product_id
         schema:
           type: integer
-        required: true
-      - in: path
-        name: sku
-        schema:
-          type: string
         required: true
       tags:
       - baskets

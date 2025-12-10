@@ -22,12 +22,12 @@ backet_item_router = router.register(
 
 urlpatterns = [
     path(
-        "baskets/create_from_product/<str:sku>/",
+        "baskets/create_from_product/<str:product_id>/",
         create_basket_from_product,
         name="create_from_product",
     ),
     path(
-        "baskets/create_from_product/<str:sku>/<str:discount_code>/",
+        "baskets/create_from_product/<str:product_id>/<str:discount_code>/",
         create_basket_from_product_with_discount,
         name="create_from_product_with_discount",
     ),

@@ -220,7 +220,9 @@ class BasketItem(TimestampedModel):
 
         discounts = [
             discount_redemption.redeemed_discount
-            for discount_redemption in self.basket.discounts.all()
+            for discount_redemption in self.basket.discounts.prefetch_related(
+                "redeemed_discount"
+            ).all()
         ]
 
         return (
