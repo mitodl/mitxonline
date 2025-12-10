@@ -393,7 +393,10 @@ class Discount(TimestampedModel):
                 bool: True if the discount is associated to the product in the basket,
                 or not associated with any product.
             """
-            return self.product is None or self.product in basket.get_products()
+            return (
+                self.products.count() == 0
+                or self.products.filter(product__in=basket.get_products()).count() > 0
+            )
 
         def _discount_user_has_discount() -> bool:
             """
@@ -403,8 +406,9 @@ class Discount(TimestampedModel):
                 bool: True if the discount is associated with the basket's user,
                 or not associated with any user.
             """
-            return self.assigned_users.count() == 0 or self.assigned_users.contains(
-                basket.user
+            return (
+                self.user_discount_discount.count() == 0
+                or self.user_discount_discount.filter(user=basket.user).count() > 0
             )
 
         def _discount_redemption_limit_valid() -> bool:
@@ -418,7 +422,7 @@ class Discount(TimestampedModel):
             """
             return (
                 self.max_redemptions == 0
-                or self.redeemed_discounts.count() < self.max_redemptions
+                or self.order_redemptions.count() < self.max_redemptions
             )
 
         def _discount_activation_date_valid() -> bool:
@@ -429,8 +433,7 @@ class Discount(TimestampedModel):
                 bool: True if the discount's activation date is in the past, or the
                 activation date is None.
             """
-            now = datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
-            return self.activation_date is None or now >= self.activation_date
+            return self.activation_date is None or now_in_utc() >= self.activation_date
 
         def _discount_expiration_date_valid() -> bool:
             """
@@ -440,8 +443,7 @@ class Discount(TimestampedModel):
                 bool: True if the discount's expiration date is in the future, or the
                 expiration date is None.
             """
-            now = datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
-            return self.expiration_date is None or now <= self.expiration_date
+            return self.expiration_date is None or now_in_utc() <= self.expiration_date
 
         return (
             (allow_finaid or self.payment_type != PAYMENT_TYPE_FINANCIAL_ASSISTANCE)
@@ -524,7 +526,14 @@ class DiscountProduct(TimestampedModel):
     )
 
     def __str__(self):
-        return f"Discount {self.discount.discount_code} for product {self.product.purchasable_object}"
+        purchaseable_object = (
+            str(self.product.purchasable_object)
+            if self.product and self.product.purchasable_object
+            else "No Product"
+        )
+        return (
+            f"Discount {self.discount.discount_code} for product {purchaseable_object}"
+        )
 
 
 class UserDiscount(TimestampedModel):
