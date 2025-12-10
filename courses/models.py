@@ -1950,7 +1950,7 @@ class ProgramRequirement(MP_Node):
             # validate the fields based on the node 'type'
             CheckConstraint(
                 name="courses_programrequirement_node_check",
-                check=(
+                condition=(
                     # root nodes
                     Q(
                         node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value,
