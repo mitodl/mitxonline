@@ -2132,7 +2132,7 @@ class ProgramRequirement(MP_Node):
     path = models.CharField(max_length=255, unique=True, db_collation="C")
 
     node_type = models.CharField(  # noqa: DJ001
-        choices=ProgramRequirementNodeType.choices,
+        choices=ProgramRequirementNodeType,
         max_length=len(max(ProgramRequirementNodeType.values, key=len)),
         null=True,
     )
@@ -2142,7 +2142,7 @@ class ProgramRequirement(MP_Node):
         MIN_NUMBER_OF = "min_number_of", "Minimum # of"
 
     operator = models.CharField(  # noqa: DJ001
-        choices=Operator.choices,
+        choices=Operator,
         max_length=len(max(Operator.values, key=len)),
         null=True,
     )
