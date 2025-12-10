@@ -9,7 +9,7 @@ from datetime import timedelta
 from decimal import Decimal
 from traceback import format_exc
 from typing import TYPE_CHECKING
-from urllib.parse import urljoin
+from urllib.parse import urlparse
 
 import reversion
 from django.conf import settings
@@ -1129,6 +1129,30 @@ def resolve_courseware_object_from_id(
     )
 
 
+def generate_openedx_course_url(course_key: str) -> str:
+    """
+    Generate a valid edX course URL for the given course key.
+
+    Configuration Settings:
+    - OPENEDX_COURSE_BASE_URL: the base URL to use
+    - OPENEDX_COURSE_BASE_URL_SUFFIX: optional suffix to append to the URL
+    Args:
+    - course_key (str): the course key (course-v1:MITxT+1234x+1T2099) to use
+    Returns:
+    - str, the generated URL
+    """
+
+    parsed_base = urlparse(settings.OPENEDX_COURSE_BASE_URL)
+    suffix = (
+        "/" + settings.OPENEDX_COURSE_BASE_URL_SUFFIX.lstrip().lstrip("/")
+        if settings.OPENEDX_COURSE_BASE_URL_SUFFIX
+        else ""
+    )
+    new_path = f"{parsed_base[2]}{course_key}{suffix}"
+
+    return parsed_base._replace(path=new_path).geturl()
+
+
 def import_courserun_from_edx(  # noqa: C901, PLR0913
     course_key: str,
     *,
@@ -1245,10 +1269,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         live=live,
         is_self_paced=edx_course_run.is_self_paced(),
         is_source_run=is_source_run,
-        courseware_url_path=urljoin(
-            settings.OPENEDX_COURSE_BASE_URL,
-            f"/{edx_course_run.course_id}{settings.OPENEDX_COURSE_BASE_URL_SUFFIX}",
-        ),
+        courseware_url_path=generate_openedx_course_url(edx_course_run.course_id),
     )
 
     course_page = None
