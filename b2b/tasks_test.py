@@ -79,7 +79,7 @@ def test_create_program_contract_runs_lock_not_acquired(mocker):
     contract = ContractPageFactory.create(organization=organization)
     program = ProgramFactory.create()
 
-    _mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=False)
+    mocker.patch("django.core.cache.cache.add", return_value=False)
     mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
     mock_log_info = mocker.patch("b2b.tasks.log.info")
@@ -120,8 +120,8 @@ def test_create_program_contract_runs_skips_existing_runs(mocker):
 
     CourseRunFactory.create(course=course, courseware_id=existing_courseware_id)
 
-    mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=True)
-    mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
     mock_log_debug = mocker.patch("b2b.tasks.log.debug")
 
@@ -160,8 +160,8 @@ def test_create_program_contract_runs_courses_without_source_runs(mocker):
 
     add_courses_to_program(program, [course_with_source, course_without_source])
 
-    mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=True)
-    mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
     mock_log_info = mocker.patch("b2b.tasks.log.info")
 
@@ -190,8 +190,8 @@ def test_create_program_contract_runs_no_source_runs_for_course(mocker):
 
     CourseRunFactory.create(course=course, is_source_run=False, run_tag="REGULAR")
 
-    mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=True)
-    mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
 
     result = create_program_contract_runs.apply(
@@ -215,8 +215,8 @@ def test_create_program_contract_runs_clears_cached_requirements_data(mocker):
         course=course, is_source_run=True, courseware_id="course-v1:MITx+course+SOURCE"
     )
 
-    _mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=True)
-    _mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
     _mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
 
     result = create_program_contract_runs.apply(
@@ -234,7 +234,7 @@ def test_create_program_contract_runs_exception_releases_lock(mocker):
     contract = ContractPageFactory.create(organization=organization)
     program = ProgramFactory.create()
 
-    _mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.add", return_value=True)
     mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
 
     mock_get_contract = mocker.patch("b2b.models.ContractPage.objects.get")
@@ -268,8 +268,8 @@ def test_create_program_contract_runs_source_run_by_tag(mocker):
         courseware_id="course-v1:MITx+testcourse+SOURCE",
     )
 
-    mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=True)
-    mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
 
     result = create_program_contract_runs.apply(
@@ -305,8 +305,8 @@ def test_create_program_contract_runs_mixed_source_run_types(mocker):
         courseware_id="course-v1:MITx+course2+SOURCE",
     )
 
-    mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=True)
-    mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
 
     result = create_program_contract_runs.apply(
@@ -332,9 +332,9 @@ def test_create_program_contract_runs_logging_output(mocker):
         course=course, is_source_run=True, courseware_id="course-v1:MITx+course+SOURCE"
     )
 
-    mock_cache_add = mocker.patch("django.core.cache.cache.add", return_value=True)
-    mock_cache_delete = mocker.patch("django.core.cache.cache.delete")
-    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+    mocker.patch("django.core.cache.cache.add", return_value=True)
+    mocker.patch("django.core.cache.cache.delete")
+    mocker.patch("b2b.api.create_contract_run")
     mock_log_info = mocker.patch("b2b.tasks.log.info")
 
     result = create_program_contract_runs.apply(
