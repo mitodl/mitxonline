@@ -226,7 +226,6 @@ def test_client_init_empty_client_secret(settings):
 
 def test_client_init_ssl_verification_handling(settings, mocker):
     """Test that SSL verification is handled correctly based on settings."""
-    # Test with SSL verification enabled (default)
     settings.KEYCLOAK_BASE_URL = FAKE.url()
     settings.KEYCLOAK_REALM_NAME = FAKE.word()
     settings.KEYCLOAK_ADMIN_CLIENT_ID = FAKE.word()
@@ -249,12 +248,11 @@ def test_client_init_ssl_verification_handling(settings, mocker):
 
     client = KeycloakAdminClient()
 
-    # Verify SSL verification is enabled
     assert client.skip_verify is False
     mocked_requests_get.assert_called_once_with(
         settings.KEYCLOAK_DISCOVERY_URL,
         timeout=60,
-        verify=True,  # Should be True when SSL verification is enabled
+        verify=True,
     )
 
 
@@ -282,12 +280,11 @@ def test_client_init_ssl_verification_disabled(settings, mocker):
 
     client = KeycloakAdminClient()
 
-    # Verify SSL verification is disabled
     assert client.skip_verify is True
     mocked_requests_get.assert_called_once_with(
         settings.KEYCLOAK_DISCOVERY_URL,
         timeout=60,
-        verify=False,  # Should be False when SSL verification is disabled
+        verify=False,
     )
 
 
@@ -299,7 +296,6 @@ def test_client_init_openid_configuration_request_failure(settings, mocker):
     settings.KEYCLOAK_ADMIN_CLIENT_SECRET = FAKE.word()
     settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
     
-    # Mock a failed HTTP request
     mock_response = mocker.Mock()
     mock_response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
     mocker.patch("requests.get", return_value=mock_response)
@@ -351,14 +347,11 @@ def test_client_init_oauth_session_configuration(settings, mocker):
 
     mock_token = {"access_token": FAKE.sha256(), "expires_in": 300, "token_type": "Bearer"}
 
-    # Mock the OAuth2Session class directly instead of its constructor
     mock_oauth_session = mocker.Mock()
     mock_oauth_session.fetch_token.return_value = mock_token
 
-    # Mock the session property to prevent real requests
     mock_oauth_session.session = mocker.Mock()
 
-    # Mock OAuth2Session constructor
     mock_constructor = mocker.patch(
         "b2b.keycloak_admin_api.OAuth2Session",
         return_value=mock_oauth_session,
@@ -366,7 +359,6 @@ def test_client_init_oauth_session_configuration(settings, mocker):
 
     client = KeycloakAdminClient()
 
-    # Verify OAuth2Session was constructed with correct parameters
     mock_constructor.assert_called_once_with(
         client_id=settings.KEYCLOAK_ADMIN_CLIENT_ID,
         client_secret=settings.KEYCLOAK_ADMIN_CLIENT_SECRET,
@@ -375,21 +367,18 @@ def test_client_init_oauth_session_configuration(settings, mocker):
         verify=not client.skip_verify,
     )
 
-    # Verify token was fetched
     mock_oauth_session.fetch_token.assert_called_once_with(
         mocked_openid_config["token_endpoint"],
         grant_type="client_credentials",
     )
 
-    # Verify client has the token and session
     assert client.token == mock_token
-    assert client.oauth_session == mock_oauth_session    # Verify token was fetched
+    assert client.oauth_session == mock_oauth_session
     mock_oauth_session.fetch_token.assert_called_once_with(
         mocked_openid_config["token_endpoint"],
         grant_type="client_credentials",
     )
 
-    # Verify client has the token and session
     assert client.token == mock_token
     assert client.oauth_session == mock_oauth_session
 
@@ -449,10 +438,6 @@ def test_client_get_one_realm(settings, mocker):
 
 def test_client_list(settings, mocker):
     """Test that the list op works as expected."""
-
-    # In real life, this is not how you retrieve realms.
-    # But we just need an 'endpoint' and a 'represnetation' so this is
-    # good enough.
 
     fake_realm = RealmRepresentationFactory.create()
 
@@ -628,7 +613,7 @@ def test_bootstrap_client(settings, mocker, verify_realm):
 
     fake_realm = RealmRepresentationFactory.create()
 
-    client, _, _, _ = _mocked_admin_client(settings, mocker)
+    _, _, _, _ = _mocked_admin_client(settings, mocker)
 
     mocked_client_request = mocker.patch(
         "authlib.integrations.requests_client.OAuth2Session.request",
