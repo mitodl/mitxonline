@@ -7,8 +7,8 @@ from cms.serializers import InstructorPageSerializer
 
 
 @api_view(["GET"])
-def instructor_page(request, id, format=None):  # noqa: A002, ARG001
-    page = InstructorPage.objects.get(pk=id)
+def instructor_page(request, pk, format=None):  # noqa: A002, ARG001
+    page = InstructorPage.objects.get(pk=pk)
 
     return Response(InstructorPageSerializer(page).data)
 
