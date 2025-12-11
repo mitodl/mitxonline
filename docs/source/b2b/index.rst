@@ -8,7 +8,7 @@ The B2B system originated in xPRO, which was focused on providing professional d
 Universal AI is essentially just another set of organizations and contracts within the system - the only real differentiator is what we call it, and that the organizations tend to be educational institutions.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    background
    commands
