@@ -27,8 +27,10 @@ def test_cannot_create_user(client):
 def test_cannot_update_user(user_client, user):
     """Verify the api to update a user is doesn't accept the verb"""
     resp = user_client.patch(
-        reverse("users_api-detail", kwargs={"pk": user.id}), data={"name": "Name"}
+        reverse("users_api-detail", kwargs={"pk": user.id}), data={"name": "Name"}, content_type="application/json"
     )
+    print(user)
+    print(user.is_authenticated)
 
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 

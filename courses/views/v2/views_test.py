@@ -16,7 +16,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection
 from django.db.models import Q
-from django.test.client import RequestFactory
+from django.test import RequestFactory
 from django.urls import reverse
 from faker import Faker
 from mitol.common.utils import now_in_utc

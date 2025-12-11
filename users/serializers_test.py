@@ -3,7 +3,7 @@
 import pytest
 import responses
 from django.contrib.auth.models import AnonymousUser
-from django.test.client import RequestFactory
+from django.test import RequestFactory
 from pytest_lazy_fixtures import lf
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
