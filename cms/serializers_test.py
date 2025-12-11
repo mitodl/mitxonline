@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import bleach
 import pytest
-from django.test.client import RequestFactory
+from django.test import RequestFactory
 
 from cms.factories import (
     CoursePageFactory,

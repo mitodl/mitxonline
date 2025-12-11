@@ -5,7 +5,7 @@ import os
 
 import pytest
 import responses
-from django.test.client import Client
+from django.test import Client
 from rest_framework.test import APIClient
 from zeal import zeal_ignore
 

@@ -10,7 +10,7 @@ from datetime import timedelta
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.db import connection
-from django.test.client import RequestFactory
+from django.test import RequestFactory
 from django.urls import reverse
 from faker import Faker
 from mitol.common.utils import now_in_utc
