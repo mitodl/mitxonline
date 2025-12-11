@@ -6,6 +6,7 @@ import pytest
 import reversion
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
 from reversion.models import Version
 
@@ -28,6 +29,7 @@ from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
+    DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
     Line,
@@ -36,6 +38,7 @@ from ecommerce.models import (
     PendingOrder,
     Product,
     Transaction,
+    UserDiscount,
 )
 from users.factories import UserFactory
 
@@ -618,3 +621,145 @@ def test_discount_expires_before_activation(unlimited_discount):
 
     test_discount.expiration_date = None
     test_discount.save()
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_product_value_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    product = None if is_none else basket_item.product
+    discount = UnlimitedUseDiscountFactory.create(amount=10)
+    if product:
+        DiscountProduct.objects.create(discount=discount, product=product)
+    assert discount.is_valid(basket_item.basket)
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_user_value_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    discount = UnlimitedUseDiscountFactory.create(amount=10)
+    if not is_none:
+        user_discount = UserDiscount.objects.create(
+            discount=discount,
+            user=basket_item.basket.user,
+        )
+        basket_item.basket.user.user_discount_user.add(user_discount)
+    assert discount.is_valid(basket_item.basket)
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_max_redemptions_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    discount = UnlimitedUseDiscountFactory.create(
+        max_redemptions=2,
+        amount=10,
+    )
+    if not is_none:
+        order = OrderFactory.create(purchaser=basket_item.basket.user)
+        DiscountRedemption.objects.create(
+            redeemed_discount=discount,
+            redeemed_by=basket_item.basket.user,
+            redeemed_order=order,
+            redemption_date=now_in_utc(),
+        )
+    assert discount.is_valid(basket_item.basket)
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_activation_date_in_past_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+    activation_date = None if is_none else now_in_utc() - timedelta(days=100)
+    discount = UnlimitedUseDiscountFactory.create(
+        activation_date=activation_date,
+        amount=10,
+    )
+    assert discount.is_valid(basket_item.basket)
+
+
+@pytest.mark.parametrize("is_none", [True, False])
+def test_discount_with_expiration_date_in_future_is_valid_for_basket(is_none):
+    """Test that a discount is valid for a basket."""
+    basket_item = BasketItemFactory.create()
+    expiration_date = None if is_none else now_in_utc() + timedelta(days=100)
+    discount = UnlimitedUseDiscountFactory.create(
+        expiration_date=expiration_date,
+        amount=10,
+    )
+    assert discount.is_valid(basket_item.basket)
+
+
+def test_discount_with_unmatched_product_value_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    product = ProductFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(
+        amount=10,
+    )
+    DiscountProduct.objects.create(
+        discount=discount,
+        product=product,
+    )
+    assert not discount.is_valid(basket_item.basket)
+
+
+def test_discount_with_unmatched_user_value_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    discount = UnlimitedUseDiscountFactory.create(
+        amount=10,
+    )
+    user = UserFactory.create()
+    UserDiscount.objects.create(discount=discount, user=user)
+    assert not discount.is_valid(basket_item.basket)
+
+
+def test_discount_with_max_redemptions_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+
+    discount = UnlimitedUseDiscountFactory.create(
+        max_redemptions=1,
+        amount=10,
+    )
+
+    order = OrderFactory.create(purchaser=basket_item.basket.user)
+    DiscountRedemption.objects.create(
+        redeemed_discount=discount,
+        redeemed_by=basket_item.basket.user,
+        redeemed_order=order,
+        redemption_date=now_in_utc(),
+    )
+    assert not discount.is_valid(basket_item.basket)
+
+
+def test_discount_with_activation_date_in_future_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+    activation_date = now_in_utc() + timedelta(days=100)
+    discount = UnlimitedUseDiscountFactory.create(
+        activation_date=activation_date,
+        amount=10,
+    )
+    assert not discount.is_valid(basket_item.basket)
+
+
+def test_discount_with_expiration_date_in_past_is_not_valid_for_basket():
+    """Test that a discount is not valid for a basket."""
+    basket_item = BasketItemFactory.create()
+    expiration_date = now_in_utc() - timedelta(days=100)
+
+    with freeze_time(now_in_utc() - timedelta(days=101)):
+        discount = UnlimitedUseDiscountFactory.create(
+            expiration_date=expiration_date,
+            amount=10,
+        )
+
+    assert not discount.is_valid(basket_item.basket)

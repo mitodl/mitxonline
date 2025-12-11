@@ -80,7 +80,6 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         "/api/hubspot_sync/",
         "/api/flexible_pricing/",
         "/api/cms/",
-        "/api/v0/baskets/",
         "/api/v0/discounts/",
         "/api/v0/flexible_pricing/",
         "/cms/",

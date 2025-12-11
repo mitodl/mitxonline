@@ -2,7 +2,7 @@ import pytest
 import reversion
 
 from ecommerce.factories import ProductFactory
-from ecommerce.serializers_test import create_order_receipt
+from ecommerce.serializers.serializers_test import create_order_receipt
 from ecommerce.tasks import (
     perform_downgrade_from_order,
     perform_unenrollment_from_order,

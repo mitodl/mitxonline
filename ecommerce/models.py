@@ -29,6 +29,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPES,
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPES,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
@@ -219,7 +220,9 @@ class BasketItem(TimestampedModel):
 
         discounts = [
             discount_redemption.redeemed_discount
-            for discount_redemption in self.basket.discounts.all()
+            for discount_redemption in self.basket.discounts.prefetch_related(
+                "redeemed_discount"
+            ).all()
         ]
 
         return (
@@ -326,14 +329,10 @@ class Discount(TimestampedModel):
         ):
             return False
 
-        if (
-            self.max_redemptions > 0
-            and DiscountRedemption.objects.filter(
-                redeemed_discount=self,
-                redeemed_order__state=OrderStatus.FULFILLED,
-            ).count()
-            >= self.max_redemptions
-        ):
+        if (self.max_redemptions or 0) > 0 and DiscountRedemption.objects.filter(
+            redeemed_discount=self,
+            redeemed_order__state=OrderStatus.FULFILLED,
+        ).count() >= self.max_redemptions:
             return False
 
         return self.valid_now()
@@ -368,6 +367,94 @@ class Discount(TimestampedModel):
             return False
 
         return True
+
+    def is_valid(self, basket, *, allow_finaid=False) -> bool:
+        """
+        Check if the discount is valid for the basket.
+
+        Financial assistance discounts are excluded by default, because this
+        check is used for discount codes that are submitted by the user, and
+        those discounts can't be applied manually. When this is used to check
+        automatically applied discounts, "allow_finaid" should be set to True so
+        the financial assistance discounts pass the checks.
+
+        Args:
+            basket (Basket): The basket to check the discount against.
+        Keyword Args:
+            allow_finaid (bool): Allow financial assistance discounts.
+        Returns:
+            bool: True if the discount is valid for the basket, False otherwise.
+
+        """
+
+        def _discount_product_in_basket() -> bool:
+            """
+            Check if the discount is associated to the product in the basket.
+
+            Returns:
+                bool: True if the discount is associated to the product in the basket,
+                or not associated with any product.
+            """
+            return (
+                self.products.count() == 0
+                or self.products.filter(product__in=basket.get_products()).count() > 0
+            )
+
+        def _discount_user_has_discount() -> bool:
+            """
+            Check if the discount is associated with the basket's user.
+
+            Returns:
+                bool: True if the discount is associated with the basket's user,
+                or not associated with any user.
+            """
+            return (
+                self.user_discount_discount.count() == 0
+                or self.user_discount_discount.filter(user=basket.user).count() > 0
+            )
+
+        def _discount_redemption_limit_valid() -> bool:
+            """
+            Check if the discount has been redeemed less than the maximum number
+            of times.
+
+            Returns:
+                bool: True if the discount has been redeemed less than the maximum
+                number of times, or the maximum number of redemptions is 0.
+            """
+            return (
+                self.max_redemptions == 0
+                or self.order_redemptions.count() < self.max_redemptions
+            )
+
+        def _discount_activation_date_valid() -> bool:
+            """
+            Check if the discount's activation date is in the past.
+
+            Returns:
+                bool: True if the discount's activation date is in the past, or the
+                activation date is None.
+            """
+            return self.activation_date is None or now_in_utc() >= self.activation_date
+
+        def _discount_expiration_date_valid() -> bool:
+            """
+            Check if the discount's expiration date is in the future.
+
+            Returns:
+                bool: True if the discount's expiration date is in the future, or the
+                expiration date is None.
+            """
+            return self.expiration_date is None or now_in_utc() <= self.expiration_date
+
+        return (
+            (allow_finaid or self.payment_type != PAYMENT_TYPE_FINANCIAL_ASSISTANCE)
+            and _discount_product_in_basket()
+            and _discount_user_has_discount()
+            and _discount_redemption_limit_valid()
+            and _discount_activation_date_valid()
+            and _discount_expiration_date_valid()
+        )
 
     def friendly_format(self):
         amount = f"{self.amount:.2f}"
@@ -441,7 +528,14 @@ class DiscountProduct(TimestampedModel):
     )
 
     def __str__(self):
-        return f"Discount {self.discount.discount_code} for product {self.product.purchasable_object}"
+        purchaseable_object = (
+            str(self.product.purchasable_object)
+            if self.product and self.product.purchasable_object
+            else "No Product"
+        )
+        return (
+            f"Discount {self.discount.discount_code} for product {purchaseable_object}"
+        )
 
 
 class UserDiscount(TimestampedModel):
