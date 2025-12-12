@@ -1299,6 +1299,7 @@ class BaseCertificate(models.Model):
     issue_date = models.DateTimeField(null=True, blank=True, db_index=True)
     # TODO: We need to store the whole json object here,
     # but since we select the ID, should we use the UUID for the VC?
+    # TODO: Should this here or stored as a FK to a different model?
     verifiable_credential = models.JSONField(null=True, blank=True)
 
 
