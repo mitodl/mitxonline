@@ -28,7 +28,7 @@ def test_cannot_update_user(user_client, user):
     resp = user_client.patch(
         reverse("users_api-detail", kwargs={"pk": user.id}),
         data={"name": "Name"},
-        content_type="application/json"
+        content_type="application/json",
     )
 
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
