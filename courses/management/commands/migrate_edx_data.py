@@ -6,7 +6,14 @@ from trino.dbapi import connect
 
 from cms.api import create_default_courseware_page
 from cms.models import CertificatePage, SignatoryPage
-from courses.models import Course, CourseRun, Department
+from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunCertificate,
+    CourseRunEnrollment,
+    CourseRunGrade,
+    Department,
+)
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
 
@@ -340,6 +347,151 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"{user_creation_count} users created"))
 
+    @staticmethod
+    def _bulk_create_enrollments(rows, batch_size):
+        user_ids = [row["user_mitxonline_id"] for row in rows]
+        courserun_ids = [row["courserun_id"] for row in rows]
+
+        existing = set(
+            CourseRunEnrollment.objects.filter(
+                user_id__in=user_ids,
+                run_id__in=courserun_ids,
+            ).values_list("user_id", "run_id")
+        )
+
+        new_enrollment_objects = []
+        for row in rows:
+            key = (row["user_mitxonline_id"], row["courserun_id"])
+            if key in existing:
+                continue
+
+            new_enrollment_objects.append(
+                CourseRunEnrollment(
+                    user_id=row["user_id"],
+                    run_id=row["course_run_id"],
+                    enrollment_mode=row["courserunenrollment_enrollment_mode"],
+                    is_active=True,
+                )
+            )
+
+        return CourseRunEnrollment.objects.bulk_create(
+            new_enrollment_objects, batch_size=batch_size
+        )
+
+    @staticmethod
+    def _bulk_create_grades(rows, batch_size):
+        user_ids = [row["user_mitxonline_id"] for row in rows]
+        courserun_ids = [row["courserun_id"] for row in rows]
+
+        existing = set(
+            CourseRunGrade.objects.filter(
+                user_id__in=user_ids,
+                run_id__in=courserun_ids,
+            ).values_list("user_id", "run_id")
+        )
+
+        new_grade_objects = []
+        for row in rows:
+            key = (row["user_mitxonline_id"], row["courserun_id"])
+            if key in existing:
+                continue
+
+            new_grade_objects.append(
+                CourseRunGrade(
+                    user_id=row["user_id"],
+                    run_id=row["course_run_id"],
+                    grade=row["courserungrade_grade"],
+                    passed=row["courserungrade_is_passing"],
+                    certificate_page_revision_id=row["certificate_page_revision_id"],
+                )
+            )
+
+        return CourseRunGrade.objects.bulk_create(
+            new_grade_objects, batch_size=batch_size
+        )
+
+    @staticmethod
+    def _bulk_create_certificates(rows, batch_size):
+        user_ids = [row["user_mitxonline_id"] for row in rows]
+        courserun_ids = [row["courserun_id"] for row in rows]
+
+        existing = set(
+            CourseRunCertificate.objects.filter(
+                user_id__in=user_ids,
+                run_id__in=courserun_ids,
+            ).values_list("user_id", "run_id")
+        )
+
+        new_certificate_objects = []
+        for row in rows:
+            key = (row["user_mitxonline_id"], row["courserun_id"])
+            if key in existing:
+                continue
+
+            new_certificate_objects.append(
+                CourseRunCertificate(
+                    user_id=row["user_id"],
+                    run_id=row["course_run_id"],
+                    issue_date=row["courseruncertificate_created_on"],
+                    certificate_page_revision_id=row["certificate_page_revision_id"],
+                )
+            )
+
+        return CourseRunCertificate.objects.bulk_create(
+            new_certificate_objects, batch_size=batch_size
+        )
+
+    def _migrate_certificates(self, conn, options):
+        """
+        Migrate certificates from edX to MITx Online. Create CourseRunEnrollment, CourseRunGrade,
+        and CourseRunCertificate instances.
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+
+        cur = conn.cursor()
+
+        query = (
+            "SELECT * FROM edxorg_to_mitxonline_enrollments "
+            "WHERE user_mitxonline_id IS NOT NULL and courserun_id IS NOT NULL"
+        )
+        if limit is not None:
+            query += f" LIMIT {int(limit)}"
+        cur.execute(query)
+        columns = [desc[0] for desc in cur.description]
+
+        total_enrollments = 0
+        total_grades = 0
+        total_certificates = 0
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            rows = [dict(zip(columns, r)) for r in results]
+
+            # Bulk create enrollments
+            created_enrollments = self._bulk_create_enrollments(
+                rows, batch_size=batch_size
+            )
+            total_enrollments += len(created_enrollments)
+
+            # Bulk create grades
+            created_grades = self._bulk_create_grades(rows, batch_size=batch_size)
+            total_grades += len(created_grades)
+
+            # Bulk create certificates
+            created_certs = self._bulk_create_certificates(rows, batch_size=batch_size)
+            total_certificates += len(created_certs)
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{total_enrollments} enrollments created, "
+                f"{total_grades} grades created, "
+                f"{total_certificates} certificates created"
+            )
+        )
+
     def add_arguments(self, parser) -> None:
         parser.add_argument(
             "--use-default-signatory",
@@ -359,7 +511,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--type",
-            choices=["course_runs", "users"],
+            choices=["course_runs", "users", "certificates"],
             default="course_runs",
             help="Choose which migration to run: course_runs, users (default: course_runs)",
         )
@@ -376,3 +528,9 @@ class Command(BaseCommand):
         if migrate_type == "users":
             self.stdout.write("Migrating the edX users ...")
             self._migrate_users(conn, options)
+
+        if migrate_type == "certificates":
+            self.stdout.write(
+                "Migrating the edX enrollments, grades and certificates ..."
+            )
+            self._migrate_certificates(conn, options)
