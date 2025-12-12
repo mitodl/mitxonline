@@ -31,9 +31,9 @@ Contracts contain a number of data elements that control membership:
 - `price` - controls whether or not the learners are assessed a fee for access to courses.
 
 :::{note}
-The membership_type and integration_type fields are very similar, because one will be removed. `integration_type` was the old name, and `membership_type` is the new one. This change is taking place to make the field name easier to understand - we used to decide whether or not we cared about the Keycloak organization membership based on this field; now, we want all the organizations in Keycloak.
+The `membership_type` and `integration_type` fields are very similar, because one will be removed. The name `integration_type` was chosen because the field determined whether or not the system considered the user's Keycloak organization memberships, as the system used to only rely on Keycloak memberships if the organization had an integrated identity provider. However, we decided that _all_ organizations should be in Keycloak, even ones that don't involve an identity provider, so this field name and the values for it stopped making sense, and we decided to change the name of the field and the values for it.
 
-For the remainder of this document, we'll use `membership_type`.
+For the remainder of this document, we'll use `membership_type` and the values below.
 :::
 
 The `membership_type` field can be set to `managed`, `code`, or `auto`, and this determines how learners are allowed into the system:
