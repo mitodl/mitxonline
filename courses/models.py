@@ -1297,6 +1297,10 @@ class BaseCertificate(models.Model):
         verbose_name="revoked",
     )
     issue_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    # TODO: We need to store the whole json object here,
+    # but since we select the ID, should we use the UUID for the VC?
+    verifiable_credential = models.JSONField(null=True, blank=True)
+
 
     class Meta:
         abstract = True
