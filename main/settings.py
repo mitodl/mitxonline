@@ -1537,3 +1537,15 @@ TRINO_PASSWORD = get_string(
     default=None,
     description="Password for Trino authentication",
 )
+
+ISSUE_VERIFIABLE_CREDENTIALS = get_bool(
+    name="ISSUE_VERIFIABLE_CREDENTIALS",
+    default=False,
+    description="Enable issuing verifiable credentials to users when creating certificates.",
+)
+
+VC_SIGNER_URL = get_string(
+    name="VC_SIGNER_URL",
+    default='',
+    description="The URL of the VC Signer service. Used for issuing verifiable credentials.",
+)

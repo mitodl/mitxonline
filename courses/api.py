@@ -24,6 +24,7 @@ from mitol.common.utils.collections import (
     has_equal_properties,
 )
 from opaque_keys.edx.keys import CourseKey
+import requests
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
@@ -39,6 +40,7 @@ from courses.constants import (
 )
 from courses.models import (
     BlockedCountry,
+    BaseCertificate,
     Course,
     CourseRun,
     CourseRunCertificate,
@@ -798,6 +800,7 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
                 user=user, course_run=course_run
             )
             sync_hubspot_user(user)
+            create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
         except IntegrityError:
             log.warning(
@@ -1039,6 +1042,7 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             program.title,
         )
         sync_hubspot_user(user)
+        create_verifiable_credential(program_cert)
         _, created = ProgramEnrollment.objects.get_or_create(
             program=program, user=user, defaults={"active": True, "change_status": None}
         )
@@ -1314,3 +1318,35 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
                 )
 
     return (new_run, course_page, course_product)
+
+def create_verifiable_credential(certificate: BaseCertificate):
+    """
+    Create a verifiable credential for the given course run certificate.
+
+    Args:
+        certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
+    """
+    # TODO: Feature flag this function. I should be able to scaffold out the workflow without needing to do much
+    if not settings.ISSUE_VERIFIABLE_CREDENTIALS:
+        return
+    # Construct the right payload based on the certificate type.
+    payload = {}
+    if isinstance(certificate, CourseRunCertificate):
+        payload = {}
+    elif isinstance(certificate, ProgramCertificate):
+        payload = {}
+    else:
+        raise ValueError("Unsupported certificate type for verifiable credential creation.")
+
+    # Call the signing service to create the new credential
+    # TODO: Need to figure out what the proper failure mode is here. Should I blow up the caller or just log?
+    resp = requests.post(settings.VC_SIGNER_URL, json=payload)
+    if resp.status_code != 200:
+        raise ValueError('Failed to create verifiable credential.')
+
+    # Save the returned value as BaseCertificate.verifiable_credential
+    credential = resp.json()
+    certificate.verifiable_credential = credential
+    certificate.save()
+
+
