@@ -1330,7 +1330,6 @@ def create_verifiable_credential(certificate: BaseCertificate):
     if not settings.ISSUE_VERIFIABLE_CREDENTIALS:
         return
     # Construct the right payload based on the certificate type.
-    payload = {}
     if isinstance(certificate, CourseRunCertificate):
         payload = {}
     elif isinstance(certificate, ProgramCertificate):
@@ -1339,7 +1338,7 @@ def create_verifiable_credential(certificate: BaseCertificate):
         raise ValueError("Unsupported certificate type for verifiable credential creation.")
 
     # Call the signing service to create the new credential
-    # TODO: Need to figure out what the proper failure mode is here. Should I blow up the caller or just log?
+    # TODO: Need to figure out what the proper failure mode is here. Should I blow up the caller or just log and move on?
     resp = requests.post(settings.VC_SIGNER_URL, json=payload)
     if resp.status_code != 200:
         raise ValueError('Failed to create verifiable credential.')
