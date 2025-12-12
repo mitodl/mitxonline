@@ -1855,7 +1855,7 @@ class ProgramRequirement(MP_Node):
     alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
     node_type = models.CharField(  # noqa: DJ001
-        choices=ProgramRequirementNodeType.choices,
+        choices=ProgramRequirementNodeType,
         max_length=len(max(ProgramRequirementNodeType.values, key=len)),
         null=True,
     )
@@ -1865,7 +1865,7 @@ class ProgramRequirement(MP_Node):
         MIN_NUMBER_OF = "min_number_of", "Minimum # of"
 
     operator = models.CharField(  # noqa: DJ001
-        choices=Operator.choices,
+        choices=Operator,
         max_length=len(max(Operator.values, key=len)),
         null=True,
     )
@@ -1950,7 +1950,7 @@ class ProgramRequirement(MP_Node):
             # validate the fields based on the node 'type'
             CheckConstraint(
                 name="courses_programrequirement_node_check",
-                check=(
+                condition=(
                     # root nodes
                     Q(
                         node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value,

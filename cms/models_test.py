@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import caches
-from django.test.client import RequestFactory
+from django.test import RequestFactory
 from django.urls import resolve, reverse
 from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
