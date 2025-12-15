@@ -414,10 +414,10 @@ class Command(BaseCommand):
         batch_size = options.get("batch_size", 1000)
         dry_run = options.get("dry_run")
         courserun_readable_ids = [
-                                     readable_id.strip()
-                                     for readable_id in options.get("courserun_readable_ids", "").split(",")
-                                     if readable_id
-                                 ] or None
+            readable_id.strip()
+            for readable_id in options.get("courserun_readable_ids", "").split(",")
+            if readable_id
+        ] or None
 
         cur = conn.cursor()
 
