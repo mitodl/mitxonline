@@ -800,7 +800,9 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
                 user=user, course_run=course_run
             )
             sync_hubspot_user(user)
-            create_verifiable_credential(certificate)
+            if created:
+                # TODO: Should we instead create if there's not an existing verifiable credential on the certificate?
+                create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
         except IntegrityError:
             log.warning(
@@ -1042,12 +1044,13 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             program.title,
         )
         sync_hubspot_user(user)
-        create_verifiable_credential(program_cert)
         _, created = ProgramEnrollment.objects.get_or_create(
             program=program, user=user, defaults={"active": True, "change_status": None}
         )
 
         if created:
+            # TODO: Should we instead create if there's not an existing verifiable credential on the certificate?
+            create_verifiable_credential(program_cert)
             log.info(
                 "Program enrollment for [%s] in program [%s] is created.",
                 user.edx_username,
