@@ -11,6 +11,7 @@ from traceback import format_exc
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+import requests
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -24,7 +25,6 @@ from mitol.common.utils.collections import (
     has_equal_properties,
 )
 from opaque_keys.edx.keys import CourseKey
-import requests
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
@@ -39,8 +39,8 @@ from courses.constants import (
     PROGRAM_TEXT_ID_PREFIX,
 )
 from courses.models import (
-    BlockedCountry,
     BaseCertificate,
+    BlockedCountry,
     Course,
     CourseRun,
     CourseRunCertificate,
@@ -1322,57 +1322,54 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
 
     return (new_run, course_page, course_product)
 
+
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     # TODO: This is just boilerplate for testing. Need valid issuer information, template data, etc.
     # Taken directly from https://github.com/digitalcredentials/issuer-coordinator
-    if isinstance(certificate, CourseRunCertificate) or isinstance(certificate, ProgramCertificate):
+    if isinstance(certificate, CourseRunCertificate) or isinstance(
+        certificate, ProgramCertificate
+    ):
         return {
-      "@context": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
-      ],
-      "id": f"urn:uuid:{certificate.uuid}",
-      "type": [
-        "VerifiableCredential",
-        "OpenBadgeCredential"
-      ],
-      "name": "DCC Test Credential",
-      "issuer": {
-        "type": [
-          "Profile"
-        ],
-        "id": "did:key:z6MkhVTX9BF3NGYX6cc7jWpbNnR7cAjH8LUffabZP8Qu4ysC",
-        "name": "Digital Credentials Consortium Test Issuer",
-        "url": "https://dcconsortium.org",
-        "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png"
-      },
-      "validFrom": certificate.issue_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
-      "credentialSubject": {
-        "type": [
-          "AchievementSubject"
-        ],
-        "achievement": {
-          "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
-          "type": [
-            "Achievement"
-          ],
-          "achievementType": "Diploma",
-          "name": "Badge",
-          "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
-          "criteria": {
-            "type": "Criteria",
-            "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**."
-          },
-          "image": {
-            "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
-            "type": "Image"
-          }
-        },
-        "name": "Jane Doe"
-      }
-    }
+            "@context": [
+                "https://www.w3.org/ns/credentials/v2",
+                "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            ],
+            "id": f"urn:uuid:{certificate.uuid}",
+            "type": ["VerifiableCredential", "OpenBadgeCredential"],
+            "name": "DCC Test Credential",
+            "issuer": {
+                "type": ["Profile"],
+                "id": "did:key:z6MkhVTX9BF3NGYX6cc7jWpbNnR7cAjH8LUffabZP8Qu4ysC",
+                "name": "Digital Credentials Consortium Test Issuer",
+                "url": "https://dcconsortium.org",
+                "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png",
+            },
+            "validFrom": certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "credentialSubject": {
+                "type": ["AchievementSubject"],
+                "achievement": {
+                    "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
+                    "type": ["Achievement"],
+                    "achievementType": "Diploma",
+                    "name": "Badge",
+                    "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
+                    "criteria": {
+                        "type": "Criteria",
+                        "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**.",
+                    },
+                    "image": {
+                        "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
+                        "type": "Image",
+                    },
+                },
+                "name": "Jane Doe",
+            },
+        }
     else:
-        raise ValueError("Unsupported certificate type for verifiable credential payload generation.")
+        raise ValueError(
+            "Unsupported certificate type for verifiable credential payload generation."
+        )
+
 
 def create_verifiable_credential(certificate: BaseCertificate):
     """
@@ -1389,11 +1386,9 @@ def create_verifiable_credential(certificate: BaseCertificate):
     # TODO: Need to figure out what the proper failure mode is here. Should I blow up the caller or just log and move on?
     resp = requests.post(settings.VC_SIGNER_URL, json=payload)
     if resp.status_code != 200:
-        raise ValueError('Failed to create verifiable credential.')
+        raise ValueError("Failed to create verifiable credential.")
 
     # Save the returned value as BaseCertificate.verifiable_credential
     credential = resp.json()
     certificate.verifiable_credential = credential
     certificate.save()
-
-

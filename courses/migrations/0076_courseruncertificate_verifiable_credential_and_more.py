@@ -4,20 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0075_update_course_run_grade_allow_extra_credit'),
+        ("courses", "0075_update_course_run_grade_allow_extra_credit"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='courseruncertificate',
-            name='verifiable_credential',
+            model_name="courseruncertificate",
+            name="verifiable_credential",
             field=models.JSONField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='programcertificate',
-            name='verifiable_credential',
+            model_name="programcertificate",
+            name="verifiable_credential",
             field=models.JSONField(blank=True, null=True),
         ),
     ]

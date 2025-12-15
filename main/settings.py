@@ -1546,6 +1546,6 @@ ISSUE_VERIFIABLE_CREDENTIALS = get_bool(
 
 VC_SIGNER_URL = get_string(
     name="VC_SIGNER_URL",
-    default='',
+    default="",
     description="The URL of the VC Signer service. Used for issuing verifiable credentials.",
 )

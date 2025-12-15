@@ -1302,7 +1302,6 @@ class BaseCertificate(models.Model):
     # TODO: Should this here or stored as a FK to a different model?
     verifiable_credential = models.JSONField(null=True, blank=True)
 
-
     class Meta:
         abstract = True
 
