@@ -100,7 +100,7 @@ def test_client_init_missing_base_url(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_BASE_URL setting is not configured\."
+        match=r"KEYCLOAK_BASE_URL setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -111,7 +111,7 @@ def test_client_init_empty_base_url(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_BASE_URL setting is not configured\."
+        match=r"KEYCLOAK_BASE_URL setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -123,7 +123,7 @@ def test_client_init_missing_realm_name(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_REALM_NAME setting is not configured\."
+        match=r"KEYCLOAK_REALM_NAME setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -135,7 +135,7 @@ def test_client_init_empty_realm_name(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_REALM_NAME setting is not configured\."
+        match=r"KEYCLOAK_REALM_NAME setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -148,7 +148,7 @@ def test_client_init_missing_discovery_url(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_DISCOVERY_URL setting is not configured\."
+        match=r"KEYCLOAK_DISCOVERY_URL setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -161,7 +161,7 @@ def test_client_init_empty_discovery_url(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_DISCOVERY_URL setting is not configured\."
+        match=r"KEYCLOAK_DISCOVERY_URL setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -175,7 +175,7 @@ def test_client_init_missing_client_id(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_ADMIN_CLIENT_ID setting is not configured\."
+        match=r"KEYCLOAK_ADMIN_CLIENT_ID setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -189,7 +189,7 @@ def test_client_init_empty_client_id(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_ADMIN_CLIENT_ID setting is not configured\."
+        match=r"KEYCLOAK_ADMIN_CLIENT_ID setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -204,7 +204,7 @@ def test_client_init_missing_client_secret(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_ADMIN_CLIENT_SECRET setting is not configured\."
+        match=r"KEYCLOAK_ADMIN_CLIENT_SECRET setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -219,7 +219,7 @@ def test_client_init_empty_client_secret(settings):
 
     with pytest.raises(
         KeycloakAdminImproperlyConfiguredError,
-        match=r"KEYCLOAK_ADMIN_CLIENT_SECRET setting is not configured\."
+        match=r"KEYCLOAK_ADMIN_CLIENT_SECRET setting is not configured\.",
     ):
         KeycloakAdminClient()
 
@@ -243,7 +243,11 @@ def test_client_init_ssl_verification_handling(settings, mocker):
     )
     mocker.patch(
         "authlib.integrations.requests_client.OAuth2Session.fetch_token",
-        return_value={"access_token": FAKE.sha256(), "expires_in": 300, "token_type": "Bearer"},
+        return_value={
+            "access_token": FAKE.sha256(),
+            "expires_in": 300,
+            "token_type": "Bearer",
+        },
     )
 
     client = KeycloakAdminClient()
@@ -275,7 +279,11 @@ def test_client_init_ssl_verification_disabled(settings, mocker):
     )
     mocker.patch(
         "authlib.integrations.requests_client.OAuth2Session.fetch_token",
-        return_value={"access_token": FAKE.sha256(), "expires_in": 300, "token_type": "Bearer"},
+        return_value={
+            "access_token": FAKE.sha256(),
+            "expires_in": 300,
+            "token_type": "Bearer",
+        },
     )
 
     client = KeycloakAdminClient()
@@ -295,11 +303,11 @@ def test_client_init_openid_configuration_request_failure(settings, mocker):
     settings.KEYCLOAK_ADMIN_CLIENT_ID = FAKE.word()
     settings.KEYCLOAK_ADMIN_CLIENT_SECRET = FAKE.word()
     settings.KEYCLOAK_DISCOVERY_URL = FAKE.url()
-    
+
     mock_response = mocker.Mock()
     mock_response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
     mocker.patch("requests.get", return_value=mock_response)
-    
+
     with pytest.raises(requests.HTTPError, match="404 Not Found"):
         KeycloakAdminClient()
 
@@ -322,7 +330,11 @@ def test_client_init_base_url_processing(settings, mocker):
     )
     mocker.patch(
         "authlib.integrations.requests_client.OAuth2Session.fetch_token",
-        return_value={"access_token": FAKE.sha256(), "expires_in": 300, "token_type": "Bearer"},
+        return_value={
+            "access_token": FAKE.sha256(),
+            "expires_in": 300,
+            "token_type": "Bearer",
+        },
     )
 
     client = KeycloakAdminClient()
@@ -345,7 +357,11 @@ def test_client_init_oauth_session_configuration(settings, mocker):
         return_value=mocker.Mock(status_code=200, json=lambda: mocked_openid_config),
     )
 
-    mock_token = {"access_token": FAKE.sha256(), "expires_in": 300, "token_type": "Bearer"}
+    mock_token = {
+        "access_token": FAKE.sha256(),
+        "expires_in": 300,
+        "token_type": "Bearer",
+    }
 
     mock_oauth_session = mocker.Mock()
     mock_oauth_session.fetch_token.return_value = mock_token
