@@ -1343,7 +1343,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         "url": "https://dcconsortium.org",
         "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png"
       },
-      "validFrom": certificate.issue_date,
+      "validFrom": certificate.issue_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
       "credentialSubject": {
         "type": [
           "AchievementSubject"
