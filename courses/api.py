@@ -1320,7 +1320,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     return (new_run, course_page, course_product)
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
-    # TODO: This is just boilerplate for testing.
+    # TODO: This is just boilerplate for testing. Need valid issuer information, template data, etc.
     # Taken directly from https://github.com/digitalcredentials/issuer-coordinator
     if isinstance(certificate, CourseRunCertificate) or isinstance(certificate, ProgramCertificate):
         return {
@@ -1378,7 +1378,6 @@ def create_verifiable_credential(certificate: BaseCertificate):
     Args:
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
     """
-    # TODO: Feature flag this function. I should be able to scaffold out the workflow without needing to do much
     if not settings.ISSUE_VERIFIABLE_CREDENTIALS:
         return
     payload = get_verifiable_credentials_payload(certificate)
