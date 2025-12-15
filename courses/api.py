@@ -1319,6 +1319,58 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
 
     return (new_run, course_page, course_product)
 
+def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
+    # TODO: This is just boilerplate for testing.
+    # Taken directly from https://github.com/digitalcredentials/issuer-coordinator
+    if isinstance(certificate, CourseRunCertificate) or isinstance(certificate, ProgramCertificate):
+        return {
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
+      ],
+      "id": f"urn:uuid:{certificate.uuid}",
+      "type": [
+        "VerifiableCredential",
+        "OpenBadgeCredential"
+      ],
+      "name": "DCC Test Credential",
+      "issuer": {
+        "type": [
+          "Profile"
+        ],
+        "id": "did:key:z6MkhVTX9BF3NGYX6cc7jWpbNnR7cAjH8LUffabZP8Qu4ysC",
+        "name": "Digital Credentials Consortium Test Issuer",
+        "url": "https://dcconsortium.org",
+        "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png"
+      },
+      "validFrom": certificate.issue_date,
+      "credentialSubject": {
+        "type": [
+          "AchievementSubject"
+        ],
+        "achievement": {
+          "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
+          "type": [
+            "Achievement"
+          ],
+          "achievementType": "Diploma",
+          "name": "Badge",
+          "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
+          "criteria": {
+            "type": "Criteria",
+            "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**."
+          },
+          "image": {
+            "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
+            "type": "Image"
+          }
+        },
+        "name": "Jane Doe"
+      }
+    }
+    else:
+        raise ValueError("Unsupported certificate type for verifiable credential payload generation.")
+
 def create_verifiable_credential(certificate: BaseCertificate):
     """
     Create a verifiable credential for the given course run certificate.
@@ -1329,13 +1381,7 @@ def create_verifiable_credential(certificate: BaseCertificate):
     # TODO: Feature flag this function. I should be able to scaffold out the workflow without needing to do much
     if not settings.ISSUE_VERIFIABLE_CREDENTIALS:
         return
-    # Construct the right payload based on the certificate type.
-    if isinstance(certificate, CourseRunCertificate):
-        payload = {}
-    elif isinstance(certificate, ProgramCertificate):
-        payload = {}
-    else:
-        raise ValueError("Unsupported certificate type for verifiable credential creation.")
+    payload = get_verifiable_credentials_payload(certificate)
 
     # Call the signing service to create the new credential
     # TODO: Need to figure out what the proper failure mode is here. Should I blow up the caller or just log and move on?
