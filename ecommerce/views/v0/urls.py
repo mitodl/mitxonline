@@ -6,6 +6,11 @@ from ecommerce.views.v0 import (
     AllProductViewSet,
     BasketItemViewSet,
     BasketViewSet,
+    DiscountViewSet,
+    NestedDiscountProductViewSet,
+    NestedDiscountRedemptionViewSet,
+    NestedDiscountTierViewSet,
+    NestedUserDiscountViewSet,
     ProductViewSet,
     add_discount_to_basket,
     clear_basket,
@@ -23,6 +28,34 @@ backet_item_router = router.register(
 )
 router.register(r"products/all", AllProductViewSet, basename="all_products_api")
 router.register(r"products", ProductViewSet, basename="products_api")
+
+discountsRouter = router.register(  # noqa: N816
+    r"discounts", DiscountViewSet, basename="discounts_api"
+)
+discountsRouter.register(
+    r"redemptions",
+    NestedDiscountRedemptionViewSet,
+    basename="discounts_api-redemptions",
+    parents_query_lookups=["redeemed_discount"],
+)
+discountsRouter.register(
+    r"assignees",
+    NestedUserDiscountViewSet,
+    basename="discounts_api-assignees",
+    parents_query_lookups=["discount"],
+)
+discountsRouter.register(
+    r"products",
+    NestedDiscountProductViewSet,
+    basename="discounts_api-products",
+    parents_query_lookups=["discount"],
+)
+discountsRouter.register(
+    r"tiers",
+    NestedDiscountTierViewSet,
+    basename="discounts_api-tiers",
+    parents_query_lookups=["discount"],
+)
 
 urlpatterns = [
     path(
