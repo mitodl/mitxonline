@@ -148,7 +148,7 @@ def test_register_details_serializer_allows_numeric_only_name(  # noqa: PLR0913
     request.user = user
 
     data = {
-        "name": name.strip(),  # Strip whitespace to match what would be processed
+        "name": name.strip(),
         "username": "testuser",
         "legal_address": valid_address_dict,
         "user_profile": user_profile_dict,
