@@ -1,10 +1,7 @@
 from django.urls import include, path, re_path
-from rest_framework.routers import SimpleRouter
-from rest_framework_extensions.routers import NestedRouterMixin
 
-""" TODO: clean this up later (make the views look more like the courses one) """
-from ecommerce.admin import AdminRefundOrderView  # noqa: E402
-from ecommerce.views.v0 import (  # noqa: E402
+from ecommerce.admin import AdminRefundOrderView
+from ecommerce.views.legacy import (
     AllProductViewSet,
     BackofficeCallbackView,
     BasketDiscountViewSet,
@@ -24,11 +21,8 @@ from ecommerce.views.v0 import (  # noqa: E402
     ProductViewSet,
     UserDiscountViewSet,
 )
-
-
-class SimpleRouterWithNesting(NestedRouterMixin, SimpleRouter):
-    pass
-
+from ecommerce.views.v0.urls import urlpatterns as v0_urls
+from main.routers import SimpleRouterWithNesting
 
 router = SimpleRouterWithNesting()
 router.register(r"products/all", AllProductViewSet, basename="all_products_api")
@@ -80,7 +74,7 @@ basketRouter.register(
 )
 
 urlpatterns = [
-    path("api/v0/", include(router.urls)),
+    path("api/v0/", include((v0_urls, "v0"))),
     path("api/", include(router.urls)),
     re_path(
         "checkout/to_payment",
