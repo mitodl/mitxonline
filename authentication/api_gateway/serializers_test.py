@@ -140,7 +140,7 @@ def test_register_extra_details_serializer_valid_data(user):
         "12",
     ],
 )
-def test_register_details_serializer_allows_numeric_only_name(
+def test_register_details_serializer_allows_numeric_only_name(  # noqa: PLR0913
     mocker, name, user, valid_address_dict, user_profile_dict, rf
 ):
     """Test RegisterDetailsSerializer allows names containing only numbers (edX supports this)"""
@@ -154,8 +154,8 @@ def test_register_details_serializer_allows_numeric_only_name(
         "user_profile": user_profile_dict,
     }
 
-    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
-    mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
+    mocker.patch("openedx.api.create_edx_user")
+    mocker.patch("openedx.api.create_edx_auth_token")
 
     serializer = RegisterDetailsSerializer(data=data, context={"request": request})
     assert serializer.is_valid(), f"Serializer should accept numeric name '{name}'. Errors: {serializer.errors}"
