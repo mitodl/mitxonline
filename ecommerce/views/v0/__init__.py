@@ -4,6 +4,7 @@ MITx Online API-ready views, migrated from Unified Ecommerce.
 
 import logging
 
+from django.db.models import Count, Q
 from django.shortcuts import redirect
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import (
@@ -13,12 +14,16 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
+from mitol.common.utils import now_in_utc
 from rest_framework import status
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 
+from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
@@ -26,8 +31,12 @@ from ecommerce.api import (
 )
 from ecommerce.exceptions import ProductBlockedError
 from ecommerce.models import Basket, BasketItem, Discount, Product
-from ecommerce.serializers import BasketItemSerializer, BasketWithProductSerializer
-from ecommerce.serializers.v0 import requests
+from ecommerce.serializers.v0 import (
+    BasketItemSerializer,
+    BasketWithProductSerializer,
+    ProductSerializer,
+    requests,
+)
 
 log = logging.getLogger(__name__)
 
@@ -352,3 +361,113 @@ def clear_basket(request):
     basket.delete()
 
     return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+
+class ProductsPagination(LimitOffsetPagination):
+    """Sets a default limit for the product list API."""
+
+    default_limit = 2
+
+
+class AllProductViewSet(ModelViewSet):
+    """This doesn't filter unenrollable products out, and adds name search for
+    courseware object readable id. It's really for the staff dashboard.
+    """
+
+    serializer_class = ProductSerializer
+    pagination_class = ProductsPagination
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        """Get the queryset for products, including run and program information."""
+        name_search = self.request.query_params.get("search")
+
+        if name_search is None:
+            return Product.objects.all()
+
+        matching_courserun_ids = CourseRun.objects.filter(
+            courseware_id__icontains=name_search
+        ).values_list("id", flat=True)
+
+        matching_program_ids = Program.objects.filter(
+            readable_id__icontains=name_search
+        ).values_list("id", flat=True)
+
+        return (
+            Product.objects.filter(
+                (
+                    Q(object_id__in=matching_courserun_ids)
+                    & Q(content_type__model="courserun")
+                )
+                | (
+                    Q(object_id__in=matching_program_ids)
+                    & Q(content_type__model="program")
+                )
+                | (Q(description__icontains=name_search))
+            )
+            .select_related("content_type")
+            .prefetch_related("purchasable_object")
+        )
+
+
+class ProductViewSet(ReadOnlyModelViewSet):
+    """List and view products within the system."""
+
+    serializer_class = ProductSerializer
+    pagination_class = ProductsPagination
+
+    def get_queryset(self):
+        """Get product queryset, with course and program information."""
+
+        now = now_in_utc()
+
+        unenrollable_courserun_ids = CourseRun.objects.filter(
+            enrollment_end__lt=now
+        ).values_list("id", flat=True)
+
+        unenrollable_course_ids = (
+            Course.objects.annotate(
+                num_runs=Count(
+                    "courseruns", filter=~Q(courseruns__in=unenrollable_courserun_ids)
+                )
+            )
+            .filter(num_runs=0)
+            .values_list("id", flat=True)
+        )
+
+        unenrollable_program_ids = (
+            Program.objects.annotate(
+                valid_runs=Count(
+                    "programruns",
+                    filter=Q(programruns__end_date__gt=now)
+                    | Q(programruns__end_date=None),
+                )
+            )
+            .filter(
+                Q(programruns__isnull=True)
+                | Q(valid_runs=0)
+                | Q(all_requirements__course__in=unenrollable_course_ids)
+            )
+            .values_list("id", flat=True)
+            .distinct()
+        )
+
+        unenrollable_programrun_ids = ProgramRun.objects.filter(
+            Q(program__in=unenrollable_program_ids) | Q(end_date__lt=now)
+        )
+
+        return (
+            Product.objects.exclude(
+                (
+                    Q(object_id__in=unenrollable_courserun_ids)
+                    & Q(content_type__model="courserun")
+                )
+                | (
+                    Q(object_id__in=unenrollable_programrun_ids)
+                    & Q(content_type__model="programrun")
+                )
+            )
+            .select_related("content_type")
+            .prefetch_related("purchasable_object")
+        )

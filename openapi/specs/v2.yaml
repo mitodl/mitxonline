@@ -601,6 +601,210 @@ paths:
                 items:
                   $ref: '#/components/schemas/Country'
           description: ''
+  /api/v0/products/:
+    get:
+      operationId: products_list
+      description: List and view products within the system.
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - products
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductList'
+          description: ''
+  /api/v0/products/{id}/:
+    get:
+      operationId: products_retrieve
+      description: List and view products within the system.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v0/products/all/:
+    get:
+      operationId: products_all_list
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - products
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductList'
+          description: ''
+    post:
+      operationId: products_all_create
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v0/products/all/{id}/:
+    get:
+      operationId: products_all_retrieve
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    put:
+      operationId: products_all_update
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    patch:
+      operationId: products_all_partial_update
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    delete:
+      operationId: products_all_destroy
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      responses:
+        '204':
+          description: No response body
   /api/v0/user_search/:
     get:
       operationId: user_search_list
@@ -1762,7 +1966,7 @@ components:
       description: BasketDiscount model serializer
       properties:
         redeemed_discount:
-          $ref: '#/components/schemas/Discount'
+          $ref: '#/components/schemas/V0Discount'
         redeemed_basket:
           $ref: '#/components/schemas/Basket'
       required:
@@ -3450,6 +3654,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CourseWithCourseRunsSerializerV2'
+    PaginatedProductList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
     PaginatedStaffDashboardUserList:
       type: object
       required:
@@ -3617,6 +3844,20 @@ components:
       properties:
         confirmed:
           type: boolean
+    PatchedProductRequest:
+      type: object
+      description: Serializes a product, including the purchasable object.
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
     PatchedUpdateCourseRunEnrollmentRequest:
       type: object
       properties:
@@ -3694,6 +3935,75 @@ components:
       - id
       - type
       - value
+    Product:
+      type: object
+      description: Serializes a product, including the purchasable object.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+        purchasable_object:
+          oneOf:
+          - type: object
+            properties:
+              id:
+                type: integer
+              run_tag:
+                type: string
+              start_date:
+                type: string
+                format: date-time
+              end_date:
+                type: string
+                format: date-time
+          - type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              run_tag:
+                type: string
+              start_date:
+                type: string
+                format: date-time
+              end_date:
+                type: string
+                format: date-time
+              course:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  title:
+                    type: string
+                  page:
+                    type: object
+              readable_id:
+                type: string
+              enrollment_start:
+                type: string
+                format: date-time
+              enrollment_end:
+                type: string
+                format: date-time
+              course_number:
+                type: string
+          readOnly: true
+      required:
+      - description
+      - id
+      - price
+      - purchasable_object
     ProductFlexibilePrice:
       type: object
       description: Simple serializer for Product without related purchasable objects
@@ -3723,6 +4033,23 @@ components:
     ProductFlexibilePriceRequest:
       type: object
       description: Simple serializer for Product without related purchasable objects
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+      required:
+      - description
+      - price
+    ProductRequest:
+      type: object
+      description: Serializes a product, including the purchasable object.
       properties:
         price:
           type: string
@@ -4329,6 +4656,58 @@ components:
       - certificate
       - enrollments
       - program
+    V0Discount:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+        automatic:
+          type: boolean
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        redemption_type:
+          $ref: '#/components/schemas/RedemptionTypeEnum'
+        max_redemptions:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+        discount_code:
+          type: string
+          maxLength: 100
+        payment_type:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        is_redeemed:
+          type: boolean
+          description: Returns True if the discount has been redeemed
+          readOnly: true
+        activation_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable before this
+            date.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable after this
+            date.
+      required:
+      - amount
+      - discount_code
+      - discount_type
+      - id
+      - is_redeemed
+      - redemption_type
     V1BaseCourseRun:
       type: object
       description: CourseRun model serializer

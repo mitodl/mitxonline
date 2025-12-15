@@ -3,8 +3,10 @@
 from django.urls import include, path, re_path
 
 from ecommerce.views.v0 import (
+    AllProductViewSet,
     BasketItemViewSet,
     BasketViewSet,
+    ProductViewSet,
     add_discount_to_basket,
     clear_basket,
     create_basket_from_product,
@@ -19,6 +21,8 @@ basket_router = router.register(r"baskets", BasketViewSet, basename="basket")
 backet_item_router = router.register(
     r"basketitems", BasketItemViewSet, basename="basketitem"
 )
+router.register(r"products/all", AllProductViewSet, basename="all_products_api")
+router.register(r"products", ProductViewSet, basename="products_api")
 
 urlpatterns = [
     path(
