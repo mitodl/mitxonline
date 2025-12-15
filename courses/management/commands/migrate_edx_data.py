@@ -349,97 +349,61 @@ class Command(BaseCommand):
 
     @staticmethod
     def _bulk_create_enrollments(rows, batch_size):
-        user_ids = [row["user_mitxonline_id"] for row in rows]
-        courserun_ids = [row["courserun_id"] for row in rows]
-
-        existing = set(
-            CourseRunEnrollment.objects.filter(
-                user_id__in=user_ids,
-                run_id__in=courserun_ids,
-            ).values_list("user_id", "run_id")
-        )
-
-        new_enrollment_objects = []
-        for row in rows:
-            key = (row["user_mitxonline_id"], row["courserun_id"])
-            if key in existing:
-                continue
-
-            new_enrollment_objects.append(
-                CourseRunEnrollment(
-                    user_id=row["user_id"],
-                    run_id=row["course_run_id"],
-                    enrollment_mode=row["courserunenrollment_enrollment_mode"],
-                    is_active=True,
-                )
+        new_enrollment_objects = [
+            CourseRunEnrollment(
+                user_id=row["user_mitxonline_id"],
+                run_id=row["courserun_id"],
+                enrollment_mode=row["courserunenrollment_enrollment_mode"],
+                active=True,
             )
+            for row in rows
+        ]
+        if not new_enrollment_objects:
+            return 0
 
-        return CourseRunEnrollment.objects.bulk_create(
-            new_enrollment_objects, batch_size=batch_size
+        CourseRunEnrollment.objects.bulk_create(
+            new_enrollment_objects, batch_size=batch_size, ignore_conflicts=True
         )
+        return len(new_enrollment_objects)
 
     @staticmethod
     def _bulk_create_grades(rows, batch_size):
-        user_ids = [row["user_mitxonline_id"] for row in rows]
-        courserun_ids = [row["courserun_id"] for row in rows]
-
-        existing = set(
-            CourseRunGrade.objects.filter(
-                user_id__in=user_ids,
-                run_id__in=courserun_ids,
-            ).values_list("user_id", "run_id")
-        )
-
-        new_grade_objects = []
-        for row in rows:
-            key = (row["user_mitxonline_id"], row["courserun_id"])
-            if key in existing:
-                continue
-
-            new_grade_objects.append(
-                CourseRunGrade(
-                    user_id=row["user_id"],
-                    run_id=row["course_run_id"],
-                    grade=row["courserungrade_grade"],
-                    passed=row["courserungrade_is_passing"],
-                    certificate_page_revision_id=row["certificate_page_revision_id"],
-                )
+        new_grade_objects = [
+            CourseRunGrade(
+                user_id=row["user_mitxonline_id"],
+                run_id=row["courserun_id"],
+                grade=row["courserungrade_grade"],
+                passed=row["courserungrade_is_passing"],
             )
+            for row in rows
+        ]
 
-        return CourseRunGrade.objects.bulk_create(
-            new_grade_objects, batch_size=batch_size
+        if not new_grade_objects:
+            return 0
+
+        CourseRunGrade.objects.bulk_create(
+            new_grade_objects, batch_size=batch_size, ignore_conflicts=True
         )
+        return len(new_grade_objects)
 
     @staticmethod
     def _bulk_create_certificates(rows, batch_size):
-        user_ids = [row["user_mitxonline_id"] for row in rows]
-        courserun_ids = [row["courserun_id"] for row in rows]
-
-        existing = set(
-            CourseRunCertificate.objects.filter(
-                user_id__in=user_ids,
-                run_id__in=courserun_ids,
-            ).values_list("user_id", "run_id")
-        )
-
-        new_certificate_objects = []
-        for row in rows:
-            key = (row["user_mitxonline_id"], row["courserun_id"])
-            if key in existing:
-                continue
-
-            new_certificate_objects.append(
-                CourseRunCertificate(
-                    user_id=row["user_id"],
-                    run_id=row["course_run_id"],
-                    issue_date=row["courseruncertificate_created_on"],
-                    certificate_page_revision_id=row["certificate_page_revision_id"],
-                )
+        new_certificate_objects = [
+            CourseRunCertificate(
+                user_id=row["user_mitxonline_id"],
+                run_id=row["courserun_id"],
+                issue_date=row["courseruncertificate_created_on"],
+                certificate_page_revision_id=row["certificate_page_revision_id"],
             )
+            for row in rows
+        ]
+        if not new_certificate_objects:
+            return 0
 
-        return CourseRunCertificate.objects.bulk_create(
-            new_certificate_objects, batch_size=batch_size
+        CourseRunCertificate.objects.bulk_create(
+            new_certificate_objects, batch_size=batch_size, ignore_conflicts=True
         )
+        return len(new_certificate_objects)
 
     def _migrate_certificates(self, conn, options):
         """
@@ -448,15 +412,28 @@ class Command(BaseCommand):
         """
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
+        courserun_readable_ids = [
+                                     readable_id.strip()
+                                     for readable_id in options.get("courserun_readable_ids", "").split(",")
+                                     if readable_id
+                                 ] or None
 
         cur = conn.cursor()
 
         query = (
             "SELECT * FROM edxorg_to_mitxonline_enrollments "
-            "WHERE user_mitxonline_id IS NOT NULL and courserun_id IS NOT NULL"
+            "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL"
         )
+        if courserun_readable_ids:
+            placeholders = [
+                f"'{readable_id}'" for readable_id in courserun_readable_ids
+            ]
+            query += f" AND courserun_readable_id IN ({','.join(placeholders)})"
+
         if limit is not None:
             query += f" LIMIT {int(limit)}"
+
         cur.execute(query)
         columns = [desc[0] for desc in cur.description]
 
@@ -470,27 +447,33 @@ class Command(BaseCommand):
 
             rows = [dict(zip(columns, r)) for r in results]
 
-            # Bulk create enrollments
-            created_enrollments = self._bulk_create_enrollments(
-                rows, batch_size=batch_size
-            )
-            total_enrollments += len(created_enrollments)
+            if dry_run:
+                count = len(rows)
+                total_enrollments += count
+                total_grades += count
+                total_certificates += count
 
-            # Bulk create grades
-            created_grades = self._bulk_create_grades(rows, batch_size=batch_size)
-            total_grades += len(created_grades)
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"[DRY RUN] Would create "
+                        f"{total_enrollments} enrollments, "
+                        f"{total_grades} grades, "
+                        f"{total_certificates} certificates"
+                    )
+                )
+            else:
+                # Bulk create enrollments, grades, and certificates
+                total_enrollments += self._bulk_create_enrollments(rows, batch_size)
+                total_grades += self._bulk_create_grades(rows, batch_size)
+                total_certificates += self._bulk_create_certificates(rows, batch_size)
 
-            # Bulk create certificates
-            created_certs = self._bulk_create_certificates(rows, batch_size=batch_size)
-            total_certificates += len(created_certs)
-
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"{total_enrollments} enrollments created, "
-                f"{total_grades} grades created, "
-                f"{total_certificates} certificates created"
-            )
-        )
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"{total_enrollments} enrollments created, "
+                        f"{total_grades} grades created, "
+                        f"{total_certificates} certificates created"
+                    )
+                )
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -514,6 +497,12 @@ class Command(BaseCommand):
             choices=["course_runs", "users", "certificates"],
             default="course_runs",
             help="Choose which migration to run: course_runs, users (default: course_runs)",
+        )
+        parser.add_argument("--dry-run", action="store_true")
+        parser.add_argument(
+            "--courserun-readable-ids",
+            type=str,
+            help="Comma-separated list of course run readable IDs to migrate",
         )
 
     def handle(self, *args, **options):  # pylint: disable=unused-argument # noqa: ARG002
