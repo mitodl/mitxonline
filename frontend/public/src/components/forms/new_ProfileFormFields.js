@@ -26,7 +26,7 @@ export const NAME_REGEX_FAIL_MESSAGE =
   "Name cannot start with a special character (~!@&)(+:'.?,-), and cannot contain any of (/^$#*=[]`%_;\\<>{}\"|)"
 
 export const legalAddressValidation = yup.object().shape({
-  name: yup.string().required().label("Full Name").min(2).max(254),
+  name:     yup.string().required().label("Full Name").min(2).max(254),
   username: yup
     .string()
     .required()
