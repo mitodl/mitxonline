@@ -1,3 +1,4 @@
+# ruff: noqa: TD002, TD003, FIX002
 """API for the Courses app"""
 
 from __future__ import annotations
@@ -98,6 +99,13 @@ UserEnrollments = namedtuple(  # noqa: PYI024
         "past_non_program_runs",
     ],
 )
+
+
+class InvalidCertificateTypeError(Exception):
+    def __init__(self):
+        super().__init__(
+            "Invalid certificate type for verifiable credential generation."
+        )
 
 
 def get_relevant_course_run_qset(
@@ -1326,9 +1334,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     # TODO: This is just boilerplate for testing. Need valid issuer information, template data, etc.
     # Taken directly from https://github.com/digitalcredentials/issuer-coordinator
-    if isinstance(certificate, CourseRunCertificate) or isinstance(
-        certificate, ProgramCertificate
-    ):
+    if isinstance(certificate, CourseRunCertificate | ProgramCertificate):
         return {
             "@context": [
                 "https://www.w3.org/ns/credentials/v2",
@@ -1366,10 +1372,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
             },
         }
     else:
-        raise ValueError(
-            "Unsupported certificate type for verifiable credential payload generation."
-        )
-
+        raise InvalidCertificateTypeError
 
 def create_verifiable_credential(certificate: BaseCertificate):
     """
@@ -1384,9 +1387,10 @@ def create_verifiable_credential(certificate: BaseCertificate):
 
     # Call the signing service to create the new credential
     # TODO: Need to figure out what the proper failure mode is here. Should I blow up the caller or just log and move on?
-    resp = requests.post(settings.VC_SIGNER_URL, json=payload)
-    if resp.status_code != 200:
-        raise ValueError("Failed to create verifiable credential.")
+
+    resp = requests.post(
+        settings.VC_SIGNER_URL, json=payload, timeout=10
+    ).raise_for_status()
 
     # Save the returned value as BaseCertificate.verifiable_credential
     credential = resp.json()
