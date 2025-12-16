@@ -1374,6 +1374,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     else:
         raise InvalidCertificateTypeError
 
+
 def create_verifiable_credential(certificate: BaseCertificate):
     """
     Create a verifiable credential for the given course run certificate.
