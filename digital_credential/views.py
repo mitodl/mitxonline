@@ -7,6 +7,8 @@ import requests
 from .api import revoke_credential, verify_credential
 
 
+import logging
+
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -19,7 +21,8 @@ def credential_verify_view(request):
         result = verify_credential(credential_id)
         return Response(result)
     except requests.RequestException as e:
-        return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+        logging.exception("Error revoking credential")
+        return Response({"error": "An internal error has occurred."}, status=status.HTTP_502_BAD_GATEWAY)
 
 
 @api_view(["POST"])
@@ -37,5 +40,6 @@ def credential_revoke_view(request):
     try:
         result = revoke_credential(credential_id, tenant_name, tenant_token)
         return Response(result)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+    except requests.RequestException as e:
+        logging.exception("Error revoking credential")
+        return Response({"error": "An internal error has occurred."}, status=status.HTTP_502_BAD_GATEWAY)
