@@ -1,18 +1,22 @@
-from digital_credential.utils import dc_url
-from digital_credential.constants import DIGITAL_CREDENTIAL_VERIFY_PATH, DIGITAL_CREDENTIAL_STATUS_PATH, \
+from digital_credential.utils import dc_url, create_verify_payload
+from digital_credential.constants import (
+    DIGITAL_CREDENTIAL_VERIFY_PATH,
+    DIGITAL_CREDENTIAL_STATUS_PATH,
     VERIFY_REQUEST_BODY
+)
 
 import requests
 
 
 
-def verify_credential(credential):
+def verify_credential(credential_id):
     """Verifies a verifiableCredential and returns a verificationResult in the response body."""
-
+    payload = create_verify_payload(credential_id)
     response = requests.post(
-        dc_url(DIGITAL_CREDENTIAL_VERIFY_PATH), data=VERIFY_REQUEST_BODY
+        dc_url(DIGITAL_CREDENTIAL_VERIFY_PATH), data=payload, timeout=10
     )
     return response.json()
+
 
 def revoke_credential(credential_id, tenant_name, tenant_token):
     """Revoke a previously issued credential"""
@@ -21,10 +25,8 @@ def revoke_credential(credential_id, tenant_name, tenant_token):
         headers={"Authorization": f"Bearer {tenant_token}"},
         json={
             "credentialId": credential_id,
-            "credentialStatus": [{
-                "type": "BitstringStatusListCredential",
-                "status": "revoked"
-            }]
-        }
+            "credentialStatus": [{ "type": "BitstringStatusListCredential", "status": "revoked"}]
+        },
+        timeout=10
     )
     return response.json()
