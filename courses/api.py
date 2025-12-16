@@ -1334,53 +1334,84 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     return (new_run, course_page, course_product)
 
 
+ACHIEVEMENT_TYPE_MAP = {
+    "course_run": "Course",
+    "program": "Program",
+}
+
+
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
-    # TODO: This is just boilerplate for testing. Need valid issuer information, template data, etc.
-    # Taken directly from https://github.com/digitalcredentials/issuer-coordinator
-    if isinstance(certificate, CourseRunCertificate | ProgramCertificate):
-        valid_from = (
-            certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ")
-            if certificate.issue_date
-            else now_in_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
-        )
-        return {
-            "@context": [
-                "https://www.w3.org/ns/credentials/v2",
-                "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
-            ],
-            "id": f"urn:uuid:{certificate.uuid}",
-            "type": ["VerifiableCredential", "OpenBadgeCredential"],
-            "name": "DCC Test Credential",
-            "issuer": {
-                "type": ["Profile"],
-                "id": "did:key:z6MkhVTX9BF3NGYX6cc7jWpbNnR7cAjH8LUffabZP8Qu4ysC",
-                "name": "Digital Credentials Consortium Test Issuer",
-                "url": "https://dcconsortium.org",
-                "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png",
-            },
-            "validFrom": valid_from,
-            "credentialSubject": {
-                "type": ["AchievementSubject"],
-                "achievement": {
-                    "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
-                    "type": ["Achievement"],
-                    "achievementType": "Diploma",
-                    "name": "Badge",
-                    "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
-                    "criteria": {
-                        "type": "Criteria",
-                        "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**.",
-                    },
-                    "image": {
-                        "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
-                        "type": "Image",
-                    },
-                },
-                "name": "Jane Doe",
-            },
-        }
+    if isinstance(certificate, CourseRunCertificate):
+        cert_type = "course_run"
+        url = certificate.course_run
+        certificate_name = ""
+    elif isinstance(certificate, ProgramCertificate):
+        cert_type = "program"
+        url = certificate.program
+        certificate_name = ""
     else:
         raise InvalidCertificateTypeError
+
+    achievement_type = ACHIEVEMENT_TYPE_MAP[cert_type]
+    user_name = certificate.user.name
+    valid_from = (
+        certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if certificate.issue_date
+        else now_in_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+    return {
+        "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        # TODO: Need to figure out if this should use the same value as the certificate
+        "id": f"urn:uuid:{certificate.uuid}",
+        "type": ["VerifiableCredential", "OpenBadgeCredential"],
+        "issuer": {
+            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",  # TODO: replace with real DID
+            "type": ["Profile"],
+            "name": "MIT Learn",
+            "image": {
+                # TODO: Needs to be hosted somewhere better
+                "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
+                "type": "Image",
+                "caption": "MIT Learn logo",
+            },
+        },
+        "validFrom": valid_from,
+        "validUntil": "2030-01-01T00:00:00Z",  # TODO: Remove this?
+        "credentialSubject": {
+            "type": ["AchievementSubject"],
+            "activityStartDate": "2023-03-01T00:00:00Z",  # TODO: Replace with real dates?
+            "activityEndDate": "2025-02-24T00:00:00Z",
+            "identifier": [
+                {
+                    "type": "IdentityObject",
+                    "identityHash": user_name,
+                    "identityType": "name",
+                    "hashed": False,
+                    "salt": "not-used",
+                }
+            ],
+            "achievement": {
+                "id": url,
+                "achievementType": achievement_type,
+                "type": ["Achievement"],
+                "image": {
+                    "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
+                    "type": "Image",
+                    "caption": "MIT Learn Certificate logo",
+                },
+                "criteria": {
+                    # TODO: Need to figure out what this needs to be
+                    "narrative": "If you wanted to add some kind of criteria, e.g. a list of courses or modules, etc. CAN BE MARKDOWN"
+                },
+                "description": f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
+                "name": certificate_name,
+            },
+        },
+    }
 
 
 def create_verifiable_credential(certificate: BaseCertificate):
@@ -1395,9 +1426,8 @@ def create_verifiable_credential(certificate: BaseCertificate):
     payload = get_verifiable_credentials_payload(certificate)
 
     # Call the signing service to create the new credential
-    # TODO: Need to figure out what the proper failure mode is here. Should I blow up the caller or just log and move on?
-
     resp = requests.post(settings.VC_SIGNER_URL, json=payload, timeout=10)
+    # TODO: Add sentry issue here, don't blow up the rest of the processing.
     resp.raise_for_status()
 
     # Save the returned value as BaseCertificate.verifiable_credential
