@@ -22,12 +22,16 @@ from main.routers import SimpleRouterWithNesting
 
 router = SimpleRouterWithNesting()
 
-basket_router = router.register(r"baskets", BasketViewSet, basename="basket")
-backet_item_router = router.register(
-    r"basketitems", BasketItemViewSet, basename="basketitem"
-)
 router.register(r"products/all", AllProductViewSet, basename="all_products_api")
 router.register(r"products", ProductViewSet, basename="products_api")
+
+basket_router = router.register(r"baskets", BasketViewSet, basename="baskets_api")
+basket_router.register(
+    r"items",
+    BasketItemViewSet,
+    basename="baskets_api-items",
+    parents_query_lookups=["basket"],
+)
 
 discountsRouter = router.register(  # noqa: N816
     r"discounts", DiscountViewSet, basename="discounts_api"
@@ -61,27 +65,27 @@ urlpatterns = [
     path(
         "baskets/create_from_product/<str:product_id>/",
         create_basket_from_product,
-        name="create_from_product",
+        name="baskets_api-create_from_product",
     ),
     path(
         "baskets/create_from_product/<str:product_id>/<str:discount_code>/",
         create_basket_from_product_with_discount,
-        name="create_from_product_with_discount",
+        name="baskets_api-create_from_product_with_discount",
     ),
     path(
         "baskets/create_with_products/",
         create_basket_with_products,
-        name="create_with_products",
+        name="baskets_api-create_with_products",
     ),
     path(
         "baskets/clear/",
         clear_basket,
-        name="clear_basket",
+        name="baskets_api-clear_basket",
     ),
     path(
         "baskets/add_discount/",
         add_discount_to_basket,
-        name="add_discount",
+        name="baskets_api-add_discount",
     ),
     re_path(
         r"^",

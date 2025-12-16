@@ -65,7 +65,6 @@ User = get_user_model()
 
 @extend_schema(
     description="Returns the basket items for the current user.",
-    methods=["GET"],
     request=None,
     responses=BasketItemSerializer,
 )
@@ -120,7 +119,6 @@ class BasketViewSet(ReadOnlyModelViewSet):
     request=None,
     responses=BasketWithProductSerializer,
     parameters=[
-        OpenApiParameter("system_slug", OpenApiTypes.STR, OpenApiParameter.PATH),
         OpenApiParameter(
             "discount_code", OpenApiTypes.STR, OpenApiParameter.QUERY, required=True
         ),

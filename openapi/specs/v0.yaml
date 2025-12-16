@@ -227,141 +227,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
           description: ''
-  /api/v0/basketitems/:
-    get:
-      operationId: basketitems_list
-      description: Returns the basket items for the current user.
-      tags:
-      - basketitems
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/BasketItem'
-          description: ''
-    post:
-      operationId: basketitems_create
-      description: ViewSet for handling BasketItem operations.
-      tags:
-      - basketitems
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-        required: true
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasketItem'
-          description: ''
-  /api/v0/basketitems/{id}/:
-    get:
-      operationId: basketitems_retrieve
-      description: Returns the basket items for the current user.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this basket item.
-        required: true
-      tags:
-      - basketitems
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasketItem'
-          description: ''
-    put:
-      operationId: basketitems_update
-      description: ViewSet for handling BasketItem operations.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this basket item.
-        required: true
-      tags:
-      - basketitems
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasketItem'
-          description: ''
-    patch:
-      operationId: basketitems_partial_update
-      description: ViewSet for handling BasketItem operations.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this basket item.
-        required: true
-      tags:
-      - basketitems
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedBasketItemRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedBasketItemRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedBasketItemRequest'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasketItem'
-          description: ''
-    delete:
-      operationId: basketitems_destroy
-      description: ViewSet for handling BasketItem operations.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this basket item.
-        required: true
-      tags:
-      - basketitems
-      responses:
-        '204':
-          description: No response body
   /api/v0/baskets/:
     get:
       operationId: baskets_list
@@ -377,6 +242,138 @@ paths:
                 items:
                   $ref: '#/components/schemas/BasketWithProduct'
           description: ''
+  /api/v0/baskets/{parent_lookup_basket}/items/:
+    get:
+      operationId: baskets_items_list
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: string
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BasketItem'
+          description: ''
+    post:
+      operationId: baskets_items_create
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: string
+        required: true
+      tags:
+      - baskets
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+  /api/v0/baskets/{parent_lookup_basket}/items/{id}/:
+    get:
+      operationId: baskets_items_retrieve
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this basket item.
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: string
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+    put:
+      operationId: baskets_items_update
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this basket item.
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: string
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+    patch:
+      operationId: baskets_items_partial_update
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this basket item.
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: string
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+    delete:
+      operationId: baskets_items_destroy
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this basket item.
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: string
+        required: true
+      tags:
+      - baskets
+      responses:
+        '204':
+          description: No response body
   /api/v0/baskets/{id}/:
     get:
       operationId: baskets_retrieve
@@ -404,11 +401,6 @@ paths:
       parameters:
       - in: query
         name: discount_code
-        schema:
-          type: string
-        required: true
-      - in: path
-        name: system_slug
         schema:
           type: string
         required: true
@@ -3016,17 +3008,6 @@ components:
       - basket
       - id
       - product
-    BasketItemRequest:
-      type: object
-      description: BasketItem model serializer
-      properties:
-        basket:
-          type: integer
-        product:
-          type: integer
-      required:
-      - basket
-      - product
     BasketWithProduct:
       type: object
       description: Serializer for Basket model with product details
@@ -5237,14 +5218,6 @@ components:
       required:
       - email
       - name
-    PatchedBasketItemRequest:
-      type: object
-      description: BasketItem model serializer
-      properties:
-        basket:
-          type: integer
-        product:
-          type: integer
     PatchedChangeEmailRequestUpdateRequest:
       type: object
       description: Serializer for confirming a user email change
@@ -5943,17 +5916,11 @@ components:
       properties:
         quantity:
           type: integer
-        total_paid:
-          type: string
-        discount:
-          type: string
         CEUs:
           type: string
         content_title:
           type: string
         readable_id:
-          type: string
-        price:
           type: string
         start_date:
           type: string
@@ -5961,6 +5928,12 @@ components:
         end_date:
           type: string
           format: date-time
+        total_paid:
+          type: string
+        discount:
+          type: string
+        price:
+          type: string
       required:
       - CEUs
       - content_title
