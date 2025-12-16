@@ -1,9 +1,9 @@
 """Project conftest"""
 
 import uuid
-from types import SimpleNamespace  # noqa: F401
 
 import pytest
+from faker import Faker
 
 from fixtures.b2b import *  # noqa: F403
 from fixtures.common import *  # noqa: F403
@@ -67,3 +67,9 @@ def pytest_configure(config):
         if config.pluginmanager.has_plugin("warnings"):
             warnings_plugin = config.pluginmanager.get_plugin("warnings")
             config.pluginmanager.unregister(warnings_plugin)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def fake() -> Faker:
+    """Fixture to provide a Faker instance"""
+    return Faker()
