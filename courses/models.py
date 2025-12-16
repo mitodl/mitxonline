@@ -1285,6 +1285,18 @@ def limit_to_certificate_pages():
     return {"object_id__in": list(map(str, available_revisions))}
 
 
+class VerifiableCredential(TimestampedModel):
+    """
+    Model for storing verifiable credentials for both course runs and programs
+    """
+
+    # TODO: Need to determine what this will actually be.
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
+    credential_data = models.JSONField(
+        help_text="JSON data representing the verifiable credential"
+    )
+
+
 class BaseCertificate(models.Model):
     """
     Common properties for certificate models
@@ -1298,10 +1310,9 @@ class BaseCertificate(models.Model):
         verbose_name="revoked",
     )
     issue_date = models.DateTimeField(null=True, blank=True, db_index=True)
-    # TODO: We need to store the whole json object here,
-    # but since we select the ID, should we use the UUID for the VC?
-    # TODO: Should this here or stored as a FK to a different model?
-    verifiable_credential = models.JSONField(null=True, blank=True)
+    verifiable_credential = models.OneToOneField(
+        VerifiableCredential, on_delete=models.SET_NULL, blank=True, null=True
+    )
 
     class Meta:
         abstract = True

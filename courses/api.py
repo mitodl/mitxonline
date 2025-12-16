@@ -53,6 +53,7 @@ from courses.models import (
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
+    VerifiableCredential,
 )
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
@@ -1335,6 +1336,11 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     # TODO: This is just boilerplate for testing. Need valid issuer information, template data, etc.
     # Taken directly from https://github.com/digitalcredentials/issuer-coordinator
     if isinstance(certificate, CourseRunCertificate | ProgramCertificate):
+        valid_from = (
+            certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+            if certificate.issue_date
+            else now_in_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
         return {
             "@context": [
                 "https://www.w3.org/ns/credentials/v2",
@@ -1350,7 +1356,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
                 "url": "https://dcconsortium.org",
                 "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png",
             },
-            "validFrom": certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "validFrom": valid_from,
             "credentialSubject": {
                 "type": ["AchievementSubject"],
                 "achievement": {
@@ -1389,11 +1395,13 @@ def create_verifiable_credential(certificate: BaseCertificate):
     # Call the signing service to create the new credential
     # TODO: Need to figure out what the proper failure mode is here. Should I blow up the caller or just log and move on?
 
-    resp = requests.post(
-        settings.VC_SIGNER_URL, json=payload, timeout=10
-    ).raise_for_status()
+    resp = requests.post(settings.VC_SIGNER_URL, json=payload, timeout=10)
+    resp.raise_for_status()
 
     # Save the returned value as BaseCertificate.verifiable_credential
     credential = resp.json()
-    certificate.verifiable_credential = credential
+    verifiable_credential = VerifiableCredential.objects.create(
+        uuid=credential["id"], credential_data=credential
+    )
+    certificate.verifiable_credential = verifiable_credential
     certificate.save()
