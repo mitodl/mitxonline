@@ -1,13 +1,12 @@
-from rest_framework.response import Response
+import logging
+
+import requests
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
-import requests
+from rest_framework.response import Response
 
 from .api import revoke_credential, verify_credential
-
-
-import logging
 
 
 @api_view(["POST"])
@@ -20,9 +19,12 @@ def credential_verify_view(request):
     try:
         result = verify_credential(credential_id)
         return Response(result)
-    except requests.RequestException as e:
+    except requests.RequestException:
         logging.exception("Error revoking credential")
-        return Response({"error": "An internal error has occurred."}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(
+            {"error": "An internal error has occurred."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
 
 
 @api_view(["POST"])
@@ -36,10 +38,18 @@ def credential_revoke_view(request):
     tenant_name = request.data.get("tenant_name")
     tenant_token = request.data.get("tenant_token")
     if not all([credential_id, tenant_name, tenant_token]):
-        return Response({"error": "Missing required fields: credentialId, tenant_name, tenant_token"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "error": "Missing required fields: credentialId, tenant_name, tenant_token"
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     try:
         result = revoke_credential(credential_id, tenant_name, tenant_token)
         return Response(result)
-    except requests.RequestException as e:
+    except requests.RequestException:
         logging.exception("Error revoking credential")
-        return Response({"error": "An internal error has occurred."}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(
+            {"error": "An internal error has occurred."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )

@@ -1,7 +1,7 @@
+from copy import deepcopy
 from urllib.parse import urljoin
 
 from django.conf import settings
-from copy import deepcopy
 
 from digital_credential.constants import VERIFY_REQUEST_BODY
 

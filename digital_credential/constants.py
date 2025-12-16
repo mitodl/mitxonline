@@ -6,16 +6,10 @@ DIGITAL_CREDENTIAL_ISSUER = "MIT Learn"
 CREDENTIAL_TYPE = "EnvelopedVerifiableCredential"
 
 VERIFY_REQUEST_BODY = {
-"verifiableCredential": {
-        "@context": [
-            "www.w3.org",
-            "www.w3.org"
-        ],
+    "verifiableCredential": {
+        "@context": ["www.w3.org", "www.w3.org"],
         "id": "credential_id",
-        "type": [
-            "VerifiableCredential",
-            "UniversityDegreeCredential"
-        ],
+        "type": ["VerifiableCredential", "UniversityDegreeCredential"],
         "issuer": DIGITAL_CREDENTIAL_ISSUER,
         "issuanceDate": "2010-01-01T19:23:24Z",
         "credentialSubject": {},
@@ -24,8 +18,8 @@ VERIFY_REQUEST_BODY = {
             "created": "",
             "proofPurpose": "assertionMethod",
             "verificationMethod": "",
-        }
+        },
     },
     "verifyStatus": True,
-    "fetchRemoteContexts": False
+    "fetchRemoteContexts": False,
 }
