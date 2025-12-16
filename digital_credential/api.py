@@ -16,11 +16,13 @@ def verify_credential(credential_id):
     return response.json()
 
 
-def revoke_credential(credential_id, tenant_name, tenant_token):
+def revoke_credential(credential_id):
     """Revoke a previously issued credential"""
     response = requests.post(
         dc_url(DIGITAL_CREDENTIAL_STATUS_PATH),
-        headers={"Authorization": f"Bearer {tenant_token}"},
+        headers={
+            "Content-Type": "application/json",
+        },
         json={
             "credentialId": credential_id,
             "credentialStatus": [
