@@ -1,49 +1,41 @@
-from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 import requests
 
-from digital_credential.utils import dc_url
-
-DIGITAL_CREDENTAIL_STATUS_PATH = "credentails/status/"
-
-class CredentialPresentView(APIView):
-    """
-    API endpoint to proxy GET /credentials/present/<credential_id> to the digitalcredentials/issuer-coordinator service.
-    """
-    def get(self, request, credential_id):
-        try:
-            resp = requests.get(dc_url(DIGITAL_CREDENTAIL_STATUS_PATH))
-            return Response(resp.json(), status=resp.status_code)
-        except requests.RequestException as e:
-            return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
-
-class CredentialRevokeView(APIView):
-    """
-    API endpoint to proxy POST /credentials/revoke to the digitalcredentials/issuer-coordinator service.
-    """
-    def post(self, request):
-        try:
-            payload = {
-                "credentialId": request.data.get("credentialId"),
-                "credentialStatus": [{
-                    "type": "BitstringStatusListCredential",
-                    "status": "revoked"
-                }]
-            }
-            resp = requests.post(dc_url(DIGITAL_CREDENTAIL_STATUS_PATH), json=payload)
-            return Response(resp.json(), status=resp.status_code)
-        except requests.RequestException as e:
-            return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+from .api import revoke_credential, verify_credential
 
 
-class CredentialVerifyView(APIView):
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def credential_verify_view(request):
     """
-    API endpoint to proxy POST /credentials/verify to the digitalcredentials/issuer-coordinator service.
+    Function-based API view to verify a credential
     """
-    def post(self, request):
-        try:
-            resp = requests.post(external_url, json=request.data)
-            return Response(resp.json(), status=resp.status_code)
-        except requests.RequestException as e:
-            return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+    credential_id = request.data.get("credentialId")
+    try:
+        result = verify_credential(credential_id)
+        return Response(result)
+    except requests.RequestException as e:
+        return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def credential_revoke_view(request):
+    """
+    Function-based API view to revoke a credential by calling revoke_credential from api.py.
+    Expects credentialId, tenant_name, and tenant_token in the request data.
+    """
+    credential_id = request.data.get("credentialId")
+    tenant_name = request.data.get("tenant_name")
+    tenant_token = request.data.get("tenant_token")
+    if not all([credential_id, tenant_name, tenant_token]):
+        return Response({"error": "Missing required fields: credentialId, tenant_name, tenant_token"}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        result = revoke_credential(credential_id, tenant_name, tenant_token)
+        return Response(result)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)

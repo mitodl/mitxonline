@@ -1,13 +1,11 @@
 from django.urls import path
 
 from .views import (
-    CredentialPresentView,
-    CredentialRevokeView,
-    CredentialVerifyView,
+    credential_revoke_view,
+    credential_verify_view,
 )
 
 urlpatterns = [
-    path("present/<str:credential_id>", CredentialPresentView.as_view(), name="credentials-present"),
-    path("revoke/", CredentialRevokeView.as_view(), name="credentials-revoke"),
-    path("verify/", CredentialVerifyView.as_view(), name="credentials-verify"),
+    path("revoke/", credential_revoke_view, name="credentials-revoke"),
+    path("verify/", credential_verify_view, name="credentials-verify"),
 ]
