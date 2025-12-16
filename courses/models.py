@@ -1,3 +1,4 @@
+# ruff: noqa: TD002, TD003, FIX002
 """
 Course models
 """
