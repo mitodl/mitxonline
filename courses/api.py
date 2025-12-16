@@ -25,6 +25,7 @@ from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
 )
+from mitol.olposthog.features import is_enabled
 from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -63,6 +64,7 @@ from courses.utils import (
     is_letter_grade_valid,
 )
 from ecommerce.models import OrderStatus, Product
+from main import features
 from openedx.api import (
     create_edx_course_mode,
     enroll_in_edx_course_runs,
@@ -1388,7 +1390,7 @@ def create_verifiable_credential(certificate: BaseCertificate):
     Args:
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
     """
-    if not settings.ISSUE_VERIFIABLE_CREDENTIALS:
+    if not is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING):
         return
     payload = get_verifiable_credentials_payload(certificate)
 
