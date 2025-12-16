@@ -101,6 +101,7 @@ urlpatterns = [
     path("", include("cms.urls")),
     # Example view
     path("", index, name="main-index"),
+    path("api/v0/digital-credentail", include("digital_credential.urls")),
 ] + (
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
