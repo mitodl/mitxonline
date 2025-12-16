@@ -1341,14 +1341,17 @@ ACHIEVEMENT_TYPE_MAP = {
 
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
+    # TODO: Need to figure out how to construct URLs correctly
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
-        url = certificate.course_run
-        certificate_name = ""
+        # This will explode if the course run is missing a URL.
+        url = certificate.course_run.courseware_url_path
+        certificate_name = certificate.course_run.title
     elif isinstance(certificate, ProgramCertificate):
+        # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field.
         cert_type = "program"
-        url = certificate.program
-        certificate_name = ""
+        url = ""
+        certificate_name = certificate.program.title
     else:
         raise InvalidCertificateTypeError
 
@@ -1395,7 +1398,10 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
                 }
             ],
             "achievement": {
-                "id": url,
+                # The ID is supposed to be an unambiguous URI corresponding to the course or program.
+                # For now, we will just use the URL if we have it, but we need to figure out the proper way to do this
+                # before we release anything
+                "id": url or f"urn:uuid:{certificate.uuid}",
                 "achievementType": achievement_type,
                 "type": ["Achievement"],
                 "image": {
