@@ -95,6 +95,7 @@ granian = "^2.5.4"
 
 
 [tool.poetry.group.dev.dependencies]
+anys = "^0.3.1"
 bpython = "^0.26"
 ddt = "^1.6.0"
 django-debug-toolbar = "^4.1.0"

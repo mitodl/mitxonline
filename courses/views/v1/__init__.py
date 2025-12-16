@@ -517,7 +517,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-            .all()
+            .order_by("-id")
         )
 
         program_list = []
@@ -532,7 +532,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page")
-                    .all(),
+                    .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }

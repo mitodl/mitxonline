@@ -1,15 +1,18 @@
 """Shared pytest configuration for courses application"""
 
-from random import Random
-
 import pytest
 
+from b2b.factories import ContractPageFactory
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunFactory,
+    ProgramCertificateFactory,
+    ProgramEnrollmentFactory,
     ProgramFactory,
 )
 from courses.models import (
+    CourseRunEnrollment,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
@@ -44,7 +47,9 @@ def course_catalog_course_count(request):
 
 
 @pytest.fixture
-def course_catalog_data(course_catalog_program_count, course_catalog_course_count):
+def course_catalog_data(
+    fake, course_catalog_program_count, course_catalog_course_count
+):
     """
     Current production data is around 85 courses and 150 course runs. I opted to create 3 of each to allow
     the best course run logic to play out as well as to push the endpoint a little harder in testing.
@@ -60,34 +65,28 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
         course_catalog_course_count(int): number of courses to generate.
         course_catalog_program_count(int): number of programs to generate.
     """
-    import random
-
-    # Seed both local and global random for full determinism
-    # Factory Boy's FuzzyText uses the global random module
-    random.seed(42)
-    rng = Random(42)  # noqa: S311
     programs = []
     courses = []
     course_runs = []
-    for n in range(course_catalog_course_count):
-        course, course_runs_for_course = _create_course(n)
+    for idx in range(course_catalog_course_count):
+        course, course_runs_for_course = _create_course(idx)
         courses.append(course)
         course_runs.append(course_runs_for_course)
-    for n in range(course_catalog_program_count):  # noqa: B007
-        program = _create_program(courses, rng)
+    for _ in range(course_catalog_program_count):
+        program = _create_program(programs, courses, fake)
         programs.append(program)
     return courses, programs, course_runs
 
 
-def _create_course(n):
-    test_course = CourseFactory.create(title=f"Test Course {n}")
+def _create_course(idx):
+    test_course = CourseFactory.create(title=f"Test Course {idx}")
     cr1 = CourseRunFactory.create(course=test_course, past_start=True)
     cr2 = CourseRunFactory.create(course=test_course, in_progress=True)
     cr3 = CourseRunFactory.create(course=test_course, in_future=True)
     return test_course, [cr1, cr2, cr3]
 
 
-def _create_program(courses, rng):
+def _create_program(programs, courses, fake):
     program = ProgramFactory.create()
     root_node = program.requirements_root
     required_courses_node = root_node.add_child(
@@ -102,26 +101,88 @@ def _create_program(courses, rng):
         title="Elective Courses",
         elective_flag=True,
     )
-    if len(courses) > 3:  # noqa: PLR2004
-        # Use deterministic indices instead of random sampling
-        # This ensures the same courses are selected regardless of test execution order
-        indices = list(range(len(courses)))
-        rng.shuffle(indices)
 
-        # Select 3 courses for required
-        for idx in indices[:3]:
-            required_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=courses[idx]
-            )
+    courses = fake.random_sample(courses, length=min(len(courses), 5))
 
-        # Select 3 courses for electives (reuse the shuffled indices)
-        elective_indices = indices[3:6] if len(indices) >= 6 else indices[:3]  # noqa: PLR2004
-        for idx in elective_indices:
-            elective_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=courses[idx]
-            )
-    else:
+    # Select 3 courses for required
+    for course in courses[:2]:
         required_courses_node.add_child(
-            node_type=ProgramRequirementNodeType.COURSE, course=courses[0]
+            node_type=ProgramRequirementNodeType.COURSE, course=course
         )
+
+    # the rest are electives
+    for course in courses[2:]:
+        elective_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=course
+        )
+
+    if programs:
+        # 33% chance this gets a required program
+        if fake.boolean(chance_of_getting_true=0.33):
+            required_courses_node.add_child(
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                required_program=fake.random_element(programs),
+            )
+        # 66% chance this gets an elective program
+        if fake.boolean(chance_of_getting_true=0.66):
+            elective_courses_node.add_child(
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                required_program=fake.random_element(programs),
+            )
+
     return program
+
+
+@pytest.fixture
+def b2b_courses(fake, course_catalog_data):
+    """Configure some of the courses as b2b"""
+    courses, _, _ = course_catalog_data
+    contract = ContractPageFactory.create()
+    b2b_courses = []
+
+    for course in courses:
+        if fake.boolean(chance_of_getting_true=50):
+            for run in course.courseruns.all():
+                run.b2b_contract = contract
+                run.save()
+            b2b_courses.append(course)
+
+    return b2b_courses
+
+
+@pytest.fixture
+def user_with_enrollments_and_certificates(fake, user, course_catalog_data):
+    """
+    Tests the program enrollments API, which should show the user's enrollment
+    in programs with the course runs that apply.
+    """
+    courses, programs, _ = course_catalog_data
+
+    certificate_runs = []
+
+    for program in fake.random_sample(programs):
+        ProgramEnrollmentFactory.create(user=user, program=program)
+        courses = [
+            req.course for req in program.all_requirements.filter(course__isnull=False)
+        ]
+
+        if fake.boolean(chance_of_getting_true=50):
+            ProgramCertificateFactory.create(user=user, program=program)
+
+        for course in courses:
+            if fake.boolean(chance_of_getting_true=50):
+                continue
+
+            runs = list(course.courseruns.all())
+
+            for run in fake.random_sample(runs):
+                CourseRunEnrollment.objects.get_or_create(run=run, user=user)
+
+                if (
+                    fake.boolean(chance_of_getting_true=80)
+                    and run not in certificate_runs
+                ):
+                    CourseRunCertificateFactory.create(user=user, course_run=run)
+                    certificate_runs.append(run)
+
+    return user

@@ -41,6 +41,18 @@ files = [
 ]
 
 [[package]]
+name = "anys"
+version = "0.3.1"
+description = "Matchers for pytest"
+optional = false
+python-versions = ">=3.8"
+groups = ["dev"]
+files = [
+    {file = "anys-0.3.1-py3-none-any.whl", hash = "sha256:a7f5353eb061e97cdbbfc41249a397d13fc7e558310ec23cece891d6f10a0a6d"},
+    {file = "anys-0.3.1.tar.gz", hash = "sha256:5bcda88fcc490eda840a247c8c18b7a350051f530c288ad530e94c8d139602de"},
+]
+
+[[package]]
 name = "asgiref"
 version = "3.8.1"
 description = "ASGI specs, helper code, and adapters"
