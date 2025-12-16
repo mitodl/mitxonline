@@ -1428,13 +1428,12 @@ def create_verifiable_credential(certificate: BaseCertificate):
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
     """
     try:
-        if not is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING):
+        if not is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING, False):  # noqa: FBT003
             return
         payload = get_verifiable_credentials_payload(certificate)
 
         # Call the signing service to create the new credential
         resp = requests.post(settings.VC_SIGNER_URL, json=payload, timeout=10)
-        # TODO: Add sentry issue here, don't blow up the rest of the processing.
         resp.raise_for_status()
 
         # Save the returned value as BaseCertificate.verifiable_credential
