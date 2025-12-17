@@ -609,13 +609,12 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     responses={200: VerifiableCredentialSerializer(many=True)},
 )
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def download_course_credential(request, credential_id):
     credential = get_object_or_404(
         VerifiableCredential,
         pk=credential_id,
     )
-    user = request.user
     try:
         get_object_or_404(CourseRunCertificate, user=request.user, uuid=credential_id)
     except Http404:
@@ -635,7 +634,7 @@ def download_course_credential(request, credential_id):
     responses={200: VerifiableCredentialSerializer(many=True)},
 )
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def download_program_credential(request, credential_id):
     credential = get_object_or_404(
         VerifiableCredential,
