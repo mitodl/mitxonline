@@ -614,7 +614,7 @@ def download_course_credential(request, credential_id):
         VerifiableCredential,
         pk=credential_id,
     )
-    response = JsonResponse(credential.issued_credential)
+    response = JsonResponse(credential.credential_data)
     response["Content-Disposition"] = (
         f'attachment; filename="credential_{credential_id}.json"'
     )
@@ -632,7 +632,7 @@ def download_program_credential(request, credential_id):
         VerifiableCredential,
         pk=credential_id,
     )
-    response = JsonResponse(credential.issued_credential)
+    response = JsonResponse(credential.credential_data)
     response["Content-Disposition"] = (
         f'attachment; filename="credential_{credential_id}.json"'
     )

@@ -36,9 +36,9 @@ urlpatterns = [
         v2.get_program_certificate,
         name="get_program_certificate",
     ),
-    path("verifiable_course_credentail/<uuid:credential_id>/download/", v2.download_course_credential,
+    path("verifiable_course_credential/<uuid:credential_id>/download/", v2.download_course_credential,
          name="download_course_credential"),
-    path("verifiable_program_credentail/<uuid:credential_id>/download/", v2.download_program_credential,
+    path("verifiable_program_credential/<uuid:credential_id>/download/", v2.download_program_credential,
          name="download_program_credential"),
 
 ]
