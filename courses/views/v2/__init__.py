@@ -6,7 +6,7 @@ import contextlib
 
 import django_filters
 from django.db.models import Count, Prefetch, Q
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -605,17 +605,49 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
 
 
 @extend_schema(
-    description="Verifies credential using ....",
+    description="Returns the json for the verifiable credential with the given ID, if it belongs to the user.",
     responses={200: VerifiableCredentialSerializer(many=True)},
 )
 @api_view(["GET"])
-@permission_classes([UserIsOwnerPermission])
-def download_credential(request, credential_id):
+@permission_classes([IsAuthenticated])
+def download_course_credential(request, credential_id):
     credential = get_object_or_404(
         VerifiableCredential,
         pk=credential_id,
-        recipient=request.user,  # Ensure user owns this
     )
+    user = request.user
+    try:
+        get_object_or_404(CourseRunCertificate, user=request.user, uuid=credential_id)
+    except Http404:
+        return Response(
+            {"detail": "The object doesn't exist or you don't have permission."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    response = JsonResponse(credential.issued_credential)
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
+    return response
+
+
+@extend_schema(
+    description="Returns the json for the verifiable credential with the given ID, if it belongs to the user.",
+    responses={200: VerifiableCredentialSerializer(many=True)},
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def download_program_credential(request, credential_id):
+    credential = get_object_or_404(
+        VerifiableCredential,
+        pk=credential_id,
+    )
+    try:
+        get_object_or_404(ProgramCertificate, user=request.user, uuid=credential_id)
+    except Http404:
+        return Response(
+            {"detail": "The object doesn't exist or you don't have permission."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
     response = JsonResponse(credential.issued_credential)
     response["Content-Disposition"] = (
         f'attachment; filename="credential_{credential_id}.json"'
