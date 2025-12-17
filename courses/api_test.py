@@ -1,5 +1,6 @@
 """Courses API tests"""
 
+from copy import deepcopy
 from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
@@ -2293,3 +2294,113 @@ def test_generate_openedx_course_url(settings, add_pre_path, add_suffix):
         assert settings.OPENEDX_COURSE_BASE_URL_SUFFIX in generated_url
     else:
         assert not settings.OPENEDX_COURSE_BASE_URL_SUFFIX
+
+
+FAKE_PROOF_PAYLOAD = {
+    "type": "DataIntegrityProof",
+    "created": "2025-12-12T17:52:25Z",
+    "verificationMethod": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS#z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",
+    "cryptosuite": "eddsa-rdfc-2022",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z5UBb8q7StJLsA839GjyMrFsB6atZRkeXx2MCmgaB6D4mDvQQujcxxzysF3F6d8MZgWQh4ftUCRbWCBWibyRMCwR8",
+}
+
+
+def return_signed_credential(payload):
+    return_value = deepcopy(payload)
+    return_value["proof"] = FAKE_PROOF_PAYLOAD
+    return return_value
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_verifiable_credentials(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user
+):
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+
+    mocker.patch(
+        "courses.api.request_verifiable_credential",
+        side_effect=return_signed_credential,
+    )
+    mocker.patch(
+        "courses.api.should_provision_verifiable_credential", return_value=True
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+    assert certificate.verifiable_credential
+    assert (
+        certificate.verifiable_credential.credential_data["proof"] == FAKE_PROOF_PAYLOAD
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_program_certificate_verifiable_credentials(
+    mock_upsert_custom_properties,
+    user,
+    program_with_requirements,  # noqa: F811
+    mocker,
+):
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.request_verifiable_credential",
+        side_effect=return_signed_credential,
+    )
+    mocker.patch(
+        "courses.api.should_provision_verifiable_credential", return_value=True
+    )
+    courses = CourseFactory.create_batch(3)
+    course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    CourseRunCertificateFactory.create_batch(
+        2, user=user, course_run=factory.Iterator(course_runs)
+    )
+    program = program_with_requirements.program
+    program.add_requirement(courses[0])
+    program.add_requirement(courses[1])
+    program.add_requirement(courses[2])
+
+    certificate, created = generate_program_certificate(
+        user=user, program=program, force_create=True
+    )
+    assert created is True
+    assert isinstance(certificate, ProgramCertificate)
+    assert len(ProgramCertificate.objects.all()) == 1
+    assert certificate.verifiable_credential
+    assert (
+        certificate.verifiable_credential.credential_data["proof"] == FAKE_PROOF_PAYLOAD
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_verifiable_credentials_feature_flag_disabled(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user
+):
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.should_provision_verifiable_credential", return_value=False
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+    assert certificate.verifiable_credential is None

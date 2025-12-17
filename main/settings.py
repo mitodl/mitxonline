@@ -1537,3 +1537,9 @@ TRINO_PASSWORD = get_string(
     default=None,
     description="Password for Trino authentication",
 )
+
+VC_SIGNER_URL = get_string(
+    name="VC_SIGNER_URL",
+    default="",
+    description="The URL of the VC Signer service. Used for issuing verifiable credentials.",
+)
