@@ -1453,6 +1453,8 @@ def create_verifiable_credential(certificate: BaseCertificate):
         certificate.verifiable_credential = verifiable_credential
         certificate.save()
     except Exception:
+        # We don't want to block certificate creation if VC creation fails, so we swallow and log all errors to sentry
+        # We can revisit this later once we've ironed out some of the intended behavior around the json payload
         log.exception(
             "Error creating verifiable credential for certificate %s",
             certificate.uuid,
