@@ -39,7 +39,8 @@ from courses.models import (
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
-    ProgramCertificateSerializer, DigitalCredentialSerializer,
+    DigitalCredentialSerializer,
+    ProgramCertificateSerializer,
 )
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
@@ -604,7 +605,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
 
 @extend_schema(
     description="Verifies credential using ....",
-    responses={200: DigitalCredentialSerializer}
+    responses={200: DigitalCredentialSerializer},
 )
 @api_view(["GET"])
 @permission_classes([UserIsOwnerPermission])
@@ -612,9 +613,10 @@ def download_credential(request, credential_id):
     credential = get_object_or_404(
         DigitalCredential,
         pk=credential_id,
-        recipient=request.user  # Ensure user owns this
+        recipient=request.user,  # Ensure user owns this
     )
     response = JsonResponse(credential.issued_credential)
-    response['Content-Disposition'] = f'attachment; filename="credential_{credential_id}.json"'
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
     return response
-

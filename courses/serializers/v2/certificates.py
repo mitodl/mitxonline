@@ -223,6 +223,7 @@ class ProgramCertificateSerializer(BaseCertificateSerializer):
             "certificate_page_revision",
         ]
 
+
 @extend_schema_serializer(component_name="V2DigitalCredentialSerializer")
 class DigitalCredentialSerializer(serializers.Serializer):
     """Serializer for digital credential data."""
@@ -231,11 +232,5 @@ class DigitalCredentialSerializer(serializers.Serializer):
         """Meta options for the serializer."""
 
         model = DigitalCertificate
-        fields = [
-            "uuid",
-            "credential_data"
-        ]
-        read_only_fields = [
-            "uuid",
-            "credential_data"
-        ]
+        fields = ["uuid", "credential_data"]
+        read_only_fields = ["uuid", "credential_data"]
