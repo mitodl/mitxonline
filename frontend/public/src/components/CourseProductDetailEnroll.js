@@ -67,7 +67,7 @@ type ProductDetailState = {
   destinationUrl: string
 }
 
-export class CourseProductDetailEnroll extends React.Component<
+export class CourseProductDetailEnroll extends React.PureComponent<
   Props,
   ProductDetailState
 > {
@@ -77,6 +77,28 @@ export class CourseProductDetailEnroll extends React.Component<
     currentCourseRun:                  null,
     showAddlProfileFieldsModal:        false,
     destinationUrl:                    ""
+  }
+
+  constructor(props: Props) {
+    super(props)
+
+    // Bind methods to avoid creating new functions on every render
+    this.toggleAddlProfileFieldsModal = this.toggleAddlProfileFieldsModal.bind(this)
+    this.toggleCartConfirmationDialogVisibility = this.toggleCartConfirmationDialogVisibility.bind(this)
+    this.onAddToCartClick = this.onAddToCartClick.bind(this)
+    this.redirectToCourseHomepage = this.redirectToCourseHomepage.bind(this)
+    this.saveProfile = this.saveProfile.bind(this)
+    this.cancelEnrollment = this.cancelEnrollment.bind(this)
+
+    // Initialize memoization cache
+    this._computedCourseDataCache = null
+    this._lastCoursesRef = null
+  }
+
+  componentWillUnmount() {
+    // Clean up cache references to prevent memory leaks
+    this._computedCourseDataCache = null
+    this._lastCoursesRef = null
   }
 
   toggleAddlProfileFieldsModal() {
@@ -95,6 +117,7 @@ export class CourseProductDetailEnroll extends React.Component<
       window.open(target, "_blank")
     }
   }
+
   toggleCartConfirmationDialogVisibility() {
     this.setState({
       addedToCartDialogVisibility: !this.state.addedToCartDialogVisibility
@@ -203,6 +226,56 @@ export class CourseProductDetailEnroll extends React.Component<
     })
   }
 
+  // Memoize expensive computations to avoid recalculation on every render
+  getComputedCourseData = () => {
+    const { courses } = this.props
+
+    // Return cached result if courses haven't changed
+    if (this._lastCoursesRef === courses && this._computedCourseDataCache) {
+      return this._computedCourseDataCache
+    }
+
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
+    const course = courses && courses[0] ? courses[0] : null
+
+    const enrollableCourseRuns = courseRuns ?
+      courseRuns.filter(
+        (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
+      ) :
+      []
+
+    const upgradableCourseRuns = enrollableCourseRuns.filter(
+      (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
+    )
+
+    let run = null
+    let product = null
+
+    if (courses && courseRuns) {
+      run = getFirstRelevantRun(courses[0], courseRuns)
+      if (run) {
+        product = run && run.products ? run.products[0] : null
+        this.updateDate(run)
+      }
+    }
+
+    const computedData = {
+      course,
+      courseRuns,
+      enrollableCourseRuns,
+      upgradableCourseRuns,
+      run,
+      product,
+      hasMultipleEnrollableRuns: enrollableCourseRuns && enrollableCourseRuns.length > 1
+    }
+
+    // Cache the result
+    this._computedCourseDataCache = computedData
+    this._lastCoursesRef = courses
+
+    return computedData
+  }
+
   renderRunSelectorButtons(
     enrollableCourseRuns: Array<EnrollmentFlaggedCourseRun>
   ) {
@@ -216,7 +289,7 @@ export class CourseProductDetailEnroll extends React.Component<
           </label>
         )}
         <select
-          onChange={this.hndSetCourseRun.bind(this)}
+          onChange={this.hndSetCourseRun}
           className="form-control"
         >
           <option value="default" key="default-select">
@@ -269,16 +342,17 @@ export class CourseProductDetailEnroll extends React.Component<
     const { courses } = this.props
     const { addedToCartDialogVisibility } = this.state
     const course = courses && courses[0] ? courses[0] : null
+
     return (
       <Modal
-        id={`added-to-cart-dialog`}
+        id="added-to-cart-dialog"
         className="added-to-cart-modal"
         isOpen={addedToCartDialogVisibility}
-        toggle={() => this.toggleCartConfirmationDialogVisibility()}
+        toggle={this.toggleCartConfirmationDialogVisibility}
         centered
       >
         <ModalHeader
-          toggle={() => this.toggleCartConfirmationDialogVisibility()}
+          toggle={this.toggleCartConfirmationDialogVisibility}
         >
           Added to Cart
         </ModalHeader>
@@ -319,20 +393,27 @@ export class CourseProductDetailEnroll extends React.Component<
 
   renderUpgradeEnrollmentDialog() {
     const { courses, currentUser } = this.props
-    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
-    const enrollableCourseRuns = courseRuns ?
-      courseRuns.filter(
-        (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
-      ) :
-      []
-    const upgradableCourseRuns = enrollableCourseRuns.filter(
-      (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
-    )
+    const { upgradeEnrollmentDialogVisibility } = this.state
+
+    // Use memoized computation
+    const {
+      course,
+      enrollableCourseRuns,
+      upgradableCourseRuns
+    } = this.getComputedCourseData()
+
     if (upgradableCourseRuns.length < 1 && enrollableCourseRuns.length < 1) {
       return null
     }
-    const course = courses && courses[0] ? courses[0] : null
+
     const run = this.getCurrentCourseRun()
+    const product = run && run.products ? run.products[0] : null
+    const newCartDesign = checkFeatureFlag(
+      "new-cart-design",
+      currentUser && currentUser.id ? currentUser.id : "anonymousUser"
+    )
+    const canUpgrade = !!(run && run.is_upgradable && product)
+
     const needFinancialAssistanceLink =
       run &&
       course &&
@@ -348,23 +429,17 @@ export class CourseProductDetailEnroll extends React.Component<
           Need financial assistance?
           </a>
         ) : null
-    const { upgradeEnrollmentDialogVisibility } = this.state
-    const product = run && run.products ? run.products[0] : null
-    const newCartDesign = checkFeatureFlag(
-      "new-cart-design",
-      currentUser && currentUser.id ? currentUser.id : "anonymousUser"
-    )
-    const canUpgrade = !!(run && run.is_upgradable && product)
+
     return upgradableCourseRuns.length > 0 ||
       enrollableCourseRuns.length > 1 ? (
         <Modal
-          id={`upgrade-enrollment-dialog`}
+          id="upgrade-enrollment-dialog"
           className="upgrade-enrollment-modal"
           isOpen={upgradeEnrollmentDialogVisibility}
-          toggle={() => this.cancelEnrollment()}
+          toggle={this.cancelEnrollment}
           centered
         >
-          <ModalHeader toggle={() => this.cancelEnrollment()}>
+          <ModalHeader toggle={this.cancelEnrollment}>
             {course && course.title}
           </ModalHeader>
           <ModalBody>
@@ -443,7 +518,7 @@ export class CourseProductDetailEnroll extends React.Component<
                     <div className="col-md-6 col-sm-12 pr-0">
                       <div className="new-design">
                         <button
-                          onClick={this.onAddToCartClick.bind(this)}
+                          onClick={this.onAddToCartClick}
                           type="button"
                           className="btn btn-upgrade btn-gradient-red-to-blue"
                           disabled={!canUpgrade}
@@ -500,14 +575,14 @@ export class CourseProductDetailEnroll extends React.Component<
 
     return (
       <Modal
-        id={`upgrade-enrollment-dialog`}
+        id="upgrade-enrollment-dialog"
         className="upgrade-enrollment-modal"
         isOpen={showAddlProfileFieldsModal}
-        toggle={() => this.toggleAddlProfileFieldsModal()}
+        toggle={this.toggleAddlProfileFieldsModal}
       >
         <ModalHeader
           id={`more-info-modal-${currentUser.id}`}
-          toggle={() => this.toggleAddlProfileFieldsModal()}
+          toggle={this.toggleAddlProfileFieldsModal}
         >
           Provide More Info
         </ModalHeader>
@@ -521,8 +596,8 @@ export class CourseProductDetailEnroll extends React.Component<
             </div>
           </div>
           <AddlProfileFieldsForm
-            onSubmit={this.saveProfile.bind(this)}
-            onCancel={() => this.toggleAddlProfileFieldsModal()}
+            onSubmit={this.saveProfile}
+            onCancel={this.toggleAddlProfileFieldsModal}
             user={currentUser}
             countries={countries}
           ></AddlProfileFieldsForm>
@@ -576,7 +651,7 @@ export class CourseProductDetailEnroll extends React.Component<
           <button
             id="upgradeEnrollBtn"
             className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight enroll-now"
-            onClick={() => this.toggleUpgradeDialogVisibility()}
+            onClick={this.toggleUpgradeDialogVisibility}
             disabled={!run.is_enrollable}
           >
             Enroll now
@@ -600,24 +675,14 @@ export class CourseProductDetailEnroll extends React.Component<
 
   render() {
     const { courses, courseIsLoading, currentUser } = this.props
-    let run,
-      product = null
-    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
-    const enrollableCourseRuns = courseRuns ?
-      courseRuns.filter(
-        (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
-      ) :
-      []
-    if (courses && courseRuns) {
-      run = getFirstRelevantRun(courses[0], courseRuns)
 
-      if (run) {
-        product = run && run.products ? run.products[0] : null
-        this.updateDate(run)
-      }
-    }
-    const hasMultipleEnrollableRuns =
-      enrollableCourseRuns && enrollableCourseRuns.length > 1
+    // Use memoized computation to avoid repeated calculations
+    const {
+      run,
+      product,
+      enrollableCourseRuns,
+      hasMultipleEnrollableRuns
+    } = this.getComputedCourseData()
 
     return (
       <>

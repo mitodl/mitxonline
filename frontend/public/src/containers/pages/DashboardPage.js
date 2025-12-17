@@ -67,7 +67,7 @@ type DashboardPageState = {
   destinationUrl: string
 }
 
-export class DashboardPage extends React.Component<
+export class DashboardPage extends React.PureComponent<
   DashboardPageProps,
   DashboardPageState
 > {
@@ -77,6 +77,30 @@ export class DashboardPage extends React.Component<
     currentTab:                 DashboardTab.courses,
     showAddlProfileFieldsModal: false,
     destinationUrl:             ""
+  }
+
+  constructor(props: DashboardPageProps) {
+    super(props)
+
+    // Bind methods to avoid creating new functions on every render
+    this.toggleDrawer = this.toggleDrawer.bind(this)
+    this.updateDrawerEnrollments = this.updateDrawerEnrollments.bind(this)
+    this.toggleTab = this.toggleTab.bind(this)
+    this.toggleAddlProfileFieldsModal = this.toggleAddlProfileFieldsModal.bind(this)
+    this.redirectToCourseHomepage = this.redirectToCourseHomepage.bind(this)
+    this.saveProfile = this.saveProfile.bind(this)
+    this.renderCurrentTab = this.renderCurrentTab.bind(this)
+    this.renderAddlProfileFieldsModal = this.renderAddlProfileFieldsModal.bind(this)
+
+    // Cache for computed values
+    this._tabClassesCache = null
+    this._lastCurrentTab = null
+  }
+
+  componentWillUnmount() {
+    // Clean up cache references to prevent memory leaks
+    this._tabClassesCache = null
+    this._lastCurrentTab = null
   }
 
   toggleDrawer(enrollment: any) {
@@ -92,6 +116,7 @@ export class DashboardPage extends React.Component<
     if (
       programDrawerEnrollments !== null &&
       programDrawerEnrollments.program &&
+      enrollment?.program &&
       programDrawerEnrollments.program.id === enrollment.program.id
     ) {
       this.setState({
@@ -119,8 +144,52 @@ export class DashboardPage extends React.Component<
       this.setState({
         destinationUrl: ""
       })
-      window.open(target, "_blank")
+      try {
+        window.open(target, "_blank")
+      } catch (error) {
+        console.error("Failed to open window:", error)
+        // Fallback to location.href if popup is blocked
+        window.location.href = target
+      }
     }
+  }
+
+  // Memoize tab classes computation to avoid recalculation on every render
+  getTabClasses = () => {
+    const { currentTab } = this.state
+
+    // Return cached result if currentTab hasn't changed
+    if (this._lastCurrentTab === currentTab && this._tabClassesCache) {
+      return this._tabClassesCache
+    }
+
+    const myCourseClasses = `dash-tab${
+      currentTab === DashboardTab.courses ? " active" : ""
+    }`
+    const programsClasses = `dash-tab${
+      currentTab === DashboardTab.programs ? " active" : ""
+    }`
+
+    const classes = { myCourseClasses, programsClasses }
+
+    // Cache the result
+    this._tabClassesCache = classes
+    this._lastCurrentTab = currentTab
+
+    return classes
+  }
+
+  // Optimize user profile validation
+  shouldShowProfileModal = (currentUser: User): boolean => {
+    return !(
+      currentUser &&
+      currentUser.legal_address &&
+      currentUser.legal_address.country !== "" &&
+      currentUser.legal_address.country !== null &&
+      currentUser.user_profile &&
+      currentUser.user_profile.year_of_birth !== "" &&
+      currentUser.user_profile.year_of_birth !== null
+    )
   }
 
   redirectToCourseHomepage(url: string, ev: any) {
@@ -131,19 +200,18 @@ export class DashboardPage extends React.Component<
 
     const { currentUser } = this.props
 
-    if (
-      currentUser &&
-      currentUser.legal_address &&
-      currentUser.legal_address.country !== "" &&
-      currentUser.legal_address.country !== null &&
-      currentUser.user_profile &&
-      currentUser.user_profile.year_of_birth !== "" &&
-      currentUser.user_profile.year_of_birth !== null
-    ) {
+    if (!url || typeof url !== 'string') {
+      console.error("Invalid URL provided to redirectToCourseHomepage:", url)
       return
     }
 
-    ev.preventDefault()
+    if (!this.shouldShowProfileModal(currentUser)) {
+      return
+    }
+
+    if (ev && typeof ev.preventDefault === 'function') {
+      ev.preventDefault()
+    }
 
     this.setState({
       destinationUrl:             url,
@@ -164,21 +232,26 @@ export class DashboardPage extends React.Component<
 
   renderCurrentTab() {
     const { enrollments, programEnrollments, forceRequest } = this.props
+    const { currentTab } = this.state
 
-    if (this.state.currentTab === DashboardTab.programs) {
-      if (programEnrollments.length === 0) {
+    // Defensive checks for data
+    const safeEnrollments = enrollments || []
+    const safeProgramEnrollments = programEnrollments || []
+
+    if (currentTab === DashboardTab.programs) {
+      if (safeProgramEnrollments.length === 0) {
         this.setState({ currentTab: DashboardTab.courses })
       } else {
         return (
           <div>
             <h2 className="hide-element">Programs</h2>
             <EnrolledProgramList
-              key={"enrolled-programs"}
-              enrollments={programEnrollments}
-              toggleDrawer={this.toggleDrawer.bind(this)}
-              onUpdateDrawerEnrollment={this.updateDrawerEnrollments.bind(this)}
+              key="enrolled-programs"
+              enrollments={safeProgramEnrollments}
+              toggleDrawer={this.toggleDrawer}
+              onUpdateDrawerEnrollment={this.updateDrawerEnrollments}
               onUnenroll={forceRequest}
-            ></EnrolledProgramList>
+            />
           </div>
         )
       }
@@ -188,11 +261,11 @@ export class DashboardPage extends React.Component<
       <div>
         <h2 className="hide-element">My Courses</h2>
         <EnrolledCourseList
-          key={"enrolled-courses"}
-          enrollments={enrollments}
-          redirectToCourseHomepage={this.redirectToCourseHomepage.bind(this)}
+          key="enrolled-courses"
+          enrollments={safeEnrollments}
+          redirectToCourseHomepage={this.redirectToCourseHomepage}
           onUnenroll={forceRequest}
-        ></EnrolledCourseList>
+        />
       </div>
     )
   }
@@ -201,16 +274,21 @@ export class DashboardPage extends React.Component<
     const { currentUser, countries } = this.props
     const { showAddlProfileFieldsModal } = this.state
 
+    // Defensive check for required props
+    if (!currentUser || !countries) {
+      return null
+    }
+
     return (
       <Modal
-        id={`upgrade-enrollment-dialog`}
+        id="upgrade-enrollment-dialog"
         className="upgrade-enrollment-modal"
         isOpen={showAddlProfileFieldsModal}
-        toggle={() => this.toggleAddlProfileFieldsModal()}
+        toggle={this.toggleAddlProfileFieldsModal}
       >
         <ModalHeader
           id={`more-info-modal-${currentUser.id}`}
-          toggle={() => this.toggleAddlProfileFieldsModal()}
+          toggle={this.toggleAddlProfileFieldsModal}
         >
           Provide More Info
         </ModalHeader>
@@ -222,11 +300,11 @@ export class DashboardPage extends React.Component<
           </div>
 
           <AddlProfileFieldsForm
-            onSubmit={this.saveProfile.bind(this)}
-            onCancel={() => this.toggleAddlProfileFieldsModal()}
+            onSubmit={this.saveProfile}
+            onCancel={this.toggleAddlProfileFieldsModal}
             user={currentUser}
             countries={countries}
-          ></AddlProfileFieldsForm>
+          />
         </ModalBody>
       </Modal>
     )
@@ -235,15 +313,17 @@ export class DashboardPage extends React.Component<
   render() {
     const { isLoading, programEnrollments, forceRequest } = this.props
 
-    const myCourseClasses = `dash-tab${
-      this.state.currentTab === DashboardTab.courses ? " active" : ""
-    }`
-    const programsClasses = `dash-tab${
-      this.state.currentTab === DashboardTab.programs ? " active" : ""
-    }`
+    // Use memoized tab classes computation
+    const { myCourseClasses, programsClasses } = this.getTabClasses()
+
     const programEnrollmentsLength = programEnrollments ?
       programEnrollments.length :
       0
+
+    // Create stable references for event handlers
+    const handleCoursesTabClick = () => this.toggleTab(DashboardTab.courses)
+    const handleProgramsTabClick = () => this.toggleTab(DashboardTab.programs)
+    const handleDrawerShow = () => this.setState({ programDrawerVisibility: false })
 
     return (
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>
@@ -258,7 +338,7 @@ export class DashboardPage extends React.Component<
                   <>
                     <button
                       className={myCourseClasses}
-                      onClick={() => this.toggleTab(DashboardTab.courses)}
+                      onClick={handleCoursesTabClick}
                     >
                       My Courses
                     </button>
@@ -267,13 +347,13 @@ export class DashboardPage extends React.Component<
                   <>
                     <button
                       className={myCourseClasses}
-                      onClick={() => this.toggleTab(DashboardTab.courses)}
+                      onClick={handleCoursesTabClick}
                     >
                       My Courses
                     </button>
                     <button
                       className={programsClasses}
-                      onClick={() => this.toggleTab(DashboardTab.programs)}
+                      onClick={handleProgramsTabClick}
                     >
                       My Programs
                     </button>
@@ -287,12 +367,10 @@ export class DashboardPage extends React.Component<
               <ProgramEnrollmentDrawer
                 isHidden={this.state.programDrawerVisibility}
                 enrollment={this.state.programDrawerEnrollments}
-                showDrawer={() =>
-                  this.setState({ programDrawerVisibility: false })
-                }
+                showDrawer={handleDrawerShow}
                 redirectToCourseHomepage={this.redirectToCourseHomepage}
                 onUnenroll={forceRequest}
-              ></ProgramEnrollmentDrawer>
+              />
 
               {this.renderAddlProfileFieldsModal()}
             </Loader>
