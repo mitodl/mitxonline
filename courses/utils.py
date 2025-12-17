@@ -255,4 +255,4 @@ def get_approved_flexible_price_exists(instance, context):
 
 def dc_url(path):
     """Returns the full url to the provided path"""
-    return urljoin(settings.DIGITAL_CREDENTAL_COORDINATOR_URL, path)
+    return urljoin(settings.DIGITAL_CREDENTIAL_ISSUER_URL, path)
