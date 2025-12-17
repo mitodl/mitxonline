@@ -1544,3 +1544,4 @@ VC_SIGNER_URL = get_string(
     description="The URL of the VC Signer service. Used for issuing verifiable credentials.",
 )
 
+
