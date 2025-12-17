@@ -36,11 +36,12 @@ from courses.models import (
     ProgramCollection,
     ProgramEnrollment,
     ProgramRequirement,
+    VerifiableCredential,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
-    DigitalCredentialSerializer,
     ProgramCertificateSerializer,
+    VerifiableCredentialSerializer,
 )
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
@@ -605,13 +606,13 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
 
 @extend_schema(
     description="Verifies credential using ....",
-    responses={200: DigitalCredentialSerializer},
+    responses={200: VerifiableCredentialSerializer(many=True)},
 )
 @api_view(["GET"])
 @permission_classes([UserIsOwnerPermission])
 def download_credential(request, credential_id):
     credential = get_object_or_404(
-        DigitalCredential,
+        VerifiableCredential,
         pk=credential_id,
         recipient=request.user,  # Ensure user owns this
     )
