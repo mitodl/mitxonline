@@ -1670,6 +1670,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2Program'
           description: ''
+  /api/v2/verifiable_course_credentail/{credential_id}/download/:
+    get:
+      operationId: verifiable_course_credentail_download_list
+      description: Returns the json for the verifiable credential with the given ID,
+        if it belongs to the user.
+      parameters:
+      - in: path
+        name: credential_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - verifiable_course_credentail
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v2/verifiable_program_credentail/{credential_id}/download/:
+    get:
+      operationId: verifiable_program_credentail_download_list
+      description: Returns the json for the verifiable credential with the given ID,
+        if it belongs to the user.
+      parameters:
+      - in: path
+        name: credential_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - verifiable_program_credentail
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
   /enrollments/:
     post:
       operationId: api_enrollments_create

@@ -614,13 +614,6 @@ def download_course_credential(request, credential_id):
         VerifiableCredential,
         pk=credential_id,
     )
-    try:
-        get_object_or_404(CourseRunCertificate, user=request.user, uuid=credential_id)
-    except Http404:
-        return Response(
-            {"detail": "The object doesn't exist or you don't have permission."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
     response = JsonResponse(credential.issued_credential)
     response["Content-Disposition"] = (
         f'attachment; filename="credential_{credential_id}.json"'
@@ -639,13 +632,6 @@ def download_program_credential(request, credential_id):
         VerifiableCredential,
         pk=credential_id,
     )
-    try:
-        get_object_or_404(ProgramCertificate, user=request.user, uuid=credential_id)
-    except Http404:
-        return Response(
-            {"detail": "The object doesn't exist or you don't have permission."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
     response = JsonResponse(credential.issued_credential)
     response["Content-Disposition"] = (
         f'attachment; filename="credential_{credential_id}.json"'
