@@ -62,7 +62,6 @@ from courses.utils import (
     get_unenrollable_courses,
 )
 from main import features
-from main.permissions import UserIsOwnerPermission
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
 
