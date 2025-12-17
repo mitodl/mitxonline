@@ -1341,10 +1341,9 @@ ACHIEVEMENT_TYPE_MAP = {
 
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
-    # TODO: Need to figure out how to construct URLs correctly
+    # TODO: Need to figure out how to construct URLs correctly. They're used as a required ID.
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
-        # This will explode if the course run is missing a URL.
         url = certificate.course_run.courseware_url_path
         certificate_name = certificate.course_run.title
     elif isinstance(certificate, ProgramCertificate):
@@ -1420,6 +1419,18 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     }
 
 
+def request_verifiable_credential(payload) -> dict:
+    resp = requests.post(settings.VC_SIGNER_URL, json=payload, timeout=10)
+    resp.raise_for_status()
+
+    # Save the returned value as BaseCertificate.verifiable_credential
+    return resp.json()
+
+
+def should_provision_verifiable_credential() -> bool:
+    return is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING, False)  # noqa: FBT003
+
+
 def create_verifiable_credential(certificate: BaseCertificate):
     """
     Create a verifiable credential for the given course run certificate.
@@ -1428,16 +1439,14 @@ def create_verifiable_credential(certificate: BaseCertificate):
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
     """
     try:
-        if not is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING, False):  # noqa: FBT003
+        if not should_provision_verifiable_credential():
             return
         payload = get_verifiable_credentials_payload(certificate)
 
         # Call the signing service to create the new credential
-        resp = requests.post(settings.VC_SIGNER_URL, json=payload, timeout=10)
-        resp.raise_for_status()
+        # TODO: Needs the auth token for the signer service
+        credential = request_verifiable_credential(payload)
 
-        # Save the returned value as BaseCertificate.verifiable_credential
-        credential = resp.json()
         verifiable_credential = VerifiableCredential.objects.create(
             uuid=credential["id"], credential_data=credential
         )
