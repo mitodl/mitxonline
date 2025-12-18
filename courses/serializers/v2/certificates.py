@@ -168,6 +168,7 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
 
         return None
 
+    @extend_schema_field(serializers.JSONField)
     def get_verifiable_credential_json(self, instance):
         """Retrieve the verifiable credential data as JSON, if it exists."""
         if instance.verifiable_credential:
