@@ -1381,7 +1381,6 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
             },
         },
         "validFrom": valid_from,
-        "validUntil": "2030-01-01T00:00:00Z",  # TODO: Remove this?
         "credentialSubject": {
             "type": ["AchievementSubject"],
             "activityStartDate": "2023-03-01T00:00:00Z",  # TODO: Replace with real dates?
