@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.136.5
+---------------
+
+- Add VC json to certificate api (#3153)
+- Adding APIs for downloading a digital credential (#3149)
+
 Version 0.136.4 (Released December 18, 2025)
 ---------------
 
