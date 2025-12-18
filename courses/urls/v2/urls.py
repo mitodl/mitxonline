@@ -47,3 +47,5 @@ urlpatterns = [
         name="download_program_credential",
     ),
 ]
+# http://mitxonline.odl.local:8013/api/v2/courses/course_certificates/cc7dfe00-44b4-4ff2-9369-5cf3fbd74cf6/
+# http://mitxonline.odl.local:8013/api/v2/course_certificates/cc7dfe00-44b4-4ff2-9369-5cf3fbd74cf6/
