@@ -1357,11 +1357,11 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         course_run = certificate.course_run
         # TODO: Need to confirm the URL structure #noqa: TD002, TD003, FIX002
         # In RC, the data is kinda squirrely. I need to run this by someone who knows about URL structure here.
-        course_url_id = course_run.courseware_id.split.rsplit("+", 1)[0]
+        course_url_id = course_run.courseware_id.rsplit("+", 1)[0]
         url = f"https://{learn_hostname}/courses/{course_url_id}"
         certificate_name = certificate.course_run.title
         activity_start_date = CourseRunEnrollment.objects.get(
-            user_id=certificate.user_id, course_run=course_run
+            user_id=certificate.user_id, run=course_run
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
         achievement_image_url = "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894"
     elif isinstance(certificate, ProgramCertificate):
