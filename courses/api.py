@@ -1340,20 +1340,25 @@ ACHIEVEMENT_TYPE_MAP = {
 
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
+    # TODO: Riddled with n+1 queries. Needs fixing #noqa: TD002, TD003, FIX002
+    # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field. #noqa: TD002, TD003, FIX002
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
-        url = certificate.course_run.courseware_url_path
+        course_run = certificate.course_run
+        url = course_run.courseware_url_path
         certificate_name = certificate.course_run.title
-        # TODO: Replace with real dates? #noqa: TD002, TD003, FIX002
-        activity_start_date = None
+        activity_start_date = CourseRunEnrollment.objects.get(
+            user_id=certificate.user_id, course_run=course_run
+        ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
         achievement_image_url = "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894"
     elif isinstance(certificate, ProgramCertificate):
-        # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field. #noqa: TD002, TD003, FIX002
         cert_type = "program"
+        program = certificate.program
         url = ""
         certificate_name = certificate.program.title
-        # TODO: Replace with real dates? #noqa: TD002, TD003, FIX002
-        activity_start_date = None
+        activity_start_date = ProgramEnrollment.objects.get(
+            user_id=certificate.user_id, program=program
+        ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
         achievement_image_url = "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894"
     else:
         raise InvalidCertificateTypeError
