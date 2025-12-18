@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.136.4
+Version 0.136.4 (Released December 18, 2025)
 ---------------
 
 - fix(deps): update react monorepo (#3145)
