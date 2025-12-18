@@ -4946,6 +4946,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
           readOnly: true
+        verifiable_credential_json:
+          readOnly: true
         course_run:
           $ref: '#/components/schemas/V2CourseRunWithCourse'
         certificate_page_revision:
@@ -4959,6 +4961,7 @@ components:
       - is_revoked
       - user
       - uuid
+      - verifiable_credential_json
     V2CourseRunWithCourse:
       type: object
       description: CourseRun model serializer - also serializes the parent Course.
@@ -5362,6 +5365,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
           readOnly: true
+        verifiable_credential_json:
+          readOnly: true
         program:
           $ref: '#/components/schemas/V2Program'
         certificate_page_revision:
@@ -5375,6 +5380,7 @@ components:
       - program
       - user
       - uuid
+      - verifiable_credential_json
     V2ProgramCollection:
       type: object
       description: Serializer for ProgramCollection
