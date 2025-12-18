@@ -67,6 +67,22 @@ User = get_user_model()
     description="Returns the basket items for the current user.",
     request=None,
     responses=BasketItemSerializer,
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_basket",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent basket",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket item",
+            required=True,
+        ),
+    ],
 )
 class BasketItemViewSet(ModelViewSet):
     """ViewSet for handling BasketItem operations."""

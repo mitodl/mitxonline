@@ -248,9 +248,16 @@ paths:
       description: Returns the basket items for the current user.
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the parent basket
         required: true
       tags:
       - baskets
@@ -268,9 +275,16 @@ paths:
       description: Returns the basket items for the current user.
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the parent basket
         required: true
       tags:
       - baskets
@@ -290,12 +304,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this basket item.
+        description: ID of the basket item
         required: true
       - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the parent basket
         required: true
       tags:
       - baskets
@@ -314,12 +329,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this basket item.
+        description: ID of the basket item
         required: true
       - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the parent basket
         required: true
       tags:
       - baskets
@@ -338,12 +354,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this basket item.
+        description: ID of the basket item
         required: true
       - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the parent basket
         required: true
       tags:
       - baskets
@@ -362,12 +379,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this basket item.
+        description: ID of the basket item
         required: true
       - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the parent basket
         required: true
       tags:
       - baskets
@@ -729,7 +747,7 @@ paths:
           description: ''
     post:
       operationId: discounts_assignees_create
-      description: API view set for User Discounts. This one is for use within a Discount.
+      description: Create an association between a user and a discount.
       parameters:
       - in: path
         name: id
