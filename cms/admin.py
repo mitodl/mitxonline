@@ -30,7 +30,7 @@ class RevisionAdmin(admin.ModelAdmin):
             if hasattr(page, 'title'):
                 return page.title
             return str(page)
-        except:
+        except (AttributeError, ValueError, TypeError):
             return "Unknown"
     get_page_title.short_description = 'Page Title'
     
@@ -38,10 +38,11 @@ class RevisionAdmin(admin.ModelAdmin):
         """Get the product name of the certificate page"""
         try:
             page = obj.as_object()
+        except (AttributeError, ValueError, TypeError):
+            return "N/A"
+        else:
             if hasattr(page, 'product_name'):
                 return page.product_name
-            return "N/A"
-        except:
             return "N/A"
     get_page_product_name.short_description = 'Product Name'
     
@@ -81,20 +82,20 @@ class RevisionAdmin(admin.ModelAdmin):
             content_type__model='certificatepage'
         ).select_related('user', 'content_type').prefetch_related('content_object')
     
-    def has_add_permission(self, request):
+    def has_add_permission(self, request):  # noqa: ARG002
         """
         Disable adding revisions through admin - they should be created
         through the Wagtail interface.
         """
         return False
     
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request, obj=None):  # noqa: ARG002
         """
         Disable editing revisions through admin - they are immutable.
         """
         return False
     
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
         """
         Disable deleting revisions through admin for data integrity.
         """
