@@ -1341,11 +1341,14 @@ ACHIEVEMENT_TYPE_MAP = {
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     # TODO: Riddled with n+1 queries. Needs fixing #noqa: TD002, TD003, FIX002
-    # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field. #noqa: TD002, TD003, FIX002
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
         course_run = certificate.course_run
-        url = course_run.courseware_url_path
+        # TODO: Need to confirm the URL structure #noqa: TD002, TD003, FIX002
+        # TODO: Should these all go to env specific learn URLs? #noqa: TD002, TD003, FIX002
+        # In RC, the data is kinda squirrely. I need to run this by someone who knows about URL structure here.
+        course_url_id = course_run.courseware_id.split.rsplit("+", 1)[0]
+        url = f"https://learn.mit.edu/courses/{course_url_id}"
         certificate_name = certificate.course_run.title
         activity_start_date = CourseRunEnrollment.objects.get(
             user_id=certificate.user_id, course_run=course_run
@@ -1354,7 +1357,8 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
         program = certificate.program
-        url = ""
+        # TODO: Need to confirm the URL structure #noqa: TD002, TD003, FIX002
+        url = f"https://learn.mit.edu/programs/{program.readable_id}"
         certificate_name = certificate.program.title
         activity_start_date = ProgramEnrollment.objects.get(
             user_id=certificate.user_id, program=program
