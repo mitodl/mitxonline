@@ -1338,9 +1338,20 @@ ACHIEVEMENT_TYPE_MAP = {
     "program": "Program",
 }
 
+# Maps the value of settings.ENVIRONMENT to the hostname for that environment's Learn instance
+ENV_TO_LEARN_HOSTNAME_MAP = {
+    "production": "learn.mit.edu",
+    "rc": "learn.rc.mit.edu",
+    "ci": "learn.ci.mit.edu",
+}
+
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     # TODO: Riddled with n+1 queries. Needs fixing #noqa: TD002, TD003, FIX002
+    learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
+        settings.ENVIRONMENT, "learn.mit.edu"
+    )
+
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
         course_run = certificate.course_run
@@ -1348,7 +1359,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         # TODO: Should these all go to env specific learn URLs? #noqa: TD002, TD003, FIX002
         # In RC, the data is kinda squirrely. I need to run this by someone who knows about URL structure here.
         course_url_id = course_run.courseware_id.split.rsplit("+", 1)[0]
-        url = f"https://learn.mit.edu/courses/{course_url_id}"
+        url = f"https://{learn_hostname}/courses/{course_url_id}"
         certificate_name = certificate.course_run.title
         activity_start_date = CourseRunEnrollment.objects.get(
             user_id=certificate.user_id, course_run=course_run
@@ -1358,7 +1369,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         cert_type = "program"
         program = certificate.program
         # TODO: Need to confirm the URL structure #noqa: TD002, TD003, FIX002
-        url = f"https://learn.mit.edu/programs/{program.readable_id}"
+        url = f"https://{learn_hostname}/programs/{program.readable_id}"
         certificate_name = certificate.program.title
         activity_start_date = ProgramEnrollment.objects.get(
             user_id=certificate.user_id, program=program
