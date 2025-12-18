@@ -534,7 +534,7 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         if obj.certificate_page_revision:
             try:
                 page = obj.certificate_page_revision.as_object()
-                if hasattr(page, 'title'):
+                if hasattr(page, "title"):
                     return page.title
                 return str(page)
             except:
