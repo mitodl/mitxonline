@@ -82,10 +82,10 @@ def test_serialize_certificate(is_program):
             "CEUs": cert_page.CEUs,
             "overrides": [],
             "signatory_items": cert_page.signatory_items,
-            "verifiable_credential_json": certificate.verifiable_credential.credentail_data
-            if certificate.verifiable_credential
-            else None,
         },
+        "verifiable_credential_json": certificate.verifiable_credential.credential_data
+        if certificate.verifiable_credential
+        else None,
     }
 
     if is_program:
