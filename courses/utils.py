@@ -2,7 +2,6 @@
 
 import logging
 import re
-from urllib.parse import urljoin
 
 from django.db.models import Prefetch, Q
 from mitol.common.utils.datetime import now_in_utc
@@ -15,7 +14,6 @@ from courses.models import (
     CourseRunQuerySet,
     ProgramCertificate,
 )
-from main import settings
 
 log = logging.getLogger(__name__)
 

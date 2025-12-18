@@ -14,7 +14,12 @@ from cms.wagtail_api.schema.serializers import (
     CertificatePageSerializer,
     PageMetaSerializer,
 )
-from courses.models import BaseCertificate, CourseRunCertificate, ProgramCertificate, VerifiableCredential
+from courses.models import (
+    BaseCertificate,
+    CourseRunCertificate,
+    ProgramCertificate,
+    VerifiableCredential,
+)
 from courses.serializers.v2.courses import CourseRunWithCourseSerializer
 from courses.serializers.v2.programs import ProgramSerializer
 from users.serializers import PublicUserSerializer

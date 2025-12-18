@@ -1420,7 +1420,9 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
 
 
 def request_verifiable_credential(payload) -> dict:
-    resp = requests.post(settings.VERIFIABLE_CREDENTIAL_SIGNER_URL, json=payload, timeout=10)
+    resp = requests.post(
+        settings.VERIFIABLE_CREDENTIAL_SIGNER_URL, json=payload, timeout=10
+    )
     resp.raise_for_status()
 
     # Save the returned value as BaseCertificate.verifiable_credential
