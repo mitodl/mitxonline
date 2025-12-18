@@ -1673,8 +1673,7 @@ paths:
   /api/v2/verifiable_course_credential/{credential_id}/download/:
     get:
       operationId: verifiable_course_credential_download_list
-      description: Returns the json for the verifiable credential with the given ID,
-        if it belongs to the user.
+      description: Returns the json for the verifiable credential with the given ID
       parameters:
       - in: path
         name: credential_id
@@ -1692,8 +1691,7 @@ paths:
   /api/v2/verifiable_program_credential/{credential_id}/download/:
     get:
       operationId: verifiable_program_credential_download_list
-      description: Returns the json for the verifiable credential with the given ID,
-        if it belongs to the user.
+      description: Returns the json for the verifiable credential with the given ID
       parameters:
       - in: path
         name: credential_id
