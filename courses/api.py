@@ -1388,7 +1388,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
             "type": ["Profile"],
             "name": "MIT Learn",
             "image": {
-                # TODO: Needs to be hosted somewhere better #noqa: TD002, TD003, FIX002
+                # TODO: replace w/ output of https://github.com/mitodl/hq/issues/9657 # noqa: TD002, FIX002
                 "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
                 "type": "Image",
                 "caption": "MIT Learn logo",
