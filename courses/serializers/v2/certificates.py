@@ -14,7 +14,12 @@ from cms.wagtail_api.schema.serializers import (
     CertificatePageSerializer,
     PageMetaSerializer,
 )
-from courses.models import BaseCertificate, CourseRunCertificate, ProgramCertificate
+from courses.models import (
+    BaseCertificate,
+    CourseRunCertificate,
+    ProgramCertificate,
+    VerifiableCredential,
+)
 from courses.serializers.v2.courses import CourseRunWithCourseSerializer
 from courses.serializers.v2.programs import ProgramSerializer
 from users.serializers import PublicUserSerializer
@@ -222,3 +227,15 @@ class ProgramCertificateSerializer(BaseCertificateSerializer):
             "program",
             "certificate_page_revision",
         ]
+
+
+@extend_schema_serializer(component_name="V2VerifiableCredentialSerializer")
+class VerifiableCredentialSerializer(serializers.Serializer):
+    """Serializer for digital credential data."""
+
+    class Meta:
+        """Meta options for the serializer."""
+
+        model = VerifiableCredential
+        fields = ["uuid", "credential_data"]
+        read_only_fields = ["uuid", "credential_data"]

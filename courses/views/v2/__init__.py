@@ -6,6 +6,7 @@ import contextlib
 
 import django_filters
 from django.db.models import Count, Prefetch, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -35,10 +36,12 @@ from courses.models import (
     ProgramCollection,
     ProgramEnrollment,
     ProgramRequirement,
+    VerifiableCredential,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
     ProgramCertificateSerializer,
+    VerifiableCredentialSerializer,
 )
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
@@ -598,3 +601,39 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         )
 
         return self.list(request)
+
+
+@extend_schema(
+    description="Returns the json for the verifiable credential with the given ID",
+    responses={200: VerifiableCredentialSerializer(many=True)},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_course_credential(request, credential_id):  # noqa: ARG001
+    credential = get_object_or_404(
+        VerifiableCredential,
+        pk=credential_id,
+    )
+    response = JsonResponse(credential.credential_data)
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
+    return response
+
+
+@extend_schema(
+    description="Returns the json for the verifiable credential with the given ID",
+    responses={200: VerifiableCredentialSerializer(many=True)},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_program_credential(request, credential_id):  # noqa: ARG001
+    credential = get_object_or_404(
+        VerifiableCredential,
+        pk=credential_id,
+    )
+    response = JsonResponse(credential.credential_data)
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
+    return response
