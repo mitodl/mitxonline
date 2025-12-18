@@ -5,6 +5,7 @@ MITxOnline ecommerce serializers
 from decimal import Decimal
 
 import pytz
+from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
@@ -23,6 +24,8 @@ from ecommerce.models import Basket, BasketItem, Order, Product
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.settings import TIME_ZONE
 from users.serializers import ExtendedLegalAddressSerializer, UserSerializer
+
+User = get_user_model()
 
 
 class V0DiscountSerializer(serializers.ModelSerializer):
