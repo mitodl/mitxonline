@@ -184,14 +184,14 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
             "uuid",
             "is_revoked",
             "certificate_page",
-            "verifiable_credential_json"
+            "verifiable_credential_json",
         ]
         read_only_fields = [
             "user",
             "uuid",
             "is_revoked",
             "certificate_page",
-            "verifiable_credential_json"
+            "verifiable_credential_json",
         ]
 
 
