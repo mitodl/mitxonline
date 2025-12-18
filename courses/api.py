@@ -1340,14 +1340,12 @@ ACHIEVEMENT_TYPE_MAP = {
 
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
-    # ruff: noqa: TD002, TD003, FIX002
     # TODO: Need to figure out how to construct URLs correctly. They're used as a required ID.
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
         url = certificate.course_run.courseware_url_path
         certificate_name = certificate.course_run.title
     elif isinstance(certificate, ProgramCertificate):
-        # ruff: noqa: TD002, TD003, FIX002
         # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field.
         cert_type = "program"
         url = ""
@@ -1368,17 +1366,14 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
             "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
             "https://w3id.org/security/suites/ed25519-2020/v1",
         ],
-        # ruff: noqa: TD002, TD003, FIX002
         # TODO: Need to figure out if this should use the same value as the certificate
         "id": f"urn:uuid:{certificate.uuid}",
         "type": ["VerifiableCredential", "OpenBadgeCredential"],
         "issuer": {
-            # ruff: noqa: TD002, TD003, FIX002
             "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",  # TODO: replace with real DID
             "type": ["Profile"],
             "name": "MIT Learn",
             "image": {
-                # ruff: noqa: TD002, TD003, FIX002
                 # TODO: Needs to be hosted somewhere better
                 "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
                 "type": "Image",
