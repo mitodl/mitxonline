@@ -670,13 +670,27 @@ class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
     permission_classes = (IsAdminUser,)
     pagination_class = LimitOffsetPagination
 
+    def create(self, request, **kwargs):
+        """Create an association between a user and a discount."""
+
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+
+        UserDiscount.objects.create(discount=discount, user_id=request.data["user"])
+
+        return Response(
+            UserDiscountMetaSerializer(
+                UserDiscount.objects.filter(discount=discount).all(), many=True
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
     def partial_update(self, request, **kwargs):
         """Partial update for a user discount."""
 
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
 
         (_, created) = UserDiscount.objects.get_or_create(
-            discount=discount, user_id=request.data["user_id"]
+            discount=discount, user_id=request.data["user"]
         )
 
         return Response(
