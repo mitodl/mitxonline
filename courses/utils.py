@@ -251,8 +251,3 @@ def get_approved_flexible_price_exists(instance, context):
         check_user = user
 
     return is_courseware_flexible_price_approved(course_or_run, check_user)
-
-
-def dc_url(path):
-    """Returns the full url to the provided path"""
-    return urljoin(settings.DIGITAL_CREDENTIAL_ISSUER_URL, path)

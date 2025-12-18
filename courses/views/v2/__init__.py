@@ -604,7 +604,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
 
 
 @extend_schema(
-    description="Returns the json for the verifiable credential with the given ID, if it belongs to the user.",
+    description="Returns the json for the verifiable credential with the given ID",
     responses={200: VerifiableCredentialSerializer(many=True)},
 )
 @api_view(["GET"])
@@ -622,7 +622,7 @@ def download_course_credential(request, credential_id):  # noqa: ARG001
 
 
 @extend_schema(
-    description="Returns the json for the verifiable credential with the given ID, if it belongs to the user.",
+    description="Returns the json for the verifiable credential with the given ID",
     responses={200: VerifiableCredentialSerializer(many=True)},
 )
 @api_view(["GET"])
