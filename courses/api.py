@@ -1340,13 +1340,13 @@ ACHIEVEMENT_TYPE_MAP = {
 
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
-    # TODO: Need to figure out how to construct URLs correctly. They're used as a required ID.
+    # TODO: Need to figure out how to construct URLs correctly. They're used as a required ID. #noqa: TD002, TD003, FIX002
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
         url = certificate.course_run.courseware_url_path
         certificate_name = certificate.course_run.title
     elif isinstance(certificate, ProgramCertificate):
-        # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field.
+        # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field. #noqa: TD002, TD003, FIX002
         cert_type = "program"
         url = ""
         certificate_name = certificate.program.title
@@ -1366,15 +1366,15 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
             "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
             "https://w3id.org/security/suites/ed25519-2020/v1",
         ],
-        # TODO: Need to figure out if this should use the same value as the certificate
+        # TODO: Need to figure out if this should use the same value as the certificate #noqa: TD002, TD003, FIX002
         "id": f"urn:uuid:{certificate.uuid}",
         "type": ["VerifiableCredential", "OpenBadgeCredential"],
         "issuer": {
-            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",  # TODO: replace with real DID
+            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",  # TODO: replace with real DID #noqa: TD002, TD003, FIX002
             "type": ["Profile"],
             "name": "MIT Learn",
             "image": {
-                # TODO: Needs to be hosted somewhere better
+                # TODO: Needs to be hosted somewhere better #noqa: TD002, TD003, FIX002
                 "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
                 "type": "Image",
                 "caption": "MIT Learn logo",
@@ -1383,7 +1383,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         "validFrom": valid_from,
         "credentialSubject": {
             "type": ["AchievementSubject"],
-            "activityStartDate": "2023-03-01T00:00:00Z",  # TODO: Replace with real dates?
+            "activityStartDate": "2023-03-01T00:00:00Z",  # TODO: Replace with real dates? #noqa: TD002, TD003, FIX002
             "activityEndDate": "2025-02-24T00:00:00Z",
             "identifier": [
                 {
@@ -1407,7 +1407,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
                     "caption": "MIT Learn Certificate logo",
                 },
                 "criteria": {
-                    # TODO: Need to figure out what this needs to be
+                    # TODO: Need to figure out what this needs to be #noqa: TD002, TD003, FIX002
                     "narrative": "If you wanted to add some kind of criteria, e.g. a list of courses or modules, etc. CAN BE MARKDOWN"
                 },
                 "description": f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
@@ -1444,8 +1444,7 @@ def create_verifiable_credential(certificate: BaseCertificate):
         payload = get_verifiable_credentials_payload(certificate)
 
         # Call the signing service to create the new credential
-        # ruff: noqa: TD002, TD003, FIX002
-        # TODO: Needs the auth token for the signer service
+        # TODO: Needs the auth token for the signer service #noqa: TD002, TD003, FIX002
         credential = request_verifiable_credential(payload)
 
         verifiable_credential = VerifiableCredential.objects.create(
