@@ -1356,7 +1356,6 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         cert_type = "course_run"
         course_run = certificate.course_run
         # TODO: Need to confirm the URL structure #noqa: TD002, TD003, FIX002
-        # TODO: Should these all go to env specific learn URLs? #noqa: TD002, TD003, FIX002
         # In RC, the data is kinda squirrely. I need to run this by someone who knows about URL structure here.
         course_url_id = course_run.courseware_id.split.rsplit("+", 1)[0]
         url = f"https://{learn_hostname}/courses/{course_url_id}"

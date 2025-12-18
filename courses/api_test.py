@@ -2368,6 +2368,7 @@ def test_program_certificate_verifiable_credentials(
         2, user=user, course_run=factory.Iterator(course_runs)
     )
     program = program_with_requirements.program
+    ProgramEnrollmentFactory.create(user=user, program=program)
     program.add_requirement(courses[0])
     program.add_requirement(courses[1])
     program.add_requirement(courses[2])
