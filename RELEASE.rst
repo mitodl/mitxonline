@@ -1,6 +1,23 @@
 Release Notes
 =============
 
+Version 0.136.4 (Released December 18, 2025)
+---------------
+
+- fix(deps): update react monorepo (#3145)
+- Remove additional profile fields modal and related logic (#3150)
+- Verifiable credentials database population (#3147)
+- fix(deps): update dependency validator to v13.15.22 [security] (#3122)
+- fix: verify numeric usernames (#3131)
+- Keycloak admin client init unit tests (#3146)
+- Add batch import of enrollments, grades, and certificates to migrate_edx_data management command (#3143)
+- Add UE basket APIs to MITx Online (#3137)
+- fix(deps): update dependency wagtail to v7.2.1 (#3144)
+- Create program contract runs unit tests (#3141)
+- chore(deps): update actions/checkout digest to 93cb6ef (#3134)
+- Refactor Open edX course URL generation (#3140)
+- Flexible pricing tests (#3139)
+
 Version 0.136.3 (Released December 09, 2025)
 ---------------
 
