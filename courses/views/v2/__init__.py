@@ -6,7 +6,7 @@ import contextlib
 
 import django_filters
 from django.db.models import Count, Prefetch, Q
-from django.http import JsonResponse, Http404
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -609,7 +609,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def download_course_credential(request, credential_id):
+def download_course_credential(request, credential_id):  # noqa: ARG001
     credential = get_object_or_404(
         VerifiableCredential,
         pk=credential_id,
@@ -627,7 +627,7 @@ def download_course_credential(request, credential_id):
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def download_program_credential(request, credential_id):
+def download_program_credential(request, credential_id):  # noqa: ARG001
     credential = get_object_or_404(
         VerifiableCredential,
         pk=credential_id,
