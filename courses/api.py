@@ -1340,16 +1340,21 @@ ACHIEVEMENT_TYPE_MAP = {
 
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
-    # TODO: Need to figure out how to construct URLs correctly. They're used as a required ID. #noqa: TD002, TD003, FIX002
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
         url = certificate.course_run.courseware_url_path
         certificate_name = certificate.course_run.title
+        # TODO: Replace with real dates? #noqa: TD002, TD003, FIX002
+        activity_start_date = None
+        achievement_image_url = "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894"
     elif isinstance(certificate, ProgramCertificate):
         # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field. #noqa: TD002, TD003, FIX002
         cert_type = "program"
         url = ""
         certificate_name = certificate.program.title
+        # TODO: Replace with real dates? #noqa: TD002, TD003, FIX002
+        activity_start_date = None
+        achievement_image_url = "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894"
     else:
         raise InvalidCertificateTypeError
 
@@ -1360,13 +1365,13 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         if certificate.issue_date
         else now_in_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
     )
+    activity_end_date = valid_from
     return {
         "@context": [
             "https://www.w3.org/ns/credentials/v2",
             "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
             "https://w3id.org/security/suites/ed25519-2020/v1",
         ],
-        # TODO: Need to figure out if this should use the same value as the certificate #noqa: TD002, TD003, FIX002
         "id": f"urn:uuid:{certificate.uuid}",
         "type": ["VerifiableCredential", "OpenBadgeCredential"],
         "issuer": {
@@ -1383,8 +1388,8 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         "validFrom": valid_from,
         "credentialSubject": {
             "type": ["AchievementSubject"],
-            "activityStartDate": "2023-03-01T00:00:00Z",  # TODO: Replace with real dates? #noqa: TD002, TD003, FIX002
-            "activityEndDate": "2025-02-24T00:00:00Z",
+            "activityStartDate": activity_start_date,
+            "activityEndDate": activity_end_date,
             "identifier": [
                 {
                     "type": "IdentityObject",
@@ -1402,7 +1407,8 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
                 "achievementType": achievement_type,
                 "type": ["Achievement"],
                 "image": {
-                    "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
+                    # TODO: Need to replace with the course/program logo. Ask Anna for advice #noqa: TD002, TD003, FIX002
+                    "id": achievement_image_url,
                     "type": "Image",
                     "caption": "MIT Learn Certificate logo",
                 },
