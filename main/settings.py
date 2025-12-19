@@ -1543,3 +1543,15 @@ VERIFIABLE_CREDENTIAL_SIGNER_URL = get_string(
     default="",
     description="The URL of the VC Signer service. Used for issuing verifiable credentials.",
 )
+
+VERIFIABLE_CREDENTIAL_BEARER_TOKEN = get_string(
+    name="VERIFIABLE_CREDENTIAL_BEARER_TOKEN",
+    default="",
+    description="The bearer token used to authenticate with the VC Signer service.",
+)
+
+VERIFIABLE_CREDENTIAL_DID = get_string(
+    name="VERIFIABLE_CREDENTIAL_DID",
+    default="",
+    description="The Decentralized Identifier (DID) used as the issuer for verifiable credentials.",
+)
