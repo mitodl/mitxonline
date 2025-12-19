@@ -104,11 +104,9 @@ UserEnrollments = namedtuple(  # noqa: PYI024
 )
 
 
-class InvalidCertificateTypeError(Exception):
+class InvalidCertificateError(Exception):
     def __init__(self):
-        super().__init__(
-            "Invalid certificate type for verifiable credential generation."
-        )
+        super().__init__("Invalid input for verifiable credential generation.")
 
 
 def get_relevant_course_run_qset(
@@ -1360,6 +1358,10 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         course_run = certificate.course_run
         course = course_run.course
         course_page = course.page
+        if not course_page.what_you_learn:
+            # If it's empty, we can't generate a valid payload as narrative is required.
+            raise InvalidCertificateError
+
         course_url_id = course.readable_id
         url = f"https://{learn_hostname}/courses/{course_url_id}"
         certificate_name = certificate.course_run.title
@@ -1369,6 +1371,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(course_page) if course_page.feature_image else ""
         )
+        narrative = course.what_you_learn
 
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
@@ -1382,8 +1385,11 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(program_page) if program_page.feature_image else ""
         )
+        narrative = [
+            f"- {program_course.title}" for program_course in program.courses
+        ].join("\n")
     else:
-        raise InvalidCertificateTypeError
+        raise InvalidCertificateError
 
     achievement_type = ACHIEVEMENT_TYPE_MAP[cert_type]
     user_name = certificate.user.name
@@ -1434,7 +1440,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
                 "type": ["Achievement"],
                 "criteria": {
                     # This will be a markdown list of constituent courses for program certs and the value of the `what_you_learn` field for courserun certs
-                    "narrative": "If you wanted to add some kind of criteria, e.g. a list of courses or modules, etc. CAN BE MARKDOWN"
+                    "narrative": narrative
                 },
                 "description": f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
                 "name": certificate_name,
