@@ -537,7 +537,7 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
                 if hasattr(page, "title"):
                     return page.title
                 return str(page)
-            except:
+            except (AttributeError, ValueError, TypeError):
                 return f"Revision {obj.certificate_page_revision.id}"
         return "No certificate page"
 
