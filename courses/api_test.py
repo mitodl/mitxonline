@@ -2398,6 +2398,9 @@ def test_course_run_certificate_verifiable_credentials_feature_flag_disabled(
     mocker.patch(
         "courses.api.should_provision_verifiable_credential", return_value=False
     )
+    passed_grade_with_enrollment.course_run.course.page.what_you_learn = (
+        "Some learning content"
+    )
     certificate, created, deleted = process_course_run_grade_certificate(
         passed_grade_with_enrollment
     )
