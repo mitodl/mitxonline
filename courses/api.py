@@ -55,6 +55,7 @@ from courses.models import (
     ProgramRequirement,
     VerifiableCredential,
 )
+from courses.serializers.base import get_thumbnail_url
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
     exception_logging_generator,
@@ -1347,7 +1348,8 @@ ENV_TO_LEARN_HOSTNAME_MAP = {
 
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
-    # TODO: Riddled with n+1 queries. Needs fixing #noqa: TD002, TD003, FIX002
+    # TODO: We could optimize these queries #noqa: TD002, TD003, FIX002
+    # It's not a massive priority though, as we have a total of 20k certs in prod
     learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
         settings.ENVIRONMENT, "learn.mit.edu"
     )
@@ -1355,25 +1357,28 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
         course_run = certificate.course_run
+        course = course_run.course
+        course_page = course.page
         # TODO: Need to confirm the URL structure #noqa: TD002, TD003, FIX002
         # In RC, the data is kinda squirrely. I need to run this by someone who knows about URL structure here.
-        course_url_id = course_run.courseware_id.rsplit("+", 1)[0]
+        course_url_id = course.readable_id
         url = f"https://{learn_hostname}/courses/{course_url_id}"
         certificate_name = certificate.course_run.title
         activity_start_date = CourseRunEnrollment.objects.get(
             user_id=certificate.user_id, run=course_run
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
-        achievement_image_url = "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894"
+        achievement_image_url = get_thumbnail_url(course_page)
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
         program = certificate.program
+        program_page = program.page
         # TODO: Need to confirm the URL structure #noqa: TD002, TD003, FIX002
         url = f"https://{learn_hostname}/programs/{program.readable_id}"
         certificate_name = certificate.program.title
         activity_start_date = ProgramEnrollment.objects.get(
             user_id=certificate.user_id, program=program
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
-        achievement_image_url = "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894"
+        achievement_image_url = get_thumbnail_url(program_page)
     else:
         raise InvalidCertificateTypeError
 
