@@ -15,7 +15,6 @@ Main Documentation
 
    commands
    common_workflows
-   configuration
    troubleshooting
 
 Technical Reference

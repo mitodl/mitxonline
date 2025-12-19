@@ -48,7 +48,7 @@ This document will go over the basic use of the management commands. To get the 
     - If the object specified is a course run, the mapping to the contract will be removed. (The run itself is not removed.)
     - If the object specified is a program, the mapping between the program and the contract will be removed. The contract runs won't be removed either.
 
-    To understand the contract course run process, see this other page.
+    To understand the contract course run process, see [the Courseware Resources page](courseware).
 
 ### b2b_list
 
@@ -85,3 +85,21 @@ B2B data is designed to be managed via Wagtail, and some things can be viewed or
 Organizations and Contracts are Wagtail pages. An index page for organizations is be under the Home Page, and new organizations can be added here.
 
 Under each Organization page, any number of Contracts can be created as child pages.
+
+### In Wagtail
+
+You can create new and manage existing organizations and contracts within Wagtail. There are some things to be aware of before using this interface, though.
+
+- Organizations are best made in Keycloak, and then imported into MITx Online. There is a Celery task that will import organizations on a regular basis, or you can run the import manually. This will allow user management to be centralized within Keycloak. If you _must_ create an organization that exists outside of Keycloak, it's important that the Organization ID field remain blank.
+- Do not modify the Organization ID within an Organization record. Doing so will break the sync between the org and the Keycloak org, and you'll end up with a duplicate organization when the Keycloak one is synced back into the system.
+- Contracts can be created but at this point you cannot add courseware objects to them without using the management commands. Similarly, you cannot get out the enrollment codes other than the management command (or looking in Django Admin). (We will build these interfaces out but they're not ready as of this writing.)
+
+### In Django Admin
+
+The Contract and Organization pages can be viewed from within the Django Admin, but no changes can be made to them within this interface. This is to both funnel you into the Wagtail interface, and to prevent data issues, as Wagtail models are more complex than regular Django models. You can, however, drill down into the individual Contract and see what course runs and programs are associated with the Contract.
+
+Course runs within Django Admin expose the contract they belong to. If you need to manually add or remove a course run to or from a contract, you can do this here.
+
+Programs with in Django Admin expose the list of contracts they are associated with. You can update these as necessary from within this interface. Note that adding contracts to a program will not kick off the course run creation process for the program's courses. You will still need to do that with the management command, by adding the program to the contract again.
+
+Users within Django Admin also list out which organizations and contracts the user belongs to. You can manage these as necessary. If you're adding an organization to a user manually, it is important that you check the "Keep Until Seen" box, or the system will potentially remove the user's organization membership the next time they load anything from MITx Online. Also, be aware that adding a contract to a user here does not automatically put them in the organization; you will need to add them to the org and the contract. (Similarly, removing the user from all of an organization's contracts won't also remove them from the org, and may result in the user being automatically added back to some contracts as per the rules set in the contract.)
