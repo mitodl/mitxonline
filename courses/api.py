@@ -1401,7 +1401,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         "id": f"urn:uuid:{certificate.uuid}",
         "type": ["VerifiableCredential", "OpenBadgeCredential"],
         "issuer": {
-            "id": f"did:key:{settings.VERIFIABLE_CREDENTIAL_DID}",  # TODO: replace with real DID #noqa: TD002, TD003, FIX002
+            "id": f"did:key:{settings.VERIFIABLE_CREDENTIAL_DID}",
             "type": ["Profile"],
             "name": "MIT Learn",
             "image": {
@@ -1484,7 +1484,6 @@ def create_verifiable_credential(certificate: BaseCertificate):
         payload = get_verifiable_credentials_payload(certificate)
 
         # Call the signing service to create the new credential
-        # TODO: Needs the auth token for the signer service #noqa: TD002, TD003, FIX002
         credential = request_verifiable_credential(payload)
 
         verifiable_credential = VerifiableCredential.objects.create(
