@@ -1369,6 +1369,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(course_page) if course_page.feature_image else ""
         )
+
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
         program = certificate.program
@@ -1405,8 +1406,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
             "type": ["Profile"],
             "name": "MIT Learn",
             "image": {
-                # TODO: replace w/ output of https://github.com/mitodl/hq/issues/9657 # noqa: TD002, FIX002
-                "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
+                "id": "https://learn.mit.edu/images/mit-red.png",
                 "type": "Image",
                 "caption": "MIT Learn logo",
             },
@@ -1433,7 +1433,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
                 "achievementType": achievement_type,
                 "type": ["Achievement"],
                 "criteria": {
-                    # TODO: Need to figure out what this needs to be #noqa: TD002, TD003, FIX002
+                    # This will be a markdown list of constituent courses for program certs and the value of the `what_you_learn` field for courserun certs
                     "narrative": "If you wanted to add some kind of criteria, e.g. a list of courses or modules, etc. CAN BE MARKDOWN"
                 },
                 "description": f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
