@@ -1171,6 +1171,11 @@ paths:
       description: List all courses - API v2
       parameters:
       - in: query
+        name: contract_id
+        schema:
+          type: number
+        description: Only show courses belonging to this B2B contract
+      - in: query
         name: courserun_is_enrollable
         schema:
           type: boolean
@@ -1600,6 +1605,10 @@ paths:
       operationId: programs_list_v2
       description: List Programs - v2
       parameters:
+      - in: query
+        name: contract_id
+        schema:
+          type: number
       - in: query
         name: id
         schema:
