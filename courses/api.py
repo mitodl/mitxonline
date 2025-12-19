@@ -1367,18 +1367,21 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         activity_start_date = CourseRunEnrollment.objects.get(
             user_id=certificate.user_id, run=course_run
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
-        achievement_image_url = get_thumbnail_url(course_page)
+        achievement_image_url = (
+            get_thumbnail_url(course_page) if course_page.feature_image else ""
+        )
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
         program = certificate.program
         program_page = program.page
-        # TODO: Need to confirm the URL structure #noqa: TD002, TD003, FIX002
         url = f"https://{learn_hostname}/programs/{program.readable_id}"
         certificate_name = certificate.program.title
         activity_start_date = ProgramEnrollment.objects.get(
             user_id=certificate.user_id, program=program
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
-        achievement_image_url = get_thumbnail_url(program_page)
+        achievement_image_url = (
+            get_thumbnail_url(program_page) if program_page.feature_image else ""
+        )
     else:
         raise InvalidCertificateTypeError
 
@@ -1390,7 +1393,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         else now_in_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
     )
     activity_end_date = valid_from
-    return {
+    payload = {
         "@context": [
             "https://www.w3.org/ns/credentials/v2",
             "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
@@ -1430,12 +1433,6 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
                 "id": url or f"urn:uuid:{certificate.uuid}",
                 "achievementType": achievement_type,
                 "type": ["Achievement"],
-                "image": {
-                    # TODO: Need to replace with the course/program logo. Ask Anna for advice #noqa: TD002, TD003, FIX002
-                    "id": achievement_image_url,
-                    "type": "Image",
-                    "caption": "MIT Learn Certificate logo",
-                },
                 "criteria": {
                     # TODO: Need to figure out what this needs to be #noqa: TD002, TD003, FIX002
                     "narrative": "If you wanted to add some kind of criteria, e.g. a list of courses or modules, etc. CAN BE MARKDOWN"
@@ -1445,6 +1442,14 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
             },
         },
     }
+    if achievement_image_url:
+        payload["achievement"]["image"] = {
+            # TODO: Need to replace with the course/program logo. Ask Anna for advice #noqa: TD002, TD003, FIX002
+            "id": achievement_image_url,
+            "type": "Image",
+            "caption": "MIT Learn Certificate logo",
+        }
+    return payload
 
 
 def request_verifiable_credential(payload) -> dict:
