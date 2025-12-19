@@ -1385,9 +1385,9 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(program_page) if program_page.feature_image else ""
         )
-        narrative = [
-            f"- {program_course[0].title}" for program_course in program.courses
-        ].join("\n")
+        narrative = "\n".join(
+            [f"- {program_course[0].title}" for program_course in program.courses]
+        )
     else:
         raise InvalidCertificateError
 
