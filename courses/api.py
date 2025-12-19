@@ -1442,7 +1442,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         },
     }
     if achievement_image_url:
-        payload["achievement"]["image"] = {
+        payload["credentialSubject"]["achievement"]["image"] = {
             "id": achievement_image_url,
             "type": "Image",
             "caption": "MIT Learn Certificate logo",
