@@ -258,7 +258,9 @@ class Command(BaseCommand):
             )
             user.set_unusable_password()
             new_users.append(user)
-        return User.objects.bulk_create(new_users, batch_size=batch_size)
+        return User.objects.bulk_create(
+            new_users, batch_size=batch_size, ignore_conflicts=True
+        )
 
     @staticmethod
     def _bulk_create_legal_addresses(created_users, row_lookup, batch_size):
@@ -371,7 +373,7 @@ class Command(BaseCommand):
         new_grade_objects = [
             CourseRunGrade(
                 user_id=row["user_mitxonline_id"],
-                run_id=row["courserun_id"],
+                course_run_id=row["courserun_id"],
                 grade=row["courserungrade_grade"],
                 passed=row["courserungrade_is_passing"],
             )
@@ -391,7 +393,7 @@ class Command(BaseCommand):
         new_certificate_objects = [
             CourseRunCertificate(
                 user_id=row["user_mitxonline_id"],
-                run_id=row["courserun_id"],
+                course_run_id=row["courserun_id"],
                 issue_date=row["courseruncertificate_created_on"],
                 certificate_page_revision_id=row["certificate_page_revision_id"],
             )
@@ -415,7 +417,7 @@ class Command(BaseCommand):
         dry_run = options.get("dry_run")
         courserun_readable_ids = [
             readable_id.strip()
-            for readable_id in options.get("courserun_readable_ids", "").split(",")
+            for readable_id in (options.get("courserun_readable_ids") or "").split(",")
             if readable_id
         ] or None
 
