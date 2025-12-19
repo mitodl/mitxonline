@@ -1394,7 +1394,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         "id": f"urn:uuid:{certificate.uuid}",
         "type": ["VerifiableCredential", "OpenBadgeCredential"],
         "issuer": {
-            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",  # TODO: replace with real DID #noqa: TD002, TD003, FIX002
+            "id": f"did:key:{settings.VERIFIABLE_CREDENTIAL_DID}",  # TODO: replace with real DID #noqa: TD002, TD003, FIX002
             "type": ["Profile"],
             "name": "MIT Learn",
             "image": {
@@ -1443,8 +1443,15 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
 
 
 def request_verifiable_credential(payload) -> dict:
+    headers = {
+        "content-type": "application/json",
+        "Authorization": f"Bearer {settings.VERIFIABLE_CREDENTIAL_BEARER_TOKEN}",
+    }
     resp = requests.post(
-        settings.VERIFIABLE_CREDENTIAL_SIGNER_URL, json=payload, timeout=10
+        settings.VERIFIABLE_CREDENTIAL_SIGNER_URL,
+        json=payload,
+        headers=headers,
+        timeout=10,
     )
     resp.raise_for_status()
 
