@@ -1371,7 +1371,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(course_page) if course_page.feature_image else ""
         )
-        narrative = course.what_you_learn
+        narrative = course_page.what_you_learn
 
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
