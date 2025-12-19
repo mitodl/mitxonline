@@ -1340,6 +1340,7 @@ ACHIEVEMENT_TYPE_MAP = {
 }
 
 # Maps the value of settings.ENVIRONMENT to the hostname for that environment's Learn instance
+# This is ugly, if anyone has other suggestions I'm all ears.
 ENV_TO_LEARN_HOSTNAME_MAP = {
     "production": "learn.mit.edu",
     "rc": "learn.rc.mit.edu",
@@ -1349,7 +1350,7 @@ ENV_TO_LEARN_HOSTNAME_MAP = {
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     # TODO: We could optimize these queries #noqa: TD002, TD003, FIX002
-    # It's not a massive priority though, as we have a total of 20k certs in prod
+    # It's not a massive priority though, as we have a total of 20k certs in prod as of 12/25
     learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
         settings.ENVIRONMENT, "learn.mit.edu"
     )
@@ -1359,8 +1360,6 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         course_run = certificate.course_run
         course = course_run.course
         course_page = course.page
-        # TODO: Need to confirm the URL structure #noqa: TD002, TD003, FIX002
-        # In RC, the data is kinda squirrely. I need to run this by someone who knows about URL structure here.
         course_url_id = course.readable_id
         url = f"https://{learn_hostname}/courses/{course_url_id}"
         certificate_name = certificate.course_run.title
@@ -1444,7 +1443,6 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     }
     if achievement_image_url:
         payload["achievement"]["image"] = {
-            # TODO: Need to replace with the course/program logo. Ask Anna for advice #noqa: TD002, TD003, FIX002
             "id": achievement_image_url,
             "type": "Image",
             "caption": "MIT Learn Certificate logo",
