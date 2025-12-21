@@ -1,11 +1,12 @@
 """Courses API tests"""
 
 from copy import deepcopy
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 from urllib.parse import quote
+from uuid import UUID
 
 import factory
 import faker
@@ -40,6 +41,7 @@ from courses.api import (
     generate_openedx_course_url,
     generate_program_certificate,
     get_certificate_grade_eligible_runs,
+    get_verifiable_credentials_payload,
     import_courserun_from_edx,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
@@ -2408,3 +2410,217 @@ def test_course_run_certificate_verifiable_credentials_feature_flag_disabled(
     assert created
     assert not deleted
     assert certificate.verifiable_credential is None
+
+
+@patch("courses.api.CourseRunEnrollment.objects.get")
+@patch("courses.api.get_thumbnail_url")
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_verifiable_credentials_signing_payload(
+    mock_upsert_custom_properties,
+    mock_get_thumbnail_url,
+    mock_enrollment_get,
+    settings,
+    mocker,
+):
+    """Test that get_verifiable_credentials_payload generates the expected payload structure"""
+
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+
+    # Mock enrollment created_on date
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(2024, 1, 15, 10, 30, 0, tzinfo=pytz.UTC)
+    mock_enrollment_get.return_value = mock_enrollment
+
+    # Mock thumbnail URL
+    mock_get_thumbnail_url.return_value = "https://example.com/thumbnail.jpg"
+
+    # Set environment for hostname mapping
+    settings.ENVIRONMENT = "production"
+    settings.VERIFIABLE_CREDENTIAL_DID = (
+        "z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS"
+    )
+
+    # Create certificate with controlled values
+    course_run_cert = CourseRunCertificateFactory.create(
+        uuid=UUID("12345678-1234-5678-1234-567812345678"),
+        issue_date=datetime(2024, 6, 1, 12, 0, 0, tzinfo=pytz.UTC),
+    )
+
+    # Set controlled values on related objects
+    course_run_cert.user.name = "John Doe"
+    course_run_cert.user.save()
+
+    course_run_cert.course_run.title = "Introduction to Python"
+    course_run_cert.course_run.save()
+
+    course_run_cert.course_run.course.readable_id = "course-v1:MITx+6.00.1x"
+    course_run_cert.course_run.course.save()
+
+    course_run_cert.course_run.course.page.what_you_learn = (
+        "Learn Python programming fundamentals"
+    )
+    course_run_cert.course_run.course.page.save()
+
+    payload = get_verifiable_credentials_payload(course_run_cert)
+
+    # Assert the expected payload structure
+    expected_payload = {
+        "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        "id": "urn:uuid:12345678-1234-5678-1234-567812345678",
+        "type": ["VerifiableCredential", "OpenBadgeCredential"],
+        "issuer": {
+            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",
+            "type": ["Profile"],
+            "name": "MIT Learn",
+            "image": {
+                "id": "https://learn.mit.edu/images/mit-red.png",
+                "type": "Image",
+                "caption": "MIT Learn logo",
+            },
+        },
+        "validFrom": "2024-06-01T12:00:00Z",
+        "credentialSubject": {
+            "type": ["AchievementSubject"],
+            "activityStartDate": "2024-01-15T10:30:00Z",
+            "activityEndDate": "2024-06-01T12:00:00Z",
+            "identifier": [
+                {
+                    "type": "IdentityObject",
+                    "identityHash": "John Doe",
+                    "identityType": "name",
+                    "hashed": False,
+                    "salt": "not-used",
+                }
+            ],
+            "achievement": {
+                "id": "https://learn.mit.edu/courses/course-v1:MITx+6.00.1x",
+                "achievementType": "Course",
+                "type": ["Achievement"],
+                "criteria": {"narrative": "Learn Python programming fundamentals"},
+                "description": "John Doe has successfully completed all modules and earned a Course Certificate in Introduction to Python.",
+                "name": "Introduction to Python",
+                "image": {
+                    "id": "https://example.com/thumbnail.jpg",
+                    "type": "Image",
+                    "caption": "MIT Learn Certificate logo",
+                },
+            },
+        },
+    }
+
+    assert payload == expected_payload
+
+
+@patch("courses.api.ProgramEnrollment.objects.get")
+@patch("courses.api.get_thumbnail_url")
+def test_program_certificate_verifiable_credentials_signing_payload(
+    mock_get_thumbnail_url, mock_enrollment_get, settings, mocker
+):
+    """Test that get_verifiable_credentials_payload generates the expected payload structure for programs"""
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+
+    # Mock enrollment created_on date
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(2024, 2, 20, 14, 45, 0, tzinfo=pytz.UTC)
+    mock_enrollment_get.return_value = mock_enrollment
+
+    # Mock thumbnail URL
+    mock_get_thumbnail_url.return_value = "https://example.com/program-thumbnail.jpg"
+
+    # Set environment for hostname mapping
+    settings.ENVIRONMENT = "production"
+    settings.VERIFIABLE_CREDENTIAL_DID = (
+        "z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS"
+    )
+
+    # Create program certificate with controlled values
+    program_cert = ProgramCertificateFactory.create(
+        uuid=UUID("87654321-4321-8765-4321-876543218765"),
+        issue_date=datetime(2024, 7, 15, 16, 30, 0, tzinfo=pytz.UTC),
+    )
+
+    # Set controlled values on related objects
+    program_cert.user.name = "Jane Smith"
+    program_cert.user.save()
+
+    program_cert.program.title = "Data Science MicroMasters"
+    program_cert.program.readable_id = "program-v1:MITx+DataScienceMM"
+    program_cert.program.save()
+
+    # Create courses and add them to the program
+    course1 = CourseFactory.create()
+    course2 = CourseFactory.create()
+    course3 = CourseFactory.create()
+
+    program_cert.program.add_requirement(course1)
+    program_cert.program.add_requirement(course2)
+    program_cert.program.add_requirement(course3)
+
+    payload = get_verifiable_credentials_payload(program_cert)
+
+    # Build expected narrative from the actual course titles
+    narrative = "\n".join(
+        [f"- {course[0].title}" for course in program_cert.program.courses]
+    )
+
+    # Assert the expected payload structure
+    expected_payload = {
+        "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        "id": "urn:uuid:87654321-4321-8765-4321-876543218765",
+        "type": ["VerifiableCredential", "OpenBadgeCredential"],
+        "issuer": {
+            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",
+            "type": ["Profile"],
+            "name": "MIT Learn",
+            "image": {
+                "id": "https://learn.mit.edu/images/mit-red.png",
+                "type": "Image",
+                "caption": "MIT Learn logo",
+            },
+        },
+        "validFrom": "2024-07-15T16:30:00Z",
+        "credentialSubject": {
+            "type": ["AchievementSubject"],
+            "activityStartDate": "2024-02-20T14:45:00Z",
+            "activityEndDate": "2024-07-15T16:30:00Z",
+            "identifier": [
+                {
+                    "type": "IdentityObject",
+                    "identityHash": "Jane Smith",
+                    "identityType": "name",
+                    "hashed": False,
+                    "salt": "not-used",
+                }
+            ],
+            "achievement": {
+                "id": "https://learn.mit.edu/programs/program-v1:MITx+DataScienceMM",
+                "achievementType": "Program",
+                "type": ["Achievement"],
+                "criteria": {"narrative": narrative},
+                "description": "Jane Smith has successfully completed all modules and earned a Program Certificate in Data Science MicroMasters.",
+                "name": "Data Science MicroMasters",
+                "image": {
+                    "id": "https://example.com/program-thumbnail.jpg",
+                    "type": "Image",
+                    "caption": "MIT Learn Certificate logo",
+                },
+            },
+        },
+    }
+
+    assert payload == expected_payload
