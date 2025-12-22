@@ -743,12 +743,8 @@ class TestFlexiblePricingFormBuilder:
         from cms.models import FlexiblePricingFormBuilder
         from flexiblepricing.factories import CurrencyExchangeRateFactory
 
-        CurrencyExchangeRateFactory.create(
-            currency_code="USD", description="US Dollar"
-        )
-        CurrencyExchangeRateFactory.create(
-            currency_code="EUR", description="Euro"
-        )
+        CurrencyExchangeRateFactory.create(currency_code="USD", description="US Dollar")
+        CurrencyExchangeRateFactory.create(currency_code="EUR", description="Euro")
         CurrencyExchangeRateFactory.create(currency_code="GBP", description="")
 
         field = None
