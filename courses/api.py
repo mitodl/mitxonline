@@ -808,7 +808,7 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
             certificate, created = CourseRunCertificate.objects.get_or_create(
                 user=user, course_run=course_run
             )
-            # sync_hubspot_user(user)
+            sync_hubspot_user(user)
             if not certificate.verifiable_credential_id:
                 create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
@@ -1489,8 +1489,8 @@ def create_verifiable_credential(certificate: BaseCertificate):
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
     """
     try:
-        # if not should_provision_verifiable_credential():
-        #     return
+        if not should_provision_verifiable_credential():
+            return
         payload = get_verifiable_credentials_payload(certificate)
 
         # Call the signing service to create the new credential
