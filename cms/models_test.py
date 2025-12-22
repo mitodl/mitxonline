@@ -743,13 +743,13 @@ class TestFlexiblePricingFormBuilder:
         from cms.models import FlexiblePricingFormBuilder
         from flexiblepricing.factories import CurrencyExchangeRateFactory
 
-        rate1 = CurrencyExchangeRateFactory.create(
+        CurrencyExchangeRateFactory.create(
             currency_code="USD", description="US Dollar"
         )
-        rate2 = CurrencyExchangeRateFactory.create(
+        CurrencyExchangeRateFactory.create(
             currency_code="EUR", description="Euro"
         )
-        rate3 = CurrencyExchangeRateFactory.create(currency_code="GBP", description="")
+        CurrencyExchangeRateFactory.create(currency_code="GBP", description="")
 
         field = None
         options = {"label": "Country Currency"}
