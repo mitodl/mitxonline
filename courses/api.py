@@ -1396,7 +1396,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
     valid_from = (
         certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         if certificate.issue_date
-        else now_in_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
+        else certificate.created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
     )
     activity_end_date = valid_from
     payload = {
