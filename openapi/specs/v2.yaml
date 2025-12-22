@@ -1670,6 +1670,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2Program'
           description: ''
+  /api/v2/verifiable_course_credential/{credential_id}/download/:
+    get:
+      operationId: verifiable_course_credential_download_list
+      description: Returns the json for the verifiable credential with the given ID
+      parameters:
+      - in: path
+        name: credential_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - verifiable_course_credential
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v2/verifiable_program_credential/{credential_id}/download/:
+    get:
+      operationId: verifiable_program_credential_download_list
+      description: Returns the json for the verifiable credential with the given ID
+      parameters:
+      - in: path
+        name: credential_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - verifiable_program_credential
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
   /enrollments/:
     post:
       operationId: api_enrollments_create
@@ -4910,6 +4946,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
           readOnly: true
+        verifiable_credential_json:
+          readOnly: true
         course_run:
           $ref: '#/components/schemas/V2CourseRunWithCourse'
         certificate_page_revision:
@@ -4923,6 +4961,7 @@ components:
       - is_revoked
       - user
       - uuid
+      - verifiable_credential_json
     V2CourseRunWithCourse:
       type: object
       description: CourseRun model serializer - also serializes the parent Course.
@@ -5326,6 +5365,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
           readOnly: true
+        verifiable_credential_json:
+          readOnly: true
         program:
           $ref: '#/components/schemas/V2Program'
         certificate_page_revision:
@@ -5339,6 +5380,7 @@ components:
       - program
       - user
       - uuid
+      - verifiable_credential_json
     V2ProgramCollection:
       type: object
       description: Serializer for ProgramCollection

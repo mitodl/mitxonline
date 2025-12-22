@@ -1164,7 +1164,13 @@ class CourseRun(TimestampedModel):
         Checks if the course can be upgraded
         A null value means that the upgrade window is always open
         """
-        return self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
+        return (
+            self.live is True
+            and (
+                self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
+            )
+            and self.products.count() > 0
+        )
 
     @cached_property
     def is_enrollable(self):

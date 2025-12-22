@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.136.4"
+VERSION = "0.137.0"
 
 log = logging.getLogger()
 
@@ -1538,8 +1538,20 @@ TRINO_PASSWORD = get_string(
     description="Password for Trino authentication",
 )
 
-VC_SIGNER_URL = get_string(
-    name="VC_SIGNER_URL",
+VERIFIABLE_CREDENTIAL_SIGNER_URL = get_string(
+    name="VERIFIABLE_CREDENTIAL_SIGNER_URL",
     default="",
     description="The URL of the VC Signer service. Used for issuing verifiable credentials.",
+)
+
+VERIFIABLE_CREDENTIAL_BEARER_TOKEN = get_string(
+    name="VERIFIABLE_CREDENTIAL_BEARER_TOKEN",
+    default="",
+    description="The bearer token used to authenticate with the VC Signer service.",
+)
+
+VERIFIABLE_CREDENTIAL_DID = get_string(
+    name="VERIFIABLE_CREDENTIAL_DID",
+    default="",
+    description="The Decentralized Identifier (DID) used as the issuer for verifiable credentials.",
 )

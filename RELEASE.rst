@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.137.0
+---------------
+
+- Change JSON payload for verifiable credentials (#3154)
+- Add custom admin for Wagtail Revision and enhance certificate admin (#3155)
+- Fix issues with grade and certificate migration in migrate_edx_data (#3158)
+- Updating is_upgradable for CourseRun (#3124)
+- Add VC json to certificate api (#3153)
+- Adding APIs for downloading a digital credential (#3149)
+
 Version 0.136.4 (Released December 18, 2025)
 ---------------
 
