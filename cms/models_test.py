@@ -817,8 +817,8 @@ class TestFlexiblePricingFormBuilder:
         
         assert result.error_messages["required"] == "Test Label is a required field."
 
-    def test_create_country_field_ordering_matches_database_order(self):
-        """Test that create_country_field maintains the database ordering of currency exchange rates"""
+    def test_create_country_field_ordering(self):
+        """Test that create_country_field maintains alphabetical ordering of choices"""
         from cms.models import FlexiblePricingFormBuilder
         from flexiblepricing.factories import CurrencyExchangeRateFactory
         
@@ -841,9 +841,9 @@ class TestFlexiblePricingFormBuilder:
         result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
         
         expected_choices = [
-            ("ZAR", "ZAR - South African Rand"),
             ("AUD", "AUD - Australian Dollar"),
             ("MXN", "MXN - Mexican Peso"),
+            ("ZAR", "ZAR - South African Rand"),
         ]
         assert result.choices == expected_choices
 # Additional comprehensive tests for FlexiblePricingRequestForm.get_context method
