@@ -801,7 +801,7 @@ class TestFlexiblePricingFormBuilder:
         from cms.models import FlexiblePricingFormBuilder
         from flexiblepricing.factories import CurrencyExchangeRateFactory
 
-        rate = CurrencyExchangeRateFactory.create(currency_code="JPY", description=None)
+        CurrencyExchangeRateFactory.create(currency_code="JPY", description=None)
 
         field = None
         options = {"label": "Test Label"}
@@ -820,13 +820,13 @@ class TestFlexiblePricingFormBuilder:
         from cms.models import FlexiblePricingFormBuilder
         from flexiblepricing.factories import CurrencyExchangeRateFactory
 
-        rate1 = CurrencyExchangeRateFactory.create(
+        CurrencyExchangeRateFactory.create(
             currency_code="ZAR", description="South African Rand"
         )
-        rate2 = CurrencyExchangeRateFactory.create(
+        CurrencyExchangeRateFactory.create(
             currency_code="AUD", description="Australian Dollar"
         )
-        rate3 = CurrencyExchangeRateFactory.create(
+        CurrencyExchangeRateFactory.create(
             currency_code="MXN", description="Mexican Peso"
         )
 
