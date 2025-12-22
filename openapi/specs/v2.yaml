@@ -227,6 +227,280 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
           description: ''
+  /api/v0/basketitems/:
+    get:
+      operationId: basketitems_list
+      description: Returns the basket items for the current user.
+      tags:
+      - basketitems
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BasketItem'
+          description: ''
+    post:
+      operationId: basketitems_create
+      description: ViewSet for handling BasketItem operations.
+      tags:
+      - basketitems
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BasketItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BasketItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BasketItemRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+  /api/v0/basketitems/{id}/:
+    get:
+      operationId: basketitems_retrieve
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this basket item.
+        required: true
+      tags:
+      - basketitems
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+    put:
+      operationId: basketitems_update
+      description: ViewSet for handling BasketItem operations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this basket item.
+        required: true
+      tags:
+      - basketitems
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BasketItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BasketItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BasketItemRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+    patch:
+      operationId: basketitems_partial_update
+      description: ViewSet for handling BasketItem operations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this basket item.
+        required: true
+      tags:
+      - basketitems
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBasketItemRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBasketItemRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBasketItemRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+    delete:
+      operationId: basketitems_destroy
+      description: ViewSet for handling BasketItem operations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this basket item.
+        required: true
+      tags:
+      - basketitems
+      responses:
+        '204':
+          description: No response body
+  /api/v0/baskets/:
+    get:
+      operationId: baskets_list
+      description: Retrives the current user's baskets.
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BasketWithProduct'
+          description: ''
+  /api/v0/baskets/{id}/:
+    get:
+      operationId: baskets_retrieve
+      description: Retrieve a basket for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketWithProduct'
+          description: ''
+  /api/v0/baskets/add_discount/:
+    post:
+      operationId: baskets_add_discount_create
+      description: Creates or updates a basket for the current user, adding the discount
+        if valid.
+      parameters:
+      - in: query
+        name: discount_code
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: system_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketWithProduct'
+          description: ''
+  /api/v0/baskets/clear/:
+    delete:
+      operationId: baskets_clear_destroy
+      description: Clears the basket for the current user.
+      tags:
+      - baskets
+      responses:
+        '204':
+          description: Basket cleared successfully
+  /api/v0/baskets/create_from_product/{product_id}/:
+    post:
+      operationId: baskets_create_from_product_create
+      description: Creates or updates a basket for the current user, adding the selected
+        product.
+      parameters:
+      - in: path
+        name: product_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketWithProduct'
+          description: ''
+  /api/v0/baskets/create_from_product/{product_id}/{discount_code}/:
+    post:
+      operationId: create_basket_from_product_with_discount
+      description: Creates or updates a basket for the current user, adding the selected
+        product and discount.
+      parameters:
+      - in: path
+        name: discount_code
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: product_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketWithProduct'
+          description: ''
+  /api/v0/baskets/create_with_products/:
+    post:
+      operationId: baskets_create_with_products_create
+      description: Creates or updates a basket for the current user, adding the selected
+        product.
+      tags:
+      - baskets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBasketWithProductsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateBasketWithProductsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateBasketWithProductsRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketWithProduct'
+          description: ''
   /api/v0/change-emails/:
     post:
       operationId: change_emails_create
@@ -1396,6 +1670,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2Program'
           description: ''
+  /api/v2/verifiable_course_credential/{credential_id}/download/:
+    get:
+      operationId: verifiable_course_credential_download_list
+      description: Returns the json for the verifiable credential with the given ID
+      parameters:
+      - in: path
+        name: credential_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - verifiable_course_credential
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v2/verifiable_program_credential/{credential_id}/download/:
+    get:
+      operationId: verifiable_program_credential_download_list
+      description: Returns the json for the verifiable credential with the given ID
+      parameters:
+      - in: path
+        name: credential_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - verifiable_program_credential
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
   /enrollments/:
     post:
       operationId: api_enrollments_create
@@ -1420,6 +1730,115 @@ components:
       x-enum-descriptions:
       - anytime
       - dated
+    Basket:
+      type: object
+      description: Basket model serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+        basket_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BasketItem'
+          readOnly: true
+      required:
+      - basket_items
+      - id
+      - user
+    BasketDiscountDetail:
+      type: object
+      description: BasketDiscount model serializer
+      properties:
+        redeemed_discount:
+          $ref: '#/components/schemas/Discount'
+        redeemed_basket:
+          $ref: '#/components/schemas/Basket'
+      required:
+      - redeemed_basket
+      - redeemed_discount
+    BasketItem:
+      type: object
+      description: BasketItem model serializer
+      properties:
+        basket:
+          type: integer
+        product:
+          type: integer
+        id:
+          type: integer
+          readOnly: true
+      required:
+      - basket
+      - id
+      - product
+    BasketItemRequest:
+      type: object
+      description: BasketItem model serializer
+      properties:
+        basket:
+          type: integer
+        product:
+          type: integer
+      required:
+      - basket
+      - product
+    BasketWithProduct:
+      type: object
+      description: Serializer for Basket model with product details
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+        basket_items:
+          type: array
+          items:
+            type: object
+            properties:
+              basket:
+                type: integer
+              product:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  price:
+                    type: number
+                  description:
+                    type: string
+                  is_active:
+                    type: boolean
+                  purchasable_object:
+                    type: object
+              id:
+                type: integer
+          readOnly: true
+        total_price:
+          type: number
+          format: double
+          description: Get total price of all items in basket before discounts
+          readOnly: true
+        discounted_price:
+          type: number
+          format: double
+          description: Get total price after any discounts are applied
+          readOnly: true
+        discounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/BasketDiscountDetail'
+          readOnly: true
+      required:
+      - basket_items
+      - discounted_price
+      - discounts
+      - id
+      - total_price
+      - user
     BlankEnum:
       enum:
       - ''
@@ -2359,6 +2778,39 @@ components:
       - order
       - price
       - result
+    CreateBasketWithProductIDRequest:
+      type: object
+      description: Defines the schema for a product ID and quantity in the CreateBasketWithProductsSerializer.
+      properties:
+        product_id:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+      required:
+      - product_id
+      - quantity
+    CreateBasketWithProductsRequest:
+      type: object
+      description: Serializer for creating a basket with products. (For OpenAPI spec.)
+      properties:
+        system_slug:
+          type: string
+          minLength: 1
+        product_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateBasketWithProductIDRequest'
+        checkout:
+          type: boolean
+        discount_code:
+          type: string
+          minLength: 1
+      required:
+      - checkout
+      - discount_code
+      - product_ids
+      - system_slug
     Department:
       type: object
       description: Department model serializer
@@ -3128,6 +3580,14 @@ components:
       required:
       - email
       - name
+    PatchedBasketItemRequest:
+      type: object
+      description: BasketItem model serializer
+      properties:
+        basket:
+          type: integer
+        product:
+          type: integer
     PatchedChangeEmailRequestUpdateRequest:
       type: object
       description: Serializer for confirming a user email change
@@ -4486,6 +4946,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
           readOnly: true
+        verifiable_credential_json:
+          readOnly: true
         course_run:
           $ref: '#/components/schemas/V2CourseRunWithCourse'
         certificate_page_revision:
@@ -4499,6 +4961,7 @@ components:
       - is_revoked
       - user
       - uuid
+      - verifiable_credential_json
     V2CourseRunWithCourse:
       type: object
       description: CourseRun model serializer - also serializes the parent Course.
@@ -4902,6 +5365,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
           readOnly: true
+        verifiable_credential_json:
+          readOnly: true
         program:
           $ref: '#/components/schemas/V2Program'
         certificate_page_revision:
@@ -4915,6 +5380,7 @@ components:
       - program
       - user
       - uuid
+      - verifiable_credential_json
     V2ProgramCollection:
       type: object
       description: Serializer for ProgramCollection

@@ -6,3 +6,6 @@ ENABLE_AUTO_DAILY_FEATURED_ITEMS = "mitxonline-auto-daily-featured-items"
 ENABLE_MULTIPLE_CART_ITEMS = "ENABLE_MULTIPLE_CART_ITEMS"
 
 ENABLE_GOOGLE_ANALYTICS_DATA_PUSH = "mitxonline-4099-dedp-google-analytics"
+ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING = (
+    "mitxonline-verifiable-credentials-provisioning"
+)

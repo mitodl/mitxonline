@@ -1,3 +1,4 @@
+# ruff: noqa: TD002, TD003, FIX002
 """API for the Courses app"""
 
 from __future__ import annotations
@@ -9,8 +10,9 @@ from datetime import timedelta
 from decimal import Decimal
 from traceback import format_exc
 from typing import TYPE_CHECKING
-from urllib.parse import urljoin
+from urllib.parse import urlparse
 
+import requests
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -23,6 +25,7 @@ from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
 )
+from mitol.olposthog.features import is_enabled
 from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -38,6 +41,7 @@ from courses.constants import (
     PROGRAM_TEXT_ID_PREFIX,
 )
 from courses.models import (
+    BaseCertificate,
     BlockedCountry,
     Course,
     CourseRun,
@@ -50,6 +54,7 @@ from courses.models import (
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
+    VerifiableCredential,
 )
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
@@ -59,6 +64,7 @@ from courses.utils import (
     is_letter_grade_valid,
 )
 from ecommerce.models import OrderStatus, Product
+from main import features
 from openedx.api import (
     create_edx_course_mode,
     enroll_in_edx_course_runs,
@@ -96,6 +102,13 @@ UserEnrollments = namedtuple(  # noqa: PYI024
         "past_non_program_runs",
     ],
 )
+
+
+class InvalidCertificateTypeError(Exception):
+    def __init__(self):
+        super().__init__(
+            "Invalid certificate type for verifiable credential generation."
+        )
 
 
 def get_relevant_course_run_qset(
@@ -798,6 +811,8 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
                 user=user, course_run=course_run
             )
             sync_hubspot_user(user)
+            if not certificate.verifiable_credential_id:
+                create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
         except IntegrityError:
             log.warning(
@@ -1039,6 +1054,9 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             program.title,
         )
         sync_hubspot_user(user)
+        if not program_cert.verifiable_credential_id:
+            create_verifiable_credential(program_cert)
+
         _, created = ProgramEnrollment.objects.get_or_create(
             program=program, user=user, defaults={"active": True, "change_status": None}
         )
@@ -1127,6 +1145,30 @@ def resolve_courseware_object_from_id(
         CourseRun.objects.filter(courseware_id=courseware_id).first()
         or Course.objects.filter(readable_id=courseware_id).first()
     )
+
+
+def generate_openedx_course_url(course_key: str) -> str:
+    """
+    Generate a valid edX course URL for the given course key.
+
+    Configuration Settings:
+    - OPENEDX_COURSE_BASE_URL: the base URL to use
+    - OPENEDX_COURSE_BASE_URL_SUFFIX: optional suffix to append to the URL
+    Args:
+    - course_key (str): the course key (course-v1:MITxT+1234x+1T2099) to use
+    Returns:
+    - str, the generated URL
+    """
+
+    parsed_base = urlparse(settings.OPENEDX_COURSE_BASE_URL)
+    suffix = (
+        "/" + settings.OPENEDX_COURSE_BASE_URL_SUFFIX.lstrip().lstrip("/")
+        if settings.OPENEDX_COURSE_BASE_URL_SUFFIX
+        else ""
+    )
+    new_path = f"{parsed_base[2]}{course_key}{suffix}"
+
+    return parsed_base._replace(path=new_path).geturl()
 
 
 def import_courserun_from_edx(  # noqa: C901, PLR0913
@@ -1245,10 +1287,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         live=live,
         is_self_paced=edx_course_run.is_self_paced(),
         is_source_run=is_source_run,
-        courseware_url_path=urljoin(
-            settings.OPENEDX_COURSE_BASE_URL,
-            f"/{edx_course_run.course_id}/course",
-        ),
+        courseware_url_path=generate_openedx_course_url(edx_course_run.course_id),
     )
 
     course_page = None
@@ -1293,3 +1332,132 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
                 )
 
     return (new_run, course_page, course_product)
+
+
+ACHIEVEMENT_TYPE_MAP = {
+    "course_run": "Course",
+    "program": "Program",
+}
+
+
+def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
+    # TODO: Need to figure out how to construct URLs correctly. They're used as a required ID.
+    if isinstance(certificate, CourseRunCertificate):
+        cert_type = "course_run"
+        url = certificate.course_run.courseware_url_path
+        certificate_name = certificate.course_run.title
+    elif isinstance(certificate, ProgramCertificate):
+        # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field.
+        cert_type = "program"
+        url = ""
+        certificate_name = certificate.program.title
+    else:
+        raise InvalidCertificateTypeError
+
+    achievement_type = ACHIEVEMENT_TYPE_MAP[cert_type]
+    user_name = certificate.user.name
+    valid_from = (
+        certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if certificate.issue_date
+        else now_in_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+    return {
+        "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        # TODO: Need to figure out if this should use the same value as the certificate
+        "id": f"urn:uuid:{certificate.uuid}",
+        "type": ["VerifiableCredential", "OpenBadgeCredential"],
+        "issuer": {
+            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",  # TODO: replace with real DID
+            "type": ["Profile"],
+            "name": "MIT Learn",
+            "image": {
+                # TODO: Needs to be hosted somewhere better
+                "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
+                "type": "Image",
+                "caption": "MIT Learn logo",
+            },
+        },
+        "validFrom": valid_from,
+        "validUntil": "2030-01-01T00:00:00Z",  # TODO: Remove this?
+        "credentialSubject": {
+            "type": ["AchievementSubject"],
+            "activityStartDate": "2023-03-01T00:00:00Z",  # TODO: Replace with real dates?
+            "activityEndDate": "2025-02-24T00:00:00Z",
+            "identifier": [
+                {
+                    "type": "IdentityObject",
+                    "identityHash": user_name,
+                    "identityType": "name",
+                    "hashed": False,
+                    "salt": "not-used",
+                }
+            ],
+            "achievement": {
+                # The ID is supposed to be an unambiguous URI corresponding to the course or program.
+                # For now, we will just use the URL if we have it, but we need to figure out the proper way to do this
+                # before we release anything
+                "id": url or f"urn:uuid:{certificate.uuid}",
+                "achievementType": achievement_type,
+                "type": ["Achievement"],
+                "image": {
+                    "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
+                    "type": "Image",
+                    "caption": "MIT Learn Certificate logo",
+                },
+                "criteria": {
+                    # TODO: Need to figure out what this needs to be
+                    "narrative": "If you wanted to add some kind of criteria, e.g. a list of courses or modules, etc. CAN BE MARKDOWN"
+                },
+                "description": f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
+                "name": certificate_name,
+            },
+        },
+    }
+
+
+def request_verifiable_credential(payload) -> dict:
+    resp = requests.post(
+        settings.VERIFIABLE_CREDENTIAL_SIGNER_URL, json=payload, timeout=10
+    )
+    resp.raise_for_status()
+
+    # Save the returned value as BaseCertificate.verifiable_credential
+    return resp.json()
+
+
+def should_provision_verifiable_credential() -> bool:
+    return is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING, False)  # noqa: FBT003
+
+
+def create_verifiable_credential(certificate: BaseCertificate):
+    """
+    Create a verifiable credential for the given course run certificate.
+
+    Args:
+        certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
+    """
+    try:
+        if not should_provision_verifiable_credential():
+            return
+        payload = get_verifiable_credentials_payload(certificate)
+
+        # Call the signing service to create the new credential
+        # TODO: Needs the auth token for the signer service
+        credential = request_verifiable_credential(payload)
+
+        verifiable_credential = VerifiableCredential.objects.create(
+            uuid=credential["id"], credential_data=credential
+        )
+        certificate.verifiable_credential = verifiable_credential
+        certificate.save()
+    except Exception:
+        # We don't want to block certificate creation if VC creation fails, so we swallow and log all errors to sentry
+        # We can revisit this later once we've ironed out some of the intended behavior around the json payload
+        log.exception(
+            "Error creating verifiable credential for certificate %s",
+            certificate.uuid,
+        )

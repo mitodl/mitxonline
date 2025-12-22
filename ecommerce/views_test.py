@@ -873,7 +873,7 @@ def test_discount_redemptions_api(
     )
     assert resp.status_code == 403
 
-    resp = user_drf_client.get(f"/api/v0/discounts/{discount.id}/redemptions/")
+    resp = user_drf_client.get(f"/api/discounts/{discount.id}/redemptions/")
     assert resp.status_code == 403
 
     # create basket with discount, then check for redemptions
@@ -891,7 +891,7 @@ def test_discount_redemptions_api(
     # 100% discount will redirect to user dashboard
     assert resp.status_code == 200 or resp.status_code == 302  # noqa: PLR1714
 
-    resp = admin_drf_client.get(f"/api/v0/discounts/{discount.id}/redemptions/")
+    resp = admin_drf_client.get(f"/api/discounts/{discount.id}/redemptions/")
     assert resp.status_code == 200
 
     results = resp.json()
@@ -912,7 +912,7 @@ def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
     )
     assert resp.status_code == 403
 
-    resp = user_drf_client.get(f"/api/v0/discounts/{discount.id}/assignees/")
+    resp = user_drf_client.get(f"/api/discounts/{discount.id}/assignees/")
     assert resp.status_code == 403
 
     # create a user discount using the model first
@@ -920,7 +920,7 @@ def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
     user_discount = UserDiscount(discount=discount, user=user)
     user_discount.save()
 
-    resp = admin_drf_client.get(f"/api/v0/discounts/{discount.id}/assignees/")
+    resp = admin_drf_client.get(f"/api/discounts/{discount.id}/assignees/")
     assert resp.status_code == 200
 
     data = resp.json()
@@ -934,7 +934,7 @@ def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
     )
     assert resp.status_code >= 200 and resp.status_code < 300  # noqa: PT018
 
-    resp = admin_drf_client.get(f"/api/v0/discounts/{discount.id}/assignees/")
+    resp = admin_drf_client.get(f"/api/discounts/{discount.id}/assignees/")
     assert resp.status_code == 200
 
     data = resp.json()

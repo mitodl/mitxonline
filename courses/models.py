@@ -1,3 +1,4 @@
+# ruff: noqa: TD002, TD003, FIX002
 """
 Course models
 """
@@ -1163,7 +1164,13 @@ class CourseRun(TimestampedModel):
         Checks if the course can be upgraded
         A null value means that the upgrade window is always open
         """
-        return self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
+        return (
+            self.live is True
+            and (
+                self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
+            )
+            and self.products.count() > 0
+        )
 
     @cached_property
     def is_enrollable(self):
@@ -1284,6 +1291,18 @@ def limit_to_certificate_pages():
     return {"object_id__in": list(map(str, available_revisions))}
 
 
+class VerifiableCredential(TimestampedModel):
+    """
+    Model for storing verifiable credentials for both course runs and programs
+    """
+
+    # TODO: Need to determine what this will actually be.
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
+    credential_data = models.JSONField(
+        help_text="JSON data representing the verifiable credential"
+    )
+
+
 class BaseCertificate(models.Model):
     """
     Common properties for certificate models
@@ -1297,6 +1316,9 @@ class BaseCertificate(models.Model):
         verbose_name="revoked",
     )
     issue_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    verifiable_credential = models.OneToOneField(
+        VerifiableCredential, on_delete=models.SET_NULL, blank=True, null=True
+    )
 
     class Meta:
         abstract = True

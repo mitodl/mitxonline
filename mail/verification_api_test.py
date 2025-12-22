@@ -3,39 +3,15 @@
 from urllib.parse import quote_plus
 
 import pytest
-from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.mail import EmailMessage
 from django.shortcuts import reverse
 from django.test.client import RequestFactory
 from mitol.common.pytest_utils import any_instance_of
-from social_core.backends.email import EmailAuth
-from social_django.utils import load_backend, load_strategy
 
 from mail import verification_api
 from users.models import ChangeEmailRequest
 
 pytestmark = [pytest.mark.django_db]
-
-
-def test_send_verification_email(mocker, rf):
-    """Test that send_verification_email sends an email with the link in it"""
-    send_messages_mock = mocker.patch("mail.api.send_messages")
-    email = "test@localhost"
-    request = rf.post(reverse("social:complete", args=("email",)), {"email": email})
-    # social_django depends on request.session, so use the middleware to set that
-    get_response = mocker.MagicMock()
-    SessionMiddleware(get_response).process_request(request)
-    strategy = load_strategy(request)
-    backend = load_backend(strategy, EmailAuth.name, None)
-    code = mocker.Mock(code="abc")
-    verification_api.send_verification_email(strategy, backend, code, "def")
-
-    send_messages_mock.assert_called_once_with([any_instance_of(EmailMessage)])
-
-    email_body = send_messages_mock.call_args[0][0][0].body
-    assert (
-        "/create-account/confirm/?verification_code=abc&partial_token=def" in email_body
-    )
 
 
 def test_send_verify_email_change_email(mocker, user):
