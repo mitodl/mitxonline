@@ -730,3 +730,118 @@ def test_homepage_featured_products(settings, mocker):
             "program_type": None,
         }
     ]
+
+
+class TestFlexiblePricingFormBuilder:
+    """Tests for FlexiblePricingFormBuilder methods"""
+
+    def test_create_country_field_with_currency_exchange_rates(self):
+        """Test create_country_field method with currency exchange rates in database"""
+        from cms.models import FlexiblePricingFormBuilder
+        from django.forms import ChoiceField
+        from flexiblepricing.factories import CurrencyExchangeRateFactory
+        
+        rate1 = CurrencyExchangeRateFactory.create(
+            currency_code="USD",
+            description="US Dollar"
+        )
+        rate2 = CurrencyExchangeRateFactory.create(
+            currency_code="EUR",
+            description="Euro"
+        )
+        rate3 = CurrencyExchangeRateFactory.create(
+            currency_code="GBP",
+            description=""
+        )
+        
+
+        field = None
+        options = {"label": "Country Currency"}
+        
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+        
+        assert isinstance(result, ChoiceField)
+        
+        expected_choices = [
+            ("USD", "USD - US Dollar"),
+            ("EUR", "EUR - Euro"),
+            ("GBP", "GBP"),
+        ]
+        assert set(result.choices) == set(expected_choices)
+        
+        assert "error_messages" in result.__dict__
+        assert result.error_messages["required"] == "Country Currency is a required field."
+
+    def test_create_country_field_with_no_currency_exchange_rates(self):
+        """Test create_country_field method with no currency exchange rates in database"""
+        from cms.models import FlexiblePricingFormBuilder
+        from django.forms import ChoiceField
+        
+        from flexiblepricing.models import CurrencyExchangeRate
+        CurrencyExchangeRate.objects.all().delete()
+        
+        field = None
+        options = {"label": "Currency Selection"}
+        
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+        
+
+        assert isinstance(result, ChoiceField)
+        
+        assert result.choices == []
+        
+        assert "error_messages" in result.__dict__
+        assert result.error_messages["required"] == "Currency Selection is a required field."
+
+    def test_create_country_field_with_null_description(self):
+        """Test create_country_field method with currency exchange rate having None description"""
+        from cms.models import FlexiblePricingFormBuilder
+        from django.forms import ChoiceField
+        from flexiblepricing.factories import CurrencyExchangeRateFactory
+        
+        rate = CurrencyExchangeRateFactory.create(
+            currency_code="JPY",
+            description=None
+        )
+        
+        field = None
+        options = {"label": "Test Label"}
+        
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+        
+        assert isinstance(result, ChoiceField)
+        
+        expected_choices = [("JPY", "JPY")]
+        assert result.choices == expected_choices
+        
+        assert result.error_messages["required"] == "Test Label is a required field."
+
+    def test_create_country_field_ordering_matches_database_order(self):
+        """Test that create_country_field maintains the database ordering of currency exchange rates"""
+        from cms.models import FlexiblePricingFormBuilder
+        from flexiblepricing.factories import CurrencyExchangeRateFactory
+        
+        rate1 = CurrencyExchangeRateFactory.create(
+            currency_code="ZAR",
+            description="South African Rand"
+        )
+        rate2 = CurrencyExchangeRateFactory.create(
+            currency_code="AUD",
+            description="Australian Dollar"
+        )
+        rate3 = CurrencyExchangeRateFactory.create(
+            currency_code="MXN",
+            description="Mexican Peso"
+        )
+        
+        field = None
+        options = {"label": "Currency"}
+        
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+        
+        expected_choices = [
+            ("ZAR", "ZAR - South African Rand"),
+            ("AUD", "AUD - Australian Dollar"),
+            ("MXN", "MXN - Mexican Peso"),
+        ]
+        assert result.choices == expected_choices
