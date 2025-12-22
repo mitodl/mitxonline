@@ -554,14 +554,15 @@ class FlexiblePricingFormBuilder(FormBuilder):
         Creates a ChoiceField populated with currency exchange rates.
         """
         exchange_rate_data = CurrencyExchangeRate.objects.values_list(
-            'currency_code', 'description'
-        ).order_by('currency_code')
+            "currency_code", "description"
+        ).order_by("currency_code")
 
         exchange_rates = [
             (
                 currency_code,
-                f"{currency_code} - {description}" if description and description.strip()
-                else currency_code
+                f"{currency_code} - {description}"
+                if description and description.strip()
+                else currency_code,
             )
             for currency_code, description in exchange_rate_data
         ]
