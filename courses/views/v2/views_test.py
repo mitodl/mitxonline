@@ -765,3 +765,172 @@ def test_get_program_certificate():
 
     resp400 = client.get(reverse("v2:get_program_certificate", args=["not-uuid"]))
     assert resp400.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_filter_by_contract_id_with_contracted_user(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering by contract_id returns only programs in that contract for authorized users"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_contracts.add(contract)
+
+    program_with_contract = ProgramFactory.create()
+    (course, _) = contract_ready_course
+    program_with_contract.add_requirement(course)
+    program_with_contract.refresh_from_db()
+
+    contract.add_program_courses(program_with_contract)
+
+    # Unrelated program (should not be included)
+    ProgramFactory()
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+    url = reverse("v2:programs_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    assert program_with_contract.title in [
+        program["title"] for program in response.data["results"]
+    ]
+
+
+@pytest.mark.django_db
+def test_filter_by_contract_id_without_contract_access(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering by contract_id returns only non-B2B programs if user doesn't have access"""
+    org = OrganizationPageFactory()
+    user = UserFactory()
+
+    program_with_contract = ProgramFactory()
+    (course, _) = contract_ready_course
+    contract = ContractPageFactory(active=True, organization=org)
+    program_with_contract.add_requirement(course)
+    program_with_contract.refresh_from_db()
+
+    contract.add_program_courses(program_with_contract)
+
+    # Another program without contract (should be included)
+    public_program = ProgramFactory()
+
+    request = Request(
+        RequestFactory().get("v2:programs_api-list", {"contract_id": contract.id})
+    )
+    request.user = user  # Not associated with contract
+
+    filterset = ProgramFilterSet(
+        data={"contract_id": contract.id},
+        queryset=Program.objects.all(),
+        request=request,
+    )
+
+    filtered = filterset.qs
+    assert public_program in filtered
+    assert program_with_contract in filtered
+    assert filtered.count() == 2
+
+
+@pytest.mark.django_db
+def test_filter_by_contract_id_unauthenticated_user(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering by contract_id returns only non-B2B programs if user is unauthenticated"""
+    org = OrganizationPageFactory()
+
+    program_with_contract = ProgramFactory()
+    (course, _) = contract_ready_course
+    contract = ContractPageFactory(active=True, organization=org)
+
+    program_with_contract.add_requirement(course)
+    program_with_contract.refresh_from_db()
+
+    contract.add_program_courses(program_with_contract)
+
+    public_program = ProgramFactory()
+
+    request = Request(
+        RequestFactory().get("v2:programs_api-list", {"contract_id": contract.id})
+    )
+    request.user = AnonymousUser()
+
+    filterset = ProgramFilterSet(
+        data={"contract_id": contract.id},
+        queryset=Program.objects.all(),
+        request=request,
+    )
+
+    filtered = filterset.qs
+    assert public_program in filtered
+    assert program_with_contract in filtered
+    assert filtered.count() == 2
+
+
+@pytest.mark.django_db
+def test_filter_courses_with_contract_id_authenticated_user(
+    mocker, contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering courses by contract_id returns contracted courses for authorized users"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    unrelated_course = Course.objects.create(title="Other Course")
+    CourseRunFactory(course=unrelated_course)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    titles = [result["title"] for result in response.data["results"]]
+    assert course.title in titles
+    assert unrelated_course.title not in titles
+
+
+@pytest.mark.django_db
+def test_filter_courses_with_contract_id_no_access(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering courses by contract_id returns no courses if user lacks access"""
+    org = OrganizationPageFactory(name="Test Org")
+    user = UserFactory()
+    contract = ContractPageFactory(organization=org, active=True)
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    unrelated_course = Course.objects.create(title="Other Course")
+    CourseRunFactory(course=unrelated_course)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    assert response.data["results"] == []
+
+
+@pytest.mark.django_db
+def test_filter_courses_with_contract_id_anonymous():
+    """Test that filtering courses by contract_id returns no courses for anonymous users"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+
+    client = APIClient()
+
+    unrelated_course = Course.objects.create(title="Other Course")
+    CourseRunFactory(course=unrelated_course)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    assert response.data["results"] == []
