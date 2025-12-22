@@ -550,13 +550,21 @@ class FlexiblePricingFormBuilder(FormBuilder):
         return IntegerField(**options)
 
     def create_country_field(self, field, options):  # noqa: ARG002
-        exchange_rates = []
+        """
+        Creates a ChoiceField populated with currency exchange rates.
+        """
+        exchange_rate_data = CurrencyExchangeRate.objects.values_list(
+            'currency_code', 'description'
+        ).order_by('currency_code')
 
-        for record in CurrencyExchangeRate.objects.all():
-            desc = record.currency_code
-            if record.description is not None and len(record.description) > 0:
-                desc = f"{record.currency_code} - {record.description}"
-            exchange_rates.append((record.currency_code, desc))
+        exchange_rates = [
+            (
+                currency_code,
+                f"{currency_code} - {description}" if description and description.strip()
+                else currency_code
+            )
+            for currency_code, description in exchange_rate_data
+        ]
 
         options["choices"] = exchange_rates
         options["error_messages"] = {
