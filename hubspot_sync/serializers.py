@@ -103,13 +103,13 @@ class LineSerializer(serializers.ModelSerializer):
     def get_product_id(self, instance):
         """Return the product version text_id"""
         product = self._get_product(instance)
-        if product:  # noqa: RET503
+        if product:
             return product.purchasable_object.readable_id
 
     def get_price(self, instance):
         """Get the product version price"""
         product = self._get_product(instance)
-        if product:  # noqa: RET503
+        if product:
             return format_decimal(product.price)
 
     class Meta:
@@ -182,13 +182,13 @@ class OrderToDealSerializer(serializers.ModelSerializer):
 
     def get_closedate(self, instance):
         """Return the updated_on date (as a timestamp in milliseconds) if fulfilled"""
-        if instance.state == models.OrderStatus.FULFILLED:  # noqa: RET503
+        if instance.state == models.OrderStatus.FULFILLED:
             return int(instance.updated_on.timestamp() * 1000)
 
     def get_discount_type(self, instance):
         """Get the discount type of the applied coupon"""
         discount = self._get_discount(instance)
-        if discount:  # noqa: RET503
+        if discount:
             return discount.discount_type
 
     def get_amount(self, instance):
@@ -230,7 +230,7 @@ class OrderToDealSerializer(serializers.ModelSerializer):
     def get_coupon_code(self, instance):
         """Get the coupon code used for the order if any"""
         discount = self._get_discount(instance)
-        if discount:  # noqa: RET503
+        if discount:
             return discount.discount_code
 
     class Meta:
