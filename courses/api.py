@@ -1361,8 +1361,9 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         if not course_page.what_you_learn:
             # If it's empty, we can't generate a valid payload as narrative is required.
             log.error(
-                "Error creating verifiable credential - missing 'what_you_learn' for course page %s for certificate %s",  # noqa: G004
-                course_page.title, certificate
+                "Error creating verifiable credential - missing 'what_you_learn' for course page %s for certificate %s",
+                course_page.title,
+                certificate,
             )
             raise InvalidCertificateError
 

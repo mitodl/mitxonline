@@ -5,20 +5,27 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0052_signatorypage_title_3'),
+        ("cms", "0052_signatorypage_title_3"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='coursepage',
-            name='what_you_learn',
-            field=wagtail.fields.RichTextField(blank=True, help_text='*Required for Verifiable Credential generation. What you will learn from this course.', null=True),
+            model_name="coursepage",
+            name="what_you_learn",
+            field=wagtail.fields.RichTextField(
+                blank=True,
+                help_text="*Required for Verifiable Credential generation. What you will learn from this course.",
+                null=True,
+            ),
         ),
         migrations.AlterField(
-            model_name='programpage',
-            name='what_you_learn',
-            field=wagtail.fields.RichTextField(blank=True, help_text='*Required for Verifiable Credential generation. What you will learn from this course.', null=True),
+            model_name="programpage",
+            name="what_you_learn",
+            field=wagtail.fields.RichTextField(
+                blank=True,
+                help_text="*Required for Verifiable Credential generation. What you will learn from this course.",
+                null=True,
+            ),
         ),
     ]
