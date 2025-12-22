@@ -1,4 +1,3 @@
-# ruff: noqa: TD002, TD003, FIX002
 """API for the Courses app"""
 
 from __future__ import annotations
@@ -56,6 +55,7 @@ from courses.models import (
     ProgramRequirement,
     VerifiableCredential,
 )
+from courses.serializers.base import get_thumbnail_url
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
     exception_logging_generator,
@@ -104,11 +104,9 @@ UserEnrollments = namedtuple(  # noqa: PYI024
 )
 
 
-class InvalidCertificateTypeError(Exception):
+class InvalidCertificateError(Exception):
     def __init__(self):
-        super().__init__(
-            "Invalid certificate type for verifiable credential generation."
-        )
+        super().__init__("Invalid input for verifiable credential generation.")
 
 
 def get_relevant_course_run_qset(
@@ -1339,54 +1337,91 @@ ACHIEVEMENT_TYPE_MAP = {
     "program": "Program",
 }
 
+# Maps the value of settings.ENVIRONMENT to the hostname for that environment's Learn instance
+# This is ugly, if anyone has other suggestions I'm all ears.
+ENV_TO_LEARN_HOSTNAME_MAP = {
+    "production": "learn.mit.edu",
+    "rc": "learn.rc.mit.edu",
+    "ci": "learn.ci.mit.edu",
+}
+
 
 def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
-    # TODO: Need to figure out how to construct URLs correctly. They're used as a required ID.
+    # TODO: We could optimize these queries #noqa: TD002, TD003, FIX002
+    # It's not a massive priority though, as we have a total of 20k certs in prod as of 12/25
+    learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
+        settings.ENVIRONMENT, "learn.mit.edu"
+    )
+
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
-        url = certificate.course_run.courseware_url_path
+        course_run = certificate.course_run
+        course = course_run.course
+        course_page = course.page
+        if not course_page.what_you_learn:
+            # If it's empty, we can't generate a valid payload as narrative is required.
+            raise InvalidCertificateError
+
+        course_url_id = course.readable_id
+        url = f"https://{learn_hostname}/courses/{course_url_id}"
         certificate_name = certificate.course_run.title
+        activity_start_date = CourseRunEnrollment.objects.get(
+            user_id=certificate.user_id, run=course_run
+        ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
+        achievement_image_url = (
+            get_thumbnail_url(course_page) if course_page.feature_image else ""
+        )
+        narrative = course_page.what_you_learn
+
     elif isinstance(certificate, ProgramCertificate):
-        # TODO: Completely untested. I don't know how to derive a URL from a program, which is a required field.
         cert_type = "program"
-        url = ""
+        program = certificate.program
+        program_page = program.page
+        url = f"https://{learn_hostname}/programs/{program.readable_id}"
         certificate_name = certificate.program.title
+        activity_start_date = ProgramEnrollment.objects.get(
+            user_id=certificate.user_id, program=program
+        ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
+        achievement_image_url = (
+            get_thumbnail_url(program_page) if program_page.feature_image else ""
+        )
+        narrative = "\n".join(
+            [f"- {program_course[0].title}" for program_course in program.courses]
+        )
     else:
-        raise InvalidCertificateTypeError
+        raise InvalidCertificateError
 
     achievement_type = ACHIEVEMENT_TYPE_MAP[cert_type]
     user_name = certificate.user.name
     valid_from = (
         certificate.issue_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         if certificate.issue_date
-        else now_in_utc().strftime("%Y-%m-%dT%H:%M:%SZ")
+        else certificate.created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
     )
-    return {
+    activity_end_date = valid_from
+    payload = {
         "@context": [
             "https://www.w3.org/ns/credentials/v2",
             "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
             "https://w3id.org/security/suites/ed25519-2020/v1",
         ],
-        # TODO: Need to figure out if this should use the same value as the certificate
         "id": f"urn:uuid:{certificate.uuid}",
         "type": ["VerifiableCredential", "OpenBadgeCredential"],
         "issuer": {
-            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",  # TODO: replace with real DID
+            "id": f"did:key:{settings.VERIFIABLE_CREDENTIAL_DID}",
             "type": ["Profile"],
             "name": "MIT Learn",
             "image": {
-                # TODO: Needs to be hosted somewhere better
-                "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
+                "id": "https://learn.mit.edu/images/mit-red.png",
                 "type": "Image",
                 "caption": "MIT Learn logo",
             },
         },
         "validFrom": valid_from,
-        "validUntil": "2030-01-01T00:00:00Z",  # TODO: Remove this?
         "credentialSubject": {
             "type": ["AchievementSubject"],
-            "activityStartDate": "2023-03-01T00:00:00Z",  # TODO: Replace with real dates?
-            "activityEndDate": "2025-02-24T00:00:00Z",
+            "activityStartDate": activity_start_date,
+            "activityEndDate": activity_end_date,
             "identifier": [
                 {
                     "type": "IdentityObject",
@@ -1403,25 +1438,34 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
                 "id": url or f"urn:uuid:{certificate.uuid}",
                 "achievementType": achievement_type,
                 "type": ["Achievement"],
-                "image": {
-                    "id": "https://github.com/digitalcredentials/test-files/assets/206059/01eca9f5-a508-40ac-9dd5-c12d11308894",
-                    "type": "Image",
-                    "caption": "MIT Learn Certificate logo",
-                },
                 "criteria": {
-                    # TODO: Need to figure out what this needs to be
-                    "narrative": "If you wanted to add some kind of criteria, e.g. a list of courses or modules, etc. CAN BE MARKDOWN"
+                    # This will be a markdown list of constituent courses for program certs and the value of the `what_you_learn` field for courserun certs
+                    "narrative": narrative
                 },
                 "description": f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
                 "name": certificate_name,
             },
         },
     }
+    if achievement_image_url:
+        payload["credentialSubject"]["achievement"]["image"] = {
+            "id": achievement_image_url,
+            "type": "Image",
+            "caption": "MIT Learn Certificate logo",
+        }
+    return payload
 
 
 def request_verifiable_credential(payload) -> dict:
+    headers = {
+        "content-type": "application/json",
+        "Authorization": f"Bearer {settings.VERIFIABLE_CREDENTIAL_BEARER_TOKEN}",
+    }
     resp = requests.post(
-        settings.VERIFIABLE_CREDENTIAL_SIGNER_URL, json=payload, timeout=10
+        settings.VERIFIABLE_CREDENTIAL_SIGNER_URL,
+        json=payload,
+        headers=headers,
+        timeout=10,
     )
     resp.raise_for_status()
 
@@ -1446,7 +1490,6 @@ def create_verifiable_credential(certificate: BaseCertificate):
         payload = get_verifiable_credentials_payload(certificate)
 
         # Call the signing service to create the new credential
-        # TODO: Needs the auth token for the signer service
         credential = request_verifiable_credential(payload)
 
         verifiable_credential = VerifiableCredential.objects.create(
