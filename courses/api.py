@@ -808,7 +808,7 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
             certificate, created = CourseRunCertificate.objects.get_or_create(
                 user=user, course_run=course_run
             )
-            sync_hubspot_user(user)
+            # sync_hubspot_user(user)
             if not certificate.verifiable_credential_id:
                 create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
@@ -1360,6 +1360,10 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         course_page = course.page
         if not course_page.what_you_learn:
             # If it's empty, we can't generate a valid payload as narrative is required.
+            log.error(
+                "Error creating verifiable credential - missing 'what_you_learn' for course page %s for certificate %s",  # noqa: G004
+                course_page.title, certificate
+            )
             raise InvalidCertificateError
 
         course_url_id = course.readable_id
@@ -1485,8 +1489,8 @@ def create_verifiable_credential(certificate: BaseCertificate):
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
     """
     try:
-        if not should_provision_verifiable_credential():
-            return
+        # if not should_provision_verifiable_credential():
+        #     return
         payload = get_verifiable_credentials_payload(certificate)
 
         # Call the signing service to create the new credential
