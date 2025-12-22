@@ -2412,7 +2412,7 @@ def test_course_run_certificate_verifiable_credentials_feature_flag_disabled(
     assert certificate.verifiable_credential is None
 
 
-@patch("courses.api.CourseRunEnrollment.objects.get")
+@patch("courses.api.CourseRunEnrollment.all_objects.get")
 @patch("courses.api.get_thumbnail_url")
 @patch("courses.signals.upsert_custom_properties")
 def test_course_run_certificate_verifiable_credentials_signing_payload(
@@ -2517,7 +2517,7 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
     assert payload == expected_payload
 
 
-@patch("courses.api.ProgramEnrollment.objects.get")
+@patch("courses.api.ProgramEnrollment.all_objects.get")
 @patch("courses.api.get_thumbnail_url")
 def test_program_certificate_verifiable_credentials_signing_payload(
     mock_get_thumbnail_url, mock_enrollment_get, settings, mocker

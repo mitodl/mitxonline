@@ -1365,7 +1365,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         course_url_id = course.readable_id
         url = f"https://{learn_hostname}/courses/{course_url_id}"
         certificate_name = certificate.course_run.title
-        activity_start_date = CourseRunEnrollment.objects.get(
+        activity_start_date = CourseRunEnrollment.all_objects.get(
             user_id=certificate.user_id, run=course_run
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
         achievement_image_url = (
@@ -1379,7 +1379,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         program_page = program.page
         url = f"https://{learn_hostname}/programs/{program.readable_id}"
         certificate_name = certificate.program.title
-        activity_start_date = ProgramEnrollment.objects.get(
+        activity_start_date = ProgramEnrollment.all_objects.get(
             user_id=certificate.user_id, program=program
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
         achievement_image_url = (
