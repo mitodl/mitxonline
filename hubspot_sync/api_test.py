@@ -153,7 +153,9 @@ def test_sync_contact_with_hubspot(mock_hubspot_api):
         == FAKE_HUBSPOT_ID
     )
     mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_called_once_with(
-        simple_public_object_input_for_create=api.make_contact_sync_message_from_user(user),
+        simple_public_object_input_for_create=api.make_contact_sync_message_from_user(
+            user
+        ),
         object_type=api.HubspotObjectType.CONTACTS.value,
     )
     user.refresh_from_db()
@@ -217,7 +219,9 @@ def test_sync_product_with_hubspot(mock_hubspot_api):
         == FAKE_HUBSPOT_ID
     )
     mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_called_once_with(
-        simple_public_object_input_for_create=api.make_product_sync_message_from_product(product),
+        simple_public_object_input_for_create=api.make_product_sync_message_from_product(
+            product
+        ),
         object_type=api.HubspotObjectType.PRODUCTS.value,
     )
 
@@ -230,7 +234,9 @@ def test_sync_deal_with_hubspot(mocker, mock_hubspot_api, hubspot_order):
     api.sync_deal_with_hubspot(hubspot_order)
 
     mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_called_once_with(
-        simple_public_object_input_for_create=api.make_deal_sync_message_from_order(hubspot_order),
+        simple_public_object_input_for_create=api.make_deal_sync_message_from_order(
+            hubspot_order
+        ),
         object_type=api.HubspotObjectType.DEALS.value,
     )
 
