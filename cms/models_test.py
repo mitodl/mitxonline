@@ -733,6 +733,112 @@ def test_homepage_featured_products(settings, mocker):
     ]
 
 
+class TestFlexiblePricingFormBuilder:
+    """Tests for FlexiblePricingFormBuilder methods"""
+
+    def test_create_country_field_with_currency_exchange_rates(self):
+        """Test create_country_field method with currency exchange rates in database"""
+        from django.forms import ChoiceField
+
+        from cms.models import FlexiblePricingFormBuilder
+        from flexiblepricing.factories import CurrencyExchangeRateFactory
+
+        CurrencyExchangeRateFactory.create(currency_code="USD", description="US Dollar")
+        CurrencyExchangeRateFactory.create(currency_code="EUR", description="Euro")
+        CurrencyExchangeRateFactory.create(currency_code="GBP", description="")
+
+        field = None
+        options = {"label": "Country Currency"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        assert isinstance(result, ChoiceField)
+
+        expected_choices = [
+            ("USD", "USD - US Dollar"),
+            ("EUR", "EUR - Euro"),
+            ("GBP", "GBP"),
+        ]
+        assert set(result.choices) == set(expected_choices)
+
+        assert "error_messages" in result.__dict__
+        assert (
+            result.error_messages["required"] == "Country Currency is a required field."
+        )
+
+    def test_create_country_field_with_no_currency_exchange_rates(self):
+        """Test create_country_field method with no currency exchange rates in database"""
+        from django.forms import ChoiceField
+
+        from cms.models import FlexiblePricingFormBuilder
+        from flexiblepricing.models import CurrencyExchangeRate
+
+        CurrencyExchangeRate.objects.all().delete()
+
+        field = None
+        options = {"label": "Currency Selection"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        assert isinstance(result, ChoiceField)
+
+        assert result.choices == []
+
+        assert "error_messages" in result.__dict__
+        assert (
+            result.error_messages["required"]
+            == "Currency Selection is a required field."
+        )
+
+    def test_create_country_field_with_null_description(self):
+        """Test create_country_field method with currency exchange rate having None description"""
+        from django.forms import ChoiceField
+
+        from cms.models import FlexiblePricingFormBuilder
+        from flexiblepricing.factories import CurrencyExchangeRateFactory
+
+        CurrencyExchangeRateFactory.create(currency_code="JPY", description=None)
+
+        field = None
+        options = {"label": "Test Label"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        assert isinstance(result, ChoiceField)
+
+        expected_choices = [("JPY", "JPY")]
+        assert result.choices == expected_choices
+
+        assert result.error_messages["required"] == "Test Label is a required field."
+
+    def test_create_country_field_ordering(self):
+        """Test that create_country_field maintains alphabetical ordering of choices"""
+        from cms.models import FlexiblePricingFormBuilder
+        from flexiblepricing.factories import CurrencyExchangeRateFactory
+
+        CurrencyExchangeRateFactory.create(
+            currency_code="ZAR", description="South African Rand"
+        )
+        CurrencyExchangeRateFactory.create(
+            currency_code="AUD", description="Australian Dollar"
+        )
+        CurrencyExchangeRateFactory.create(
+            currency_code="MXN", description="Mexican Peso"
+        )
+
+        field = None
+        options = {"label": "Currency"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        expected_choices = [
+            ("AUD", "AUD - Australian Dollar"),
+            ("MXN", "MXN - Mexican Peso"),
+            ("ZAR", "ZAR - South African Rand"),
+        ]
+        assert result.choices == expected_choices
+
+
 # Additional comprehensive tests for FlexiblePricingRequestForm.get_context method
 
 
