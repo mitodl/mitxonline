@@ -1,5 +1,4 @@
 """View tests for the v0 API."""
-# ruff: noqa: PLR0913
 
 import operator as op
 import random

@@ -1231,7 +1231,7 @@ def get_hubspot_id_for_object(  # noqa: C901
             serialized_product["name"],
             raise_count_error=raise_error,
         )
-    if hubspot_obj and hubspot_obj.id:  # noqa: RET503
+    if hubspot_obj and hubspot_obj.id:
         try:
             HubspotObject.objects.update_or_create(
                 object_id=obj.id,

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -48,7 +46,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     course_number = serializers.SerializerMethodField()
     courseware_url = serializers.SerializerMethodField()
 
-    def get_courseware_url(self, instance) -> Optional[str]:
+    def get_courseware_url(self, instance) -> str | None:
         """Get the courseware URL"""
         return instance.courseware_url
 

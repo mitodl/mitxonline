@@ -102,7 +102,7 @@ class VideoPlayerConfigMixin(Page):
     def video_player_config(self):
         """Get configuration for video player"""
 
-        if self.video_url:  # noqa: RET503
+        if self.video_url:
             config = {"techOrder": ["html5"], "sources": [{"src": self.video_url}]}
             try:
                 embed = get_embed(self.video_url)
