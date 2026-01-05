@@ -953,6 +953,8 @@ def test_filter_courses_with_contract_id_anonymous():
     response = client.get(url, {"contract_id": contract.id})
 
     assert response.data["results"] == []
+
+
 @pytest.mark.skip_nplusone_check
 @pytest.mark.usefixtures("b2b_courses")
 def test_program_enrollments(user_drf_client, user_with_enrollments_and_certificates):
