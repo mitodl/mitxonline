@@ -10,6 +10,7 @@ from urllib.parse import quote
 
 import pytest
 import reversion
+from anys import ANY_STR
 from django.db.models import Count, Q
 from django.test import RequestFactory
 from django.test.client import Client
@@ -20,6 +21,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from reversion.models import Version
 
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     BlockedCountryFactory,
@@ -30,6 +32,7 @@ from courses.factories import (
 from courses.models import (
     Course,
     CourseRun,
+    CourseRunEnrollment,
     Program,
     ProgramEnrollment,
 )
@@ -39,7 +42,11 @@ from courses.serializers.v1.courses import (
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v1.programs import ProgramSerializer
+from courses.serializers.v1.programs import (
+    ProgramRequirementTreeSerializer,
+    ProgramSerializer,
+)
+from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_programs,
@@ -755,36 +762,120 @@ def test_update_user_enrollment_failure(
 
 
 @pytest.mark.skip_nplusone_check
-def test_program_enrollments(user_drf_client, user, programs):
+@pytest.mark.usefixtures("b2b_courses")
+def test_program_enrollments(user_drf_client, user_with_enrollments_and_certificates):
     """
     Tests the program enrollments API, which should show the user's enrollment
     in programs with the course runs that apply.
     """
+    user = user_with_enrollments_and_certificates
 
-    enrollments = []
-    for program in programs:
-        enrollment = ProgramEnrollment(user=user, program=program)
-        enrollment.save()
-        enrollments.append(enrollment)
+    program_enrollments = (
+        ProgramEnrollment.objects.filter(user=user)
+        .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+        .order_by("-id")
+    )
 
-    course = CourseFactory.create()
-    programs[1].add_requirement(course)
-    course_run = CourseRunFactory.create(course=course)
-    course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run, user=user)
+    run_enrollments_by_program_id = {
+        program_enrollment.program_id: CourseRunEnrollment.objects.filter(
+            user=user, run__course__in_programs__program=program_enrollment.program
+        )
+        .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+        .order_by("-id")
+        for program_enrollment in program_enrollments
+    }
+
+    courses_by_program_id = {
+        program_enrollment.program_id: Course.objects.filter(
+            in_programs__program=program_enrollment.program
+        ).order_by("in_programs__path")
+        for program_enrollment in program_enrollments
+    }
+
+    # assert that we ended up with data
+    assert len(program_enrollments) > 0
+    for runs in run_enrollments_by_program_id.values():
+        assert len(runs) > 0
 
     resp = user_drf_client.get(reverse("v1:user_program_enrollments_api-list"))
 
     assert resp.status_code == status.HTTP_200_OK
 
-    resp_data = resp.json()
-
-    assert len(resp_data) == len(programs)
-
-    for program_detail in resp_data:
-        if program_detail["program"]["id"] == programs[1].id:
-            assert program_detail["enrollments"][0]["id"] == course_run_enrollment.id
-        else:
-            assert len(program_detail["enrollments"]) == 0
+    assert resp.json() == [
+        {
+            "program": {
+                "id": program_enrollment.program.id,
+                "title": program_enrollment.program.title,
+                "live": program_enrollment.program.live,
+                "departments": [],
+                "readable_id": program_enrollment.program.readable_id,
+                "req_tree": list(
+                    ProgramRequirementTreeSerializer(
+                        program_enrollment.program.get_requirements_root()
+                    ).data
+                ),
+                "requirements": {
+                    "electives": [
+                        course.id
+                        for course in program_enrollment.program.elective_courses
+                    ],
+                    "required": [
+                        course.id
+                        for course in program_enrollment.program.required_courses
+                    ],
+                },
+                "program_type": program_enrollment.program.program_type,
+                "page": dict(
+                    ProgramPageSerializer(program_enrollment.program.page).data
+                ),
+                "courses": [
+                    {
+                        "id": course.id,
+                        "instructors": [],
+                        "departments": [],
+                        "next_run_id": getattr(course.first_unexpired_run, "id", None),
+                        "current_price": None,
+                        "page": dict(CoursePageSerializer(course.page).data),
+                        "page_url": None,
+                        "programs": None,
+                        "live": course.live,
+                        "effort": course.page.effort,
+                        "length": course.page.length,
+                        "description": course.page.description,
+                        "readable_id": course.readable_id,
+                        "title": course.page.title,
+                        "financial_assistance_form_url": "",
+                        "feature_image_src": ANY_STR,
+                        "courseruns": [
+                            dict(CourseRunSerializer(run).data)
+                            for run in course.courseruns.all()
+                        ],
+                    }
+                    for course in courses_by_program_id[program_enrollment.program.id]
+                ],
+            },
+            "certificate": maybe_serialize_program_cert(
+                program_enrollment.program, user
+            ),
+            "enrollments": [
+                {
+                    "approved_flexible_price_exists": False,
+                    "edx_emails_subscription": True,
+                    "certificate": maybe_serialize_course_cert(
+                        run_enrollment.run, user
+                    ),
+                    "grades": [],
+                    "id": run_enrollment.id,
+                    "enrollment_mode": run_enrollment.enrollment_mode,
+                    "run": dict(CourseRunWithCourseSerializer(run_enrollment.run).data),
+                }
+                for run_enrollment in run_enrollments_by_program_id[
+                    program_enrollment.program_id
+                ]
+            ],
+        }
+        for program_enrollment in program_enrollments
+    ]
 
 
 @pytest.mark.parametrize("fulfilled_order_exists", [True, False])
