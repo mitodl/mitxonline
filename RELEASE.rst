@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.137.1
+---------------
+
+- Create country field unit tests (#3164)
+- fix(deps): update dependency drf-spectacular to ^0.29.0 (#3080)
+- Add better assertions to program enrollments test (#3157)
+- chore: upgrade hubspot-api-client and mitol-hubspot-api (#3163)
+- add filtering on contract_id (#3159)
+- Handle verifiable credential generation for certificates with inactive enrollments (#3166)
+
 Version 0.137.0 (Released January 05, 2026)
 ---------------
 
