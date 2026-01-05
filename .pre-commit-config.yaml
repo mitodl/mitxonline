@@ -3,7 +3,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -14,11 +14,11 @@ repos:
       - id: check-toml
       - id: debug-statements
   - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.11.0-1
+    rev: v3.12.0-2
     hooks:
       - id: shfmt
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.37.0
+    rev: v1.37.1
     hooks:
       - id: yamllint
         args: [--format, parsable, -d, relaxed]
@@ -47,7 +47,7 @@ repos:
           - "config/keycloak/*"
         additional_dependencies: ["gibberish-detector"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.11.7"
+    rev: "v0.14.10"
     hooks:
       - id: ruff-format
       - id: ruff
@@ -55,12 +55,12 @@ repos:
           - --extend-ignore=D1
           - --fix
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.10.0.1
+    rev: v0.11.0.1
     hooks:
       - id: shellcheck
         args: ["--severity=warning"]
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.7
+    rev: v1.7.10
     hooks:
       - id: actionlint
         name: actionlint
