@@ -21,6 +21,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
+from cms.models import InstructorPageLink
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -265,8 +266,21 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         """Get the queryset for the viewset."""
 
         return (
-            Course.objects.select_related("page")
-            .prefetch_related("departments", "courseruns")
+            Course.objects.select_related("page", "page__feature_image")
+            .prefetch_related("departments")
+            .prefetch_related(
+                Prefetch(
+                    "courseruns", 
+                    queryset=CourseRun.objects.select_related("b2b_contract__organization").order_by("id")
+                )
+            )
+            .prefetch_related(
+                Prefetch(
+                    "page__linked_instructors",
+                    queryset=InstructorPageLink.objects.select_related("linked_instructor_page")
+                )
+            )
+            .prefetch_related("page__topics__parent")
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
             .annotate(count_courseruns=Count("courseruns"))
             .order_by("title")

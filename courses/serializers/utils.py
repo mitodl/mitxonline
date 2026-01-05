@@ -19,25 +19,24 @@ def get_topics_from_page(page_instance) -> list[dict]:
     if not page_instance:
         return []
 
-    # Get direct topics from the page
+    # Get direct topics from the page (this should be prefetched)
     direct_topics = page_instance.topics.all()
 
-    # Get parent topics for the direct topics
-    parent_topics = CoursesTopic.objects.filter(
-        child_topics__in=direct_topics
-    ).distinct()
+    # Use a set to track all topics (direct + parent) and avoid duplicates
+    all_topic_names = set()
+    
+    # Add direct topics and their parents
+    for topic in direct_topics:
+        all_topic_names.add(topic.name)
+        # Add parent topic name if it exists (parent should be prefetched)
+        if topic.parent:
+            all_topic_names.add(topic.parent.name)
 
-    # Create list of topic names, starting with direct topics
-    all_topics = sorted(
-        [{"name": topic.name} for topic in direct_topics],
+    # Return sorted list of topic dictionaries
+    return sorted(
+        [{"name": name} for name in all_topic_names],
         key=lambda topic: topic["name"],
     )
-
-    # Add parent topics
-    for parent_topic in parent_topics:
-        all_topics.append({"name": parent_topic.name})
-
-    return all_topics
 
 
 def get_unique_topics_from_courses(courses) -> list[dict]:
