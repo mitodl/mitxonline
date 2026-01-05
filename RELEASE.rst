@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.0
+Version 0.137.0 (Released January 05, 2026)
 ---------------
 
 - Change JSON payload for verifiable credentials (#3154)
