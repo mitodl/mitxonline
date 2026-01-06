@@ -227,141 +227,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
           description: ''
-  /api/v0/basketitems/:
-    get:
-      operationId: basketitems_list
-      description: Returns the basket items for the current user.
-      tags:
-      - basketitems
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/BasketItem'
-          description: ''
-    post:
-      operationId: basketitems_create
-      description: ViewSet for handling BasketItem operations.
-      tags:
-      - basketitems
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-        required: true
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasketItem'
-          description: ''
-  /api/v0/basketitems/{id}/:
-    get:
-      operationId: basketitems_retrieve
-      description: Returns the basket items for the current user.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this basket item.
-        required: true
-      tags:
-      - basketitems
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasketItem'
-          description: ''
-    put:
-      operationId: basketitems_update
-      description: ViewSet for handling BasketItem operations.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this basket item.
-        required: true
-      tags:
-      - basketitems
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BasketItemRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasketItem'
-          description: ''
-    patch:
-      operationId: basketitems_partial_update
-      description: ViewSet for handling BasketItem operations.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this basket item.
-        required: true
-      tags:
-      - basketitems
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedBasketItemRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedBasketItemRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedBasketItemRequest'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasketItem'
-          description: ''
-    delete:
-      operationId: basketitems_destroy
-      description: ViewSet for handling BasketItem operations.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this basket item.
-        required: true
-      tags:
-      - basketitems
-      responses:
-        '204':
-          description: No response body
   /api/v0/baskets/:
     get:
       operationId: baskets_list
@@ -377,6 +242,156 @@ paths:
                 items:
                   $ref: '#/components/schemas/BasketWithProduct'
           description: ''
+  /api/v0/baskets/{parent_lookup_basket}/items/:
+    get:
+      operationId: baskets_items_list
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: integer
+        description: ID of the parent basket
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BasketItem'
+          description: ''
+    post:
+      operationId: baskets_items_create
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: integer
+        description: ID of the parent basket
+        required: true
+      tags:
+      - baskets
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+  /api/v0/baskets/{parent_lookup_basket}/items/{id}/:
+    get:
+      operationId: baskets_items_retrieve
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: integer
+        description: ID of the parent basket
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+    put:
+      operationId: baskets_items_update
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: integer
+        description: ID of the parent basket
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+    patch:
+      operationId: baskets_items_partial_update
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: integer
+        description: ID of the parent basket
+        required: true
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketItem'
+          description: ''
+    delete:
+      operationId: baskets_items_destroy
+      description: Returns the basket items for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
+        name: parent_lookup_basket
+        schema:
+          type: integer
+        description: ID of the parent basket
+        required: true
+      tags:
+      - baskets
+      responses:
+        '204':
+          description: No response body
   /api/v0/baskets/{id}/:
     get:
       operationId: baskets_retrieve
@@ -404,11 +419,6 @@ paths:
       parameters:
       - in: query
         name: discount_code
-        schema:
-          type: string
-        required: true
-      - in: path
-        name: system_slug
         schema:
           type: string
         required: true
@@ -601,6 +611,1216 @@ paths:
                 items:
                   $ref: '#/components/schemas/Country'
           description: ''
+  /api/v0/discounts/:
+    get:
+      operationId: discounts_list
+      description: API view set for Discounts
+      parameters:
+      - in: query
+        name: is_redeemed
+        schema:
+          type: string
+          enum:
+          - 'no'
+          - 'yes'
+        description: |-
+          * `yes` - yes
+          * `no` - no
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: query
+        name: payment_type
+        schema:
+          type: string
+          nullable: true
+          enum:
+          - customer-support
+          - financial-assistance
+          - legacy
+          - marketing
+          - sales
+          - staff
+        description: |-
+          * `marketing` - marketing
+          * `sales` - sales
+          * `financial-assistance` - financial-assistance
+          * `customer-support` - customer-support
+          * `staff` - staff
+          * `legacy` - legacy
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: q
+      - in: query
+        name: redemption_type
+        schema:
+          type: string
+          enum:
+          - one-time
+          - one-time-per-user
+          - unlimited
+        description: |-
+          * `one-time` - one-time
+          * `one-time-per-user` - one-time-per-user
+          * `unlimited` - unlimited
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedV0DiscountList'
+          description: ''
+    post:
+      operationId: discounts_create
+      description: API view set for Discounts
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/V0DiscountRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/V0DiscountRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/V0DiscountRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V0Discount'
+          description: ''
+  /api/v0/discounts/{parent_lookup_discount}/assignees/:
+    get:
+      operationId: discounts_assignees_list
+      description: API view set for User Discounts. This one is for use within a Discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserDiscountMetaList'
+          description: ''
+    post:
+      operationId: discounts_assignees_create
+      description: Create an association between a user and a discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserDiscountMetaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserDiscountMetaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserDiscountMetaRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDiscountMeta'
+          description: ''
+  /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/:
+    get:
+      operationId: discounts_assignees_retrieve
+      description: API view set for User Discounts. This one is for use within a Discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDiscountMeta'
+          description: ''
+    put:
+      operationId: discounts_assignees_update
+      description: API view set for User Discounts. This one is for use within a Discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserDiscountMetaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserDiscountMetaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserDiscountMetaRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDiscountMeta'
+          description: ''
+    patch:
+      operationId: discounts_assignees_partial_update
+      description: Partial update for a user discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserDiscountMetaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserDiscountMetaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserDiscountMetaRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDiscountMeta'
+          description: ''
+    delete:
+      operationId: discounts_assignees_destroy
+      description: Delete a user discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '204':
+          description: No response body
+  /api/v0/discounts/{parent_lookup_discount}/products/:
+    get:
+      operationId: discounts_products_list
+      description: API view set for Discounts
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDiscountProductList'
+          description: ''
+    post:
+      operationId: discounts_products_create
+      description: API view set for Discounts
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DiscountProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DiscountProductRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountProduct'
+          description: ''
+  /api/v0/discounts/{parent_lookup_discount}/products/{id}/:
+    get:
+      operationId: discounts_products_retrieve
+      description: API view set for Discounts
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountProduct'
+          description: ''
+    put:
+      operationId: discounts_products_update
+      description: API view set for Discounts
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DiscountProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DiscountProductRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountProduct'
+          description: ''
+    patch:
+      operationId: discounts_products_partial_update
+      description: Partial update for a discount product.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDiscountProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDiscountProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDiscountProductRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountProduct'
+          description: ''
+    delete:
+      operationId: discounts_products_destroy
+      description: Delete a linked product from a discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '204':
+          description: No response body
+  /api/v0/discounts/{parent_lookup_discount}/tiers/:
+    get:
+      operationId: discounts_tiers_list
+      description: API view set for Flexible Pricing Tiers. This one is for use within
+        a Discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFlexiblePriceTierList'
+          description: ''
+    post:
+      operationId: discounts_tiers_create
+      description: API view set for Flexible Pricing Tiers. This one is for use within
+        a Discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlexiblePriceTierRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FlexiblePriceTierRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FlexiblePriceTierRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlexiblePriceTier'
+          description: ''
+  /api/v0/discounts/{parent_lookup_discount}/tiers/{id}/:
+    get:
+      operationId: discounts_tiers_retrieve
+      description: API view set for Flexible Pricing Tiers. This one is for use within
+        a Discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlexiblePriceTier'
+          description: ''
+    put:
+      operationId: discounts_tiers_update
+      description: API view set for Flexible Pricing Tiers. This one is for use within
+        a Discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlexiblePriceTierRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FlexiblePriceTierRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FlexiblePriceTierRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlexiblePriceTier'
+          description: ''
+    patch:
+      operationId: discounts_tiers_partial_update
+      description: API view set for Flexible Pricing Tiers. This one is for use within
+        a Discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFlexiblePriceTierRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFlexiblePriceTierRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFlexiblePriceTierRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlexiblePriceTier'
+          description: ''
+    delete:
+      operationId: discounts_tiers_destroy
+      description: API view set for Flexible Pricing Tiers. This one is for use within
+        a Discount.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '204':
+          description: No response body
+  /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/:
+    get:
+      operationId: discounts_redemptions_list
+      description: API view set for Discount Redemptions
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - in: path
+        name: parent_lookup_redeemed_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDiscountRedemptionList'
+          description: ''
+    post:
+      operationId: discounts_redemptions_create
+      description: API view set for Discount Redemptions
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_redeemed_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountRedemptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DiscountRedemptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DiscountRedemptionRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountRedemption'
+          description: ''
+  /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/:
+    get:
+      operationId: discounts_redemptions_retrieve
+      description: API view set for Discount Redemptions
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_redeemed_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountRedemption'
+          description: ''
+    put:
+      operationId: discounts_redemptions_update
+      description: API view set for Discount Redemptions
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_redeemed_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountRedemptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DiscountRedemptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DiscountRedemptionRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountRedemption'
+          description: ''
+    patch:
+      operationId: discounts_redemptions_partial_update
+      description: API view set for Discount Redemptions
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_redeemed_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDiscountRedemptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDiscountRedemptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDiscountRedemptionRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountRedemption'
+          description: ''
+    delete:
+      operationId: discounts_redemptions_destroy
+      description: API view set for Discount Redemptions
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
+        name: parent_lookup_redeemed_discount
+        schema:
+          type: integer
+        description: ID of the parent discount
+        required: true
+      tags:
+      - discounts
+      responses:
+        '204':
+          description: No response body
+  /api/v0/discounts/{id}/:
+    get:
+      operationId: discounts_retrieve
+      description: API view set for Discounts
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this discount.
+        required: true
+      tags:
+      - discounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V0Discount'
+          description: ''
+    put:
+      operationId: discounts_update
+      description: API view set for Discounts
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this discount.
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/V0DiscountRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/V0DiscountRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/V0DiscountRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V0Discount'
+          description: ''
+    patch:
+      operationId: discounts_partial_update
+      description: API view set for Discounts
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this discount.
+        required: true
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedV0DiscountRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedV0DiscountRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedV0DiscountRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V0Discount'
+          description: ''
+    delete:
+      operationId: discounts_destroy
+      description: API view set for Discounts
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this discount.
+        required: true
+      tags:
+      - discounts
+      responses:
+        '204':
+          description: No response body
+  /api/v0/discounts/create_batch/:
+    post:
+      operationId: discounts_create_batch_create
+      description: |-
+        Create a batch of codes. This is used in the staff-dashboard.
+        POST arguments are the same as in generate_discount_code - look there
+        for details.
+      tags:
+      - discounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/V0DiscountRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/V0DiscountRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/V0DiscountRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V0Discount'
+          description: ''
+  /api/v0/products/:
+    get:
+      operationId: products_list
+      description: List and view products within the system.
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - products
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductList'
+          description: ''
+  /api/v0/products/{id}/:
+    get:
+      operationId: products_retrieve
+      description: List and view products within the system.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v0/products/all/:
+    get:
+      operationId: products_all_list
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - products
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductList'
+          description: ''
+    post:
+      operationId: products_all_create
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v0/products/all/{id}/:
+    get:
+      operationId: products_all_retrieve
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    put:
+      operationId: products_all_update
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    patch:
+      operationId: products_all_partial_update
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProductRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProductRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProductRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+    delete:
+      operationId: products_all_destroy
+      description: |-
+        This doesn't filter unenrollable products out, and adds name search for
+        courseware object readable id. It's really for the staff dashboard.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      responses:
+        '204':
+          description: No response body
   /api/v0/user_search/:
     get:
       operationId: user_search_list
@@ -1739,6 +2959,29 @@ components:
       x-enum-descriptions:
       - anytime
       - dated
+    BaseCourse:
+      type: object
+      description: Basic course model serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        type:
+          type: string
+          description: Returns the type of object this is serializing.
+          readOnly: true
+      required:
+      - id
+      - readable_id
+      - title
+      - type
     Basket:
       type: object
       description: Basket model serializer
@@ -1762,7 +3005,7 @@ components:
       description: BasketDiscount model serializer
       properties:
         redeemed_discount:
-          $ref: '#/components/schemas/Discount'
+          $ref: '#/components/schemas/V0Discount'
         redeemed_basket:
           $ref: '#/components/schemas/Basket'
       required:
@@ -1782,17 +3025,6 @@ components:
       required:
       - basket
       - id
-      - product
-    BasketItemRequest:
-      type: object
-      description: BasketItem model serializer
-      properties:
-        basket:
-          type: integer
-        product:
-          type: integer
-      required:
-      - basket
       - product
     BasketWithProduct:
       type: object
@@ -2938,6 +4170,67 @@ components:
       - id
       - is_redeemed
       - redemption_type
+    DiscountProduct:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        discount:
+          $ref: '#/components/schemas/V0Discount'
+        product:
+          $ref: '#/components/schemas/Product'
+      required:
+      - discount
+      - id
+      - product
+    DiscountProductRequest:
+      type: object
+      properties:
+        discount:
+          $ref: '#/components/schemas/V0DiscountRequest'
+        product:
+          $ref: '#/components/schemas/ProductRequest'
+      required:
+      - discount
+      - product
+    DiscountRedemption:
+      type: object
+      description: Serializes a discount redemption.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        redemption_date:
+          type: string
+          format: date-time
+          readOnly: true
+        redeemed_by:
+          $ref: '#/components/schemas/User'
+        redeemed_discount:
+          $ref: '#/components/schemas/V0Discount'
+        redeemed_order:
+          $ref: '#/components/schemas/Order'
+      required:
+      - id
+      - redeemed_by
+      - redeemed_discount
+      - redeemed_order
+      - redemption_date
+    DiscountRedemptionRequest:
+      type: object
+      description: Serializes a discount redemption.
+      properties:
+        redeemed_by:
+          $ref: '#/components/schemas/UserRequest'
+        redeemed_discount:
+          $ref: '#/components/schemas/V0DiscountRequest'
+        redeemed_order:
+          $ref: '#/components/schemas/OrderRequest'
+      required:
+      - redeemed_by
+      - redeemed_discount
+      - redeemed_order
     DiscountTypeEnum:
       enum:
       - percent-off
@@ -2963,6 +4256,25 @@ components:
       x-enum-descriptions:
       - audit
       - verified
+    ExtendedLegalAddress:
+      type: object
+      description: Serializer class that includes email address as part of the legal
+        address
+      properties:
+        country:
+          type: string
+          maxLength: 2
+        state:
+          type: string
+          nullable: true
+          maxLength: 10
+        email:
+          type: string
+          description: Get email from the linked user object
+          readOnly: true
+      required:
+      - country
+      - email
     Faculty:
       type: object
       description: Serializer for faculty details used in course pages.
@@ -3004,6 +4316,41 @@ components:
       - image_url
       - title
       - width
+    FlexiblePriceTier:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        courseware_object:
+          allOf:
+          - $ref: '#/components/schemas/BaseCourse'
+          readOnly: true
+        discount:
+          type: integer
+        current:
+          type: boolean
+        income_threshold_usd:
+          type: number
+          format: double
+      required:
+      - courseware_object
+      - discount
+      - id
+      - income_threshold_usd
+    FlexiblePriceTierRequest:
+      type: object
+      properties:
+        discount:
+          type: integer
+        current:
+          type: boolean
+        income_threshold_usd:
+          type: number
+          format: double
+      required:
+      - discount
+      - income_threshold_usd
     GenderEnum:
       enum:
       - m
@@ -3198,9 +4545,185 @@ components:
           maxLength: 10
       required:
       - country
+    Nested:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+        automatic:
+          type: boolean
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        redemption_type:
+          $ref: '#/components/schemas/RedemptionTypeEnum'
+        payment_type:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        max_redemptions:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+        discount_code:
+          type: string
+          maxLength: 100
+        activation_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable before this
+            date.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable after this
+            date.
+        is_bulk:
+          type: boolean
+      required:
+      - amount
+      - created_on
+      - discount_code
+      - discount_type
+      - id
+      - redemption_type
+      - updated_on
+    NodeTypeEnum:
+      enum:
+      - operator
+      - course
+      - program
+      type: string
+      description: |-
+        * `operator` - operator
+        * `course` - course
+        * `program` - program
+      x-enum-descriptions:
+      - operator
+      - course
+      - program
     NullEnum:
       enum:
       - null
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        state:
+          $ref: '#/components/schemas/StateEnum'
+        purchaser:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtendedLegalAddress'
+          readOnly: true
+        total_price_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionLine'
+          readOnly: true
+        discounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/RedeemedDiscount'
+          readOnly: true
+        refunds:
+          type: array
+          items:
+            type: object
+            properties:
+              amount:
+                type: number
+              date:
+                type: string
+                format: date-time
+          readOnly: true
+        reference_number:
+          type: string
+          nullable: true
+          maxLength: 255
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        transactions:
+          type: object
+          properties:
+            card_number:
+              type: string
+            card_type:
+              type: string
+            name:
+              type: string
+            bill_to_email:
+              type: string
+            payment_method:
+              type: string
+          readOnly: true
+        street_address:
+          type: object
+          properties:
+            line:
+              type: array
+              items:
+                type: string
+            postal_code:
+              type: string
+            state:
+              type: string
+            city:
+              type: string
+            country:
+              type: string
+          readOnly: true
+      required:
+      - created_on
+      - discounts
+      - id
+      - lines
+      - purchaser
+      - refunds
+      - state
+      - street_address
+      - total_price_paid
+      - transactions
+    OrderRequest:
+      type: object
+      properties:
+        state:
+          $ref: '#/components/schemas/StateEnum'
+        total_price_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+        reference_number:
+          type: string
+          nullable: true
+          maxLength: 255
+      required:
+      - state
+      - total_price_paid
     OrganizationPage:
       type: object
       description: Serializer for the OrganizationPage model.
@@ -3436,6 +4959,98 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CourseWithCourseRunsSerializerV2'
+    PaginatedDiscountProductList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscountProduct'
+    PaginatedDiscountRedemptionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscountRedemption'
+    PaginatedFlexiblePriceTierList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlexiblePriceTier'
+    PaginatedProductList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
     PaginatedStaffDashboardUserList:
       type: object
       required:
@@ -3459,6 +5074,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StaffDashboardUser'
+    PaginatedUserDiscountMetaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserDiscountMeta'
+    PaginatedV0DiscountList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/V0Discount'
     PaginatedV1CourseWithCourseRunsList:
       type: object
       required:
@@ -3589,26 +5250,67 @@ components:
       required:
       - email
       - name
-    PatchedBasketItemRequest:
-      type: object
-      description: BasketItem model serializer
-      properties:
-        basket:
-          type: integer
-        product:
-          type: integer
     PatchedChangeEmailRequestUpdateRequest:
       type: object
       description: Serializer for confirming a user email change
       properties:
         confirmed:
           type: boolean
+    PatchedDiscountProductRequest:
+      type: object
+      properties:
+        discount:
+          $ref: '#/components/schemas/V0DiscountRequest'
+        product:
+          $ref: '#/components/schemas/ProductRequest'
+    PatchedDiscountRedemptionRequest:
+      type: object
+      description: Serializes a discount redemption.
+      properties:
+        redeemed_by:
+          $ref: '#/components/schemas/UserRequest'
+        redeemed_discount:
+          $ref: '#/components/schemas/V0DiscountRequest'
+        redeemed_order:
+          $ref: '#/components/schemas/OrderRequest'
+    PatchedFlexiblePriceTierRequest:
+      type: object
+      properties:
+        discount:
+          type: integer
+        current:
+          type: boolean
+        income_threshold_usd:
+          type: number
+          format: double
+    PatchedProductRequest:
+      type: object
+      description: Serializes a product, including the purchasable object.
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
     PatchedUpdateCourseRunEnrollmentRequest:
       type: object
       properties:
         receive_emails:
           type: boolean
           description: Whether to receive course emails
+    PatchedUserDiscountMetaRequest:
+      type: object
+      description: Serializes UserDiscount but only allows depth = 1
+      properties:
+        discount:
+          $ref: '#/components/schemas/V0DiscountRequest'
+        user:
+          $ref: '#/components/schemas/UserRequest'
     PatchedUserRequest:
       type: object
       description: Serializer for users
@@ -3641,6 +5343,45 @@ components:
         is_active:
           type: boolean
           default: true
+    PatchedV0DiscountRequest:
+      type: object
+      properties:
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+        automatic:
+          type: boolean
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        redemption_type:
+          $ref: '#/components/schemas/RedemptionTypeEnum'
+        max_redemptions:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+        discount_code:
+          type: string
+          minLength: 1
+          maxLength: 100
+        payment_type:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        activation_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable before this
+            date.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable after this
+            date.
     PaymentTypeEnum:
       enum:
       - marketing
@@ -3680,6 +5421,75 @@ components:
       - id
       - type
       - value
+    Product:
+      type: object
+      description: Serializes a product, including the purchasable object.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+        purchasable_object:
+          oneOf:
+          - type: object
+            properties:
+              id:
+                type: integer
+              run_tag:
+                type: string
+              start_date:
+                type: string
+                format: date-time
+              end_date:
+                type: string
+                format: date-time
+          - type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              run_tag:
+                type: string
+              start_date:
+                type: string
+                format: date-time
+              end_date:
+                type: string
+                format: date-time
+              course:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  title:
+                    type: string
+                  page:
+                    type: object
+              readable_id:
+                type: string
+              enrollment_start:
+                type: string
+                format: date-time
+              enrollment_end:
+                type: string
+                format: date-time
+              course_number:
+                type: string
+          readOnly: true
+      required:
+      - description
+      - id
+      - price
+      - purchasable_object
     ProductFlexibilePrice:
       type: object
       description: Simple serializer for Product without related purchasable objects
@@ -3709,6 +5519,23 @@ components:
     ProductFlexibilePriceRequest:
       type: object
       description: Simple serializer for Product without related purchasable objects
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+      required:
+      - description
+      - price
+    ProductRequest:
+      type: object
+      description: Serializes a product, including the purchasable object.
       properties:
         price:
           type: string
@@ -3969,6 +5796,16 @@ components:
       - created_on
       - id
       - updated_on
+    RedeemedDiscount:
+      type: object
+      description: DiscountRedemption model serializer
+      properties:
+        redeemed_discount:
+          allOf:
+          - $ref: '#/components/schemas/Nested'
+          readOnly: true
+      required:
+      - redeemed_discount
     RedemptionTypeEnum:
       enum:
       - one-time
@@ -4066,6 +5903,35 @@ components:
       - id
       - legal_address
       - username
+    StateEnum:
+      enum:
+      - pending
+      - fulfilled
+      - canceled
+      - declined
+      - errored
+      - refunded
+      - review
+      - partially_refunded
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `fulfilled` - Fulfilled
+        * `canceled` - Canceled
+        * `declined` - Declined
+        * `errored` - Errored
+        * `refunded` - Refunded
+        * `review` - Review
+        * `partially_refunded` - Partially Refunded
+      x-enum-descriptions:
+      - Pending
+      - Fulfilled
+      - Canceled
+      - Declined
+      - Errored
+      - Refunded
+      - Review
+      - Partially Refunded
     Topic:
       type: object
       description: Serializer for topics used in course pages.
@@ -4076,6 +5942,40 @@ components:
           type: string
       required:
       - name
+    TransactionLine:
+      type: object
+      description: Serializes a line item from a transaction.
+      properties:
+        quantity:
+          type: integer
+        CEUs:
+          type: string
+        content_title:
+          type: string
+        readable_id:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        total_paid:
+          type: string
+        discount:
+          type: string
+        price:
+          type: string
+      required:
+      - CEUs
+      - content_title
+      - discount
+      - end_date
+      - price
+      - quantity
+      - readable_id
+      - start_date
+      - total_paid
     User:
       type: object
       description: Serializer for users
@@ -4155,6 +6055,32 @@ components:
       - is_superuser
       - legal_address
       - updated_on
+    UserDiscountMeta:
+      type: object
+      description: Serializes UserDiscount but only allows depth = 1
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        discount:
+          $ref: '#/components/schemas/V0Discount'
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+      - discount
+      - id
+      - user
+    UserDiscountMetaRequest:
+      type: object
+      description: Serializes UserDiscount but only allows depth = 1
+      properties:
+        discount:
+          $ref: '#/components/schemas/V0DiscountRequest'
+        user:
+          $ref: '#/components/schemas/UserRequest'
+      required:
+      - discount
+      - user
     UserProfile:
       type: object
       description: Serializer for profile
@@ -4315,6 +6241,136 @@ components:
       - certificate
       - enrollments
       - program
+    UserRequest:
+      type: object
+      description: Serializer for users
+      properties:
+        username:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 30
+        name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          nullable: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        legal_address:
+          allOf:
+          - $ref: '#/components/schemas/LegalAddressRequest'
+          nullable: true
+        user_profile:
+          allOf:
+          - $ref: '#/components/schemas/UserProfileRequest'
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
+      required:
+      - legal_address
+    V0Discount:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+        automatic:
+          type: boolean
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        redemption_type:
+          $ref: '#/components/schemas/RedemptionTypeEnum'
+        max_redemptions:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+        discount_code:
+          type: string
+          maxLength: 100
+        payment_type:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        is_redeemed:
+          type: boolean
+          description: Returns True if the discount has been redeemed
+          readOnly: true
+        activation_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable before this
+            date.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable after this
+            date.
+      required:
+      - amount
+      - discount_code
+      - discount_type
+      - id
+      - is_redeemed
+      - redemption_type
+    V0DiscountRequest:
+      type: object
+      properties:
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+        automatic:
+          type: boolean
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        redemption_type:
+          $ref: '#/components/schemas/RedemptionTypeEnum'
+        max_redemptions:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+        discount_code:
+          type: string
+          minLength: 1
+          maxLength: 100
+        payment_type:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        activation_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable before this
+            date.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: If set, this discount code will not be redeemable after this
+            date.
+      required:
+      - amount
+      - discount_code
+      - discount_type
+      - redemption_type
     V1BaseCourseRun:
       type: object
       description: CourseRun model serializer
@@ -4756,7 +6812,7 @@ components:
       description: Serializer for ProgramRequirement data
       properties:
         node_type:
-          $ref: '#/components/schemas/V1ProgramRequirementDataNodeTypeEnum'
+          $ref: '#/components/schemas/NodeTypeEnum'
         course:
           type: string
           nullable: true
@@ -4780,20 +6836,6 @@ components:
           default: false
       required:
       - node_type
-    V1ProgramRequirementDataNodeTypeEnum:
-      enum:
-      - operator
-      - course
-      - program
-      type: string
-      description: |-
-        * `operator` - operator
-        * `course` - course
-        * `program` - program
-      x-enum-descriptions:
-      - operator
-      - course
-      - program
     V2Course:
       type: object
       description: Course model serializer
@@ -5449,7 +7491,7 @@ components:
       description: Serializer for ProgramRequirement data
       properties:
         node_type:
-          $ref: '#/components/schemas/V2ProgramRequirementDataNodeTypeEnum'
+          $ref: '#/components/schemas/NodeTypeEnum'
         course:
           type: integer
           nullable: true
@@ -5474,20 +7516,6 @@ components:
           default: false
       required:
       - node_type
-    V2ProgramRequirementDataNodeTypeEnum:
-      enum:
-      - course
-      - program
-      - operator
-      type: string
-      description: |-
-        * `course` - course
-        * `program` - program
-        * `operator` - operator
-      x-enum-descriptions:
-      - course
-      - program
-      - operator
     V2UserProgramEnrollmentDetail:
       type: object
       description: |-
