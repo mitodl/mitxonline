@@ -3198,6 +3198,20 @@ components:
           maxLength: 10
       required:
       - country
+    NodeTypeEnum:
+      enum:
+      - operator
+      - course
+      - program
+      type: string
+      description: |-
+        * `operator` - operator
+        * `course` - course
+        * `program` - program
+      x-enum-descriptions:
+      - operator
+      - course
+      - program
     NullEnum:
       enum:
       - null
@@ -4756,7 +4770,7 @@ components:
       description: Serializer for ProgramRequirement data
       properties:
         node_type:
-          $ref: '#/components/schemas/V1ProgramRequirementDataNodeTypeEnum'
+          $ref: '#/components/schemas/NodeTypeEnum'
         course:
           type: string
           nullable: true
@@ -4780,20 +4794,6 @@ components:
           default: false
       required:
       - node_type
-    V1ProgramRequirementDataNodeTypeEnum:
-      enum:
-      - operator
-      - course
-      - program
-      type: string
-      description: |-
-        * `operator` - operator
-        * `course` - course
-        * `program` - program
-      x-enum-descriptions:
-      - operator
-      - course
-      - program
     V2Course:
       type: object
       description: Course model serializer
@@ -5449,7 +5449,7 @@ components:
       description: Serializer for ProgramRequirement data
       properties:
         node_type:
-          $ref: '#/components/schemas/V2ProgramRequirementDataNodeTypeEnum'
+          $ref: '#/components/schemas/NodeTypeEnum'
         course:
           type: integer
           nullable: true
@@ -5474,20 +5474,6 @@ components:
           default: false
       required:
       - node_type
-    V2ProgramRequirementDataNodeTypeEnum:
-      enum:
-      - course
-      - program
-      - operator
-      type: string
-      description: |-
-        * `course` - course
-        * `program` - program
-        * `operator` - operator
-      x-enum-descriptions:
-      - course
-      - program
-      - operator
     V2UserProgramEnrollmentDetail:
       type: object
       description: |-
