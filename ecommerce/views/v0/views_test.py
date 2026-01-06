@@ -32,6 +32,8 @@ from ecommerce.models import (
     Discount,
     DiscountProduct,
     DiscountRedemption,
+    Order,
+    OrderStatus,
     UserDiscount,
 )
 from ecommerce.serializers import (
@@ -791,3 +793,39 @@ def test_redeem_time_limited_discount(
         assert resp_json["message"] == "Discount applied"
     else:
         assert "not found" in resp_json
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout(user, user_drf_client, products):
+    """
+    Hits the start checkout view, which should create an Order record
+    and its associated line items.
+    """
+    create_basket(user, products)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    # if there's not a payload in here, something went wrong
+    assert "payload" in resp.json()
+
+    order = Order.objects.filter(purchaser=user).get()
+
+    assert order.state == OrderStatus.PENDING
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_discounts(user, user_drf_client, products, discounts):
+    """
+    Applies a discount, then hits the start checkout view, which should create
+    an Order record and its associated line items.
+    """
+    test_redeem_discount(user, user_drf_client, products, discounts, False, False)  # noqa: FBT003
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    # if there's not a payload in here, something went wrong
+    assert "payload" in resp.json()
+
+    order = Order.objects.filter(purchaser=user).get()
+
+    assert order.state == OrderStatus.PENDING

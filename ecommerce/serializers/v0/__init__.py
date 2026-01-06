@@ -22,6 +22,15 @@ from ecommerce.constants import (
 )
 from ecommerce.models import Basket, BasketItem, Order, Product
 from flexiblepricing.api import determine_courseware_flexible_price_discount
+from main.constants import (
+    USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
+    USER_MSG_TYPE_B2B_INVALID_BASKET,
+    USER_MSG_TYPE_BASKET_EMPTY,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_DISCOUNT_INVALID,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
+)
 from main.settings import TIME_ZONE
 from users.serializers import ExtendedLegalAddressSerializer, UserSerializer
 
@@ -29,6 +38,8 @@ User = get_user_model()
 
 
 class V0DiscountSerializer(serializers.ModelSerializer):
+    """Serializes a discount."""
+
     class Meta:
         model = models.Discount
         fields = [
@@ -907,3 +918,53 @@ class OrderReceiptSerializer(serializers.ModelSerializer):
     class Meta:
         fields = ["purchaser", "lines", "coupon", "order", "receipt"]
         model = models.Order
+
+
+class CheckoutPayloadSerializer(serializers.Serializer):
+    """Serializes the payload for the checkout data."""
+
+    no_checkout = serializers.BooleanField(
+        read_only=True,
+        required=False,
+        default=False,
+        help_text="Set if the order was automatically completed and no checkout process is required.",
+    )
+    url = serializers.CharField(
+        read_only=True,
+        required=False,
+        default="",
+        help_text="The URL to POST the form to.",
+    )
+    method = serializers.CharField(
+        read_only=True,
+        required=False,
+        default="POST",
+        help_text="The method to use for the checkout form (always POST).",
+    )
+    payload = serializers.JSONField(
+        read_only=True, required=False, default={}, help_text="The data for the form."
+    )
+    order_id = serializers.IntegerField(
+        read_only=True,
+        required=False,
+        default=0,
+        help_text="If the order was automatically completed, the ID of the new order.",
+    )
+    error = serializers.ChoiceField(
+        read_only=True,
+        required=False,
+        default=None,
+        help_text="Error message for the order, if there is one.",
+        choices=(
+            USER_MSG_TYPE_ENROLL_BLOCKED,
+            USER_MSG_TYPE_ENROLL_DUPLICATED,
+            USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+            USER_MSG_TYPE_DISCOUNT_INVALID,
+            USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
+            USER_MSG_TYPE_B2B_INVALID_BASKET,
+            USER_MSG_TYPE_BASKET_EMPTY,
+        ),
+    )
+
+    class Meta:
+        fields = ["no_checkout", "url", "method", "payload", "order_id", "error"]
