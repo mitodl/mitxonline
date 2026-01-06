@@ -1,6 +1,6 @@
 import logging
 
-from wagtail.signals import page_published, page_unpublished, post_page_move
+from wagtail.signals import page_published
 
 from cms.models import FlexiblePricingRequestForm
 from cms.tasks import queue_fastly_purge_url
@@ -32,12 +32,10 @@ def fastly_purge_url_receiver(sender, **kwargs):  # noqa: ARG001
 def flex_pricing_field_check(sender, **kwargs):  # noqa: ARG001
     """
     Receives the Wagtail page_published signal and, if it's for a flexible
-    pricing request form, ensures the form has the two fields required to make
-    this work:
-    - Your Income (a Number field)
-    - Income Currency (a Country field)
+    pricing request form, ensures the form has the fields required to make
+    this work.
 
-    If these fields exist with these names, it will leave them alone. If the
+    If the fields exist with correct name/type names, it will leave them alone. If the
     fields don't exist, it will create new ones and append them to the form. If
     there are fields "in between" (name or type matches but not both), we'll
     log an error.
@@ -54,9 +52,5 @@ def flex_pricing_field_check(sender, **kwargs):  # noqa: ARG001
         else:
             logger.info("Form changed (or needs changes)")
 
-
-page_published.connect(fastly_purge_url_receiver)
-page_unpublished.connect(fastly_purge_url_receiver)
-post_page_move.connect(fastly_purge_url_receiver)
 
 page_published.connect(flex_pricing_field_check)
