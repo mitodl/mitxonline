@@ -25,7 +25,7 @@ class Command(BaseCommand):
             "-i",
             "--ids",
             type=str,
-            help="The ids of the programs or course runs to backfill",
+            help="Comma-separated list of readable ids for the programs or course runs to backfill",
             required=True,
         )
         parser.add_argument(
