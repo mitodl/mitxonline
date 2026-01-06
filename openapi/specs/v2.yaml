@@ -4604,6 +4604,20 @@ components:
       - id
       - redemption_type
       - updated_on
+    NodeTypeEnum:
+      enum:
+      - operator
+      - course
+      - program
+      type: string
+      description: |-
+        * `operator` - operator
+        * `course` - course
+        * `program` - program
+      x-enum-descriptions:
+      - operator
+      - course
+      - program
     NullEnum:
       enum:
       - null
