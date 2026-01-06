@@ -5436,6 +5436,7 @@ components:
           default: true
     PatchedV0DiscountRequest:
       type: object
+      description: Serializes a discount.
       properties:
         amount:
           type: string
@@ -6368,6 +6369,7 @@ components:
       - legal_address
     V0Discount:
       type: object
+      description: Serializes a discount.
       properties:
         id:
           type: integer
@@ -6420,6 +6422,7 @@ components:
       - redemption_type
     V0DiscountRequest:
       type: object
+      description: Serializes a discount.
       properties:
         amount:
           type: string
