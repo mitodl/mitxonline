@@ -11,6 +11,7 @@ from traceback import format_exc
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+import bleach
 import requests
 import reversion
 from django.conf import settings
@@ -1371,7 +1372,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(course_page) if course_page.feature_image else ""
         )
-        narrative = course_page.what_you_learn
+        narrative = bleach.clean(course_page.what_you_learn, tags=[], strip=True)
 
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
