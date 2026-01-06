@@ -192,7 +192,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        queryset = (
+        return (
             Course.objects.filter()
             .select_related("page")
             .prefetch_related("departments")
@@ -208,8 +208,6 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             )
             .all()
         )
-
-        return queryset
 
     def get_serializer_context(self):
         added_context = {}

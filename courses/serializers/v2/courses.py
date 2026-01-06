@@ -244,9 +244,9 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
         # Use prefetched courseruns and avoid additional queries
         if (
             hasattr(instance, "_prefetched_objects_cache")
-            and "courseruns" in instance._prefetched_objects_cache
+            and "courseruns" in instance._prefetched_objects_cache # noqa: SLF001
         ):
-            courseruns = instance._prefetched_objects_cache["courseruns"]
+            courseruns = instance._prefetched_objects_cache["courseruns"] # noqa: SLF001
         else:
             courseruns = instance.courseruns.order_by("id")
 
