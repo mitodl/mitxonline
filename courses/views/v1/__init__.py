@@ -165,14 +165,7 @@ class CourseFilterSet(django_filters.FilterSet):
 
         filter_keys = self.form.cleaned_data.keys()
 
-        # Debug print to see what's happening
-        print(f"DEBUG filter_queryset: filter_keys = {list(filter_keys)}")
-        print(
-            f"DEBUG filter_queryset: courserun_is_enrollable in filter_keys = {'courserun_is_enrollable' in filter_keys}"
-        )
-
         if "courserun_is_enrollable" not in filter_keys:
-            print("DEBUG: Adding courseruns prefetch")
             queryset = queryset.prefetch_related(
                 Prefetch(
                     "courseruns",
