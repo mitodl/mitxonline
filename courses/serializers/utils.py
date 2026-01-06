@@ -1,7 +1,6 @@
 """Utility functions for serializers"""
 
 
-
 def get_topics_from_page(page_instance) -> list[dict]:
     """
     Extract topics from a page instance, including parent topics.
