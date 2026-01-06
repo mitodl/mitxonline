@@ -9,7 +9,12 @@ import pytest
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
-from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
+from hubspot.crm.objects import (
+    ApiException,
+)
+from hubspot.crm.objects import (
+    BatchInputSimplePublicObjectBatchInputForCreate as BatchInputCreate,
+)
 from mitol.hubspot_api.api import HubspotAssociationType, HubspotObjectType
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
@@ -30,7 +35,7 @@ from hubspot_sync.tasks import (
     sync_deal_with_hubspot,
     sync_product_with_hubspot,
 )
-from users.factories import UserFactory, UserSocialAuthFactory
+from users.factories import UserFactory
 from users.models import User
 
 pytestmark = [pytest.mark.django_db]
@@ -112,7 +117,7 @@ def test_batch_upsert_hubspot_objects(settings, mocker, mocked_celery, create):
     mock_update = mocker.patch(
         "hubspot_sync.tasks.batch_update_hubspot_objects_chunked.s"
     )
-    unsynced_users = [social.user for social in UserSocialAuthFactory.create_batch(2)]
+    unsynced_users = UserFactory.create_batch(2)
     synced_users = UserFactory.create_batch(13)
     content_type = ContentType.objects.get_for_model(User)
     hs_objects = [
@@ -238,7 +243,7 @@ def test_batch_update_hubspot_objects_chunked(mocker, id_count):
     )
     mock_hubspot_api.return_value.crm.objects.batch_api.update.assert_any_call(
         HubspotObjectType.CONTACTS.value,
-        BatchInputSimplePublicObjectInput(
+        BatchInputCreate(
             inputs=make_contact_update_message_list_from_user_ids(
                 mock_ids[0 : min(id_count, 10)]
             )
@@ -296,7 +301,7 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     )
     mock_hubspot_api.return_value.crm.objects.batch_api.create.assert_any_call(
         HubspotObjectType.CONTACTS.value,
-        BatchInputSimplePublicObjectInput(
+        BatchInputCreate(
             inputs=make_contact_create_message_list_from_user_ids(
                 mock_ids[0 : min(id_count, 10)]
             )

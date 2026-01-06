@@ -6,6 +6,7 @@ import contextlib
 
 import django_filters
 from django.db.models import Count, Prefetch, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -36,10 +37,12 @@ from courses.models import (
     ProgramCollection,
     ProgramEnrollment,
     ProgramRequirement,
+    VerifiableCredential,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
     ProgramCertificateSerializer,
+    VerifiableCredentialSerializer,
 )
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
@@ -89,19 +92,22 @@ class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
 class ProgramFilterSet(django_filters.FilterSet):
     id = NumberInFilter(field_name="id", lookup_expr="in", label="Program ID")
     org_id = django_filters.NumberFilter(method="filter_by_org_id")
+    contract_id = django_filters.NumberFilter(method="filter_by_contract_id")
 
     class Meta:
         model = Program
-        fields = ["id", "live", "readable_id", "page__live", "org_id"]
+        fields = ["id", "live", "readable_id", "page__live", "org_id", "contract_id"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     @property
     def qs(self):
-        """If the request isn't explicitly filtering on org_id, exclude contracted courses."""
+        """If the request isn't explicitly filtering on org_id or contract_id, exclude contracted courses."""
 
-        if "org_id" not in getattr(self.request, "GET", {}):
+        if "org_id" not in getattr(
+            self.request, "GET", {}
+        ) and "contract_id" not in getattr(self.request, "GET", {}):
             return super().qs.filter(b2b_only=False)
 
         return super().qs
@@ -114,6 +120,18 @@ class ProgramFilterSet(django_filters.FilterSet):
             )
         else:
             return queryset.filter(b2b_only=False)
+
+    def filter_by_contract_id(self, queryset, _, contract_id):
+        """Filter according to contract_id. If the user has access to the contract, return only related programs."""
+        user = self.request.user if self.request else None
+        if (
+            user
+            and user.is_authenticated
+            and contract_id
+            and user.b2b_contracts.filter(id=contract_id).exists()
+        ):
+            return queryset.filter(contract_memberships__contract__id=contract_id)
+        return queryset.filter(b2b_only=False)
 
 
 class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
@@ -191,6 +209,11 @@ class CourseFilterSet(django_filters.FilterSet):
         label="Only show courses belonging to this B2B/UAI organization",
         field_name="org_id",
     )
+    contract_id = django_filters.NumberFilter(
+        method="filter_contract_id",
+        label="Only show courses belonging to this B2B contract",
+        field_name="contract_id",
+    )
     include_approved_financial_aid = django_filters.BooleanFilter(
         method="filter_include_approved_financial_aid",
         label="Include approved financial assistance information",
@@ -206,6 +229,7 @@ class CourseFilterSet(django_filters.FilterSet):
             "page__live",
             "courserun_is_enrollable",
             "org_id",
+            "contract_id",
             "include_approved_financial_aid",
         ]
 
@@ -219,6 +243,25 @@ class CourseFilterSet(django_filters.FilterSet):
         if user_has_org_access(user, value):
             return queryset.filter(
                 courseruns__b2b_contract__organization_id=value,
+                courseruns__b2b_contract__active=True,
+            )
+        return Course.objects.none()
+
+    def filter_contract_id(self, queryset, _, value):
+        """
+        Filter courses that have course runs linked to the specified contract_id,
+        if the user has access to that contract.
+        """
+        user = self.request.user
+
+        if (
+            user
+            and user.is_authenticated
+            and value
+            and user.b2b_contracts.filter(id=value).exists()
+        ):
+            return queryset.filter(
+                courseruns__b2b_contract__id=value,
                 courseruns__b2b_contract__active=True,
             )
         return Course.objects.none()
@@ -294,9 +337,12 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             added_context["all_runs"] = True
         if qp.get("include_approved_financial_aid"):
             added_context["include_approved_financial_aid"] = True
-        if qp.get("org_id"):
+        if qp.get("org_id") or qp.get("contract_id"):
             user = self.request.user
-            added_context["org_id"] = qp.get("org_id")
+            if qp.get("org_id"):
+                added_context["org_id"] = qp.get("org_id")
+            if qp.get("contract_id"):
+                added_context["contract_id"] = qp.get("contract_id")
             added_context["user_contracts"] = (
                 user.b2b_contracts.values_list("id", flat=True).all()
                 if user.is_authenticated and user.b2b_contracts
@@ -564,7 +610,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-            .all()
+            .order_by("-id")
         )
 
         program_list = []
@@ -579,7 +625,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page", "run__b2b_contract")
-                    .all(),
+                    .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
@@ -625,3 +671,39 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         )
 
         return self.list(request)
+
+
+@extend_schema(
+    description="Returns the json for the verifiable credential with the given ID",
+    responses={200: VerifiableCredentialSerializer(many=True)},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_course_credential(request, credential_id):  # noqa: ARG001
+    credential = get_object_or_404(
+        VerifiableCredential,
+        pk=credential_id,
+    )
+    response = JsonResponse(credential.credential_data)
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
+    return response
+
+
+@extend_schema(
+    description="Returns the json for the verifiable credential with the given ID",
+    responses={200: VerifiableCredentialSerializer(many=True)},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_program_credential(request, credential_id):  # noqa: ARG001
+    credential = get_object_or_404(
+        VerifiableCredential,
+        pk=credential_id,
+    )
+    response = JsonResponse(credential.credential_data)
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
+    return response

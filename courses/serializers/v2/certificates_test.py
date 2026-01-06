@@ -83,6 +83,9 @@ def test_serialize_certificate(is_program):
             "overrides": [],
             "signatory_items": cert_page.signatory_items,
         },
+        "verifiable_credential_json": certificate.verifiable_credential.credential_data
+        if certificate.verifiable_credential
+        else None,
     }
 
     if is_program:

@@ -8,7 +8,7 @@ from urllib.parse import urljoin
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
@@ -253,7 +253,14 @@ def apply_user_discounts(request):
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
         return
 
-    product = BasketItem.objects.get(basket=basket).product
+    # For multiple items, check each item for flexible pricing discounts
+    basket_items = BasketItem.objects.filter(basket=basket)
+    if basket_items.count() == 0:
+        return
+
+    # Use the first item's product for flexible pricing determination
+    # This maintains backward compatibility while supporting multiple items
+    product = basket_items.first().product
     flexible_price_discount = determine_courseware_flexible_price_discount(
         product, user
     )
@@ -800,3 +807,42 @@ def generate_discount_code(**kwargs):  # noqa: C901
         generated_codes.append(discount)
 
     return generated_codes
+
+
+def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
+    """
+    Get the auto-apply discounts that can be applied to a basket.
+
+    Args:
+        basket_id (int): The ID of the basket to get the auto-apply discounts for.
+
+    Returns:
+        QuerySet: The auto-apply discounts that can be applied to the basket.
+    """
+    basket = Basket.objects.get(pk=basket_id)
+    products = basket.get_products()
+
+    return Discount.objects.filter(
+        Q(products__product__in=products) | Q(products__isnull=True),
+        Q(user_discount_discount__user=basket.user)
+        | Q(user_discount_discount__isnull=True),
+        automatic=True,
+    )
+
+
+def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):
+    """
+    Apply a discount to a basket.
+
+    Args:
+        discount (Discount): The Discount to apply to the basket.
+    Keyword Args:
+        allow_finaid (bool): Allow a financial assistance discount through.
+    """
+    if discount.is_valid(basket, allow_finaid=allow_finaid):
+        BasketDiscount.objects.create(
+            redeemed_by=basket.user,
+            redeemed_discount=discount,
+            redeemed_basket=basket,
+            redemption_date=now_in_utc(),
+        )

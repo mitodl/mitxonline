@@ -14,7 +14,12 @@ from cms.wagtail_api.schema.serializers import (
     CertificatePageSerializer,
     PageMetaSerializer,
 )
-from courses.models import BaseCertificate, CourseRunCertificate, ProgramCertificate
+from courses.models import (
+    BaseCertificate,
+    CourseRunCertificate,
+    ProgramCertificate,
+    VerifiableCredential,
+)
 from courses.serializers.v2.courses import CourseRunWithCourseSerializer
 from courses.serializers.v2.programs import ProgramSerializer
 from users.serializers import PublicUserSerializer
@@ -144,6 +149,7 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
 
     user = PublicUserSerializer()
     certificate_page = serializers.SerializerMethodField()
+    verifiable_credential_json = serializers.SerializerMethodField()
 
     @extend_schema_field(CertificatePageModelSerializer)
     def get_certificate_page(self, instance):
@@ -162,6 +168,13 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
 
         return None
 
+    @extend_schema_field(serializers.JSONField)
+    def get_verifiable_credential_json(self, instance):
+        """Retrieve the verifiable credential data as JSON, if it exists."""
+        if instance.verifiable_credential:
+            return instance.verifiable_credential.credential_data
+        return None
+
     class Meta:
         """Meta options for the serializer."""
 
@@ -171,12 +184,14 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
             "uuid",
             "is_revoked",
             "certificate_page",
+            "verifiable_credential_json",
         ]
         read_only_fields = [
             "user",
             "uuid",
             "is_revoked",
             "certificate_page",
+            "verifiable_credential_json",
         ]
 
 
@@ -222,3 +237,15 @@ class ProgramCertificateSerializer(BaseCertificateSerializer):
             "program",
             "certificate_page_revision",
         ]
+
+
+@extend_schema_serializer(component_name="V2VerifiableCredentialSerializer")
+class VerifiableCredentialSerializer(serializers.Serializer):
+    """Serializer for digital credential data."""
+
+    class Meta:
+        """Meta options for the serializer."""
+
+        model = VerifiableCredential
+        fields = ["uuid", "credential_data"]
+        read_only_fields = ["uuid", "credential_data"]

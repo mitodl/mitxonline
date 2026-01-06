@@ -128,3 +128,37 @@ def test_register_extra_details_serializer_valid_data(user):
     assert validated_data["gender"] == "Male"
     assert validated_data["birth_year"] == "1990"
     assert validated_data["company"] == "TechCorp"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "name",
+    [
+        "12345",
+        "123",
+        "  12345  ",
+        "999999",
+        "12",
+    ],
+)
+def test_register_details_serializer_allows_numeric_only_name(  # noqa: PLR0913
+    mocker, name, user, valid_address_dict, user_profile_dict, rf
+):
+    """Test RegisterDetailsSerializer allows names containing only numbers (edX supports this)"""
+    request = rf.post("/api/profile/details/")
+    request.user = user
+
+    data = {
+        "name": name.strip(),
+        "username": "testuser",
+        "legal_address": valid_address_dict,
+        "user_profile": user_profile_dict,
+    }
+
+    mocker.patch("openedx.api.create_edx_user")
+    mocker.patch("openedx.api.create_edx_auth_token")
+
+    serializer = RegisterDetailsSerializer(data=data, context={"request": request})
+    assert serializer.is_valid(), (
+        f"Serializer should accept numeric name '{name}'. Errors: {serializer.errors}"
+    )
