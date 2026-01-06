@@ -36,8 +36,8 @@ class Command(BaseCommand):
             default=False,
         )
         parser.add_argument(
-            "-t",
-            "--throttle",
+            "-s",
+            "--sleep",
             type=float,
             help="If specified, sleeps this many seconds between processing each certificate to avoid overloading external services",
             default=0.0,
@@ -58,7 +58,7 @@ class Command(BaseCommand):
         # These are either the readable IDs of a program or the IDs of course runs to process
         ids = options["ids"].split(",")
         force = options["force"]
-        throttle = options["throttle"]
+        sleep = options["sleep"]
         certificates = []
         if options["type"] == "program":
             program_ids = Program.objects.filter(readable_id__in=ids).values_list(
@@ -75,7 +75,7 @@ class Command(BaseCommand):
 
         for cert in certificates:
             self.generate_credential_for_certificate(cert, force=force)
-            time.sleep(throttle)
+            time.sleep(sleep)
             self.stdout.write(
                 self.style.SUCCESS(f"Backfilled certificates for program {cert}")
             )
