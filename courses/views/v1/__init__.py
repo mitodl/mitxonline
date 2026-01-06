@@ -267,7 +267,13 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             return (
                 CourseRun.objects.select_related("course")
-                .prefetch_related("course__departments", "course__page", "products")
+                .prefetch_related(
+                    "course__departments", 
+                    "course__page", 
+                    "course__page__feature_image",
+                    "course__page__linked_instructors",
+                    "products"
+                )
                 .filter(live=True)
             )
 
@@ -434,7 +440,11 @@ class UserEnrollmentsApiViewSet(
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
             .select_related("run__course__page", "user", "run")
-            .prefetch_related("run__products")
+            .prefetch_related(
+                "run__products",
+                "run__course__page__linked_instructors",
+                "run__course__page__feature_image"
+            )
             .all()
         )
 
@@ -531,6 +541,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                 "program",
                 "program__page",
             )
+            .prefetch_related("program__departments", "program__page__feature_image")
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .all()
@@ -548,6 +559,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page")
+                    .prefetch_related("run__course__departments")
                     .all(),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
