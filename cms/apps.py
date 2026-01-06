@@ -4,7 +4,7 @@ from wagtail.users.apps import WagtailUsersAppConfig
 
 class CmsConfig(AppConfig):
     name = "cms"
-    default = True
+    default = True  # This file has two app configs, so we need to specify the default.
 
     def ready(self):
         import cms.signals  # noqa: F401
