@@ -14,7 +14,8 @@ def get_topics_from_page(page_instance) -> list[dict]:
         page_instance: The page instance that has a topics relationship
 
     Returns:
-        List of topic dictionaries with 'name' key, sorted alphabetically
+        List of topic dictionaries with 'name' key, with direct topics sorted first,
+        followed by parent topics sorted separately
     """
     if not page_instance:
         return []
@@ -22,21 +23,25 @@ def get_topics_from_page(page_instance) -> list[dict]:
     # Get direct topics from the page (this should be prefetched)
     direct_topics = page_instance.topics.all()
 
-    # Use a set to track all topics (direct + parent) and avoid duplicates
-    all_topic_names = set()
+    # Collect direct topics names and parent topic names separately
+    direct_topic_names = set()
+    parent_topic_names = set()
     
-    # Add direct topics and their parents
+    # First pass: collect all direct topic names
     for topic in direct_topics:
-        all_topic_names.add(topic.name)
-        # Add parent topic name if it exists (parent should be prefetched)
-        if topic.parent:
-            all_topic_names.add(topic.parent.name)
+        direct_topic_names.add(topic.name)
+    
+    # Second pass: collect parent topics that are not already in direct topics
+    for topic in direct_topics:
+        if topic.parent and topic.parent.name not in direct_topic_names:
+            parent_topic_names.add(topic.parent.name)
 
-    # Return sorted list of topic dictionaries
-    return sorted(
-        [{"name": name} for name in all_topic_names],
-        key=lambda topic: topic["name"],
-    )
+    # Sort direct topics first, then parent topics
+    sorted_direct = sorted([{"name": name} for name in direct_topic_names], key=lambda topic: topic["name"])
+    sorted_parents = sorted([{"name": name} for name in parent_topic_names], key=lambda topic: topic["name"])
+    
+    # Return direct topics first, then parent topics
+    return sorted_direct + sorted_parents
 
 
 def get_unique_topics_from_courses(courses) -> list[dict]:

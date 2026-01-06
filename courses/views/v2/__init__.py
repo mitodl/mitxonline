@@ -433,7 +433,19 @@ class UserEnrollmentsApiViewSet(
                 "run__b2b_contract",
                 "run__b2b_contract__organization",
             )
-            .prefetch_related("run__products")
+            .prefetch_related(
+                "run__products",
+                "run__course__departments",  # Prefetch departments to avoid N+1 queries
+                "run__course__page__feature_image",  # Prefetch feature_image to avoid N+1 queries
+                "run__course__page__topics",  # Prefetch topics to avoid N+1 queries
+                # Prefetch linked instructors to avoid N+1 queries in cms/serializers.py get_instructors
+                Prefetch(
+                    "run__course__page__linked_instructors",
+                    queryset=InstructorPageLink.objects.select_related(
+                        "linked_instructor_page"
+                    ),
+                ),
+            )
             .all()
         )
 
