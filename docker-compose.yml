@@ -235,6 +235,17 @@ services:
       - ./config/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml
       - ./config/apisix/debug.yaml:/usr/local/apisix/conf/debug.yaml
 
+  coordinator:
+    profiles:
+      - verifiable-creds
+    image: digitalcredentials/issuer-coordinator:1.0.0
+    ports:
+      - "4005:4005"
+  signer:
+    profiles:
+      - verifiable-creds
+    image: digitalcredentials/signing-service:1.0.0
+
 
 volumes:
   npm-cache: {}
