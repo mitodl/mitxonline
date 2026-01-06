@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from mitol.common.serializers import QuerySetSerializer
 from mitol.common.utils import now_in_utc
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -77,8 +78,10 @@ class LearnerProgramRecordShareSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-@extend_schema_serializer(component_name="V1ProgramSerializer")
-class ProgramSerializer(serializers.ModelSerializer):
+@extend_schema_serializer(
+    component_name="V1ProgramSerializer", description="A program record"
+)
+class ProgramSerializer(QuerySetSerializer):
     """Program model serializer"""
 
     courses = serializers.SerializerMethodField()
@@ -86,15 +89,17 @@ class ProgramSerializer(serializers.ModelSerializer):
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
     departments = DepartmentSerializer(many=True, read_only=True)
+    courses = CourseWithCourseRunsSerializer(many=True, read_only=True)
 
-    @extend_schema_field(CourseWithCourseRunsSerializer)
-    def get_courses(self, instance):
-        """Serializer for courses"""
-        return CourseWithCourseRunsSerializer(
-            [course[0] for course in instance.courses if course[0].live],
-            many=True,
-            context={"include_page_fields": True},
-        ).data
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related(
+                Prefetch("courses", queryset=models.Course.objects.distinct("id")),
+                "department",
+            )
+        )
 
     @extend_schema_field(
         {
@@ -229,18 +234,27 @@ class ProgramCertificateSerializer(serializers.ModelSerializer):
         fields = ["uuid", "link"]
 
 
-class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
+@extend_schema_serializer(description="A user program enrollment record")
+class UserProgramEnrollmentDetailSerializer(QuerySetSerializer):
     program = ProgramSerializer()
     enrollments = CourseRunEnrollmentSerializer(many=True)
-    certificate = serializers.SerializerMethodField(read_only=True)
+    certificate = ProgramCertificateSerializer(read_only=True, allow_null=True)
 
-    @extend_schema_field(ProgramCertificateSerializer(allow_null=True))
-    def get_certificate(self, user_program_enrollment):
-        """
-        Resolve a certificate for this enrollment if it exists
-        """
-        certificate = user_program_enrollment.get("certificate")
-        return ProgramCertificateSerializer(certificate).data if certificate else None
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+
+        return qs.prefetch_related(
+            "program",
+            Prefetch(
+                "program__courses__courseruns__enrollments",
+                queryset=models.CourseRunEnrollment.objects.filter(user=requst.user),
+                to_attr="_enrollments",
+            ),
+        )
+
+    class Meta:
+        model = models.ProgramEnrollment
+        fields = ["program", "enrollments", "certificate"]
 
 
 class LearnerRecordSerializer(serializers.Serializer):

@@ -76,7 +76,7 @@ class Command(BaseCommand):
                 f"Could not find program with readable_id - {self.PROGRAM_READABLE_ID}"  # noqa: EM102
             )
 
-        course_ids = [course.id for (course, type) in program.courses]  # noqa: A001
+        course_ids = [course.id for course in program.courses]
         course_runs = CourseRun.objects.select_related("course").filter(
             course_id__in=course_ids
         )

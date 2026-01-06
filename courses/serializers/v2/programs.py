@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from mitol.common.serializers import QuerySetSerializer
 from rest_framework import serializers
 
 from cms.serializers import ProgramPageSerializer
@@ -10,6 +11,7 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramCollection,
+    ProgramEnrollment,
     ProgramRequirementNodeType,
 )
 from courses.serializers.base import (
@@ -149,7 +151,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     start_date = serializers.SerializerMethodField()
 
     def get_courses(self, instance) -> list[int]:
-        return [course[0].id for course in instance.courses if course[0].live]
+        return [course.id for course in instance.courses if course.live]
 
     def get_collections(self, instance) -> list[int]:
         if hasattr(instance, "programcollection_set"):
@@ -165,59 +167,6 @@ class ProgramSerializer(serializers.ModelSerializer):
             )
         ]
 
-    @extend_schema_field(
-        {
-            "type": "object",
-            "properties": {
-                "courses": {
-                    "type": "object",
-                    "properties": {
-                        "required": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of required course IDs",
-                        },
-                        "electives": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of elective course IDs",
-                        },
-                    },
-                },
-                "programs": {
-                    "type": "object",
-                    "properties": {
-                        "required": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of required program IDs",
-                        },
-                        "electives": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of elective program IDs",
-                        },
-                    },
-                },
-            },
-        }
-    )
     def _is_requirement_elective(self, requirement):
         """Check if a requirement is elective based on its flag or parent flag"""
         if requirement.elective_flag:
@@ -556,8 +505,11 @@ class ProgramCertificateSerializer(serializers.ModelSerializer):
         fields = ["uuid", "link"]
 
 
-@extend_schema_serializer(component_name="V2UserProgramEnrollmentDetail")
-class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
+@extend_schema_serializer(
+    component_name="V2UserProgramEnrollmentDetail",
+    description="A user's enrollment in a program",
+)
+class UserProgramEnrollmentDetailSerializer(QuerySetSerializer):
     """
     Serializer for user program enrollments with associated course enrollments.
 
@@ -567,12 +519,8 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
 
     program = ProgramSerializer()
     enrollments = CourseRunEnrollmentSerializer(many=True)
-    certificate = serializers.SerializerMethodField(read_only=True)
+    certificate = ProgramCertificateSerializer(allow_null=True, read_only=True)
 
-    @extend_schema_field(ProgramCertificateSerializer(allow_null=True))
-    def get_certificate(self, instance):
-        """
-        Resolve a certificate for this enrollment if it exists.
-        """
-        certificate = instance.get("certificate")
-        return ProgramCertificateSerializer(certificate).data if certificate else None
+    class Meta:
+        model = ProgramEnrollment
+        fields = ["program", "enrollments", "certificate"]
