@@ -1474,7 +1474,10 @@ def request_verifiable_credential(payload) -> dict:
 
 
 def should_provision_verifiable_credential() -> bool:
-    return is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING, False)  # noqa: FBT003
+    return (
+        is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING, False)  # noqa: FBT003
+        or settings.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING
+    )
 
 
 def create_verifiable_credential(certificate: BaseCertificate):
