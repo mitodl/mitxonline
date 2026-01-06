@@ -526,7 +526,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 node_type=ProgramRequirementNodeType.COURSE,
             )
             .filter(path_q)
-            .select_related("course")
+            .prefetch_related(
+                "course",
+                Prefetch(
+                    "course__courseruns",
+                    queryset=CourseRun.objects.filter(live=True).order_by("id"),
+                ),
+            )
         )
 
     def _process_course_requirements(self, course_reqs, path_to_operator):
