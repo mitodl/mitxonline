@@ -46,6 +46,13 @@ class Command(BaseCommand):
     def generate_credential_for_certificate(self, certificate, *, force=False):
         """Generate a verifiable credential for a given certificate"""
         if not certificate.verifiable_credential or force:
+            if certificate.verifiable_credential:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Deleting and regenerating verifiable credential for certificate {certificate}"
+                    )
+                )
+                certificate.verifiable_credential.delete()
             create_verifiable_credential(certificate)
         else:
             self.stdout.write(
