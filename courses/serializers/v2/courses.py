@@ -242,8 +242,11 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     def get_courseruns(self, instance):
         """Get the course runs for the given instance."""
         # Use prefetched courseruns and avoid additional queries
-        if hasattr(instance, '_prefetched_objects_cache') and 'courseruns' in instance._prefetched_objects_cache:
-            courseruns = instance._prefetched_objects_cache['courseruns']
+        if (
+            hasattr(instance, "_prefetched_objects_cache")
+            and "courseruns" in instance._prefetched_objects_cache
+        ):
+            courseruns = instance._prefetched_objects_cache["courseruns"]
         else:
             courseruns = instance.courseruns.order_by("id")
 
@@ -251,8 +254,11 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
         if "org_id" in self.context:
             org_id = self.context["org_id"]
             courseruns = [
-                cr for cr in courseruns 
-                if hasattr(cr, 'b2b_contract') and cr.b2b_contract and cr.b2b_contract.organization_id == org_id
+                cr
+                for cr in courseruns
+                if hasattr(cr, "b2b_contract")
+                and cr.b2b_contract
+                and cr.b2b_contract.organization_id == org_id
             ]
 
         return CourseRunSerializer(courseruns, many=True, read_only=True).data

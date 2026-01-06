@@ -290,7 +290,12 @@ class CourseFilterSet(django_filters.FilterSet):
 
         if "courserun_is_enrollable" not in filter_keys:
             queryset = queryset.prefetch_related(
-                Prefetch("courseruns", queryset=CourseRun.objects.prefetch_related("products").order_by("id")),
+                Prefetch(
+                    "courseruns",
+                    queryset=CourseRun.objects.prefetch_related("products").order_by(
+                        "id"
+                    ),
+                ),
             )
 
         return queryset
@@ -313,14 +318,18 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .prefetch_related("departments")
             .prefetch_related(
                 Prefetch(
-                    "courseruns", 
-                    queryset=CourseRun.objects.select_related("b2b_contract__organization").order_by("id")
+                    "courseruns",
+                    queryset=CourseRun.objects.select_related(
+                        "b2b_contract__organization"
+                    ).order_by("id"),
                 )
             )
             .prefetch_related(
                 Prefetch(
                     "page__linked_instructors",
-                    queryset=InstructorPageLink.objects.select_related("linked_instructor_page")
+                    queryset=InstructorPageLink.objects.select_related(
+                        "linked_instructor_page"
+                    ),
                 )
             )
             .prefetch_related("page__topics__parent")

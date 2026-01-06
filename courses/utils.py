@@ -3,7 +3,7 @@
 import logging
 import re
 
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
@@ -90,7 +90,9 @@ def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
         enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
         valid_courses: Queryset of Course objects, to filter the course runs by if needed
     """
-    queryset = CourseRun.objects.enrollable(enrollment_end_date).prefetch_related("products")
+    queryset = CourseRun.objects.enrollable(enrollment_end_date).prefetch_related(
+        "products"
+    )
 
     if valid_courses:
         queryset = queryset.filter(course__in=valid_courses)
@@ -106,7 +108,9 @@ def get_enrollable_courses(queryset, enrollment_end_date=None):
         queryset: Queryset of Course objects
         enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
     """
-    enrollable_courseruns_qs = CourseRun.objects.enrollable(enrollment_end_date).prefetch_related("products")
+    enrollable_courseruns_qs = CourseRun.objects.enrollable(
+        enrollment_end_date
+    ).prefetch_related("products")
 
     return (
         queryset.prefetch_related("courseruns__products", "courseruns")

@@ -1,6 +1,5 @@
 """Utility functions for serializers"""
 
-from courses.models import CoursesTopic
 
 
 def get_topics_from_page(page_instance) -> list[dict]:
@@ -26,20 +25,24 @@ def get_topics_from_page(page_instance) -> list[dict]:
     # Collect direct topics names and parent topic names separately
     direct_topic_names = set()
     parent_topic_names = set()
-    
+
     # First pass: collect all direct topic names
     for topic in direct_topics:
         direct_topic_names.add(topic.name)
-    
+
     # Second pass: collect parent topics that are not already in direct topics
     for topic in direct_topics:
         if topic.parent and topic.parent.name not in direct_topic_names:
             parent_topic_names.add(topic.parent.name)
 
     # Sort direct topics first, then parent topics
-    sorted_direct = sorted([{"name": name} for name in direct_topic_names], key=lambda topic: topic["name"])
-    sorted_parents = sorted([{"name": name} for name in parent_topic_names], key=lambda topic: topic["name"])
-    
+    sorted_direct = sorted(
+        [{"name": name} for name in direct_topic_names], key=lambda topic: topic["name"]
+    )
+    sorted_parents = sorted(
+        [{"name": name} for name in parent_topic_names], key=lambda topic: topic["name"]
+    )
+
     # Return direct topics first, then parent topics
     return sorted_direct + sorted_parents
 

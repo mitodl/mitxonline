@@ -230,12 +230,12 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     @extend_schema_field(list)
     def get_instructors(self, instance):
         """Get instructor information"""
-        # The key insight: When we prefetch with Prefetch(), Django stores the 
-        # results in a special cached attribute. We need to avoid calling 
+        # The key insight: When we prefetch with Prefetch(), Django stores the
+        # results in a special cached attribute. We need to avoid calling
         # .select_related().all() which creates a new query.
-        
+
         linked_instructors = instance.linked_instructors
-        
+
         # Use the prefetched results directly - this should not trigger additional queries
         # since we've prefetched with Prefetch object in the view
         instructor_links = list(linked_instructors.all())
