@@ -10,7 +10,6 @@ import pytest
 import pytz
 import reversion
 from django.contrib.contenttypes.models import ContentType
-from hubspot.crm.objects import SimplePublicObject
 from mitol.hubspot_api.factories import HubspotObjectFactory
 from reversion.models import Version
 
@@ -121,13 +120,3 @@ def hubspot_order_id(hubspot_order):
         content_type=ContentType.objects.get_for_model(Order),
         object_id=hubspot_order.id,
     ).hubspot_id
-
-
-@pytest.fixture
-def mock_hubspot_api(mocker):
-    """Mock the Hubspot CRM API"""
-    mock_api = mocker.patch("mitol.hubspot_api.api.HubspotApi")
-    mock_api.return_value.crm.objects.basic_api.create.return_value = (
-        SimplePublicObject(id=FAKE_HUBSPOT_ID)
-    )
-    return mock_api
