@@ -4,6 +4,9 @@ MITx Online API-ready views, migrated from Unified Ecommerce.
 
 import logging
 
+import django_filters
+from django.contrib.auth import get_user_model
+from django.db.models import Count, Q
 from django.shortcuts import redirect
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import (
@@ -13,30 +16,73 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
+from mitol.common.utils import now_in_utc
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import ParseError
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+from rest_framework_extensions.mixins import NestedViewSetMixin
 
+from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
+    generate_discount_code,
     get_auto_apply_discounts_for_basket,
 )
 from ecommerce.exceptions import ProductBlockedError
-from ecommerce.models import Basket, BasketItem, Discount, Product
-from ecommerce.serializers import BasketItemSerializer, BasketWithProductSerializer
-from ecommerce.serializers.v0 import requests
+from ecommerce.models import (
+    Basket,
+    BasketItem,
+    Discount,
+    DiscountProduct,
+    DiscountRedemption,
+    Product,
+    UserDiscount,
+)
+from ecommerce.serializers.v0 import (
+    BasketItemSerializer,
+    BasketWithProductSerializer,
+    BulkDiscountSerializer,
+    DiscountProductSerializer,
+    DiscountRedemptionSerializer,
+    ProductSerializer,
+    UserDiscountMetaSerializer,
+    UserDiscountSerializer,
+    V0DiscountSerializer,
+    requests,
+)
+from flexiblepricing.models import FlexiblePriceTier
+from flexiblepricing.serializers import FlexiblePriceTierSerializer
 
 log = logging.getLogger(__name__)
+User = get_user_model()
 
 
 @extend_schema(
     description="Returns the basket items for the current user.",
-    methods=["GET"],
     request=None,
     responses=BasketItemSerializer,
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_basket",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent basket",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket item",
+            required=True,
+        ),
+    ],
 )
 class BasketItemViewSet(ModelViewSet):
     """ViewSet for handling BasketItem operations."""
@@ -89,7 +135,6 @@ class BasketViewSet(ReadOnlyModelViewSet):
     request=None,
     responses=BasketWithProductSerializer,
     parameters=[
-        OpenApiParameter("system_slug", OpenApiTypes.STR, OpenApiParameter.PATH),
         OpenApiParameter(
             "discount_code", OpenApiTypes.STR, OpenApiParameter.QUERY, required=True
         ),
@@ -352,3 +397,393 @@ def clear_basket(request):
     basket.delete()
 
     return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+
+class ProductsPagination(LimitOffsetPagination):
+    """Sets a default limit for the product list API."""
+
+    default_limit = 2
+
+
+class AllProductViewSet(ModelViewSet):
+    """This doesn't filter unenrollable products out, and adds name search for
+    courseware object readable id. It's really for the staff dashboard.
+    """
+
+    serializer_class = ProductSerializer
+    pagination_class = ProductsPagination
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        """Get the queryset for products, including run and program information."""
+        name_search = self.request.query_params.get("search")
+
+        if name_search is None:
+            return Product.objects.all()
+
+        matching_courserun_ids = CourseRun.objects.filter(
+            courseware_id__icontains=name_search
+        ).values_list("id", flat=True)
+
+        matching_program_ids = Program.objects.filter(
+            readable_id__icontains=name_search
+        ).values_list("id", flat=True)
+
+        return (
+            Product.objects.filter(
+                (
+                    Q(object_id__in=matching_courserun_ids)
+                    & Q(content_type__model="courserun")
+                )
+                | (
+                    Q(object_id__in=matching_program_ids)
+                    & Q(content_type__model="program")
+                )
+                | (Q(description__icontains=name_search))
+            )
+            .select_related("content_type")
+            .prefetch_related("purchasable_object")
+        )
+
+
+class ProductViewSet(ReadOnlyModelViewSet):
+    """List and view products within the system."""
+
+    serializer_class = ProductSerializer
+    pagination_class = ProductsPagination
+
+    def get_queryset(self):
+        """Get product queryset, with course and program information."""
+
+        now = now_in_utc()
+
+        unenrollable_courserun_ids = CourseRun.objects.filter(
+            enrollment_end__lt=now
+        ).values_list("id", flat=True)
+
+        unenrollable_course_ids = (
+            Course.objects.annotate(
+                num_runs=Count(
+                    "courseruns", filter=~Q(courseruns__in=unenrollable_courserun_ids)
+                )
+            )
+            .filter(num_runs=0)
+            .values_list("id", flat=True)
+        )
+
+        unenrollable_program_ids = (
+            Program.objects.annotate(
+                valid_runs=Count(
+                    "programruns",
+                    filter=Q(programruns__end_date__gt=now)
+                    | Q(programruns__end_date=None),
+                )
+            )
+            .filter(
+                Q(programruns__isnull=True)
+                | Q(valid_runs=0)
+                | Q(all_requirements__course__in=unenrollable_course_ids)
+            )
+            .values_list("id", flat=True)
+            .distinct()
+        )
+
+        unenrollable_programrun_ids = ProgramRun.objects.filter(
+            Q(program__in=unenrollable_program_ids) | Q(end_date__lt=now)
+        )
+
+        return (
+            Product.objects.exclude(
+                (
+                    Q(object_id__in=unenrollable_courserun_ids)
+                    & Q(content_type__model="courserun")
+                )
+                | (
+                    Q(object_id__in=unenrollable_programrun_ids)
+                    & Q(content_type__model="programrun")
+                )
+            )
+            .select_related("content_type")
+            .prefetch_related("purchasable_object")
+        )
+
+
+class DiscountFilterSet(django_filters.FilterSet):
+    """Custom filtering for discounts."""
+
+    q = django_filters.CharFilter(
+        field_name="discount_code", label="q", lookup_expr="icontains"
+    )
+    is_redeemed = django_filters.ChoiceFilter(
+        method="redeemed_filter", choices=(("yes", "yes"), ("no", "no"))
+    )
+
+    def redeemed_filter(self, qs, name, value):  # noqa: ARG002
+        """Filter by discount redemption status."""
+
+        qs = qs.annotate(num_redemptions=Count("order_redemptions"))
+
+        if value == "yes":
+            qs = qs.filter(num_redemptions__gt=0)
+        elif value == "no":
+            qs = qs.filter(num_redemptions=0)
+
+        return qs
+
+    class Meta:
+        model = Discount
+        fields = [
+            "q",
+            "redemption_type",
+            "payment_type",
+            "is_redeemed",
+        ]
+
+
+class DiscountViewSet(ModelViewSet):
+    """API view set for Discounts"""
+
+    queryset = Discount.objects.order_by("-created_on").all()
+    serializer_class = V0DiscountSerializer
+    authentication_classes = (SessionAuthentication,)
+    permission_classes = (IsAdminUser,)
+    pagination_class = LimitOffsetPagination
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filterset_class = DiscountFilterSet
+
+    @action(url_name="create_batch", detail=False, methods=["post"])
+    def create_batch(self, request):
+        """
+        Create a batch of codes. This is used in the staff-dashboard.
+        POST arguments are the same as in generate_discount_code - look there
+        for details.
+        """
+        otherSerializer = BulkDiscountSerializer(data=request.data)
+
+        if otherSerializer.is_valid():
+            generated_codes = generate_discount_code(**request.data)
+
+            discounts = V0DiscountSerializer(generated_codes, many=True)
+
+            return Response(discounts.data, status=status.HTTP_201_CREATED)
+
+        raise ParseError(f"Batch creation failed: {otherSerializer.errors}")  # noqa: EM102
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_discount",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent discount",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the discount product",
+            required=True,
+        ),
+    ]
+)
+class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
+    """API view set for Discounts"""
+
+    serializer_class = DiscountProductSerializer
+    queryset = DiscountProduct.objects.all()
+    authentication_classes = (SessionAuthentication,)
+    permission_classes = (IsAdminUser,)
+    pagination_class = LimitOffsetPagination
+
+    def partial_update(self, request, **kwargs):
+        """Partial update for a discount product."""
+
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+
+        (_, created) = DiscountProduct.objects.get_or_create(
+            discount=discount, product_id=request.data["product_id"]
+        )
+
+        return Response(
+            DiscountProductSerializer(
+                DiscountProduct.objects.filter(discount=discount).all(), many=True
+            ).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, **kwargs):  # noqa: ARG002
+        """Delete a linked product from a discount."""
+
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+        product = Product.objects.get(pk=kwargs["pk"])
+
+        DiscountProduct.objects.filter(discount=discount, product=product).delete()
+
+        return Response(
+            DiscountProductSerializer(
+                DiscountProduct.objects.filter(discount=discount).all(), many=True
+            ).data
+        )
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_redeemed_discount",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent discount",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the user discount",
+            required=True,
+        ),
+    ]
+)
+class NestedDiscountRedemptionViewSet(NestedViewSetMixin, ModelViewSet):
+    """API view set for Discount Redemptions"""
+
+    serializer_class = DiscountRedemptionSerializer
+    queryset = DiscountRedemption.objects.all()
+    authentication_classes = (SessionAuthentication,)
+    permission_classes = (IsAdminUser,)
+    pagination_class = LimitOffsetPagination
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_discount",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent discount",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the user discount",
+            required=True,
+        ),
+    ]
+)
+class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
+    """
+    API view set for User Discounts. This one is for use within a Discount.
+    """
+
+    serializer_class = UserDiscountMetaSerializer
+    queryset = UserDiscount.objects.all()
+    authentication_classes = (SessionAuthentication,)
+    permission_classes = (IsAdminUser,)
+    pagination_class = LimitOffsetPagination
+
+    def create(self, request, **kwargs):
+        """Create an association between a user and a discount."""
+
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+
+        UserDiscount.objects.create(discount=discount, user_id=request.data["user"])
+
+        return Response(
+            UserDiscountMetaSerializer(
+                UserDiscount.objects.filter(discount=discount).all(), many=True
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def partial_update(self, request, **kwargs):
+        """Partial update for a user discount."""
+
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+
+        (_, created) = UserDiscount.objects.get_or_create(
+            discount=discount, user_id=request.data["user"]
+        )
+
+        return Response(
+            UserDiscountMetaSerializer(
+                UserDiscount.objects.filter(discount=discount).all(), many=True
+            ).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, **kwargs):  # noqa: ARG002
+        """Delete a user discount."""
+
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+        user = User.objects.get(pk=kwargs["pk"])
+
+        UserDiscount.objects.filter(discount=discount, user=user).delete()
+
+        return Response(
+            UserDiscountMetaSerializer(
+                UserDiscount.objects.filter(discount=discount).all(), many=True
+            ).data
+        )
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_discount",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent discount",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the user discount",
+            required=True,
+        ),
+    ]
+)
+class NestedDiscountTierViewSet(NestedViewSetMixin, ModelViewSet):
+    """
+    API view set for Flexible Pricing Tiers. This one is for use within a Discount.
+    """
+
+    serializer_class = FlexiblePriceTierSerializer
+    queryset = FlexiblePriceTier.objects.all()
+    authentication_classes = (SessionAuthentication,)
+    permission_classes = (IsAdminUser,)
+    pagination_class = LimitOffsetPagination
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_discount",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent discount",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the user discount",
+            required=True,
+        ),
+    ]
+)
+class UserDiscountViewSet(ModelViewSet):
+    """API view set for User Discounts. This one is for working with the set as a whole."""
+
+    serializer_class = UserDiscountSerializer
+    queryset = UserDiscount.objects.all()
+    authentication_classes = (SessionAuthentication,)
+    permission_classes = (IsAdminUser,)
+    pagination_class = LimitOffsetPagination
