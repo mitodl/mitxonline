@@ -589,7 +589,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         program_list = []
 
         for enrollment in program_enrollments:
-            courses = [course[0] for course in enrollment.program.courses.all()]
+            courses = enrollment.program.courses.all()
 
             program_list.append(
                 {

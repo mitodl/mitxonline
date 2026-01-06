@@ -151,7 +151,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     start_date = serializers.SerializerMethodField()
 
     def get_courses(self, instance) -> list[int]:
-        return [course.id for course in instance.courses if course.live]
+        return [course.id for course in instance.courses.filter(live=True)]
 
     def get_collections(self, instance) -> list[int]:
         if hasattr(instance, "programcollection_set"):

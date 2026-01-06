@@ -1,5 +1,5 @@
 from django.contrib.auth.models import AnonymousUser
-from django.db.models import Q
+from django.db.models import Q, Prefetch
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from mitol.common.serializers import QuerySetSerializer
 from mitol.common.utils import now_in_utc
@@ -244,10 +244,9 @@ class UserProgramEnrollmentDetailSerializer(QuerySetSerializer):
         qs = super().get_queryset(request)
 
         return qs.prefetch_related(
-            "program",
             Prefetch(
                 "program__courses__courseruns__enrollments",
-                queryset=models.CourseRunEnrollment.objects.filter(user=requst.user),
+                queryset=models.CourseRunEnrollment.objects.filter(user=request.user),
                 to_attr="_enrollments",
             ),
         )
