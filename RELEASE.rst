@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.1
+Version 0.137.1 (Released January 06, 2026)
 ---------------
 
 - Create country field unit tests (#3164)
