@@ -44,7 +44,10 @@ class Command(BaseCommand):
         )
 
     def generate_credential_for_certificate(self, certificate, *, force=False):
-        """Generate a verifiable credential for a given certificate"""
+        """
+        Generate a verifiable credential for a given certificate
+        We may want to wrap this in a transaction in the future if force=True gets a lot of use
+        """
         if not certificate.verifiable_credential or force:
             if certificate.verifiable_credential:
                 self.stdout.write(
@@ -53,7 +56,7 @@ class Command(BaseCommand):
                     )
                 )
                 certificate.verifiable_credential.delete()
-            create_verifiable_credential(certificate)
+            create_verifiable_credential(certificate, raise_on_error=True)
         else:
             self.stdout.write(
                 self.style.WARNING(
@@ -81,8 +84,15 @@ class Command(BaseCommand):
             )
 
         for cert in certificates:
-            self.generate_credential_for_certificate(cert, force=force)
-            time.sleep(sleep)
-            self.stdout.write(
-                self.style.SUCCESS(f"Backfilled certificates for program {cert}")
-            )
+            try:
+                self.generate_credential_for_certificate(cert, force=force)
+                self.stdout.write(
+                    self.style.SUCCESS(f"Backfilled certificate for program {cert}")
+                )
+                time.sleep(sleep)
+            except Exception:  # noqa: BLE001, PERF203
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"Failed to backfill certificate for program {cert}"
+                    )
+                )

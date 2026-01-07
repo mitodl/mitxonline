@@ -1480,12 +1480,13 @@ def should_provision_verifiable_credential() -> bool:
     )
 
 
-def create_verifiable_credential(certificate: BaseCertificate):
+def create_verifiable_credential(certificate: BaseCertificate, *, raise_on_error=False):
     """
     Create a verifiable credential for the given course run certificate.
 
     Args:
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
+        raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
     """
     try:
         if not should_provision_verifiable_credential():
@@ -1507,3 +1508,5 @@ def create_verifiable_credential(certificate: BaseCertificate):
             "Error creating verifiable credential for certificate %s",
             certificate.uuid,
         )
+        if raise_on_error:
+            raise
