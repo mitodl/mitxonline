@@ -121,7 +121,7 @@ def insert_wagtail_pages_schema(endpoints):
     Insert Wagtail pages schema into the OpenAPI endpoints.
     """
 
-    from cms.wagtail_api.schema.views import (
+    from cms.wagtail_api.schema.views import (  # noqa: PLC0415
         WagtailCertificatePagesSchemaView,
         WagtailCoursePagesSchemaView,
         WagtailPagesRetrieveSchemaView,

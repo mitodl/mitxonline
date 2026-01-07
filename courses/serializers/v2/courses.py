@@ -112,7 +112,9 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_programs(self, instance) -> list[dict] | None:
         if self.context.get("all_runs", False):
-            from courses.serializers.v1.base import BaseProgramSerializer
+            from courses.serializers.v1.base import (  # noqa: PLC0415
+                BaseProgramSerializer,
+            )
 
             return BaseProgramSerializer(instance.programs, many=True).data
 

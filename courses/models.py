@@ -1289,7 +1289,7 @@ def limit_to_certificate_pages():
     to limit the choices to certificate pages, rather than every page in the
     CMS.
     """
-    from cms.models import CertificatePage
+    from cms.models import CertificatePage  # noqa: PLC0415
 
     available_revisions = CertificatePage.objects.filter(live=True).values_list(
         "id", flat=True
@@ -1391,7 +1391,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         return f'CourseRunCertificate for user={self.user.edx_username}, run={self.course_run.text_id} ({self.uuid})"'
 
     def clean(self):
-        from cms.models import CertificatePage, CoursePage
+        from cms.models import CertificatePage, CoursePage  # noqa: PLC0415
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
@@ -1484,7 +1484,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         return f'ProgramCertificate for user={self.user.edx_username}, program={self.program.text_id} ({self.uuid})"'
 
     def clean(self):
-        from cms.models import CertificatePage, ProgramPage
+        from cms.models import CertificatePage, ProgramPage  # noqa: PLC0415
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
@@ -1649,7 +1649,7 @@ class CourseRunEnrollment(EnrollmentModel):
         we can change the payment to another run
         """
         # Due to circular dependancy importing locally
-        from ecommerce.models import OrderStatus
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
 
         paid_run = PaidCourseRun.objects.filter(
             user=self.user,
@@ -1825,7 +1825,7 @@ class PaidCourseRun(TimestampedModel):
         """
 
         # Due to circular dependancy importing locally
-        from ecommerce.models import OrderStatus
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
 
         # PaidCourseRun should only contain fulfilled orders
         return cls.objects.filter(

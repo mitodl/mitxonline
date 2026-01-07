@@ -1,7 +1,7 @@
 """Course views version 1"""
 
 import logging
-from typing import Optional, Tuple, Union  # noqa: UP035
+from typing import Tuple, Union  # noqa: UP035
 
 import django_filters
 from django.contrib.auth.models import User
@@ -569,7 +569,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         """
 
         program = Program.objects.get(pk=pk)
-        (enrollment, created) = ProgramEnrollment.objects.update_or_create(
+        ProgramEnrollment.objects.update_or_create(
             user=request.user,
             program=program,
             defaults={"change_status": ENROLL_CHANGE_STATUS_UNENROLLED},
@@ -631,7 +631,7 @@ class LearnerRecordShareView(APIView):
             except:  # noqa: E722
                 return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
 
-            (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+            (ps_share, _) = LearnerProgramRecordShare.objects.filter(
                 user=request.user, program=program, partner_school=school
             ).get_or_create(user=request.user, program=program, partner_school=school)
             ps_share.is_active = True
@@ -639,7 +639,7 @@ class LearnerRecordShareView(APIView):
 
             send_partner_school_email.delay(ps_share.share_uuid)
         else:
-            (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+            LearnerProgramRecordShare.objects.filter(
                 user=request.user, program=program, partner_school=None, is_active=True
             ).get_or_create(
                 user=request.user, program=program, partner_school=None, is_active=True

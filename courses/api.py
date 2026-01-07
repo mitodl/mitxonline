@@ -341,8 +341,8 @@ def deactivate_run_enrollment(
     Returns:
         CourseRunEnrollment: The deactivated enrollment
     """
-    from ecommerce.models import Line
-    from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id
+    from ecommerce.models import Line  # noqa: PLC0415
+    from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id  # noqa: PLC0415
 
     try:
         unenroll_edx_course_run(run_enrollment)
@@ -787,7 +787,7 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         Tuple[ CourseRunCertificate, bool, bool ]: A Tuple containing None or CourseRunCertificate object,
             A bool representing if the certificate is created, A bool representing if a certificate is deleted
     """
-    from hubspot_sync.task_helpers import sync_hubspot_user
+    from hubspot_sync.task_helpers import sync_hubspot_user  # noqa: PLC0415
 
     user = course_run_grade.user
     course_run = course_run_grade.course_run
@@ -1030,7 +1030,7 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
         ProgramCertificate (or None if one was not found or created) paired
         with a boolean indicating whether the certificate was newly created.
     """
-    from hubspot_sync.task_helpers import sync_hubspot_user
+    from hubspot_sync.task_helpers import sync_hubspot_user  # noqa: PLC0415
 
     existing_cert_queryset = ProgramCertificate.all_objects.filter(
         user=user, program=program

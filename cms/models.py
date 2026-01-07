@@ -15,7 +15,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.forms import ChoiceField
+from django.forms import ChoiceField, IntegerField
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -129,6 +129,8 @@ class VideoPlayerConfigMixin(Page):
                     f"The embed for the current url {self.video_url} is unavailable."  # noqa: G004
                 )
             return dumps(config)
+
+        return None
 
 
 class SignatoryObjectIndexPage(Page):
@@ -544,8 +546,6 @@ class FlexiblePricingFormBuilder(FormBuilder):
             "required": f"{options['label']} is a required field.",
             "invalid": f"{options['label']} must be a whole number.",
         }
-        # Use IntegerField for integer-only validation
-        from django.forms import IntegerField
 
         return IntegerField(**options)
 
@@ -1248,7 +1248,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         Returns a list of linked instructors for this product page.
         This is used for wagtail API.
         """
-        from cms.serializers import InstructorPageSerializer
+        from cms.serializers import InstructorPageSerializer  # noqa: PLC0415
 
         instructor_pages = [
             member.linked_instructor_page for member in self.linked_instructors.all()
@@ -1429,7 +1429,7 @@ class CoursePage(ProductPage):
 
     @property
     def course_details(self):
-        from courses.serializers.v2.courses import CourseSerializer
+        from courses.serializers.v2.courses import CourseSerializer  # noqa: PLC0415
 
         return CourseSerializer(self.course).data
 
@@ -1494,7 +1494,7 @@ class ProgramPage(ProductPage):
 
     @property
     def program_details(self):
-        from courses.serializers.v2.programs import ProgramSerializer
+        from courses.serializers.v2.programs import ProgramSerializer  # noqa: PLC0415
 
         return ProgramSerializer(self.program).data
 

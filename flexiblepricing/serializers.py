@@ -216,6 +216,8 @@ class FlexiblePriceCoursewareAdminSerializer(serializers.ModelSerializer):
                 Program.objects.filter(id=instance["courseware_object_id"]).first()
             ).data
 
+        return None
+
     @extend_schema_field(str)
     def get_id(self, instance):
         """

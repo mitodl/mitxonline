@@ -106,11 +106,15 @@ class LineSerializer(serializers.ModelSerializer):
         if product:
             return product.purchasable_object.readable_id
 
+        return None
+
     def get_price(self, instance):
         """Get the product version price"""
         product = self._get_product(instance)
         if product:
             return format_decimal(product.price)
+
+        return None
 
     class Meta:
         fields = (
@@ -185,11 +189,15 @@ class OrderToDealSerializer(serializers.ModelSerializer):
         if instance.state == models.OrderStatus.FULFILLED:
             return int(instance.updated_on.timestamp() * 1000)
 
+        return None
+
     def get_discount_type(self, instance):
         """Get the discount type of the applied coupon"""
         discount = self._get_discount(instance)
         if discount:
             return discount.discount_type
+
+        return None
 
     def get_amount(self, instance):
         """Get the amount paid after discount"""
@@ -232,6 +240,8 @@ class OrderToDealSerializer(serializers.ModelSerializer):
         discount = self._get_discount(instance)
         if discount:
             return discount.discount_code
+
+        return None
 
     class Meta:
         fields = (

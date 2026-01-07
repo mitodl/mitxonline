@@ -94,7 +94,7 @@ def create_courses_from_data_list(course_data_list):
             )
             if run["is_upgradable"]:
                 with reversion.create_revision():
-                    product, created = Product.objects.update_or_create(
+                    _, created = Product.objects.update_or_create(
                         object_id=course_run.id,
                         content_type=course_run_content_type,
                         is_active=True,

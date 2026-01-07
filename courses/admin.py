@@ -42,7 +42,7 @@ class ProgramContractPageInline(admin.TabularInline):
     """Inline for contract pages"""
 
     # Import here to avoid circular dependency at module load time
-    from b2b.models import ContractProgramItem
+    from b2b.models import ContractProgramItem  # noqa: PLC0415
 
     model = ContractProgramItem
     extra = 0
@@ -315,7 +315,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
     def downgrade_enrollment(self, request, queryset):
         """Admin action to change the status of users enrollment from verified to audit"""
         enrollment = queryset.first()
-        enrollments, enroll_success = downgrade_learner(enrollment)
+        _, enroll_success = downgrade_learner(enrollment)
         if not enroll_success:
             self.message_user(
                 request,
