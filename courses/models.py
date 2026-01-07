@@ -916,8 +916,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use a fresh query to avoid N+1 issues with prefetched relations
-        from courses.models import CourseRun
 
         # First try to find non-past enrollable runs (end_date is None or in the future)
         best_run = (
