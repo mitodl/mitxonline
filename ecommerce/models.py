@@ -49,8 +49,9 @@ User = get_user_model()  # noqa: F811
 
 
 def valid_purchasable_objects_list():
+    """Return a Q object of purchasable objects."""
     return models.Q(app_label="courses", model="courserun") | models.Q(
-        app_label="courses", model="programrun"
+        app_label="courses", model="program"
     )
 
 
