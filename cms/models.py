@@ -1135,9 +1135,11 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         blank=True,
         help_text="URL to the video to be displayed for this course/program. It can be an HLS or Youtube video URL.",
     )
-
+    # this field should be required, since VC creation depends on it
     what_you_learn = RichTextField(
-        null=True, blank=True, help_text="What you will learn from this course."
+        null=True,
+        blank=True,
+        help_text="*Required for Verifiable Credential generation. What you will learn from this course.",
     )
 
     feature_image = models.ForeignKey(
