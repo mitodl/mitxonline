@@ -24,6 +24,7 @@ from courses.models import (
     Department,
     LearnerProgramRecordShare,
     PaidCourseRun,
+    PaidProgram,
     PartnerSchool,
     Program,
     ProgramCertificate,
@@ -489,6 +490,37 @@ class PaidCourseRunAdmin(TimestampedModelAdmin):
     @display(description="Course Run")
     def get_courseware_id(self, obj):
         return obj.course_run.courseware_id
+
+    @display(description="Order ID")
+    def get_order_id(self, obj):
+        return obj.order.id
+
+    @display(description="Order State")
+    def get_order_state(self, obj):
+        return obj.order.state
+
+
+@admin.register(PaidProgram)
+class PaidProgramAdmin(TimestampedModelAdmin):
+    """Admin for PaidProgram"""
+
+    model = PaidProgram
+    list_display = [
+        "id",
+        "get_user_email",
+        "get_readable_id",
+        "get_order_id",
+        "get_order_state",
+    ]
+    search_fields = ["program__readable_id", "user__username", "user__email"]
+
+    @display(description="User")
+    def get_user_email(self, obj):
+        return obj.user.email
+
+    @display(description="Program")
+    def get_readable_id(self, obj):
+        return obj.program.readable_id
 
     @display(description="Order ID")
     def get_order_id(self, obj):

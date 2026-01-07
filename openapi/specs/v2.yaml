@@ -2611,6 +2611,39 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v2/enrollments/add_program_course_enrollment/:
+    post:
+      operationId: enrollments_add_program_course_enrollment_create
+      description: |-
+        Create a program-related course enrollment for the learner.
+
+        Some special handling is needed for program-related enrollments. The
+        learner should generally get a course run enrollment that matches the
+        program enrollment. However, if the learner has a paid enrollment in the
+        program, they're enrolling in an elective, and they already have
+        enrollments in the required number of electives, then they should get an
+        audit enrollment.
+      tags:
+      - enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentRequestV2Request'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentRequestV2Request'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentRequestV2Request'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollmentRequestV2'
+          description: ''
   /api/v2/pages/:
     get:
       operationId: pages_list
