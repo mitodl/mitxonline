@@ -8,15 +8,17 @@ import pytz
 import reversion
 from CyberSource.rest import ApiException
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from factory import Faker, fuzzy
 from mitol.payment_gateway.api import ProcessorResponse
 from reversion.models import Version
 
-from courses.factories import CourseRunEnrollmentFactory
+from courses.factories import CourseRunEnrollmentFactory, ProgramFactory
 from ecommerce.api import (
     check_and_process_pending_orders_for_resolution,
     check_for_duplicate_discount_redemptions,
+    create_verified_program_discounts,
     process_cybersource_payment_response,
     refund_order,
     unenroll_learner_from_order,
@@ -39,6 +41,7 @@ from ecommerce.models import (
     FulfilledOrder,
     Order,
     OrderStatus,
+    Product,
     Transaction,
 )
 from users.factories import UserFactory
@@ -635,3 +638,23 @@ def test_duplicate_redemption_check(peruser):
     seen_ids = check_for_duplicate_discount_redemptions()
 
     assert discount.id in seen_ids
+
+
+def test_create_verified_program_discounts():
+    """Test that creating a special discount for programs works OK"""
+
+    program = ProgramFactory.create()
+    content_type = ContentType.objects.get_for_model(program)
+
+    with reversion.create_revision():
+        Product.objects.create(
+            price=100, content_type=content_type, object_id=program.id
+        )
+
+    discount = create_verified_program_discounts(program)
+
+    assert discount
+    assert discount.is_program_discount
+    assert discount.products.filter(
+        product__content_type=content_type, product__object_id=program.id
+    ).exists()
