@@ -1311,7 +1311,7 @@ class VerifiableCredential(TimestampedModel):
 
 class BaseCertificate(models.Model):
     """
-    Common properties for certificate models. Test comment
+    Common properties for certificate models.
     """
 
     user = models.ForeignKey(User, null=False, on_delete=models.CASCADE)
