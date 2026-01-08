@@ -3,7 +3,7 @@
 import logging
 import re
 
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
@@ -113,7 +113,7 @@ def get_enrollable_courses(queryset, enrollment_end_date=None):
     ).prefetch_related("products")
 
     return (
-        queryset.prefetch_related("courseruns__products", "courseruns")
+        queryset.prefetch_related("courseruns__products", "courseruns", Prefetch("courseruns", queryset=enrollable_courseruns_qs))
         .filter(
             courseruns__id__in=enrollable_courseruns_qs.values_list("id", flat=True)
         )
