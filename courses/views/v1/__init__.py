@@ -165,12 +165,7 @@ class CourseFilterSet(django_filters.FilterSet):
 
         filter_keys = self.form.cleaned_data.keys()
 
-        # Debug print to see what's happening
-        print(f"DEBUG filter_queryset: filter_keys = {list(filter_keys)}")
-        print(f"DEBUG filter_queryset: courserun_is_enrollable in filter_keys = {'courserun_is_enrollable' in filter_keys}")
-
         if "courserun_is_enrollable" not in filter_keys:
-            print("DEBUG: Adding courseruns prefetch")
             queryset = queryset.prefetch_related(
                 Prefetch("courseruns", queryset=CourseRun.objects.prefetch_related("products").order_by("id")),
             )
@@ -192,7 +187,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        queryset = (
+        return (
             Course.objects.filter()
             .select_related("page")
             .prefetch_related("departments")
@@ -204,10 +199,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                     queryset=InstructorPageLink.objects.select_related("linked_instructor_page"),
                 )
             )
-            .all()
         )
-
-        return queryset
 
     def get_serializer_context(self):
         added_context = {}

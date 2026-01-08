@@ -640,7 +640,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def download_course_credential(request, credential_id):
+def download_course_credential(_, credential_id):
     """Download a course verifiable credential by UUID."""
     from courses.models import VerifiableCredential
     
@@ -667,7 +667,7 @@ def download_course_credential(request, credential_id):
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def download_program_credential(request, credential_id):
+def download_program_credential(_, credential_id):
     """Download a program verifiable credential by UUID."""
     from courses.models import VerifiableCredential
     
