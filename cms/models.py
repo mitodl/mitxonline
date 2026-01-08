@@ -1445,6 +1445,12 @@ class ProgramPage(ProductPage):
         "courses.Program", null=True, on_delete=models.SET_NULL, related_name="page"
     )
 
+    description = RichTextField(
+        help_text="The description shown on the home page and product page.",
+        blank=True,
+        null=True,
+    )
+
     template = "product_page.html"
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
