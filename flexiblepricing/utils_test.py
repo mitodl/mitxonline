@@ -26,16 +26,22 @@ def test_form_with_no_fields(flex_price_form):
 
     flex_price_form.refresh_from_db()
 
-    assert flex_price_form.form_fields.count() == 2
+    assert flex_price_form.form_fields.count() == 4
 
-    for field in flex_price_form.form_fields.all():
-        assert (
-            field.clean_name == "income_currency" or field.clean_name == "your_income"  # noqa: PLR1714
-        )
+    field_names = {field.clean_name for field in flex_price_form.form_fields.all()}
+    assert field_names == {
+        "your_income",
+        "income_currency",
+        "country_of_income",
+        "country_of_residence",
+    }
 
 
-@pytest.mark.parametrize("field_type", ["income", "currency"])
-def test_form_with_misnamed_fields(flex_price_form, field_type):
+@pytest.mark.parametrize(
+    "clean_name",
+    ["your_income", "income_currency", "country_of_income", "country_of_residence"],
+)
+def test_form_with_misnamed_fields(flex_price_form, clean_name):
     """
     Tests a form that has a field with clean_name set right but the label isn't.
     This should still work and the defined field should be left alone.
@@ -43,18 +49,26 @@ def test_form_with_misnamed_fields(flex_price_form, field_type):
 
     assert flex_price_form.form_fields.count() == 0
 
+    # Create a field with a fuzzy label first, then update clean_name after save
+    # (because Wagtail's AbstractFormField.save() overwrites clean_name for new fields)
     new_field = FormField(
         page=flex_price_form,
         required=True,
         label=factory.fuzzy.FuzzyText("Form Field "),
     )
 
-    if field_type == "income":
-        new_field.clean_name = "your_income"
-        new_field.field_type = "number"
-    else:
-        new_field.clean_name = "income_currency"
-        new_field.field_type = "country"
+    field_types = {
+        "your_income": "number",
+        "income_currency": "country",
+        "country_of_income": "iso_country",
+        "country_of_residence": "iso_country",
+    }
+
+    new_field.save()
+
+    # Now update clean_name after the initial save
+    new_field.clean_name = clean_name
+    new_field.field_type = field_types[clean_name]
 
     new_field.save()
     new_field.refresh_from_db()
@@ -62,10 +76,12 @@ def test_form_with_misnamed_fields(flex_price_form, field_type):
     flex_price_form.refresh_from_db()
 
     assert ensure_flexprice_form_fields(flex_price_form) is False
+    assert flex_price_form.form_fields.count() == 4
 
     for field in flex_price_form.form_fields.all():
         if field == new_field:
-            assert field.clean_name == new_field.clean_name
+            assert field.clean_name == clean_name
+            assert new_field.clean_name == clean_name
             assert field.label == new_field.label
 
 
@@ -87,6 +103,22 @@ def test_form_with_proper_fields(flex_price_form):
         clean_name="income_currency",
         label="Income Currency",
         field_type="country",
+        required=True,
+    )
+
+    FormField.objects.create(
+        page=flex_price_form,
+        clean_name="country_of_income",
+        label="Country of Income",
+        field_type="iso_country",
+        required=True,
+    )
+
+    FormField.objects.create(
+        page=flex_price_form,
+        clean_name="country_of_residence",
+        label="Country of Residence",
+        field_type="iso_country",
         required=True,
     )
 

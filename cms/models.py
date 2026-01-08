@@ -1614,7 +1614,11 @@ class FlexiblePricingRequestForm(AbstractForm):
         FieldPanel("selected_course"),
         FieldPanel("selected_program"),
         FieldPanel("guest_text"),
-        InlinePanel("form_fields", label="Form Fields"),
+        InlinePanel(
+            "form_fields",
+            label="Form Fields",
+            help_text="Required fields will be auto-populated when the form is published if not already present.",
+        ),
         FieldPanel("application_processing_text"),
         FieldPanel("application_approved_text"),
         FieldPanel("application_approved_no_discount_text"),
