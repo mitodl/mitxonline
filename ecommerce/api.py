@@ -6,6 +6,7 @@ from decimal import Decimal
 from urllib.parse import urljoin
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q, QuerySet
@@ -28,6 +29,7 @@ from ecommerce.constants import (
     ALL_REDEMPTION_TYPES,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    PAYMENT_TYPE_SALES,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
@@ -39,11 +41,13 @@ from ecommerce.models import (
     BasketDiscount,
     BasketItem,
     Discount,
+    DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
     Order,
     OrderStatus,
     PendingOrder,
+    Product,
     UserDiscount,
 )
 from ecommerce.tasks import perform_downgrade_from_order
@@ -865,3 +869,73 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
             redeemed_basket=basket,
             redemption_date=now_in_utc(),
         )
+
+
+def create_verified_program_discounts(program):
+    """
+    Create discount (enrollment) codes for a program.
+
+    When a learner buys a program, they need to be able to get verified enrollments
+    in the courses that are in the program. We generally do this with enrollment
+    codes - this creates one for the program that is set up to make the order
+    zero-value, so the learner doesn't have to pay for upgraded enrollments.
+
+    This will create a single discount, with the "verified program" flag set,
+    with unlimited redemptions, set to 100% off.
+
+    If a discount already exists for this purpose, this will return it.
+
+    Args:
+    - program (Program): the program to create a discount for
+    Returns:
+    - Discount, the discount that was created
+    """
+
+    content_type = ContentType.objects.get_for_model(program)
+    product = Product.objects.filter(
+        content_type=content_type, object_id=program.id
+    ).get()
+
+    existing_discount_qs = Discount.objects.filter(
+        Q(activation_date__isnull=True) | Q(activation_date__lte=now_in_utc()),
+        Q(expiration_date__isnull=True) | Q(expiration_date__gte=now_in_utc()),
+        products__product=product,
+        is_program_discount=True,
+    )
+
+    if existing_discount_qs.exists():
+        return existing_discount_qs.last()
+
+    discount = Discount.objects.create(
+        amount=Decimal(100),
+        automatic=False,
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        redemption_type=REDEMPTION_TYPE_UNLIMITED,
+        payment_type=PAYMENT_TYPE_SALES,
+        discount_code=f"{program.readable_id}-{uuid.uuid4()}",
+        is_bulk=True,
+        is_program_discount=True,
+    )
+
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    return discount
+
+
+def create_verified_program_course_run_enrollment(user, courserun, program):
+    """
+    Create a verified course run enrollment in a course that is associated with
+    a program for the specified learner.
+
+    If the learner has a verified enrollment in the program, and they're enrolling
+    in a course run that's for a course within the program, they'll need a
+    matching verified enrollment in the course run too. We want verified
+    enrollments to have corresponding orders within the system. So, this takes
+    the user, run, and program and creates an order and fulfills it.
+
+    Because the learner has already paid for the program, though, we need to make
+    sure they're not paying for the run again. So, the order should be a
+    zero-value one. This will use a discount code for this - if we don't have one
+    already, then we will make one on the fly for the program, and then apply it
+    to the order.
+    """

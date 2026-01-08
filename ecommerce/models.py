@@ -75,7 +75,7 @@ class ActiveUndeleteManager(models.Manager):
 class Product(TimestampedModel):
     """
     Representation of a purchasable product. There is a GenericForeignKey to a
-    Course Run or Program Run.
+    Course Run or Program.
     """
 
     valid_purchasable_objects = valid_purchasable_objects_list()
@@ -264,6 +264,10 @@ class Discount(TimestampedModel):
         help_text="If set, this discount code will not be redeemable after this date.",
     )
     is_bulk = models.BooleanField(default=False)
+    is_program_discount = models.BooleanField(
+        default=False,
+        help_text="Discount is only for creating verified course run enrollments for a program.",
+    )
 
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"
