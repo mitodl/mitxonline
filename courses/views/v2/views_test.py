@@ -14,7 +14,6 @@ from django.db import connection
 from django.db.models import Q
 from django.test.client import RequestFactory
 from django.urls import reverse
-from courses.utils import get_enrollable_courses, get_unenrollable_courses
 from faker import Faker
 from mitol.common.utils import now_in_utc
 from rest_framework import status
@@ -57,6 +56,7 @@ from courses.serializers.v2.programs import (
     ProgramSerializer,
 )
 from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
+from courses.utils import get_enrollable_courses, get_unenrollable_courses
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_department,
