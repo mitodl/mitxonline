@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 import requests
 import reversion
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -1371,7 +1372,10 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(course_page) if course_page.feature_image else ""
         )
-        narrative = course_page.what_you_learn
+        soup = BeautifulSoup(course_page.what_you_learn, "html.parser")
+        narrative = "\n".join(
+            [f"- {stripped_string}" for stripped_string in soup.stripped_strings]
+        )
 
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"

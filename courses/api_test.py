@@ -2502,7 +2502,7 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
                 "id": "https://learn.mit.edu/courses/course-v1:MITx+6.00.1x",
                 "achievementType": "Course",
                 "type": ["Achievement"],
-                "criteria": {"narrative": "Learn Python programming fundamentals"},
+                "criteria": {"narrative": "- Learn Python programming fundamentals"},
                 "description": "John Doe has successfully completed all modules and earned a Course Certificate in Introduction to Python.",
                 "name": "Introduction to Python",
                 "image": {
