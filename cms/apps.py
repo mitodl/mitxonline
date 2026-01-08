@@ -7,7 +7,7 @@ class CmsConfig(AppConfig):
     default = True  # This file has two app configs, so we need to specify the default.
 
     def ready(self):
-        import cms.signals  # noqa: F401
+        import cms.signals  # noqa: F401, PLC0415
 
 
 class CustomWagtailUsersAppConfig(WagtailUsersAppConfig):
