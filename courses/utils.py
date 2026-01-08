@@ -113,7 +113,10 @@ def get_enrollable_courses(queryset, enrollment_end_date=None):
     ).prefetch_related("products")
 
     return (
-        queryset.prefetch_related("courseruns__products", Prefetch("courseruns", queryset=enrollable_courseruns_qs))
+        queryset.prefetch_related(
+            "courseruns__products",
+            Prefetch("courseruns", queryset=enrollable_courseruns_qs),
+        )
         .filter(
             courseruns__id__in=enrollable_courseruns_qs.values_list("id", flat=True)
         )
@@ -130,7 +133,9 @@ def get_unenrollable_courses(queryset):
     """
     courseruns_qs = CourseRun.objects.unenrollable().prefetch_related("products")
     return (
-        queryset.prefetch_related("courseruns__products", Prefetch("courseruns", queryset=courseruns_qs))
+        queryset.prefetch_related(
+            "courseruns__products", Prefetch("courseruns", queryset=courseruns_qs)
+        )
         .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
         .distinct()
     )
