@@ -1056,7 +1056,9 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         abstract = True
 
     description = RichTextField(
-        help_text="The description shown on the home page and product page."
+        help_text="The description shown on the home page and product page.",
+        blank=True,
+        null=True,
     )
 
     length = models.CharField(
