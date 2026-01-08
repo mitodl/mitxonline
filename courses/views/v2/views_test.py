@@ -244,6 +244,11 @@ def test_get_courses(
     if courserun_is_enrollable is not None:
         params["courserun_is_enrollable"] = courserun_is_enrollable
 
+        if courserun_is_enrollable:
+            courses = get_enrollable_courses(courses)
+        else:
+            courses = get_unenrollable_courses(courses)
+
     for course in courses:
         courses_from_fixture.append(
             CourseWithCourseRunsSerializer(instance=course, context=mock_context).data

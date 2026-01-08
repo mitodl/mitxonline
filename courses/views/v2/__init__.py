@@ -318,6 +318,14 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .prefetch_related("departments")
             .prefetch_related(
                 Prefetch(
+                    "courseruns",
+                    queryset=CourseRun.objects.select_related(
+                        "b2b_contract__organization"
+                    ).order_by("id"),
+                )
+            )
+            .prefetch_related(
+                Prefetch(
                     "page__linked_instructors",
                     queryset=InstructorPageLink.objects.select_related(
                         "linked_instructor_page"
@@ -325,6 +333,8 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 )
             )
             .prefetch_related("page__topics__parent")
+            .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
+            .annotate(count_courseruns=Count("courseruns"))
             .order_by("title")
             .distinct()
         )

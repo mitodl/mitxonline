@@ -38,7 +38,7 @@ def get_topics_from_page(page_instance) -> list[dict]:
     sorted_direct = sorted(
         [{"name": name} for name in direct_topic_names], key=lambda topic: topic["name"]
     )
-    sorted_parents = [{"name": name} for name in sorted(parent_topic_names)]
+    sorted_parents = [{"name": name} for name in sorted(parent_topic_names)])
 
     # Return direct topics first, then parent topics
     return sorted_direct + sorted_parents
