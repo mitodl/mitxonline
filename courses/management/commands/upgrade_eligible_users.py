@@ -79,7 +79,7 @@ class Command(BaseCommand):
                     )
                 elif enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE:
                     (
-                        successful_enrollments,
+                        _,
                         edx_request_success,
                     ) = create_run_enrollments(
                         user, [course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE

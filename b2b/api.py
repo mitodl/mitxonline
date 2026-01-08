@@ -151,7 +151,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
     if run_qs.exists():
         run = run_qs.get()
     else:
-        from courses.api import import_courserun_from_edx
+        from courses.api import import_courserun_from_edx  # noqa: PLC0415
 
         rundata = import_courserun_from_edx(
             course_key=course_run_id,
@@ -363,7 +363,7 @@ def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> boo
     Returns:
         bool: True if discount is supplied or not needed, False otherwise.
     """
-    from ecommerce.api import establish_basket
+    from ecommerce.api import establish_basket  # noqa: PLC0415
 
     if not active_contracts:
         # No contracts = nothing to validate
@@ -426,7 +426,7 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
 
     Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
-    from ecommerce.api import establish_basket
+    from ecommerce.api import establish_basket  # noqa: PLC0415
 
     basket = establish_basket(request)
     if not basket:
@@ -748,7 +748,7 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     Returns:
         The prepared basket.
     """
-    from ecommerce.api import establish_basket
+    from ecommerce.api import establish_basket  # noqa: PLC0415
 
     basket = establish_basket(request)
     # Clear the basket. For Unified Ecommerce, we may want to change this.
@@ -810,7 +810,7 @@ def create_b2b_enrollment(request, product: Product):
     - "price": the total for the basket, if enrollment did not succeed
     - "checkout_result": the result of the checkout attempt, if applicable.
     """
-    from ecommerce.api import generate_checkout_payload
+    from ecommerce.api import generate_checkout_payload  # noqa: PLC0415
 
     # Validate prerequisites for B2B enrollment
     validation_error = _validate_b2b_enrollment_prerequisites(request.user, product)

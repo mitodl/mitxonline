@@ -8,10 +8,10 @@ to generate the enrollments if specified (rather than reinventing the wheel).
 from argparse import RawTextHelpFormatter
 from getpass import getpass
 
+from authentication.pipeline.user import CREATE_OPENEDX_USER_RETRY_DELAY
 from django.core.management import BaseCommand, call_command
 from django.db.models import Q
 
-from authentication.pipeline.user import CREATE_OPENEDX_USER_RETRY_DELAY
 from mail.api import validate_email_addresses
 from openedx.api import create_user as openedx_create_user
 from openedx.tasks import create_user_from_id as openedx_create_user_from_id

@@ -90,7 +90,7 @@ class Command(BaseCommand):
         )
         for course_run in course_runs:
             with reversion.create_revision():
-                product, created = Product.objects.get_or_create(
+                _, created = Product.objects.get_or_create(
                     object_id=course_run.id,
                     content_type=course_run_content_type,
                     is_active=active,

@@ -248,7 +248,7 @@ def test_create_run_enrollments_upgrade(
     )
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
-    successful_enrollments, edx_request_success = create_run_enrollments(
+    _, edx_request_success = create_run_enrollments(
         user, runs=[test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
     patched_edx_enroll.assert_called_once_with(
@@ -1434,7 +1434,7 @@ def test_generate_program_certificate_success_minimum_electives_not_met(
         user=user, course_run=elective_course1_course_run
     )
 
-    certificate, created = generate_program_certificate(user=user, program=program)
+    _, created = generate_program_certificate(user=user, program=program)
     assert created is False
     assert len(ProgramCertificate.objects.all()) == 0
 

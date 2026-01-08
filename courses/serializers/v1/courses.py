@@ -50,7 +50,9 @@ class CourseSerializer(BaseCourseSerializer):
     )
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
-            from courses.serializers.v1.base import BaseProgramSerializer
+            from courses.serializers.v1.base import (  # noqa: PLC0415
+                BaseProgramSerializer,
+            )
 
             programs = (
                 models.Program.objects.select_related("page")
@@ -176,7 +178,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
             run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
-        successful_enrollments, edx_request_success = create_run_enrollments(
+        successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
             keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),

@@ -1,3 +1,4 @@
+# ruff: noqa: PLC0415
 """
 Tasks for the courses app
 """

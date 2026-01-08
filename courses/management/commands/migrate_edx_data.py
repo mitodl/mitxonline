@@ -229,7 +229,7 @@ class Command(BaseCommand):
                             )
                         )
 
-                course_run, run_created = self._create_course_run(course, row)
+                _, run_created = self._create_course_run(course, row)
                 if run_created:
                     run_success_count += 1
 

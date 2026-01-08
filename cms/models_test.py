@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import caches
+from django.forms import ChoiceField
 from django.test.client import RequestFactory
 from django.urls import resolve, reverse
 from mitol.common.factories import UserFactory
@@ -738,10 +739,10 @@ class TestFlexiblePricingFormBuilder:
 
     def test_create_country_field_with_currency_exchange_rates(self):
         """Test create_country_field method with currency exchange rates in database"""
-        from django.forms import ChoiceField
-
-        from cms.models import FlexiblePricingFormBuilder
-        from flexiblepricing.factories import CurrencyExchangeRateFactory
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.factories import (  # noqa: PLC0415
+            CurrencyExchangeRateFactory,
+        )
 
         CurrencyExchangeRateFactory.create(currency_code="USD", description="US Dollar")
         CurrencyExchangeRateFactory.create(currency_code="EUR", description="Euro")
@@ -768,10 +769,8 @@ class TestFlexiblePricingFormBuilder:
 
     def test_create_country_field_with_no_currency_exchange_rates(self):
         """Test create_country_field method with no currency exchange rates in database"""
-        from django.forms import ChoiceField
-
-        from cms.models import FlexiblePricingFormBuilder
-        from flexiblepricing.models import CurrencyExchangeRate
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.models import CurrencyExchangeRate  # noqa: PLC0415
 
         CurrencyExchangeRate.objects.all().delete()
 
@@ -792,10 +791,10 @@ class TestFlexiblePricingFormBuilder:
 
     def test_create_country_field_with_null_description(self):
         """Test create_country_field method with currency exchange rate having None description"""
-        from django.forms import ChoiceField
-
-        from cms.models import FlexiblePricingFormBuilder
-        from flexiblepricing.factories import CurrencyExchangeRateFactory
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.factories import (  # noqa: PLC0415
+            CurrencyExchangeRateFactory,
+        )
 
         CurrencyExchangeRateFactory.create(currency_code="JPY", description=None)
 
@@ -813,8 +812,10 @@ class TestFlexiblePricingFormBuilder:
 
     def test_create_country_field_ordering(self):
         """Test that create_country_field maintains alphabetical ordering of choices"""
-        from cms.models import FlexiblePricingFormBuilder
-        from flexiblepricing.factories import CurrencyExchangeRateFactory
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.factories import (  # noqa: PLC0415
+            CurrencyExchangeRateFactory,
+        )
 
         CurrencyExchangeRateFactory.create(
             currency_code="ZAR", description="South African Rand"

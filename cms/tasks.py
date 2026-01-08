@@ -26,8 +26,7 @@ def call_fastly_purge_api(relative_url):
         - Dict of the response (resp.json), or False if there was an error.
     """
     logger = logging.getLogger("fastly_purge")
-
-    (scheme, netloc, path, params, query, fragment) = urlparse(SITE_BASE_URL)
+    netloc = urlparse(SITE_BASE_URL)[1]
 
     headers = {"host": netloc}
 
@@ -76,7 +75,8 @@ def queue_fastly_purge_url(page_id):
         logger.info("Purge request processed OK.")
         return True
 
-    logger.error("Purge request failed.")  # noqa: RET503
+    logger.error("Purge request failed.")
+    return False
 
 
 @app.task()
@@ -96,7 +96,8 @@ def queue_fastly_full_purge():
         logger.info("Purge request processed OK.")
         return True
 
-    logger.error("Purge request failed.")  # noqa: RET503
+    logger.error("Purge request failed.")
+    return False
 
 
 @app.task

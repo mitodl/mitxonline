@@ -29,6 +29,6 @@ class Command(BaseCommand):
         ensure_instructors_index()
         ensure_program_collection_index()
 
-        from b2b.api import ensure_b2b_organization_index
+        from b2b.api import ensure_b2b_organization_index  # noqa: PLC0415
 
         ensure_b2b_organization_index()

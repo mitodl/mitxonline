@@ -338,7 +338,7 @@ def test_order_refund_failure(mocker, fulfilled_transaction):
     )
 
     with pytest.raises(ApiException):  # noqa: PT012
-        refund_response, message = refund_order(order_id=fulfilled_transaction.order.id)
+        refund_response, _ = refund_order(order_id=fulfilled_transaction.order.id)
         assert refund_response is False
     assert (
         Transaction.objects.filter(

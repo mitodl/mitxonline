@@ -1,5 +1,4 @@
 """View tests for the v0 API."""
-# ruff: noqa: PLR0913
 
 import operator as op
 import random
@@ -350,7 +349,7 @@ def test_create_basket_with_product(
         [True, True],  # noqa: PT007
     ],
 )
-def test_redeem_discount(
+def test_redeem_discount(  # noqa: PLR0913
     user,
     user_drf_client,
     products,
@@ -742,7 +741,7 @@ def test_redeem_discount_with_higher_discount(
     "time, expects",  # noqa: PT006
     [["valid", True], ["past", False], ["future", False]],  # noqa: PT007
 )
-def test_redeem_time_limited_discount(
+def test_redeem_time_limited_discount(  # noqa: PLR0913
     user, user_drf_client, products, discounts, time, expects
 ):
     """
