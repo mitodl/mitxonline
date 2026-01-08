@@ -144,7 +144,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
                         Prefetch(
                             "course__page__topics",
                             queryset=CoursesTopic.objects.only("name"),
-                        )
+                        ),
                     )
                     .only(
                         "id",
@@ -251,7 +251,12 @@ class CourseFilterSet(django_filters.FilterSet):
 
         if "courserun_is_enrollable" not in filter_keys:
             queryset = queryset.prefetch_related(
-                Prefetch("courseruns", queryset=CourseRun.objects.prefetch_related("products").order_by("id")),
+                Prefetch(
+                    "courseruns",
+                    queryset=CourseRun.objects.prefetch_related("products").order_by(
+                        "id"
+                    ),
+                ),
             )
 
         return queryset
@@ -274,14 +279,18 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .prefetch_related("departments")
             .prefetch_related(
                 Prefetch(
-                    "courseruns", 
-                    queryset=CourseRun.objects.select_related("b2b_contract__organization").order_by("id")
+                    "courseruns",
+                    queryset=CourseRun.objects.select_related(
+                        "b2b_contract__organization"
+                    ).order_by("id"),
                 )
             )
             .prefetch_related(
                 Prefetch(
                     "page__linked_instructors",
-                    queryset=InstructorPageLink.objects.select_related("linked_instructor_page")
+                    queryset=InstructorPageLink.objects.select_related(
+                        "linked_instructor_page"
+                    ),
                 )
             )
             .prefetch_related("page__topics__parent")
@@ -643,19 +652,19 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
 def download_course_credential(request, credential_id):
     """Download a course verifiable credential by UUID."""
     from courses.models import VerifiableCredential
-    
+
     credential = get_object_or_404(VerifiableCredential, uuid=credential_id)
-    
+
     # Find the associated certificate to verify access if needed
-    cert = (
-        CourseRunCertificate.objects.filter(
-            verifiable_credential=credential, is_revoked=False
-        ).first()
-    )
-    
+    cert = CourseRunCertificate.objects.filter(
+        verifiable_credential=credential, is_revoked=False
+    ).first()
+
     if not cert:
-        return Response({"error": "Certificate not found"}, status=status.HTTP_404_NOT_FOUND)
-    
+        return Response(
+            {"error": "Certificate not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+
     return Response(credential.credential_data)
 
 
@@ -670,17 +679,17 @@ def download_course_credential(request, credential_id):
 def download_program_credential(request, credential_id):
     """Download a program verifiable credential by UUID."""
     from courses.models import VerifiableCredential
-    
+
     credential = get_object_or_404(VerifiableCredential, uuid=credential_id)
-    
+
     # Find the associated certificate to verify access if needed
-    cert = (
-        ProgramCertificate.objects.filter(
-            verifiable_credential=credential, is_revoked=False
-        ).first()
-    )
-    
+    cert = ProgramCertificate.objects.filter(
+        verifiable_credential=credential, is_revoked=False
+    ).first()
+
     if not cert:
-        return Response({"error": "Certificate not found"}, status=status.HTTP_404_NOT_FOUND)
-    
+        return Response(
+            {"error": "Certificate not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+
     return Response(credential.credential_data)
