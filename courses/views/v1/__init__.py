@@ -7,7 +7,7 @@ import django_filters
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Q, Prefetch
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -25,6 +25,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from reversion.models import Version
 
+from cms.models import InstructorPageLink
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -43,7 +44,6 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
-from cms.models import InstructorPageLink
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
     CourseRunWithCourseSerializer,
@@ -165,14 +165,14 @@ class CourseFilterSet(django_filters.FilterSet):
 
         filter_keys = self.form.cleaned_data.keys()
 
-        # Debug print to see what's happening
-        print(f"DEBUG filter_queryset: filter_keys = {list(filter_keys)}")
-        print(f"DEBUG filter_queryset: courserun_is_enrollable in filter_keys = {'courserun_is_enrollable' in filter_keys}")
-
         if "courserun_is_enrollable" not in filter_keys:
-            print("DEBUG: Adding courseruns prefetch")
             queryset = queryset.prefetch_related(
-                Prefetch("courseruns", queryset=CourseRun.objects.prefetch_related("products").order_by("id")),
+                Prefetch(
+                    "courseruns",
+                    queryset=CourseRun.objects.prefetch_related("products").order_by(
+                        "id"
+                    ),
+                ),
             )
 
         return queryset
@@ -192,7 +192,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        queryset = (
+        return (
             Course.objects.filter()
             .select_related("page")
             .prefetch_related("departments")
@@ -201,13 +201,13 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .prefetch_related(
                 Prefetch(
                     "page__linked_instructors",
-                    queryset=InstructorPageLink.objects.select_related("linked_instructor_page"),
+                    queryset=InstructorPageLink.objects.select_related(
+                        "linked_instructor_page"
+                    ),
                 )
             )
             .all()
         )
-
-        return queryset
 
     def get_serializer_context(self):
         added_context = {}
@@ -268,13 +268,11 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
             return (
                 CourseRun.objects.select_related("course")
                 .prefetch_related(
-                    "course__departments", 
-                    "course__page", 
+                    "course__departments",
+                    "course__page",
                     "course__page__feature_image",
                     "course__page__linked_instructors",
-                    "course__page__topics",
-                    "course__page__topics__parent",
-                    "products"
+                    "products",
                 )
                 .filter(live=True)
             )
@@ -446,8 +444,6 @@ class UserEnrollmentsApiViewSet(
                 "run__products",
                 "run__course__page__linked_instructors",
                 "run__course__page__feature_image",
-                "run__course__page__topics",
-                "run__course__page__topics__parent"
             )
             .all()
         )
@@ -545,12 +541,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                 "program",
                 "program__page",
             )
-            .prefetch_related(
-                "program__departments", 
-                "program__page__feature_image",
-                "program__page__topics__parent",
-                "program__page__linked_instructors"
-            )
+            .prefetch_related("program__departments", "program__page__feature_image")
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .order_by("-id")
@@ -568,12 +559,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page")
-                    .prefetch_related(
-                        "run__course__departments",
-                        "run__course__page__topics__parent",
-                        "run__course__page__linked_instructors",
-                        "run__course__page__feature_image"
-                    )
+                    .prefetch_related("run__course__departments")
                     .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
