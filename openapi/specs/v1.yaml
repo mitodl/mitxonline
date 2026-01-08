@@ -5599,6 +5599,7 @@ components:
           readOnly: true
         description:
           type: string
+          nullable: true
           description: The description shown on the home page and product page.
         live:
           type: boolean
@@ -5619,7 +5620,6 @@ components:
           description: Get the price text from the program page.
           readOnly: true
       required:
-      - description
       - feature_image_src
       - financial_assistance_form_url
       - live
@@ -5641,6 +5641,7 @@ components:
           maxLength: 255
         description:
           type: string
+          nullable: true
           description: The description shown on the home page and product page.
         length:
           type: string
