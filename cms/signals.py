@@ -3,30 +3,9 @@ import logging
 from wagtail.signals import page_published
 
 from cms.models import FlexiblePricingRequestForm
-from cms.tasks import queue_fastly_purge_url
 from flexiblepricing.utils import ensure_flexprice_form_fields
 
 logger = logging.getLogger("cms.signalreceiver")
-
-
-def fastly_purge_url_receiver(sender, **kwargs):  # noqa: ARG001
-    """
-    Generic receiver for the Wagtail page_published, page_unpublished, and
-    post_page_move signals. The most important part of the kwargs passed in all
-    of these is the page instance so we can use the same receiver for all of them.
-
-    For post_page_move, we also look for the url_path_before arg and only
-    process this if the path_before and path_after are different.
-    """
-    instance = kwargs["instance"]
-
-    if "url_path_before" in kwargs:  # noqa: SIM102
-        if kwargs["url_path_before"] == kwargs["url_path_after"]:
-            return
-
-    logger.info(f"Queueing Fastly purge for {instance.id} - {instance.title}")  # noqa: G004
-
-    queue_fastly_purge_url.delay(instance.id)
 
 
 def flex_pricing_field_check(sender, **kwargs):  # noqa: ARG001

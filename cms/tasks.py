@@ -53,11 +53,7 @@ def call_fastly_purge_api(relative_url):
 @app.task
 def queue_fastly_purge_url(page_id):
     """
-    Purges the given page_id from the Fastly cache. This should happen on a
-    handful of Wagtail signals:
-    - page_published
-    - page_unpublished
-    - post_page_move
+    Purges the given page_id from the Fastly cache.
     """
     logger = logging.getLogger("fastly_purge")
 
