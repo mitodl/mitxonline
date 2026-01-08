@@ -114,6 +114,9 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
 
     courseruns = CourseRunSerializer(many=True, read_only=True)
 
+    def get_courseruns_queryset(self, queryset, _request):
+        return queryset.order_by("id")
+
     class Meta:
         model = models.Course
         fields = CourseSerializer.Meta.fields + [  # noqa: RUF005

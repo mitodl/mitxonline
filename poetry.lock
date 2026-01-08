@@ -2928,7 +2928,7 @@ celery = ["celery (>=5.5.0)"]
 type = "git"
 url = "https://github.com/mitodl/ol-django"
 reference = "nl/add_prefetched_serializers"
-resolved_reference = "63827243f7983ad5e5ee7b3d6e39574b63af2f27"
+resolved_reference = "0f40b1d0d19dd2a1247003a42df079a1579c4fe3"
 subdirectory = "src/common"
 
 [[package]]

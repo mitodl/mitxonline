@@ -1,5 +1,5 @@
 from django.contrib.auth.models import AnonymousUser
-from django.db.models import Q, Prefetch
+from django.db.models import Prefetch, Q
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from mitol.common.serializers import QuerySetSerializer
 from mitol.common.utils import now_in_utc
@@ -84,22 +84,14 @@ class LearnerProgramRecordShareSerializer(serializers.ModelSerializer):
 class ProgramSerializer(QuerySetSerializer):
     """Program model serializer"""
 
-    courses = serializers.SerializerMethodField()
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
     departments = DepartmentSerializer(many=True, read_only=True)
     courses = CourseWithCourseRunsSerializer(many=True, read_only=True)
 
-    def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .prefetch_related(
-                Prefetch("courses", queryset=models.Course.objects.distinct("id")),
-                "department",
-            )
-        )
+    def get_courses_queryset(self, queryset, _request):
+        return queryset.distinct()
 
     @extend_schema_field(
         {
@@ -240,10 +232,10 @@ class UserProgramEnrollmentDetailSerializer(QuerySetSerializer):
     enrollments = CourseRunEnrollmentSerializer(many=True)
     certificate = ProgramCertificateSerializer(read_only=True, allow_null=True)
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
+    def get_queryset(self, queryset, request):
+        queryset = super().get_queryset(queryset, request)
 
-        return qs.prefetch_related(
+        return queryset.prefetch_related(
             Prefetch(
                 "program__courses__courseruns__enrollments",
                 queryset=models.CourseRunEnrollment.objects.filter(user=request.user),

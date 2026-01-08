@@ -2,9 +2,9 @@
 
 import uuid
 
-from hubspot.crm.objects import SimplePublicObject
 import pytest
 from faker import Faker
+from hubspot.crm.objects import SimplePublicObject
 
 from fixtures.b2b import *  # noqa: F403
 from fixtures.common import *  # noqa: F403
@@ -38,6 +38,7 @@ def payment_gateway_settings(settings):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
+
 
 @pytest.fixture(autouse=True)
 def mock_hubspot_api(mocker):

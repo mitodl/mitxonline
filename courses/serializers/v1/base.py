@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from drf_spectacular.utils import extend_schema_field
+from mitol.common.serializers import QuerySetSerializer
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer
@@ -13,7 +14,7 @@ from ecommerce.serializers import ProductFlexibilePriceSerializer
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
-class BaseCourseSerializer(serializers.ModelSerializer):
+class BaseCourseSerializer(QuerySetSerializer):
     """Basic course model serializer"""
 
     type = serializers.SerializerMethodField(read_only=True)
@@ -38,7 +39,7 @@ class BaseCourseSerializer(serializers.ModelSerializer):
         ]
 
 
-class BaseCourseRunSerializer(serializers.ModelSerializer):
+class BaseCourseRunSerializer(QuerySetSerializer):
     """Minimal CourseRun model serializer"""
 
     is_archived = serializers.SerializerMethodField()
