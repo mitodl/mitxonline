@@ -39,6 +39,7 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    DepartmentFactory,
 )
 from courses.models import CourseRunEnrollment
 from ecommerce.api_test import create_basket
@@ -969,7 +970,7 @@ def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach):
 
 
 @pytest.mark.parametrize(
-    "run_exists,import_succeeds",
+    ("run_exists", "import_succeeds"),
     [
         (True, True),  # Run exists, import call should not be made
         (False, True),  # Run doesn't exist, import succeeds
@@ -985,8 +986,6 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
     2. If not, import it from edX using import_courserun_from_edx
     3. Create a contract run using the existing or imported run
     """
-    from courses.factories import DepartmentFactory
-
     # Setup test data
     contract = ContractPageFactory.create()
     department1 = DepartmentFactory.create(name="Engineering", slug="engineering")
@@ -1070,7 +1069,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
             mock_import.return_value = None
 
             with pytest.raises(
-                ValueError, match="Import and create contract run for .* failed"
+                ValueError, match=r"Import and create contract run for .* failed"
             ):
                 import_and_create_contract_run(
                     contract=contract,
@@ -1084,8 +1083,6 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
 
 def test_import_and_create_contract_run_with_all_kwargs(mocker):
     """Test import_and_create_contract_run with all possible keyword arguments."""
-    from courses.factories import DepartmentFactory
-
     contract = ContractPageFactory.create()
     departments = [DepartmentFactory.create()]
     course_run_id = "course-v1:MITx+6.00x+2T2023"
@@ -1149,8 +1146,6 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
 
 def test_import_and_create_contract_run_with_string_departments(mocker):
     """Test import_and_create_contract_run with department names as strings."""
-    from courses.factories import DepartmentFactory
-
     contract = ContractPageFactory.create()
 
     # Create departments and use their names as strings
