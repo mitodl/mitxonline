@@ -2,8 +2,10 @@
 Creates a basic courseware about page. This can be for programs or courses.
 """
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.management import BaseCommand
+from django.urls import reverse
 
 from cms.api import create_default_courseware_page
 from cms.models import Course, Program
@@ -46,10 +48,15 @@ class Command(BaseCommand):
             return
 
         try:
-            create_default_courseware_page(courseware, kwargs["live"])
+            page = create_default_courseware_page(courseware, kwargs["live"])
+            edit_url = (
+                f"{settings.SITE_BASE_URL.rstrip('/')}"
+                f"{reverse('wagtailadmin_pages:edit', args=[page.id])}"
+            )
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"About page created successfully for {courseware.readable_id}"
+                    f"About page created successfully for {courseware.readable_id}\n"
+                    f"Edit page at: {edit_url}"
                 )
             )
         except ValidationError as e:
