@@ -1,6 +1,26 @@
 Release Notes
 =============
 
+Version 0.137.2
+---------------
+
+- chore(deps): update postgres docker tag to v15.15 (#3188)
+- chore(deps): update digitalcredentials/signing-service docker tag to v1.2.0 (#3187)
+- fix: make description field on program pages optional (#3183)
+- chore(deps): update dependency authlib to v1.6.6 [security] (#3185)
+- Add Verifiable Credential issuer to dev stack (#3180)
+- Fix CI (#3184)
+- Strip html tags from what_you_learn for verifiable credentials (#3177)
+- Restore cms app config / signals (finaid form check) (#3181)
+- precommit upgrade fixes (#3182)
+- Add more B2B documentation (#3160)
+- Fix program enrollment course run sorting (#3175)
+- Fix bulk_create error in migrate_edx_data management command (#3176)
+- Always mock the hubspot API (#3179)
+- Update products and discounts API for OpenAPI spec generation (#3148)
+- Verifiable credential backfill (#3170)
+- Regenerate OpenAPI spec now that drf-spectacular has been upgraded (#3171)
+
 Version 0.137.1 (Released January 06, 2026)
 ---------------
 
