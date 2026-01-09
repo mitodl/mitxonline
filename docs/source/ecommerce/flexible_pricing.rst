@@ -3,9 +3,8 @@ Flexible Pricing
 
 The Flexible Pricing system allows learners to request alternative pricing for MITx Online courses based on their location and annual income. These requests can be made through a customizable form in the Wagtail CMS system.
 
-Flexible pricing is based on the learner's location and annual income. Several tiers of pricing can be available based on these factors.
+Flexible pricing is based on the learner's location and annual income. Several tiers of pricing can be available based on these factors. Requests must be approved and may require additional documentation be submitted via DocuSign. Approval indicates that the form has been submitted and processed, but may not guarantee a reduced price (e.g., sufficient income may put users in a "No discount" tier.) Denial indicates an issue processing the request.
 
-Authenticated users can submit requests for flexible pricing and track the status of their requests. Approval may be automatic or manual and may require additional documentation submitted via DocuSign.
 
 Requirements
 *************
