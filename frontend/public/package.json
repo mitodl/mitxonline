@@ -35,7 +35,6 @@
     "casual-browserify": "1.5.19-2",
     "chai": "4.5.0",
     "chai-as-promised": "7.1.2",
-    "codecov": "3.8.3",
     "css-loader": "3.6.0",
     "decimal.js-light": "2.5.1",
     "enzyme": "3.11.0",

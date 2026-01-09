@@ -108,11 +108,6 @@ jobs:
           OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
           SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
 
-      - name: Upload coverage to CodeCov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-
   javascript-tests:
     runs-on: ubuntu-22.04
     steps:
@@ -153,7 +148,6 @@ jobs:
       - name: Tests
         run: yarn workspaces foreach run test
         env:
-          CODECOV: true
           NODE_ENV: development
 
       - name: Webpack production build
@@ -161,8 +155,3 @@ jobs:
           yarn workspaces foreach run build --bail --mode production
         env:
           NODE_ENV: production
-
-      - name: Upload test coverage to CodeCov
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage/lcov.info
