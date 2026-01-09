@@ -114,7 +114,7 @@ def test_serialize_course_with_page_fields(
             "financial_assistance_form_url": expected_financial_assistance_url,
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "effort": course_page.effort,
             "length": course_page.length,

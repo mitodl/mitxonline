@@ -39,12 +39,12 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
     @extend_schema_field(str)
     def get_description(self, instance):
         """Get cleaned description text."""
-        return bleach.clean(instance.description, tags=[], strip=True)
+        return bleach.clean(instance.description, tags={}, strip=True)
 
     def get_effort(self, instance) -> str | None:
         """Get cleaned effort text."""
         return (
-            bleach.clean(instance.effort, tags=[], strip=True)
+            bleach.clean(instance.effort, tags={}, strip=True)
             if instance.effort
             else None
         )
@@ -53,7 +53,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
     def get_length(self, instance):
         """Get cleaned length text."""
         return (
-            bleach.clean(instance.length, tags=[], strip=True)
+            bleach.clean(instance.length, tags={}, strip=True)
             if instance.length
             else None
         )
@@ -247,7 +247,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
                 "name": getattr(link.linked_instructor_page, "instructor_name", ""),
                 "description": bleach.clean(
                     getattr(link.linked_instructor_page, "instructor_bio_short", ""),
-                    tags=[],
+                    tags={},
                     strip=True,
                 )
                 if getattr(link.linked_instructor_page, "instructor_bio_short", None)
@@ -297,7 +297,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     def get_description(self, instance):
         """The description shown on the home page and product page."""
         if instance.description:
-            return bleach.clean(instance.description, tags=[], strip=True)
+            return bleach.clean(instance.description, tags={}, strip=True)
         return ""
 
     @extend_schema_field(str)
