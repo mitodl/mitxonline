@@ -971,31 +971,30 @@ def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach):
 @pytest.mark.parametrize(
     "run_exists,import_succeeds",
     [
-        (True, True),   # Run exists, import call should not be made
+        (True, True),  # Run exists, import call should not be made
         (False, True),  # Run doesn't exist, import succeeds
-        (False, False), # Run doesn't exist, import fails
+        (False, False),  # Run doesn't exist, import fails
     ],
 )
 def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
     """
     Test import_and_create_contract_run function.
-    
+
     This function should:
     1. Check if the course run already exists
     2. If not, import it from edX using import_courserun_from_edx
     3. Create a contract run using the existing or imported run
     """
-    from b2b.api import import_and_create_contract_run
     from courses.factories import DepartmentFactory
-    
+
     # Setup test data
     contract = ContractPageFactory.create()
     department1 = DepartmentFactory.create(name="Engineering", slug="engineering")
     department2 = DepartmentFactory.create(name="Science", slug="science")
     departments = [department1, department2]
-    
+
     course_run_id = "course-v1:MITx+6.00x+2T2023"
-    
+
     # Mock the create_contract_run function
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
     mock_run = mocker.Mock()
@@ -1003,18 +1002,18 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
     mock_run.course = mock_course
     mock_product = mocker.Mock()
     mock_create_contract_run.return_value = (mock_run, mock_product)
-    
+
     if run_exists:
         # Create a mock existing run
         existing_run = CourseRunFactory.create(courseware_id=course_run_id)
-        
+
         # Test the case where run exists
         result = import_and_create_contract_run(
             contract=contract,
             course_run_id=course_run_id,
             departments=departments,
         )
-        
+
         # Should use existing run and call create_contract_run
         mock_create_contract_run.assert_called_once_with(
             contract,
@@ -1026,14 +1025,14 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
     else:
         # Mock import_courserun_from_edx
         mock_import = mocker.patch("courses.api.import_courserun_from_edx")
-        
+
         if import_succeeds:
             # Mock successful import
             imported_run = mocker.Mock()
             imported_course = mocker.Mock()
             imported_run.course = imported_course
             mock_import.return_value = (imported_run, None, None)
-            
+
             result = import_and_create_contract_run(
                 contract=contract,
                 course_run_id=course_run_id,
@@ -1041,7 +1040,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
                 live=True,
                 create_cms_page=True,
             )
-            
+
             # Verify import was called with correct parameters
             mock_import.assert_called_once_with(
                 course_key=course_run_id,
@@ -1057,7 +1056,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
                 ingest_content_files_for_ai=True,
                 is_source_run=True,
             )
-            
+
             # Verify create_contract_run was called with imported run
             mock_create_contract_run.assert_called_once_with(
                 contract,
@@ -1069,40 +1068,41 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
         else:
             # Mock failed import
             mock_import.return_value = None
-            
-            with pytest.raises(ValueError, match="Import and create contract run for .* failed"):
+
+            with pytest.raises(
+                ValueError, match="Import and create contract run for .* failed"
+            ):
                 import_and_create_contract_run(
                     contract=contract,
                     course_run_id=course_run_id,
                     departments=departments,
                 )
-            
+
             mock_import.assert_called_once()
             mock_create_contract_run.assert_not_called()
 
 
 def test_import_and_create_contract_run_with_all_kwargs(mocker):
     """Test import_and_create_contract_run with all possible keyword arguments."""
-    from b2b.api import import_and_create_contract_run
     from courses.factories import DepartmentFactory
-    
+
     contract = ContractPageFactory.create()
     departments = [DepartmentFactory.create()]
     course_run_id = "course-v1:MITx+6.00x+2T2023"
-    
+
     # Mock import since run doesn't exist
     mock_import = mocker.patch("courses.api.import_courserun_from_edx")
     imported_run = mocker.Mock()
     imported_course = mocker.Mock()
     imported_run.course = imported_course
     mock_import.return_value = (imported_run, None, None)
-    
+
     # Mock create_contract_run
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
     mock_run = mocker.Mock()
     mock_product = mocker.Mock()
     mock_create_contract_run.return_value = (mock_run, mock_product)
-    
+
     # Test with all kwargs
     result = import_and_create_contract_run(
         contract=contract,
@@ -1119,7 +1119,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
         skip_edx=True,
         require_designated_source_run=True,
     )
-    
+
     # Verify import was called with all parameters
     mock_import.assert_called_once_with(
         course_key=course_run_id,
@@ -1135,7 +1135,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
         ingest_content_files_for_ai=False,
         is_source_run=True,
     )
-    
+
     # Verify create_contract_run was called with kwargs
     mock_create_contract_run.assert_called_once_with(
         contract,
@@ -1143,39 +1143,38 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
         skip_edx=True,
         require_designated_source_run=True,
     )
-    
+
     assert result == (mock_run, mock_product)
 
 
 def test_import_and_create_contract_run_with_string_departments(mocker):
     """Test import_and_create_contract_run with department names as strings."""
-    from b2b.api import import_and_create_contract_run
     from courses.factories import DepartmentFactory
-    
+
     contract = ContractPageFactory.create()
-    
+
     # Create departments and use their names as strings
     dept1 = DepartmentFactory.create(name="Engineering")
     dept2 = DepartmentFactory.create(name="Science")
     departments = [dept1.name, dept2.name]
-    
+
     course_run_id = "course-v1:MITx+6.00x+2T2023"
-    
+
     # Create existing run to avoid import path
     existing_run = CourseRunFactory.create(courseware_id=course_run_id)
-    
+
     # Mock create_contract_run
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
     mock_run = mocker.Mock()
     mock_product = mocker.Mock()
     mock_create_contract_run.return_value = (mock_run, mock_product)
-    
+
     result = import_and_create_contract_run(
         contract=contract,
         course_run_id=course_run_id,
         departments=departments,
     )
-    
+
     # Should work with string department names
     mock_create_contract_run.assert_called_once_with(
         contract,
