@@ -230,17 +230,11 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     @extend_schema_field(list)
     def get_instructors(self, instance):
         """Get instructor information"""
-        # Handle both QuerySet and prefetched list cases
         linked_instructors = instance.linked_instructors
 
-        if hasattr(linked_instructors, "all"):
-            # It's a Manager/QuerySet - apply select_related and get all
-            instructor_links = linked_instructors.select_related(
-                "linked_instructor_page"
-            ).all()
-        else:
-            # It's already a prefetched list - use directly
-            instructor_links = linked_instructors
+        # Use the prefetched results directly - this should not trigger additional queries
+        # since we've prefetched with Prefetch object in the view
+        instructor_links = list(linked_instructors.all())
 
         return [
             {
