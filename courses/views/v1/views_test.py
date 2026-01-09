@@ -4,18 +4,24 @@ Tests for course views
 
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
 import operator as op
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 from urllib.parse import quote
 
 import pytest
 import reversion
+from anys import ANY_STR
 from django.db.models import Count, Q
+from django.test import RequestFactory
 from django.test.client import Client
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
+from rest_framework.test import APIClient
 from reversion.models import Version
 
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     BlockedCountryFactory,
@@ -24,7 +30,10 @@ from courses.factories import (
     CourseRunFactory,
 )
 from courses.models import (
+    Course,
     CourseRun,
+    CourseRunEnrollment,
+    Program,
     ProgramEnrollment,
 )
 from courses.serializers.v1.courses import (
@@ -33,12 +42,20 @@ from courses.serializers.v1.courses import (
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v1.programs import ProgramSerializer
+from courses.serializers.v1.programs import (
+    ProgramRequirementTreeSerializer,
+    ProgramSerializer,
+)
+from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_programs,
 )
-from courses.views.v1 import UserEnrollmentsApiViewSet
+from courses.views.v1 import (
+    CourseFilterSet,
+    ProgramViewSet,
+    UserEnrollmentsApiViewSet,
+)
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order, OrderStatus
 from main import features
@@ -51,6 +68,7 @@ from main.constants import (
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from main.utils import encode_json_cookie_value
 from openedx.exceptions import NoEdxApiAuthError
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -744,36 +762,122 @@ def test_update_user_enrollment_failure(
 
 
 @pytest.mark.skip_nplusone_check
-def test_program_enrollments(user_drf_client, user, programs):
+@pytest.mark.usefixtures("b2b_courses")
+def test_program_enrollments(user_drf_client, user_with_enrollments_and_certificates):
     """
     Tests the program enrollments API, which should show the user's enrollment
     in programs with the course runs that apply.
     """
+    user = user_with_enrollments_and_certificates
 
-    enrollments = []
-    for program in programs:
-        enrollment = ProgramEnrollment(user=user, program=program)
-        enrollment.save()
-        enrollments.append(enrollment)
+    program_enrollments = (
+        ProgramEnrollment.objects.filter(user=user)
+        .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+        .order_by("-id")
+    )
 
-    course = CourseFactory.create()
-    programs[1].add_requirement(course)
-    course_run = CourseRunFactory.create(course=course)
-    course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run, user=user)
+    run_enrollments_by_program_id = {
+        program_enrollment.program_id: CourseRunEnrollment.objects.filter(
+            user=user, run__course__in_programs__program=program_enrollment.program
+        )
+        .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+        .order_by("-id")
+        for program_enrollment in program_enrollments
+    }
+
+    courses_by_program_id = {
+        program_enrollment.program_id: Course.objects.filter(
+            in_programs__program=program_enrollment.program
+        ).order_by("in_programs__path")
+        for program_enrollment in program_enrollments
+    }
+
+    # assert that we ended up with data
+    assert len(program_enrollments) > 0
+    for runs in run_enrollments_by_program_id.values():
+        assert len(runs) > 0
 
     resp = user_drf_client.get(reverse("v1:user_program_enrollments_api-list"))
 
     assert resp.status_code == status.HTTP_200_OK
 
-    resp_data = resp.json()
-
-    assert len(resp_data) == len(programs)
-
-    for program_detail in resp_data:
-        if program_detail["program"]["id"] == programs[1].id:
-            assert program_detail["enrollments"][0]["id"] == course_run_enrollment.id
-        else:
-            assert len(program_detail["enrollments"]) == 0
+    assert resp.json() == [
+        {
+            "program": {
+                "id": program_enrollment.program.id,
+                "title": program_enrollment.program.title,
+                "live": program_enrollment.program.live,
+                "departments": [],
+                "readable_id": program_enrollment.program.readable_id,
+                "req_tree": list(
+                    ProgramRequirementTreeSerializer(
+                        program_enrollment.program.get_requirements_root()
+                    ).data
+                ),
+                "requirements": {
+                    "electives": [
+                        course.id
+                        for course in program_enrollment.program.elective_courses
+                    ],
+                    "required": [
+                        course.id
+                        for course in program_enrollment.program.required_courses
+                    ],
+                },
+                "program_type": program_enrollment.program.program_type,
+                "page": dict(
+                    ProgramPageSerializer(program_enrollment.program.page).data
+                ),
+                "courses": [
+                    {
+                        "id": course.id,
+                        "instructors": [],
+                        "departments": [],
+                        "next_run_id": getattr(course.first_unexpired_run, "id", None),
+                        "current_price": None,
+                        "page": dict(CoursePageSerializer(course.page).data),
+                        "page_url": None,
+                        "programs": None,
+                        "live": course.live,
+                        "effort": course.page.effort,
+                        "length": course.page.length,
+                        "description": course.page.description,
+                        "readable_id": course.readable_id,
+                        "title": course.page.title,
+                        "financial_assistance_form_url": "",
+                        "feature_image_src": ANY_STR,
+                        "courseruns": [
+                            dict(CourseRunSerializer(run).data)
+                            for run in course.courseruns.filter(live=True).order_by(
+                                "id"
+                            )
+                        ],
+                    }
+                    for course in courses_by_program_id[program_enrollment.program.id]
+                ],
+            },
+            "certificate": maybe_serialize_program_cert(
+                program_enrollment.program, user
+            ),
+            "enrollments": [
+                {
+                    "approved_flexible_price_exists": False,
+                    "edx_emails_subscription": True,
+                    "certificate": maybe_serialize_course_cert(
+                        run_enrollment.run, user
+                    ),
+                    "grades": [],
+                    "id": run_enrollment.id,
+                    "enrollment_mode": run_enrollment.enrollment_mode,
+                    "run": dict(CourseRunWithCourseSerializer(run_enrollment.run).data),
+                }
+                for run_enrollment in run_enrollments_by_program_id[
+                    program_enrollment.program_id
+                ]
+            ],
+        }
+        for program_enrollment in program_enrollments
+    ]
 
 
 @pytest.mark.parametrize("fulfilled_order_exists", [True, False])
@@ -808,3 +912,159 @@ def test_create_enrollments_with_existing_fulfilled_order(
     else:
         assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
     patched_create_enrollments.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestCourseFilterSet:
+    """Test CourseFilterSet filtering methods"""
+
+    def test_filter_courserun_is_enrollable_true(self):
+        """Test filtering for enrollable courses"""
+        # Create courses with different enrollment status
+        enrollable_course = CourseFactory.create(live=True)
+        # Create an enrollable course run: live=True, has enrollment_start in past, no enrollment_end, has start_date
+        CourseRunFactory.create(
+            course=enrollable_course,
+            live=True,
+            enrollment_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            enrollment_end=None,
+            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc),
+        )
+
+        non_enrollable_course = CourseFactory.create(live=True)
+        CourseRunFactory.create(course=non_enrollable_course, live=False)
+
+        queryset = Course.objects.all()
+        filterset = CourseFilterSet()
+
+        # Test filtering for enrollable courses
+        result = filterset.filter_courserun_is_enrollable(queryset, None, value=True)
+        assert enrollable_course in result
+
+    def test_filter_courserun_is_enrollable_false(self):
+        """Test filtering for non-enrollable courses"""
+        # Create courses with different enrollment status
+        enrollable_course = CourseFactory.create(live=True)
+        # Create an enrollable course run: live=True, has enrollment_start in past, no enrollment_end, has start_date
+        CourseRunFactory.create(
+            course=enrollable_course,
+            live=True,
+            enrollment_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            enrollment_end=None,
+            start_date=datetime(2020, 1, 15, tzinfo=timezone.utc),
+        )
+
+        non_enrollable_course = CourseFactory.create(live=True)
+        CourseRunFactory.create(course=non_enrollable_course, live=False)
+
+        queryset = Course.objects.all()
+        filterset = CourseFilterSet()
+
+        # Test filtering for non-enrollable courses
+        result = filterset.filter_courserun_is_enrollable(queryset, None, value=False)
+        assert non_enrollable_course in result
+
+
+@pytest.mark.django_db
+class TestProgramViewSetPagination:
+    """Test ProgramViewSet pagination edge cases"""
+
+    def setup_method(self):
+        self.factory = RequestFactory()
+        self.user = UserFactory.create()
+        self.viewset = ProgramViewSet()
+
+    def test_paginate_queryset_no_page_param(self):
+        """Test pagination when no page parameter is provided"""
+        # Create a mock request without page parameter
+        request = self.factory.get("/api/v1/programs/")
+        request.user = self.user
+        request.query_params = {}
+
+        # Set up the viewset
+        self.viewset.request = request
+
+        # Create a mock pagination class instance
+        mock_pagination_class = MagicMock()
+        # Mock the pagination_class attribute to return our mock
+        with patch.object(self.viewset, "pagination_class", mock_pagination_class):
+            queryset = Program.objects.all()
+            result = self.viewset.paginate_queryset(queryset)
+
+            # Should return None when no page param and paginator exists
+            assert result is None
+
+    def test_paginate_queryset_with_page_param(self):
+        """Test pagination when page parameter is provided"""
+        request = self.factory.get("/api/v1/programs/?page=1")
+        request.user = self.user
+        request.query_params = {"page": "1"}
+
+        self.viewset.request = request
+
+        queryset = Program.objects.all()
+
+        # Mock both pagination_class and the parent's paginate_queryset method
+        mock_pagination_class = MagicMock()
+        with (
+            patch.object(self.viewset, "pagination_class", mock_pagination_class),
+            patch(
+                "rest_framework.viewsets.ReadOnlyModelViewSet.paginate_queryset"
+            ) as mock_super,
+        ):
+            mock_super.return_value = "paginated_result"
+            result = self.viewset.paginate_queryset(queryset)
+
+            mock_super.assert_called_once_with(queryset)
+            assert result == "paginated_result"
+
+
+@pytest.mark.django_db
+class TestUserEnrollmentsApiViewSetSync:
+    """Test UserEnrollmentsApiViewSet sync functionality"""
+
+    def setup_method(self):
+        self.factory = RequestFactory()
+        self.user = UserFactory.create()
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.viewset = UserEnrollmentsApiViewSet()
+
+    @patch("courses.views.v1.sync_enrollments_with_edx")
+    @patch("courses.views.v1.is_enabled")
+    def test_list_with_sync_enabled_success(self, mock_is_enabled, mock_sync):
+        """Test list method when sync is enabled and succeeds"""
+        mock_is_enabled.return_value = True
+        mock_sync.return_value = None
+
+        response = self.client.get(reverse("v1:user-enrollments-api-list"))
+
+        assert response.status_code == status.HTTP_200_OK
+        mock_sync.assert_called_once_with(self.user)
+
+    @patch("courses.views.v1.sync_enrollments_with_edx")
+    @patch("courses.views.v1.is_enabled")
+    @patch("courses.views.v1.log.exception")
+    def test_list_with_sync_enabled_exception(
+        self, mock_log, mock_is_enabled, mock_sync
+    ):
+        """Test list method when sync is enabled but fails"""
+        mock_is_enabled.return_value = True
+        mock_sync.side_effect = Exception("Sync failed")
+
+        response = self.client.get(reverse("v1:user-enrollments-api-list"))
+
+        assert response.status_code == status.HTTP_200_OK
+        mock_sync.assert_called_once_with(self.user)
+        mock_log.assert_called_once_with("Failed to sync user enrollments with edX")
+
+    @patch("courses.views.v1.sync_enrollments_with_edx")
+    @patch("courses.views.v1.is_enabled")
+    def test_list_with_sync_disabled(self, mock_is_enabled, mock_sync):
+        """Test list method when sync is disabled"""
+        mock_is_enabled.return_value = False
+
+        response = self.client.get(reverse("v1:user-enrollments-api-list"))
+
+        assert response.status_code == status.HTTP_200_OK
+        mock_sync.assert_not_called()

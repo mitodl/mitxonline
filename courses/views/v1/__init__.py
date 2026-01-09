@@ -1,7 +1,7 @@
 """Course views version 1"""
 
 import logging
-from typing import Optional, Tuple, Union  # noqa: UP035
+from typing import Tuple, Union  # noqa: UP035
 
 import django_filters
 from django.contrib.auth.models import User
@@ -269,7 +269,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
 def _validate_enrollment_post_request(
     request: Request,
-) -> Union[Tuple[Optional[HttpResponse], None, None], Tuple[None, User, CourseRun]]:  # noqa: UP006
+) -> Union[Tuple[HttpResponse | None, None, None], Tuple[None, User, CourseRun]]:  # noqa: UP006
     """
     Validates a request to create an enrollment. Returns a response if validation fails, or a user and course run
     if validation succeeds.
@@ -517,7 +517,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-            .all()
+            .order_by("-id")
         )
 
         program_list = []
@@ -532,7 +532,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page")
-                    .all(),
+                    .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
@@ -569,7 +569,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         """
 
         program = Program.objects.get(pk=pk)
-        (enrollment, created) = ProgramEnrollment.objects.update_or_create(
+        ProgramEnrollment.objects.update_or_create(
             user=request.user,
             program=program,
             defaults={"change_status": ENROLL_CHANGE_STATUS_UNENROLLED},
@@ -631,7 +631,7 @@ class LearnerRecordShareView(APIView):
             except:  # noqa: E722
                 return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
 
-            (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+            (ps_share, _) = LearnerProgramRecordShare.objects.filter(
                 user=request.user, program=program, partner_school=school
             ).get_or_create(user=request.user, program=program, partner_school=school)
             ps_share.is_active = True
@@ -639,7 +639,7 @@ class LearnerRecordShareView(APIView):
 
             send_partner_school_email.delay(ps_share.share_uuid)
         else:
-            (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+            LearnerProgramRecordShare.objects.filter(
                 user=request.user, program=program, partner_school=None, is_active=True
             ).get_or_create(
                 user=request.user, program=program, partner_school=None, is_active=True

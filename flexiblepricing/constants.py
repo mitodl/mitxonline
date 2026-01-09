@@ -83,3 +83,38 @@ FINAID_FORM_TEXTS = {
     "approved_no_discount": APPLICATION_APPROVED_NO_DISCOUNT_TEXT,
     "denied": APPLICATION_DENIED_TEXT,
 }
+
+# Required fields for Flexible Pricing Request Forms.
+# Note: clean_name is used for matching existing fields and must match what Wagtail
+# auto-generates from the label (e.g., "Your Income" -> "your_income") at creation.
+# new fields, clean_name is NOT set explicitly - Wagtail generates it from the label.
+REQUIRED_FLEXIBLE_PRICING_FORM_FIELDS = [
+    {
+        "clean_name": "your_income",
+        "label": "Your Income",
+        "field_type": "number",
+        "sort_order": 1,
+        "required": True,
+    },
+    {
+        "clean_name": "income_currency",
+        "label": "Income Currency",
+        "field_type": "country",
+        "sort_order": 2,
+        "required": True,
+    },
+    {
+        "clean_name": "country_of_income",
+        "label": "Country of Income",
+        "field_type": "iso_country",
+        "sort_order": 3,
+        "required": True,
+    },
+    {
+        "clean_name": "country_of_residence",
+        "label": "Country of Residence",
+        "field_type": "iso_country",
+        "sort_order": 4,
+        "required": True,
+    },
+]

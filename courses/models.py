@@ -1,3 +1,4 @@
+# ruff: noqa: TD002, TD003, FIX002
 """
 Course models
 """
@@ -525,7 +526,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 node_type=ProgramRequirementNodeType.COURSE,
             )
             .filter(path_q)
-            .select_related("course")
+            .prefetch_related(
+                "course",
+                Prefetch(
+                    "course__courseruns",
+                    queryset=CourseRun.objects.filter(live=True).order_by("id"),
+                ),
+            )
         )
 
     def _process_course_requirements(self, course_reqs, path_to_operator):
@@ -1163,7 +1170,13 @@ class CourseRun(TimestampedModel):
         Checks if the course can be upgraded
         A null value means that the upgrade window is always open
         """
-        return self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
+        return (
+            self.live is True
+            and (
+                self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
+            )
+            and self.products.count() > 0
+        )
 
     @cached_property
     def is_enrollable(self):
@@ -1276,12 +1289,24 @@ def limit_to_certificate_pages():
     to limit the choices to certificate pages, rather than every page in the
     CMS.
     """
-    from cms.models import CertificatePage
+    from cms.models import CertificatePage  # noqa: PLC0415
 
     available_revisions = CertificatePage.objects.filter(live=True).values_list(
         "id", flat=True
     )
     return {"object_id__in": list(map(str, available_revisions))}
+
+
+class VerifiableCredential(TimestampedModel):
+    """
+    Model for storing verifiable credentials for both course runs and programs
+    """
+
+    # TODO: Need to determine what this will actually be.
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
+    credential_data = models.JSONField(
+        help_text="JSON data representing the verifiable credential"
+    )
 
 
 class BaseCertificate(models.Model):
@@ -1297,6 +1322,9 @@ class BaseCertificate(models.Model):
         verbose_name="revoked",
     )
     issue_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    verifiable_credential = models.OneToOneField(
+        VerifiableCredential, on_delete=models.SET_NULL, blank=True, null=True
+    )
 
     class Meta:
         abstract = True
@@ -1363,7 +1391,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         return f'CourseRunCertificate for user={self.user.edx_username}, run={self.course_run.text_id} ({self.uuid})"'
 
     def clean(self):
-        from cms.models import CertificatePage, CoursePage
+        from cms.models import CertificatePage, CoursePage  # noqa: PLC0415
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
@@ -1456,7 +1484,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         return f'ProgramCertificate for user={self.user.edx_username}, program={self.program.text_id} ({self.uuid})"'
 
     def clean(self):
-        from cms.models import CertificatePage, ProgramPage
+        from cms.models import CertificatePage, ProgramPage  # noqa: PLC0415
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
@@ -1621,7 +1649,7 @@ class CourseRunEnrollment(EnrollmentModel):
         we can change the payment to another run
         """
         # Due to circular dependancy importing locally
-        from ecommerce.models import OrderStatus
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
 
         paid_run = PaidCourseRun.objects.filter(
             user=self.user,
@@ -1797,7 +1825,7 @@ class PaidCourseRun(TimestampedModel):
         """
 
         # Due to circular dependancy importing locally
-        from ecommerce.models import OrderStatus
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
 
         # PaidCourseRun should only contain fulfilled orders
         return cls.objects.filter(

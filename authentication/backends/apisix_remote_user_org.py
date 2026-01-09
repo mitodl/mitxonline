@@ -10,6 +10,7 @@ from mitol.apigateway.api import decode_x_header
 from mitol.apigateway.backends import ApisixRemoteUserBackend
 
 from b2b.api import reconcile_user_orgs
+from hubspot_sync.task_helpers import sync_hubspot_user
 
 log = logging.getLogger(__name__)
 
@@ -41,5 +42,13 @@ class ApisixRemoteUserOrgBackend(ApisixRemoteUserBackend):
 
         # Task should check to see if it needs to run or not
         reconcile_user_orgs(user, org_uuids)
+
+        if created:
+            log.info(
+                "New user created via APISIX/Keycloak, syncing to HubSpot: user_id=%s, email=%s",
+                user.id,
+                user.email,
+            )
+            sync_hubspot_user(user)
 
         return user

@@ -16,11 +16,18 @@ from users.serializers import (
 log = logging.getLogger()
 User = get_user_model()
 
+NAME_MIN_LENGTH = 2
+NAME_MAX_LENGTH = 254
+
 
 class RegisterDetailsSerializer(serializers.Serializer):
     """Serializer for registration details"""
 
-    name = serializers.CharField(write_only=True)
+    name = serializers.CharField(
+        write_only=True,
+        min_length=NAME_MIN_LENGTH,
+        max_length=NAME_MAX_LENGTH,
+    )
     username = serializers.CharField(write_only=True)
     legal_address = LegalAddressSerializer(write_only=True)
     user_profile = UserProfileSerializer(write_only=True)

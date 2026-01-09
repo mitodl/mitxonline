@@ -41,6 +41,18 @@ files = [
 ]
 
 [[package]]
+name = "anys"
+version = "0.3.1"
+description = "Matchers for pytest"
+optional = false
+python-versions = ">=3.8"
+groups = ["dev"]
+files = [
+    {file = "anys-0.3.1-py3-none-any.whl", hash = "sha256:a7f5353eb061e97cdbbfc41249a397d13fc7e558310ec23cece891d6f10a0a6d"},
+    {file = "anys-0.3.1.tar.gz", hash = "sha256:5bcda88fcc490eda840a247c8c18b7a350051f530c288ad530e94c8d139602de"},
+]
+
+[[package]]
 name = "asgiref"
 version = "3.8.1"
 description = "ASGI specs, helper code, and adapters"
@@ -109,14 +121,14 @@ tests-mypy = ["mypy (>=1.11.1) ; platform_python_implementation == \"CPython\" a
 
 [[package]]
 name = "authlib"
-version = "1.6.5"
+version = "1.6.6"
 description = "The ultimate Python library in building OAuth and OpenID Connect servers and clients."
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "authlib-1.6.5-py2.py3-none-any.whl", hash = "sha256:3e0e0507807f842b02175507bdee8957a1d5707fd4afb17c32fb43fee90b6e3a"},
-    {file = "authlib-1.6.5.tar.gz", hash = "sha256:6aaf9c79b7cc96c900f0b284061691c5d4e61221640a948fe690b556a6d6d10b"},
+    {file = "authlib-1.6.6-py2.py3-none-any.whl", hash = "sha256:7d9e9bc535c13974313a87f53e8430eb6ea3d1cf6ae4f6efcd793f2e949143fd"},
+    {file = "authlib-1.6.6.tar.gz", hash = "sha256:45770e8e056d0f283451d9996fbb59b70d45722b45d854d58f32878d0a40c38e"},
 ]
 
 [package.dependencies]
@@ -1630,14 +1642,14 @@ packaging = ">=24.1"
 
 [[package]]
 name = "drf-spectacular"
-version = "0.28.0"
+version = "0.29.0"
 description = "Sane and flexible OpenAPI 3 schema generation for Django REST framework"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "drf_spectacular-0.28.0-py3-none-any.whl", hash = "sha256:856e7edf1056e49a4245e87a61e8da4baff46c83dbc25be1da2df77f354c7cb4"},
-    {file = "drf_spectacular-0.28.0.tar.gz", hash = "sha256:2c778a47a40ab2f5078a7c42e82baba07397bb35b074ae4680721b2805943061"},
+    {file = "drf_spectacular-0.29.0-py3-none-any.whl", hash = "sha256:d1ee7c9535d89848affb4427347f7c4a22c5d22530b8842ef133d7b72e19b41a"},
+    {file = "drf_spectacular-0.29.0.tar.gz", hash = "sha256:0a069339ea390ce7f14a75e8b5af4a0860a46e833fd4af027411a3e94fc1a0cc"},
 ]
 
 [package.dependencies]
@@ -1654,14 +1666,14 @@ sidecar = ["drf-spectacular-sidecar"]
 
 [[package]]
 name = "edx-api-client"
-version = "1.13.0"
+version = "1.14.0"
 description = "Python interface to the edX REST APIs"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "edx_api_client-1.13.0-py2.py3-none-any.whl", hash = "sha256:60a949eb31ddf3f8b0ddb63189d58bc9e7057117dfad032c9416a1ff1a401fae"},
-    {file = "edx_api_client-1.13.0.tar.gz", hash = "sha256:d52f3267e0af0d4bb60982d31fd792c4edf10bb935ab0389c7b47c9dd8737e27"},
+    {file = "edx_api_client-1.14.0-py2.py3-none-any.whl", hash = "sha256:22cf76f434146e6397fae21811fdaea4ea05b99f96faaa0ef10f0e45c56ddafa"},
+    {file = "edx_api_client-1.14.0.tar.gz", hash = "sha256:b18c604c1499a9afb532893d82b508aa1bfb5b77f35e6e0403a536f2da72ba0f"},
 ]
 
 [package.dependencies]
@@ -2278,21 +2290,22 @@ pyparsing = {version = ">=2.4.2,<3.0.0 || >3.0.0,<3.0.1 || >3.0.1,<3.0.2 || >3.0
 
 [[package]]
 name = "hubspot-api-client"
-version = "6.1.0"
+version = "12.0.0"
 description = "HubSpot API client"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "hubspot-api-client-6.1.0.tar.gz", hash = "sha256:eb5a59a56900a1c57291d3b939469174307d2fd9cfabfc61568650a990582f80"},
-    {file = "hubspot_api_client-6.1.0-py3-none-any.whl", hash = "sha256:c90414a45559fc12aef294995e6001c2b007cb98a74879208d5abe07d90a6144"},
+    {file = "hubspot_api_client-12.0.0-py3-none-any.whl", hash = "sha256:5426627ff808fdf259d5b5e4791667a323a2a82d36a834e7e43ec8e8f021aa08"},
+    {file = "hubspot_api_client-12.0.0.tar.gz", hash = "sha256:ddfc60f3a80565dd5bf7fc7554d0d2dabad37926f547436158258772f1a04e69"},
 ]
 
 [package.dependencies]
-certifi = "*"
-python-dateutil = "*"
-six = ">=1.10"
-urllib3 = ">=1.15"
+certifi = ">=2023.1.1"
+python-dateutil = ">=2.8.2"
+requests = ">=2.31.0"
+six = ">=1.10,<2.0"
+urllib3 = ">=1.15,<3.0"
 
 [package.extras]
 dev = ["black", "pytest"]
@@ -2976,24 +2989,24 @@ pluggy = ">0.13.1"
 
 [[package]]
 name = "mitol-django-hubspot-api"
-version = "2023.12.19"
+version = "2025.12.18"
 description = "Django application for Hubspot API integration"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol-django-hubspot-api-2023.12.19.tar.gz", hash = "sha256:cdec5eb5ddd20dccdd6dca9a1bfee7cb04f70874367691da24017556f9b4bb58"},
-    {file = "mitol_django_hubspot_api-2023.12.19-py3-none-any.whl", hash = "sha256:5a761a238474bd5e2c20b4d72a31f7298b6196e453f6e2047cc67590d995068b"},
+    {file = "mitol_django_hubspot_api-2025.12.18-py3-none-any.whl", hash = "sha256:ee062a5f1194f120f810bedad93f19a0f47c3e42c45eb94ced01296b8522bfe0"},
+    {file = "mitol_django_hubspot_api-2025.12.18.tar.gz", hash = "sha256:3d67d3f64bc6b49c14548d712460321d7a1da1dbcfc61f77ba0c3023457969cb"},
 ]
 
 [package.dependencies]
 django = ">=3.0"
+django-stubs = ">=1.13.1"
 djangorestframework = ">=3.0.0"
 factory-boy = ">=3.2,<4.0"
-hubspot-api-client = "6.1.0"
+hubspot-api-client = "12.0.0"
 mitol-django-common = "*"
 requests = ">=2.20.0"
-setuptools = "*"
 urllib3 = ">=1.26.5"
 
 [[package]]
@@ -3943,14 +3956,14 @@ test = ["anthropic", "coverage", "django", "flake8", "freezegun (==1.5.1)", "lan
 
 [[package]]
 name = "pre-commit"
-version = "3.8.0"
+version = "4.5.1"
 description = "A framework for managing and maintaining multi-language pre-commit hooks."
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "pre_commit-3.8.0-py2.py3-none-any.whl", hash = "sha256:9a90a53bf82fdd8778d58085faf8d83df56e40dfe18f45b19446e26bf1b3a63f"},
-    {file = "pre_commit-3.8.0.tar.gz", hash = "sha256:8bb6494d4a20423842e198980c9ecf9f96607a07ea29549e180eef9ae80fe7af"},
+    {file = "pre_commit-4.5.1-py2.py3-none-any.whl", hash = "sha256:3b3afd891e97337708c1674210f8eba659b52a38ea5f822ff142d10786221f77"},
+    {file = "pre_commit-4.5.1.tar.gz", hash = "sha256:eb545fcff725875197837263e977ea257a402056661f09dae08e4b149b030a61"},
 ]
 
 [package.dependencies]
@@ -5168,22 +5181,22 @@ files = [
 
 [[package]]
 name = "social-auth-app-django"
-version = "5.4.3"
+version = "5.6.0"
 description = "Python Social Authentication, Django integration."
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "social_auth_app_django-5.4.3-py3-none-any.whl", hash = "sha256:db70b972faeb10ee1ec83d0dc7dbd0558d5f5830417bba317b712b10ff58d031"},
-    {file = "social_auth_app_django-5.4.3.tar.gz", hash = "sha256:d1f4286d5ca1e512c9b2f686e7ecb2a0128148f1a33d853b69dc07b58508362e"},
+    {file = "social_auth_app_django-5.6.0-py3-none-any.whl", hash = "sha256:43ca88cc5cd9161710896165ced58b3155e8aafaaff847e859879194770f138d"},
+    {file = "social_auth_app_django-5.6.0.tar.gz", hash = "sha256:c695501fcbf6fe87f68f5a79e379abe853662f5129e7ec6cb758a75d5b28c888"},
 ]
 
 [package.dependencies]
-Django = ">=3.2"
+Django = ">=5.1"
 social-auth-core = ">=4.4,<5.0"
 
 [package.extras]
-dev = ["coverage (>=3.6)"]
+dev = ["coverage (>=3.6)", "django-stubs (==5.2.7)", "django-stubs-ext (==5.2.7)", "mypy (==1.18.2)", "pre-commit", "pyright (==1.1.406)", "tox"]
 
 [[package]]
 name = "social-auth-core"
@@ -5669,14 +5682,14 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 
 [[package]]
 name = "wagtail"
-version = "7.2"
+version = "7.2.1"
 description = "A Django content management system."
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "wagtail-7.2-py3-none-any.whl", hash = "sha256:2c0d41545976b57266e84df3f03e7dd812e6a4d0a8d61d5b76863fe021613973"},
-    {file = "wagtail-7.2.tar.gz", hash = "sha256:8a39df908bd64ab029e08bf191f475f54cc914f84aa41e9ae79b41bf41d55ec3"},
+    {file = "wagtail-7.2.1-py3-none-any.whl", hash = "sha256:b29f9fc226fadf744cf6fd5a24ee1c2b7a00ade5f801c72069af8b453d6a1241"},
+    {file = "wagtail-7.2.1.tar.gz", hash = "sha256:388bb42c4818c081a4ddf36e6f4529bfbc54ed262a91b65b0e5f951476f2cf74"},
 ]
 
 [package.dependencies]
@@ -6065,4 +6078,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "c735bf976a706b07d9a1285a62fec2a9ee657f0d3fb70c8378157147d3c25da0"
+content-hash = "912fcf178339203acb5c46ec00ce5f667758792a959591a9c71ffa54e4fc566f"

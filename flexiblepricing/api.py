@@ -395,7 +395,7 @@ def create_default_flexible_pricing_page(
     Raises:
     - Exception if there's no page for the courseware object specified
     """
-    from cms.models import FlexiblePricingRequestForm
+    from cms.models import FlexiblePricingRequestForm  # noqa: PLC0415
 
     if isinstance(object, Program) or (
         (isinstance(object, Course) and forceCourse)

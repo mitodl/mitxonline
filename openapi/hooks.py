@@ -80,8 +80,6 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         "/api/hubspot_sync/",
         "/api/flexible_pricing/",
         "/api/cms/",
-        "/api/v0/baskets/",
-        "/api/v0/discounts/",
         "/api/v0/flexible_pricing/",
         "/cms/",
         "/api/login/",
@@ -96,7 +94,6 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         "/api/user_search/",
         "/api/partnerschools/",
         "/api/v1/partnerschools/",
-        "/api/v0/products/",
         "/api/products/",
         "/api/checkout/",
         "/api/discounts/",
@@ -124,7 +121,7 @@ def insert_wagtail_pages_schema(endpoints):
     Insert Wagtail pages schema into the OpenAPI endpoints.
     """
 
-    from cms.wagtail_api.schema.views import (
+    from cms.wagtail_api.schema.views import (  # noqa: PLC0415
         WagtailCertificatePagesSchemaView,
         WagtailCoursePagesSchemaView,
         WagtailPagesRetrieveSchemaView,

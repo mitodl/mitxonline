@@ -1,6 +1,76 @@
 Release Notes
 =============
 
+Version 0.137.1 (Released January 06, 2026)
+---------------
+
+- Create country field unit tests (#3164)
+- fix(deps): update dependency drf-spectacular to ^0.29.0 (#3080)
+- Add better assertions to program enrollments test (#3157)
+- chore: upgrade hubspot-api-client and mitol-hubspot-api (#3163)
+- add filtering on contract_id (#3159)
+- Handle verifiable credential generation for certificates with inactive enrollments (#3166)
+
+Version 0.137.0 (Released January 05, 2026)
+---------------
+
+- Change JSON payload for verifiable credentials (#3154)
+- Add custom admin for Wagtail Revision and enhance certificate admin (#3155)
+- Fix issues with grade and certificate migration in migrate_edx_data (#3158)
+- Updating is_upgradable for CourseRun (#3124)
+- Add VC json to certificate api (#3153)
+- Adding APIs for downloading a digital credential (#3149)
+
+Version 0.136.4 (Released December 18, 2025)
+---------------
+
+- fix(deps): update react monorepo (#3145)
+- Remove additional profile fields modal and related logic (#3150)
+- Verifiable credentials database population (#3147)
+- fix(deps): update dependency validator to v13.15.22 [security] (#3122)
+- fix: verify numeric usernames (#3131)
+- Keycloak admin client init unit tests (#3146)
+- Add batch import of enrollments, grades, and certificates to migrate_edx_data management command (#3143)
+- Add UE basket APIs to MITx Online (#3137)
+- fix(deps): update dependency wagtail to v7.2.1 (#3144)
+- Create program contract runs unit tests (#3141)
+- chore(deps): update actions/checkout digest to 93cb6ef (#3134)
+- Refactor Open edX course URL generation (#3140)
+- Flexible pricing tests (#3139)
+
+Version 0.136.3 (Released December 09, 2025)
+---------------
+
+- Updates the URLs in the staff-dashboard auth provider to use the versioned "me" API (#3136)
+- Replace sync_organizations with reconcile_keycloak_orgs (#3135)
+- Course v1 unit tests (#3126)
+- Add a configurable suffix to Open edX course URLs (#3121)
+- Always disable S3 under pytest (#3132)
+
+Version 0.136.2 (Released December 05, 2025)
+---------------
+
+- set the storage backend properly to S3 if necessary for Django 5 (#3129)
+
+Version 0.136.1 (Released December 04, 2025)
+---------------
+
+- Remove social auth (#3127)
+- REmoved banner and footer (#3120)
+- Handle blank signatories in migrate_edx_data  (#3125)
+- add a management command backfill_certificate_page_revision (#3115)
+- fix: Fix LTI based duplicate email users (#3098)
+- fix: sync keycloak users to hubspot on create (#3119)
+- fix(deps): update dependency social-auth-app-django to v5.6.0 [security] (#3005)
+- Add multiple items to cart (#3117)
+- Upgrade django to 5.1.15 (#3108)
+- Removed option related to unused pgbouncer (#3118)
+- Fix close button on add to cart confirm modal (#3114)
+- Update retrieve user api to be versioned (#3102)
+- Fix a 500 error when previewing CertificatePage from CMS (#3116)
+- Hubspot course name fix (#3100)
+- Fix b2b management commands (#3113)
+
 Version 0.135.6 (Released December 01, 2025)
 ---------------
 

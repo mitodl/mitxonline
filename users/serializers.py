@@ -9,7 +9,6 @@ from drf_spectacular.utils import extend_schema_field
 from requests import HTTPError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
-from social_django.models import UserSocialAuth
 
 from b2b.serializers.v0 import OrganizationPageSerializer
 from hubspot_sync.task_helpers import sync_hubspot_user
@@ -65,7 +64,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def validate_year_of_birth(self, value):
         """Validates the year of birth field"""
-        from users.utils import determine_approx_age
+        from users.utils import determine_approx_age  # noqa: PLC0415
 
         if not (value and determine_approx_age(value) >= 13):  # noqa: PLR2004
             raise serializers.ValidationError("Year of Birth provided is under 13")  # noqa: EM101
@@ -475,15 +474,8 @@ class ChangeEmailRequestUpdateSerializer(serializers.ModelSerializer):
         # change request has been confirmed
         if result.confirmed:
             user = result.user
-            old_email = user.email
             user.email = result.new_email
             user.save()
-            # delete social_auth entry to avoid old email account access
-            try:
-                user_social_auth = UserSocialAuth.objects.get(uid=old_email, user=user)
-                user_social_auth.delete()
-            except UserSocialAuth.DoesNotExist:
-                pass
             change_edx_user_email_async.delay(user.id)
 
         return result

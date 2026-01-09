@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from factory import Faker, RelatedFactory, SelfAttribute, SubFactory, Trait
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyDateTime, FuzzyText
-from social_django.models import UserSocialAuth
 
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
@@ -47,17 +46,6 @@ class UserFactory(DjangoModelFactory):
         no_openedx_api_auth = Trait(openedx_api_auth=None)
 
         legacy_username = Trait(username=FuzzyText())
-
-
-class UserSocialAuthFactory(DjangoModelFactory):
-    """Factory for UserSocialAuth"""
-
-    provider = FuzzyText()
-    user = SubFactory("users.factories.UserFactory")
-    uid = FuzzyText()
-
-    class Meta:
-        model = UserSocialAuth
 
 
 class LegalAddressFactory(DjangoModelFactory):

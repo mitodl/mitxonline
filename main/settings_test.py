@@ -57,7 +57,7 @@ def test_s3_settings(settings_sandbox):
     # Unset, we don't do S3
     settings_vars = settings_sandbox.patch({"MITX_ONLINE_USE_S3": "False"})
 
-    assert settings_vars.get("DEFAULT_FILE_STORAGE") is None
+    assert settings_vars.get("STORAGES", {}).get("default", {}).get("BACKEND") is None
 
     with pytest.raises(ImproperlyConfigured):
         settings_sandbox.patch({"MITX_ONLINE_USE_S3": "True"})
@@ -72,7 +72,7 @@ def test_s3_settings(settings_sandbox):
         }
     )
     assert (
-        settings_vars.get("DEFAULT_FILE_STORAGE")
+        settings_vars.get("STORAGES", {}).get("default", {}).get("BACKEND")
         == "storages.backends.s3boto3.S3Boto3Storage"
     )
 

@@ -8,11 +8,12 @@ import os
 import platform
 import sys
 from datetime import timedelta
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import cssutils
 import dj_database_url
 from celery.schedules import crontab
+from django.conf import global_settings
 from django.core.exceptions import ImproperlyConfigured
 from mitol.apigateway.settings import *  # noqa: F403  # noqa: F403
 from mitol.common.envs import (
@@ -36,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.135.6"
+VERSION = "0.137.1"
 
 log = logging.getLogger()
 
@@ -222,7 +223,6 @@ INSTALLED_APPS = (
     "django.contrib.humanize",
     "django.contrib.sites",
     "django_user_agents",
-    "social_django",
     "oauth2_provider",
     "rest_framework",
     "anymail",
@@ -393,8 +393,6 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "social_django.context_processors.backends",
-                "social_django.context_processors.login_redirect",
                 "main.context_processors.api_keys",
                 "main.context_processors.configuration_context",
             ]
@@ -453,107 +451,11 @@ ROBOTS_CACHE_TIMEOUT = get_int(
     description="How long the robots.txt file should be cached",
 )
 
-# Social Auth Configuration
-
 AUTHENTICATION_BACKENDS = (
     "authentication.backends.apisix_remote_user_org.ApisixRemoteUserOrgBackend",
-    "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
 )
-
-SOCIAL_AUTH_LOGIN_ERROR_URL = "gateway-login"
-SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [urlparse(SITE_BASE_URL).netloc]
-SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = [
-    "global_id",
-]
-
-# Email backend settings
-
-SOCIAL_AUTH_EMAIL_FORM_URL = "gateway-login"
-SOCIAL_AUTH_EMAIL_FORM_HTML = "login.html"
-
-SOCIAL_AUTH_EMAIL_USER_FIELDS = ["username", "email", "name", "password"]
-
-# Only validate emails for the email backend
-SOCIAL_AUTH_EMAIL_FORCE_EMAIL_VALIDATION = True
-
-# Configure social_core.pipeline.mail.mail_validation
-SOCIAL_AUTH_EMAIL_VALIDATION_FUNCTION = "mail.verification_api.send_verification_email"
-SOCIAL_AUTH_EMAIL_VALIDATION_URL = "/"
-
-SOCIAL_AUTH_PIPELINE = (
-    # Checks if an admin user attempts to login/register while hijacking another user.
-    "authentication.pipeline.user.forbid_hijack",
-    # Get the information we can about the user and return it in a simple
-    # format to create the user instance later. On some cases the details are
-    # already part of the auth response from the provider, but sometimes this
-    # could hit a provider API.
-    "social_core.pipeline.social_auth.social_details",
-    # Get the social uid from whichever service we're authing thru. The uid is
-    # the unique identifier of the given user in the provider.
-    "social_core.pipeline.social_auth.social_uid",
-    # Verifies that the current auth process is valid within the current
-    # project, this is where emails and domains whitelists are applied (if
-    # defined).
-    "social_core.pipeline.social_auth.auth_allowed",
-    # Checks if the current social-account is already associated in the site.
-    "social_core.pipeline.social_auth.social_user",
-    # Associates the current social details with another user account with the same email address.
-    "social_core.pipeline.social_auth.associate_by_email",
-    # validate an incoming email auth request
-    "authentication.pipeline.user.validate_email_auth_request",
-    # validate the user's email either it is blocked or not.
-    "authentication.pipeline.user.validate_email",
-    # require a password and profile if they're not set
-    "authentication.pipeline.user.validate_password",
-    # Send a validation email to the user to verify its email address.
-    # Disabled by default.
-    "social_core.pipeline.mail.mail_validation",
-    # Send the email address and hubspot cookie if it exists to hubspot.
-    # "authentication.pipeline.user.send_user_to_hubspot",
-    # Generate a username for the user
-    # NOTE: needs to be right before create_user so nothing overrides the username
-    "authentication.pipeline.user.get_username",
-    # Create a user if one doesn't exist, and require a password and name
-    "authentication.pipeline.user.create_user_via_email",
-    # If we're using the OIDC backend, create the user from the OIDC response
-    "authentication.pipeline.user.create_ol_oidc_user",
-    # verify the user against export compliance
-    # "authentication.pipeline.compliance.verify_exports_compliance",
-    # Create the record that associates the social account with the user.
-    "social_core.pipeline.social_auth.associate_user",
-    # create the user's edx user and auth
-    "authentication.pipeline.user.create_openedx_user",
-    # Populate the extra_data field in the social record with the values
-    # specified by settings (and the default ones like access_token, etc).
-    "social_core.pipeline.social_auth.load_extra_data",
-    # Update the user record with any changed info from the auth service.
-    "social_core.pipeline.user.user_details",
-)
-
-
-# Social Auth OIDC configuration
-
-SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT = get_string(
-    name="SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT",
-    default=None,
-    description="The configuration endpoint for the OIDC provider",
-)
-
-SOCIAL_AUTH_OL_OIDC_KEY = get_string(
-    name="SOCIAL_AUTH_OL_OIDC_KEY",
-    default="some available client id",
-    description="The client id for the OIDC provider",
-)
-
-SOCIAL_AUTH_OL_OIDC_SECRET = get_string(
-    name="SOCIAL_AUTH_OL_OIDC_SECRET",
-    default="some super secret key",
-    description="The client secret for the OIDC provider",
-)
-
-SOCIAL_AUTH_OL_OIDC_SCOPE = ["ol-profile"]
 
 AUTH_CHANGE_EMAIL_TTL_IN_MINUTES = get_int(
     name="AUTH_CHANGE_EMAIL_TTL_IN_MINUTES",
@@ -931,7 +833,9 @@ if MITX_ONLINE_USE_S3 and (
 if MITX_ONLINE_USE_S3:
     if CLOUDFRONT_DIST:
         AWS_S3_CUSTOM_DOMAIN = f"{CLOUDFRONT_DIST}.cloudfront.net"
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    # Override default storage backend to use S3 (Django 5.0+)
+    STORAGES = global_settings.STORAGES.copy()
+    STORAGES["default"]["BACKEND"] = "storages.backends.s3boto3.S3Boto3Storage"
 
 FEATURES_DEFAULT = get_bool(
     name="FEATURES_DEFAULT",
@@ -939,6 +843,14 @@ FEATURES_DEFAULT = get_bool(
     dev_only=True,
     description="The default value for all feature flags",
 )
+
+# Multiple cart items feature flag
+ENABLE_MULTIPLE_CART_ITEMS = get_bool(
+    name="ENABLE_MULTIPLE_CART_ITEMS",
+    default=False,
+    description="Enable users to add multiple items to their cart/basket",
+)
+
 FEATURES = get_features()
 
 # Redis
@@ -1257,6 +1169,11 @@ OPENEDX_COURSE_BASE_URL = get_string(
     name="OPENEDX_COURSE_BASE_URL",
     default="http://edx.odl.local:18000/learn/course/",
     description="The base URL to use to construct URLs to a course",
+)
+OPENEDX_COURSE_BASE_URL_SUFFIX = get_string(
+    name="OPENEDX_COURSE_BASE_URL_SUFFIX",
+    default="/home",
+    description="The suffix (with leading slash) to append to a course URL.",
 )
 
 OPENEDX_BASE_REDIRECT_URL = get_string(
@@ -1619,4 +1536,27 @@ TRINO_PASSWORD = get_string(
     name="TRINO_PASSWORD",
     default=None,
     description="Password for Trino authentication",
+)
+
+VERIFIABLE_CREDENTIAL_SIGNER_URL = get_string(
+    name="VERIFIABLE_CREDENTIAL_SIGNER_URL",
+    default="",
+    description="The URL of the VC Signer service. Used for issuing verifiable credentials.",
+)
+
+VERIFIABLE_CREDENTIAL_BEARER_TOKEN = get_string(
+    name="VERIFIABLE_CREDENTIAL_BEARER_TOKEN",
+    default="",
+    description="The bearer token used to authenticate with the VC Signer service.",
+)
+
+VERIFIABLE_CREDENTIAL_DID = get_string(
+    name="VERIFIABLE_CREDENTIAL_DID",
+    default="",
+    description="The Decentralized Identifier (DID) used as the issuer for verifiable credentials.",
+)
+ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING = get_bool(
+    name="ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING",
+    default=False,
+    description="Override posthog flag to enable the provisioning of verifiable credentials in dev.",
 )

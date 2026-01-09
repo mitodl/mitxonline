@@ -12,6 +12,7 @@ declare type Settings = {
   recaptchaKey: ?string,
   support_email: string,
   features: {
+    enable_multiple_cart_items?: boolean
   },
   site_name: string,
   zendesk_config: {

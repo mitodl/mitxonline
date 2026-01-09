@@ -1,12 +1,14 @@
 """Project conftest"""
 
 import uuid
-from types import SimpleNamespace  # noqa: F401
 
 import pytest
+from faker import Faker
+from hubspot.crm.objects import SimplePublicObject
 
 from fixtures.b2b import *  # noqa: F403
 from fixtures.common import *  # noqa: F403
+from hubspot_sync.conftest import FAKE_HUBSPOT_ID
 from main import features
 
 
@@ -38,6 +40,16 @@ def payment_gateway_settings(settings):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
 
 
+@pytest.fixture(autouse=True)
+def mock_hubspot_api(mocker):
+    """Mock the Hubspot CRM API"""
+    mock_api = mocker.patch("mitol.hubspot_api.api.HubspotApi")
+    mock_api.return_value.crm.objects.basic_api.create.return_value = (
+        SimplePublicObject(id=FAKE_HUBSPOT_ID)
+    )
+    return mock_api
+
+
 def pytest_addoption(parser):
     """Pytest hook that adds command line parameters"""
     parser.addoption(
@@ -67,3 +79,9 @@ def pytest_configure(config):
         if config.pluginmanager.has_plugin("warnings"):
             warnings_plugin = config.pluginmanager.get_plugin("warnings")
             config.pluginmanager.unregister(warnings_plugin)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def fake() -> Faker:
+    """Fixture to provide a Faker instance"""
+    return Faker()

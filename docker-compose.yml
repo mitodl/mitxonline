@@ -28,10 +28,11 @@ x-extra-hosts:
   - "mitxonline.odl.local:host-gateway"
   - "local.openedx.io:host-gateway"
   - "studio.local.openedx.io:host-gateway"
+  - "dcc.odl.local:host-gateway"
 
 services:
   db:
-    image: postgres:15.14
+    image: postgres:15.15
     ports:
       - "5432"
     environment:
@@ -233,6 +234,17 @@ services:
       - ./config/apisix/config.yaml:/usr/local/apisix/conf/config.yaml
       - ./config/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml
       - ./config/apisix/debug.yaml:/usr/local/apisix/conf/debug.yaml
+
+  coordinator:
+    profiles:
+      - verifiable-creds
+    image: digitalcredentials/issuer-coordinator:1.0.0
+    ports:
+      - "4005:4005"
+  signer:
+    profiles:
+      - verifiable-creds
+    image: digitalcredentials/signing-service:1.2.0
 
 
 volumes:

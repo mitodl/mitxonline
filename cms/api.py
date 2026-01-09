@@ -306,7 +306,12 @@ def create_default_courseware_page(
     Raises:
     - Exception
     """
-    from cms.models import CourseIndexPage, CoursePage, ProgramIndexPage, ProgramPage
+    from cms.models import (  # noqa: PLC0415
+        CourseIndexPage,
+        CoursePage,
+        ProgramIndexPage,
+        ProgramPage,
+    )
 
     page_framework = {
         "title": courseware.title,
