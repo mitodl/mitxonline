@@ -10,7 +10,7 @@ USER_MSG_TYPE_COURSE_NON_UPGRADABLE = "course-non-upgradable"
 USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
 USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY = "required-enrollment-code-empty"
 USER_MSG_TYPE_PROFILE_CREATED = "profile-created"
-
+USER_MSG_TYPE_BASKET_EMPTY = "basket-empty"
 
 USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"
 USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"
@@ -27,6 +27,7 @@ USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE = "b2b-error-missing-enrollment-
 USER_MSG_TYPE_B2B_ERROR_INVALID_ENROLLMENT_CODE = "b2b-error-invalid-enrollment-code"
 USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT = "b2b-error-requires-checkout"
 USER_MSG_TYPE_B2B_ENROLL_SUCCESS = "b2b-enroll-success"
+USER_MSG_TYPE_B2B_INVALID_BASKET = "b2b-invalid-basket"
 
 USER_MSG_TYPE_B2B = [
     USER_MSG_TYPE_B2B_DISALLOWED,

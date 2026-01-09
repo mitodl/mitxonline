@@ -50,6 +50,9 @@ from ecommerce.tasks import perform_downgrade_from_order
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from hubspot_sync.task_helpers import sync_hubspot_deal
 from main.constants import (
+    USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
+    USER_MSG_TYPE_B2B_INVALID_BASKET,
+    USER_MSG_TYPE_BASKET_EMPTY,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
@@ -74,6 +77,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if basket.has_user_blocked_products(request.user):
         return {
             "country_blocked": True,
+            "error": USER_MSG_TYPE_ENROLL_BLOCKED,
             "response": redirect_with_user_message(
                 reverse("user-dashboard"),
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
@@ -83,6 +87,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if basket.has_user_purchased_same_courserun(request.user):
         return {
             "purchased_same_courserun": True,
+            "error": USER_MSG_TYPE_ENROLL_DUPLICATED,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
@@ -92,6 +97,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if basket.has_user_purchased_non_upgradable_courserun():
         return {
             "purchased_non_upgradeable_courserun": True,
+            "error": USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE},
@@ -104,6 +110,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
         apply_user_discounts(request)
         return {
             "invalid_discounts": True,
+            "error": USER_MSG_TYPE_DISCOUNT_INVALID,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
@@ -115,6 +122,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if not is_discount_supplied_for_b2b_purchase(request, active_contracts):
         return {
             "invalid_discounts": True,
+            "error": USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY},
@@ -124,9 +132,20 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if not validate_basket_for_b2b_purchase(request, active_contracts):
         return {
             "invalid_discounts": True,
+            "error": USER_MSG_TYPE_B2B_INVALID_BASKET,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
+            ),
+        }
+
+    if not basket.basket_items.count():
+        return {
+            "basket_empty": True,
+            "error": USER_MSG_TYPE_BASKET_EMPTY,
+            "response": redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_BASKET_EMPTY},
             ),
         }
 
