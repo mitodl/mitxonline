@@ -54,7 +54,7 @@ class Command(BaseCommand):
                     user = User.objects.filter(username=edx_enrollment.user).first()
                     if user:
                         (
-                            enrollment,
+                            _,
                             created,
                         ) = CourseRunEnrollment.all_objects.get_or_create(
                             user=user,

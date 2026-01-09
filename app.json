@@ -783,6 +783,10 @@
     "VERIFIABLE_CREDENTIAL_DID":{
       "description": "The Decentralized Identifier (DID) used as the issuer for verifiable credentials.",
       "required": false
+    },
+    "ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING":{
+      "description": "Whether to enable verifiable credentials provisioning functionality if Posthog feature flag is disabled.",
+      "required": false
     }
   },
   "keywords": [

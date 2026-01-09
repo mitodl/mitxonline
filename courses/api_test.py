@@ -248,7 +248,7 @@ def test_create_run_enrollments_upgrade(
     )
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
-    successful_enrollments, edx_request_success = create_run_enrollments(
+    _, edx_request_success = create_run_enrollments(
         user, runs=[test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
     patched_edx_enroll.assert_called_once_with(
@@ -1434,7 +1434,7 @@ def test_generate_program_certificate_success_minimum_electives_not_met(
         user=user, course_run=elective_course1_course_run
     )
 
-    certificate, created = generate_program_certificate(user=user, program=program)
+    _, created = generate_program_certificate(user=user, program=program)
     assert created is False
     assert len(ProgramCertificate.objects.all()) == 0
 
@@ -2502,7 +2502,7 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
                 "id": "https://learn.mit.edu/courses/course-v1:MITx+6.00.1x",
                 "achievementType": "Course",
                 "type": ["Achievement"],
-                "criteria": {"narrative": "Learn Python programming fundamentals"},
+                "criteria": {"narrative": "- Learn Python programming fundamentals"},
                 "description": "John Doe has successfully completed all modules and earned a Course Certificate in Introduction to Python.",
                 "name": "Introduction to Python",
                 "image": {

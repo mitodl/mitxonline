@@ -2,6 +2,8 @@
 Serializers for Wagtail API Schema
 """
 
+import bleach
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cms.models import CoursePage, ProgramPage
@@ -216,6 +218,8 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
     Serializer for individual program page items, including all relevant fields.
     """
 
+    description = serializers.SerializerMethodField()
+
     class Meta:
         model = ProgramPage
         fields = [
@@ -247,6 +251,13 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
         # NOTE: We use this serializer for schema generation only,
         # And only for GET requests, in which all fields are returned.
         extra_kwargs = {field: {"required": True} for field in fields}
+
+    @extend_schema_field(str)
+    def get_description(self, instance):
+        """The description shown on the home page and product page."""
+        if instance.description:
+            return bleach.clean(instance.description, tags=[], strip=True)
+        return ""
 
     meta = PageMetaSerializer()
     price = PriceItemSerializer(many=True)

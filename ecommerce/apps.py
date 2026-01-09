@@ -7,4 +7,4 @@ class EcommerceConfig(AppConfig):
 
     def ready(self):
         """Application is ready"""
-        import ecommerce.signals  # noqa: F401
+        import ecommerce.signals  # noqa: F401, PLC0415

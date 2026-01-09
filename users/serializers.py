@@ -64,7 +64,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def validate_year_of_birth(self, value):
         """Validates the year of birth field"""
-        from users.utils import determine_approx_age
+        from users.utils import determine_approx_age  # noqa: PLC0415
 
         if not (value and determine_approx_age(value) >= 13):  # noqa: PLR2004
             raise serializers.ValidationError("Year of Birth provided is under 13")  # noqa: EM101

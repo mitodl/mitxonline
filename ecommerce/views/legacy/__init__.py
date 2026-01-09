@@ -376,7 +376,7 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     def partial_update(self, request, **kwargs):
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
 
-        (discount_product, created) = DiscountProduct.objects.get_or_create(
+        (_, created) = DiscountProduct.objects.get_or_create(
             discount=discount, product_id=request.data["product_id"]
         )
 
@@ -444,7 +444,7 @@ class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
     def partial_update(self, request, **kwargs):
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
 
-        (discount_user, created) = UserDiscount.objects.get_or_create(
+        (_, created) = UserDiscount.objects.get_or_create(
             discount=discount, user_id=request.data["user_id"]
         )
 
@@ -730,8 +730,6 @@ class CheckoutCallbackView(View):
     """
 
     def __init__(self, *args, **kwargs):  # noqa: ARG002
-        import logging
-
         self.logger = logging.getLogger(__name__)
 
     def post_checkout_redirect(self, order_state, order, request):

@@ -790,7 +790,7 @@ def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
     Returns:
         SimplePublicObjectInput: Input object for upserting User data to Hubspot
     """
-    from hubspot_sync.serializers import HubspotContactSerializer
+    from hubspot_sync.serializers import HubspotContactSerializer  # noqa: PLC0415
 
     contact_properties_map = {
         "email": "email",
@@ -876,7 +876,7 @@ def make_deal_sync_message_from_order(order: Order) -> SimplePublicObjectInput:
     Returns:
         SimplePublicObjectInput: input object for upserting Order data to Hubspot
     """
-    from hubspot_sync.serializers import OrderToDealSerializer
+    from hubspot_sync.serializers import OrderToDealSerializer  # noqa: PLC0415
 
     properties = OrderToDealSerializer(order).data
     return make_object_properties_message(properties)
@@ -937,7 +937,7 @@ def make_line_item_sync_message_from_line(line: Line) -> SimplePublicObjectInput
     Returns:
         SimplePublicObjectInput: input object for upserting Line data to Hubspot
     """
-    from hubspot_sync.serializers import LineSerializer
+    from hubspot_sync.serializers import LineSerializer  # noqa: PLC0415
 
     properties = LineSerializer(line).data
     return make_object_properties_message(properties)
@@ -1000,7 +1000,7 @@ def make_product_sync_message_from_product(product: Product) -> SimplePublicObje
     Returns:
         SimplePublicObjectInput: input object for upserting Product data to Hubspot
     """
-    from hubspot_sync.serializers import ProductSerializer
+    from hubspot_sync.serializers import ProductSerializer  # noqa: PLC0415
 
     properties = ProductSerializer(product).data
     return make_object_properties_message(properties)
@@ -1195,7 +1195,7 @@ def get_hubspot_id_for_object(  # noqa: C901
         The hubspot id for the object if it has been previously synced to Hubspot.
         Raises a ValueError if no matching Hubspot object can be found.
     """
-    from hubspot_sync.serializers import get_hubspot_serializer
+    from hubspot_sync.serializers import get_hubspot_serializer  # noqa: PLC0415
 
     content_type = ContentType.objects.get_for_model(obj)
     hubspot_obj = HubspotObject.objects.filter(
@@ -1231,7 +1231,7 @@ def get_hubspot_id_for_object(  # noqa: C901
             serialized_product["name"],
             raise_count_error=raise_error,
         )
-    if hubspot_obj and hubspot_obj.id:  # noqa: RET503
+    if hubspot_obj and hubspot_obj.id:
         try:
             HubspotObject.objects.update_or_create(
                 object_id=obj.id,
@@ -1247,6 +1247,8 @@ def get_hubspot_id_for_object(  # noqa: C901
     elif raise_error:
         msg = f"Hubspot id could not be found for {content_type.name} for id {obj.id}"
         raise ValueError(msg)
+
+    return None
 
 
 def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:

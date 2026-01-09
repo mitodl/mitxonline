@@ -61,7 +61,12 @@ async def build_docs(targets: Targets, dist_dir: DistDir, workspace: Workspace) 
             output_filename="sphinx-build.pex",
             internal_only=True,
             requirements=PexRequirements(
-                ["sphinx", "insipid-sphinx-theme", "sphinxcontrib-mermaid"]
+                [
+                    "sphinx",
+                    "insipid-sphinx-theme",
+                    "sphinxcontrib-mermaid",
+                    "myst_parser",
+                ]
             ),
             interpreter_constraints=InterpreterConstraints([">=3.6"]),
             main=ConsoleScript("sphinx-build"),

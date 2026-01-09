@@ -7,10 +7,11 @@ Welcome to MITx Online Documentation's documentation!
 =====================================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
 
    authentication
+   b2b/index
    configuration/index
    ecommerce/index
    commands/index

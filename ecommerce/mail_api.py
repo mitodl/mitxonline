@@ -21,7 +21,7 @@ def send_ecommerce_order_receipt(order_record):
     Args:
         order_record: An order.
     """
-    from ecommerce.serializers import OrderReceiptSerializer
+    from ecommerce.serializers import OrderReceiptSerializer  # noqa: PLC0415
 
     data = OrderReceiptSerializer(instance=order_record).data
     purchaser = data.get("purchaser")

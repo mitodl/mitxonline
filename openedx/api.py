@@ -720,7 +720,7 @@ def repair_faulty_openedx_users(users):
         try:
             # edX is our only openedx for the time being. If a different openedx is added, this
             # function will need to be updated.
-            created_user, created_auth_token = repair_faulty_edx_user(user)
+            repair_faulty_edx_user(user)
         except HTTPError as exc:  # noqa: PERF203
             log.exception(
                 "Failed to repair faulty user %s (%s). %s",
@@ -1533,7 +1533,7 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
     Returns:
     bool, whether or not it worked
     """
-    from courses.api import check_course_modes
+    from courses.api import check_course_modes  # noqa: PLC0415
 
     edx_client = get_edx_api_jwt_client(
         settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,

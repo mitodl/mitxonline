@@ -67,7 +67,7 @@ log = logging.getLogger(__name__)
 def generate_checkout_payload(request):  # noqa: PLR0911
     """Generate the checkout payload for the current basket."""
 
-    from b2b.api import validate_basket_for_b2b_purchase
+    from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
 
     basket = establish_basket(request)
 

@@ -2,11 +2,11 @@ from urllib.parse import urljoin
 
 from django.conf import settings
 from django.db import migrations
+from oauth2_provider.models import get_application_model
 
 
 def create_edx_oauth_application(apps, schema_editor):
     """Ensures that an Application exists for creating a user in Open edX"""
-    from oauth2_provider.models import get_application_model
 
     Application = get_application_model()
     Application.objects.get_or_create(
@@ -26,7 +26,6 @@ def create_edx_oauth_application(apps, schema_editor):
 
 def remove_edx_oauth_application(apps, schema_editor):
     """Removes an Application for creating a user in Open edX"""
-    from oauth2_provider.models import get_application_model
 
     Application = get_application_model()
     Application.objects.filter(name=settings.OPENEDX_OAUTH_APP_NAME).delete()

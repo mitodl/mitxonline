@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional  # noqa: UP035
+from typing import List  # noqa: UP035
 
 import pytz
 import reversion
@@ -216,7 +216,7 @@ class BasketItem(TimestampedModel):
     @cached_property
     def discounted_price(self):
         """Return the price of the product with discounts"""
-        from ecommerce.discounts import DiscountType
+        from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
         discounts = [
             discount_redemption.redeemed_discount
@@ -478,7 +478,7 @@ class Discount(TimestampedModel):
         Returns:
             Number; the calculated amount of the discounts
         """
-        from ecommerce.discounts import DiscountType
+        from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
         if (user is None and self.valid_now()) or self.check_validity(user):
             return DiscountType.get_discounted_price([self], product).quantize(
@@ -495,7 +495,7 @@ class Discount(TimestampedModel):
 
     def b2b_contracts(self):
         """Return the applicable B2B contract(s), if any."""
-        from b2b.models import ContractPage
+        from b2b.models import ContractPage  # noqa: PLC0415
 
         products_qs = self.products.select_related(
             "product", "product__content_type"
@@ -640,7 +640,7 @@ class OrderFlow:
                 "Failed to record transaction: Missing transaction id from refund API response"  # noqa: EM101
             )
 
-        refund_transaction, created = self.order.transactions.get_or_create(
+        refund_transaction, _ = self.order.transactions.get_or_create(
             transaction_id=transaction_id,
             data=api_response_data,
             amount=amount,
@@ -765,7 +765,7 @@ class Order(TimestampedModel):
     def create_enrollments(self):
         """Enroll the user appropriately after the transaction has completed."""
 
-        from courses.api import create_run_enrollments
+        from courses.api import create_run_enrollments  # noqa: PLC0415
 
         if not self.is_fulfilled:
             return
@@ -898,7 +898,7 @@ class PendingOrder(Order):
 
     @classmethod
     def create_from_product(
-        cls, product: Product, user: User, discount: Optional[Discount] = None
+        cls, product: Product, user: User, discount: Discount | None = None
     ):
         """
         Creates a new pending order from a product
@@ -1051,7 +1051,7 @@ class Line(TimestampedModel):
     @cached_property
     def discounted_price(self):
         """Return the price of the product with discounts"""
-        from ecommerce.discounts import DiscountType
+        from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
         discounts = [
             discount_redemption.redeemed_discount
@@ -1069,7 +1069,7 @@ class Line(TimestampedModel):
 
     @cached_property
     def product(self):
-        from ecommerce.discounts import resolve_product_version
+        from ecommerce.discounts import resolve_product_version  # noqa: PLC0415
 
         return resolve_product_version(
             Product.all_objects.get(pk=self.product_version.field_dict["id"]),

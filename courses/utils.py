@@ -213,7 +213,9 @@ def get_approved_flexible_price_exists(instance, context):
         bool: True if an approved flexible price exists, False otherwise
     """
     # Import here to avoid circular dependency
-    from flexiblepricing.api import is_courseware_flexible_price_approved
+    from flexiblepricing.api import (  # noqa: PLC0415
+        is_courseware_flexible_price_approved,
+    )
 
     # Handle different instance types to extract course/run and user
     if isinstance(instance, list):

@@ -848,7 +848,9 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                         "feature_image_src": ANY_STR,
                         "courseruns": [
                             dict(CourseRunSerializer(run).data)
-                            for run in course.courseruns.all()
+                            for run in course.courseruns.filter(live=True).order_by(
+                                "id"
+                            )
                         ],
                     }
                     for course in courses_by_program_id[program_enrollment.program.id]

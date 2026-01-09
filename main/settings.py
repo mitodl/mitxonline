@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.137.1"
+VERSION = "0.137.2"
 
 log = logging.getLogger()
 
@@ -1554,4 +1554,9 @@ VERIFIABLE_CREDENTIAL_DID = get_string(
     name="VERIFIABLE_CREDENTIAL_DID",
     default="",
     description="The Decentralized Identifier (DID) used as the issuer for verifiable credentials.",
+)
+ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING = get_bool(
+    name="ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING",
+    default=False,
+    description="Override posthog flag to enable the provisioning of verifiable credentials in dev.",
 )

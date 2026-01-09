@@ -229,7 +229,7 @@ class Command(BaseCommand):
                             )
                         )
 
-                course_run, run_created = self._create_course_run(course, row)
+                _, run_created = self._create_course_run(course, row)
                 if run_created:
                     run_success_count += 1
 
@@ -268,7 +268,11 @@ class Command(BaseCommand):
         Create legal addresses in bulk for the created users.
         """
         legal_addresses = []
-        for user in created_users:
+        # ensure all users are properly saved
+        user_ids = [user.id for user in created_users]
+        saved_users = User.objects.filter(id__in=user_ids)
+
+        for user in saved_users:
             user_data = row_lookup.get(user.email)
             if not user_data:
                 continue
@@ -286,7 +290,11 @@ class Command(BaseCommand):
         """
 
         user_profiles = []
-        for user in created_users:
+        # ensure all users are properly saved
+        user_ids = [user.id for user in created_users]
+        saved_users = User.objects.filter(id__in=user_ids)
+
+        for user in saved_users:
             user_data = row_lookup.get(user.email)
             if not user_data:
                 continue

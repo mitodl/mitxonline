@@ -582,7 +582,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
         user = UserFactory.create()
 
         # Step 1: course that belongs to a program - should get back the program tiers
-        course, course_tiers, program, program_tiers = create_courseware()
+        course, _course_tiers, program, _program_tiers = create_courseware()
         course.program = program
         course.save()
         course.refresh_from_db()
