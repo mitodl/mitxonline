@@ -439,8 +439,10 @@ class UserEnrollmentsApiViewSet(
     def get_queryset(self):
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
-            .select_related("run__course__page", "user", "run")
+            .select_related("user")
             .prefetch_related(
+                "run",
+                "run__course__page",
                 "run__products",
                 "run__course__page__linked_instructors",
                 "run__course__page__feature_image",
