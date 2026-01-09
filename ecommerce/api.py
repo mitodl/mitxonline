@@ -36,6 +36,11 @@ from ecommerce.constants import (
     REFUND_SUCCESS_STATES,
     ZERO_PAYMENT_DATA,
 )
+from ecommerce.exceptions import (
+    VerifiedProgramInvalidBasketError,
+    VerifiedProgramInvalidOrderError,
+    VerifiedProgramNoEnrollmentError,
+)
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -66,13 +71,24 @@ from main.constants import (
 )
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import parse_supplied_date, redirect_with_user_message
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
 
-def generate_checkout_payload(request):  # noqa: PLR0911
-    """Generate the checkout payload for the current basket."""
+def generate_checkout_payload(request, *, skip_discount_check=False):  # noqa: PLR0911
+    """
+    Generate the checkout payload for the current basket.
+
+    Set skip_discount_check when generating a payload for a verified program
+    enrollment. The discount in that case is attached to the program, not the
+    courserun that's being purchased, so it's technically "invalid".
+
+    Args:
+    - request: the incoming http request
+    Kwargs:
+    - skip_discount_check: skip checking discounts for validity (default False)
+    """
 
     from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
 
@@ -108,7 +124,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
             ),
         }
 
-    if not check_basket_discounts_for_validity(request):
+    if not skip_discount_check and not check_basket_discounts_for_validity(request):
         # We only allow one discount per basket so clear all of them here.
         basket.discounts.all().delete()
         apply_user_discounts(request)
@@ -871,7 +887,7 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
         )
 
 
-def create_verified_program_discounts(program):
+def create_verified_program_discount(program):
     """
     Create discount (enrollment) codes for a program.
 
@@ -922,7 +938,7 @@ def create_verified_program_discounts(program):
     return discount
 
 
-def create_verified_program_course_run_enrollment(user, courserun, program):
+def create_verified_program_course_run_enrollment(request, courserun, program):
     """
     Create a verified course run enrollment in a course that is associated with
     a program for the specified learner.
@@ -938,4 +954,62 @@ def create_verified_program_course_run_enrollment(user, courserun, program):
     zero-value one. This will use a discount code for this - if we don't have one
     already, then we will make one on the fly for the program, and then apply it
     to the order.
+
+    Courses can belong to multiple programs, so the program must be specified
+    so the function can verify the user's program enrollment.
+
+    Args:
+    - request: The incoming HTTP request.
+    - courserun: The course run to purchase.
+    - program: The program to use.
+    Returns:
+    - CourseRunEnrollment
+    Raises:
+    - VerifiedProgramNoEnrollmentError if the learner doesn't have a program
+      enrollment
+    - VerifiedProgramInvalidBasketError if the basket isn't zero value
+    - VerifiedProgramInvalidOrderError if the order doesn't get processed through
     """
+
+    if not program.enrollments.filter(
+        user=request.user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, active=True
+    ).exists():
+        msg = f"No verified enrollment for {request.user} for program {program}"
+        raise VerifiedProgramNoEnrollmentError(msg)
+
+    discount = create_verified_program_discount(program)
+
+    cr_ctype = ContentType.objects.get_for_model(courserun)
+    product = Product.objects.filter(
+        content_type=cr_ctype, object_id=courserun.id, is_active=True
+    ).get()
+
+    basket = establish_basket(request)
+
+    if basket.basket_items.count() > 0:
+        # Stuff in the basket - stop here.
+        msg = f"Basket for {request.user} is not empty"
+        raise VerifiedProgramInvalidBasketError(msg)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=request.user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    if Decimal(
+        sum([basket_item.discounted_price for basket_item in basket.basket_items.all()])
+    ) > Decimal(0):
+        # For some reason the basket's not zero-value.
+        msg = f"Basket for {request.user} is not zero-value"
+        raise VerifiedProgramInvalidBasketError(msg)
+
+    processed_order = generate_checkout_payload(request, skip_discount_check=True)
+
+    if "no_checkout" not in processed_order:
+        # It didn't just clear the order so something went wrong
+        raise VerifiedProgramInvalidOrderError
+
+    return courserun.enrollments.filter(user=request.user).get()

@@ -9,21 +9,32 @@ import reversion
 from CyberSource.rest import ApiException
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.test import RequestFactory
 from django.urls import reverse
 from factory import Faker, fuzzy
 from mitol.payment_gateway.api import ProcessorResponse
 from reversion.models import Version
 
-from courses.factories import CourseRunEnrollmentFactory, ProgramFactory
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramEnrollmentFactory,
+    ProgramFactory,
+)
 from ecommerce.api import (
     check_and_process_pending_orders_for_resolution,
     check_for_duplicate_discount_redemptions,
-    create_verified_program_discounts,
+    create_verified_program_course_run_enrollment,
+    create_verified_program_discount,
     process_cybersource_payment_response,
     refund_order,
     unenroll_learner_from_order,
 )
 from ecommerce.constants import TRANSACTION_TYPE_PAYMENT, TRANSACTION_TYPE_REFUND
+from ecommerce.exceptions import (
+    VerifiedProgramInvalidBasketError,
+    VerifiedProgramNoEnrollmentError,
+)
 from ecommerce.factories import (
     DiscountRedemptionFactory,
     LineFactory,
@@ -44,6 +55,7 @@ from ecommerce.models import (
     Product,
     Transaction,
 )
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -640,7 +652,7 @@ def test_duplicate_redemption_check(peruser):
     assert discount.id in seen_ids
 
 
-def test_create_verified_program_discounts():
+def test_create_verified_program_discount():
     """Test that creating a special discount for programs works OK"""
 
     program = ProgramFactory.create()
@@ -651,10 +663,136 @@ def test_create_verified_program_discounts():
             price=100, content_type=content_type, object_id=program.id
         )
 
-    discount = create_verified_program_discounts(program)
+    discount = create_verified_program_discount(program)
 
     assert discount
     assert discount.is_program_discount
     assert discount.products.filter(
         product__content_type=content_type, product__object_id=program.id
     ).exists()
+
+
+def test_create_verified_program_course_run_enrollment(
+    mocker, mock_create_run_enrollments
+):
+    """Test that creating a verified course run enrollment for a program works."""
+
+    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+    mock_cre_side_effect = mock_create_run_enrollments.side_effect
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    prog_ctype = ContentType.objects.get_for_model(prog_enrollment.program)
+    with reversion.create_revision():
+        Product.objects.create(
+            content_type=prog_ctype,
+            object_id=prog_enrollment.program.id,
+            price=10,
+        )
+
+    courserun = CourseRunFactory.create()
+    prog_enrollment.program.add_requirement(courserun.course)
+
+    cr_ctype = ContentType.objects.get_for_model(courserun)
+    with reversion.create_revision():
+        Product.objects.create(content_type=cr_ctype, object_id=courserun.id, price=10)
+
+    request = RequestFactory().get("/")
+    request.user = prog_enrollment.user
+
+    mock_create_run_enrollments.side_effect = (
+        lambda user, runs, *, mode=EDX_ENROLLMENT_VERIFIED_MODE, **kwargs: (  # noqa: ARG005
+            [
+                CourseRunEnrollmentFactory.create(
+                    run=runs[0], user=user, enrollment_mode=mode
+                )
+            ],
+            False,
+        )
+    )
+
+    cr_enrollment = create_verified_program_course_run_enrollment(
+        request, courserun, prog_enrollment.program
+    )
+
+    assert cr_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    mock_create_run_enrollments.side_effect = mock_cre_side_effect
+
+
+def test_create_vpcre_no_program():
+    """
+    Test that creating a verified course run enrollment for a program fails if
+    there's no program enrollment.
+    """
+
+    user = UserFactory.create()
+    program = ProgramFactory.create()
+    prog_ctype = ContentType.objects.get_for_model(program)
+    with reversion.create_revision():
+        Product.objects.create(
+            content_type=prog_ctype,
+            object_id=program.id,
+            price=10,
+        )
+
+    courserun = CourseRunFactory.create()
+    program.add_requirement(courserun.course)
+
+    cr_ctype = ContentType.objects.get_for_model(courserun)
+    with reversion.create_revision():
+        Product.objects.create(content_type=cr_ctype, object_id=courserun.id, price=10)
+
+    request = RequestFactory().get("/")
+    request.user = user
+
+    with pytest.raises(VerifiedProgramNoEnrollmentError) as exc:
+        create_verified_program_course_run_enrollment(request, courserun, program)
+
+    assert "No verified enrollment" in str(exc.value)
+
+
+def test_create_vpcre_bad_basket(mocker):
+    """
+    Test that creating a verified course run enrollment for a program fails if
+    the basket has other stuff in.
+    """
+
+    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+
+    with reversion.create_revision():
+        some_other_product = ProductFactory.create()
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    prog_ctype = ContentType.objects.get_for_model(prog_enrollment.program)
+    with reversion.create_revision():
+        Product.objects.create(
+            content_type=prog_ctype,
+            object_id=prog_enrollment.program.id,
+            price=10,
+        )
+
+    courserun = CourseRunFactory.create()
+    prog_enrollment.program.add_requirement(courserun.course)
+
+    cr_ctype = ContentType.objects.get_for_model(courserun)
+    with reversion.create_revision():
+        Product.objects.create(content_type=cr_ctype, object_id=courserun.id, price=10)
+
+    request = RequestFactory().get("/")
+    request.user = prog_enrollment.user
+
+    user_basket = Basket.objects.create(user=prog_enrollment.user)
+    BasketItem.objects.create(
+        basket=user_basket, product=some_other_product, quantity=1
+    )
+
+    with pytest.raises(VerifiedProgramInvalidBasketError) as exc:
+        create_verified_program_course_run_enrollment(
+            request, courserun, prog_enrollment.program
+        )
+
+    assert "not empty" in str(exc.value)
