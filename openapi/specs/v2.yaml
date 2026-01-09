@@ -5600,6 +5600,7 @@ components:
         description:
           type: string
           description: The description shown on the home page and product page.
+          readOnly: true
         live:
           type: boolean
           readOnly: true
@@ -5642,6 +5643,7 @@ components:
         description:
           type: string
           description: The description shown on the home page and product page.
+          readOnly: true
         length:
           type: string
           description: A short description indicating how long it takes to complete

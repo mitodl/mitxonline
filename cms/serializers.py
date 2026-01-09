@@ -273,6 +273,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     page_url = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
     financial_assistance_form_url = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
 
     def _get_financial_assistance_url(self, page, slug):
         """Helper method to construct financial assistance URL"""
@@ -291,6 +292,13 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     def get_page_url(self, instance):
         """Get the page URL for the instance."""
         return instance.get_url()
+
+    @extend_schema_field(str)
+    def get_description(self, instance):
+        """The description shown on the home page and product page."""
+        if instance.description:
+            return bleach.clean(instance.description, tags=[], strip=True)
+        return ""
 
     @extend_schema_field(str)
     def get_price(self, instance):
