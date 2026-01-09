@@ -5,15 +5,18 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0052_signatorypage_title_3'),
+        ("cms", "0052_signatorypage_title_3"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='programpage',
-            name='description',
-            field=wagtail.fields.RichTextField(blank=True, help_text='The description shown on the home page and product page.', null=True),
+            model_name="programpage",
+            name="description",
+            field=wagtail.fields.RichTextField(
+                blank=True,
+                help_text="The description shown on the home page and product page.",
+                null=True,
+            ),
         ),
     ]
