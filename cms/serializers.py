@@ -117,6 +117,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
                     selected_program_id__in=all_program_ids
                 )
                 .select_related("selected_program")
+                .live()
                 .first()
             )
             if form:

@@ -11,7 +11,7 @@ from urllib.parse import urlencode, urljoin
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models import Case, IntegerField, When
 from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
@@ -283,9 +283,10 @@ def get_wagtail_img_src(image_obj) -> str:
 
 def create_default_courseware_page(
     courseware: Union[Course, Program],
-    live: bool = False,  # noqa: FBT001, FBT002
-    *args,  # noqa: ARG001
-    **kwargs,  # noqa: ARG001
+    *,
+    live: bool = False,
+    include_in_learn_catalog: bool = False,
+    ingest_content_files_for_ai: bool = False,
 ):
     """
     Creates a default about page for the given courseware object. Created pages
@@ -323,15 +324,24 @@ def create_default_courseware_page(
         "min_weekly_hours": "Empty",
     }
 
+    course_only_kwargs = {
+        "include_in_learn_catalog": include_in_learn_catalog,
+        "ingest_content_files_for_ai": ingest_content_files_for_ai,
+    }
+    program_only_kwargs = {}
+
     try:
         if isinstance(courseware, Course):
             parent_page = CourseIndexPage.objects.filter(live=True).get()
-            page = CoursePage(course=courseware, **page_framework)
         else:
             parent_page = ProgramIndexPage.objects.filter(live=True).get()
-            page = ProgramPage(program=courseware, **page_framework)
-    except:  # noqa: E722
+    except ObjectDoesNotExist:
         raise ValidationError(f"No valid index page found for {courseware}.")  # noqa: B904, EM102
+
+    if isinstance(courseware, Course):
+        page = CoursePage(course=courseware, **page_framework, **course_only_kwargs)
+    else:
+        page = ProgramPage(program=courseware, **page_framework, **program_only_kwargs)
 
     parent_page.add_child(instance=page)
 

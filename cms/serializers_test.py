@@ -238,13 +238,13 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
 
 
 @pytest.mark.parametrize(
-    "own_program_has_form,related_program,related_program_has_form",  # noqa: PT006
+    ("own_program_has_form", "related_program", "related_program_has_form"),
     [
-        [True, False, False],  # noqa: PT007
-        [True, True, False],  # noqa: PT007
-        [False, True, False],  # noqa: PT007
-        [False, True, True],  # noqa: PT007
-        [True, True, True],  # noqa: PT007
+        (True, False, False),
+        (True, True, False),
+        (False, True, False),
+        (False, True, True),
+        (True, True, True),
     ],
 )
 def test_serialized_course_finaid_form_url(
@@ -309,6 +309,50 @@ def test_serialized_course_finaid_form_url(
                 related_fa_page.slug
                 in serialized_output["financial_assistance_form_url"]
             )
+
+
+@pytest.mark.parametrize(
+    ("own_form_published", "related_form_published"),
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_serialized_course_finaid_form_url_publishing_states(
+    own_form_published, related_form_published
+):
+    """
+    Test a few scenarios where financial aid forms exist but are not yet published.
+    """
+
+    program1 = ProgramFactory.create()
+    course1 = CourseFactory.create()
+    program1.add_requirement(course1)
+
+    program2 = ProgramFactory.create()
+    course2 = CourseFactory.create()
+    program2.add_requirement(course2)
+    program1.add_related_program(program2)
+
+    own_fa_page = FlexiblePricingFormFactory.create(
+        parent=program1.page, selected_program=program1, live=own_form_published
+    )
+    related_fa_page = FlexiblePricingFormFactory.create(
+        parent=program2.page, selected_program=program2, live=related_form_published
+    )
+
+    serialized_output = CoursePageSerializer(course1.page).data
+
+    if own_form_published:
+        assert own_fa_page.slug in serialized_output["financial_assistance_form_url"]
+    elif related_form_published:
+        assert (
+            related_fa_page.slug in serialized_output["financial_assistance_form_url"]
+        )
+    else:
+        assert serialized_output["financial_assistance_form_url"] == ""
 
 
 def test_serialize_program_page(

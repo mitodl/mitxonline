@@ -6,6 +6,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.management import BaseCommand
 
 from cms.models import Course, Program
+from cms.utils import get_page_editing_url
 from flexiblepricing.api import create_default_flexible_pricing_page
 
 
@@ -63,20 +64,16 @@ class Command(BaseCommand):
             return
 
         try:
-            if create_default_flexible_pricing_page(
+            page = create_default_flexible_pricing_page(
                 courseware,
                 True if kwargs["force"] else False,  # noqa: SIM210
                 **kwargs,
-            ):
+            )
+            if page:
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"Created financial assistance form for {courseware.readable_id} successfully."
-                    )
-                )
-            else:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Can't create financial assistance form for {courseware.readable_id}."
+                        f"Created financial assistance form for {courseware.readable_id} successfully.\n"
+                        f"Edit page at: {get_page_editing_url(page.id)}"
                     )
                 )
         except ValidationError as e:
