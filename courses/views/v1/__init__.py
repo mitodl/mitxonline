@@ -206,7 +206,6 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                     ),
                 )
             )
-            .all()
         )
 
     def get_serializer_context(self):
@@ -447,7 +446,6 @@ class UserEnrollmentsApiViewSet(
                 "run__course__page__linked_instructors",
                 "run__course__page__feature_image",
             )
-            .all()
         )
 
     def get_serializer_context(self):
