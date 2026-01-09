@@ -5,7 +5,7 @@ Course API Views version 2
 import contextlib
 
 import django_filters
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
