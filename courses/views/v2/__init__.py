@@ -287,8 +287,9 @@ class CourseFilterSet(django_filters.FilterSet):
         # perform additional filtering
 
         filter_keys = self.form.cleaned_data.keys()
+        courserun_is_enrollable_value = self.form.cleaned_data.get("courserun_is_enrollable")
 
-        if "courserun_is_enrollable" not in filter_keys:
+        if "courserun_is_enrollable" not in filter_keys or courserun_is_enrollable_value is None:
             queryset = queryset.prefetch_related(
                 Prefetch(
                     "courseruns",
