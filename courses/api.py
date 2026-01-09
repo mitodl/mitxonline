@@ -571,7 +571,7 @@ def _filter_valid_course_keys(runs):
     return valid_course_keys, runs_by_course_id
 
 
-def sync_course_runs(runs):
+def sync_course_runs(runs):  # noqa: C901
     """
     Sync course run dates and title from Open edX using course list API
 
@@ -630,7 +630,7 @@ def sync_course_runs(runs):
                     run.certificate_available_date = (
                         course_detail.certificate_available_date
                     )
-                else:
+                elif course_detail.end:
                     run.certificate_available_date = course_detail.end
 
                 run.save()
