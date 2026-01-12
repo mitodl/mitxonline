@@ -373,7 +373,6 @@ class ContractPage(Page, ClusterableModel):
         """Save the page, and update the slug and title appropriately."""
 
         self.title = str(self.name)
-        self.slug = slugify(f"contract-{self.organization.id}-{self.title}")
 
         # This should be removed once we're done migrating orgs into Keycloak.
         # The integration type field should also be removed at that time.
