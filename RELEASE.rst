@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.2
+Version 0.137.2 (Released January 12, 2026)
 ---------------
 
 - chore(deps): update postgres docker tag to v15.15 (#3188)
