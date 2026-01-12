@@ -593,7 +593,7 @@ def add_verified_program_course_enrollment(request, program_id: str, courserun_i
 
     if run not in program_enrollment.program.required_courses and (
         CourseRunEnrollment.objects.filter(
-            run__in=program_enrollment.program.elective_courses,
+            run__course__in=program_enrollment.program.elective_courses,
             user=request.user,
             active=True,
             enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,

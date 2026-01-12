@@ -265,6 +265,8 @@ class Discount(TimestampedModel):
     )
     is_bulk = models.BooleanField(default=False)
     is_program_discount = models.BooleanField(
+        null=True,
+        blank=True,
         default=False,
         help_text="Discount is only for creating verified course run enrollments for a program.",
     )
