@@ -50,6 +50,7 @@ from ecommerce.serializers.v0 import (
     BulkDiscountSerializer,
     DiscountProductSerializer,
     DiscountRedemptionSerializer,
+    ProductFlexibilePriceSerializer,
     ProductSerializer,
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
@@ -507,6 +508,27 @@ class ProductViewSet(ReadOnlyModelViewSet):
             .select_related("content_type")
             .prefetch_related("purchasable_object")
         )
+
+    @extend_schema(
+        operation_id="products_user_flexible_price_retrieve",
+        description="Retrieve a product with user-specific flexible price information",
+        responses={
+            200: ProductFlexibilePriceSerializer,
+        },
+    )
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[],
+        url_path="user_flexible_price",
+    )
+    def user_flexible_price(self, request, **kwargs):  # noqa: ARG002
+        """Get product with user-specific flexible price information."""
+        product = self.get_object()
+        serializer = ProductFlexibilePriceSerializer(
+            product, context={"request": request}
+        )
+        return Response(serializer.data)
 
 
 class DiscountFilterSet(django_filters.FilterSet):

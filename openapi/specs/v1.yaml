@@ -1663,6 +1663,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/Product'
           description: ''
+  /api/v0/products/{id}/user_flexible_price/:
+    get:
+      operationId: products_user_flexible_price_retrieve
+      description: Retrieve a product with user-specific flexible price information
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this product.
+        required: true
+      tags:
+      - products
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductFlexibilePrice'
+          description: ''
   /api/v0/products/all/:
     get:
       operationId: products_all_list
@@ -5508,7 +5528,7 @@ components:
           description: Controls visibility of the product in the app.
         product_flexible_price:
           allOf:
-          - $ref: '#/components/schemas/Discount'
+          - $ref: '#/components/schemas/V0Discount'
           nullable: true
           readOnly: true
       required:
