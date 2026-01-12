@@ -7,7 +7,7 @@ import django_filters
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -25,6 +25,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from reversion.models import Version
 
+from cms.models import InstructorPageLink
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -158,6 +159,24 @@ class CourseFilterSet(django_filters.FilterSet):
             return get_enrollable_courses(queryset)
         return get_unenrollable_courses(queryset)
 
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        # perform additional filtering
+
+        filter_keys = self.form.cleaned_data.keys()
+
+        if "courserun_is_enrollable" not in filter_keys:
+            queryset = queryset.prefetch_related(
+                Prefetch(
+                    "courseruns",
+                    queryset=CourseRun.objects.prefetch_related("products").order_by(
+                        "id"
+                    ),
+                ),
+            )
+
+        return queryset
+
     class Meta:
         model = Course
         fields = ["id", "live", "readable_id", "page__live", "courserun_is_enrollable"]
@@ -173,26 +192,21 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        courserun_is_enrollable = self.request.query_params.get(
-            "courserun_is_enrollable", None
+        return (
+            Course.objects.filter()
+            .select_related("page")
+            .prefetch_related("departments")
+            .prefetch_related("courseruns__products")
+            .prefetch_related("page__feature_image")
+            .prefetch_related(
+                Prefetch(
+                    "page__linked_instructors",
+                    queryset=InstructorPageLink.objects.select_related(
+                        "linked_instructor_page"
+                    ),
+                )
+            )
         )
-
-        if courserun_is_enrollable:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related("departments")
-                .all()
-            )
-        else:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related("courseruns", "departments")
-                .all()
-            )
-
-        return queryset
 
     def get_serializer_context(self):
         added_context = {}
@@ -252,7 +266,13 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             return (
                 CourseRun.objects.select_related("course")
-                .prefetch_related("course__departments", "course__page")
+                .prefetch_related(
+                    "course__departments",
+                    "course__page",
+                    "course__page__feature_image",
+                    "course__page__linked_instructors",
+                    "products",
+                )
                 .filter(live=True)
             )
 
@@ -418,8 +438,14 @@ class UserEnrollmentsApiViewSet(
     def get_queryset(self):
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
-            .select_related("run__course__page", "user", "run")
-            .all()
+            .select_related("user")
+            .prefetch_related(
+                "run",
+                "run__course__page",
+                "run__products",
+                "run__course__page__linked_instructors",
+                "run__course__page__feature_image",
+            )
         )
 
     def get_serializer_context(self):
@@ -515,6 +541,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                 "program",
                 "program__page",
             )
+            .prefetch_related("program__departments", "program__page__feature_image")
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .order_by("-id")
@@ -532,6 +559,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page")
+                    .prefetch_related("run__course__departments")
                     .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
