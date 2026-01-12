@@ -2611,39 +2611,6 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v2/enrollments/add_program_course_enrollment/:
-    post:
-      operationId: enrollments_add_program_course_enrollment_create
-      description: |-
-        Create a program-related course enrollment for the learner.
-
-        Some special handling is needed for program-related enrollments. The
-        learner should generally get a course run enrollment that matches the
-        program enrollment. However, if the learner has a paid enrollment in the
-        program, they're enrolling in an elective, and they already have
-        enrollments in the required number of electives, then they should get an
-        audit enrollment.
-      tags:
-      - enrollments
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CourseRunEnrollmentRequestV2Request'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CourseRunEnrollmentRequestV2Request'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CourseRunEnrollmentRequestV2Request'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CourseRunEnrollmentRequestV2'
-          description: ''
   /api/v2/pages/:
     get:
       operationId: pages_list
@@ -3001,6 +2968,46 @@ paths:
       - {}
       responses:
         '200':
+          description: No response body
+  /api/v2/verified_program_enrollments/{program_id}/{courserun_id}/:
+    post:
+      operationId: verified_program_enrollments_create
+      description: |-
+        Create a program-related course enrollment for the learner.
+
+        Some special handling is needed for program-related course run enrollments
+        when the learner has an enrollment in the program. The learner should get a
+        course run enrollment that matches their program enrollment at no additional
+        charge. However, if the learner is enrolling in a course that's an elective,
+        and they have already enrolled in enough electives to satisfy the program's
+        requirements, they should then get an audit enrollment. (This won't preclude
+        them from getting a certificate for the course itself but they'll have to buy
+        the upgrade separately.)
+      parameters:
+      - in: path
+        name: courserun_id
+        schema:
+          type: string
+        description: Readable ID for the course run to enroll in.
+        required: true
+      - in: path
+        name: program_id
+        schema:
+          type: string
+        description: Readable ID for the program.
+        required: true
+      tags:
+      - verified_program_enrollments
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollmentRequestV2'
+          description: ''
+        '204':
+          description: No response body
+        '404':
           description: No response body
   /enrollments/:
     post:
@@ -4740,6 +4747,10 @@ components:
             date.
         is_bulk:
           type: boolean
+        is_program_discount:
+          type: boolean
+          description: Discount is only for creating verified course run enrollments
+            for a program.
       required:
       - amount
       - created_on

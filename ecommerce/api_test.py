@@ -128,6 +128,55 @@ def mock_create_run_enrollments(mocker):
     return mocker.patch("courses.api.create_run_enrollments", autospec=True)
 
 
+@pytest.fixture
+def mock_hubspot_order(mocker):
+    """Mock sync_deal_with_hubspot."""
+
+    return mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+
+
+@pytest.fixture
+def bootstrapped_verified_program():
+    """
+    Returns a bootstrapped program.
+
+    Bootstrapped means you get back:
+    - a program
+    - a product for the program
+    - a course associated with the program (as a requirement)
+    - a course run
+    - a product for the course run
+
+    Returns:
+    - tuple of the above things in that order
+    """
+    program = ProgramFactory.create()
+    prog_ctype = ContentType.objects.get_for_model(program)
+    with reversion.create_revision():
+        prog_product = Product.objects.create(
+            content_type=prog_ctype,
+            object_id=program.id,
+            price=10,
+        )
+
+    courserun = CourseRunFactory.create()
+    program.add_requirement(courserun.course)
+
+    cr_ctype = ContentType.objects.get_for_model(courserun)
+    with reversion.create_revision():
+        cr_product = Product.objects.create(
+            content_type=cr_ctype, object_id=courserun.id, price=10
+        )
+
+    return (
+        program,
+        prog_product,
+        courserun.course,
+        courserun,
+        cr_product,
+    )
+
+
 def test_cybersource_refund_no_order():
     """Tests that refund_order throws FulfilledOrder.DoesNotExist exception when the order doesn't exist"""
 
@@ -653,7 +702,7 @@ def test_duplicate_redemption_check(peruser):
 
 
 def test_create_verified_program_discount():
-    """Test that creating a special discount for programs works OK"""
+    """Test that creating a special discount for programs works"""
 
     program = ProgramFactory.create()
     content_type = ContentType.objects.get_for_model(program)
@@ -673,33 +722,20 @@ def test_create_verified_program_discount():
 
 
 def test_create_verified_program_course_run_enrollment(
-    mocker, mock_create_run_enrollments
+    mock_create_run_enrollments, mock_hubspot_order, bootstrapped_verified_program, user
 ):
     """Test that creating a verified course run enrollment for a program works."""
 
-    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
     mock_cre_side_effect = mock_create_run_enrollments.side_effect
 
-    prog_enrollment = ProgramEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    (program, _, _, courserun, _) = bootstrapped_verified_program
+
+    ProgramEnrollmentFactory.create(
+        program=program, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
-    prog_ctype = ContentType.objects.get_for_model(prog_enrollment.program)
-    with reversion.create_revision():
-        Product.objects.create(
-            content_type=prog_ctype,
-            object_id=prog_enrollment.program.id,
-            price=10,
-        )
-
-    courserun = CourseRunFactory.create()
-    prog_enrollment.program.add_requirement(courserun.course)
-
-    cr_ctype = ContentType.objects.get_for_model(courserun)
-    with reversion.create_revision():
-        Product.objects.create(content_type=cr_ctype, object_id=courserun.id, price=10)
 
     request = RequestFactory().get("/")
-    request.user = prog_enrollment.user
+    request.user = user
 
     mock_create_run_enrollments.side_effect = (
         lambda user, runs, *, mode=EDX_ENROLLMENT_VERIFIED_MODE, **kwargs: (  # noqa: ARG005
@@ -713,7 +749,7 @@ def test_create_verified_program_course_run_enrollment(
     )
 
     cr_enrollment = create_verified_program_course_run_enrollment(
-        request, courserun, prog_enrollment.program
+        request, courserun, program
     )
 
     assert cr_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
@@ -721,28 +757,13 @@ def test_create_verified_program_course_run_enrollment(
     mock_create_run_enrollments.side_effect = mock_cre_side_effect
 
 
-def test_create_vpcre_no_program():
+def test_create_vpcre_no_program(bootstrapped_verified_program, user):
     """
     Test that creating a verified course run enrollment for a program fails if
     there's no program enrollment.
     """
 
-    user = UserFactory.create()
-    program = ProgramFactory.create()
-    prog_ctype = ContentType.objects.get_for_model(program)
-    with reversion.create_revision():
-        Product.objects.create(
-            content_type=prog_ctype,
-            object_id=program.id,
-            price=10,
-        )
-
-    courserun = CourseRunFactory.create()
-    program.add_requirement(courserun.course)
-
-    cr_ctype = ContentType.objects.get_for_model(courserun)
-    with reversion.create_revision():
-        Product.objects.create(content_type=cr_ctype, object_id=courserun.id, price=10)
+    (program, _, _, courserun, _) = bootstrapped_verified_program
 
     request = RequestFactory().get("/")
     request.user = user
@@ -753,34 +774,22 @@ def test_create_vpcre_no_program():
     assert "No verified enrollment" in str(exc.value)
 
 
-def test_create_vpcre_bad_basket(mocker):
+def test_create_vpcre_bad_basket(
+    mocker, mock_hubspot_order, bootstrapped_verified_program
+):
     """
     Test that creating a verified course run enrollment for a program fails if
     the basket has other stuff in.
     """
 
-    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
-
     with reversion.create_revision():
         some_other_product = ProductFactory.create()
 
+    (program, _, _, courserun, _) = bootstrapped_verified_program
+
     prog_enrollment = ProgramEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
-    prog_ctype = ContentType.objects.get_for_model(prog_enrollment.program)
-    with reversion.create_revision():
-        Product.objects.create(
-            content_type=prog_ctype,
-            object_id=prog_enrollment.program.id,
-            price=10,
-        )
-
-    courserun = CourseRunFactory.create()
-    prog_enrollment.program.add_requirement(courserun.course)
-
-    cr_ctype = ContentType.objects.get_for_model(courserun)
-    with reversion.create_revision():
-        Product.objects.create(content_type=cr_ctype, object_id=courserun.id, price=10)
 
     request = RequestFactory().get("/")
     request.user = prog_enrollment.user
@@ -791,8 +800,6 @@ def test_create_vpcre_bad_basket(mocker):
     )
 
     with pytest.raises(VerifiedProgramInvalidBasketError) as exc:
-        create_verified_program_course_run_enrollment(
-            request, courserun, prog_enrollment.program
-        )
+        create_verified_program_course_run_enrollment(request, courserun, program)
 
     assert "not empty" in str(exc.value)
