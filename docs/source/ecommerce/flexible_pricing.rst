@@ -18,14 +18,17 @@ For flexible pricing to function properly, you will need several records in the 
 
   - For courses in a program, you can create products for each course run via ``./manage.py create_product_for_program_courses --program <program_readable_id>``; add ``--active`` to ensure the products are active.
   - For standalone courses, create a product for the courserun manually via Django Admin.
+- **Flexible Pricing Tiers:** Flexible pricing tiers must be created for the courseware. Run ``./manage.py configure_tiers --program <program_readable_id>``  or ``./manage.py configure_tiers --course <course_readable_id>``. These determine the discount available for different levels of income.
 
+  - See also `configure_tiers <../commands/configure_tiers.rst>`_
 - **Flexible Pricing Form:** See below.
+
 Form Creation
 *************
 
 Flexible pricing forms are managed in Wagtail and can be children of either a course or a program. To create a flexible pricing form, use the ``create_finaid_form`` management command then modify the form as needed. Alternatively, you can manually add the form as a child page in Wagtail.
 
-**The create_finaid_form management command**: Run ``./manage.py create_finaid_form <courseware_readable_id> [--force]``. This will:
+**Management command**: Run ``./manage.py create_finaid_form <courseware_readable_id> [--force]``. This will:
 
 1. If the courseware is a program, add the form as a child of the program page.
 2. If the courseware is a standalone course:
@@ -48,8 +51,8 @@ Flexible pricing forms are managed in Wagtail and can be children of either a co
    6. The Application Denied text is displayed if the learner navigates to the form and their application has been denied.
 
 Submitting and Approving the Flexible Pricing Request
-*************
+*****************************************************
 
 The flexible pricing request form is linked to on relevant course and program pages.
 
-After a user submits a request, a ``FlexiblePrice`` record will be created for the user. The price is initially in a "Pending" status and must be approved manually. Approval can be done via Django Admin or the Refine staff dashboard.
+After a user submits a request, a ``FlexiblePrice`` record will be created for the user. The price is initially in a "Pending" status; it may be automatically approved or require manual approval via the Refine staff dashboard.
