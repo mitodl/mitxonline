@@ -61,6 +61,7 @@ class ContractPageFactory(wagtail_factories.PageFactory):
         else CONTRACT_MEMBERSHIP_SSO
     )
     membership_type = LazyAttribute(lambda o: o.integration_type)
+    slug = LazyAttribute(lambda _: FAKE.unique.slug())
 
     class Meta:
         model = ContractPage
