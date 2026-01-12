@@ -71,6 +71,7 @@ logger = logging.getLogger(__name__)
 faker = Faker()
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
 def test_get_programs(
