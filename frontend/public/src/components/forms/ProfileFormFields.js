@@ -205,7 +205,11 @@ export const LegalAddressCountryFields = ({
     ) {
       setShowCountryField(true)
     }
-  }, [values.user_profile.year_of_birth, values.legal_address.country, values.legal_address.state])
+  }, [
+    values.user_profile.year_of_birth,
+    values.legal_address.country,
+    values.legal_address.state
+  ])
 
   return (
     <React.Fragment>

@@ -54,7 +54,10 @@ describe("DashboardPage", () => {
   })
 
   describe("PostHog feature flag redirect", () => {
-    let mockLocation, posthogIdentifyStub, posthogOnFeatureFlagsStub, posthogIsFeatureEnabledStub
+    let mockLocation,
+      posthogIdentifyStub,
+      posthogOnFeatureFlagsStub,
+      posthogIsFeatureEnabledStub
 
     beforeEach(() => {
       // Mock window.location.href
@@ -72,7 +75,9 @@ describe("DashboardPage", () => {
       mockUser.global_id = "test-guid-123"
 
       // Mock PostHog feature flag to return true
-      posthogIsFeatureEnabledStub.withArgs("redirect-to-learn-dashboard").returns(true)
+      posthogIsFeatureEnabledStub
+        .withArgs("redirect-to-learn-dashboard")
+        .returns(true)
 
       // Mock onFeatureFlags to immediately call the callback
       posthogOnFeatureFlagsStub.callsFake(callback => {
@@ -104,7 +109,9 @@ describe("DashboardPage", () => {
       mockUser.global_id = "test-guid-123"
 
       // Mock PostHog feature flag to return false
-      posthogIsFeatureEnabledStub.withArgs("redirect-to-learn-dashboard").returns(false)
+      posthogIsFeatureEnabledStub
+        .withArgs("redirect-to-learn-dashboard")
+        .returns(false)
 
       // Mock onFeatureFlags to immediately call the callback
       posthogOnFeatureFlagsStub.callsFake(callback => {
@@ -112,7 +119,10 @@ describe("DashboardPage", () => {
       })
 
       // Mock checkFeatureFlag to return false as well
-      sandbox.stub(util, "checkFeatureFlag").withArgs("redirect-to-learn-dashboard", mockUser.global_id).returns(false)
+      sandbox
+        .stub(util, "checkFeatureFlag")
+        .withArgs("redirect-to-learn-dashboard", mockUser.global_id)
+        .returns(false)
 
       const { inner } = await renderPage({}, { currentUser: mockUser })
 
@@ -166,13 +176,18 @@ describe("DashboardPage", () => {
       mockUser.global_id = "test-guid-123"
 
       // Mock PostHog methods to return false initially
-      posthogIsFeatureEnabledStub.withArgs("redirect-to-learn-dashboard").returns(false)
+      posthogIsFeatureEnabledStub
+        .withArgs("redirect-to-learn-dashboard")
+        .returns(false)
 
       // Mock onFeatureFlags to not call the callback (simulating it not triggering)
       posthogOnFeatureFlagsStub.callsFake(() => {})
 
       // Mock checkFeatureFlag to return true (fallback should work)
-      sandbox.stub(util, "checkFeatureFlag").withArgs("redirect-to-learn-dashboard", mockUser.global_id).returns(true)
+      sandbox
+        .stub(util, "checkFeatureFlag")
+        .withArgs("redirect-to-learn-dashboard", mockUser.global_id)
+        .returns(true)
 
       // Mock setTimeout to immediately call the callback
       sandbox.stub(window, "setTimeout").callsFake(callback => {
@@ -199,8 +214,13 @@ describe("DashboardPage", () => {
       posthogOnFeatureFlagsStub.callsFake(() => {})
 
       // Mock checkFeatureFlag to return false but direct PostHog check to return true
-      sandbox.stub(util, "checkFeatureFlag").withArgs("redirect-to-learn-dashboard", mockUser.global_id).returns(false)
-      posthogIsFeatureEnabledStub.withArgs("redirect-to-learn-dashboard").returns(true)
+      sandbox
+        .stub(util, "checkFeatureFlag")
+        .withArgs("redirect-to-learn-dashboard", mockUser.global_id)
+        .returns(false)
+      posthogIsFeatureEnabledStub
+        .withArgs("redirect-to-learn-dashboard")
+        .returns(true)
 
       // Mock setTimeout to immediately call the callback
       sandbox.stub(window, "setTimeout").callsFake(callback => {

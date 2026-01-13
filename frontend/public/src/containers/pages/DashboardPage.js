@@ -94,7 +94,9 @@ export class DashboardPage extends React.Component<
       })
 
       posthog.onFeatureFlags(() => {
-        const flagEnabled = posthog.isFeatureEnabled("redirect-to-learn-dashboard")
+        const flagEnabled = posthog.isFeatureEnabled(
+          "redirect-to-learn-dashboard"
+        )
 
         if (flagEnabled) {
           window.location.href = "https://learn.mit.edu/dashboard"
@@ -104,8 +106,13 @@ export class DashboardPage extends React.Component<
 
       // Fallback check with delay
       setTimeout(() => {
-        const flagEnabled = checkFeatureFlag("redirect-to-learn-dashboard", currentUser.global_id)
-        const directCheck = posthog.isFeatureEnabled("redirect-to-learn-dashboard")
+        const flagEnabled = checkFeatureFlag(
+          "redirect-to-learn-dashboard",
+          currentUser.global_id
+        )
+        const directCheck = posthog.isFeatureEnabled(
+          "redirect-to-learn-dashboard"
+        )
 
         if (flagEnabled || directCheck) {
           window.location.href = "https://learn.mit.edu/dashboard"
