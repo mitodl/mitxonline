@@ -4749,6 +4749,7 @@ components:
           type: boolean
         is_program_discount:
           type: boolean
+          nullable: true
           description: Discount is only for creating verified course run enrollments
             for a program.
       required:
