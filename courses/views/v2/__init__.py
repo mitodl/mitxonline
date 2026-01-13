@@ -5,7 +5,7 @@ Course API Views version 2
 import contextlib
 
 import django_filters
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -22,7 +22,6 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from cms.models import InstructorPageLink
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -287,21 +286,10 @@ class CourseFilterSet(django_filters.FilterSet):
         # perform additional filtering
 
         filter_keys = self.form.cleaned_data.keys()
-        courserun_is_enrollable_value = self.form.cleaned_data.get(
-            "courserun_is_enrollable"
-        )
 
-        if (
-            "courserun_is_enrollable" not in filter_keys
-            or courserun_is_enrollable_value is None
-        ):
+        if "courserun_is_enrollable" not in filter_keys:
             queryset = queryset.prefetch_related(
-                Prefetch(
-                    "courseruns",
-                    queryset=CourseRun.objects.prefetch_related("products").order_by(
-                        "id"
-                    ),
-                ),
+                Prefetch("courseruns", queryset=CourseRun.objects.order_by("id")),
             )
 
         return queryset
@@ -320,17 +308,10 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         """Get the queryset for the viewset."""
 
         return (
-            Course.objects.select_related("page", "page__feature_image")
+            Course.objects.select_related("page")
             .prefetch_related("departments")
-            .prefetch_related(
-                Prefetch(
-                    "page__linked_instructors",
-                    queryset=InstructorPageLink.objects.select_related(
-                        "linked_instructor_page"
-                    ),
-                )
-            )
-            .prefetch_related("page__topics__parent")
+            .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
+            .annotate(count_courseruns=Count("courseruns"))
             .order_by("title")
             .distinct()
         )
@@ -483,19 +464,6 @@ class UserEnrollmentsApiViewSet(
                 "run",
                 "run__b2b_contract",
                 "run__b2b_contract__organization",
-            )
-            .prefetch_related(
-                "run__products",
-                "run__course__departments",  # Prefetch departments to avoid N+1 queries
-                "run__course__page__feature_image",  # Prefetch feature_image to avoid N+1 queries
-                "run__course__page__topics",  # Prefetch topics to avoid N+1 queries
-                # Prefetch linked instructors to avoid N+1 queries in cms/serializers.py get_instructors
-                Prefetch(
-                    "run__course__page__linked_instructors",
-                    queryset=InstructorPageLink.objects.select_related(
-                        "linked_instructor_page"
-                    ),
-                ),
             )
             .all()
         )

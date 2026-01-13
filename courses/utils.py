@@ -90,9 +90,7 @@ def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
         enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
         valid_courses: Queryset of Course objects, to filter the course runs by if needed
     """
-    queryset = CourseRun.objects.enrollable(enrollment_end_date).prefetch_related(
-        "products"
-    )
+    queryset = CourseRun.objects.enrollable(enrollment_end_date)
 
     if valid_courses:
         queryset = queryset.filter(course__in=valid_courses)
@@ -108,16 +106,11 @@ def get_enrollable_courses(queryset, enrollment_end_date=None):
         queryset: Queryset of Course objects
         enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
     """
-    enrollable_courseruns_qs = CourseRun.objects.enrollable(
-        enrollment_end_date
-    ).prefetch_related("products")
+    enrollable_courseruns_qs = CourseRun.objects.enrollable(enrollment_end_date)
 
     return (
         queryset.prefetch_related(
-            Prefetch(
-                "courseruns",
-                queryset=enrollable_courseruns_qs.prefetch_related("products"),
-            )
+            Prefetch("courseruns", queryset=enrollable_courseruns_qs)
         )
         .filter(
             courseruns__id__in=enrollable_courseruns_qs.values_list("id", flat=True)
@@ -133,9 +126,10 @@ def get_unenrollable_courses(queryset):
     Args:
         queryset: Queryset of Course objects
     """
-    courseruns_qs = CourseRun.objects.unenrollable().prefetch_related("products")
+    courseruns_qs = CourseRun.objects.unenrollable()
     return (
         queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
+        .prefetch_related("courseruns__course")
         .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
         .distinct()
     )
