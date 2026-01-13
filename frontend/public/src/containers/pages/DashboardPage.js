@@ -83,30 +83,30 @@ export class DashboardPage extends React.Component<
 
   componentDidMount() {
     const { currentUser } = this.props
-    
+
     // Identify the user to PostHog using their global_id (GUID) if available
     if (currentUser && currentUser.global_id && SETTINGS.posthog_api_host) {
       posthog.identify(currentUser.global_id, {
-        email: currentUser.email,
-        name: currentUser.name,
-        user_id: currentUser.id,
+        email:       currentUser.email,
+        name:        currentUser.name,
+        user_id:     currentUser.id,
         environment: SETTINGS.environment
       })
-      
+
       posthog.onFeatureFlags(() => {
         const flagEnabled = posthog.isFeatureEnabled("redirect-to-learn-dashboard")
-        
+
         if (flagEnabled) {
           window.location.href = "https://learn.mit.edu/dashboard"
           return
         }
       })
-      
+
       // Fallback check with delay
       setTimeout(() => {
         const flagEnabled = checkFeatureFlag("redirect-to-learn-dashboard", currentUser.global_id)
         const directCheck = posthog.isFeatureEnabled("redirect-to-learn-dashboard")
-        
+
         if (flagEnabled || directCheck) {
           window.location.href = "https://learn.mit.edu/dashboard"
           return
