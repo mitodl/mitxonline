@@ -646,6 +646,10 @@ class ProductFlexiblePriceSerializer(BaseProductSerializer):
         discount_record = determine_courseware_flexible_price_discount(
             instance, self.context["request"].user
         )
+
+        if not discount_record:
+            return None
+
         return V0DiscountSerializer(discount_record, context=self.context).data
 
     class Meta:

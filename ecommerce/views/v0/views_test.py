@@ -198,8 +198,7 @@ def test_product_user_flexible_price_no_flexible_price(user_drf_client, user, pr
     assert resp_data["id"] == product.id
 
     # Verify flexible price discount has no amount when user has no approved flexible price
-    assert "product_flexible_price" in resp_data
-    assert resp_data["product_flexible_price"]["amount"] is None
+    assert resp_data["product_flexible_price"] is None
 
 
 def test_product_user_flexible_price_unauthenticated(client, products):
@@ -217,8 +216,7 @@ def test_product_user_flexible_price_unauthenticated(client, products):
     assert resp_data["id"] == product.id
 
     # Verify flexible price discount has no amount when user has no approved flexible price
-    assert "product_flexible_price" in resp_data
-    assert resp_data["product_flexible_price"]["amount"] is None
+    assert resp_data["product_flexible_price"] is None
 
 
 def test_get_basket(user_drf_client, user):
