@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.137.4
+---------------
+
+- Revert "Fix n+1 courses api (#3169)" (#3213)
+- [pre-commit.ci] pre-commit autoupdate (#3209)
+
 Version 0.137.3 (Released January 13, 2026)
 ---------------
 
