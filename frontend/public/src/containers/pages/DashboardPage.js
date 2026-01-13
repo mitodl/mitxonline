@@ -106,10 +106,12 @@ export class DashboardPage extends React.Component<
 
       // Fallback check with delay
       setTimeout(() => {
-        const flagEnabled = checkFeatureFlag(
-          "redirect-to-learn-dashboard",
-          currentUser.global_id
-        )
+        const flagEnabled = currentUser.global_id ?
+          checkFeatureFlag(
+            "redirect-to-learn-dashboard",
+            currentUser.global_id
+          ) :
+          false
         const directCheck = posthog.isFeatureEnabled(
           "redirect-to-learn-dashboard"
         )
