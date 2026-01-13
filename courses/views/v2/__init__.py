@@ -584,7 +584,10 @@ def add_verified_program_course_enrollment(request, program_id: str, courserun_i
         # Audit enrollments just get created, regardless of whether or not
         # the course is an elective.
         enrollments, _ = create_run_enrollments(
-            request.user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE
+            request.user,
+            [run],
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            keep_failed_enrollments=True,
         )
         return Response(
             CourseRunEnrollmentSerializer(enrollments[0]).data,
@@ -598,11 +601,14 @@ def add_verified_program_course_enrollment(request, program_id: str, courserun_i
             active=True,
             enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         ).count()
-        >= program_enrollment.program.minimum_elective_courses_requirement
+        >= (program_enrollment.program.minimum_elective_courses_requirement or 1)
     ):
         # Too many verified elective enrollments, so make this as an audit one.
         enrollments, _ = create_run_enrollments(
-            request.user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE
+            request.user,
+            [run],
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            keep_failed_enrollments=True,
         )
         return Response(
             CourseRunEnrollmentSerializer(enrollments[0]).data,
