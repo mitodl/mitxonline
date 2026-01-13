@@ -135,6 +135,90 @@ def test_get_products_inactive(user_drf_client, products):
     )
 
 
+def test_product_user_flexible_price(user_drf_client, user, products):
+    """Test the user_flexible_price action returns product with flexible pricing info."""
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+    course = product.purchasable_object.course
+
+    # Create a flexible price tier and approved flexible price for the user
+    tier = FlexiblePriceTierFactory.create(
+        courseware_object=course,
+        income_threshold_usd=25000,
+        current=True,
+        discount__amount=50,
+        discount__discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        discount__payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    )
+    FlexiblePriceFactory.create(
+        income_usd=20000,
+        country_of_income="US",
+        user=user,
+        courseware_object=course,
+        status=FlexiblePriceStatus.APPROVED,
+        tier=tier,
+    )
+
+    resp = user_drf_client.get(
+        reverse("v0:products_api-user-flexible-price", kwargs={"pk": product.id})
+    )
+
+    assert resp.status_code == 200
+    resp_data = resp.json()
+
+    # Verify basic product fields are present
+    assert resp_data["id"] == product.id
+    assert resp_data["price"] == str(product.price)
+    assert resp_data["description"] == product.description
+    assert resp_data["is_active"] == product.is_active
+
+    # Verify flexible price information is present
+    assert "product_flexible_price" in resp_data
+    assert resp_data["product_flexible_price"] is not None
+    assert float(resp_data["product_flexible_price"]["amount"]) == float(
+        tier.discount.amount
+    )
+    assert (
+        resp_data["product_flexible_price"]["discount_type"]
+        == DISCOUNT_TYPE_PERCENT_OFF
+    )
+
+
+def test_product_user_flexible_price_no_flexible_price(user_drf_client, user, products):
+    """Test the user_flexible_price action when user has no flexible price."""
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+
+    resp = user_drf_client.get(
+        reverse("v0:products_api-user-flexible-price", kwargs={"pk": product.id})
+    )
+
+    assert resp.status_code == 200
+    resp_data = resp.json()
+
+    # Verify basic product fields are present
+    assert resp_data["id"] == product.id
+
+    # Verify flexible price discount has no amount when user has no approved flexible price
+    assert resp_data["product_flexible_price"] is None
+
+
+def test_product_user_flexible_price_unauthenticated(client, products):
+    """Test the user_flexible_price action requires authentication."""
+    product = products[random.randrange(0, len(products))]  # noqa: S311
+
+    resp = client.get(
+        reverse("v0:products_api-user-flexible-price", kwargs={"pk": product.id})
+    )
+
+    assert resp.status_code == 200
+    resp_data = resp.json()
+
+    # Verify basic product fields are present
+    assert resp_data["id"] == product.id
+
+    # Verify flexible price discount has no amount when user has no approved flexible price
+    assert resp_data["product_flexible_price"] is None
+
+
 def test_get_basket(user_drf_client, user):
     """Test the view that returns a state of Basket"""
     basket = BasketFactory.create(user=user)

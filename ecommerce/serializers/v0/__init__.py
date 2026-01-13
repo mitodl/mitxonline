@@ -635,7 +635,7 @@ class OrderHistorySerializer(serializers.ModelSerializer):
         depth = 1
 
 
-class ProductFlexibilePriceSerializer(BaseProductSerializer):
+class ProductFlexiblePriceSerializer(BaseProductSerializer):
     product_flexible_price = serializers.SerializerMethodField()
 
     @extend_schema_field(V0DiscountSerializer(allow_null=True))
@@ -646,6 +646,10 @@ class ProductFlexibilePriceSerializer(BaseProductSerializer):
         discount_record = determine_courseware_flexible_price_discount(
             instance, self.context["request"].user
         )
+
+        if not discount_record:
+            return None
+
         return V0DiscountSerializer(discount_record, context=self.context).data
 
     class Meta:
