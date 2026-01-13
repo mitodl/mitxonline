@@ -8,7 +8,6 @@ to generate the enrollments if specified (rather than reinventing the wheel).
 from argparse import RawTextHelpFormatter
 from getpass import getpass
 
-from authentication.pipeline.user import CREATE_OPENEDX_USER_RETRY_DELAY
 from django.core.management import BaseCommand, call_command
 from django.db.models import Q
 
@@ -16,6 +15,8 @@ from mail.api import validate_email_addresses
 from openedx.api import create_user as openedx_create_user
 from openedx.tasks import create_user_from_id as openedx_create_user_from_id
 from users.models import User, validate_iso_3166_1_code
+
+CREATE_OPENEDX_USER_RETRY_DELAY = 60
 
 
 class Command(BaseCommand):
