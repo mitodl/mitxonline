@@ -1,5 +1,7 @@
 """Utility functions for serializers"""
 
+from courses.models import CoursesTopic
+
 
 def get_topics_from_page(page_instance) -> list[dict]:
     """
@@ -12,36 +14,30 @@ def get_topics_from_page(page_instance) -> list[dict]:
         page_instance: The page instance that has a topics relationship
 
     Returns:
-        List of topic dictionaries with 'name' key, with direct topics sorted first,
-        followed by parent topics sorted separately
+        List of topic dictionaries with 'name' key, sorted alphabetically
     """
     if not page_instance:
         return []
 
-    # Get direct topics from the page (this should be prefetched)
+    # Get direct topics from the page
     direct_topics = page_instance.topics.all()
 
-    # Collect direct topics names and parent topic names separately
-    direct_topic_names = set()
-    parent_topic_names = set()
+    # Get parent topics for the direct topics
+    parent_topics = CoursesTopic.objects.filter(
+        child_topics__in=direct_topics
+    ).distinct()
 
-    # First pass: collect all direct topic names
-    for topic in direct_topics:
-        direct_topic_names.add(topic.name)
-
-    # Second pass: collect parent topics that are not already in direct topics
-    for topic in direct_topics:
-        if topic.parent and topic.parent.name not in direct_topic_names:
-            parent_topic_names.add(topic.parent.name)
-
-    # Sort direct topics first, then parent topics
-    sorted_direct = sorted(
-        [{"name": name} for name in direct_topic_names], key=lambda topic: topic["name"]
+    # Create list of topic names, starting with direct topics
+    all_topics = sorted(
+        [{"name": topic.name} for topic in direct_topics],
+        key=lambda topic: topic["name"],
     )
-    sorted_parents = [{"name": name} for name in sorted(parent_topic_names)]
 
-    # Return direct topics first, then parent topics
-    return sorted_direct + sorted_parents
+    # Add parent topics
+    for parent_topic in parent_topics:
+        all_topics.append({"name": parent_topic.name})
+
+    return all_topics
 
 
 def get_unique_topics_from_courses(courses) -> list[dict]:

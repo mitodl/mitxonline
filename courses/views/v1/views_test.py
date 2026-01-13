@@ -164,6 +164,7 @@ def test_delete_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
 def test_get_courses(
@@ -319,6 +320,7 @@ def test_delete_course(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 def test_get_course_runs(user_drf_client, course_runs, django_assert_max_num_queries):
     """Test the view that handles requests for all CourseRuns"""
     with django_assert_max_num_queries(38) as context:
@@ -437,6 +439,7 @@ def test_delete_course_run(user_drf_client, course_runs, django_assert_max_num_q
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.skip_nplusone_check
 def test_user_enrollments_list(user_drf_client, user):
     """The user enrollments view should return serialized enrollments for the logged-in user"""
     assert UserEnrollmentsApiViewSet.serializer_class == CourseRunEnrollmentSerializer
