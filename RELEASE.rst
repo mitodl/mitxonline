@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.3
+Version 0.137.3 (Released January 13, 2026)
 ---------------
 
 - Update Financial Aid docs and Fix a bug (#3198)
