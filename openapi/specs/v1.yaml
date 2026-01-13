@@ -1681,7 +1681,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductFlexibilePrice'
+                $ref: '#/components/schemas/ProductFlexiblePrice'
           description: ''
   /api/v0/products/all/:
     get:
@@ -5528,7 +5528,7 @@ components:
           description: Controls visibility of the product in the app.
         product_flexible_price:
           allOf:
-          - $ref: '#/components/schemas/V0Discount'
+          - $ref: '#/components/schemas/Discount'
           nullable: true
           readOnly: true
       required:
@@ -5553,6 +5553,32 @@ components:
       required:
       - description
       - price
+    ProductFlexiblePrice:
+      type: object
+      description: Simple serializer for Product without related purchasable objects
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+        product_flexible_price:
+          allOf:
+          - $ref: '#/components/schemas/V0Discount'
+          nullable: true
+          readOnly: true
+      required:
+      - description
+      - id
+      - price
+      - product_flexible_price
     ProductRequest:
       type: object
       description: Serializes a product, including the purchasable object.

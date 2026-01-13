@@ -50,7 +50,7 @@ from ecommerce.serializers.v0 import (
     BulkDiscountSerializer,
     DiscountProductSerializer,
     DiscountRedemptionSerializer,
-    ProductFlexibilePriceSerializer,
+    ProductFlexiblePriceSerializer,
     ProductSerializer,
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
@@ -513,7 +513,7 @@ class ProductViewSet(ReadOnlyModelViewSet):
         operation_id="products_user_flexible_price_retrieve",
         description="Retrieve a product with user-specific flexible price information",
         responses={
-            200: ProductFlexibilePriceSerializer,
+            200: ProductFlexiblePriceSerializer,
         },
     )
     @action(
@@ -525,7 +525,7 @@ class ProductViewSet(ReadOnlyModelViewSet):
     def user_flexible_price(self, request, **kwargs):  # noqa: ARG002
         """Get product with user-specific flexible price information."""
         product = self.get_object()
-        serializer = ProductFlexibilePriceSerializer(
+        serializer = ProductFlexiblePriceSerializer(
             product, context={"request": request}
         )
         return Response(serializer.data)

@@ -635,7 +635,7 @@ class OrderHistorySerializer(serializers.ModelSerializer):
         depth = 1
 
 
-class ProductFlexibilePriceSerializer(BaseProductSerializer):
+class ProductFlexiblePriceSerializer(BaseProductSerializer):
     product_flexible_price = serializers.SerializerMethodField()
 
     @extend_schema_field(V0DiscountSerializer(allow_null=True))
