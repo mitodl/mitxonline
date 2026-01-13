@@ -1,6 +1,27 @@
 Release Notes
 =============
 
+Version 0.137.3
+---------------
+
+- Update Financial Aid docs and Fix a bug (#3198)
+- Update ContractPage to use the default slug generation algorithm (#3208)
+- Skip N+1 on test_get_programs for the time being (#3210)
+- chore(deps): update dependency pytest-env to v1 (#3205)
+- import_and_create_contract_run unit tests (#3201)
+- chore(deps): update redis docker tag to v8 (#3199)
+- fix(deps): update dependency mitol-django-olposthog to v2025 (#3207)
+- Fix n+1 courses api (#3169)
+- chore(deps): update dependency faker to v40 (#3202)
+- fix(deps): update dependency bleach to v6 (#3200)
+- chore(deps): update peter-evans/create-or-update-comment action to v5 (#3196)
+- chore(deps): update peter-evans/find-comment action to v4 (#3197)
+- Drop codecov, since its not been used in quite some time (#3194)
+- chore(deps): update dependency pre-commit to v4 (#3195)
+- chore(deps): update actions/checkout action to v6 (#3190)
+- chore(deps): update actions/setup-python action to v6 (#3191)
+- chore(deps): update actions/cache action to v5 (#3189)
+
 Version 0.137.2 (Released January 12, 2026)
 ---------------
 
