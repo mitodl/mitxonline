@@ -85,6 +85,7 @@ export type User = {
   updated_on: string,
   legal_address: ?LegalAddress,
   user_profile: ?UserProfile,
+  global_id: ?string,
 }
 
 export type AnonymousUser = {
