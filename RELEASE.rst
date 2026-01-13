@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.4
+Version 0.137.4 (Released January 13, 2026)
 ---------------
 
 - Revert "Fix n+1 courses api (#3169)" (#3213)
