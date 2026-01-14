@@ -431,6 +431,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasketWithProduct'
           description: ''
+  /api/v0/baskets/checkout/:
+    get:
+      operationId: baskets_checkout_retrieve
+      description: Returns the payload necessary to redirect the user to CyberSource
+        for payment.
+      tags:
+      - baskets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutPayload'
+          description: ''
   /api/v0/baskets/clear/:
     delete:
       operationId: baskets_clear_destroy
@@ -3219,6 +3233,57 @@ components:
           type: boolean
       required:
       - confirmed
+    CheckoutPayload:
+      type: object
+      description: Serializes the payload for the checkout data.
+      properties:
+        no_checkout:
+          type: boolean
+          readOnly: true
+          default: false
+          description: Set if the order was automatically completed and no checkout
+            process is required.
+        url:
+          type: string
+          readOnly: true
+          default: ''
+          description: The URL to POST the form to.
+        method:
+          type: string
+          readOnly: true
+          default: POST
+          description: The method to use for the checkout form (always POST).
+        payload:
+          readOnly: true
+          default: {}
+          description: The data for the form.
+        order_id:
+          type: integer
+          readOnly: true
+          default: 0
+          description: If the order was automatically completed, the ID of the new
+            order.
+        error:
+          allOf:
+          - $ref: '#/components/schemas/ErrorEnum'
+          readOnly: true
+          description: |-
+            Error message for the order, if there is one.
+
+            * `enroll-blocked` - enroll-blocked
+            * `enroll-duplicated` - enroll-duplicated
+            * `course-non-upgradable` - course-non-upgradable
+            * `discount-invalid` - discount-invalid
+            * `b2b-error-missing-enrollment-code` - b2b-error-missing-enrollment-code
+            * `b2b-invalid-basket` - b2b-invalid-basket
+            * `basket-empty` - basket-empty
+      required:
+      - error
+      - method
+      - no_checkout
+      - order_id
+      - payload
+      - url
     CompanySizeEnum:
       enum:
       - 1
@@ -4276,6 +4341,32 @@ components:
       x-enum-descriptions:
       - audit
       - verified
+    ErrorEnum:
+      enum:
+      - enroll-blocked
+      - enroll-duplicated
+      - course-non-upgradable
+      - discount-invalid
+      - b2b-error-missing-enrollment-code
+      - b2b-invalid-basket
+      - basket-empty
+      type: string
+      description: |-
+        * `enroll-blocked` - enroll-blocked
+        * `enroll-duplicated` - enroll-duplicated
+        * `course-non-upgradable` - course-non-upgradable
+        * `discount-invalid` - discount-invalid
+        * `b2b-error-missing-enrollment-code` - b2b-error-missing-enrollment-code
+        * `b2b-invalid-basket` - b2b-invalid-basket
+        * `basket-empty` - basket-empty
+      x-enum-descriptions:
+      - enroll-blocked
+      - enroll-duplicated
+      - course-non-upgradable
+      - discount-invalid
+      - b2b-error-missing-enrollment-code
+      - b2b-invalid-basket
+      - basket-empty
     ExtendedLegalAddress:
       type: object
       description: Serializer class that includes email address as part of the legal
@@ -5365,6 +5456,7 @@ components:
           default: true
     PatchedV0DiscountRequest:
       type: object
+      description: Serializes a discount.
       properties:
         amount:
           type: string
@@ -6325,6 +6417,7 @@ components:
       - legal_address
     V0Discount:
       type: object
+      description: Serializes a discount.
       properties:
         id:
           type: integer
@@ -6377,6 +6470,7 @@ components:
       - redemption_type
     V0DiscountRequest:
       type: object
+      description: Serializes a discount.
       properties:
         amount:
           type: string
