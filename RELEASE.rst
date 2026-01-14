@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.5
+Version 0.137.5 (Released January 14, 2026)
 ---------------
 
 - Add `/v0/products/123/user_flexible_price/` endpoint (#3211)
