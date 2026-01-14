@@ -85,6 +85,42 @@ class Command(BaseCommand):
 
         return Department.objects.filter(name__in=departments).all()
 
+    def _get_or_create_departments(
+        self,
+        department_names: list[str],
+        *,
+        create_if_missing: bool,
+    ) -> models.QuerySet:
+        """
+        Retrieves or creates Department objects based on the provided names.
+
+        Args:
+            department_names (List[str]): List of department names.
+            create_if_missing (bool): If True, creates departments that don't exist.
+                If False, exits with an error if any departments don't exist.
+
+        Returns:
+            models.QuerySet: Query set containing all of the departments specified
+                in the list of department names.
+        """
+        if not department_names:
+            self._department_must_be_defined_error()
+
+        existing_depts = Department.objects.filter(name__in=department_names).all()
+        existing_names = {dept.name for dept in existing_depts}
+        missing_names = [
+            name for name in department_names if name not in existing_names
+        ]
+
+        if missing_names:
+            if create_if_missing:
+                for dept_name in missing_names:
+                    Department.objects.create(name=dept_name)
+            else:
+                self._departments_do_not_exist_error()
+
+        return Department.objects.filter(name__in=department_names).all()
+
     def _department_must_be_defined_error(self):
         """
         Outputs an error message indicating that departments must be
@@ -168,6 +204,121 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(f"Created course run {course_run.id}: {course_run}")
         )
+
+    def _handle_program(self, add_depts: models.QuerySet, **kwargs):
+        """Handle creation of a program."""
+        self._check_if_courseware_object_readable_id_exists(
+            Program, kwargs["courseware_id"]
+        )
+
+        new_program = Program.objects.create(
+            readable_id=kwargs["courseware_id"],
+            title=kwargs["title"],
+            live=kwargs["live"],
+        )
+
+        self._add_departments_to_courseware_object(new_program, add_depts)
+
+        self._successfully_created_courseware_object_message(new_program)
+
+        if kwargs["related"] is not None and len(kwargs["related"]) > 0:
+            for readable_id in kwargs["related"]:
+                try:
+                    related_program = Program.objects.filter(
+                        readable_id=readable_id
+                    ).get()
+                    new_program.add_related_program(related_program)
+
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Added relationship for {readable_id}.")
+                    )
+                except Exception:  # noqa: BLE001, PERF203
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"Can't add relationship for {readable_id}: program not found."
+                        )
+                    )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Added {len(new_program.related_programs)} program relationships."
+            )
+        )
+
+    def _handle_course(self, add_depts: models.QuerySet, **kwargs):
+        """Handle creation of a course."""
+        self._check_if_courseware_object_readable_id_exists(
+            Course, kwargs["courseware_id"]
+        )
+
+        new_course = Course.objects.create(
+            title=kwargs["title"],
+            readable_id=kwargs["courseware_id"],
+            live=kwargs["live"],
+        )
+
+        self._add_departments_to_courseware_object(new_course, add_depts)
+
+        self._successfully_created_courseware_object_message(new_course)
+
+        if "create_run" in kwargs and kwargs["create_run"] is not None:
+            self._create_course_run(new_course, **kwargs)
+
+        if kwargs["live"] or kwargs["force"]:
+            if kwargs["force"]:
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"WARNING: creating a requirement for {new_course.readable_id} anyway since you specified --force. This will probably break the Django Admin until you set the course to Live."
+                    )
+                )
+
+            new_req = None
+
+        if "program" in kwargs and kwargs["program"] is not None:
+            try:
+                program = Program.objects.filter(pk=kwargs["program"]).first()
+            except:  # noqa: E722
+                program = Program.objects.filter(readable_id=kwargs["program"]).first()
+
+            self._add_departments_to_courseware_object(program, add_depts)
+
+            if program is not None and kwargs["required"]:
+                new_req = program.add_requirement(new_course)
+            elif program is not None and kwargs["elective"]:
+                new_req = program.add_elective(new_course)
+
+            if new_req is not None:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Added {new_course.readable_id} to {program.readable_id}'s {new_req.get_parent().title} requirements."
+                    )
+                )
+        else:
+            self.stdout.write(
+                f"Live flag not specified for {new_course.readable_id}, ignoring any requirements flags"
+            )
+
+    def _handle_courserun(self, **kwargs):
+        """Handle creation of a course run."""
+        if not Course.objects.filter(readable_id=kwargs["courseware_id"]).exists():
+            self.stderr.write(
+                self.style.ERROR(
+                    f"Course with ID {kwargs['courseware_id']} doesn't exist."
+                )
+            )
+            exit(-1)  # noqa: PLR1722
+
+        if "create_run" not in kwargs or kwargs["create_run"] is None:
+            self.stderr.write(
+                self.style.ERROR(
+                    "You must specify the run tag with either --run-tag or --create-run when creating a course run."
+                )
+            )
+            exit(-1)  # noqa: PLR1722
+
+        course = Course.objects.filter(readable_id=kwargs["courseware_id"]).get()
+
+        self._create_course_run(course, **kwargs)
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -297,7 +448,7 @@ class Command(BaseCommand):
             action="store_true",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
+    def handle(self, *_args, **kwargs):
         if not (
             kwargs["force"]
             or kwargs["courseware_id"].startswith("course")
@@ -310,134 +461,17 @@ class Command(BaseCommand):
             )
             exit(-1)  # noqa: PLR1722
 
+        # Validate/create departments for programs and courses (not needed for courseruns)
+        if kwargs["type"] in ["program", "course"]:
+            add_depts = self._get_or_create_departments(
+                kwargs["depts"], create_if_missing=kwargs["create_depts"]
+            )
+
         if kwargs["type"] == "program":
-            if kwargs["depts"] and len(kwargs["depts"]) > 0:
-                add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
-            else:
-                self._department_must_be_defined_error()
-
-            if kwargs["create_depts"]:
-                add_depts = self._create_departments(kwargs["depts"])
-            elif not add_depts:
-                self._departments_do_not_exist_error()
-
-            self._check_if_courseware_object_readable_id_exists(
-                Program, kwargs["courseware_id"]
-            )
-
-            new_program = Program.objects.create(
-                readable_id=kwargs["courseware_id"],
-                title=kwargs["title"],
-                live=kwargs["live"],
-            )
-
-            self._add_departments_to_courseware_object(new_program, add_depts)
-
-            self._successfully_created_courseware_object_message(new_program)
-
-            if kwargs["related"] is not None and len(kwargs["related"]) > 0:
-                for readable_id in kwargs["related"]:
-                    try:
-                        related_program = Program.objects.filter(
-                            readable_id=readable_id
-                        ).get()
-                        new_program.add_related_program(related_program)
-
-                        self.stdout.write(
-                            self.style.SUCCESS(f"Added relationship for {readable_id}.")
-                        )
-                    except Exception:  # noqa: BLE001, PERF203
-                        self.stderr.write(
-                            self.style.ERROR(
-                                f"Can't add relationship for {readable_id}: program not found."
-                            )
-                        )
-
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Added {len(new_program.related_programs)} program relationships."
-                )
-            )
+            self._handle_program(add_depts, **kwargs)
         elif kwargs["type"] == "course":
-            self._check_if_courseware_object_readable_id_exists(
-                Course, kwargs["courseware_id"]
-            )
-
-            new_course = Course.objects.create(
-                title=kwargs["title"],
-                readable_id=kwargs["courseware_id"],
-                live=kwargs["live"],
-            )
-
-            if kwargs["depts"] and len(kwargs["depts"]) > 0:
-                add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
-            else:
-                self._department_must_be_defined_error()
-
-            if kwargs["create_depts"]:
-                add_depts = self._create_departments(kwargs["depts"])
-            if "add_depts" not in locals() or not add_depts:
-                self._departments_do_not_exist_error()
-
-            self._successfully_created_courseware_object_message(new_course)
-
-            if "create_run" in kwargs and kwargs["create_run"] is not None:
-                self._create_course_run(new_course, **kwargs)
-
-            if kwargs["live"] or kwargs["force"]:
-                if kwargs["force"]:
-                    self.stderr.write(
-                        self.style.ERROR(
-                            f"WARNING: creating a requirement for {new_course.readable_id} anyway since you specified --force. This will probably break the Django Admin until you set the course to Live."
-                        )
-                    )
-
-                new_req = None
-
-            if "program" in kwargs and kwargs["program"] is not None:
-                try:
-                    program = Program.objects.filter(pk=kwargs["program"]).first()
-                except:  # noqa: E722
-                    program = Program.objects.filter(
-                        readable_id=kwargs["program"]
-                    ).first()
-
-                self._add_departments_to_courseware_object(program, add_depts)
-
-                if program is not None and kwargs["required"]:
-                    new_req = program.add_requirement(new_course)
-                elif program is not None and kwargs["elective"]:
-                    new_req = program.add_elective(new_course)
-
-                if new_req is not None:
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Added {new_course.readable_id} to {program.readable_id}'s {new_req.get_parent().title} requirements."
-                        )
-                    )
-            else:
-                self.stdout.write(
-                    f"Live flag not specified for {new_course.readable_id}, ignoring any requirements flags"
-                )
+            self._handle_course(add_depts, **kwargs)
         elif kwargs["type"] == "courserun":
-            if not Course.objects.filter(readable_id=kwargs["courseware_id"]).exists():
-                self.stderr.write(
-                    self.style.ERROR(
-                        f"Course with ID {kwargs['courseware_id']} doesn't exist."
-                    )
-                )
-                exit(-1)  # noqa: PLR1722
-
-            if "create_run" not in kwargs or kwargs["create_run"] is None:
-                self.stderr.write(
-                    self.style.ERROR(
-                        "You must specify the run tag with either --run-tag or --create-run when creating a course run."
-                    )
-                )
-                exit(-1)  # noqa: PLR1722
-
-            course = Course.objects.filter(readable_id=kwargs["courseware_id"]).get()
-
-            self._create_course_run(course, **kwargs)
+            self._handle_courserun(**kwargs)
         else:
             self.stderr.write(self.style.ERROR(f"Not sure what {kwargs['type']} is."))
