@@ -95,14 +95,16 @@ export class DashboardPage extends React.Component<
 
       try {
         // Check feature flag and redirect if enabled
-        const flagEnabled = checkFeatureFlag(
-          "redirect-to-learn-dashboard",
-          currentUser.global_id
-        )
+        if (currentUser.global_id) {
+          const flagEnabled = checkFeatureFlag(
+            "redirect-to-learn-dashboard",
+            currentUser.global_id
+          )
 
-        if (flagEnabled) {
-          window.location.href = "https://learn.mit.edu/dashboard"
-          return
+          if (flagEnabled) {
+            window.location.href = "https://learn.mit.edu/dashboard"
+            return
+          }
         }
       } catch (error) {
         console.warn("Feature flag check failed:", error)
