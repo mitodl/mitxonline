@@ -19,10 +19,10 @@ describe("DashboardPage", () => {
     helper = new IntegrationTestHelper()
     userEnrollments = [makeCourseRunEnrollment(), makeCourseRunEnrollment()]
     currentUser = {
-      id: 1,
-      email: "default@test.com",
-      name: "Default User", 
-      is_anonymous: false,
+      id:               1,
+      email:            "default@test.com",
+      name:             "Default User",
+      is_anonymous:     false,
       is_authenticated: true
       // No global_id by default
     }
@@ -31,8 +31,8 @@ describe("DashboardPage", () => {
     // Mock SETTINGS global
     mockSettings = {
       posthog_api_host: "https://app.posthog.com",
-      environment: "test",
-      site_name: "Test Site"
+      environment:      "test",
+      site_name:        "Test Site"
     }
     global.SETTINGS = mockSettings
 
@@ -70,7 +70,7 @@ describe("DashboardPage", () => {
 
       // Mock PostHog methods
       posthogIdentifyStub = sandbox.stub(posthog, "identify")
-      
+
       // Mock checkFeatureFlag
       checkFeatureFlagStub = sandbox.stub(util, "checkFeatureFlag")
     })
@@ -84,17 +84,20 @@ describe("DashboardPage", () => {
         .withArgs("redirect-to-learn-dashboard", "test-guid-123")
         .returns(true)
 
-      const { inner } = await renderPage({
-        entities: {
-          enrollments: userEnrollments,
-          currentUser: mockUser  // Override the currentUser from beforeEach
-        }
-      }, { currentUser: mockUser })
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: mockUser // Override the currentUser from beforeEach
+          }
+        },
+        { currentUser: mockUser }
+      )
 
       // Component mounts automatically, so PostHog calls should have been made
       // Check that PostHog identify was called
       sinon.assert.called(posthogIdentifyStub)
-      
+
       // Check the identify call had the correct GUID
       const identifyCall = posthogIdentifyStub.getCall(0)
       assert.equal(identifyCall.args[0], "test-guid-123")
@@ -104,7 +107,11 @@ describe("DashboardPage", () => {
       assert.equal(identifyCall.args[1].environment, "test")
 
       // Verify checkFeatureFlag was called
-      sinon.assert.calledWith(checkFeatureFlagStub, "redirect-to-learn-dashboard", "test-guid-123")
+      sinon.assert.calledWith(
+        checkFeatureFlagStub,
+        "redirect-to-learn-dashboard",
+        "test-guid-123"
+      )
 
       // Verify redirect happened
       assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard")
@@ -119,19 +126,26 @@ describe("DashboardPage", () => {
         .withArgs("redirect-to-learn-dashboard", "test-guid-123")
         .returns(false)
 
-      const { inner } = await renderPage({
-        entities: {
-          enrollments: userEnrollments,
-          currentUser: mockUser  // Override the currentUser from beforeEach
-        }
-      }, { currentUser: mockUser })
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: mockUser // Override the currentUser from beforeEach
+          }
+        },
+        { currentUser: mockUser }
+      )
 
       // Component mounts automatically, so PostHog calls should have been made
       // Verify PostHog identify was called
       sinon.assert.called(posthogIdentifyStub)
 
       // Verify checkFeatureFlag was called
-      sinon.assert.calledWith(checkFeatureFlagStub, "redirect-to-learn-dashboard", "test-guid-123")
+      sinon.assert.calledWith(
+        checkFeatureFlagStub,
+        "redirect-to-learn-dashboard",
+        "test-guid-123"
+      )
 
       // Verify no redirect happened
       assert.equal(mockLocation.href, "")
@@ -139,20 +153,23 @@ describe("DashboardPage", () => {
 
     it("does not redirect when user has no global_id", async () => {
       const mockUser = {
-        id: 123,
-        email: "test@example.com", 
-        name: "Test User",
-        is_anonymous: false,
-        is_authenticated: true,
+        id:               123,
+        email:            "test@example.com",
+        name:             "Test User",
+        is_anonymous:     false,
+        is_authenticated: true
         // Explicitly no global_id property
       }
 
-      const { inner } = await renderPage({
-        entities: {
-          enrollments: userEnrollments,
-          currentUser: mockUser  // Override the currentUser from beforeEach
-        }
-      }, { currentUser: mockUser })
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: mockUser // Override the currentUser from beforeEach
+          }
+        },
+        { currentUser: mockUser }
+      )
 
       // Component mounts automatically
       // Since there's no global_id, PostHog identify should not be called
@@ -169,12 +186,15 @@ describe("DashboardPage", () => {
       // Remove PostHog configuration
       global.SETTINGS.posthog_api_host = null
 
-      const { inner } = await renderPage({
-        entities: {
-          enrollments: userEnrollments,
-          currentUser: mockUser  // Override the currentUser from beforeEach
-        }
-      }, { currentUser: mockUser })
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: mockUser // Override the currentUser from beforeEach
+          }
+        },
+        { currentUser: mockUser }
+      )
 
       // Component mounts automatically
       // Verify PostHog identify was not called
@@ -193,18 +213,25 @@ describe("DashboardPage", () => {
         .withArgs("redirect-to-learn-dashboard", "test-guid-456")
         .returns(true)
 
-      const { inner } = await renderPage({
-        entities: {
-          enrollments: userEnrollments,
-          currentUser: mockUser  // Override the currentUser from beforeEach
-        }
-      }, { currentUser: mockUser })
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: mockUser // Override the currentUser from beforeEach
+          }
+        },
+        { currentUser: mockUser }
+      )
 
       // Verify PostHog identify was called
       sinon.assert.called(posthogIdentifyStub)
 
       // Verify checkFeatureFlag was called
-      sinon.assert.calledWith(checkFeatureFlagStub, "redirect-to-learn-dashboard", "test-guid-456")
+      sinon.assert.calledWith(
+        checkFeatureFlagStub,
+        "redirect-to-learn-dashboard",
+        "test-guid-456"
+      )
 
       // Verify redirect happened
       assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard")
@@ -219,34 +246,45 @@ describe("DashboardPage", () => {
         .withArgs("redirect-to-learn-dashboard", "test-guid-789")
         .throws(new Error("PostHog service unavailable"))
 
-      const { inner } = await renderPage({
-        entities: {
-          enrollments: userEnrollments,
-          currentUser: mockUser  // Override the currentUser from beforeEach
-        }
-      }, { currentUser: mockUser })
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: mockUser // Override the currentUser from beforeEach
+          }
+        },
+        { currentUser: mockUser }
+      )
 
       // Verify PostHog identify was called
       sinon.assert.called(posthogIdentifyStub)
 
       // Verify checkFeatureFlag was called
-      sinon.assert.calledWith(checkFeatureFlagStub, "redirect-to-learn-dashboard", "test-guid-789")
+      sinon.assert.calledWith(
+        checkFeatureFlagStub,
+        "redirect-to-learn-dashboard",
+        "test-guid-789"
+      )
 
       // Verify no redirect happened (error handled gracefully)
       assert.equal(mockLocation.href, "")
     })
 
     it("handles undefined currentUser gracefully", async () => {
-      const { inner } = await renderPage({
-        entities: {
-          enrollments: userEnrollments,
-          currentUser: {  // Minimal user object that won't break the component
-            id: null,
-            is_anonymous: true,
-            is_authenticated: false
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: {
+              // Minimal user object that won't break the component
+              id:               null,
+              is_anonymous:     true,
+              is_authenticated: false
+            }
           }
-        }
-      }, { currentUser: null })
+        },
+        { currentUser: null }
+      )
 
       // Component mounts automatically with null user
       // Since there's no currentUser, PostHog identify should not be called
