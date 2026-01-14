@@ -61,7 +61,7 @@ describe("DashboardPage", () => {
   })
 
   describe("PostHog feature flag redirect", () => {
-    let mockLocation, posthogIdentifyStub, checkFeatureFlagStub
+    let mockLocation, posthogIdentifyStub, checkFeatureFlagStub, clock
 
     beforeEach(() => {
       // Mock window.location.href
@@ -73,6 +73,9 @@ describe("DashboardPage", () => {
 
       // Mock checkFeatureFlag
       checkFeatureFlagStub = sandbox.stub(util, "checkFeatureFlag")
+
+      // Create fake timer to control setTimeout
+      clock = sandbox.useFakeTimers()
     })
 
     it("identifies user to PostHog and redirects when feature flag is enabled", async () => {
@@ -106,7 +109,13 @@ describe("DashboardPage", () => {
       assert.equal(identifyCall.args[1].user_id, mockUser.id)
       assert.equal(identifyCall.args[1].environment, "test")
 
-      // Verify checkFeatureFlag was called
+      // Feature flag check hasn't happened yet (it's in setTimeout)
+      sinon.assert.notCalled(checkFeatureFlagStub)
+
+      // Advance time to trigger the setTimeout
+      clock.tick(500)
+
+      // Now verify checkFeatureFlag was called
       sinon.assert.calledWith(
         checkFeatureFlagStub,
         "redirect-to-learn-dashboard",
@@ -140,7 +149,13 @@ describe("DashboardPage", () => {
       // Verify PostHog identify was called
       sinon.assert.called(posthogIdentifyStub)
 
-      // Verify checkFeatureFlag was called
+      // Feature flag check hasn't happened yet (it's in setTimeout)
+      sinon.assert.notCalled(checkFeatureFlagStub)
+
+      // Advance time to trigger the setTimeout
+      clock.tick(500)
+
+      // Now verify checkFeatureFlag was called
       sinon.assert.calledWith(
         checkFeatureFlagStub,
         "redirect-to-learn-dashboard",
@@ -226,7 +241,13 @@ describe("DashboardPage", () => {
       // Verify PostHog identify was called
       sinon.assert.called(posthogIdentifyStub)
 
-      // Verify checkFeatureFlag was called
+      // Feature flag check hasn't happened yet (it's in setTimeout)
+      sinon.assert.notCalled(checkFeatureFlagStub)
+
+      // Advance time to trigger the setTimeout
+      clock.tick(500)
+
+      // Now verify checkFeatureFlag was called
       sinon.assert.calledWith(
         checkFeatureFlagStub,
         "redirect-to-learn-dashboard",
@@ -259,7 +280,13 @@ describe("DashboardPage", () => {
       // Verify PostHog identify was called
       sinon.assert.called(posthogIdentifyStub)
 
-      // Verify checkFeatureFlag was called
+      // Feature flag check hasn't happened yet (it's in setTimeout)
+      sinon.assert.notCalled(checkFeatureFlagStub)
+
+      // Advance time to trigger the setTimeout
+      clock.tick(500)
+
+      // Now verify checkFeatureFlag was called
       sinon.assert.calledWith(
         checkFeatureFlagStub,
         "redirect-to-learn-dashboard",
