@@ -45,7 +45,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "-e",
             "--execute",
-            type=bool,
+            action="store_true",
             help="If specified, actually performs the backfill; otherwise, just simulates the process",
             default=False,
         )
