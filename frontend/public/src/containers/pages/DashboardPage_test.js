@@ -21,7 +21,7 @@ describe("DashboardPage", () => {
     currentUser = {
       id: 1,
       email: "default@test.com",
-      name: "Default User", 
+      name: "Default User",
       is_anonymous: false,
       is_authenticated: true
       // No global_id by default
@@ -70,7 +70,7 @@ describe("DashboardPage", () => {
 
       // Mock PostHog methods
       posthogIdentifyStub = sandbox.stub(posthog, "identify")
-      
+
       // Mock checkFeatureFlag
       checkFeatureFlagStub = sandbox.stub(util, "checkFeatureFlag")
     })
@@ -94,7 +94,7 @@ describe("DashboardPage", () => {
       // Component mounts automatically, so PostHog calls should have been made
       // Check that PostHog identify was called
       sinon.assert.called(posthogIdentifyStub)
-      
+
       // Check the identify call had the correct GUID
       const identifyCall = posthogIdentifyStub.getCall(0)
       assert.equal(identifyCall.args[0], "test-guid-123")
@@ -140,7 +140,7 @@ describe("DashboardPage", () => {
     it("does not redirect when user has no global_id", async () => {
       const mockUser = {
         id: 123,
-        email: "test@example.com", 
+        email: "test@example.com",
         name: "Test User",
         is_anonymous: false,
         is_authenticated: true,
