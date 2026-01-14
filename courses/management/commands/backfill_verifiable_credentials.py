@@ -42,6 +42,13 @@ class Command(BaseCommand):
             help="If specified, sleeps this many seconds between processing each certificate to avoid overloading external services",
             default=0.0,
         )
+        parser.add_argument(
+            "-e",
+            "--execute",
+            type=bool,
+            help="If specified, actually performs the backfill; otherwise, just simulates the process",
+            default=False,
+        )
 
     def generate_credential_for_certificate(self, certificate, *, force=False):
         """
@@ -69,6 +76,7 @@ class Command(BaseCommand):
         ids = options["ids"].split(",")
         force = options["force"]
         sleep = options["sleep"]
+        execute = options["execute"]
         certificates = []
         if options["type"] == "program":
             program_ids = Program.objects.filter(readable_id__in=ids).values_list(
@@ -85,10 +93,17 @@ class Command(BaseCommand):
 
         for cert in certificates:
             try:
-                self.generate_credential_for_certificate(cert, force=force)
-                self.stdout.write(
-                    self.style.SUCCESS(f"Backfilled certificate for program {cert}")
-                )
+                if execute:
+                    self.generate_credential_for_certificate(cert, force=force)
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Backfilled certificate for program {cert}")
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"DRY RUN -- Backfilled certificate for program {cert}"
+                        )
+                    )
                 time.sleep(sleep)
             except Exception:  # noqa: BLE001, PERF203
                 self.stderr.write(
