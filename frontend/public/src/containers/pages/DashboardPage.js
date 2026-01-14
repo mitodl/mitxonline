@@ -93,34 +93,20 @@ export class DashboardPage extends React.Component<
         environment: SETTINGS.environment
       })
 
-      posthog.onFeatureFlags(() => {
-        const flagEnabled = posthog.isFeatureEnabled(
-          "redirect-to-learn-dashboard"
+      try {
+        // Check feature flag and redirect if enabled
+        const flagEnabled = checkFeatureFlag(
+          "redirect-to-learn-dashboard",
+          currentUser.global_id
         )
 
         if (flagEnabled) {
           window.location.href = "https://learn.mit.edu/dashboard"
           return
         }
-      })
-
-      // Fallback check with delay
-      setTimeout(() => {
-        const flagEnabled = currentUser.global_id ?
-          checkFeatureFlag(
-            "redirect-to-learn-dashboard",
-            currentUser.global_id
-          ) :
-          false
-        const directCheck = posthog.isFeatureEnabled(
-          "redirect-to-learn-dashboard"
-        )
-
-        if (flagEnabled || directCheck) {
-          window.location.href = "https://learn.mit.edu/dashboard"
-          return
-        }
-      }, 500)
+      } catch (error) {
+        console.warn("Feature flag check failed:", error)
+      }
     }
   }
 

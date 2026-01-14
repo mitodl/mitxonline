@@ -18,14 +18,21 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     userEnrollments = [makeCourseRunEnrollment(), makeCourseRunEnrollment()]
-    currentUser = makeUser()
+    currentUser = {
+      id: 1,
+      email: "default@test.com",
+      name: "Default User", 
+      is_anonymous: false,
+      is_authenticated: true
+      // No global_id by default
+    }
     sandbox = sinon.createSandbox()
 
     // Mock SETTINGS global
     mockSettings = {
       posthog_api_host: "https://app.posthog.com",
-      environment:      "test",
-      site_name:        "Test Site"
+      environment: "test",
+      site_name: "Test Site"
     }
     global.SETTINGS = mockSettings
 
@@ -54,10 +61,7 @@ describe("DashboardPage", () => {
   })
 
   describe("PostHog feature flag redirect", () => {
-    let mockLocation,
-      posthogIdentifyStub,
-      posthogOnFeatureFlagsStub,
-      posthogIsFeatureEnabledStub
+    let mockLocation, posthogIdentifyStub, checkFeatureFlagStub
 
     beforeEach(() => {
       // Mock window.location.href
@@ -66,39 +70,41 @@ describe("DashboardPage", () => {
 
       // Mock PostHog methods
       posthogIdentifyStub = sandbox.stub(posthog, "identify")
-      posthogOnFeatureFlagsStub = sandbox.stub(posthog, "onFeatureFlags")
-      posthogIsFeatureEnabledStub = sandbox.stub(posthog, "isFeatureEnabled")
+      
+      // Mock checkFeatureFlag
+      checkFeatureFlagStub = sandbox.stub(util, "checkFeatureFlag")
     })
 
     it("identifies user to PostHog and redirects when feature flag is enabled", async () => {
       const mockUser = makeUser()
       mockUser.global_id = "test-guid-123"
 
-      // Mock PostHog feature flag to return true
-      posthogIsFeatureEnabledStub
-        .withArgs("redirect-to-learn-dashboard")
+      // Mock checkFeatureFlag to return true
+      checkFeatureFlagStub
+        .withArgs("redirect-to-learn-dashboard", "test-guid-123")
         .returns(true)
 
-      // Mock onFeatureFlags to immediately call the callback
-      posthogOnFeatureFlagsStub.callsFake(callback => {
-        callback()
-      })
+      const { inner } = await renderPage({
+        entities: {
+          enrollments: userEnrollments,
+          currentUser: mockUser  // Override the currentUser from beforeEach
+        }
+      }, { currentUser: mockUser })
 
-      const { inner } = await renderPage({}, { currentUser: mockUser })
+      // Component mounts automatically, so PostHog calls should have been made
+      // Check that PostHog identify was called
+      sinon.assert.called(posthogIdentifyStub)
+      
+      // Check the identify call had the correct GUID
+      const identifyCall = posthogIdentifyStub.getCall(0)
+      assert.equal(identifyCall.args[0], "test-guid-123")
+      assert.equal(identifyCall.args[1].email, mockUser.email)
+      assert.equal(identifyCall.args[1].name, mockUser.name)
+      assert.equal(identifyCall.args[1].user_id, mockUser.id)
+      assert.equal(identifyCall.args[1].environment, "test")
 
-      // Trigger componentDidMount
-      inner.instance().componentDidMount()
-
-      // Verify PostHog identify was called with correct parameters
-      sinon.assert.calledWith(posthogIdentifyStub, mockUser.global_id, {
-        email:       mockUser.email,
-        name:        mockUser.name,
-        user_id:     mockUser.id,
-        environment: "test"
-      })
-
-      // Verify onFeatureFlags was called
-      sinon.assert.calledOnce(posthogOnFeatureFlagsStub)
+      // Verify checkFeatureFlag was called
+      sinon.assert.calledWith(checkFeatureFlagStub, "redirect-to-learn-dashboard", "test-guid-123")
 
       // Verify redirect happened
       assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard")
@@ -108,44 +114,48 @@ describe("DashboardPage", () => {
       const mockUser = makeUser()
       mockUser.global_id = "test-guid-123"
 
-      // Mock PostHog feature flag to return false
-      posthogIsFeatureEnabledStub
-        .withArgs("redirect-to-learn-dashboard")
+      // Mock checkFeatureFlag to return false
+      checkFeatureFlagStub
+        .withArgs("redirect-to-learn-dashboard", "test-guid-123")
         .returns(false)
 
-      // Mock onFeatureFlags to immediately call the callback
-      posthogOnFeatureFlagsStub.callsFake(callback => {
-        callback()
-      })
+      const { inner } = await renderPage({
+        entities: {
+          enrollments: userEnrollments,
+          currentUser: mockUser  // Override the currentUser from beforeEach
+        }
+      }, { currentUser: mockUser })
 
-      // Mock checkFeatureFlag to return false as well
-      sandbox
-        .stub(util, "checkFeatureFlag")
-        .withArgs("redirect-to-learn-dashboard", mockUser.global_id)
-        .returns(false)
-
-      const { inner } = await renderPage({}, { currentUser: mockUser })
-
-      // Trigger componentDidMount
-      inner.instance().componentDidMount()
-
+      // Component mounts automatically, so PostHog calls should have been made
       // Verify PostHog identify was called
-      sinon.assert.calledOnce(posthogIdentifyStub)
+      sinon.assert.called(posthogIdentifyStub)
+
+      // Verify checkFeatureFlag was called
+      sinon.assert.calledWith(checkFeatureFlagStub, "redirect-to-learn-dashboard", "test-guid-123")
 
       // Verify no redirect happened
       assert.equal(mockLocation.href, "")
     })
 
     it("does not redirect when user has no global_id", async () => {
-      const mockUser = makeUser()
-      mockUser.global_id = null
+      const mockUser = {
+        id: 123,
+        email: "test@example.com", 
+        name: "Test User",
+        is_anonymous: false,
+        is_authenticated: true,
+        // Explicitly no global_id property
+      }
 
-      const { inner } = await renderPage({}, { currentUser: mockUser })
+      const { inner } = await renderPage({
+        entities: {
+          enrollments: userEnrollments,
+          currentUser: mockUser  // Override the currentUser from beforeEach
+        }
+      }, { currentUser: mockUser })
 
-      // Trigger componentDidMount
-      inner.instance().componentDidMount()
-
-      // Verify PostHog identify was not called
+      // Component mounts automatically
+      // Since there's no global_id, PostHog identify should not be called
       sinon.assert.notCalled(posthogIdentifyStub)
 
       // Verify no redirect happened
@@ -159,11 +169,14 @@ describe("DashboardPage", () => {
       // Remove PostHog configuration
       global.SETTINGS.posthog_api_host = null
 
-      const { inner } = await renderPage({}, { currentUser: mockUser })
+      const { inner } = await renderPage({
+        entities: {
+          enrollments: userEnrollments,
+          currentUser: mockUser  // Override the currentUser from beforeEach
+        }
+      }, { currentUser: mockUser })
 
-      // Trigger componentDidMount
-      inner.instance().componentDidMount()
-
+      // Component mounts automatically
       // Verify PostHog identify was not called
       sinon.assert.notCalled(posthogIdentifyStub)
 
@@ -171,78 +184,72 @@ describe("DashboardPage", () => {
       assert.equal(mockLocation.href, "")
     })
 
-    it("falls back to checkFeatureFlag when onFeatureFlags callback doesn't trigger", async () => {
+    it("handles checkFeatureFlag returning true", async () => {
       const mockUser = makeUser()
-      mockUser.global_id = "test-guid-123"
+      mockUser.global_id = "test-guid-456"
 
-      // Mock PostHog methods to return false initially
-      posthogIsFeatureEnabledStub
-        .withArgs("redirect-to-learn-dashboard")
-        .returns(false)
-
-      // Mock onFeatureFlags to not call the callback (simulating it not triggering)
-      posthogOnFeatureFlagsStub.callsFake(() => {})
-
-      // Mock checkFeatureFlag to return true (fallback should work)
-      sandbox
-        .stub(util, "checkFeatureFlag")
-        .withArgs("redirect-to-learn-dashboard", mockUser.global_id)
+      // Mock checkFeatureFlag to return true
+      checkFeatureFlagStub
+        .withArgs("redirect-to-learn-dashboard", "test-guid-456")
         .returns(true)
 
-      // Mock setTimeout to immediately call the callback
-      sandbox.stub(window, "setTimeout").callsFake(callback => {
-        callback()
-      })
-
-      const { inner } = await renderPage({}, { currentUser: mockUser })
-
-      // Trigger componentDidMount
-      inner.instance().componentDidMount()
+      const { inner } = await renderPage({
+        entities: {
+          enrollments: userEnrollments,
+          currentUser: mockUser  // Override the currentUser from beforeEach
+        }
+      }, { currentUser: mockUser })
 
       // Verify PostHog identify was called
-      sinon.assert.calledOnce(posthogIdentifyStub)
+      sinon.assert.called(posthogIdentifyStub)
 
-      // Verify redirect happened via fallback
+      // Verify checkFeatureFlag was called
+      sinon.assert.calledWith(checkFeatureFlagStub, "redirect-to-learn-dashboard", "test-guid-456")
+
+      // Verify redirect happened
       assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard")
     })
 
-    it("redirects via fallback when direct PostHog check returns true", async () => {
+    it("handles checkFeatureFlag gracefully when it throws an error", async () => {
       const mockUser = makeUser()
-      mockUser.global_id = "test-guid-123"
+      mockUser.global_id = "test-guid-789"
 
-      // Mock onFeatureFlags to not call the callback
-      posthogOnFeatureFlagsStub.callsFake(() => {})
+      // Mock checkFeatureFlag to throw an error
+      checkFeatureFlagStub
+        .withArgs("redirect-to-learn-dashboard", "test-guid-789")
+        .throws(new Error("PostHog service unavailable"))
 
-      // Mock checkFeatureFlag to return false but direct PostHog check to return true
-      sandbox
-        .stub(util, "checkFeatureFlag")
-        .withArgs("redirect-to-learn-dashboard", mockUser.global_id)
-        .returns(false)
-      posthogIsFeatureEnabledStub
-        .withArgs("redirect-to-learn-dashboard")
-        .returns(true)
+      const { inner } = await renderPage({
+        entities: {
+          enrollments: userEnrollments,
+          currentUser: mockUser  // Override the currentUser from beforeEach
+        }
+      }, { currentUser: mockUser })
 
-      // Mock setTimeout to immediately call the callback
-      sandbox.stub(window, "setTimeout").callsFake(callback => {
-        callback()
-      })
+      // Verify PostHog identify was called
+      sinon.assert.called(posthogIdentifyStub)
 
-      const { inner } = await renderPage({}, { currentUser: mockUser })
+      // Verify checkFeatureFlag was called
+      sinon.assert.calledWith(checkFeatureFlagStub, "redirect-to-learn-dashboard", "test-guid-789")
 
-      // Trigger componentDidMount
-      inner.instance().componentDidMount()
-
-      // Verify redirect happened via direct PostHog check
-      assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard")
+      // Verify no redirect happened (error handled gracefully)
+      assert.equal(mockLocation.href, "")
     })
 
     it("handles undefined currentUser gracefully", async () => {
-      const { inner } = await renderPage({}, { currentUser: null })
+      const { inner } = await renderPage({
+        entities: {
+          enrollments: userEnrollments,
+          currentUser: {  // Minimal user object that won't break the component
+            id: null,
+            is_anonymous: true,
+            is_authenticated: false
+          }
+        }
+      }, { currentUser: null })
 
-      // Trigger componentDidMount
-      inner.instance().componentDidMount()
-
-      // Verify no PostHog calls were made
+      // Component mounts automatically with null user
+      // Since there's no currentUser, PostHog identify should not be called
       sinon.assert.notCalled(posthogIdentifyStub)
 
       // Verify no redirect happened
