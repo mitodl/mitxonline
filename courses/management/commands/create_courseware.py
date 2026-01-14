@@ -106,7 +106,7 @@ class Command(BaseCommand):
         if not department_names:
             self._department_must_be_defined_error()
 
-        existing_depts = Department.objects.filter(name__in=department_names).all()
+        existing_depts = Department.objects.filter(name__in=department_names)
         existing_names = {dept.name for dept in existing_depts}
         missing_names = [
             name for name in department_names if name not in existing_names
@@ -119,7 +119,7 @@ class Command(BaseCommand):
             else:
                 self._departments_do_not_exist_error()
 
-        return Department.objects.filter(name__in=department_names).all()
+        return Department.objects.filter(name__in=department_names)
 
     def _department_must_be_defined_error(self):
         """
