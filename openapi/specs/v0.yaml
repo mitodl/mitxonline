@@ -6045,9 +6045,15 @@ components:
           items:
             $ref: '#/components/schemas/OrganizationPage'
           readOnly: true
+        global_id:
+          type: string
+          readOnly: true
+          nullable: true
+          description: The SSO ID (usually a Keycloak UUID) for the user.
       required:
       - b2b_organizations
       - created_on
+      - global_id
       - grants
       - id
       - is_anonymous
