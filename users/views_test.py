@@ -225,6 +225,7 @@ def test_get_userinfo(client, user, is_anonymous, has_openedx_user, has_edx_user
             "username": user.edx_username,
             "email": user.email,
             "name": user.name,
+            "global_id": user.global_id,
             "legal_address": {
                 "country": user.legal_address.country,
                 "state": user.legal_address.state,
