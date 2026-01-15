@@ -855,7 +855,8 @@ def test_course_object_index_page_route_with_invalid_readable_id(course_index_pa
         course_index_page.route(request, path_components)
 
 
-def test_program_object_index_page_route_with_valid_program_readable_id(program_index_page):
+@patch('cms.models.ProgramPage.route')
+def test_program_object_index_page_route_with_valid_program_readable_id(mock_route, program_index_page):
     """
     Test that route() works correctly for program pages as well
     """
@@ -867,25 +868,26 @@ def test_program_object_index_page_route_with_valid_program_readable_id(program_
     program = ProgramFactory.create(readable_id=f"program-v1:MIT+MicroMasters+{unique_id}", page=None)
     program_page = ProgramPageFactory.create(program=program, parent=program_index_page)
 
+    # Verify the relationship is set correctly
+    assert program_page.program == program
+    assert program.readable_id == f"program-v1:MIT+MicroMasters+{unique_id}"
+
+    # Test the get_child_by_readable_id method directly
+    found_page = program_index_page.get_child_by_readable_id(program.readable_id)
+    assert found_page.specific == program_page
+
     path_components = [f"program-v1:MIT+MicroMasters+{unique_id}"]
 
-    # Mock the route method on the program page to verify it gets called
-    original_route = program_page.route
-    route_called = False
+    # Mock the route method to return a mock response
+    mock_response = Mock()
+    mock_route.return_value = mock_response
 
-    def mock_route(request, remaining_components):
-        nonlocal route_called
-        route_called = True
-        assert remaining_components == []
-        return original_route(request, remaining_components)
-
-    program_page.route = mock_route
-
-    # Call route on the program index page
+    # Call route on the index page
     result = program_index_page.route(request, path_components)
 
-    # Verify that the program page's route method was called
-    assert route_called
+    # Verify that the program page's route method was called with correct arguments
+    mock_route.assert_called_once_with(request, [])
+    assert result == mock_response
     assert result is not None
 
 
