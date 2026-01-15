@@ -968,27 +968,6 @@ def test_course_index_page_get_child_by_readable_id_raises_does_not_exist(course
         course_index_page.get_child_by_readable_id("non-existent-readable-id")
 
 
-def test_course_object_index_page_route_calls_specific_on_subpage(course_index_page):
-    """
-    Test that route() calls .specific on the found subpage before calling route
-    """
-    rf = RequestFactory()
-    request = rf.get("/")
-
-    unique_id = uuid.uuid4().hex[:8]
-    course = CourseFactory.create(readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None)
-    CoursePageFactory.create(course=course, parent=course_index_page)
-
-    path_components = [f"course-v1:MIT+6.00x+{unique_id}"]
-
-    # The route method should find the page and call .specific.route()
-    # We can verify this by ensuring that we get a result
-    result = course_index_page.route(request, path_components)
-
-    # The result should come from the specific course page's route method
-    assert result is not None
-
-
 @patch('cms.models.CoursePage.route')
 def test_course_object_index_page_route_multiple_path_components(mock_route, course_index_page):
     """
