@@ -1,7 +1,3 @@
-"""
-Creates a basic courseware about page. This can be for programs or courses.
-"""
-
 import sys
 import uuid
 
