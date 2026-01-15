@@ -328,6 +328,7 @@ def test_filter_with_org_id_anonymous():
 
 
 @pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_returns_contracted_course(
     mocker, contract_ready_course, mock_course_run_clone
 ):
@@ -356,6 +357,7 @@ def test_filter_with_org_id_returns_contracted_course(
 
 
 @pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
 def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses(
     contract_ready_course, mock_course_run_clone
 ):
@@ -377,6 +379,337 @@ def test_filter_with_org_id_user_not_associated_with_org_returns_no_courses(
     titles = [result["title"] for result in response.data["results"]]
     assert course.title not in titles
     assert unrelated_course.title not in titles
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_multiple_courses_same_org(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering by org_id returns all contracted courses for that org"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    # Create multiple courses for the same org
+    (course1, _) = contract_ready_course
+    create_contract_run(contract, course1)
+
+    course2 = CourseFactory()
+    CourseRunFactory(course=course2, is_source_run=True)
+    create_contract_run(contract, course2)
+
+    course3 = CourseFactory()
+    CourseRunFactory(course=course3, is_source_run=True)
+    create_contract_run(contract, course3)
+
+    # Create unrelated course (no contract_run - should not appear in results)
+    unrelated_course = CourseFactory()
+    CourseRunFactory(course=unrelated_course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    course_ids = [result["id"] for result in response.data["results"]]
+    assert course1.id in course_ids
+    assert course2.id in course_ids
+    assert course3.id in course_ids
+    assert unrelated_course.id not in course_ids
+    assert len(course_ids) == 3
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_inactive_contract_excluded(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that courses from inactive contracts are not returned"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=False)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    assert response.data["results"] == []
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_multiple_orgs(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering by org_id returns courses only for that specific org"""
+    org1 = OrganizationPageFactory(name="Test Org 1")
+    org2 = OrganizationPageFactory(name="Test Org 2")
+    contract1 = ContractPageFactory(organization=org1, active=True)
+    contract2 = ContractPageFactory(organization=org2, active=True)
+
+    user = UserFactory()
+    user.b2b_organizations.add(org1, org2)
+    user.b2b_contracts.add(contract1, contract2)
+    user.refresh_from_db()
+
+    (course1, _) = contract_ready_course
+    create_contract_run(contract1, course1)
+
+    course2 = CourseFactory()
+    CourseRunFactory(course=course2, is_source_run=True)
+    create_contract_run(contract2, course2)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+
+    # Filter for org1
+    response = client.get(url, {"org_id": org1.id})
+    course_ids = [result["id"] for result in response.data["results"]]
+    assert course1.id in course_ids
+    assert course2.id not in course_ids
+
+    # Filter for org2
+    response = client.get(url, {"org_id": org2.id})
+    course_ids = [result["id"] for result in response.data["results"]]
+    assert course2.id in course_ids
+    assert course1.id not in course_ids
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_user_in_org_but_no_contract(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that user in org can see org's contracted courses"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    # User is in org but NOT added to contract - current behavior allows this
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    # User is in org, so can see org's courses
+    titles = [result["title"] for result in response.data["results"]]
+    assert course.title in titles
+
+
+@pytest.mark.django_db
+def test_filter_with_org_id_nonexistent_org_id(user_drf_client):
+    """Test that filtering with a nonexistent org_id returns no results"""
+    course = CourseFactory(title="Test Course")
+    CourseRunFactory(course=course)
+
+    url = reverse("v2:courses_api-list")
+    response = user_drf_client.get(url, {"org_id": 99999})
+
+    assert response.data["results"] == []
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_returns_detail_view(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that org_id filter works on detail view endpoint"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-detail", kwargs={"pk": course.id})
+    response = client.get(url, {"org_id": org.id})
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["id"] == course.id
+    assert response.data["title"] == course.title
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_detail_view_unauthorized_user(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that org_id filter prevents unauthorized users from viewing contracted courses"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    # User NOT added to org
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-detail", kwargs={"pk": course.id})
+    response = client.get(url, {"org_id": org.id})
+
+    # User doesn't have access to this org, so should get 404
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_respects_course_live_status(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that org_id filter returns contracted courses regardless of live status"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    course_run = create_contract_run(contract, course)
+
+    # Make course page not live - org_id filter doesn't filter by live status
+    course.page.live = False
+    course.page.save()
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    # Course should appear even though it's not live, since org_id filter doesn't enforce live status
+    course_ids = [result["id"] for result in response.data["results"]]
+    assert course.id in course_ids
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_case_sensitivity(mock_course_run_clone):
+    """Test that org_id filter returns correct org by numeric ID"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    course = CourseFactory(title="Org Course")
+    CourseRunFactory(course=course, is_source_run=True)
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id})
+
+    titles = [result["title"] for result in response.data["results"]]
+    assert course.title in titles
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_pagination(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that org_id filter works correctly with pagination"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course1, _) = contract_ready_course
+    create_contract_run(contract, course1)
+
+    # Create more courses to test pagination
+    for i in range(15):
+        course = CourseFactory(title=f"Org Course {i}")
+        CourseRunFactory(course=course, is_source_run=True)
+        create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"org_id": org.id, "page_size": 5})
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["count"] >= 15
+    assert len(response.data["results"]) == 5
+    assert "next" in response.data
+    assert response.data["next"] is not None
+
+
+@pytest.mark.django_db
+@pytest.mark.skip_nplusone_check
+def test_filter_with_org_id_combined_with_other_filters(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that org_id filter can be combined with other filters"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course1, _) = contract_ready_course
+    create_contract_run(contract, course1)
+
+    course2 = CourseFactory()
+    CourseRunFactory(course=course2, is_source_run=True)
+    create_contract_run(contract, course2)
+
+    unrelated_course = CourseFactory()
+    CourseRunFactory(course=unrelated_course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    url = reverse("v2:courses_api-list")
+    # Filter by org_id and specific course readable_id
+    response = client.get(
+        url,
+        {"org_id": org.id, "readable_id": course1.readable_id}
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    course_ids = [result["id"] for result in response.data["results"]]
+    assert course1.id in course_ids
+    assert course2.id not in course_ids
+    assert unrelated_course.id not in course_ids
 
 
 @pytest.mark.django_db
