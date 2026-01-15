@@ -13,7 +13,7 @@ from courses.models import Course
 
 class Command(BaseCommand):
     """
-    Creates a basic about page for the given courseware object.
+    Creates an instructor page in Wagtail. Optionally, links it to a course or program
     Note that if you have been manually editing CMS content and get an error:
     AttributeError: 'NoneType' object has no attribute '_inc_path'
     You may need to run `./manage.py fixtree --full` to get wagtail into a good state
