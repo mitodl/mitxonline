@@ -52,6 +52,12 @@ class Command(BaseCommand):
             default=None,
             help="Image url for the instructor photo",
         )
+        parser.add_argument(
+            "--link-instructor-id",
+            type=str,
+            default=None,
+            help="If specified, skip creation and only link the instructor with this ID to the course",
+        )
 
     def error(self, message):
         self.stdout.write(self.style.ERROR(message))
@@ -66,10 +72,9 @@ class Command(BaseCommand):
         instructor_image.save()
         return instructor_image
 
-    def handle(self, *args, **options):  # pylint: disable=unused-argument  # noqa: ARG002
-        use_fake_data = options["fake"]
-        course_id = options["course_id"]
-        instructor_index_page = InstructorIndexPage.objects.first()
+    def get_instructor_data(
+        self, *, use_fake_data=False, name=None, image_url=None, title=None
+    ):
         if use_fake_data:
             fake = faker.Faker()
             instructor_name = fake.name()
@@ -90,31 +95,51 @@ class Command(BaseCommand):
         else:
             # Use passed in values or stable placeholders.
             # Note that there may be collisions, so we'll tack uuids on where appropriate
-            instructor_name = options["name"] or "John Doe"
+            instructor_name = name or "John Doe"
             url_safe_instructor_name = {instructor_name.replace(" ", "_").lower()}
-            image_url = (
-                options["image_url"] or "https://learn.mit.edu/images/mit-red.png"
-            )
+            image_url = image_url or "https://learn.mit.edu/images/mit-red.png"
             # This image is completely the wrong size, but it's stable at least.
             instructor_image = self.save_image_file(image_url, url_safe_instructor_name)
             instructor_payload = {
                 "instructor_name": instructor_name,
-                "instructor_title": options["title"] or "Instructor",
+                "instructor_title": title or "Instructor",
                 "instructor_bio_short": "This is a short bio",
                 "instructor_bio_long": "This is a longer bio for the instructor",
                 "feature_image": instructor_image,  # Assuming photo upload is handled separately
                 "title": f"{instructor_name} Profile",
                 "slug": f"{instructor_name.replace(' ', '-').lower()}-{uuid.uuid4()}",
             }
+        return instructor_payload
 
-        instructor_page = InstructorPage(**instructor_payload)
-        instructor_index_page.add_child(instance=instructor_page)
-        instructor_page.save_revision().publish()
+    def link_instructor_to_course(self, instructor_page, course_id):
+        course = Course.objects.filter(readable_id=course_id).first()
+        if not course:
+            self.error(f"Could not find course with id {course_id}")
+        InstructorPageLink(
+            linked_instructor_page=instructor_page, page=course.page
+        ).save()
+
+    def handle(self, *args, **options):  # pylint: disable=unused-argument  # noqa: ARG002
+        use_fake_data = options["fake"]
+        course_id = options["course_id"]
+        link_instructor_id = options["link_instructor_id"]
+        if link_instructor_id:
+            instructor_page = InstructorPage.objects.filter(
+                id=link_instructor_id
+            ).first()
+            if not instructor_page:
+                self.error(f"Could not find instructor with id {link_instructor_id}")
+        else:
+            instructor_index_page = InstructorIndexPage.objects.first()
+            instructor_payload = self.get_instructor_data(
+                use_fake_data,
+                name=options["name"],
+                image_url=options["image_url"],
+                title=options["title"],
+            )
+            instructor_page = InstructorPage(**instructor_payload)
+            instructor_index_page.add_child(instance=instructor_page)
+            instructor_page.save_revision().publish()
 
         if course_id:
-            course = Course.objects.filter(readable_id=course_id).first()
-            if not course:
-                self.error(f"Could not find course with id {course_id}")
-            InstructorPageLink(
-                linked_instructor_page=instructor_page, page=course.page
-            ).save()
+            self.link_instructor_to_course(instructor_page, course_id)
