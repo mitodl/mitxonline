@@ -3,8 +3,8 @@
 import json
 import uuid
 from datetime import timedelta
-from urllib.parse import quote_plus
 from unittest.mock import Mock, patch
+from urllib.parse import quote_plus
 
 import factory
 import pytest
@@ -12,8 +12,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import caches
-from django.http import Http404, HttpResponse
 from django.forms import ChoiceField
+from django.http import Http404, HttpResponse
 from django.test.client import RequestFactory
 from django.urls import resolve, reverse
 from mitol.common.factories import UserFactory
@@ -746,10 +746,9 @@ def course_index_page():
     root = Page.get_first_root_node()
     unique_id = uuid.uuid4().hex[:8]
     return CourseIndexPageFactory.create(
-        parent=root,
-        slug=f"courses-{unique_id}",
-        title=f"Courses {unique_id}"
+        parent=root, slug=f"courses-{unique_id}", title=f"Courses {unique_id}"
     )
+
 
 @pytest.fixture
 def program_index_page():
@@ -757,9 +756,7 @@ def program_index_page():
     root = Page.get_first_root_node()
     unique_id = uuid.uuid4().hex[:8]
     return ProgramIndexPageFactory.create(
-        parent=root,
-        slug=f"programs-{unique_id}",
-        title=f"Programs {unique_id}"
+        parent=root, slug=f"programs-{unique_id}", title=f"Programs {unique_id}"
     )
 
 
@@ -778,8 +775,10 @@ def test_course_object_index_page_route_with_empty_path_components(course_index_
     assert result is not None
 
 
-@patch('cms.models.CoursePage.route')
-def test_course_object_index_page_route_with_valid_course_readable_id(mock_route, course_index_page):
+@patch("cms.models.CoursePage.route")
+def test_course_object_index_page_route_with_valid_course_readable_id(
+    mock_route, course_index_page
+):
     """
     Test that route() finds and routes to correct course page by readable_id
     """
@@ -788,7 +787,9 @@ def test_course_object_index_page_route_with_valid_course_readable_id(mock_route
 
     # Create a course with unique readable_id but without automatic page creation
     unique_id = uuid.uuid4().hex[:8]
-    course = CourseFactory.create(readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None)
+    course = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None
+    )
     course_page = CoursePageFactory.create(course=course, parent=course_index_page)
 
     # Verify the relationship is set correctly
@@ -814,8 +815,10 @@ def test_course_object_index_page_route_with_valid_course_readable_id(mock_route
     assert result is not None
 
 
-@patch('cms.models.CoursePage.route')
-def test_course_object_index_page_route_with_remaining_components(mock_route, course_index_page):
+@patch("cms.models.CoursePage.route")
+def test_course_object_index_page_route_with_remaining_components(
+    mock_route, course_index_page
+):
     """
     Test that route() passes remaining path components to the child page
     """
@@ -824,7 +827,9 @@ def test_course_object_index_page_route_with_remaining_components(mock_route, co
 
     # Create a course with unique readable_id but without automatic page creation
     unique_id = uuid.uuid4().hex[:8]
-    course = CourseFactory.create(readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None)
+    course = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None
+    )
     CoursePageFactory.create(course=course, parent=course_index_page)
 
     path_components = [f"course-v1:MIT+6.00x+{unique_id}", "additional", "path"]
@@ -856,8 +861,10 @@ def test_course_object_index_page_route_with_invalid_readable_id(course_index_pa
         course_index_page.route(request, path_components)
 
 
-@patch('cms.models.ProgramPage.route')
-def test_program_object_index_page_route_with_valid_program_readable_id(mock_route, program_index_page):
+@patch("cms.models.ProgramPage.route")
+def test_program_object_index_page_route_with_valid_program_readable_id(
+    mock_route, program_index_page
+):
     """
     Test that route() works correctly for program pages as well
     """
@@ -866,7 +873,9 @@ def test_program_object_index_page_route_with_valid_program_readable_id(mock_rou
 
     # Create a program with unique readable_id but without automatic page creation
     unique_id = uuid.uuid4().hex[:8]
-    program = ProgramFactory.create(readable_id=f"program-v1:MIT+MicroMasters+{unique_id}", page=None)
+    program = ProgramFactory.create(
+        readable_id=f"program-v1:MIT+MicroMasters+{unique_id}", page=None
+    )
     program_page = ProgramPageFactory.create(program=program, parent=program_index_page)
 
     # Verify the relationship is set correctly
@@ -892,7 +901,9 @@ def test_program_object_index_page_route_with_valid_program_readable_id(mock_rou
     assert result is not None
 
 
-def test_course_object_index_page_route_converts_does_not_exist_to_http404(course_index_page):
+def test_course_object_index_page_route_converts_does_not_exist_to_http404(
+    course_index_page,
+):
     """
     Test that route() converts Page.DoesNotExist to Http404
     """
@@ -901,7 +912,9 @@ def test_course_object_index_page_route_converts_does_not_exist_to_http404(cours
 
     # Create a course but with a different readable_id than what we'll search for
     unique_id = uuid.uuid4().hex[:8]
-    course = CourseFactory.create(readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None)
+    course = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None
+    )
     CoursePageFactory.create(course=course, parent=course_index_page)
 
     # Try to route to a different readable_id
@@ -919,19 +932,27 @@ def test_course_index_page_get_child_by_readable_id(course_index_page):
     # Create multiple courses with different readable_ids but without automatic page creation
     unique_id1 = uuid.uuid4().hex[:8]
     unique_id2 = uuid.uuid4().hex[:8]
-    course1 = CourseFactory.create(readable_id=f"course-v1:MIT+6.00x+{unique_id1}", page=None)
-    course2 = CourseFactory.create(readable_id=f"course-v1:MIT+6.01x+{unique_id2}", page=None)
+    course1 = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id1}", page=None
+    )
+    course2 = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.01x+{unique_id2}", page=None
+    )
 
     course_page1 = CoursePageFactory.create(course=course1, parent=course_index_page)
     course_page2 = CoursePageFactory.create(course=course2, parent=course_index_page)
 
     # Test finding the first course
-    found_page = course_index_page.get_child_by_readable_id(f"course-v1:MIT+6.00x+{unique_id1}")
+    found_page = course_index_page.get_child_by_readable_id(
+        f"course-v1:MIT+6.00x+{unique_id1}"
+    )
     assert found_page.specific == course_page1
     assert found_page.specific.course.readable_id == f"course-v1:MIT+6.00x+{unique_id1}"
 
     # Test finding the second course
-    found_page = course_index_page.get_child_by_readable_id(f"course-v1:MIT+6.01x+{unique_id2}")
+    found_page = course_index_page.get_child_by_readable_id(
+        f"course-v1:MIT+6.01x+{unique_id2}"
+    )
     assert found_page.specific == course_page2
     assert found_page.specific.course.readable_id == f"course-v1:MIT+6.01x+{unique_id2}"
 
@@ -943,24 +964,44 @@ def test_program_index_page_get_child_by_readable_id(program_index_page):
     # Create multiple programs with different readable_ids but without automatic page creation
     unique_id1 = uuid.uuid4().hex[:8]
     unique_id2 = uuid.uuid4().hex[:8]
-    program1 = ProgramFactory.create(readable_id=f"program-v1:MIT+MicroMasters+{unique_id1}", page=None)
-    program2 = ProgramFactory.create(readable_id=f"program-v1:MIT+MicroMasters+{unique_id2}", page=None)
+    program1 = ProgramFactory.create(
+        readable_id=f"program-v1:MIT+MicroMasters+{unique_id1}", page=None
+    )
+    program2 = ProgramFactory.create(
+        readable_id=f"program-v1:MIT+MicroMasters+{unique_id2}", page=None
+    )
 
-    program_page1 = ProgramPageFactory.create(program=program1, parent=program_index_page)
-    program_page2 = ProgramPageFactory.create(program=program2, parent=program_index_page)
+    program_page1 = ProgramPageFactory.create(
+        program=program1, parent=program_index_page
+    )
+    program_page2 = ProgramPageFactory.create(
+        program=program2, parent=program_index_page
+    )
 
     # Test finding the first program
-    found_page = program_index_page.get_child_by_readable_id(f"program-v1:MIT+MicroMasters+{unique_id1}")
+    found_page = program_index_page.get_child_by_readable_id(
+        f"program-v1:MIT+MicroMasters+{unique_id1}"
+    )
     assert found_page.specific == program_page1
-    assert found_page.specific.program.readable_id == f"program-v1:MIT+MicroMasters+{unique_id1}"
+    assert (
+        found_page.specific.program.readable_id
+        == f"program-v1:MIT+MicroMasters+{unique_id1}"
+    )
 
     # Test finding the second program
-    found_page = program_index_page.get_child_by_readable_id(f"program-v1:MIT+MicroMasters+{unique_id2}")
+    found_page = program_index_page.get_child_by_readable_id(
+        f"program-v1:MIT+MicroMasters+{unique_id2}"
+    )
     assert found_page.specific == program_page2
-    assert found_page.specific.program.readable_id == f"program-v1:MIT+MicroMasters+{unique_id2}"
+    assert (
+        found_page.specific.program.readable_id
+        == f"program-v1:MIT+MicroMasters+{unique_id2}"
+    )
 
 
-def test_course_index_page_get_child_by_readable_id_raises_does_not_exist(course_index_page):
+def test_course_index_page_get_child_by_readable_id_raises_does_not_exist(
+    course_index_page,
+):
     """
     Test that get_child_by_readable_id raises Page.DoesNotExist for invalid readable_id
     """
@@ -971,8 +1012,10 @@ def test_course_index_page_get_child_by_readable_id_raises_does_not_exist(course
         course_index_page.get_child_by_readable_id("non-existent-readable-id")
 
 
-@patch('cms.models.CoursePage.route')
-def test_course_object_index_page_route_multiple_path_components(mock_route, course_index_page):
+@patch("cms.models.CoursePage.route")
+def test_course_object_index_page_route_multiple_path_components(
+    mock_route, course_index_page
+):
     """
     Test that route() correctly passes all remaining path components to child
     """
@@ -980,7 +1023,9 @@ def test_course_object_index_page_route_multiple_path_components(mock_route, cou
     request = rf.get("/")
 
     unique_id = uuid.uuid4().hex[:8]
-    course = CourseFactory.create(readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None)
+    course = CourseFactory.create(
+        readable_id=f"course-v1:MIT+6.00x+{unique_id}", page=None
+    )
     CoursePageFactory.create(course=course, parent=course_index_page)
 
     path_components = [f"course-v1:MIT+6.00x+{unique_id}", "certificate", "123", "view"]
@@ -995,6 +1040,8 @@ def test_course_object_index_page_route_multiple_path_components(mock_route, cou
     # Verify all remaining components were passed
     mock_route.assert_called_once_with(request, expected_remaining)
     assert result == mock_route.return_value
+
+
 class TestFlexiblePricingFormBuilder:
     """Tests for FlexiblePricingFormBuilder methods"""
 
