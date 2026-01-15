@@ -6,7 +6,7 @@ jobs:
 
     services:
       db:
-        image: postgres:15.14
+        image: postgres:15.15
         # Health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
@@ -21,12 +21,12 @@ jobs:
           - 5432:5432
 
       redis:
-        image: redis:7.4.6
+        image: redis:8.4.0
         ports:
           - 6379:6379
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
       - name: Apt update
         run: sudo apt-get update -y
@@ -42,7 +42,7 @@ jobs:
           virtualenvs-in-project: true
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6
         with:
           python-version: "3.10"
 
@@ -108,15 +108,10 @@ jobs:
           OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
           SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
 
-      - name: Upload coverage to CodeCov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-
   javascript-tests:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
       - name: Setup NodeJS
         uses: actions/setup-node@v2-beta
@@ -127,7 +122,7 @@ jobs:
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
         id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
@@ -153,7 +148,6 @@ jobs:
       - name: Tests
         run: yarn workspaces foreach run test
         env:
-          CODECOV: true
           NODE_ENV: development
 
       - name: Webpack production build
@@ -161,8 +155,3 @@ jobs:
           yarn workspaces foreach run build --bail --mode production
         env:
           NODE_ENV: production
-
-      - name: Upload test coverage to CodeCov
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage/lcov.info

@@ -27,6 +27,11 @@ router.register(
 urlpatterns = [
     *router.urls,
     path(
+        r"verified_program_enrollments/<str:program_id>/<str:courserun_id>/",
+        v2.add_verified_program_course_enrollment,
+        name="add_verified_program_course_enrollment",
+    ),
+    path(
         r"course_certificates/<str:cert_uuid>/",
         v2.get_course_certificate,
         name="get_course_certificate",
@@ -35,5 +40,15 @@ urlpatterns = [
         r"program_certificates/<str:cert_uuid>/",
         v2.get_program_certificate,
         name="get_program_certificate",
+    ),
+    path(
+        "verifiable_course_credential/<uuid:credential_id>/download/",
+        v2.download_course_credential,
+        name="download_course_credential",
+    ),
+    path(
+        "verifiable_program_credential/<uuid:credential_id>/download/",
+        v2.download_program_credential,
+        name="download_program_credential",
     ),
 ]

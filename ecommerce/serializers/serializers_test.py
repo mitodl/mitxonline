@@ -35,7 +35,7 @@ from ecommerce.serializers import (
     TransactionPurchaserSerializer,
     TransactionPurchaseSerializer,
 )
-from ecommerce.views_test import create_basket
+from ecommerce.views.legacy.views_test import create_basket
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal

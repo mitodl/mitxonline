@@ -6,13 +6,17 @@ import contextlib
 
 import django_filters
 from django.db.models import Count, Prefetch, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.olposthog.features import is_enabled
 from rest_framework import mixins, serializers, status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+)
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import (
     AllowAny,
@@ -21,7 +25,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from courses.api import deactivate_run_enrollment
+from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     Course,
@@ -35,10 +39,12 @@ from courses.models import (
     ProgramCollection,
     ProgramEnrollment,
     ProgramRequirement,
+    VerifiableCredential,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
     ProgramCertificateSerializer,
+    VerifiableCredentialSerializer,
 )
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
@@ -58,9 +64,11 @@ from courses.utils import (
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
 )
+from ecommerce.api import create_verified_program_course_run_enrollment
 from main import features
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
 class Pagination(PageNumberPagination):
@@ -88,19 +96,22 @@ class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
 class ProgramFilterSet(django_filters.FilterSet):
     id = NumberInFilter(field_name="id", lookup_expr="in", label="Program ID")
     org_id = django_filters.NumberFilter(method="filter_by_org_id")
+    contract_id = django_filters.NumberFilter(method="filter_by_contract_id")
 
     class Meta:
         model = Program
-        fields = ["id", "live", "readable_id", "page__live", "org_id"]
+        fields = ["id", "live", "readable_id", "page__live", "org_id", "contract_id"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     @property
     def qs(self):
-        """If the request isn't explicitly filtering on org_id, exclude contracted courses."""
+        """If the request isn't explicitly filtering on org_id or contract_id, exclude contracted courses."""
 
-        if "org_id" not in getattr(self.request, "GET", {}):
+        if "org_id" not in getattr(
+            self.request, "GET", {}
+        ) and "contract_id" not in getattr(self.request, "GET", {}):
             return super().qs.filter(b2b_only=False)
 
         return super().qs
@@ -113,6 +124,18 @@ class ProgramFilterSet(django_filters.FilterSet):
             )
         else:
             return queryset.filter(b2b_only=False)
+
+    def filter_by_contract_id(self, queryset, _, contract_id):
+        """Filter according to contract_id. If the user has access to the contract, return only related programs."""
+        user = self.request.user if self.request else None
+        if (
+            user
+            and user.is_authenticated
+            and contract_id
+            and user.b2b_contracts.filter(id=contract_id).exists()
+        ):
+            return queryset.filter(contract_memberships__contract__id=contract_id)
+        return queryset.filter(b2b_only=False)
 
 
 class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
@@ -190,6 +213,11 @@ class CourseFilterSet(django_filters.FilterSet):
         label="Only show courses belonging to this B2B/UAI organization",
         field_name="org_id",
     )
+    contract_id = django_filters.NumberFilter(
+        method="filter_contract_id",
+        label="Only show courses belonging to this B2B contract",
+        field_name="contract_id",
+    )
     include_approved_financial_aid = django_filters.BooleanFilter(
         method="filter_include_approved_financial_aid",
         label="Include approved financial assistance information",
@@ -205,6 +233,7 @@ class CourseFilterSet(django_filters.FilterSet):
             "page__live",
             "courserun_is_enrollable",
             "org_id",
+            "contract_id",
             "include_approved_financial_aid",
         ]
 
@@ -218,6 +247,25 @@ class CourseFilterSet(django_filters.FilterSet):
         if user_has_org_access(user, value):
             return queryset.filter(
                 courseruns__b2b_contract__organization_id=value,
+                courseruns__b2b_contract__active=True,
+            )
+        return Course.objects.none()
+
+    def filter_contract_id(self, queryset, _, value):
+        """
+        Filter courses that have course runs linked to the specified contract_id,
+        if the user has access to that contract.
+        """
+        user = self.request.user
+
+        if (
+            user
+            and user.is_authenticated
+            and value
+            and user.b2b_contracts.filter(id=value).exists()
+        ):
+            return queryset.filter(
+                courseruns__b2b_contract__id=value,
                 courseruns__b2b_contract__active=True,
             )
         return Course.objects.none()
@@ -280,9 +328,12 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             added_context["all_runs"] = True
         if qp.get("include_approved_financial_aid"):
             added_context["include_approved_financial_aid"] = True
-        if qp.get("org_id"):
+        if qp.get("org_id") or qp.get("contract_id"):
             user = self.request.user
-            added_context["org_id"] = qp.get("org_id")
+            if qp.get("org_id"):
+                added_context["org_id"] = qp.get("org_id")
+            if qp.get("contract_id"):
+                added_context["contract_id"] = qp.get("contract_id")
             added_context["user_contracts"] = (
                 user.b2b_contracts.values_list("id", flat=True).all()
                 if user.is_authenticated and user.b2b_contracts
@@ -469,6 +520,116 @@ class UserEnrollmentsApiViewSet(
 
 @extend_schema(
     parameters=[
+        OpenApiParameter(
+            "program_id",
+            str,
+            OpenApiParameter.PATH,
+            description="Readable ID for the program.",
+        ),
+        OpenApiParameter(
+            "courserun_id",
+            str,
+            OpenApiParameter.PATH,
+            description="Readable ID for the course run to enroll in.",
+        ),
+    ],
+    request=None,
+    responses={
+        status.HTTP_201_CREATED: CourseRunEnrollmentSerializer,
+        status.HTTP_204_NO_CONTENT: None,
+        status.HTTP_404_NOT_FOUND: None,
+    },
+)
+@api_view(
+    http_method_names=["post"],
+)
+@permission_classes(
+    [
+        IsAuthenticated,
+    ]
+)
+def add_verified_program_course_enrollment(request, program_id: str, courserun_id: str):
+    """
+    Create a program-related course enrollment for the learner.
+
+    Some special handling is needed for program-related course run enrollments
+    when the learner has an enrollment in the program. The learner should get a
+    course run enrollment that matches their program enrollment at no additional
+    charge. However, if the learner is enrolling in a course that's an elective,
+    and they have already enrolled in enough electives to satisfy the program's
+    requirements, they should then get an audit enrollment. (This won't preclude
+    them from getting a certificate for the course itself but they'll have to buy
+    the upgrade separately.)
+    """
+
+    try:
+        program_enrollment = ProgramEnrollment.objects.filter(
+            program__readable_id=program_id, user=request.user
+        ).get()
+    except ProgramEnrollment.DoesNotExist:
+        # Learner isn't in the program so abort.
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if CourseRunEnrollment.objects.filter(
+        run__courseware_id=courserun_id,
+        user=request.user,
+        enrollment_mode=program_enrollment.enrollment_mode,
+    ).exists():
+        # Learner already has a matching enrollment, so nothing to do.
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    run = CourseRun.objects.filter(courseware_id=courserun_id).get()
+
+    if program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE:
+        # Audit enrollments just get created, regardless of whether or not
+        # the course is an elective.
+        enrollments, _ = create_run_enrollments(
+            request.user,
+            [run],
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            keep_failed_enrollments=True,
+        )
+        return Response(
+            CourseRunEnrollmentSerializer(enrollments[0]).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    if run not in program_enrollment.program.required_courses and (
+        CourseRunEnrollment.objects.filter(
+            run__course__in=program_enrollment.program.elective_courses,
+            user=request.user,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        ).count()
+        >= (program_enrollment.program.minimum_elective_courses_requirement or 1)
+    ):
+        # Too many verified elective enrollments, so make this as an audit one.
+        enrollments, _ = create_run_enrollments(
+            request.user,
+            [run],
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            keep_failed_enrollments=True,
+        )
+        return Response(
+            CourseRunEnrollmentSerializer(enrollments[0]).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    # Everything checks out for a verified enrollment, so generate one.
+    # This requires generating an order.
+
+    enrollment = create_verified_program_course_run_enrollment(
+        request, run, program_enrollment.program
+    )
+
+    return Response(
+        CourseRunEnrollmentSerializer(enrollment).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@extend_schema(
+    parameters=[
         OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),
     ],
     responses=CourseRunCertificateSerializer,
@@ -537,7 +698,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-            .all()
+            .order_by("-id")
         )
 
         program_list = []
@@ -552,7 +713,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page", "run__b2b_contract")
-                    .all(),
+                    .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
@@ -598,3 +759,39 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         )
 
         return self.list(request)
+
+
+@extend_schema(
+    description="Returns the json for the verifiable credential with the given ID",
+    responses={200: VerifiableCredentialSerializer(many=True)},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_course_credential(request, credential_id):  # noqa: ARG001
+    credential = get_object_or_404(
+        VerifiableCredential,
+        pk=credential_id,
+    )
+    response = JsonResponse(credential.credential_data)
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
+    return response
+
+
+@extend_schema(
+    description="Returns the json for the verifiable credential with the given ID",
+    responses={200: VerifiableCredentialSerializer(many=True)},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_program_credential(request, credential_id):  # noqa: ARG001
+    credential = get_object_or_404(
+        VerifiableCredential,
+        pk=credential_id,
+    )
+    response = JsonResponse(credential.credential_data)
+    response["Content-Disposition"] = (
+        f'attachment; filename="credential_{credential_id}.json"'
+    )
+    return response

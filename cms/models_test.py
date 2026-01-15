@@ -8,10 +8,12 @@ from unittest.mock import Mock, patch
 
 import factory
 import pytest
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import caches
 from django.http import Http404, HttpResponse
+from django.forms import ChoiceField
 from django.test.client import RequestFactory
 from django.urls import resolve, reverse
 from mitol.common.factories import UserFactory
@@ -738,7 +740,6 @@ def test_homepage_featured_products(settings, mocker):
     ]
 
 
-# Tests for CourseObjectIndexPage.route method
 @pytest.fixture
 def course_index_page():
     """Fixture for creating a course index page with unique slug"""
@@ -994,3 +995,527 @@ def test_course_object_index_page_route_multiple_path_components(mock_route, cou
     # Verify all remaining components were passed
     mock_route.assert_called_once_with(request, expected_remaining)
     assert result == mock_route.return_value
+class TestFlexiblePricingFormBuilder:
+    """Tests for FlexiblePricingFormBuilder methods"""
+
+    def test_create_country_field_with_currency_exchange_rates(self):
+        """Test create_country_field method with currency exchange rates in database"""
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.factories import (  # noqa: PLC0415
+            CurrencyExchangeRateFactory,
+        )
+
+        CurrencyExchangeRateFactory.create(currency_code="USD", description="US Dollar")
+        CurrencyExchangeRateFactory.create(currency_code="EUR", description="Euro")
+        CurrencyExchangeRateFactory.create(currency_code="GBP", description="")
+
+        field = None
+        options = {"label": "Country Currency"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        assert isinstance(result, ChoiceField)
+
+        expected_choices = [
+            ("USD", "USD - US Dollar"),
+            ("EUR", "EUR - Euro"),
+            ("GBP", "GBP"),
+        ]
+        assert set(result.choices) == set(expected_choices)
+
+        assert "error_messages" in result.__dict__
+        assert (
+            result.error_messages["required"] == "Country Currency is a required field."
+        )
+
+    def test_create_country_field_with_no_currency_exchange_rates(self):
+        """Test create_country_field method with no currency exchange rates in database"""
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.models import CurrencyExchangeRate  # noqa: PLC0415
+
+        CurrencyExchangeRate.objects.all().delete()
+
+        field = None
+        options = {"label": "Currency Selection"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        assert isinstance(result, ChoiceField)
+
+        assert result.choices == []
+
+        assert "error_messages" in result.__dict__
+        assert (
+            result.error_messages["required"]
+            == "Currency Selection is a required field."
+        )
+
+    def test_create_country_field_with_null_description(self):
+        """Test create_country_field method with currency exchange rate having None description"""
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.factories import (  # noqa: PLC0415
+            CurrencyExchangeRateFactory,
+        )
+
+        CurrencyExchangeRateFactory.create(currency_code="JPY", description=None)
+
+        field = None
+        options = {"label": "Test Label"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        assert isinstance(result, ChoiceField)
+
+        expected_choices = [("JPY", "JPY")]
+        assert result.choices == expected_choices
+
+        assert result.error_messages["required"] == "Test Label is a required field."
+
+    def test_create_country_field_ordering(self):
+        """Test that create_country_field maintains alphabetical ordering of choices"""
+        from cms.models import FlexiblePricingFormBuilder  # noqa: PLC0415
+        from flexiblepricing.factories import (  # noqa: PLC0415
+            CurrencyExchangeRateFactory,
+        )
+
+        CurrencyExchangeRateFactory.create(
+            currency_code="ZAR", description="South African Rand"
+        )
+        CurrencyExchangeRateFactory.create(
+            currency_code="AUD", description="Australian Dollar"
+        )
+        CurrencyExchangeRateFactory.create(
+            currency_code="MXN", description="Mexican Peso"
+        )
+
+        field = None
+        options = {"label": "Currency"}
+
+        result = FlexiblePricingFormBuilder.create_country_field(None, field, options)
+
+        expected_choices = [
+            ("AUD", "AUD - Australian Dollar"),
+            ("MXN", "MXN - Mexican Peso"),
+            ("ZAR", "ZAR - South African Rand"),
+        ]
+        assert result.choices == expected_choices
+
+
+# Additional comprehensive tests for FlexiblePricingRequestForm.get_context method
+
+
+def test_flexible_pricing_form_get_context_basic_structure():
+    """Test that get_context returns the expected basic structure"""
+    # Arrange
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    # Act
+    context = flex_form.get_context(request)
+
+    # Assert
+    assert "prior_request" in context
+    assert "country_of_income" in context
+    assert "country_of_residence" in context
+    assert "product" in context
+    assert "product_page" in context
+
+
+def test_flexible_pricing_form_get_context_no_previous_submission():
+    """Test get_context when user has no previous flexible pricing submission"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    user.legal_address.country = ""
+    user.legal_address.save()
+
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] is None
+    assert context["country_of_income"] == ""
+    assert context["country_of_residence"] == ""
+
+
+def test_flexible_pricing_form_get_context_with_user_legal_address():
+    """Test get_context when user has legal address"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    user.legal_address.country = "US"
+    user.legal_address.save()
+
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["country_of_income"] == "US"
+    assert context["country_of_residence"] == "US"
+
+
+def test_flexible_pricing_form_get_context_previous_submission_overrides():
+    """Test that previous submission country values override legal address"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    user.legal_address.country = "US"
+    user.legal_address.save()
+
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course_page.course,
+        country_of_income="CA",
+        country_of_residence="UK",
+    )
+
+    context = flex_form.get_context(request)
+
+    assert context["country_of_income"] == "CA"
+    assert context["country_of_residence"] == "UK"
+
+
+def test_flexible_pricing_form_get_context_with_specific_submission():
+    """Test get_context with specific flexible pricing submission"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps({"test": "data"}), page=flex_form, user=user
+    )
+    flexible_price = FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course_page.course,
+        cms_submission=submission,
+        status=FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
+    )
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] == flexible_price
+
+
+def test_flexible_pricing_form_get_context_product_for_course():
+    """Test get_context returns active product for course"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    course_run = CourseRunFactory.create(course=course_page.course)
+    product = ProductFactory.create(purchasable_object=course_run, is_active=True)
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["product"] == product
+    assert context["product_page"] == course_page.url
+
+
+def test_flexible_pricing_form_get_context_course_no_active_products():
+    """Test get_context returns None when course has no active products"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    course_run = CourseRunFactory.create(course=course_page.course)
+    ProductFactory.create(purchasable_object=course_run, is_active=False)
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["product"] is None
+    assert context["product_page"] == course_page.url
+
+
+def test_flexible_pricing_form_get_context_product_for_program():
+    """Test get_context returns None for program (as per the logic)"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    program_page = ProgramPageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=program_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["product"] is None
+    assert context["product_page"] == program_page.url
+
+
+def test_flexible_pricing_form_get_context_with_anonymous_user():
+    """Test get_context with anonymous user"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] is None
+    assert context["country_of_income"] == ""
+    assert context["country_of_residence"] == ""
+
+
+def test_flexible_pricing_form_get_context_courseware_specific():
+    """Test that get_previous_submission respects courseware-specific logic"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course1_page = CoursePageFactory.create()
+    course2_page = CoursePageFactory.create()
+
+    flex_form = FlexiblePricingFormFactory.create(parent=course1_page)
+
+    FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course2_page.course,
+        country_of_income="FR",
+        country_of_residence="DE",
+    )
+
+    flexible_price_same_course = FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course1_page.course,
+        country_of_income="JP",
+        country_of_residence="KR",
+    )
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] == flexible_price_same_course
+    assert context["country_of_income"] == "JP"
+    assert context["country_of_residence"] == "KR"
+
+
+def test_flexible_pricing_form_get_context_absolute_last_submission_fallback():
+    """Test that absolute last submission is used for country info when no courseware-specific submission exists"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course1_page = CoursePageFactory.create()
+    course2_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course1_page)
+
+    FlexiblePriceFactory.create(
+        user=user,
+        courseware_object=course2_page.course,
+        country_of_income="IT",
+        country_of_residence="ES",
+    )
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] is None
+    assert context["country_of_income"] == "IT"
+    assert context["country_of_residence"] == "ES"
+
+
+@pytest.mark.parametrize("has_legal_address", [True, False])
+@pytest.mark.parametrize("has_previous_submission", [True, False])
+def test_flexible_pricing_form_get_context_country_precedence(
+    has_legal_address, has_previous_submission
+):
+    """Test the precedence of country information sources"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+    course_page = CoursePageFactory.create()
+    flex_form = FlexiblePricingFormFactory.create(parent=course_page)
+
+    if has_legal_address:
+        user.legal_address.country = "US"
+        user.legal_address.save()
+    else:
+        user.legal_address.country = ""
+        user.legal_address.save()
+
+    if has_previous_submission:
+        FlexiblePriceFactory.create(
+            user=user,
+            courseware_object=course_page.course,
+            country_of_income="CA",
+            country_of_residence="MX",
+        )
+
+    context = flex_form.get_context(request)
+
+    if has_previous_submission:
+        assert context["country_of_income"] == "CA"
+        assert context["country_of_residence"] == "MX"
+    elif has_legal_address:
+        assert context["country_of_income"] == "US"
+        assert context["country_of_residence"] == "US"
+    else:
+        assert context["country_of_income"] == ""
+        assert context["country_of_residence"] == ""
+
+
+def test_fp_request_form_get_context_no_previous_submission():
+    """Test get_context when there is no previous submission."""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course_page = CoursePageFactory.create()
+    run = CourseRunFactory.create(course=course_page.course)
+    product = ProductFactory.create(purchasable_object=run)
+
+    flex_form = FlexiblePricingFormFactory(parent=course_page)
+
+    # Update user's legal address (UserFactory already creates one)
+    user.legal_address.country = "US"
+    user.legal_address.save()
+
+    context = flex_form.get_context(request)
+
+    # Should inherit from parent
+    assert "prior_request" in context
+    assert context["prior_request"] is None
+
+    assert context["country_of_income"] == "US"
+    assert context["country_of_residence"] == "US"
+
+    assert context["product"] == product
+    assert context["product_page"] == course_page.url
+
+
+def test_fp_request_form_get_context_with_previous_submission():
+    """Test get_context when there is a previous submission."""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course_page = CoursePageFactory.create()
+    run = CourseRunFactory.create(course=course_page.course)
+    product = ProductFactory.create(purchasable_object=run)
+    flex_form = FlexiblePricingFormFactory(parent=course_page)
+
+    # Create previous submission with different country data
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps({}), page=flex_form, user=user
+    )
+    flexible_price = FlexiblePrice.objects.create(
+        user=user,
+        cms_submission=submission,
+        courseware_object=course_page.course,
+        country_of_income="CA",
+        country_of_residence="CA",
+        status=FlexiblePriceStatus.CREATED,
+    )
+
+    user.legal_address.country = "US"
+    user.legal_address.save()
+
+    context = flex_form.get_context(request)
+
+    assert context["prior_request"] == flexible_price
+
+    assert context["country_of_income"] == "CA"
+    assert context["country_of_residence"] == "CA"
+
+    assert context["product"] == product
+    assert context["product_page"] == course_page.url
+
+
+def test_fp_request_form_get_context_no_legal_address():
+    """Test get_context when user has no legal address."""
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    User = get_user_model()
+    user = User.objects.create_user(username="testuser", email="test@example.com")
+    request.user = user
+
+    course_page = CoursePageFactory.create()
+    run = CourseRunFactory.create(course=course_page.course)
+    product = ProductFactory.create(purchasable_object=run)
+    flex_form = FlexiblePricingFormFactory(parent=course_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["country_of_income"] == ""
+    assert context["country_of_residence"] == ""
+
+    assert context["product"] == product
+    assert context["product_page"] == course_page.url
+
+
+def test_fp_request_form_get_context_program_page():
+    """Test get_context when form is under a program page."""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    program_page = ProgramPageFactory.create()
+    flex_form = FlexiblePricingFormFactory(parent=program_page)
+
+    context = flex_form.get_context(request)
+
+    assert context["product"] is None
+    assert context["product_page"] == program_page.url
+
+
+def test_fp_request_form_get_context_absolute_last_submission():
+    """Test that absolute last submission overrides legal address."""
+    rf = RequestFactory()
+    request = rf.get("/")
+    user = UserFactory.create()
+    request.user = user
+
+    course_page1 = CoursePageFactory.create()
+    course_page2 = CoursePageFactory.create()
+    run1 = CourseRunFactory.create(course=course_page1.course)
+    run2 = CourseRunFactory.create(course=course_page2.course)
+    ProductFactory.create(purchasable_object=run1)
+    ProductFactory.create(purchasable_object=run2)
+
+    flex_form1 = FlexiblePricingFormFactory(parent=course_page1)
+    flex_form2 = FlexiblePricingFormFactory(parent=course_page2)
+
+    user.legal_address.country = "US"
+    user.legal_address.save()
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps({}), page=flex_form1, user=user
+    )
+    FlexiblePrice.objects.create(
+        user=user,
+        cms_submission=submission,
+        courseware_object=course_page1.course,
+        country_of_income="MX",
+        country_of_residence="MX",
+        status=FlexiblePriceStatus.CREATED,
+    )
+
+    context = flex_form2.get_context(request)
+
+    assert context["country_of_income"] == "MX"
+    assert context["country_of_residence"] == "MX"

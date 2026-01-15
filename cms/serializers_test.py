@@ -63,7 +63,7 @@ def test_serialize_course_page(
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_page.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -106,7 +106,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -148,7 +148,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -190,7 +190,7 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_page.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -229,7 +229,7 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
-            "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "description": bleach.clean(course_page.description, tags={}, strip=True),
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -238,13 +238,13 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
 
 
 @pytest.mark.parametrize(
-    "own_program_has_form,related_program,related_program_has_form",  # noqa: PT006
+    ("own_program_has_form", "related_program", "related_program_has_form"),
     [
-        [True, False, False],  # noqa: PT007
-        [True, True, False],  # noqa: PT007
-        [False, True, False],  # noqa: PT007
-        [False, True, True],  # noqa: PT007
-        [True, True, True],  # noqa: PT007
+        (True, False, False),
+        (True, True, False),
+        (False, True, False),
+        (False, True, True),
+        (True, True, True),
     ],
 )
 def test_serialized_course_finaid_form_url(
@@ -311,6 +311,50 @@ def test_serialized_course_finaid_form_url(
             )
 
 
+@pytest.mark.parametrize(
+    ("own_form_published", "related_form_published"),
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_serialized_course_finaid_form_url_publishing_states(
+    own_form_published, related_form_published
+):
+    """
+    Test a few scenarios where financial aid forms exist but are not yet published.
+    """
+
+    program1 = ProgramFactory.create()
+    course1 = CourseFactory.create()
+    program1.add_requirement(course1)
+
+    program2 = ProgramFactory.create()
+    course2 = CourseFactory.create()
+    program2.add_requirement(course2)
+    program1.add_related_program(program2)
+
+    own_fa_page = FlexiblePricingFormFactory.create(
+        parent=program1.page, selected_program=program1, live=own_form_published
+    )
+    related_fa_page = FlexiblePricingFormFactory.create(
+        parent=program2.page, selected_program=program2, live=related_form_published
+    )
+
+    serialized_output = CoursePageSerializer(course1.page).data
+
+    if own_form_published:
+        assert own_fa_page.slug in serialized_output["financial_assistance_form_url"]
+    elif related_form_published:
+        assert (
+            related_fa_page.slug in serialized_output["financial_assistance_form_url"]
+        )
+    else:
+        assert serialized_output["financial_assistance_form_url"] == ""
+
+
 def test_serialize_program_page(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
@@ -337,7 +381,7 @@ def test_serialize_program_page(
             "feature_image_src": fake_image_src,
             "page_url": program_page.url,
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
-            "description": bleach.clean(program_page.description, tags=[], strip=True),
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
@@ -375,7 +419,7 @@ def test_serialize_program_page__with_related_financial_form(
             "feature_image_src": fake_image_src,
             "page_url": program_page.url,
             "financial_assistance_form_url": f"{other_program_page.get_url()}{financial_assistance_form.slug}/",
-            "description": bleach.clean(program_page.description, tags=[], strip=True),
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
@@ -407,7 +451,7 @@ def test_serialize_program_page__no_financial_form(
             "feature_image_src": fake_image_src,
             "page_url": program_page.url,
             "financial_assistance_form_url": "",
-            "description": bleach.clean(program_page.description, tags=[], strip=True),
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
@@ -442,7 +486,7 @@ def test_serialize_program_page__with_related_program_no_financial_form(
             "feature_image_src": fake_image_src,
             "page_url": program_page.url,
             "financial_assistance_form_url": "",
-            "description": bleach.clean(program_page.description, tags=[], strip=True),
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,

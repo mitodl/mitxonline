@@ -1,10 +1,12 @@
 """Courses API tests"""
 
-from datetime import timedelta
+from copy import deepcopy
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 from urllib.parse import quote
+from uuid import UUID
 
 import factory
 import faker
@@ -36,8 +38,10 @@ from courses.api import (
     deactivate_run_enrollment,
     defer_enrollment,
     generate_course_run_certificates,
+    generate_openedx_course_url,
     generate_program_certificate,
     get_certificate_grade_eligible_runs,
+    get_verifiable_credentials_payload,
     import_courserun_from_edx,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
@@ -244,7 +248,7 @@ def test_create_run_enrollments_upgrade(
     )
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
-    successful_enrollments, edx_request_success = create_run_enrollments(
+    _, edx_request_success = create_run_enrollments(
         user, runs=[test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
     patched_edx_enroll.assert_called_once_with(
@@ -1430,7 +1434,7 @@ def test_generate_program_certificate_success_minimum_electives_not_met(
         user=user, course_run=elective_course1_course_run
     )
 
-    certificate, created = generate_program_certificate(user=user, program=program)
+    _, created = generate_program_certificate(user=user, program=program)
     assert created is False
     assert len(ProgramCertificate.objects.all()) == 0
 
@@ -2256,3 +2260,367 @@ def test_import_courserun_from_edx_specific_course_pages(  # noqa: PLR0913
         ingest_content_files_for_ai=ingest_content_files_for_ai,
         is_source_run=False,
     )
+
+
+@pytest.mark.parametrize(
+    "add_pre_path",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "add_suffix",
+    [
+        True,
+        False,
+    ],
+)
+def test_generate_openedx_course_url(settings, add_pre_path, add_suffix):
+    """Test that course home URL generation works as expected."""
+
+    course_key = "course-v1:TestX+12.345q+9T2199"
+    settings.OPENEDX_COURSE_BASE_URL = FAKE.url()
+
+    if add_pre_path:
+        settings.OPENEDX_COURSE_BASE_URL += FAKE.uri_path(3)
+
+    settings.OPENEDX_COURSE_BASE_URL_SUFFIX = FAKE.uri_path(1) if add_suffix else None
+
+    generated_url = generate_openedx_course_url(course_key)
+
+    assert course_key in generated_url
+    assert settings.OPENEDX_COURSE_BASE_URL in generated_url
+
+    if add_suffix and settings.OPENEDX_COURSE_BASE_URL_SUFFIX:
+        assert settings.OPENEDX_COURSE_BASE_URL_SUFFIX in generated_url
+    else:
+        assert not settings.OPENEDX_COURSE_BASE_URL_SUFFIX
+
+
+FAKE_PROOF_PAYLOAD = {
+    "type": "DataIntegrityProof",
+    "created": "2025-12-12T17:52:25Z",
+    "verificationMethod": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS#z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",
+    "cryptosuite": "eddsa-rdfc-2022",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z5UBb8q7StJLsA839GjyMrFsB6atZRkeXx2MCmgaB6D4mDvQQujcxxzysF3F6d8MZgWQh4ftUCRbWCBWibyRMCwR8",
+}
+
+
+def return_signed_credential(payload):
+    return_value = deepcopy(payload)
+    return_value["proof"] = FAKE_PROOF_PAYLOAD
+    return return_value
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_verifiable_credentials(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user
+):
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+
+    mocker.patch(
+        "courses.api.request_verifiable_credential",
+        side_effect=return_signed_credential,
+    )
+    mocker.patch(
+        "courses.api.should_provision_verifiable_credential", return_value=True
+    )
+    passed_grade_with_enrollment.course_run.course.page.what_you_learn = (
+        "Some learning content"
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+    assert certificate.verifiable_credential
+    assert (
+        certificate.verifiable_credential.credential_data["proof"] == FAKE_PROOF_PAYLOAD
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_program_certificate_verifiable_credentials(
+    mock_upsert_custom_properties,
+    user,
+    program_with_requirements,  # noqa: F811
+    mocker,
+):
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.request_verifiable_credential",
+        side_effect=return_signed_credential,
+    )
+    mocker.patch(
+        "courses.api.should_provision_verifiable_credential", return_value=True
+    )
+    courses = CourseFactory.create_batch(3)
+    course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    CourseRunCertificateFactory.create_batch(
+        2, user=user, course_run=factory.Iterator(course_runs)
+    )
+    program = program_with_requirements.program
+    ProgramEnrollmentFactory.create(user=user, program=program)
+    program.add_requirement(courses[0])
+    program.add_requirement(courses[1])
+    program.add_requirement(courses[2])
+
+    certificate, created = generate_program_certificate(
+        user=user, program=program, force_create=True
+    )
+    assert created is True
+    assert isinstance(certificate, ProgramCertificate)
+    assert len(ProgramCertificate.objects.all()) == 1
+    assert certificate.verifiable_credential
+    assert (
+        certificate.verifiable_credential.credential_data["proof"] == FAKE_PROOF_PAYLOAD
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_verifiable_credentials_feature_flag_disabled(
+    mock_upsert_custom_properties, passed_grade_with_enrollment, mocker, user
+):
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.should_provision_verifiable_credential", return_value=False
+    )
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+    assert certificate.verifiable_credential is None
+
+
+@patch("courses.api.CourseRunEnrollment.all_objects.get")
+@patch("courses.api.get_thumbnail_url")
+@patch("courses.signals.upsert_custom_properties")
+def test_course_run_certificate_verifiable_credentials_signing_payload(
+    mock_upsert_custom_properties,
+    mock_get_thumbnail_url,
+    mock_enrollment_get,
+    settings,
+    mocker,
+):
+    """Test that get_verifiable_credentials_payload generates the expected payload structure"""
+
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+
+    # Mock enrollment created_on date
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(2024, 1, 15, 10, 30, 0, tzinfo=pytz.UTC)
+    mock_enrollment_get.return_value = mock_enrollment
+
+    # Mock thumbnail URL
+    mock_get_thumbnail_url.return_value = "https://example.com/thumbnail.jpg"
+
+    # Set environment for hostname mapping
+    settings.ENVIRONMENT = "production"
+    settings.VERIFIABLE_CREDENTIAL_DID = (
+        "z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS"
+    )
+
+    # Create certificate with controlled values
+    course_run_cert = CourseRunCertificateFactory.create(
+        uuid=UUID("12345678-1234-5678-1234-567812345678"),
+        issue_date=datetime(2024, 6, 1, 12, 0, 0, tzinfo=pytz.UTC),
+    )
+
+    # Set controlled values on related objects
+    course_run_cert.user.name = "John Doe"
+    course_run_cert.user.save()
+
+    course_run_cert.course_run.title = "Introduction to Python"
+    course_run_cert.course_run.save()
+
+    course_run_cert.course_run.course.readable_id = "course-v1:MITx+6.00.1x"
+    course_run_cert.course_run.course.save()
+
+    course_run_cert.course_run.course.page.what_you_learn = (
+        "Learn Python programming fundamentals"
+    )
+    course_run_cert.course_run.course.page.save()
+
+    payload = get_verifiable_credentials_payload(course_run_cert)
+
+    # Assert the expected payload structure
+    expected_payload = {
+        "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        "id": "urn:uuid:12345678-1234-5678-1234-567812345678",
+        "type": ["VerifiableCredential", "OpenBadgeCredential"],
+        "issuer": {
+            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",
+            "type": ["Profile"],
+            "name": "MIT Learn",
+            "image": {
+                "id": "https://learn.mit.edu/images/mit-red.png",
+                "type": "Image",
+                "caption": "MIT Learn logo",
+            },
+        },
+        "validFrom": "2024-06-01T12:00:00Z",
+        "credentialSubject": {
+            "type": ["AchievementSubject"],
+            "activityStartDate": "2024-01-15T10:30:00Z",
+            "activityEndDate": "2024-06-01T12:00:00Z",
+            "identifier": [
+                {
+                    "type": "IdentityObject",
+                    "identityHash": "John Doe",
+                    "identityType": "name",
+                    "hashed": False,
+                    "salt": "not-used",
+                }
+            ],
+            "achievement": {
+                "id": "https://learn.mit.edu/courses/course-v1:MITx+6.00.1x",
+                "achievementType": "Course",
+                "type": ["Achievement"],
+                "criteria": {"narrative": "- Learn Python programming fundamentals"},
+                "description": "John Doe has successfully completed all modules and earned a Course Certificate in Introduction to Python.",
+                "name": "Introduction to Python",
+                "image": {
+                    "id": "https://example.com/thumbnail.jpg",
+                    "type": "Image",
+                    "caption": "MIT Learn Certificate logo",
+                },
+            },
+        },
+    }
+
+    assert payload == expected_payload
+
+
+@patch("courses.api.ProgramEnrollment.all_objects.get")
+@patch("courses.api.get_thumbnail_url")
+def test_program_certificate_verifiable_credentials_signing_payload(
+    mock_get_thumbnail_url, mock_enrollment_get, settings, mocker
+):
+    """Test that get_verifiable_credentials_payload generates the expected payload structure for programs"""
+    mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+
+    # Mock enrollment created_on date
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(2024, 2, 20, 14, 45, 0, tzinfo=pytz.UTC)
+    mock_enrollment_get.return_value = mock_enrollment
+
+    # Mock thumbnail URL
+    mock_get_thumbnail_url.return_value = "https://example.com/program-thumbnail.jpg"
+
+    # Set environment for hostname mapping
+    settings.ENVIRONMENT = "production"
+    settings.VERIFIABLE_CREDENTIAL_DID = (
+        "z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS"
+    )
+
+    # Create program certificate with controlled values
+    program_cert = ProgramCertificateFactory.create(
+        uuid=UUID("87654321-4321-8765-4321-876543218765"),
+        issue_date=datetime(2024, 7, 15, 16, 30, 0, tzinfo=pytz.UTC),
+    )
+
+    # Set controlled values on related objects
+    program_cert.user.name = "Jane Smith"
+    program_cert.user.save()
+
+    program_cert.program.title = "Data Science MicroMasters"
+    program_cert.program.readable_id = "program-v1:MITx+DataScienceMM"
+    program_cert.program.save()
+
+    # Create courses and add them to the program
+    course1 = CourseFactory.create()
+    course2 = CourseFactory.create()
+    course3 = CourseFactory.create()
+
+    program_cert.program.add_requirement(course1)
+    program_cert.program.add_requirement(course2)
+    program_cert.program.add_requirement(course3)
+
+    payload = get_verifiable_credentials_payload(program_cert)
+
+    # Build expected narrative from the actual course titles
+    narrative = "\n".join(
+        [f"- {course[0].title}" for course in program_cert.program.courses]
+    )
+
+    # Assert the expected payload structure
+    expected_payload = {
+        "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        "id": "urn:uuid:87654321-4321-8765-4321-876543218765",
+        "type": ["VerifiableCredential", "OpenBadgeCredential"],
+        "issuer": {
+            "id": "did:key:z6MkjoriXdbyWD25YXTed114F8hdJrLXQ567xxPHAUKxpKkS",
+            "type": ["Profile"],
+            "name": "MIT Learn",
+            "image": {
+                "id": "https://learn.mit.edu/images/mit-red.png",
+                "type": "Image",
+                "caption": "MIT Learn logo",
+            },
+        },
+        "validFrom": "2024-07-15T16:30:00Z",
+        "credentialSubject": {
+            "type": ["AchievementSubject"],
+            "activityStartDate": "2024-02-20T14:45:00Z",
+            "activityEndDate": "2024-07-15T16:30:00Z",
+            "identifier": [
+                {
+                    "type": "IdentityObject",
+                    "identityHash": "Jane Smith",
+                    "identityType": "name",
+                    "hashed": False,
+                    "salt": "not-used",
+                }
+            ],
+            "achievement": {
+                "id": "https://learn.mit.edu/programs/program-v1:MITx+DataScienceMM",
+                "achievementType": "Program",
+                "type": ["Achievement"],
+                "criteria": {"narrative": narrative},
+                "description": "Jane Smith has successfully completed all modules and earned a Program Certificate in Data Science MicroMasters.",
+                "name": "Data Science MicroMasters",
+                "image": {
+                    "id": "https://example.com/program-thumbnail.jpg",
+                    "type": "Image",
+                    "caption": "MIT Learn Certificate logo",
+                },
+            },
+        },
+    }
+
+    assert payload == expected_payload

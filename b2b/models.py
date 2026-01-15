@@ -133,7 +133,7 @@ class OrganizationPage(Page):
         - bool: success flag
         """
 
-        from b2b.api import add_user_org_membership
+        from b2b.api import add_user_org_membership  # noqa: PLC0415
 
         try:
             return add_user_org_membership(self, user)
@@ -232,7 +232,7 @@ class ContractProgramItem(Orderable):
         super().save(*args, **kwargs)
 
         if is_new and not skip_run_creation:
-            from b2b.tasks import create_program_contract_runs
+            from b2b.tasks import create_program_contract_runs  # noqa: PLC0415
 
             create_program_contract_runs.delay(self.contract.id, self.program.id)
             log.info(
@@ -373,7 +373,6 @@ class ContractPage(Page, ClusterableModel):
         """Save the page, and update the slug and title appropriately."""
 
         self.title = str(self.name)
-        self.slug = slugify(f"contract-{self.organization.id}-{self.title}")
 
         # This should be removed once we're done migrating orgs into Keycloak.
         # The integration type field should also be removed at that time.
@@ -414,7 +413,7 @@ class ContractPage(Page, ClusterableModel):
     def get_course_runs(self):
         """Get the runs associated with the contract."""
 
-        from courses.models import CourseRun
+        from courses.models import CourseRun  # noqa: PLC0415
 
         return (
             CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
@@ -423,8 +422,8 @@ class ContractPage(Page, ClusterableModel):
     def get_products(self):
         """Get the products associated with the contract."""
 
-        from courses.models import CourseRun
-        from ecommerce.models import Product
+        from courses.models import CourseRun  # noqa: PLC0415
+        from ecommerce.models import Product  # noqa: PLC0415
 
         content_type = ContentType.objects.get_for_model(CourseRun)
 
@@ -437,7 +436,7 @@ class ContractPage(Page, ClusterableModel):
     def get_discounts(self):
         """Get the discounts associated with the contract."""
 
-        from ecommerce.models import Discount
+        from ecommerce.models import Discount  # noqa: PLC0415
 
         return Discount.objects.filter(products__product__in=self.get_products()).all()
 
@@ -455,7 +454,7 @@ class ContractPage(Page, ClusterableModel):
             - number of courses with no source run
         """
 
-        from b2b.api import create_contract_run
+        from b2b.api import create_contract_run  # noqa: PLC0415
 
         # Clear any cached properties to ensure fresh data
         if hasattr(program, "_courses_with_requirements_data"):

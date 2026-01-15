@@ -8,8 +8,14 @@ import uuid
 from datetime import timedelta
 
 import pytest
+import responses
+import reversion
+from anys import ANY_STR
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.contrib.contenttypes.models import ContentType
 from django.db import connection
+from django.db.models import Q
 from django.test.client import RequestFactory
 from django.urls import reverse
 from faker import Faker
@@ -21,6 +27,8 @@ from rest_framework.test import APIClient
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from cms.factories import CoursePageFactory, ProgramPageFactory
+from cms.serializers import ProgramPageSerializer
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     CourseFactory,
     CourseRunCertificateFactory,
@@ -28,26 +36,44 @@ from courses.factories import (
     CourseRunFactory,
     DepartmentFactory,
     ProgramCertificateFactory,
+    ProgramEnrollmentFactory,
     ProgramFactory,
 )
-from courses.models import Course, Program
+from courses.models import (
+    Course,
+    CourseRunEnrollment,
+    Program,
+    ProgramEnrollment,
+)
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
     ProgramCertificateSerializer,
 )
-from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
+from courses.serializers.v2.courses import (
+    CourseRunWithCourseSerializer,
+    CourseWithCourseRunsSerializer,
+)
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
 )
-from courses.serializers.v2.programs import ProgramSerializer
-from courses.utils import get_enrollable_courses, get_unenrollable_courses
+from courses.serializers.v2.programs import (
+    ProgramRequirementTreeSerializer,
+    ProgramSerializer,
+)
+from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
+from courses.utils import (
+    get_enrollable_courses,
+    get_unenrollable_courses,
+)
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_department,
     num_queries_from_programs,
 )
 from courses.views.v2 import Pagination, ProgramFilterSet
+from ecommerce.models import Product
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -765,3 +791,460 @@ def test_get_program_certificate():
 
     resp400 = client.get(reverse("v2:get_program_certificate", args=["not-uuid"]))
     assert resp400.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_filter_by_contract_id_with_contracted_user(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering by contract_id returns only programs in that contract for authorized users"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_contracts.add(contract)
+
+    program_with_contract = ProgramFactory.create()
+    (course, _) = contract_ready_course
+    program_with_contract.add_requirement(course)
+    program_with_contract.refresh_from_db()
+
+    contract.add_program_courses(program_with_contract)
+
+    # Unrelated program (should not be included)
+    ProgramFactory()
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+    url = reverse("v2:programs_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    assert program_with_contract.title in [
+        program["title"] for program in response.data["results"]
+    ]
+
+
+@pytest.mark.django_db
+def test_filter_by_contract_id_without_contract_access(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering by contract_id returns only non-B2B programs if user doesn't have access"""
+    org = OrganizationPageFactory()
+    user = UserFactory()
+
+    program_with_contract = ProgramFactory()
+    (course, _) = contract_ready_course
+    contract = ContractPageFactory(active=True, organization=org)
+    program_with_contract.add_requirement(course)
+    program_with_contract.refresh_from_db()
+
+    contract.add_program_courses(program_with_contract)
+
+    # Another program without contract (should be included)
+    public_program = ProgramFactory()
+
+    request = Request(
+        RequestFactory().get("v2:programs_api-list", {"contract_id": contract.id})
+    )
+    request.user = user  # Not associated with contract
+
+    filterset = ProgramFilterSet(
+        data={"contract_id": contract.id},
+        queryset=Program.objects.all(),
+        request=request,
+    )
+
+    filtered = filterset.qs
+    assert public_program in filtered
+    assert program_with_contract in filtered
+    assert filtered.count() == 2
+
+
+@pytest.mark.django_db
+def test_filter_by_contract_id_unauthenticated_user(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering by contract_id returns only non-B2B programs if user is unauthenticated"""
+    org = OrganizationPageFactory()
+
+    program_with_contract = ProgramFactory()
+    (course, _) = contract_ready_course
+    contract = ContractPageFactory(active=True, organization=org)
+
+    program_with_contract.add_requirement(course)
+    program_with_contract.refresh_from_db()
+
+    contract.add_program_courses(program_with_contract)
+
+    public_program = ProgramFactory()
+
+    request = Request(
+        RequestFactory().get("v2:programs_api-list", {"contract_id": contract.id})
+    )
+    request.user = AnonymousUser()
+
+    filterset = ProgramFilterSet(
+        data={"contract_id": contract.id},
+        queryset=Program.objects.all(),
+        request=request,
+    )
+
+    filtered = filterset.qs
+    assert public_program in filtered
+    assert program_with_contract in filtered
+    assert filtered.count() == 2
+
+
+@pytest.mark.django_db
+def test_filter_courses_with_contract_id_authenticated_user(
+    mocker, contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering courses by contract_id returns contracted courses for authorized users"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+    user = UserFactory()
+    user.b2b_contracts.add(contract)
+    user.refresh_from_db()
+
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    unrelated_course = Course.objects.create(title="Other Course")
+    CourseRunFactory(course=unrelated_course)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    titles = [result["title"] for result in response.data["results"]]
+    assert course.title in titles
+    assert unrelated_course.title not in titles
+
+
+@pytest.mark.django_db
+def test_filter_courses_with_contract_id_no_access(
+    contract_ready_course, mock_course_run_clone
+):
+    """Test that filtering courses by contract_id returns no courses if user lacks access"""
+    org = OrganizationPageFactory(name="Test Org")
+    user = UserFactory()
+    contract = ContractPageFactory(organization=org, active=True)
+    (course, _) = contract_ready_course
+    create_contract_run(contract, course)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    unrelated_course = Course.objects.create(title="Other Course")
+    CourseRunFactory(course=unrelated_course)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    assert response.data["results"] == []
+
+
+@pytest.mark.django_db
+def test_filter_courses_with_contract_id_anonymous():
+    """Test that filtering courses by contract_id returns no courses for anonymous users"""
+    org = OrganizationPageFactory(name="Test Org")
+    contract = ContractPageFactory(organization=org, active=True)
+
+    client = APIClient()
+
+    unrelated_course = Course.objects.create(title="Other Course")
+    CourseRunFactory(course=unrelated_course)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    assert response.data["results"] == []
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.usefixtures("b2b_courses")
+def test_program_enrollments(user_drf_client, user_with_enrollments_and_certificates):
+    """
+    Tests the program enrollments API, which should show the user's enrollment
+    in programs with the course runs that apply.
+    """
+    user = user_with_enrollments_and_certificates
+
+    program_enrollments = (
+        ProgramEnrollment.objects.filter(user=user)
+        .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+        .order_by("-id")
+    )
+
+    courses_by_program_id = {
+        program_enrollment.program_id: Course.objects.filter(
+            in_programs__program=program_enrollment.program
+        ).order_by("in_programs__path")
+        for program_enrollment in program_enrollments
+    }
+
+    run_enrollments_by_program_id = {
+        program_enrollment.program_id: CourseRunEnrollment.objects.filter(
+            user=user, run__course__in_programs__program=program_enrollment.program
+        )
+        .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+        .order_by("-id")
+        for program_enrollment in program_enrollments
+    }
+
+    # assert that we ended up with data
+    assert len(program_enrollments) > 0
+    for runs in run_enrollments_by_program_id.values():
+        assert len(runs) > 0
+
+    resp = user_drf_client.get(reverse("v2:user_program_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    def _get_page_prop(program_enrollment, prop, default=None):
+        program = program_enrollment.program
+        if hasattr(program, "page") and hasattr(program.page, prop):
+            return getattr(program.page, prop, default)
+        return default
+
+    assert resp.json() == [
+        {
+            "program": {
+                "id": program_enrollment.program.id,
+                "title": program_enrollment.program.title,
+                "live": program_enrollment.program.live,
+                "departments": [],
+                "readable_id": program_enrollment.program.readable_id,
+                "req_tree": list(
+                    ProgramRequirementTreeSerializer(
+                        program_enrollment.program.get_requirements_root()
+                    ).data
+                ),
+                "collections": [],
+                "availability": "anytime",
+                "certificate_type": "Certificate of Completion",
+                "required_prerequisites": _get_page_prop(
+                    program_enrollment, "prerequisites", ""
+                )
+                != "",
+                "topics": [],
+                "start_date": ANY_STR,
+                "end_date": None,
+                "enrollment_end": None,
+                "enrollment_start": None,
+                "duration": _get_page_prop(program_enrollment, "length"),
+                "time_commitment": _get_page_prop(program_enrollment, "effort"),
+                "min_price": _get_page_prop(program_enrollment, "min_price"),
+                "max_price": _get_page_prop(program_enrollment, "max_price"),
+                "min_weeks": _get_page_prop(program_enrollment, "min_weeks"),
+                "max_weeks": _get_page_prop(program_enrollment, "max_weeks"),
+                "min_weekly_hours": _get_page_prop(
+                    program_enrollment, "min_weekly_hours"
+                ),
+                "max_weekly_hours": _get_page_prop(
+                    program_enrollment, "max_weekly_hours"
+                ),
+                "requirements": {
+                    "courses": {
+                        "electives": [
+                            {"id": course.id, "readable_id": course.readable_id}
+                            for course in program_enrollment.program.elective_courses
+                        ],
+                        "required": [
+                            {"id": course.id, "readable_id": course.readable_id}
+                            for course in program_enrollment.program.required_courses
+                        ],
+                    },
+                    "programs": {
+                        "electives": [
+                            {"id": program.id, "readable_id": program.readable_id}
+                            for program in program_enrollment.program.elective_programs
+                        ],
+                        "required": [
+                            {"id": program.id, "readable_id": program.readable_id}
+                            for program in program_enrollment.program.required_programs
+                        ],
+                    },
+                },
+                "program_type": program_enrollment.program.program_type,
+                "page": dict(
+                    ProgramPageSerializer(program_enrollment.program.page).data
+                ),
+                "courses": [
+                    course.id
+                    for course in courses_by_program_id[program_enrollment.program.id]
+                ],
+            },
+            "certificate": maybe_serialize_program_cert(
+                program_enrollment.program, user
+            ),
+            "enrollments": [
+                {
+                    "approved_flexible_price_exists": False,
+                    "edx_emails_subscription": True,
+                    "certificate": maybe_serialize_course_cert(
+                        run_enrollment.run, user
+                    ),
+                    "grades": [],
+                    "id": run_enrollment.id,
+                    "enrollment_mode": run_enrollment.enrollment_mode,
+                    "run": dict(CourseRunWithCourseSerializer(run_enrollment.run).data),
+                    **(
+                        {
+                            "b2b_contract_id": run_enrollment.run.b2b_contract.id,
+                            "b2b_organization_id": run_enrollment.run.b2b_contract.organization_id,
+                        }
+                        if run_enrollment.run.b2b_contract
+                        else {
+                            "b2b_contract_id": None,
+                            "b2b_organization_id": None,
+                        }
+                    ),
+                }
+                for run_enrollment in run_enrollments_by_program_id[
+                    program_enrollment.program_id
+                ]
+            ],
+        }
+        for program_enrollment in program_enrollments
+    ]
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+@pytest.mark.parametrize(
+    (
+        "program_enrollment_type",
+        "requirement_type",
+    ),
+    [
+        (
+            None,
+            "requirement",
+        ),
+        (
+            EDX_ENROLLMENT_AUDIT_MODE,
+            "requirement",
+        ),
+        (
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            "requirement",
+        ),
+        (
+            EDX_ENROLLMENT_AUDIT_MODE,
+            "elective",
+        ),
+        (
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            "elective",
+        ),
+        (
+            EDX_ENROLLMENT_AUDIT_MODE,
+            "elective-extra",
+        ),
+        (
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            "elective-extra",
+        ),
+    ],
+)
+def test_add_verified_program_course_enrollment(
+    user, user_drf_client, program_enrollment_type, requirement_type
+):
+    """
+    Test that the endpoint works as expected.
+
+    The codepath for creating the verified enrollments has its own tests, so
+    this is testing the setup and check processes.
+    """
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={
+            "results": [
+                {"mode": program_enrollment_type, "is_active": True},
+            ],
+        },
+        status=status.HTTP_200_OK,
+    )
+
+    if program_enrollment_type:
+        prog_enrollment = ProgramEnrollmentFactory.create(
+            user=user, enrollment_mode=program_enrollment_type
+        )
+        program = prog_enrollment.program
+
+        if program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+            program_content_type = ContentType.objects.get_for_model(program)
+            with reversion.create_revision():
+                Product.objects.create(
+                    price=10,
+                    is_active=True,
+                    object_id=program.id,
+                    content_type=program_content_type,
+                )
+    else:
+        program = ProgramFactory.create()
+
+    course_run = CourseRunFactory.create()
+    program.add_requirement(
+        course_run.course
+    ) if requirement_type == "requirement" else program.add_elective(course_run.course)
+
+    if program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+        course_run_content_type = ContentType.objects.get_for_model(course_run)
+        with reversion.create_revision():
+            Product.objects.create(
+                price=10,
+                is_active=True,
+                object_id=course_run.id,
+                content_type=course_run_content_type,
+            )
+
+    if requirement_type == "elective-extra":
+        # Add another elective, adjust the requirement to only require one, and
+        # give the user a verified enrollment in that course. This should result
+        # in the learner getting an _audit_ enrollment in the course created
+        # earlier.
+        second_elective = CourseRunFactory.create()
+        program.add_elective(second_elective.course)
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=second_elective,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={
+                "courserun_id": course_run.courseware_id,
+                "program_id": program.readable_id,
+            },
+        )
+    )
+
+    if program_enrollment_type:
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert resp.json()["run"]["id"] == course_run.id
+
+        if (
+            program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
+            and requirement_type != "elective-extra"
+        ):
+            order = user.orders.last()
+            line = order.lines.last()
+            assert course_run == line.purchased_object
+            assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_VERIFIED_MODE
+
+        if (
+            program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
+            and requirement_type == "elective-extra"
+        ):
+            # We had enough electives so we should have gotten an audit enrollment
+            assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
+    else:
+        assert resp.status_code == status.HTTP_404_NOT_FOUND

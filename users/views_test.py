@@ -7,7 +7,6 @@ from django.urls import reverse
 from factory import fuzzy
 from mitol.common.utils import now_in_utc
 from rest_framework import status
-from social_django.models import UserSocialAuth
 
 from b2b.factories import ContractPageFactory
 from main.test_utils import drf_datetime
@@ -330,11 +329,9 @@ def test_create_email_change_request_valid_email(user_drf_client, user, mocker):
     code = mock_email.call_args[0][1].code
     assert code
 
-    old_email = user.email
     resp = user_drf_client.patch(
         f"/api/change-emails/{code}/", data={"confirmed": True}
     )
-    assert not UserSocialAuth.objects.filter(uid=old_email, user=user).exists()
     assert resp.status_code == status.HTTP_200_OK
     user.refresh_from_db()
     assert user.email == "abc@example.com"

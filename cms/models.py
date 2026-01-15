@@ -15,7 +15,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.forms import ChoiceField
+from django.forms import ChoiceField, IntegerField
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -102,7 +102,7 @@ class VideoPlayerConfigMixin(Page):
     def video_player_config(self):
         """Get configuration for video player"""
 
-        if self.video_url:  # noqa: RET503
+        if self.video_url:
             config = {"techOrder": ["html5"], "sources": [{"src": self.video_url}]}
             try:
                 embed = get_embed(self.video_url)
@@ -129,6 +129,8 @@ class VideoPlayerConfigMixin(Page):
                     f"The embed for the current url {self.video_url} is unavailable."  # noqa: G004
                 )
             return dumps(config)
+
+        return None
 
 
 class SignatoryObjectIndexPage(Page):
@@ -544,19 +546,26 @@ class FlexiblePricingFormBuilder(FormBuilder):
             "required": f"{options['label']} is a required field.",
             "invalid": f"{options['label']} must be a whole number.",
         }
-        # Use IntegerField for integer-only validation
-        from django.forms import IntegerField
 
         return IntegerField(**options)
 
     def create_country_field(self, field, options):  # noqa: ARG002
-        exchange_rates = []
+        """
+        Creates a ChoiceField populated with currency exchange rates.
+        """
+        exchange_rate_data = CurrencyExchangeRate.objects.values_list(
+            "currency_code", "description"
+        ).order_by("currency_code")
 
-        for record in CurrencyExchangeRate.objects.all():
-            desc = record.currency_code
-            if record.description is not None and len(record.description) > 0:
-                desc = f"{record.currency_code} - {record.description}"
-            exchange_rates.append((record.currency_code, desc))
+        exchange_rates = [
+            (
+                currency_code,
+                f"{currency_code} - {description}"
+                if description and description.strip()
+                else currency_code,
+            )
+            for currency_code, description in exchange_rate_data
+        ]
 
         options["choices"] = exchange_rates
         options["error_messages"] = {
@@ -1239,7 +1248,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         Returns a list of linked instructors for this product page.
         This is used for wagtail API.
         """
-        from cms.serializers import InstructorPageSerializer
+        from cms.serializers import InstructorPageSerializer  # noqa: PLC0415
 
         instructor_pages = [
             member.linked_instructor_page for member in self.linked_instructors.all()
@@ -1420,7 +1429,7 @@ class CoursePage(ProductPage):
 
     @property
     def course_details(self):
-        from courses.serializers.v2.courses import CourseSerializer
+        from courses.serializers.v2.courses import CourseSerializer  # noqa: PLC0415
 
         return CourseSerializer(self.course).data
 
@@ -1434,6 +1443,12 @@ class ProgramPage(ProductPage):
 
     program = models.OneToOneField(
         "courses.Program", null=True, on_delete=models.SET_NULL, related_name="page"
+    )
+
+    description = RichTextField(
+        help_text="The description shown on the home page and product page.",
+        blank=True,
+        null=True,
     )
 
     template = "product_page.html"
@@ -1485,7 +1500,7 @@ class ProgramPage(ProductPage):
 
     @property
     def program_details(self):
-        from courses.serializers.v2.programs import ProgramSerializer
+        from courses.serializers.v2.programs import ProgramSerializer  # noqa: PLC0415
 
         return ProgramSerializer(self.program).data
 
@@ -1605,7 +1620,11 @@ class FlexiblePricingRequestForm(AbstractForm):
         FieldPanel("selected_course"),
         FieldPanel("selected_program"),
         FieldPanel("guest_text"),
-        InlinePanel("form_fields", label="Form Fields"),
+        InlinePanel(
+            "form_fields",
+            label="Form Fields",
+            help_text="Required fields will be auto-populated when the form is published if not already present.",
+        ),
         FieldPanel("application_processing_text"),
         FieldPanel("application_approved_text"),
         FieldPanel("application_approved_no_discount_text"),

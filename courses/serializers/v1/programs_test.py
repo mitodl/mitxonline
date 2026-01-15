@@ -112,7 +112,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
 def test_program_requirement_tree_serializer_save():
     """Verify that the ProgramRequirementTreeSerializer validates data"""
     program = ProgramFactory.create()
-    course1, course2, course3 = CourseFactory.create_batch(3)
+    course1, _course2, _course3 = CourseFactory.create_batch(3)
     root = program.requirements_root
 
     serializer = ProgramRequirementTreeSerializer(

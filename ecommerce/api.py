@@ -6,9 +6,10 @@ from decimal import Decimal
 from urllib.parse import urljoin
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
@@ -28,28 +29,39 @@ from ecommerce.constants import (
     ALL_REDEMPTION_TYPES,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    PAYMENT_TYPE_SALES,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
     ZERO_PAYMENT_DATA,
 )
+from ecommerce.exceptions import (
+    VerifiedProgramInvalidBasketError,
+    VerifiedProgramInvalidOrderError,
+    VerifiedProgramNoEnrollmentError,
+)
 from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
     Discount,
+    DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
     Order,
     OrderStatus,
     PendingOrder,
+    Product,
     UserDiscount,
 )
 from ecommerce.tasks import perform_downgrade_from_order
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from hubspot_sync.task_helpers import sync_hubspot_deal
 from main.constants import (
+    USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
+    USER_MSG_TYPE_B2B_INVALID_BASKET,
+    USER_MSG_TYPE_BASKET_EMPTY,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
@@ -59,21 +71,33 @@ from main.constants import (
 )
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import parse_supplied_date, redirect_with_user_message
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
 
-def generate_checkout_payload(request):  # noqa: PLR0911
-    """Generate the checkout payload for the current basket."""
+def generate_checkout_payload(request, *, skip_discount_check=False):  # noqa: PLR0911
+    """
+    Generate the checkout payload for the current basket.
 
-    from b2b.api import validate_basket_for_b2b_purchase
+    Set skip_discount_check when generating a payload for a verified program
+    enrollment. The discount in that case is attached to the program, not the
+    courserun that's being purchased, so it's technically "invalid".
+
+    Args:
+    - request: the incoming http request
+    Kwargs:
+    - skip_discount_check: skip checking discounts for validity (default False)
+    """
+
+    from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
 
     basket = establish_basket(request)
 
     if basket.has_user_blocked_products(request.user):
         return {
             "country_blocked": True,
+            "error": USER_MSG_TYPE_ENROLL_BLOCKED,
             "response": redirect_with_user_message(
                 reverse("user-dashboard"),
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
@@ -83,6 +107,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if basket.has_user_purchased_same_courserun(request.user):
         return {
             "purchased_same_courserun": True,
+            "error": USER_MSG_TYPE_ENROLL_DUPLICATED,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
@@ -92,18 +117,20 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if basket.has_user_purchased_non_upgradable_courserun():
         return {
             "purchased_non_upgradeable_courserun": True,
+            "error": USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE},
             ),
         }
 
-    if not check_basket_discounts_for_validity(request):
+    if not skip_discount_check and not check_basket_discounts_for_validity(request):
         # We only allow one discount per basket so clear all of them here.
         basket.discounts.all().delete()
         apply_user_discounts(request)
         return {
             "invalid_discounts": True,
+            "error": USER_MSG_TYPE_DISCOUNT_INVALID,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
@@ -115,6 +142,7 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if not is_discount_supplied_for_b2b_purchase(request, active_contracts):
         return {
             "invalid_discounts": True,
+            "error": USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY},
@@ -124,9 +152,20 @@ def generate_checkout_payload(request):  # noqa: PLR0911
     if not validate_basket_for_b2b_purchase(request, active_contracts):
         return {
             "invalid_discounts": True,
+            "error": USER_MSG_TYPE_B2B_INVALID_BASKET,
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
+            ),
+        }
+
+    if not basket.basket_items.count():
+        return {
+            "basket_empty": True,
+            "error": USER_MSG_TYPE_BASKET_EMPTY,
+            "response": redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_BASKET_EMPTY},
             ),
         }
 
@@ -807,3 +846,170 @@ def generate_discount_code(**kwargs):  # noqa: C901
         generated_codes.append(discount)
 
     return generated_codes
+
+
+def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
+    """
+    Get the auto-apply discounts that can be applied to a basket.
+
+    Args:
+        basket_id (int): The ID of the basket to get the auto-apply discounts for.
+
+    Returns:
+        QuerySet: The auto-apply discounts that can be applied to the basket.
+    """
+    basket = Basket.objects.get(pk=basket_id)
+    products = basket.get_products()
+
+    return Discount.objects.filter(
+        Q(products__product__in=products) | Q(products__isnull=True),
+        Q(user_discount_discount__user=basket.user)
+        | Q(user_discount_discount__isnull=True),
+        automatic=True,
+    )
+
+
+def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):
+    """
+    Apply a discount to a basket.
+
+    Args:
+        discount (Discount): The Discount to apply to the basket.
+    Keyword Args:
+        allow_finaid (bool): Allow a financial assistance discount through.
+    """
+    if discount.is_valid(basket, allow_finaid=allow_finaid):
+        BasketDiscount.objects.create(
+            redeemed_by=basket.user,
+            redeemed_discount=discount,
+            redeemed_basket=basket,
+            redemption_date=now_in_utc(),
+        )
+
+
+def create_verified_program_discount(program):
+    """
+    Create discount (enrollment) codes for a program.
+
+    When a learner buys a program, they need to be able to get verified enrollments
+    in the courses that are in the program. We generally do this with enrollment
+    codes - this creates one for the program that is set up to make the order
+    zero-value, so the learner doesn't have to pay for upgraded enrollments.
+
+    This will create a single discount, with the "verified program" flag set,
+    with unlimited redemptions, set to 100% off.
+
+    If a discount already exists for this purpose, this will return it.
+
+    Args:
+    - program (Program): the program to create a discount for
+    Returns:
+    - Discount, the discount that was created
+    """
+
+    content_type = ContentType.objects.get_for_model(program)
+    product = Product.objects.filter(
+        content_type=content_type, object_id=program.id
+    ).get()
+
+    existing_discount_qs = Discount.objects.filter(
+        Q(activation_date__isnull=True) | Q(activation_date__lte=now_in_utc()),
+        Q(expiration_date__isnull=True) | Q(expiration_date__gte=now_in_utc()),
+        products__product=product,
+        is_program_discount=True,
+    )
+
+    if existing_discount_qs.exists():
+        return existing_discount_qs.last()
+
+    discount = Discount.objects.create(
+        amount=Decimal(100),
+        automatic=False,
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+        redemption_type=REDEMPTION_TYPE_UNLIMITED,
+        payment_type=PAYMENT_TYPE_SALES,
+        discount_code=f"{program.readable_id}-{uuid.uuid4()}",
+        is_bulk=True,
+        is_program_discount=True,
+    )
+
+    DiscountProduct.objects.create(discount=discount, product=product)
+
+    return discount
+
+
+def create_verified_program_course_run_enrollment(request, courserun, program):
+    """
+    Create a verified course run enrollment in a course that is associated with
+    a program for the specified learner.
+
+    If the learner has a verified enrollment in the program, and they're enrolling
+    in a course run that's for a course within the program, they'll need a
+    matching verified enrollment in the course run too. We want verified
+    enrollments to have corresponding orders within the system. So, this takes
+    the user, run, and program and creates an order and fulfills it.
+
+    Because the learner has already paid for the program, though, we need to make
+    sure they're not paying for the run again. So, the order should be a
+    zero-value one. This will use a discount code for this - if we don't have one
+    already, then we will make one on the fly for the program, and then apply it
+    to the order.
+
+    Courses can belong to multiple programs, so the program must be specified
+    so the function can verify the user's program enrollment.
+
+    Args:
+    - request: The incoming HTTP request.
+    - courserun: The course run to purchase.
+    - program: The program to use.
+    Returns:
+    - CourseRunEnrollment
+    Raises:
+    - VerifiedProgramNoEnrollmentError if the learner doesn't have a program
+      enrollment
+    - VerifiedProgramInvalidBasketError if the basket isn't zero value
+    - VerifiedProgramInvalidOrderError if the order doesn't get processed through
+    """
+
+    if not program.enrollments.filter(
+        user=request.user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, active=True
+    ).exists():
+        msg = f"No verified enrollment for {request.user} for program {program}"
+        raise VerifiedProgramNoEnrollmentError(msg)
+
+    discount = create_verified_program_discount(program)
+
+    cr_ctype = ContentType.objects.get_for_model(courserun)
+    product = Product.objects.filter(
+        content_type=cr_ctype, object_id=courserun.id, is_active=True
+    ).get()
+
+    basket = establish_basket(request)
+
+    if basket.basket_items.count() > 0:
+        # Stuff in the basket - stop here.
+        msg = f"Basket for {request.user} is not empty"
+        raise VerifiedProgramInvalidBasketError(msg)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=request.user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    if Decimal(
+        sum([basket_item.discounted_price for basket_item in basket.basket_items.all()])
+    ) > Decimal(0):
+        # For some reason the basket's not zero-value.
+        msg = f"Basket for {request.user} is not zero-value"
+        raise VerifiedProgramInvalidBasketError(msg)
+
+    processed_order = generate_checkout_payload(request, skip_discount_check=True)
+
+    if "no_checkout" not in processed_order:
+        # It didn't just clear the order so something went wrong
+        raise VerifiedProgramInvalidOrderError
+
+    return courserun.enrollments.filter(user=request.user).get()

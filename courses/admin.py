@@ -9,6 +9,7 @@ from django.forms import TextInput
 from django.urls import reverse
 from mitol.common.admin import TimestampedModelAdmin
 
+import cms.admin  # noqa: F401
 from courses.api import downgrade_learner
 from courses.forms import ProgramAdminForm
 from courses.models import (
@@ -23,6 +24,7 @@ from courses.models import (
     Department,
     LearnerProgramRecordShare,
     PaidCourseRun,
+    PaidProgram,
     PartnerSchool,
     Program,
     ProgramCertificate,
@@ -41,7 +43,7 @@ class ProgramContractPageInline(admin.TabularInline):
     """Inline for contract pages"""
 
     # Import here to avoid circular dependency at module load time
-    from b2b.models import ContractProgramItem
+    from b2b.models import ContractProgramItem  # noqa: PLC0415
 
     model = ContractProgramItem
     extra = 0
@@ -314,7 +316,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
     def downgrade_enrollment(self, request, queryset):
         """Admin action to change the status of users enrollment from verified to audit"""
         enrollment = queryset.first()
-        enrollments, enroll_success = downgrade_learner(enrollment)
+        _, enroll_success = downgrade_learner(enrollment)
         if not enroll_success:
             self.message_user(
                 request,
@@ -498,6 +500,37 @@ class PaidCourseRunAdmin(TimestampedModelAdmin):
         return obj.order.state
 
 
+@admin.register(PaidProgram)
+class PaidProgramAdmin(TimestampedModelAdmin):
+    """Admin for PaidProgram"""
+
+    model = PaidProgram
+    list_display = [
+        "id",
+        "get_user_email",
+        "get_readable_id",
+        "get_order_id",
+        "get_order_state",
+    ]
+    search_fields = ["program__readable_id", "user__username", "user__email"]
+
+    @display(description="User")
+    def get_user_email(self, obj):
+        return obj.user.email
+
+    @display(description="Program")
+    def get_readable_id(self, obj):
+        return obj.program.readable_id
+
+    @display(description="Order ID")
+    def get_order_id(self, obj):
+        return obj.order.id
+
+    @display(description="Order State")
+    def get_order_state(self, obj):
+        return obj.order.state
+
+
 @admin.register(CourseRunCertificate)
 class CourseRunCertificateAdmin(TimestampedModelAdmin):
     """Admin for CourseRunCertificate"""
@@ -508,6 +541,7 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         "uuid",
         "user",
         "course_run",
+        "get_certificate_page_title",
         "get_revoked_state",
     ]
     search_fields = [
@@ -517,7 +551,27 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         "user__email",
     ]
     list_filter = ["is_revoked", "course_run__course"]
-    raw_id_fields = ("user",)
+    raw_id_fields = ("user", "course_run")
+    autocomplete_fields = ("certificate_page_revision",)
+
+    def get_readonly_fields(self, request, obj=None):
+        """Make course_run and certificate_page_revision read-only when editing"""
+        return list(super().get_readonly_fields(request, obj))
+
+    @admin.display(
+        description="Certificate Page",
+    )
+    def get_certificate_page_title(self, obj):
+        """Returns the certificate page title from the revision"""
+        if obj.certificate_page_revision:
+            try:
+                page = obj.certificate_page_revision.as_object()
+                if hasattr(page, "title"):
+                    return page.title
+                return str(page)
+            except (AttributeError, ValueError, TypeError):
+                return f"Revision {obj.certificate_page_revision.id}"
+        return "No certificate page"
 
     @admin.display(
         description="Active",

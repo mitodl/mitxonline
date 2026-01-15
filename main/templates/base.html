@@ -34,7 +34,7 @@
     {% include "partials/gtm_body.html" %}
 
     {% include 'hijack/notification.html' %}
-    {% if not request.path|startswith:'/certificate/' %}
+    {% if not request.path|startswith:'/certificate/' and 'ecom-service' not in request.GET %}
       {% banner %}
       {% block headercontent %}
         <div id="header"></div>
@@ -48,9 +48,11 @@
     {% block contact-us %}
     {% endblock %}
   </div>
+    {% if 'ecom-service' not in request.GET %}
     {% block footer %}
         {% include "footer.html" %}
     {% endblock %}
+    {% endif %}
     {% render_bundle 'django' %}
     {% block scripts %}
       {# Script to defer youtube video rendering #}
