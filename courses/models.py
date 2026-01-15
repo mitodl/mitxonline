@@ -1868,7 +1868,7 @@ class PaidProgram(TimestampedModel):
         """
 
         # Due to circular dependancy importing locally
-        from ecommerce.models import OrderStatus
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
 
         # PaidCourseRun should only contain fulfilled orders
         return cls.objects.filter(
