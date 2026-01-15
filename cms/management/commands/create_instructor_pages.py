@@ -132,7 +132,7 @@ class Command(BaseCommand):
         else:
             instructor_index_page = InstructorIndexPage.objects.first()
             instructor_payload = self.get_instructor_data(
-                use_fake_data,
+                use_fake_data=use_fake_data,
                 name=options["name"],
                 image_url=options["image_url"],
                 title=options["title"],
