@@ -243,25 +243,12 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
         """Get the course runs for the given instance."""
-        # Use prefetched courseruns and avoid additional queries
-        if (
-            hasattr(instance, "_prefetched_objects_cache")
-            and "courseruns" in instance._prefetched_objects_cache  # noqa: SLF001
-        ):
-            courseruns = instance._prefetched_objects_cache["courseruns"]  # noqa: SLF001
-        else:
-            courseruns = instance.courseruns.order_by("id")
+        courseruns = instance.courseruns.order_by("id")
 
-        # Filter in Python if org_id is specified to avoid additional queries
         if "org_id" in self.context:
-            org_id = self.context["org_id"]
-            courseruns = [
-                cr
-                for cr in courseruns
-                if hasattr(cr, "b2b_contract")
-                and cr.b2b_contract
-                and cr.b2b_contract.organization_id == org_id
-            ]
+            courseruns = courseruns.filter(
+                b2b_contract__organization_id=self.context["org_id"]
+            )
 
         return CourseRunSerializer(courseruns, many=True, read_only=True).data
 

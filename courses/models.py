@@ -922,12 +922,10 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-
+        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
         # First try to find non-past enrollable runs (end_date is None or in the future)
         best_run = (
-            CourseRun.objects.select_related("course")
-            .prefetch_related("products")
-            .filter(course=self, b2b_contract__isnull=True)
+            self.courseruns.filter(b2b_contract__isnull=True)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
             .order_by("start_date")
@@ -937,9 +935,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         # If no non-past runs found, look for any enrollable runs (including archived)
         if best_run is None:
             best_run = (
-                CourseRun.objects.select_related("course")
-                .prefetch_related("products")
-                .filter(course=self, b2b_contract__isnull=True)
+                self.courseruns.filter(b2b_contract__isnull=True)
                 .enrollable()
                 .order_by("start_date")
                 .first()
@@ -1835,6 +1831,49 @@ class PaidCourseRun(TimestampedModel):
         return cls.objects.filter(
             user=user,
             course_run=run,
+            order__state=OrderStatus.FULFILLED,
+        ).exists()
+
+
+class PaidProgram(TimestampedModel):
+    """Stores a record of programs that the user has paid for."""
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="paid_programs"
+    )
+
+    program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="paid_programs"
+    )
+
+    order = models.ForeignKey(
+        "ecommerce.Order", on_delete=models.CASCADE, related_name="paid_programs"
+    )
+
+    class Meta:
+        unique_together = ("user", "program", "order")
+
+    def __str__(self):
+        return f"Paid Program - {self.program.readable_id} by {self.user.name}"
+
+    @classmethod
+    def fulfilled_paid_program_exists(cls, user: User, program: Program):
+        """
+        Checks if user has paid course run
+        Returns True if PaidCourseRun exists else False.
+        Args:
+            products (list): List of products.
+        Returns:
+            Boolean
+        """
+
+        # Due to circular dependancy importing locally
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
+
+        # PaidCourseRun should only contain fulfilled orders
+        return cls.objects.filter(
+            user=user,
+            program=program,
             order__state=OrderStatus.FULFILLED,
         ).exists()
 

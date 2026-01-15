@@ -47,7 +47,7 @@ repos:
           - "config/keycloak/*"
         additional_dependencies: ["gibberish-detector"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.14.10"
+    rev: "v0.14.11"
     hooks:
       - id: ruff-format
       - id: ruff
