@@ -6,7 +6,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0052_signatorypage_title_3"),
+        ("cms", "0053_alter_coursepage_what_you_learn_and_more"),
     ]
 
     operations = [
