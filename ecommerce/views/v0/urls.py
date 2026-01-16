@@ -11,6 +11,8 @@ from ecommerce.views.v0 import (
     NestedDiscountRedemptionViewSet,
     NestedDiscountTierViewSet,
     NestedUserDiscountViewSet,
+    OrderHistoryViewSet,
+    OrderReceiptView,
     ProductViewSet,
     add_discount_to_basket,
     checkout_basket,
@@ -25,6 +27,7 @@ router = SimpleRouterWithNesting()
 
 router.register(r"products/all", AllProductViewSet, basename="all_products_api")
 router.register(r"products", ProductViewSet, basename="products_api")
+router.register(r"orders/history", OrderHistoryViewSet, basename="orderhistory_api")
 
 basket_router = router.register(r"baskets", BasketViewSet, basename="baskets_api")
 basket_router.register(
@@ -92,6 +95,11 @@ urlpatterns = [
         "baskets/checkout/",
         checkout_basket,
         name="baskets_api-checkout",
+    ),
+    path(
+        "api/orders/receipt/<int:pk>/",
+        OrderReceiptView.as_view(),
+        name="order_receipt_api",
     ),
     re_path(
         r"^",
