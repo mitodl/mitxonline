@@ -111,10 +111,14 @@ class Command(BaseCommand):
             }
         return instructor_payload
 
-    def link_instructor_to_course(self, instructor_page, course_id):
-        course = Course.objects.filter(readable_id=course_id).first()
+    def link_instructor_to_course(self, instructor_page, readable_id):
+        course = Course.objects.filter(readable_id=readable_id).first()
         if not course:
-            self.error(f"Could not find course with id {course_id}")
+            self.error(f"Could not find course with id {readable_id}")
+        if not course.page:
+            self.error(
+                f"Course {readable_id} does not have a CMS page to link to. Consider creating one with create_courseware_page."
+            )
         InstructorPageLink(
             linked_instructor_page=instructor_page, page=course.page
         ).save()
