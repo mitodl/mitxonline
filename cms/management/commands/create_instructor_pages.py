@@ -120,7 +120,7 @@ class Command(BaseCommand):
         course = Course.objects.filter(readable_id=readable_id).first()
         if not course:
             self.error(f"Could not find course with id {readable_id}")
-        page = CoursePage.objects.get(course_id=readable_id).first()
+        page = CoursePage.objects.filter(course_id=course.id).first()
         if not page:
             self.error(
                 f"Course {readable_id} does not have a CMS page to link to. Consider creating one with create_courseware_page."
