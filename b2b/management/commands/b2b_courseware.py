@@ -263,6 +263,8 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 )
                 skipped += 1
 
+        contract.save()
+
         self.stdout.write(
             self.style.SUCCESS(
                 f"Managed {managed} courseware items and skipped {skipped} courseware items for {len(coursewares)} specified courseware IDs."
