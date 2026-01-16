@@ -96,6 +96,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "id": None,
             "username": None,
             "email": None,
+            "global_id": None,
             "legal_address": None,
             "is_anonymous": True,
             "is_authenticated": False,
@@ -112,6 +113,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "username": user.edx_username,
             "email": user.email,
             "name": user.name,
+            "global_id": user.global_id,
             "legal_address": {
                 "country": user.legal_address.country,
                 "state": user.legal_address.state,
@@ -225,6 +227,7 @@ def test_get_userinfo(client, user, is_anonymous, has_openedx_user, has_edx_user
             "username": user.edx_username,
             "email": user.email,
             "name": user.name,
+            "global_id": user.global_id,
             "legal_address": {
                 "country": user.legal_address.country,
                 "state": user.legal_address.state,
