@@ -6,6 +6,7 @@ import logging
 
 import django_filters
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, Q
 from django.shortcuts import redirect
 from django_filters import rest_framework as filters
@@ -31,6 +32,7 @@ from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
+    generate_checkout_payload,
     generate_discount_code,
     get_auto_apply_discounts_for_basket,
 )
@@ -48,6 +50,7 @@ from ecommerce.serializers.v0 import (
     BasketItemSerializer,
     BasketWithProductSerializer,
     BulkDiscountSerializer,
+    CheckoutPayloadSerializer,
     DiscountProductSerializer,
     DiscountRedemptionSerializer,
     ProductFlexiblePriceSerializer,
@@ -398,6 +401,37 @@ def clear_basket(request):
     basket.delete()
 
     return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(
+    description=(
+        "Returns the payload necessary to redirect the user to CyberSource for payment."
+    ),
+    methods=["GET"],
+    responses=CheckoutPayloadSerializer,
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def checkout_basket(request):
+    """
+    Generate the data for checkout and return it.
+
+    This gathers and converts the data in the current user's Basket, makes it
+    into an Order, and returns the form data needed to start the checkout process
+    in CyberSource. The frontend app then needs to pull the data into a form and
+    POST it to the appropriate URL to send the user over to CyberSource so we can
+    collect payment.
+    """
+
+    try:
+        payload = generate_checkout_payload(request)
+        req_status = (
+            status.HTTP_400_BAD_REQUEST if "error" in payload else status.HTTP_200_OK
+        )
+
+        return Response(CheckoutPayloadSerializer(payload).data, status=req_status)
+    except ObjectDoesNotExist:
+        return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 class ProductsPagination(LimitOffsetPagination):

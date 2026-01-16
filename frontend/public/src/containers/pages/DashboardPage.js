@@ -8,6 +8,7 @@ import { compose } from "redux"
 import { mutateAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { pathOr } from "ramda"
+import posthog from "posthog-js"
 import Loader from "../../components/Loader"
 import { DASHBOARD_PAGE_TITLE } from "../../constants"
 import {
@@ -24,6 +25,7 @@ import { addUserNotification } from "../../actions"
 import { ProgramEnrollmentDrawer } from "../../components/ProgramEnrollmentDrawer"
 // $FlowFixMe
 import { Modal, ModalHeader, ModalBody } from "reactstrap"
+import { checkFeatureFlag } from "../../lib/util"
 
 import EnrolledCourseList from "../../components/EnrolledCourseList"
 import EnrolledProgramList from "../../components/EnrolledProgramList"
@@ -77,6 +79,40 @@ export class DashboardPage extends React.Component<
     currentTab:                 DashboardTab.courses,
     showAddlProfileFieldsModal: false,
     destinationUrl:             ""
+  }
+
+  componentDidMount() {
+    const { currentUser } = this.props
+
+    // Identify the user to PostHog using their global_id (GUID) if available
+    if (currentUser && currentUser.global_id && SETTINGS.posthog_api_host) {
+      posthog.identify(currentUser.global_id, {
+        email:       currentUser.email,
+        name:        currentUser.name,
+        user_id:     currentUser.id,
+        environment: SETTINGS.environment
+      })
+
+      // Wait a short time for PostHog to process the identify call before checking feature flags
+      setTimeout(() => {
+        try {
+          // Check feature flag and redirect if enabled
+          if (currentUser.global_id) {
+            const flagEnabled = checkFeatureFlag(
+              "redirect-to-learn-dashboard",
+              currentUser.global_id
+            )
+
+            if (flagEnabled) {
+              window.location.href = "https://learn.mit.edu/dashboard"
+              return
+            }
+          }
+        } catch (error) {
+          console.warn("Feature flag check failed:", error)
+        }
+      }, 500) // Wait 500ms for PostHog to process the identify call
+    }
   }
 
   toggleDrawer(enrollment: any) {

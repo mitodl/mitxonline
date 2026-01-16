@@ -10,12 +10,22 @@ import pytz
 import reversion
 from django.forms.models import model_to_dict
 from django.urls import reverse
+from mitol.common.utils.datetime import now_in_utc
 
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
+from b2b.factories import ContractPageFactory
+from courses.factories import (
+    BlockedCountryFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+)
+from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_ONE_TIME,
+    ZERO_PAYMENT_DATA,
 )
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
@@ -24,13 +34,17 @@ from ecommerce.factories import (
     DiscountFactory,
     OrderFactory,
     ProductFactory,
+    UnlimitedUseDiscountFactory,
 )
 from ecommerce.models import (
     Basket,
+    BasketDiscount,
     BasketItem,
     Discount,
     DiscountProduct,
     DiscountRedemption,
+    Order,
+    OrderStatus,
     UserDiscount,
 )
 from ecommerce.serializers import (
@@ -41,6 +55,14 @@ from ecommerce.serializers import (
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from main.constants import (
+    USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
+    USER_MSG_TYPE_BASKET_EMPTY,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_DISCOUNT_INVALID,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
+)
 from main.settings import TIME_ZONE
 from main.test_utils import assert_drf_json_equal
 
@@ -874,3 +896,210 @@ def test_redeem_time_limited_discount(  # noqa: PLR0913
         assert resp_json["message"] == "Discount applied"
     else:
         assert "not found" in resp_json
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout(user, user_drf_client, products):
+    """
+    Hits the start checkout view, which should create an Order record
+    and its associated line items.
+    """
+    create_basket(user, products)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    # if there's not a payload in here, something went wrong
+    assert "payload" in resp.json()
+
+    order = Order.objects.filter(purchaser=user).get()
+
+    assert order.state == OrderStatus.PENDING
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_discounts(user, user_drf_client, products, discounts):
+    """
+    Applies a discount, then hits the start checkout view, which should create
+    an Order record and its associated line items.
+    """
+    test_redeem_discount(user, user_drf_client, products, discounts, False, False)  # noqa: FBT003
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    # if there's not a payload in here, something went wrong
+    assert "payload" in resp.json()
+
+    order = Order.objects.filter(purchaser=user).get()
+
+    assert order.state == OrderStatus.PENDING
+
+
+def test_start_checkout_with_no_lines(user, user_drf_client):
+    """Test that checking out with an empty cart generates an error."""
+
+    basket = BasketFactory.create(user=user)
+
+    assert basket.basket_items.count() == 0
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert "error" in resp.json()
+    assert resp.json()["error"] == USER_MSG_TYPE_BASKET_EMPTY
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    ("in_contract", "contract_type"),
+    [
+        (
+            True,
+            CONTRACT_MEMBERSHIP_CODE,
+        ),
+        (
+            False,
+            CONTRACT_MEMBERSHIP_CODE,
+        ),
+        (
+            False,
+            CONTRACT_MEMBERSHIP_MANAGED,
+        ),
+    ],
+)
+def test_start_checkout_with_b2b_products(
+    user, user_drf_client, in_contract, contract_type
+):
+    """Test that start_checkout works when there's B2B items in the basket."""
+
+    contract = ContractPageFactory.create(
+        integration_type=contract_type, membership_type=contract_type
+    )
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    if in_contract:
+        user.b2b_contracts.add(contract)
+        user.b2b_organizations.add(contract.organization)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    if in_contract:
+        assert resp.status_code == 200
+        assert not resp_body["error"]
+        return
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_blocked_country(user, user_drf_client):
+    """Test that we get an error if the user's in a blocked country."""
+
+    courserun = CourseRunFactory.create()
+    blocked_country = BlockedCountryFactory.create(course=courserun.course)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    user.legal_address.country = str(blocked_country.country)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_ENROLL_BLOCKED
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_upgraded_course(user, user_drf_client):
+    """Test that we get an error if the user already has a verified enrollment."""
+
+    courserun = CourseRunFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert resp.status_code == 200
+
+    order = Order.objects.filter(
+        reference_number=resp_body["payload"]["reference_number"]
+    ).get()
+    fulfill_completed_order(order, ZERO_PAYMENT_DATA, basket=basket)
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_ENROLL_DUPLICATED
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_unupgradable_course(user, user_drf_client):
+    """Test that we get an error if the enrollment can't be upgraded."""
+
+    courserun = CourseRunFactory.create(
+        start_date=now_in_utc() - timedelta(days=30),
+        upgrade_deadline=now_in_utc() - timedelta(days=15),
+    )
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=courserun)
+
+    CourseRunEnrollmentFactory.create(user=user, run=courserun, enrollment_mode="audit")
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_COURSE_NON_UPGRADABLE
+    assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_bad_discount(user, user_drf_client):
+    """Test that we get an error if the user has a bad discount in the basket."""
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    discount = UnlimitedUseDiscountFactory.create()
+
+    other_product = ProductFactory.create()
+    DiscountProduct.objects.create(
+        discount=discount,
+        product=other_product,
+    )
+
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+    resp_body = resp.json()
+
+    assert "error" in resp_body
+    assert resp_body["error"] == USER_MSG_TYPE_DISCOUNT_INVALID
+    assert resp.status_code == 400

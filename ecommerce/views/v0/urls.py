@@ -13,6 +13,7 @@ from ecommerce.views.v0 import (
     NestedUserDiscountViewSet,
     ProductViewSet,
     add_discount_to_basket,
+    checkout_basket,
     clear_basket,
     create_basket_from_product,
     create_basket_from_product_with_discount,
@@ -86,6 +87,11 @@ urlpatterns = [
         "baskets/add_discount/",
         add_discount_to_basket,
         name="baskets_api-add_discount",
+    ),
+    path(
+        "baskets/checkout/",
+        checkout_basket,
+        name="baskets_api-checkout",
     ),
     re_path(
         r"^",
