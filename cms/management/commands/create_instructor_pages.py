@@ -123,7 +123,7 @@ class Command(BaseCommand):
         page = CoursePage.objects.filter(course_id=course.id).first()
         if not page:
             self.error(
-                f"Course {readable_id} does not have a CMS page to link to. Consider creating one with create_courseware_page."
+                f"Course {readable_id} does not have a CMS page to link to. Consider creating one with create_courseware_page and rerunning with ./manage.py create_instructor_pages --link-instructor-id='{instructor_page.id}' --readable-id='{readable_id}'."
             )
         InstructorPageLink(linked_instructor_page=instructor_page, page=page).save()
 
