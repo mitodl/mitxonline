@@ -640,6 +640,9 @@ class InstructorPage(Page):
         APIField("feature_image", serializer=ImageSerializer()),
     ]
 
+    RECOMMENDED_IMAGE_WIDTH = 375
+    RECOMMENDED_IMAGE_HEIGHT = 244
+
     def serve(self, request, *args, **kwargs):  # noqa: ARG002
         """
         For index pages we raise a 404 because these pages do not have a template
