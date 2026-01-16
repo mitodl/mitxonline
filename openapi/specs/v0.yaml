@@ -98,6 +98,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/LearnerRecord'
           description: ''
+  /api/v0/api/orders/receipt/{id}/:
+    get:
+      operationId: api_orders_receipt_retrieve
+      description: Viewset to retrieve an order so it can be viewed as a receipt.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
   /api/v0/b2b/attach/{enrollment_code}/:
     post:
       operationId: b2b_attach_create
@@ -1630,6 +1649,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/V0Discount'
+          description: ''
+  /api/v0/orders/history/:
+    get:
+      operationId: orders_history_list
+      description: Viewset to retrieve a user's order history.
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - orders
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrderHistoryList'
+          description: ''
+  /api/v0/orders/history/{id}/:
+    get:
+      operationId: orders_history_retrieve
+      description: Viewset to retrieve a user's order history.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - orders
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderHistory'
           description: ''
   /api/v0/products/:
     get:
@@ -4697,6 +4761,39 @@ components:
           maxLength: 10
       required:
       - country
+    Line:
+      type: object
+      description: Serializes order lines.
+      properties:
+        quantity:
+          type: integer
+        item_description:
+          type: string
+        content_type:
+          type: string
+          readOnly: true
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,2})?$
+        total_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,2})?$
+        id:
+          type: integer
+        product:
+          allOf:
+          - $ref: '#/components/schemas/Product'
+          readOnly: true
+      required:
+      - content_type
+      - id
+      - item_description
+      - product
+      - quantity
+      - total_price
+      - unit_price
     Nested:
       type: object
       properties:
@@ -4865,6 +4962,51 @@ components:
       - street_address
       - total_price_paid
       - transactions
+    OrderHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        state:
+          $ref: '#/components/schemas/StateEnum'
+        reference_number:
+          type: string
+          nullable: true
+          maxLength: 255
+        purchaser:
+          allOf:
+          - $ref: '#/components/schemas/Nested'
+          readOnly: true
+        total_price_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/Line'
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        titles:
+          type: array
+          items: {}
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_on
+      - id
+      - lines
+      - purchaser
+      - state
+      - titles
+      - total_price_paid
+      - updated_on
     OrderRequest:
       type: object
       properties:
@@ -5185,6 +5327,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FlexiblePriceTier'
+    PaginatedOrderHistoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderHistory'
     PaginatedProductList:
       type: object
       required:

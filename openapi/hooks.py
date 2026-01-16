@@ -102,7 +102,6 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         "/api/checkout/",
         "/api/instructor/",
         "/api/v0/checkout/",
-        "/api/v0/orders/",
         "/api/v2/pages/",
         "/api/v2/images/",
         "/api/v2/documents/",
