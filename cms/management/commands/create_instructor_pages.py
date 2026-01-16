@@ -29,7 +29,7 @@ class Command(BaseCommand):
             help="If true, generate fake data instead of real data.",
         )
         parser.add_argument(
-            "--course-id",
+            "--readable-id",
             type=str,
             default=None,
             help="The course to link the instructor to",
@@ -121,7 +121,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):  # pylint: disable=unused-argument  # noqa: ARG002
         use_fake_data = options["fake"]
-        course_id = options["course_id"]
+        readable_id = options["readable_id"]
         link_instructor_id = options["link_instructor_id"]
         if link_instructor_id:
             instructor_page = InstructorPage.objects.filter(
@@ -141,5 +141,5 @@ class Command(BaseCommand):
             instructor_index_page.add_child(instance=instructor_page)
             instructor_page.save_revision().publish()
 
-        if course_id:
-            self.link_instructor_to_course(instructor_page, course_id)
+        if readable_id:
+            self.link_instructor_to_course(instructor_page, readable_id)
