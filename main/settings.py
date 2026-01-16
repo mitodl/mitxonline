@@ -1084,8 +1084,7 @@ OAUTH2_PROVIDER = {
         name="REFRESH_TOKEN_EXPIRE_SECONDS",
         default=60 * 60 * 24 * 30,  # 30 days
         description="Number of seconds until a refresh token expires",
-)
-
+    ),
 }
 
 SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
