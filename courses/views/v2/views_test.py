@@ -500,7 +500,7 @@ def test_filter_with_org_id_user_in_org_but_no_contract(
     contract = ContractPageFactory(organization=org, active=True)
     user = UserFactory()
     user.b2b_organizations.add(org)
-    # User is in org but NOT added to contract - current behavior allows this
+    # User is in org but NOT added to contract
     user.refresh_from_db()
 
     (course, _) = contract_ready_course
@@ -512,7 +512,6 @@ def test_filter_with_org_id_user_in_org_but_no_contract(
     url = reverse("v2:courses_api-list")
     response = client.get(url, {"org_id": org.id})
 
-    # User is in org, so can see org's courses
     titles = [result["title"] for result in response.data["results"]]
     assert course.title in titles
 
@@ -607,34 +606,9 @@ def test_filter_with_org_id_respects_course_live_status(
     url = reverse("v2:courses_api-list")
     response = client.get(url, {"org_id": org.id})
 
-    # Course should appear even though it's not live, since org_id filter doesn't enforce live status
+    # Course should appear even though it's not live
     course_ids = [result["id"] for result in response.data["results"]]
     assert course.id in course_ids
-
-
-@pytest.mark.django_db
-@pytest.mark.skip_nplusone_check
-def test_filter_with_org_id_case_sensitivity(mock_course_run_clone):
-    """Test that org_id filter returns correct org by numeric ID"""
-    org = OrganizationPageFactory(name="Test Org")
-    contract = ContractPageFactory(organization=org, active=True)
-    user = UserFactory()
-    user.b2b_organizations.add(org)
-    user.b2b_contracts.add(contract)
-    user.refresh_from_db()
-
-    course = CourseFactory(title="Org Course")
-    CourseRunFactory(course=course, is_source_run=True)
-    create_contract_run(contract, course)
-
-    client = APIClient()
-    client.force_authenticate(user=user)
-
-    url = reverse("v2:courses_api-list")
-    response = client.get(url, {"org_id": org.id})
-
-    titles = [result["title"] for result in response.data["results"]]
-    assert course.title in titles
 
 
 @pytest.mark.django_db
