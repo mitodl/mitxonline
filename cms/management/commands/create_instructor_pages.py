@@ -88,7 +88,7 @@ class Command(BaseCommand):
                 "instructor_title": fake.job(),
                 "instructor_bio_short": "An experienced instructor in various subjects.",
                 "instructor_bio_long": f"{instructor_name} has been teaching for over 10 years in multiple disciplines.",
-                "feature_image": instructor_image,  # Assuming photo upload is handled separately
+                "feature_image": instructor_image,
                 "title": f"{instructor_name} Profile",
                 "slug": f"{url_safe_instructor_name}",
             }
@@ -105,7 +105,7 @@ class Command(BaseCommand):
                 "instructor_title": title or "Instructor",
                 "instructor_bio_short": "This is a short bio",
                 "instructor_bio_long": "This is a longer bio for the instructor",
-                "feature_image": instructor_image,  # Assuming photo upload is handled separately
+                "feature_image": instructor_image,
                 "title": f"{instructor_name} Profile",
                 "slug": f"{instructor_name.replace(' ', '-').lower()}-{uuid.uuid4()}",
             }
