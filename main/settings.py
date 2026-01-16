@@ -1080,6 +1080,12 @@ OAUTH2_PROVIDER = {
         description="List of schemes allowed for oauth2 redirect URIs",
     ),
     "PKCE_REQUIRED": False,
+    "REFRESH_TOKEN_EXPIRE_SECONDS": get_int(
+        name="REFRESH_TOKEN_EXPIRE_SECONDS",
+        default=60 * 60 * 24 * 30,  # 30 days
+        description="Number of seconds until a refresh token expires",
+)
+
 }
 
 SCIM_SERVICE_PROVIDER["USER_ADAPTER"] = "users.adapters.LearnUserAdapter"  # noqa: F405
