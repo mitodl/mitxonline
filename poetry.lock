@@ -3029,21 +3029,21 @@ toolz = ">=0.10.0"
 
 [[package]]
 name = "mitol-django-olposthog"
-version = "2025.3.17"
+version = "2025.8.1"
 description = "MIT Open Learning django app extensions for Posthog."
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "mitol_django_olposthog-2025.3.17-py3-none-any.whl", hash = "sha256:b1d510fd045e2cae1f9ff91a2e9fae3c27e0a5a88dd88c4e6f2e1973df0b713d"},
-    {file = "mitol_django_olposthog-2025.3.17.tar.gz", hash = "sha256:758ebad5aea581dcbd1b61a8e7db8e1fccafeb424079a39d375239f25f6d0a31"},
+    {file = "mitol_django_olposthog-2025.8.1-py3-none-any.whl", hash = "sha256:6bdd9926eacdc34770cc0841d268a99ca45a00ff2068209caf9df364c1fff6d1"},
+    {file = "mitol_django_olposthog-2025.8.1.tar.gz", hash = "sha256:98dbb68b94c836626f0afce5b23c1c594e96d1ebf62bcd756d676cf8f89bf492"},
 ]
 
 [package.dependencies]
 django = ">=3.0"
 django-stubs = ">=1.13.1"
 mitol-django-common = "*"
-posthog = ">=3.5.0"
+posthog = ">=6.3.1,<7"
 
 [[package]]
 name = "mitol-django-openedx"
@@ -3124,18 +3124,6 @@ django-tasks = ">=0.7,<0.10"
 dev = ["pre-commit (==3.4.0)", "ruff (==0.13.0)"]
 docs = ["myst-parser (>=4.0.1,<5)", "sphinx (>=8.2.3,<9)", "sphinx-rtd-theme (>=3.0.2,<4.0)"]
 test = ["coverage (>=7.10.6,<8)", "dj-database-url (>=2.3.0,<3)", "django-modelcluster (>=6.4,<7)", "django-taggit (>=6.1.0,<7)", "django-tasks (>=0.6.1,<1)", "mysqlclient (>=2.2.0,<3)", "psycopg (>=3.2.6,<4)"]
-
-[[package]]
-name = "monotonic"
-version = "1.6"
-description = "An implementation of time.monotonic() for Python 2 & < 3.3"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "monotonic-1.6-py2.py3-none-any.whl", hash = "sha256:68687e19a14f11f26d140dd5c86f3dba4bf5df58003000ed467e0e2a69bca96c"},
-    {file = "monotonic-1.6.tar.gz", hash = "sha256:3a55207bcfed53ddd5c5bae174524062935efed17792e9de2ad0205ce9ad63f7"},
-]
 
 [[package]]
 name = "more-itertools"
@@ -3928,29 +3916,28 @@ testing = ["coverage", "pytest", "pytest-benchmark"]
 
 [[package]]
 name = "posthog"
-version = "3.25.0"
+version = "6.9.3"
 description = "Integrate PostHog into any python application."
 optional = false
-python-versions = "*"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "posthog-3.25.0-py2.py3-none-any.whl", hash = "sha256:85db78c13d1ecb11aed06fad53759c4e8fb3633442c2f3d0336bc0ce8a585d30"},
-    {file = "posthog-3.25.0.tar.gz", hash = "sha256:9168f3e7a0a5571b6b1065c41b3c171fbc68bfe72c3ac0bfd6e3d2fcdb7df2ca"},
+    {file = "posthog-6.9.3-py3-none-any.whl", hash = "sha256:c71e9cb7ac4ef13eb604f04c3161edd10b1d08a32499edd54437ba5eab591c58"},
+    {file = "posthog-6.9.3.tar.gz", hash = "sha256:7d201774ea9eba156f1de46d34313e30b2384d523900fe8e425accc92486cc34"},
 ]
 
 [package.dependencies]
 backoff = ">=1.10.0"
 distro = ">=1.5.0"
-monotonic = ">=1.5"
-python-dateutil = ">2.1"
+python-dateutil = ">=2.2"
 requests = ">=2.7,<3.0"
 six = ">=1.5"
+typing-extensions = ">=4.2.0"
 
 [package.extras]
-dev = ["black", "django-stubs", "flake8", "flake8-print", "isort", "lxml", "mypy", "mypy-baseline", "pre-commit", "pydantic", "types-mock", "types-python-dateutil", "types-requests", "types-setuptools", "types-six"]
+dev = ["django-stubs", "lxml", "mypy", "mypy-baseline", "packaging", "pre-commit", "pydantic", "ruff", "setuptools", "tomli", "tomli_w", "twine", "types-mock", "types-python-dateutil", "types-requests", "types-setuptools", "types-six", "wheel"]
 langchain = ["langchain (>=0.2.0)"]
-sentry = ["django", "sentry-sdk"]
-test = ["anthropic", "coverage", "django", "flake8", "freezegun (==1.5.1)", "langchain-anthropic (>=0.2.0)", "langchain-community (>=0.2.0)", "langchain-openai (>=0.2.0)", "langgraph", "mock (>=2.0.0)", "openai", "parameterized (>=0.8.1)", "pydantic", "pylint", "pytest", "pytest-asyncio", "pytest-timeout"]
+test = ["anthropic", "coverage", "django", "freezegun (==1.5.1)", "google-genai", "langchain-anthropic (>=0.3.15)", "langchain-community (>=0.3.25)", "langchain-core (>=0.3.65)", "langchain-openai (>=0.3.22)", "langgraph (>=0.4.8)", "mock (>=2.0.0)", "openai", "parameterized (>=0.8.1)", "pydantic", "pytest", "pytest-asyncio", "pytest-timeout"]
 
 [[package]]
 name = "pre-commit"
@@ -6064,4 +6051,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "489bc78dea92190484b7f5a15921a316922c9ecebf3e56d2f2f78285ed818cbe"
+content-hash = "9bab4984576436829a7460261fc5f33fbe9f4c72a3a34b6ce8c14f6829c1fb73"
