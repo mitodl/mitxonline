@@ -25,7 +25,7 @@ declare type Settings = {
   posthog_api_host: ?string,
   unified_ecommerce_url: ?string,
   oidc_login_url: ?string,
-  MIT_LEARN_DASHBOARD_URL: ?string,
+  mit_learn_dashboard_url: ?string,
   api_gateway_enabled: boolean,
 }
 declare var SETTINGS: Settings
