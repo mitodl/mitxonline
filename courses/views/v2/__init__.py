@@ -325,7 +325,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         added_context = {}
         qp = self.request.query_params
         if qp.get("readable_id"):
-            added_context["all_runs"] = True
+            added_context["include_programs"] = True
         if qp.get("include_approved_financial_aid"):
             added_context["include_approved_financial_aid"] = True
         if qp.get("org_id") or qp.get("contract_id"):
