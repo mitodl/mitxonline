@@ -407,3 +407,5 @@ describe("DashboardPage", () => {
       // Verify redirect happened with default URL
       assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard")
     })
+  })
+})
