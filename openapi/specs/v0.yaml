@@ -98,25 +98,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/LearnerRecord'
           description: ''
-  /api/v0/api/orders/receipt/{id}/:
-    get:
-      operationId: api_orders_receipt_retrieve
-      description: Viewset to retrieve an order so it can be viewed as a receipt.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Order'
-          description: ''
   /api/v0/b2b/attach/{enrollment_code}/:
     post:
       operationId: b2b_attach_create
@@ -1653,7 +1634,7 @@ paths:
   /api/v0/orders/history/:
     get:
       operationId: orders_history_list
-      description: Viewset to retrieve a user's order history.
+      description: Retrives the current user's order history.
       parameters:
       - name: limit
         required: false
@@ -1679,12 +1660,12 @@ paths:
   /api/v0/orders/history/{id}/:
     get:
       operationId: orders_history_retrieve
-      description: Viewset to retrieve a user's order history.
+      description: Retrieve a historical order for the current user.
       parameters:
       - in: path
         name: id
         schema:
-          type: string
+          type: integer
         required: true
       tags:
       - orders
@@ -1694,6 +1675,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderHistory'
+          description: ''
+  /api/v0/orders/receipt/{id}/:
+    get:
+      operationId: orders_receipt_retrieve
+      description: Viewset to retrieve an order so it can be viewed as a receipt.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - orders
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
           description: ''
   /api/v0/products/:
     get:
@@ -4769,9 +4769,6 @@ components:
           type: integer
         item_description:
           type: string
-        content_type:
-          type: string
-          readOnly: true
         unit_price:
           type: string
           format: decimal
@@ -4787,7 +4784,6 @@ components:
           - $ref: '#/components/schemas/Product'
           readOnly: true
       required:
-      - content_type
       - id
       - item_description
       - product
@@ -4975,9 +4971,7 @@ components:
           nullable: true
           maxLength: 255
         purchaser:
-          allOf:
-          - $ref: '#/components/schemas/Nested'
-          readOnly: true
+          $ref: '#/components/schemas/PublicUser'
         total_price_paid:
           type: string
           format: decimal

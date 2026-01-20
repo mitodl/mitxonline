@@ -97,7 +97,7 @@ urlpatterns = [
         name="baskets_api-checkout",
     ),
     path(
-        "api/orders/receipt/<int:pk>/",
+        "orders/receipt/<int:pk>/",
         OrderReceiptView.as_view(),
         name="order_receipt_api",
     ),

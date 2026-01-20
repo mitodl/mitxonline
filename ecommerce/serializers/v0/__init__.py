@@ -32,7 +32,11 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
 from main.settings import TIME_ZONE
-from users.serializers import ExtendedLegalAddressSerializer, UserSerializer
+from users.serializers import (
+    ExtendedLegalAddressSerializer,
+    PublicUserSerializer,
+    UserSerializer,
+)
 
 User = get_user_model()
 
@@ -438,7 +442,6 @@ class LineSerializer(serializers.ModelSerializer):
         fields = [
             "quantity",
             "item_description",
-            "content_type",
             "unit_price",
             "total_price",
             "id",
@@ -612,6 +615,7 @@ class OrderSerializer(serializers.ModelSerializer):
 class OrderHistorySerializer(serializers.ModelSerializer):
     titles = serializers.SerializerMethodField()
     lines = LineSerializer(many=True)
+    purchaser = PublicUserSerializer()
 
     @extend_schema_field(serializers.ListField)
     def get_titles(self, instance):
@@ -621,7 +625,7 @@ class OrderHistorySerializer(serializers.ModelSerializer):
             product = models.Product.all_objects.get(
                 pk=line.product_version.field_dict["id"]
             )
-            if product.content_type.model == "courserun":
+            if product.content_type.model == "courserun" and product.purchasable_object:
                 titles.append(product.purchasable_object.course.title)
             elif product.content_type.model == "programrun":
                 titles.append(product.description)

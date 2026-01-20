@@ -11,6 +11,7 @@ import reversion
 from django.forms.models import model_to_dict
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
+from reversion.models import Version
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.factories import ContractPageFactory
@@ -32,6 +33,7 @@ from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     DiscountFactory,
+    LineFactory,
     OrderFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
@@ -1103,3 +1105,59 @@ def test_start_checkout_with_bad_discount(user, user_drf_client):
     assert "error" in resp_body
     assert resp_body["error"] == USER_MSG_TYPE_DISCOUNT_INVALID
     assert resp.status_code == 400
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_history_list(user, user_drf_client):
+    """Test that we can get a user's order history."""
+    with reversion.create_revision():
+        prod_1 = ProductFactory.create()
+        prod_2 = ProductFactory.create()
+
+    prod_1_version = Version.objects.get_for_object(prod_1).last()
+    prod_2_version = Version.objects.get_for_object(prod_2).last()
+
+    order_1 = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    order_1_line = LineFactory.create(order=order_1, product_version=prod_1_version)
+
+    order_2 = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    order_2_line = LineFactory.create(order=order_2, product_version=prod_2_version)
+
+    resp = user_drf_client.get(reverse("v0:orderhistory_api-list"))
+
+    assert resp.status_code == 200
+
+    returned_orders = resp.json()
+    assert len(returned_orders) == 2
+    for returned_order in returned_orders:
+        assert returned_order["id"] in [
+            order_1.id,
+            order_2.id,
+        ]
+        for order_line in returned_order["lines"]:
+            assert order_line["id"] in [
+                order_1_line.id,
+                order_2_line.id,
+            ]
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_history_retrieve(user, user_drf_client):
+    """Test that we can get a user's order history."""
+    with reversion.create_revision():
+        prod_1 = ProductFactory.create()
+
+    prod_1_version = Version.objects.get_for_object(prod_1).last()
+
+    order_1 = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    order_1_line = LineFactory.create(order=order_1, product_version=prod_1_version)
+
+    resp = user_drf_client.get(reverse("v0:orderhistory_api-list"), {"id": order_1.id})
+
+    assert resp.status_code == 200
+
+    returned_orders = resp.json()
+    assert len(returned_orders) == 1
+    returned_order = returned_orders[0]
+    assert returned_order["id"] == order_1.id
+    assert returned_order["lines"][0]["id"] == order_1_line.id

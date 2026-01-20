@@ -850,6 +850,18 @@ class UserDiscountViewSet(ModelViewSet):
     pagination_class = LimitOffsetPagination
 
 
+@extend_schema_view(
+    list=extend_schema(
+        description=("Retrives the current user's order history."),
+        parameters=[],
+    ),
+    retrieve=extend_schema(
+        description="Retrieve a historical order for the current user.",
+        parameters=[
+            OpenApiParameter("id", OpenApiTypes.INT, OpenApiParameter.PATH),
+        ],
+    ),
+)
 class OrderHistoryViewSet(ReadOnlyModelViewSet):
     """Viewset to retrieve a user's order history."""
 
