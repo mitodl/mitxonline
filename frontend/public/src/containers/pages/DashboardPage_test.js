@@ -320,5 +320,90 @@ describe("DashboardPage", () => {
       // Verify no redirect happened
       assert.equal(mockLocation.href, "")
     })
-  })
-})
+
+    it("uses MIT_LEARN_DASHBOARD_URL setting when provided", async () => {
+      const mockUser = makeUser()
+      mockUser.global_id = "test-guid-custom-url"
+
+      // Set custom URL in settings
+      const customDashboardUrl = "https://custom.example.com/dashboard"
+      global.SETTINGS.MIT_LEARN_DASHBOARD_URL = customDashboardUrl
+
+      // Mock checkFeatureFlag to return true
+      checkFeatureFlagStub
+        .withArgs("redirect-to-learn-dashboard", "test-guid-custom-url")
+        .returns(true)
+
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: mockUser // Override the currentUser from beforeEach
+          }
+        },
+        { currentUser: mockUser }
+      )
+
+      // Component mounts automatically
+      // Verify PostHog identify was called
+      sinon.assert.called(posthogIdentifyStub)
+
+      // Feature flag check hasn't happened yet (it's in setTimeout)
+      sinon.assert.notCalled(checkFeatureFlagStub)
+
+      // Advance time to trigger the setTimeout
+      clock.tick(500)
+
+      // Now verify checkFeatureFlag was called
+      sinon.assert.calledWith(
+        checkFeatureFlagStub,
+        "redirect-to-learn-dashboard",
+        "test-guid-custom-url"
+      )
+
+      // Verify redirect happened with custom URL
+      assert.equal(mockLocation.href, customDashboardUrl)
+    })
+
+    it("falls back to default URL when MIT_LEARN_DASHBOARD_URL is not set", async () => {
+      const mockUser = makeUser()
+      mockUser.global_id = "test-guid-fallback"
+
+      // Ensure custom URL is not set
+      delete global.SETTINGS.MIT_LEARN_DASHBOARD_URL
+
+      // Mock checkFeatureFlag to return true
+      checkFeatureFlagStub
+        .withArgs("redirect-to-learn-dashboard", "test-guid-fallback")
+        .returns(true)
+
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: mockUser // Override the currentUser from beforeEach
+          }
+        },
+        { currentUser: mockUser }
+      )
+
+      // Component mounts automatically
+      // Verify PostHog identify was called
+      sinon.assert.called(posthogIdentifyStub)
+
+      // Feature flag check hasn't happened yet (it's in setTimeout)
+      sinon.assert.notCalled(checkFeatureFlagStub)
+
+      // Advance time to trigger the setTimeout
+      clock.tick(500)
+
+      // Now verify checkFeatureFlag was called
+      sinon.assert.calledWith(
+        checkFeatureFlagStub,
+        "redirect-to-learn-dashboard",
+        "test-guid-fallback"
+      )
+
+      // Verify redirect happened with default URL
+      assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard")
+    })
