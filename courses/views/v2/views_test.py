@@ -8,8 +8,12 @@ import uuid
 from datetime import timedelta
 
 import pytest
+import responses
+import reversion
 from anys import ANY_STR
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.contrib.contenttypes.models import ContentType
 from django.db import connection
 from django.db.models import Q
 from django.test.client import RequestFactory
@@ -32,6 +36,7 @@ from courses.factories import (
     CourseRunFactory,
     DepartmentFactory,
     ProgramCertificateFactory,
+    ProgramEnrollmentFactory,
     ProgramFactory,
 )
 from courses.models import (
@@ -66,7 +71,9 @@ from courses.views.test_utils import (
     num_queries_from_programs,
 )
 from courses.views.v2 import Pagination, ProgramFilterSet
+from ecommerce.models import Product
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -1409,3 +1416,142 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
         }
         for program_enrollment in program_enrollments
     ]
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+@pytest.mark.parametrize(
+    (
+        "program_enrollment_type",
+        "requirement_type",
+    ),
+    [
+        (
+            None,
+            "requirement",
+        ),
+        (
+            EDX_ENROLLMENT_AUDIT_MODE,
+            "requirement",
+        ),
+        (
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            "requirement",
+        ),
+        (
+            EDX_ENROLLMENT_AUDIT_MODE,
+            "elective",
+        ),
+        (
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            "elective",
+        ),
+        (
+            EDX_ENROLLMENT_AUDIT_MODE,
+            "elective-extra",
+        ),
+        (
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            "elective-extra",
+        ),
+    ],
+)
+def test_add_verified_program_course_enrollment(
+    user, user_drf_client, program_enrollment_type, requirement_type
+):
+    """
+    Test that the endpoint works as expected.
+
+    The codepath for creating the verified enrollments has its own tests, so
+    this is testing the setup and check processes.
+    """
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={
+            "results": [
+                {"mode": program_enrollment_type, "is_active": True},
+            ],
+        },
+        status=status.HTTP_200_OK,
+    )
+
+    if program_enrollment_type:
+        prog_enrollment = ProgramEnrollmentFactory.create(
+            user=user, enrollment_mode=program_enrollment_type
+        )
+        program = prog_enrollment.program
+
+        if program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+            program_content_type = ContentType.objects.get_for_model(program)
+            with reversion.create_revision():
+                Product.objects.create(
+                    price=10,
+                    is_active=True,
+                    object_id=program.id,
+                    content_type=program_content_type,
+                )
+    else:
+        program = ProgramFactory.create()
+
+    course_run = CourseRunFactory.create()
+    program.add_requirement(
+        course_run.course
+    ) if requirement_type == "requirement" else program.add_elective(course_run.course)
+
+    if program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
+        course_run_content_type = ContentType.objects.get_for_model(course_run)
+        with reversion.create_revision():
+            Product.objects.create(
+                price=10,
+                is_active=True,
+                object_id=course_run.id,
+                content_type=course_run_content_type,
+            )
+
+    if requirement_type == "elective-extra":
+        # Add another elective, adjust the requirement to only require one, and
+        # give the user a verified enrollment in that course. This should result
+        # in the learner getting an _audit_ enrollment in the course created
+        # earlier.
+        second_elective = CourseRunFactory.create()
+        program.add_elective(second_elective.course)
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=second_elective,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={
+                "courserun_id": course_run.courseware_id,
+                "program_id": program.readable_id,
+            },
+        )
+    )
+
+    if program_enrollment_type:
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert resp.json()["run"]["id"] == course_run.id
+
+        if (
+            program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
+            and requirement_type != "elective-extra"
+        ):
+            order = user.orders.last()
+            line = order.lines.last()
+            assert course_run == line.purchased_object
+            assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_VERIFIED_MODE
+
+        if (
+            program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
+            and requirement_type == "elective-extra"
+        ):
+            # We had enough electives so we should have gotten an audit enrollment
+            assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
+    else:
+        assert resp.status_code == status.HTTP_404_NOT_FOUND

@@ -13,7 +13,10 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.olposthog.features import is_enabled
 from rest_framework import mixins, serializers, status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+)
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import (
     AllowAny,
@@ -22,7 +25,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from courses.api import deactivate_run_enrollment
+from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     Course,
@@ -61,9 +64,11 @@ from courses.utils import (
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
 )
+from ecommerce.api import create_verified_program_course_run_enrollment
 from main import features
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
 class Pagination(PageNumberPagination):
@@ -511,6 +516,116 @@ class UserEnrollmentsApiViewSet(
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            "program_id",
+            str,
+            OpenApiParameter.PATH,
+            description="Readable ID for the program.",
+        ),
+        OpenApiParameter(
+            "courserun_id",
+            str,
+            OpenApiParameter.PATH,
+            description="Readable ID for the course run to enroll in.",
+        ),
+    ],
+    request=None,
+    responses={
+        status.HTTP_201_CREATED: CourseRunEnrollmentSerializer,
+        status.HTTP_204_NO_CONTENT: None,
+        status.HTTP_404_NOT_FOUND: None,
+    },
+)
+@api_view(
+    http_method_names=["post"],
+)
+@permission_classes(
+    [
+        IsAuthenticated,
+    ]
+)
+def add_verified_program_course_enrollment(request, program_id: str, courserun_id: str):
+    """
+    Create a program-related course enrollment for the learner.
+
+    Some special handling is needed for program-related course run enrollments
+    when the learner has an enrollment in the program. The learner should get a
+    course run enrollment that matches their program enrollment at no additional
+    charge. However, if the learner is enrolling in a course that's an elective,
+    and they have already enrolled in enough electives to satisfy the program's
+    requirements, they should then get an audit enrollment. (This won't preclude
+    them from getting a certificate for the course itself but they'll have to buy
+    the upgrade separately.)
+    """
+
+    try:
+        program_enrollment = ProgramEnrollment.objects.filter(
+            program__readable_id=program_id, user=request.user
+        ).get()
+    except ProgramEnrollment.DoesNotExist:
+        # Learner isn't in the program so abort.
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if CourseRunEnrollment.objects.filter(
+        run__courseware_id=courserun_id,
+        user=request.user,
+        enrollment_mode=program_enrollment.enrollment_mode,
+    ).exists():
+        # Learner already has a matching enrollment, so nothing to do.
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    run = CourseRun.objects.filter(courseware_id=courserun_id).get()
+
+    if program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE:
+        # Audit enrollments just get created, regardless of whether or not
+        # the course is an elective.
+        enrollments, _ = create_run_enrollments(
+            request.user,
+            [run],
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            keep_failed_enrollments=True,
+        )
+        return Response(
+            CourseRunEnrollmentSerializer(enrollments[0]).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    if run not in program_enrollment.program.required_courses and (
+        CourseRunEnrollment.objects.filter(
+            run__course__in=program_enrollment.program.elective_courses,
+            user=request.user,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        ).count()
+        >= (program_enrollment.program.minimum_elective_courses_requirement or 1)
+    ):
+        # Too many verified elective enrollments, so make this as an audit one.
+        enrollments, _ = create_run_enrollments(
+            request.user,
+            [run],
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            keep_failed_enrollments=True,
+        )
+        return Response(
+            CourseRunEnrollmentSerializer(enrollments[0]).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    # Everything checks out for a verified enrollment, so generate one.
+    # This requires generating an order.
+
+    enrollment = create_verified_program_course_run_enrollment(
+        request, run, program_enrollment.program
+    )
+
+    return Response(
+        CourseRunEnrollmentSerializer(enrollment).data,
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @extend_schema(

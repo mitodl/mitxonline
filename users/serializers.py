@@ -392,6 +392,7 @@ class UserSerializer(serializers.ModelSerializer):
             "grants",
             "is_active",
             "b2b_organizations",
+            "global_id",
         )
         read_only_fields = (
             "is_anonymous",

@@ -1835,6 +1835,49 @@ class PaidCourseRun(TimestampedModel):
         ).exists()
 
 
+class PaidProgram(TimestampedModel):
+    """Stores a record of programs that the user has paid for."""
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="paid_programs"
+    )
+
+    program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="paid_programs"
+    )
+
+    order = models.ForeignKey(
+        "ecommerce.Order", on_delete=models.CASCADE, related_name="paid_programs"
+    )
+
+    class Meta:
+        unique_together = ("user", "program", "order")
+
+    def __str__(self):
+        return f"Paid Program - {self.program.readable_id} by {self.user.name}"
+
+    @classmethod
+    def fulfilled_paid_program_exists(cls, user: User, program: Program):
+        """
+        Checks if user has paid course run
+        Returns True if PaidCourseRun exists else False.
+        Args:
+            products (list): List of products.
+        Returns:
+            Boolean
+        """
+
+        # Due to circular dependancy importing locally
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
+
+        # PaidCourseRun should only contain fulfilled orders
+        return cls.objects.filter(
+            user=user,
+            program=program,
+            order__state=OrderStatus.FULFILLED,
+        ).exists()
+
+
 class ProgramRequirementNodeType(models.TextChoices):
     PROGRAM_ROOT = "program_root", "Program Root"
     OPERATOR = "operator", "Operator"
