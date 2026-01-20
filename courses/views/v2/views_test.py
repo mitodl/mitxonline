@@ -601,7 +601,7 @@ def test_filter_with_org_id_respects_course_live_status(
     user.refresh_from_db()
 
     (course, _) = contract_ready_course
-    course_run = create_contract_run(contract, course)
+    create_contract_run(contract, course)
 
     # Make course page not live - org_id filter doesn't filter by live status
     course.page.live = False
