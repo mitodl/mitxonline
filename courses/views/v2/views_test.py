@@ -458,9 +458,7 @@ def test_filter_with_org_id_inactive_contract_excluded(
 
 @pytest.mark.django_db
 @pytest.mark.skip_nplusone_check
-def test_filter_with_org_id_multiple_orgs(
-    contract_ready_course, mock_course_run_clone
-):
+def test_filter_with_org_id_multiple_orgs(contract_ready_course, mock_course_run_clone):
     """Test that filtering by org_id returns courses only for that specific org"""
     org1 = OrganizationPageFactory(name="Test Org 1")
     org2 = OrganizationPageFactory(name="Test Org 2")
@@ -620,9 +618,7 @@ def test_filter_with_org_id_respects_course_live_status(
 
 @pytest.mark.django_db
 @pytest.mark.skip_nplusone_check
-def test_filter_with_org_id_pagination(
-    contract_ready_course, mock_course_run_clone
-):
+def test_filter_with_org_id_pagination(contract_ready_course, mock_course_run_clone):
     """Test that org_id filter works correctly with pagination"""
     org = OrganizationPageFactory(name="Test Org")
     contract = ContractPageFactory(organization=org, active=True)
@@ -681,10 +677,7 @@ def test_filter_with_org_id_combined_with_other_filters(
 
     url = reverse("v2:courses_api-list")
     # Filter by org_id and specific course readable_id
-    response = client.get(
-        url,
-        {"org_id": org.id, "readable_id": course1.readable_id}
-    )
+    response = client.get(url, {"org_id": org.id, "readable_id": course1.readable_id})
 
     assert response.status_code == status.HTTP_200_OK
     course_ids = [result["id"] for result in response.data["results"]]
