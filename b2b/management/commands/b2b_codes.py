@@ -6,13 +6,8 @@ import logging
 from pathlib import Path
 
 from django.core.management import BaseCommand, CommandError
-from django.db.models import Q
 from rich.console import Console
 from rich.table import Table
-
-from b2b import constants
-from b2b.models import ContractPage
-from ecommerce.models import DiscountRedemption
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +51,7 @@ class Command(BaseCommand):
         if output_format not in ["csv", "json"]:
             # Output using Rich - this goes straight to the console.
             console = Console()
-            table = Table()
+            table = Table(title=table_name)
 
             for col_name in output_data[0]:
                 table.add_column(col_name)
@@ -84,76 +79,14 @@ class Command(BaseCommand):
                 self.style.SUCCESS(f"Wrote {output_format} output to {filename}.")
             )
 
-    def handle_check(self, *args, **kwargs):
-        """Check enrollment codes for a single contract or an org's contracts."""
+    def handle_output(self):
+        """Output code information."""
 
-        contract = kwargs.pop("contract", False)
-        org = kwargs.pop("organization", False)
+    def handle_validate(self):
+        """Validate and fix enrollment codes."""
 
-        if not (contract or org):
-            msg = (
-                "No contract or organization specified, refusing to work on everything."
-            )
-            raise CommandError(msg)
-
-        bad_contracts = []
-        good_contracts = []
-
-        if contract:
-            try:
-                check_contracts = ContractPage.objects.filter(pk=int(contract)).all()
-            except ValueError:
-                check_contracts = ContractPage.objects.filter(slug=contract).all()
-        else:
-            try:
-                check_contracts = ContractPage.objects.filter(
-                    organization__pk=int(org)
-                ).all()
-            except ValueError:
-                check_contracts = ContractPage.objects.filter(
-                    Q(organization__slug=org) | Q(organization__sso_organization_id=org)
-                )
-
-        for check_contract in check_contracts:
-            contract_products = check_contract.get_products()
-            contract_runs = check_contract.get_course_runs()
-
-            contract_discounts = check_contract.get_discounts()
-            contract_discount_redemptions = DiscountRedemption.objects.filter(
-                redeemed_discount__in=contract_discounts
-            ).all()
-
-            if check_contract.integration_type != check_contract.membership_type:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"WARNING: Contract {check_contract} has mismatching integration_type and membership_type"
-                    )
-                )
-
-            if (
-                check_contract.membership_type in constants.CONTRACT_MEMBERSHIP_AUTOS
-                and (
-                    contract_discounts.count() > 0
-                    and contract_discounts.count()
-                    > contract_discount_redemptions.count()
-                )
-                and not (
-                    check_contract.max_learners or check_contract.enrollment_fixed_price
-                )
-            ):
-                # Contract membership is automatically managed, so we shouldn't
-                # have enrollment codes, unless there's a price set or a learner
-                # limit. If the discount has been redeemed, don't count it as a
-                # valid discount.
-
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Contract {check_contract} has {contract_discounts.count()} enrollment codes but membership is automatically managed."
-                    )
-                )
-                bad_contracts.append(check_contract)
-
-                # Fix - remove discounts that aren't redeemed yet
+    def handle_expire(self):
+        """Expire enrollment codes."""
 
     def add_arguments(self, parser):
         """Add arguments to the command."""
@@ -215,3 +148,18 @@ class Command(BaseCommand):
             help="Expire the codes without prompting.",
             action="store_true",
         )
+
+    def handle(self, *args, **kwargs):  # noqa: ARG002
+        """Dispatch the requested subcommand."""
+
+        op = kwargs.pop("operation")
+
+        if op == "output":
+            self.handle_output()
+        elif op == "validate":
+            self.handle_validate()
+        elif op == "expire":
+            self.handle_expire()
+        else:
+            msg = f"Invalid subcommand {op}"
+            raise CommandError(msg)
