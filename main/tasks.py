@@ -11,5 +11,5 @@ def run_cleartokens():
     try:
         call_command("cleartokens")
         log.info("Successfully ran cleartokens management command.")
-    except Exception as e:
+    except Exception:
         log.exception("Error running cleartokens")
