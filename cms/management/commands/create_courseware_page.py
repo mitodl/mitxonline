@@ -144,5 +144,12 @@ class Command(BaseCommand):
             )
 
         if link_to_instructor:
-            instructor_page = InstructorPage.objects.get(id=kwargs["instructor_id"])
-            InstructorPageLink(linked_instructor_page=instructor_page, page=page).save()
+            instructor_ids = [
+                int(instructor_id)
+                for instructor_id in kwargs["link_to_instructor"].split(",")
+            ]
+            instructor_pages = InstructorPage.objects.filter(id__in=instructor_ids)
+            for instructor_page in instructor_pages:
+                InstructorPageLink(
+                    linked_instructor_page=instructor_page, page=page
+                ).save()
