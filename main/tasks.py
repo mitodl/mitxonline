@@ -11,5 +11,5 @@ def run_cleartokens():
     try:
         call_command("cleartokens")
         log.info("Successfully ran cleartokens management command.")
-    except Exception as e: # pylint: disable=broad-except
-        log.error("Error running cleartokens: %s", e)
+    except Exception as e:  # noqa: BLE001
+        log.exception("Error running cleartokens: %s", e)
