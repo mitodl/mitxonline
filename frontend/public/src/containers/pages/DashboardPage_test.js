@@ -54,10 +54,10 @@ describe("DashboardPage", () => {
 
     // Mock SETTINGS global
     mockSettings = {
-      posthog_api_host:        "https://app.posthog.com",
-      environment:             "test",
-      site_name:               "Test Site",
-      MIT_LEARN_DASHBOARD_URL: undefined
+      posthog_api_host:       "https://app.posthog.com",
+      environment:            "test",
+      site_name:              "Test Site",
+      mit_learn_dashboard_url: undefined
     }
     global.SETTINGS = mockSettings
 
