@@ -3,6 +3,7 @@
 import operator as op
 import random
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 import freezegun
 import pytest
@@ -36,6 +37,7 @@ from ecommerce.factories import (
     LineFactory,
     OrderFactory,
     ProductFactory,
+    TransactionFactory,
     UnlimitedUseDiscountFactory,
 )
 from ecommerce.models import (
@@ -1161,3 +1163,30 @@ def test_order_history_retrieve(user, user_drf_client):
     returned_order = returned_orders[0]
     assert returned_order["id"] == order_1.id
     assert returned_order["lines"][0]["id"] == order_1_line.id
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_receipt_retrieve(user, user_drf_client):
+    """Test that we can get a receipt for a user's order."""
+    with reversion.create_revision():
+        prod_1 = ProductFactory.create()
+
+    prod_1_version = Version.objects.get_for_object(prod_1).last()
+
+    order_1 = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+    order_1_line = LineFactory.create(order=order_1, product_version=prod_1_version)
+    TransactionFactory.create(order=order_1)
+
+    resp = user_drf_client.get(
+        reverse("v0:order_receipt_api", kwargs={"pk": order_1.id})
+    )
+
+    assert resp.status_code == 200
+
+    receipt = resp.json()
+
+    assert receipt["reference_number"] == order_1.reference_number
+    assert Decimal(receipt["lines"][0]["price"]) == order_1_line.total_price
+    # The TransactionFactory creates a transaction with no payment data so this
+    # should be None.
+    assert receipt["transactions"]["card_number"] is None

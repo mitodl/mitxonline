@@ -12,6 +12,7 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
+    ZERO_PAYMENT_DATA,
 )
 from main.utils import now_datetime_with_tz
 from users.factories import UserFactory
@@ -118,6 +119,7 @@ class OrderFactory(DjangoModelFactory):
 class TransactionFactory(DjangoModelFactory):
     order = SubFactory(OrderFactory)
     amount = fuzzy.FuzzyDecimal(10.00, 10.00)
+    data = ZERO_PAYMENT_DATA
 
     class Meta:
         model = models.Transaction
