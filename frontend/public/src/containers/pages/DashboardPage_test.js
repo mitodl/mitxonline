@@ -399,8 +399,8 @@ describe("DashboardPage", () => {
       const mockUser = makeUser()
       mockUser.global_id = "test-guid-fallback"
 
-      // Ensure MIT_LEARN_DASHBOARD_URL is explicitly not set
-      mockSettings.MIT_LEARN_DASHBOARD_URL = undefined
+      // Ensure mit_learn_dashboard_url is explicitly not set
+      mockSettings.mit_learn_dashboard_url = undefined
 
       // Mock checkFeatureFlag to return true
       checkFeatureFlagStub
