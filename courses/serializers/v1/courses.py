@@ -49,7 +49,7 @@ class CourseSerializer(BaseCourseSerializer):
         )
     )
     def get_programs(self, instance):
-        if self.context.get("all_runs", False):
+        if self.context.get("include_programs", False):
             from courses.serializers.v1.base import (  # noqa: PLC0415
                 BaseProgramSerializer,
             )

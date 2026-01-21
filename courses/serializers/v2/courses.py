@@ -111,7 +111,7 @@ class CourseSerializer(BaseCourseSerializer):
         return run.id if run is not None else None
 
     def get_programs(self, instance) -> list[dict] | None:
-        if self.context.get("all_runs", False):
+        if self.context.get("include_programs", False):
             from courses.serializers.v1.base import (  # noqa: PLC0415
                 BaseProgramSerializer,
             )

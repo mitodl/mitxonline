@@ -254,7 +254,7 @@ def test_get_course_by_readable_id(  # noqa: PLR0913
             instance=course,
             context={
                 **mock_context,
-                "all_runs": True,
+                "include_programs": True,
             },
         ).data
     )

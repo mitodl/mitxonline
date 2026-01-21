@@ -201,7 +201,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             and self.request.query_params
             and self.request.query_params.get("readable_id", None)
         ):
-            added_context["all_runs"] = True
+            added_context["include_programs"] = True
 
         return {**super().get_serializer_context(), **added_context}
 

@@ -33,13 +33,15 @@ FAKE = faker.Faker()
 
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
-@pytest.mark.parametrize("all_runs", [True, False])
-def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings):
+@pytest.mark.parametrize("include_programs", [True, False])
+def test_serialize_course(
+    mocker, mock_context, is_anonymous, include_programs, settings
+):
     """Test Course serialization"""
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
-    if all_runs:
-        mock_context["all_runs"] = True
+    if include_programs:
+        mock_context["include_programs"] = True
     user = mock_context["request"].user
     course = CourseFactory.create()
     course_runs = CourseRunFactory.create_batch(10, course=course)
@@ -70,7 +72,9 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
             "programs": (
-                ProgramSerializer(course.programs, many=True).data if all_runs else None
+                ProgramSerializer(course.programs, many=True).data
+                if include_programs
+                else None
             ),
         },
     )

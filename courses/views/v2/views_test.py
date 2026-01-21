@@ -320,6 +320,59 @@ def test_get_course(
 
 
 @pytest.mark.django_db
+def test_get_course_with_readable_id_includes_programs(user_drf_client):
+    """Test that requesting a course with readable_id query param includes programs in response"""
+    # Create a course and a program that includes it
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course)
+
+    program = ProgramFactory.create()
+    program.add_requirement(course)
+    program.refresh_from_db()
+
+    # Request the course with readable_id query param
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": course.id}),
+        {"readable_id": course.readable_id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    course_data = resp.json()
+
+    # Verify that programs are included in the response
+    assert "programs" in course_data
+    assert course_data["programs"] is not None
+    assert len(course_data["programs"]) == 1
+    assert course_data["programs"][0]["id"] == program.id
+    assert course_data["programs"][0]["readable_id"] == program.readable_id
+    assert course_data["programs"][0]["title"] == program.title
+
+
+@pytest.mark.django_db
+def test_get_course_without_readable_id_excludes_programs(user_drf_client):
+    """Test that requesting a course without readable_id query param excludes programs from response"""
+    # Create a course and a program that includes it
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course)
+
+    program = ProgramFactory.create()
+    program.add_requirement(course)
+    program.refresh_from_db()
+
+    # Request the course without readable_id query param
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": course.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    course_data = resp.json()
+
+    # Verify that programs field is None when readable_id is not provided
+    assert "programs" in course_data
+    assert course_data["programs"] is None
+
+
+@pytest.mark.django_db
 def test_filter_with_org_id_anonymous():
     org = OrganizationPageFactory(name="Test Org")
 
