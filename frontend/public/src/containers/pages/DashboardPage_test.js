@@ -16,6 +16,30 @@ describe("DashboardPage", () => {
   let helper, renderPage, userEnrollments, currentUser, sandbox, mockSettings
 
   beforeEach(() => {
+    if (!global.performance) {
+      global.performance = {}
+    }
+
+    const mockFn = () => undefined
+
+    ;["mark", "measure", "clearMarks", "clearMeasures"].forEach((method) => {
+      try {
+        if (typeof global.performance[method] !== "function") {
+          Object.defineProperty(global.performance, method, {
+            value: mockFn,
+            writable: true,
+            configurable: true
+          })
+        }
+      } catch (e) {
+        try {
+          global.performance[method] = mockFn
+        } catch (err) {
+          // If all else fails, silently skip - the mock may already exist
+        }
+      }
+    })
+
     helper = new IntegrationTestHelper()
     userEnrollments = [makeCourseRunEnrollment(), makeCourseRunEnrollment()]
     currentUser = {
@@ -77,6 +101,11 @@ describe("DashboardPage", () => {
 
       // Create fake timer to control setTimeout
       clock = sandbox.useFakeTimers()
+    })
+
+    afterEach(() => {
+      // Reset mit_learn_dashboard_url to undefined for subsequent tests
+      mockSettings.mit_learn_dashboard_url = undefined
     })
 
     it("identifies user to PostHog and redirects when feature flag is enabled", async () => {
@@ -326,9 +355,9 @@ describe("DashboardPage", () => {
       const mockUser = makeUser()
       mockUser.global_id = "test-guid-custom-url"
 
-      // Set custom URL in settings
+      // Set custom URL in settings - this needs to be a truthy value
       const customDashboardUrl = "https://custom.example.com/dashboard"
-      global.SETTINGS.MIT_LEARN_DASHBOARD_URL = customDashboardUrl
+      mockSettings.mit_learn_dashboard_url = customDashboardUrl
 
       // Mock checkFeatureFlag to return true
       checkFeatureFlagStub
@@ -370,8 +399,9 @@ describe("DashboardPage", () => {
       const mockUser = makeUser()
       mockUser.global_id = "test-guid-fallback"
 
-      // Ensure custom URL is not set
-      delete global.SETTINGS.MIT_LEARN_DASHBOARD_URL
+      // Ensure MIT_LEARN_DASHBOARD_URL is explicitly not set
+      mockSettings.MIT_LEARN_DASHBOARD_URL = undefined
+    
 
       // Mock checkFeatureFlag to return true
       checkFeatureFlagStub
@@ -405,7 +435,7 @@ describe("DashboardPage", () => {
         "test-guid-fallback"
       )
 
-      // Verify redirect happened with default URL
+      // Verify redirect happened with default URL (fallback)
       assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard")
     })
   })
