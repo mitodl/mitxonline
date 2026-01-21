@@ -55,7 +55,7 @@ from courses.serializers.v1.programs import (
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
 )
-from courses.tasks import send_partner_school_email
+from courses.tasks import generate_course_certificates, send_partner_school_email
 from courses.utils import (
     get_enrollable_courses,
     get_program_certificate_by_enrollment,
@@ -725,3 +725,35 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
+
+@permission_classes([])
+class ProcessCertificate(APIView):
+    """API to handle certificate processing from external systems"""
+
+    @extend_schema(
+        request=serializers.Serializer(),
+        responses={200: serializers.Serializer(), 400: serializers.Serializer()},
+        operation_id="certificate_process_v1",
+        description="API endpoint to request certificate generation for a user",
+    )
+    def post(self, request):
+        """
+        Handle certificate processing from external system i.e. Open edX.
+        Expected data: username, courseware_id
+        """
+        username = request.data.get("username")
+        courseware_id = request.data.get("courseware_id")
+
+        # Validate required fields
+        if not all([username, courseware_id]):
+            return Response(
+                {"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        generate_course_certificates.delay(
+            force=True, username=username, courseware_id=courseware_id
+        )
+        return Response(
+            {"status": "success", "message": "Certificate generation requested"},
+            status=status.HTTP_200_OK,
+        )
