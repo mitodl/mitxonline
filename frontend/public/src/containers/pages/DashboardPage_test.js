@@ -22,12 +22,12 @@ describe("DashboardPage", () => {
 
     const mockFn = () => undefined
 
-    ;["mark", "measure", "clearMarks", "clearMeasures"].forEach((method) => {
+    ;["mark", "measure", "clearMarks", "clearMeasures"].forEach(method => {
       try {
         if (typeof global.performance[method] !== "function") {
           Object.defineProperty(global.performance, method, {
-            value: mockFn,
-            writable: true,
+            value:        mockFn,
+            writable:     true,
             configurable: true
           })
         }
@@ -401,7 +401,6 @@ describe("DashboardPage", () => {
 
       // Ensure MIT_LEARN_DASHBOARD_URL is explicitly not set
       mockSettings.MIT_LEARN_DASHBOARD_URL = undefined
-    
 
       // Mock checkFeatureFlag to return true
       checkFeatureFlagStub
