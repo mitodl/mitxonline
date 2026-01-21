@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.6
+Version 0.137.6 (Released January 21, 2026)
 ---------------
 
 - Remove posthog (#3224)
