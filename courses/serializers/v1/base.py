@@ -96,7 +96,7 @@ class BaseProgramSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField(read_only=True)
 
     @staticmethod
-    def get_type(obj):  # noqa: ARG004
+    def get_type(obj) -> str:  # noqa: ARG004
         return CONTENT_TYPE_MODEL_PROGRAM
 
     class Meta:
