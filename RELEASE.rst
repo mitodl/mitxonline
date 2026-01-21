@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.137.7
+---------------
+
+- Script to generate instructors for locals (#3221)
+- Make sure enrollment codes get created when managing contract courseware (#3227)
+- Adding REFRESH_TOKEN_EXPIRE_SECONDS (#3226)
+- Tests for course object index page.route method (#3222)
+
 Version 0.137.6 (Released January 21, 2026)
 ---------------
 
