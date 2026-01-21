@@ -9,5 +9,5 @@ def run_cleartokens():
     try:
         call_command("cleartokens")
         log.info("Successfully ran cleartokens management command.")
-    except Exception as e:
-        log.error(f"Error running cleartokens: {e}")
+    except Exception as e: # pylint: disable=broad-except
+        log.error("Error running cleartokens: %s", e)
