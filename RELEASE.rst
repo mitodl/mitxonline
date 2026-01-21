@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.7
+Version 0.137.7 (Released January 21, 2026)
 ---------------
 
 - Script to generate instructors for locals (#3221)
