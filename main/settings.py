@@ -1026,6 +1026,10 @@ CELERY_BEAT_SCHEDULE = {
             offset=timedelta(seconds=KEYCLOAK_ORG_SYNC_OFFSET),
         ),
     },
+    "clear-expired-tokens": {
+        "task": "main.tasks.clear_expired_tokens",
+        "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week
+    },
 }
 
 # Hijack
