@@ -51,14 +51,14 @@ class Command(BaseCommand):
                 "In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
             )
             values["what_you_learn"] = (
-                "In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites.",
+                "In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
             )
         elif isinstance(courseware_type, Program):
             values["about"] = (
                 "In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
             )
             values["what_you_learn"] = (
-                "In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites.",
+                "In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
             )
 
         return values
