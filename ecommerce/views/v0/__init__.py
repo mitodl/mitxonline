@@ -22,6 +22,7 @@ from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ParseError
+from rest_framework.generics import RetrieveAPIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -43,6 +44,8 @@ from ecommerce.models import (
     Discount,
     DiscountProduct,
     DiscountRedemption,
+    Order,
+    OrderStatus,
     Product,
     UserDiscount,
 )
@@ -53,6 +56,8 @@ from ecommerce.serializers.v0 import (
     CheckoutPayloadSerializer,
     DiscountProductSerializer,
     DiscountRedemptionSerializer,
+    OrderHistorySerializer,
+    OrderSerializer,
     ProductFlexiblePriceSerializer,
     ProductSerializer,
     UserDiscountMetaSerializer,
@@ -843,3 +848,43 @@ class UserDiscountViewSet(ModelViewSet):
     authentication_classes = (SessionAuthentication,)
     permission_classes = (IsAdminUser,)
     pagination_class = LimitOffsetPagination
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description=("Retrives the current user's order history."),
+        parameters=[],
+    ),
+    retrieve=extend_schema(
+        description="Retrieve a historical order for the current user.",
+        parameters=[
+            OpenApiParameter("id", OpenApiTypes.INT, OpenApiParameter.PATH),
+        ],
+    ),
+)
+class OrderHistoryViewSet(ReadOnlyModelViewSet):
+    """Viewset to retrieve a user's order history."""
+
+    serializer_class = OrderHistorySerializer
+    pagination_class = LimitOffsetPagination
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return only the user's fulfilled or refunded orders."""
+        return (
+            Order.objects.filter(purchaser=self.request.user)
+            .filter(state__in=[OrderStatus.FULFILLED, OrderStatus.REFUNDED])
+            .order_by("-created_on")
+            .all()
+        )
+
+
+class OrderReceiptView(RetrieveAPIView):
+    """Viewset to retrieve an order so it can be viewed as a receipt."""
+
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return only the user's orders"""
+        return Order.objects.filter(purchaser=self.request.user).all()
