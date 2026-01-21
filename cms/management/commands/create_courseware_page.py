@@ -144,5 +144,5 @@ class Command(BaseCommand):
             )
 
         if link_to_instructor:
-            instructor_page = InstructorPage.objects.filter(id=kwargs["instructor_id"])
+            instructor_page = InstructorPage.objects.get(id=kwargs["instructor_id"])
             InstructorPageLink(linked_instructor_page=instructor_page, page=page).save()
