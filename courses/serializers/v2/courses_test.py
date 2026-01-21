@@ -33,12 +33,12 @@ pytestmark = [pytest.mark.django_db]
     "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
 )
 def test_serialize_course(
-    mocker, mock_context, is_anonymous, all_runs, certificate_type
+    mocker, mock_context, is_anonymous, include_programs, certificate_type
 ):
     """Test Course serialization"""
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
-    if all_runs:
+    if include_programs:
         mock_context["include_programs"] = True
     user = mock_context["request"].user
     courseRun1 = CourseRunFactory.create()
@@ -87,7 +87,7 @@ def test_serialize_course(
             "time_commitment": course.page.effort,
             "programs": (
                 BaseProgramSerializer(course.programs, many=True).data
-                if all_runs
+                if include_programs
                 else None
             ),
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
