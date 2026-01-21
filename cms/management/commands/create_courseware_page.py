@@ -19,7 +19,9 @@ class Command(BaseCommand):
 
     help = "Creates a basic draft about page for the given courseware object."
 
-    def get_optional_values_for_courseware_type(self, courseware_type: type) -> dict:
+    def get_optional_values_for_courseware_type(
+        self, courseware_type: Course | Program
+    ) -> dict:
         """
         Returns a dictionary of optional values to include when creating the page,
         based on the type of courseware (Course or Program).
@@ -123,7 +125,7 @@ class Command(BaseCommand):
             optional_kwargs = (
                 {}
                 if not include_optional_values
-                else self.get_optional_values_for_courseware_type(courseware.__class__)
+                else self.get_optional_values_for_courseware_type(courseware)
             )
             page = create_default_courseware_page(
                 courseware,
