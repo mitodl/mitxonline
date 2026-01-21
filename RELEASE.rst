@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.137.6 (Released January 21, 2026)
+---------------
+
+- Remove posthog (#3224)
+- Dashboard redirect to learn (#3215)
+- Update ProgramPage description migration dependency (#3223)
+- Generating certificate fails if what_you_learn is not filled (#3167)
+- Add one-click verified program course run enrollment API (#3216)
+- Add execute flag for backfill (#3219)
+- Adds the checkout API to the OpenAPI-compatible API list (#3178)
+- ensure create_courseware adds the depts (#3220)
+- chore: upgrade mitol-django-common and django-redis (#3174)
+- Removes reference to dead file (#3218)
+
 Version 0.137.5 (Released January 14, 2026)
 ---------------
 
