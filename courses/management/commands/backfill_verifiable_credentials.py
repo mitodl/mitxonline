@@ -96,12 +96,21 @@ class Command(BaseCommand):
 
         certificates = []
         if certificate_uuid:
-            certificate_type = (
-                ProgramCertificate
-                if courseware_type == "program"
-                else CourseRunCertificate
-            )
-            certificates = certificate_type.objects.filter(uuid=certificate_uuid)
+            certificate = ProgramCertificate.objects.filter(
+                uuid=certificate_uuid
+            ).first()
+            if not certificate:
+                certificate = CourseRunCertificate.objects.filter(
+                    uuid=certificate_uuid
+                ).first()
+            if not certificate:
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"No certificate found with UUID {certificate_uuid}."
+                    )
+                )
+                return
+            certificates = [certificate]
         elif courseware_type == "program":
             program_ids = Program.objects.filter(readable_id__in=ids).values_list(
                 "id", flat=True
