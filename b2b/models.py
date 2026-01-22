@@ -429,6 +429,17 @@ class ContractPage(Page, ClusterableModel):
             CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
         )
 
+    def get_enrollments(self):
+        """Get the enrollments for the contract's runs"""
+
+        from courses.models import CourseRunEnrollment  # noqa: PLC0415
+
+        return (
+            CourseRunEnrollment.objects.prefetch_related("run", "run__course")
+            .filter(run__b2b_contract=self, change_status__isnull=True)
+            .all()
+        )
+
     def get_products(self):
         """Get the products associated with the contract."""
 
