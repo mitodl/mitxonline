@@ -35,32 +35,32 @@ class Command(BaseCommand):
                 (
                     "price_details",
                     {
-                        "text": "Three easy payments of 99.99",
+                        "text": "PLACEHOLDER - Three easy payments of 99.99",
                         "link": "https://example.com/pricing",
                     },
                 )
             ],
             "min_weeks": 1,
             "max_weeks": 1,
-            "effort": "1-2 hours per week",
+            "effort": "PLACEHOLDER - 1-2 hours per week",
             "min_price": 37,
             "max_price": 149,
-            "prerequisites": "No prerequisites, other than a willingness to learn",
+            "prerequisites": "PLACEHOLDER - No prerequisites, other than a willingness to learn",
             "faq_url": "https://example.com",
         }
         if isinstance(courseware_type, Course):
             values["about"] = (
-                "In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+                "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
             )
             values["what_you_learn"] = (
-                "In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+                "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
             )
         elif isinstance(courseware_type, Program):
             values["about"] = (
-                "In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+                "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
             )
             values["what_you_learn"] = (
-                "In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+                "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
             )
 
         return values
@@ -98,8 +98,6 @@ class Command(BaseCommand):
             help="Comma separated list of instructor IDs to link to the courseware page.",
         )
 
-    # Should we make this a mixin for other management commands?
-    # Could be nice to encapsulate some commonly used logic, if folks like this.
     def error(self, message):
         self.stdout.write(self.style.ERROR(message))
         sys.exit(1)
