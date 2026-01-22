@@ -25,8 +25,8 @@ class Command(BaseCommand):
             "-i",
             "--ids",
             type=str,
+            default="",
             help="Comma-separated list of readable ids for the programs or course runs to backfill",
-            required=True,
         )
         parser.add_argument(
             "-f",
@@ -48,6 +48,13 @@ class Command(BaseCommand):
             action="store_true",
             help="If specified, actually performs the backfill; otherwise, just simulates the process",
             default=False,
+        )
+        parser.add_argument(
+            "-u",
+            "--uuid",
+            type=str,
+            default=None,
+            help="UUID for a certificate to generate a verifiable credential for",
         )
 
     def generate_credential_for_certificate(self, certificate, *, force=False):
@@ -77,13 +84,30 @@ class Command(BaseCommand):
         force = options["force"]
         sleep = options["sleep"]
         execute = options["execute"]
+        certificate_uuid = options["uuid"]
+        courseware_type = options["type"]
+        if not ids and not certificate_uuid:
+            self.stderr.write(
+                self.style.ERROR(
+                    "You must provide either --ids or --uuid to backfill certificates."
+                )
+            )
+            return
+
         certificates = []
-        if options["type"] == "program":
+        if certificate_uuid:
+            certificate_type = (
+                ProgramCertificate
+                if courseware_type == "program"
+                else CourseRunCertificate
+            )
+            certificates = certificate_type.objects.filter(uuid=certificate_uuid)
+        elif courseware_type == "program":
             program_ids = Program.objects.filter(readable_id__in=ids).values_list(
                 "id", flat=True
             )
             certificates = ProgramCertificate.objects.filter(id__in=program_ids)
-        elif options["type"] == "course":
+        elif courseware_type == "course":
             course_run_ids = CourseRun.objects.filter(
                 courseware_id__in=ids
             ).values_list("id", flat=True)
