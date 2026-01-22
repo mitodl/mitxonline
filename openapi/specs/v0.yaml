@@ -3120,6 +3120,28 @@ components:
       - readable_id
       - title
       - type
+    BaseProgram:
+      type: object
+      description: Basic program model serializer
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        type:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - readable_id
+      - title
+      - type
     Basket:
       type: object
       description: Basket model serializer
@@ -4082,8 +4104,7 @@ components:
         programs:
           type: array
           items:
-            type: object
-            additionalProperties: {}
+            $ref: '#/components/schemas/BaseProgram'
           nullable: true
           readOnly: true
         topics:
@@ -7221,8 +7242,7 @@ components:
         programs:
           type: array
           items:
-            type: object
-            additionalProperties: {}
+            $ref: '#/components/schemas/BaseProgram'
           nullable: true
           readOnly: true
         topics:

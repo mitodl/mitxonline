@@ -17,6 +17,7 @@ from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
     BaseCourseSerializer,
+    BaseProgramSerializer,
     ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
@@ -110,12 +111,9 @@ class CourseSerializer(BaseCourseSerializer):
             run = instance.first_unexpired_run
         return run.id if run is not None else None
 
-    def get_programs(self, instance) -> list[dict] | None:
+    @extend_schema_field(BaseProgramSerializer(many=True, allow_null=True))
+    def get_programs(self, instance):
         if self.context.get("include_programs", False):
-            from courses.serializers.v1.base import (  # noqa: PLC0415
-                BaseProgramSerializer,
-            )
-
             return BaseProgramSerializer(instance.programs, many=True).data
 
         return None
