@@ -820,51 +820,67 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
     return None, False, False
 
 
-def get_certificate_grade_eligible_runs(now):
+def get_certificate_grade_eligible_runs(now, courseware_id=None):
     """
     Get the list of course runs that are eligible for Grades update/creation and certificates creation
+    Args:
+        now (datetime): A datetime passed representing the current time or
+                        the by which the certificate should be available.
+        courseware_id (str): A string representing the course run's courseware_id.
     """
     # Get all the course runs eligible for certificates generation
     # For a valid run it would be live, certificate_available_date would be in future or within a month of passing
     # the certificate_available_date.
 
-    course_runs = CourseRun.objects.live(include_b2b=True).filter(
+    course_runs = CourseRun.objects.live(include_b2b=True)
+    # If a run id is explicitly provided we filter by it
+    if courseware_id:
+        return course_runs.filter(courseware_id=courseware_id)
+
+    return course_runs.filter(
         Q(certificate_available_date__isnull=True)
         | Q(
             certificate_available_date__gt=now
             - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS)
         )
     )
-    return course_runs  # noqa: RET504
 
 
-def generate_course_run_certificates():
+def generate_course_run_certificates(force=False, user=None, courseware_id=None):  # noqa: FBT002
     """
     Hits the edX grades API for eligible course runs and generates the certificates and grades for users for course runs
+    Args:
+        force (bool): A flag representing if we should force the certificate generation irrespective of criteria
+        user (User): a Django user.
+        courseware_id (str): A string representing the course run's courseware_id.
     """
     now = now_in_utc()
-    course_runs = get_certificate_grade_eligible_runs(now)
+    course_runs = get_certificate_grade_eligible_runs(now, courseware_id=courseware_id)
 
     if course_runs is None or course_runs.count() == 0:
         log.info("No course runs matched the certificates generation criteria")
         return
 
     for run in course_runs:
+        # If a user is provided we make sure that we limit the grades to that user only
         edx_grade_user_iter = exception_logging_generator(
-            get_edx_grades_with_users(run)
+            get_edx_grades_with_users(run, user=user)
         )
         created_grades_count, updated_grades_count, generated_certificates_count = (
             0,
             0,
             0,
         )
-        for edx_grade, user in edx_grade_user_iter:
+        for edx_grade, edx_user in edx_grade_user_iter:
             try:
                 course_run_grade, created, updated = ensure_course_run_grade(
-                    user=user, course_run=run, edx_grade=edx_grade, should_update=True
+                    user=edx_user,
+                    course_run=run,
+                    edx_grade=edx_grade,
+                    should_update=True,
                 )
             except ValidationError:
-                msg = f"Can't save grade {edx_grade} for {user} in {run}, skipping certificate generation"
+                msg = f"Can't save grade {edx_grade} for {edx_user} in {run}, skipping certificate generation"
                 log.exception(msg)
                 continue
 
@@ -878,8 +894,14 @@ def generate_course_run_certificates():
             #   of certificate_available_date
             #   2. For others course runs we generate the certificates if the certificate_available_date of course run
             #   has passed
-            if run.is_self_paced or (
-                run.certificate_available_date and run.certificate_available_date <= now
+            #   3. If force is True we generate the certificates irrespective of above conditions
+            if (
+                force
+                or run.is_self_paced
+                or (
+                    run.certificate_available_date
+                    and run.certificate_available_date <= now
+                )
             ):
                 _, created, deleted = process_course_run_grade_certificate(
                     course_run_grade=course_run_grade

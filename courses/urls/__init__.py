@@ -45,3 +45,11 @@ urlpatterns += [
         name="create-enrollment-via-form",
     ),
 ]
+
+urlpatterns += [
+    path(
+        "certificates/",
+        v1.ProcessCertificate.as_view(),
+        name="process-user-certificate",
+    ),
+]
