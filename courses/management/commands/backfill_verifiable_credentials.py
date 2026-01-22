@@ -19,7 +19,6 @@ class Command(BaseCommand):
             "--type",
             choices=["program", "course"],
             help="Whether to backfill program certificates or course run certificates",
-            required=True,
         )
         parser.add_argument(
             "-i",
