@@ -287,6 +287,7 @@ def create_default_courseware_page(
     live: bool = False,
     include_in_learn_catalog: bool = False,
     ingest_content_files_for_ai: bool = False,
+    optional_kwargs: dict | None = None,
 ):
     """
     Creates a default about page for the given courseware object. Created pages
@@ -330,6 +331,9 @@ def create_default_courseware_page(
     }
     program_only_kwargs = {}
 
+    if optional_kwargs is None:
+        optional_kwargs = {}
+
     try:
         if isinstance(courseware, Course):
             parent_page = CourseIndexPage.objects.filter(live=True).get()
@@ -339,9 +343,16 @@ def create_default_courseware_page(
         raise ValidationError(f"No valid index page found for {courseware}.")  # noqa: B904, EM102
 
     if isinstance(courseware, Course):
-        page = CoursePage(course=courseware, **page_framework, **course_only_kwargs)
+        page = CoursePage(
+            course=courseware, **page_framework, **course_only_kwargs, **optional_kwargs
+        )
     else:
-        page = ProgramPage(program=courseware, **page_framework, **program_only_kwargs)
+        page = ProgramPage(
+            program=courseware,
+            **page_framework,
+            **program_only_kwargs,
+            **optional_kwargs,
+        )
 
     parent_page.add_child(instance=page)
 

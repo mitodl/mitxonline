@@ -1294,11 +1294,9 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         course_page = create_default_courseware_page(
             courseware=new_run.course,
             live=publish_cms_page,
+            ingest_content_files_for_ai=ingest_content_files_for_ai,
+            include_in_learn_catalog=include_in_learn_catalog,
         )
-
-        course_page.ingest_content_files_for_ai = ingest_content_files_for_ai
-        course_page.include_in_learn_catalog = include_in_learn_catalog
-        course_page.save()
 
     course_product = None
     if price:
