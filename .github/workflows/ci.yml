@@ -2,7 +2,7 @@ name: CI
 on: [push]
 jobs:
   python-tests:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     services:
       db:
@@ -109,7 +109,7 @@ jobs:
           SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
 
   javascript-tests:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
