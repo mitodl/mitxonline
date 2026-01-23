@@ -5,12 +5,15 @@ import json
 import logging
 from pathlib import Path
 
+from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand, CommandError
-from django.db.models import Q
+from django.db.models import Count, Q
 from rich.console import Console
 from rich.table import Table
 
 from b2b.models import ContractPage, DiscountContractAttachmentRedemption
+from courses.models import CourseRun
 from ecommerce.models import DiscountRedemption, OrderStatus
 
 log = logging.getLogger(__name__)
@@ -160,6 +163,45 @@ class Command(BaseCommand):
                 self.style.ERROR(f"Contract {contract} is overcommitted.")
             )
 
+    def _format_enrollment_codes(self, contract, discounts):
+        """Format the enrollment codes for output."""
+
+        codes = []
+        content_type = ContentType.objects.get_for_model(CourseRun)
+
+        for discount in discounts:
+            code = {
+                "Contract": str(contract),
+                "Course Run": "",
+                "Enrollment Code": discount.discount_code,
+                "Attach Redemption": "",
+                "Enroll Redemption": "",
+                "Attach Link": f"{settings.MIT_LEARN_ATTACH_URL}{discount.discount_code}/",
+            }
+
+            attach_qs = discount.contract_redemptions.filter(contract=contract)
+            if attach_qs.count():
+                code["Attach Redemption"] = ",".join(
+                    [dcr.user.email for dcr in attach_qs.all()]
+                )
+
+            enroll_qs = discount.order_redemptions
+            if enroll_qs.count():
+                code["Attach Redemption"] = ",".join(
+                    [ecr.redeemed_by.email for ecr in enroll_qs.all()]
+                )
+
+            codes.extend(
+                [
+                    {**code, "Course Run": dp.product.purchasable_object.courseware_id}
+                    for dp in discount.products.filter(
+                        product__content_type=content_type
+                    ).all()
+                ]
+            )
+
+        return codes
+
     def handle_output(self, **kwargs):
         """Output code information."""
 
@@ -223,6 +265,8 @@ class Command(BaseCommand):
                 table_name="Code Usage",
             )
 
+            return
+
         # If usage or stats flags aren't set, list out the codes.
         # Codes will be listed for attachment to the contract.
         # - If the "all" flag is set, then we output all the codes along with the
@@ -232,6 +276,48 @@ class Command(BaseCommand):
         #   not been used yet. If the contract has a learner limit, only a sufficient
         #   number of codes to fill the contract will be delivered. (e.g. for 100
         #   seats, 19 occupied, you'd get back 81 codes.)
+
+        codes = []
+
+        if kwargs.pop("all", False):
+            for contract in contracts:
+                codes.extend(
+                    self._format_enrollment_codes(contract, contract.get_discounts())
+                )
+
+            self._output_code_data(
+                kwargs.pop("output_format", "fancy"),
+                codes,
+                table_name="Enrollment Codes",
+                filename=kwargs.pop("filename", None),
+            )
+
+            return
+
+        for contract in contracts:
+            remaining_discounts = 1
+
+            if contract.max_learners:
+                attached_learner_count = contract.get_learners().count()
+                remaining_discounts = contract.max_learners - attached_learner_count
+
+            annotated_discounts = (
+                contract.get_discounts()
+                .annotate(Count("contract_redemptions"))
+                .filter(contract_redemptions__count=0)
+                .all()[:remaining_discounts]
+            )
+
+            codes.extend(self._format_enrollment_codes(contract, annotated_discounts))
+
+        self._output_code_data(
+            kwargs.pop("output_format", "fancy"),
+            codes,
+            table_name="Enrollment Codes",
+            filename=kwargs.pop("filename", None),
+        )
+
+        return
 
     def handle_validate(self):
         """Validate and fix enrollment codes."""
@@ -289,6 +375,11 @@ class Command(BaseCommand):
             "--usage",
             action="store_true",
             help="Output redemptions/usage for codes.",
+        )
+        output_parser.add_argument(
+            "--all",
+            action="store_true",
+            help="Output all codes, rather than a usable subset.",
         )
 
         validate_parser.add_argument(
