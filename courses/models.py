@@ -36,7 +36,6 @@ from courses.constants import (
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
-from openedx.utils import edx_redirect_url
 
 User = get_user_model()
 
@@ -1202,16 +1201,20 @@ class CourseRun(TimestampedModel):
     @property
     def courseware_url(self):
         """
-        Full URL for this CourseRun as it exists in the courseware
+        Full URL for this CourseRun as it exists in the courseware.
+        
+        This is computed based on the courseware_id (readable_id) using the pattern:
+        <edX base URL>/learn/course/<courseware_id>/home
+        
+        Configuration Settings:
+        - OPENEDX_BASE_REDIRECT_URL: the base URL for edX redirects
 
         Returns:
-            str or None: Full URL or None
+            str or None: Full URL or None if courseware_id is not set
         """
-        return (
-            edx_redirect_url(self.courseware_url_path)
-            if self.courseware_url_path
-            else None
-        )
+        from courses.utils import get_courseware_url
+        
+        return get_courseware_url(self.courseware_id)
 
     @property
     def text_id(self):
