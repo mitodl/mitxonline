@@ -8,6 +8,11 @@ from typing import List, Union  # noqa: UP035
 from django.core.management import BaseCommand
 from django.db import models
 
+from cms.api import (
+    create_default_certificate_page,
+    create_default_courseware_page,
+    create_default_signatory_page,
+)
 from courses.models import Course, CourseRun, Department, Program
 from main.utils import parse_supplied_date
 
@@ -18,6 +23,45 @@ class Command(BaseCommand):
     """
 
     help = "Creates a courseware object (a program or course, with or without a courserun)."
+
+    def _create_cms_pages_for_courseware_object(
+        self,
+        courseware_object: Union[Course, Program],
+        *,
+        create_courseware_page: bool = False,
+        create_certificate_page: bool = False,
+        create_signatory: bool = False,
+    ):
+        """
+        Creates CMS pages for the provided courseware object. This will populate a CoursePage or ProgramPage, a corresponding certificate page if specified and a signatory if specified.
+
+        Args:
+            courseware_object (Union[Course, Program]): The courseware object to create CMS pages for.
+        """
+        if create_courseware_page:
+            self.stdout.write(
+                f"Creating placeholder CMS page for {courseware_object.readable_id}."
+            )
+            courseware_page = create_default_courseware_page(courseware_object)
+            self.stdout.write(
+                self.style.SUCCESS(f"Created CMS page {courseware_page}.")
+            )
+        if create_certificate_page:
+            self.stdout.write(
+                f"Creating placeholder CertificatePage for {courseware_object.readable_id}."
+            )
+            certificate_page = create_default_certificate_page(courseware_object)
+            self.stdout.write(
+                self.style.SUCCESS(f"Created CertificatePage {certificate_page}.")
+            )
+        if create_signatory:
+            self.stdout.write(
+                f"Creating placeholder Signatory for {courseware_object.readable_id} CertificatePage."
+            )
+            signatory_page = create_default_signatory_page(
+                courseware_object, include_placeholder_image=True
+            )
+            self.stdout.write(f"Creating placeholder Signatory {signatory_page}.")
 
     def _check_if_courseware_object_readable_id_exists(
         self,
@@ -244,6 +288,12 @@ class Command(BaseCommand):
                 f"Added {len(new_program.related_programs)} program relationships."
             )
         )
+        self._create_cms_pages_for_courseware_object(
+            new_program,
+            create_courseware_page=kwargs["create_page"],
+            create_certificate_page=kwargs["create_certificate_page"],
+            create_signatory=kwargs["create_signatory"],
+        )
 
     def _handle_course(self, add_depts: models.QuerySet, **kwargs):
         """Handle creation of a course."""
@@ -297,6 +347,13 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"Live flag not specified for {new_course.readable_id}, ignoring any requirements flags"
             )
+
+        self._create_cms_pages_for_courseware_object(
+            new_course,
+            create_courseware_page=kwargs["create_page"],
+            create_certificate_page=kwargs["create_certificate_page"],
+            create_signatory=kwargs["create_signatory"],
+        )
 
     def _handle_courserun(self, **kwargs):
         """Handle creation of a course run."""
@@ -445,6 +502,22 @@ class Command(BaseCommand):
         parser.add_argument(
             "--create-depts",
             help="If departments specified aren't found, create them.",
+            action="store_true",
+        )
+
+        parser.add_argument(
+            "--create-page",
+            help="Create a CMS page for the created courseware object.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--create-certificate-page",
+            help="If CMS page for the created courseware object doesn't exist, create it.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--create-signatory",
+            help="If CMS page for certificate signatory doesn't exist, create it with a placeholder image.",
             action="store_true",
         )
 

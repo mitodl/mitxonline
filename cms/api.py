@@ -8,20 +8,24 @@ from datetime import timedelta
 from typing import Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
 
+import requests
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.files.base import ContentFile
 from django.db.models import Case, IntegerField, When
 from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
+from wagtail.blocks import StreamValue
+from wagtail.images.models import Image
 from wagtail.models import Site
 from wagtail.rich_text import RichText
 
 from cms import models as cms_models
 from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
-from cms.models import Page
+from cms.models import CertificatePage, Page, SignatoryIndexPage, SignatoryPage
 from courses.models import Course, Program
 from courses.utils import (
     get_enrollable_courseruns_qs,
@@ -279,6 +283,56 @@ def get_wagtail_img_src(image_obj) -> str:
         if image_obj
         else ""
     )
+
+
+def create_default_signatory_page(
+    courseware: Union[Course, Program],
+    *,
+    include_placeholder_image: bool = False,
+):
+    certificate_page = courseware.page.certificate_page
+    signatory_page = SignatoryPage(
+        name=f"PLACEHOLDER - {courseware.title} Signatory",
+        title1=f"PLACEHOLDER - {courseware.title} Signatory Title 1",
+        title2=f"PLACEHOLDER - {courseware.title} Signatory Title 2",
+        title3=f"PLACEHOLDER - {courseware.title} Signatory Title 3",
+        organization=f"PLACEHOLDER - {courseware.title} Signatory Organization",
+    )
+    if include_placeholder_image:
+        filename = signatory_page.name.replace(" ", "_").lower()
+        image_url = f"https://placecats.com/{SignatoryPage.MINIMUM_IMAGE_WIDTH}/{SignatoryPage.MINIMUM_IMAGE_HEIGHT}"
+        response = requests.get(image_url, timeout=10)
+        response.raise_for_status()
+        image_file = ContentFile(response.content, name=filename)
+        signatory_image = Image(title=filename, file=image_file)
+        signatory_image.save()
+        signatory_page.signature_image = signatory_image
+
+    signatory_index = SignatoryIndexPage.objects.first()
+    signatory_index.add_child(instance=signatory_page)
+    signatory_page.refresh_from_db()
+
+    signatories = StreamValue(
+        certificate_page.signatories.stream_block,
+        [("signatory", signatory_page)],
+        is_lazy=False,
+    )
+    certificate_page.signatories = signatories
+    certificate_page.save()
+    return signatory_page
+
+
+def create_default_certificate_page(
+    courseware: Union[Course, Program],
+):
+    cert_page = CertificatePage(
+        product_name=f"PLACEHOLDER - {courseware.title} Certificate",
+        CEUs="PLACEHOLDER - {courseware.title} CEUs",
+    )
+    courseware_page = courseware.page
+    courseware_page.add_child(instance=cert_page)
+    cert_page.save_revision().publish()
+    return cert_page
 
 
 def create_default_courseware_page(
