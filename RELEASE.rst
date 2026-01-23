@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.137.8
+---------------
+
+- Update dependency pytest-cov to v7 (#3204)
+- Improve v2/courses program field spec (#3238)
+- Tweaks to `create_courseware_page` to populate a bit more data (#3237)
+- Add order history/receipt APIs to OpenAPI spec. (#3234)
+- add test for v2/courses api programs property (#3229)
+- Add celery task to run cleartokens every week (#3232)
+- Courses v2 org id tests (#3230)
+
 Version 0.137.7 (Released January 21, 2026)
 ---------------
 
