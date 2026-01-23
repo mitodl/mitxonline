@@ -25,7 +25,7 @@ from wagtail.rich_text import RichText
 from cms import models as cms_models
 from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
-from cms.models import CertificatePage, Page, SignatoryIndexPage, SignatoryPage
+from cms.models import Page
 from courses.models import Course, Program
 from courses.utils import (
     get_enrollable_courseruns_qs,
@@ -290,6 +290,9 @@ def create_default_signatory_page(
     *,
     include_placeholder_image: bool = False,
 ):
+    # Import here to avoid circular imports
+    from cms.models import SignatoryIndexPage, SignatoryPage  # noqa: PLC0415
+
     certificate_page = courseware.page.certificate_page
     signatory_page = SignatoryPage(
         name=f"PLACEHOLDER - {courseware.title} Signatory",
@@ -325,13 +328,15 @@ def create_default_signatory_page(
 def create_default_certificate_page(
     courseware: Union[Course, Program],
 ):
+    # Import here to avoid circular imports
+    from cms.models import CertificatePage  # noqa: PLC0415
+
     cert_page = CertificatePage(
         product_name=f"PLACEHOLDER - {courseware.title} Certificate",
         CEUs="PLACEHOLDER - {courseware.title} CEUs",
     )
     courseware_page = courseware.page
     courseware_page.add_child(instance=cert_page)
-    cert_page.save_revision().publish()
     return cert_page
 
 
