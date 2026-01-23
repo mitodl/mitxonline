@@ -296,9 +296,9 @@ def create_default_signatory_page(
     certificate_page = courseware.page.certificate_page
     signatory_page = SignatoryPage(
         name=f"PLACEHOLDER - {courseware.title} Signatory",
-        title1=f"PLACEHOLDER - {courseware.title} Signatory Title 1",
-        title2=f"PLACEHOLDER - {courseware.title} Signatory Title 2",
-        title3=f"PLACEHOLDER - {courseware.title} Signatory Title 3",
+        title_1=f"PLACEHOLDER - {courseware.title} Signatory Title 1",
+        title_2=f"PLACEHOLDER - {courseware.title} Signatory Title 2",
+        title_3=f"PLACEHOLDER - {courseware.title} Signatory Title 3",
         organization=f"PLACEHOLDER - {courseware.title} Signatory Organization",
     )
     if include_placeholder_image:
@@ -333,11 +333,58 @@ def create_default_certificate_page(
 
     cert_page = CertificatePage(
         product_name=f"PLACEHOLDER - {courseware.title} Certificate",
-        CEUs="PLACEHOLDER - {courseware.title} CEUs",
+        CEUs=f"PLACEHOLDER - {courseware.title} CEUs",
     )
     courseware_page = courseware.page
     courseware_page.add_child(instance=cert_page)
     return cert_page
+
+
+def get_optional_placeholder_values_for_courseware_type(
+    courseware_type: Union[Course, Program],
+) -> dict:
+    """
+    Returns a dictionary of optional values to include when creating the page,
+    based on the type of courseware (Course or Program).
+    """
+
+    # Just some hardcoded example values for demonstration purposes.
+    # Might make sense to use faker for some of this or allow selection of values from different presets
+    # For now though, this sets up a page which is reasonably complete and can be immediately published
+    values = {
+        "price": [
+            (
+                "price_details",
+                {
+                    "text": "PLACEHOLDER - Three easy payments of 99.99",
+                    "link": "https://example.com/pricing",
+                },
+            )
+        ],
+        "min_weeks": 1,
+        "max_weeks": 1,
+        "effort": "PLACEHOLDER - 1-2 hours per week",
+        "min_price": 37,
+        "max_price": 149,
+        "prerequisites": "PLACEHOLDER - No prerequisites, other than a willingness to learn",
+        "faq_url": "https://example.com",
+    }
+    if isinstance(courseware_type, Course):
+        values["about"] = (
+            "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+        values["what_you_learn"] = (
+            "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+    elif isinstance(courseware_type, Program):
+        values["about"] = (
+            "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+        values["what_you_learn"] = (
+            "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+
+    return values
 
 
 def create_default_courseware_page(

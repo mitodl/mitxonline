@@ -12,6 +12,7 @@ from cms.api import (
     create_default_certificate_page,
     create_default_courseware_page,
     create_default_signatory_page,
+    get_optional_placeholder_values_for_courseware_type,
 )
 from courses.models import Course, CourseRun, Department, Program
 from main.utils import parse_supplied_date
@@ -42,7 +43,13 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"Creating placeholder CMS page for {courseware_object.readable_id}."
             )
-            courseware_page = create_default_courseware_page(courseware_object)
+            placeholder_values = get_optional_placeholder_values_for_courseware_type(
+                courseware_object
+            )
+            courseware_page = create_default_courseware_page(
+                courseware_object, live=True, optional_kwargs=placeholder_values
+            )
+            courseware_page.save_revision().publish()
             self.stdout.write(
                 self.style.SUCCESS(f"Created CMS page {courseware_page}.")
             )
@@ -51,6 +58,7 @@ class Command(BaseCommand):
                 f"Creating placeholder CertificatePage for {courseware_object.readable_id}."
             )
             certificate_page = create_default_certificate_page(courseware_object)
+            certificate_page.save_revision().publish()
             self.stdout.write(
                 self.style.SUCCESS(f"Created CertificatePage {certificate_page}.")
             )
@@ -61,7 +69,10 @@ class Command(BaseCommand):
             signatory_page = create_default_signatory_page(
                 courseware_object, include_placeholder_image=True
             )
-            self.stdout.write(f"Creating placeholder Signatory {signatory_page}.")
+            signatory_page.save_revision().publish()
+            self.stdout.write(
+                self.style.SUCCESS(f"Created Signatory {signatory_page}.")
+            )
 
     def _check_if_courseware_object_readable_id_exists(
         self,
