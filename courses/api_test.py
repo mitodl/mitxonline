@@ -1212,7 +1212,7 @@ def test_override_user_grade(grade, letter_grade, should_force_pass, is_passed):
     test_grade.refresh_from_db()
     assert test_grade.grade == grade
     assert test_grade.passed is is_passed
-    assert test_grade.letter_grade is letter_grade
+    assert test_grade.letter_grade == letter_grade
     assert test_grade.set_by_admin is True
 
 
