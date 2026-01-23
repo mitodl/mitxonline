@@ -223,6 +223,7 @@ INSTALLED_APPS = (
     "django.contrib.humanize",
     "django.contrib.sites",
     "django_user_agents",
+    "django_removals",
     "oauth2_provider",
     "rest_framework",
     "anymail",
