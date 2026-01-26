@@ -5,11 +5,13 @@ from django.core.management import call_command
 
 log = logging.getLogger(__name__)
 
+from oauth2_provider.models import clear_expired
+
 
 @shared_task
-def run_cleartokens():
+def run_clear_tokens():
     try:
-        call_command("cleartokens")
+        clear_expired()
         log.info("Successfully ran cleartokens management command.")
     except Exception:
         log.exception("Error running cleartokens")
