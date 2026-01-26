@@ -2,12 +2,17 @@
 
 import logging
 import re
+from urllib.parse import urljoin
 
+from django.conf import settings
 from django.db.models import Prefetch, Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
+from courses.constants import (
+    COURSEWARE_URL_PATTERN_TEMPLATE,
+    UAI_COURSEWARE_ID_PREFIX,
+)
 from courses.models import (
     CourseRun,
     CourseRunEnrollment,
@@ -251,3 +256,28 @@ def get_approved_flexible_price_exists(instance, context):
         check_user = user
 
     return is_courseware_flexible_price_approved(course_or_run, check_user)
+
+def get_courseware_url(courseware_id: str) -> str:
+    """
+    Generate the full courseware URL for a course run.
+    
+    The URL follows the pattern: <edX base URL>/learn/course/<courseware_id>/home
+    
+    Configuration Settings:
+    - OPENEDX_BASE_REDIRECT_URL: the base URL for edX redirects (e.g., https://edx.example.com)
+    
+    Args:
+        courseware_id (str): The readable ID of the course run (e.g., course-v1:MITx+18.01x+3T2023)
+    
+    Returns:
+        str: The full courseware URL, or None if courseware_id is None
+    
+    Example:
+        >>> get_courseware_url("course-v1:MITx+18.01x+3T2023")
+        "https://edx.example.com/learn/course/course-v1:MITx+18.01x+3T2023/home"
+    """
+    if not courseware_id:
+        return None
+    
+    path = COURSEWARE_URL_PATTERN_TEMPLATE.format(courseware_id=courseware_id)
+    return urljoin(settings.OPENEDX_BASE_REDIRECT_URL, path)

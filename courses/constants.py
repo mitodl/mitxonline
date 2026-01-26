@@ -38,3 +38,18 @@ AVAILABILITY_TYPES = [AVAILABILITY_ANYTIME, AVAILABILITY_DATED]
 AVAILABILITY_CHOICES = list(zip(AVAILABILITY_TYPES, AVAILABILITY_TYPES))
 
 COURSE_KEY_PATTERN = r"^course-v1:[^+]+\+[^+]+\+[^+]+$"
+# Courseware URL generation pattern
+# The courseware URL for a course run follows this pattern:
+# <edX base URL>/learn/course/<readable id>/home
+#
+# This is used to generate the courseware URL for a course run, which is
+# computed from the readable_id (courseware_id) and the edX base URL configured
+# in settings (OPENEDX_BASE_REDIRECT_URL).
+#
+# Example: https://edx.example.com/learn/course/course-v1:MITx+18.01x+3T2023/home
+#
+# Configuration Settings:
+# - OPENEDX_BASE_REDIRECT_URL: the base URL for edX redirects (e.g., https://edx.example.com)
+# 
+# The generated URL uses the pattern: {OPENEDX_BASE_REDIRECT_URL}/learn/course/{readable_id}/home
+COURSEWARE_URL_PATTERN_TEMPLATE = "/learn/course/{courseware_id}/home"
