@@ -1291,6 +1291,21 @@ Django = "*"
 testing = ["django-modelcluster"]
 
 [[package]]
+name = "django-prefetch"
+version = "1.2.3"
+description = "Simple and generic model related data prefetch framework for Django solving the \"1+N queries\" problem that happens when you need related data for your objects."
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
+groups = ["main"]
+files = [
+    {file = "django-prefetch-1.2.3.tar.gz", hash = "sha256:a232a63fa6c244fd14a1f1649052e3201476858dffa3f37875e13c032a09cdf4"},
+    {file = "django_prefetch-1.2.3-py2.py3-none-any.whl", hash = "sha256:6059c24ddbb896a0413caea5d9e5f08154882f5049c077cb936c9b817022b6ef"},
+]
+
+[package.dependencies]
+Django = ">=1.9"
+
+[[package]]
 name = "django-redis"
 version = "6.0.0"
 description = "Full featured redis cache backend for Django."
@@ -6019,4 +6034,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "8501e79bcbead6a2aefa6fcb7f98d6380eb746964bfef75b97fc9a1e80f4633a"
+content-hash = "1f2f551ac4a942b932c1e1b019ed76fbaa748e60cd24318572b9594f0267f752"

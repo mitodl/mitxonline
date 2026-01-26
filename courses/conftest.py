@@ -160,28 +160,27 @@ def user_with_enrollments_and_certificates(fake, user, course_catalog_data):
 
     certificate_runs = []
 
-    for program in fake.random_sample(programs):
+    programs_to_enroll_in = fake.random_sample(programs)
+    programs_with_certificate = fake.random_sample(programs_to_enroll_in)
+
+    for program in programs_to_enroll_in:
         ProgramEnrollmentFactory.create(user=user, program=program)
         courses = [
             req.course for req in program.all_requirements.filter(course__isnull=False)
         ]
 
-        if fake.boolean(chance_of_getting_true=50):
+        if program in programs_with_certificate:
             ProgramCertificateFactory.create(user=user, program=program)
 
         for course in courses:
-            if fake.boolean(chance_of_getting_true=50):
-                continue
-
             runs = list(course.courseruns.all())
+            runs_to_enroll_in = fake.random_sample(runs)
+            runs_with_certificate = fake.random_sample(runs_to_enroll_in)
 
-            for run in fake.random_sample(runs):
+            for run in runs_to_enroll_in:
                 CourseRunEnrollment.objects.get_or_create(run=run, user=user)
 
-                if (
-                    fake.boolean(chance_of_getting_true=80)
-                    and run not in certificate_runs
-                ):
+                if run in runs_with_certificate and run not in certificate_runs:
                     CourseRunCertificateFactory.create(user=user, course_run=run)
                     certificate_runs.append(run)
 

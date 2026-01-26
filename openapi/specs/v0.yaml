@@ -3073,6 +3073,40 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v3/program_enrollments/:
+    get:
+      operationId: v3_program_enrollments_list
+      description: ViewSet for user program enrollments with v3 serializers.
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/V3UserProgramEnrollment'
+          description: ''
+  /api/v3/program_enrollments/{program_id}/:
+    get:
+      operationId: v3_program_enrollments_retrieve
+      description: ViewSet for user program enrollments with v3 serializers.
+      parameters:
+      - in: path
+        name: program_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V3UserProgramEnrollment'
+          description: ''
   /enrollments/:
     post:
       operationId: api_enrollments_create
@@ -7915,6 +7949,64 @@ components:
       required:
       - certificate
       - enrollments
+      - program
+    V3ProgramCertificate:
+      type: object
+      description: ProgramCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/program/<uuid>/
+            Example: /certificate/program/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+          readOnly: true
+      required:
+      - link
+      - uuid
+    V3SimpleProgram:
+      type: object
+      description: Program Model Serializer v2
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        program_type:
+          type: string
+          nullable: true
+          maxLength: 255
+        live:
+          type: boolean
+      required:
+      - id
+      - readable_id
+      - title
+    V3UserProgramEnrollment:
+      type: object
+      description: Serializer for user program enrollments.
+      properties:
+        program:
+          allOf:
+          - $ref: '#/components/schemas/V3SimpleProgram'
+          readOnly: true
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/V3ProgramCertificate'
+          readOnly: true
+          nullable: true
+      required:
+      - certificate
       - program
     YearsExperienceEnum:
       enum:
