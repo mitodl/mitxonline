@@ -1,21 +1,16 @@
 """Course API URL routes"""
 
 from django.urls import include, path
-from rest_framework import routers
 
-import courses.urls.v1.urls as urls_v1
-import courses.urls.v2.urls as urls_v2
+from courses.urls.v1 import urls as v1_urls
 from courses.views import v1
 
-router = routers.SimpleRouter()
-
-
 urlpatterns = [
-    path("api/v1/", include(urls_v1, "v1")),
-    path("api/v2/", include(urls_v2, "v2")),
-]
-
-urlpatterns += [
+    # there is some circular import error somewhere that
+    # we need to hunt down and fix preventing usage of a string include here
+    path("api/v1/", include(v1_urls, "v1")),
+    path("api/v2/", include("courses.urls.v2.urls", "v2")),
+    path("api/v3/", include("courses.urls.v3.urls", "v3")),
     path(
         "api/records/program/<int:pk>/share/",
         v1.LearnerRecordShareView.as_view(),
@@ -36,9 +31,6 @@ urlpatterns += [
         v1.LearnerRecordFromUUIDView.as_view(),
         name="shared_learner_record_from_uuid",
     ),
-]
-
-urlpatterns += [
     path(
         "enrollments/",
         v1.CreateEnrollmentView.as_view(),
