@@ -1027,7 +1027,7 @@ CELERY_BEAT_SCHEDULE = {
         ),
     },
     "clear-expired-tokens": {
-        "task": "main.tasks.clear_expired_tokens",
+        "task": "main.tasks.run_clear_tokens",
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week
     },
 }
