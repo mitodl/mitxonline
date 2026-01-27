@@ -462,6 +462,82 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     return True  # No products to validate means valid
 
 
+def get_contract_runs_without_products(contract: ContractPage):
+    """
+    Return a list of contract course runs that don't have products.
+
+    This uses ContractPage.get_products so if the run *does* have products, but
+    they're not active products, the run will count.
+
+    Returns:
+    - QuerySet of runs without products.
+    """
+
+    return contract.get_course_runs().exclude(
+        id__in=contract.get_products().values_list("object_id", flat=True)
+    )
+
+
+def get_contract_products_with_bad_pricing(contract: ContractPage):
+    """
+    Return a list of products that don't have correct prices set.
+
+    This is products that have a price but the contract price is 0 or not set,
+    or products that have prices that aren't the same as the contract.
+
+    Returns:
+    - QuerySet of products with invalid prices.
+    """
+
+    products_qset = contract.get_products()
+
+    if (
+        not contract.enrollment_fixed_price
+        or contract.enrollment_fixed_price == Decimal(0)
+    ):
+        return products_qset.exclude(price=Decimal(0)).all()
+
+    return products_qset.exclude(price=contract.enrollment_fixed_price).all()
+
+
+def ensure_contract_run_products(contract: ContractPage) -> list[Product]:
+    """Ensure the contract's course runs all have products."""
+
+    fixable_crs = get_contract_runs_without_products(contract)
+
+    if len(fixable_crs) == 0:
+        return []
+
+    content_type = ContentType.objects.get_for_model(CourseRun)
+    return [
+        Product.objects.create(
+            content_type=content_type,
+            object_id=run.id,
+            price=contract.enrollment_fixed_price
+            if contract.enrollment_fixed_price
+            else Decimal(0),
+            active=True,
+            description=run.courseware_id,
+        )
+        for run in fixable_crs
+    ]
+
+
+def ensure_contract_run_pricing(contract: ContractPage):
+    """Ensure the contract runs are all priced correctly."""
+
+    products = contract.get_products()
+
+    for product in products:
+        product.price = (
+            contract.enrollment_fixed_price
+            if contract.enrollment_fixed_price
+            else Decimal(0)
+        )
+
+    Product.objects.bulk_update(products, ["price"])
+
+
 def _get_discount_defaults(discount_amount: Decimal) -> dict:
     """Get default discount parameters."""
     return {

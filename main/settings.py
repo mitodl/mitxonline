@@ -1569,3 +1569,9 @@ ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING = get_bool(
     default=False,
     description="Override posthog flag to enable the provisioning of verifiable credentials in dev.",
 )
+
+MIT_LEARN_ATTACH_URL = get_string(
+    name="MIT_LEARN_ATTACH_URL",
+    default="https://learn.mit.edu/enrollmentcode/",
+    description="The URL to use for generating contract attachment URLs for B2B.",
+)
