@@ -258,7 +258,7 @@ def create_contract_run(
         year=now_in_utc().year,
         contract_id=contract.id,
     )
-    source_id = CourseKey.from_string(clone_course_run.course.readable_id)
+    source_id = CourseKey.from_string(clone_course_run.readable_id)
     new_readable_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
 
     # Check first for an existing run with the same readable ID.
@@ -580,12 +580,12 @@ def _update_discount(
     )
 
 
-def _handle_extra_enrollment_codes(
-    contract: ContractPage, product: Product, product_discounts: list[Discount]
-) -> int:
+def _handle_extra_enrollment_codes(contract: ContractPage, product: Product) -> int:
     """Remove any extra codes, so there's just enough for the given product."""
 
-    remove_count = contract.get_discounts().filter(products__product=product).count() - (contract.max_learners or 1)
+    remove_count = contract.get_discounts().filter(
+        products__product=product
+    ).count() - (contract.max_learners or 1)
 
     if remove_count <= 0:
         log.info(
@@ -596,17 +596,24 @@ def _handle_extra_enrollment_codes(
 
     # Filter out the discounts that have been used for something - either for
     # contract attachment or for enrollment.
-    unused_discounts = contract.get_unused_discounts().filter(products__product=product).all()
+    unused_discounts = (
+        contract.get_unused_discounts().filter(products__product=product).all()
+    )
 
     for unused_discount in unused_discounts[:remove_count]:
         log.info(
-            "Removing extra discount %s for contract %s product %s", unused_discount, contract, product
+            "Removing extra discount %s for contract %s product %s",
+            unused_discount,
+            contract,
+            product,
         )
 
         # Remove the product from the discount - only remove the discount if
         # there's no more product.
 
-        DiscountProduct.objects.filter(discount=unused_discount, product=product).delete()
+        DiscountProduct.objects.filter(
+            discount=unused_discount, product=product
+        ).delete()
         unused_discount.refresh_from_db()
         if unused_discount.products.count() == 0:
             unused_discount.delete()
@@ -756,11 +763,13 @@ def _handle_limited_seats(
             product,
             contract.get_products().count(),
         )
-        errors = _handle_extra_enrollment_codes(contract, product, product_discounts)
-        log.warning("ensure_enrollment_codes_exist: Removed %s codes for %s product %s",
-                    errors,
-                    contract,
-                    product,)
+        errors = _handle_extra_enrollment_codes(contract, product)
+        log.warning(
+            "ensure_enrollment_codes_exist: Removed %s codes for %s product %s",
+            errors,
+            contract,
+            product,
+        )
         return (created, updated, errors)
 
     for _ in range(create_count):
