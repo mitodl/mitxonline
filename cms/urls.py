@@ -12,13 +12,18 @@ the "+" characters.
 The pattern(s) defined here serve the same Wagtail view that the library-defined pattern serves.
 """  # noqa: RUF002
 
-from django.urls import re_path
+from django.urls import include, path, re_path
+from wagtail import urls as wagtail_urls
 from wagtail import views
+from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.coreutils import WAGTAIL_APPEND_SLASH
+from wagtail.documents import urls as wagtaildocs_urls
 
 from cms.constants import COURSE_INDEX_SLUG, PROGRAM_INDEX_SLUG
 
 detail_path_char_pattern = r"\w\-\.+:"
+
+app_name = "cms"
 
 if WAGTAIL_APPEND_SLASH:
     custom_serve_pattern = (
@@ -36,6 +41,9 @@ else:
 
 
 urlpatterns = [
+    path("cms/", include(wagtailadmin_urls)),
+    path("documents/", include(wagtaildocs_urls)),
+    path("", include(wagtail_urls)),
     re_path(custom_serve_pattern, views.serve, name="wagtail_serve_custom"),
     re_path(program_custom_serve_pattern, views.serve, name="wagtail_serve_custom"),
 ]

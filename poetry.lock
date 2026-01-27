@@ -5347,6 +5347,21 @@ files = [
 ]
 
 [[package]]
+name = "traceback-with-variables"
+version = "2.2.1"
+description = "Adds variables to python traceback. Simple, lightweight, controllable. Debug reasons of exceptions by logging or pretty printing colorful variable contexts for each frame in a stacktrace, showing every value. Dump locals environments after errors to console, files, and loggers. Works with Jupyter and IPython."
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "traceback_with_variables-2.2.1-py3-none-any.whl", hash = "sha256:ab6d75c72d26d61217962d11db44c98c62dccd2fedb2d4fb0ae4f9faf9db23c2"},
+    {file = "traceback_with_variables-2.2.1.tar.gz", hash = "sha256:ea7c695f9b401762f68f75df0439d661112b8dbd58bcd6910e402cff925ad7e0"},
+]
+
+[package.extras]
+test = ["flake8", "ipython", "notebook (==6.2.0)", "pytest-cov"]
+
+[[package]]
 name = "traitlets"
 version = "5.14.3"
 description = "Traitlets Python configuration system"
@@ -6001,4 +6016,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "9ece6691009b45425eee807581bfad05397e18aad9a09ab857595ecffc30a127"
+content-hash = "41eafe3cc6336f9cefe007ba1af58569ab378f7c4a0b856615327f50bb872c81"

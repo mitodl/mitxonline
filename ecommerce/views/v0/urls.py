@@ -65,6 +65,8 @@ discountsRouter.register(
     parents_query_lookups=["discount"],
 )
 
+app_name = "ecommerce"
+
 urlpatterns = [
     path(
         "baskets/create_from_product/<str:product_id>/",

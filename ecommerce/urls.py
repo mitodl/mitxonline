@@ -21,7 +21,6 @@ from ecommerce.views.legacy import (
     ProductViewSet,
     UserDiscountViewSet,
 )
-from ecommerce.views.v0.urls import urlpatterns as v0_urls
 from main.routers import SimpleRouterWithNesting
 
 router = SimpleRouterWithNesting()
@@ -74,7 +73,6 @@ basketRouter.register(
 )
 
 urlpatterns = [
-    path("api/v0/", include((v0_urls, "v0"))),
     path("api/", include(router.urls)),
     re_path(
         "checkout/to_payment",
