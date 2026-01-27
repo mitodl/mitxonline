@@ -66,6 +66,6 @@ class Command(BaseCommand):
                     f"Would execute deletion query: {deletion_queryset.query}"
                 )
 
-            lower_id = upper_id + 1
+            lower_id = upper_id
             upper_id = lower_id + batch_size
             self.stdout.write(self.style.SUCCESS(f"Deleted {total_deleted} records"))
