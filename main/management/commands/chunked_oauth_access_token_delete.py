@@ -1,3 +1,4 @@
+import sys
 import time
 
 from django.apps import apps
@@ -19,6 +20,7 @@ class Command(BaseCommand):
             "--batch-size",
             help="How many records to delete at once.",
             type=int,
+            default=5000,  # Default batch size, chosen by fair dice roll
         )
         parser.add_argument(
             "--execute",
@@ -49,6 +51,13 @@ class Command(BaseCommand):
         sleep = kwargs["sleep"]
         access_token_model = self.get_access_token_model()
         min_id, max_id = self.get_min_and_max_id()
+        if not min_id or not max_id:
+            self.stdout.write(
+                self.style.ERROR(
+                    "Could not get min/max IDs from access token table - is oauth2_provider_accesstoken empty?"
+                )
+            )
+            sys.exit(1)
         lower_id = min_id
         upper_id = min_id + batch_size
         now = timezone.now()
