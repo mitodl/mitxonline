@@ -22,7 +22,6 @@ from argparse import FileType
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-import pytz
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand, CommandError

@@ -2430,7 +2430,9 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
 
     # Mock enrollment created_on date
     mock_enrollment = Mock()
-    mock_enrollment.created_on = datetime(2024, 1, 15, 10, 30, 0, tzinfo=ZoneInfo("UTC"))
+    mock_enrollment.created_on = datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=ZoneInfo("UTC")
+    )
     mock_enrollment_get.return_value = mock_enrollment
 
     # Mock thumbnail URL
@@ -2532,7 +2534,9 @@ def test_program_certificate_verifiable_credentials_signing_payload(
 
     # Mock enrollment created_on date
     mock_enrollment = Mock()
-    mock_enrollment.created_on = datetime(2024, 2, 20, 14, 45, 0, tzinfo=ZoneInfo("UTC"))
+    mock_enrollment.created_on = datetime(
+        2024, 2, 20, 14, 45, 0, tzinfo=ZoneInfo("UTC")
+    )
     mock_enrollment_get.return_value = mock_enrollment
 
     # Mock thumbnail URL

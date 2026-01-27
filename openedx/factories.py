@@ -4,7 +4,6 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 import faker
-import pytz
 from factory import Faker, LazyAttribute, SelfAttribute, SubFactory, Trait
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyText
@@ -35,7 +34,9 @@ class OpenEdxApiAuthFactory(DjangoModelFactory):
     user = SubFactory("users.factories.UserFactory", no_openedx_api_auth=True)
     refresh_token = Faker("pystr", max_chars=30)
     access_token = Faker("pystr", max_chars=30)
-    access_token_expires_on = Faker("future_datetime", end_date="+10h", tzinfo=ZoneInfo("UTC"))
+    access_token_expires_on = Faker(
+        "future_datetime", end_date="+10h", tzinfo=ZoneInfo("UTC")
+    )
 
     class Meta:
         model = OpenEdxApiAuth

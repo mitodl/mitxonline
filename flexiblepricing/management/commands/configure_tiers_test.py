@@ -4,7 +4,6 @@ from zoneinfo import ZoneInfo
 
 import faker
 import pytest
-import pytz
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command

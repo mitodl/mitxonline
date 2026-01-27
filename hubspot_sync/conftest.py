@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pytest
-import pytz
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from mitol.hubspot_api.factories import HubspotObjectFactory

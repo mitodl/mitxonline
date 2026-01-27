@@ -40,7 +40,6 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
-from main.settings import TIME_ZONE
 from openedx.api import create_user
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User

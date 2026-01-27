@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 
 import freezegun
 import pytest
-import pytz
 import reversion
 from django.forms.models import model_to_dict
 from django.test.client import Client

@@ -154,7 +154,8 @@ class CourseRunFactory(DjangoModelFactory):
             end_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
         )
         in_future = factory.Trait(
-            start_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")), end_date=None
+            start_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
+            end_date=None,
         )
 
 

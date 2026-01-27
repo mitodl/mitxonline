@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Union
 from zoneinfo import ZoneInfo
 
-import pytz
 import requests
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType

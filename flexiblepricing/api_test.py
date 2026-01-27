@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 import ddt
 import freezegun
 import pytest
-import pytz
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
@@ -540,9 +539,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
         discount.activation_date = (
             datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta - expired_delta
         )
-        discount.expiration_date = (
-            datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta
-        )
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta
         with freezegun.freeze_time(
             datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta * 3
         ):
