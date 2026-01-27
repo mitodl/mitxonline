@@ -31,7 +31,7 @@ class Command(BaseCommand):
     def get_min_and_max_id(self):
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT MIN(id), MAX(id) as min_id FROM oauth2_provider_accesstoken"
+                "SELECT MIN(id) as min_id, MAX(id) as max_id FROM oauth2_provider_accesstoken"
             )
             return cursor.fetchone()
 
