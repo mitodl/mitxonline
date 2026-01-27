@@ -4,6 +4,7 @@ import json
 import string  # noqa: F401
 from pathlib import Path
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import factory
 import faker
