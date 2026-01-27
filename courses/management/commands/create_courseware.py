@@ -179,7 +179,6 @@ class Command(BaseCommand):
             title=kwargs["title"],
             run_tag=kwargs["create_run"],
             courseware_id=run_id,
-            courseware_url_path=kwargs["run_url"],
             live=kwargs["live"],
             is_self_paced=kwargs["self_paced"],
             start_date=(

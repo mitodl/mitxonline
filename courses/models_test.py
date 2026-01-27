@@ -68,10 +68,123 @@ def test_program_num_courses():
 def test_courseware_url(settings):
     """Test that the courseware_url property yields the correct values"""
     settings.OPENEDX_BASE_REDIRECT_URL = "http://example.com"
-    course_run = CourseRunFactory.build(courseware_url_path="/path")
-    course_run_no_path = CourseRunFactory.build(courseware_url_path=None)
-    assert course_run.courseware_url == "http://example.com/path"
-    assert course_run_no_path.courseware_url is None
+    course_run = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+18.01x+3T2023",
+        has_courseware_url=True
+    )
+    course_run_no_url = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+18.01x+3T2023",
+        has_courseware_url=False
+    )
+    assert course_run.courseware_url == "http://example.com/learn/course/course-v1:MITx+18.01x+3T2023/home"
+    assert course_run_no_url.courseware_url is None
+
+
+def test_courseware_url_with_trailing_slash_base_url(settings):
+    """Test that the courseware_url handles base URL with trailing slash"""
+    settings.OPENEDX_BASE_REDIRECT_URL = "http://example.com/"
+    course_run = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+6.002x+1T2023",
+        has_courseware_url=True
+    )
+    # urljoin handles trailing slash correctly
+    assert course_run.courseware_url == "http://example.com/learn/course/course-v1:MITx+6.002x+1T2023/home"
+
+
+def test_courseware_url_with_https(settings):
+    """Test that the courseware_url works with HTTPS URLs"""
+    settings.OPENEDX_BASE_REDIRECT_URL = "https://secure-edx.example.com"
+    course_run = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+24.900x+2T2023",
+        has_courseware_url=True
+    )
+    assert course_run.courseware_url == "https://secure-edx.example.com/learn/course/course-v1:MITx+24.900x+2T2023/home"
+
+
+def test_courseware_url_multiple_runs_same_id(settings):
+    """Test that multiple course runs with same courseware_id can have different URL visibility"""
+    settings.OPENEDX_BASE_REDIRECT_URL = "http://example.com"
+    courseware_id = "course-v1:MITx+18.01x+1T2023"
+    
+    # Create two course runs with same courseware_id (different courses or tags)
+    run_with_url = CourseRunFactory.build(courseware_id=courseware_id, has_courseware_url=True)
+    run_without_url = CourseRunFactory.build(courseware_id=courseware_id, has_courseware_url=False)
+    
+    assert run_with_url.courseware_url == f"http://example.com/learn/course/{courseware_id}/home"
+    assert run_without_url.courseware_url is None
+
+
+def test_courseware_url_default_has_courseware_url_true(settings):
+    """Test that has_courseware_url defaults to True for new course runs"""
+    settings.OPENEDX_BASE_REDIRECT_URL = "http://example.com"
+    course_run = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+18.01x+1T2023"
+        # has_courseware_url not specified, should default to True
+    )
+    assert course_run.has_courseware_url is True
+    assert course_run.courseware_url == "http://example.com/learn/course/course-v1:MITx+18.01x+1T2023/home"
+
+
+def test_courseware_url_none_when_has_courseware_url_false(settings):
+    """Test that courseware_url is None when has_courseware_url is explicitly False"""
+    settings.OPENEDX_BASE_REDIRECT_URL = "http://example.com"
+    course_run = CourseRunFactory.build(
+        courseware_id="course-v1:MITx+18.01x+1T2023",
+        has_courseware_url=False
+    )
+    # Even with a valid courseware_id, should return None
+    assert course_run.courseware_url is None
+
+
+def test_courseware_url_preserves_none_for_fake_runs(settings):
+    """Test that fake course runs (test data) can have has_courseware_url=False"""
+    settings.OPENEDX_BASE_REDIRECT_URL = "http://example.com"
+    fake_run = CourseRunFactory.build(
+        run_tag="fake-test-run",
+        courseware_id="course-v1:MITx+fake+1T2023",
+        has_courseware_url=False
+    )
+    assert fake_run.courseware_url is None
+
+
+def test_get_courseware_url_utility_function(settings):
+    """Test the get_courseware_url utility function directly"""
+    from courses.utils import get_courseware_url
+    
+    settings.OPENEDX_BASE_REDIRECT_URL = "https://edx.example.com"
+    
+    # Test with valid courseware_id
+    url = get_courseware_url("course-v1:MITx+18.01x+3T2023")
+    assert url == "https://edx.example.com/learn/course/course-v1:MITx+18.01x+3T2023/home"
+
+
+def test_get_courseware_url_with_none(settings):
+    """Test that get_courseware_url returns None for empty/None courseware_id"""
+    from courses.utils import get_courseware_url
+    
+    settings.OPENEDX_BASE_REDIRECT_URL = "https://edx.example.com"
+    
+    assert get_courseware_url(None) is None
+    assert get_courseware_url("") is None
+
+
+def test_get_courseware_url_with_complex_courseware_id(settings):
+    """Test get_courseware_url with various realistic courseware_id formats"""
+    from courses.utils import get_courseware_url
+    
+    settings.OPENEDX_BASE_REDIRECT_URL = "https://edx.example.com"
+    
+    test_ids = [
+        "course-v1:MITx+18.01x+1T2023",
+        "course-v1:MITx+6.002x+2T2023",
+        "course-v1:MITx+24.900x+3T2023",
+        "course-v1:CompanyX+CS101+1T2024",
+    ]
+    
+    for courseware_id in test_ids:
+        url = get_courseware_url(courseware_id)
+        assert url == f"https://edx.example.com/learn/course/{courseware_id}/home"
+        assert courseware_id in url
 
 
 @pytest.mark.parametrize("end_days,expected", [[-1, True], [1, False], [None, False]])  # noqa: PT006, PT007
