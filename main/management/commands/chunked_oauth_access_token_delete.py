@@ -7,7 +7,10 @@ from django.utils import timezone
 
 class Command(BaseCommand):
     """
-    Bootstraps a fresh MITxOnline instance.
+    Performs chunked deletion of expired OAuth2 access tokens.
+    This is a slight modification of the standard `cleartokens` management command
+    that queries for records by ID in order to avoid sequential scans in favor
+    of an index scan w/ subsequent filter.
     """
 
     def add_arguments(self, parser):
@@ -39,8 +42,6 @@ class Command(BaseCommand):
             return cursor.fetchone()
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
-        """Coordinates the other commands."""
-
         batch_size = kwargs["batch_size"]
         execute = kwargs["execute"]
         access_token_model = self.get_access_token_model()
@@ -61,6 +62,8 @@ class Command(BaseCommand):
             # if a token has an associated refresh token. This is why the original script has uses a Q expression
             # However, that table is _much_ smaller than the access token table, so we will just make
             # multiple queries, do the accounting in Python and run the delete by ID knowing that the vast majority of refresh token queries will be empty
+
+            # If we decide that we don't care about the presence of refresh tokens, we can simplify this greatly.
             potential_deletion_ids = set(
                 access_token_model.objects.filter(
                     id__gt=lower_id, id__lte=upper_id, expires__lt=now
