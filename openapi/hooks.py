@@ -102,7 +102,6 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         "/api/checkout/",
         "/api/instructor/",
         "/api/v0/checkout/",
-        "/api/v2/pages/",
         "/api/v2/images/",
         "/api/v2/documents/",
     ]
@@ -113,86 +112,3 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         for (path, path_regex, method, callback) in endpoints
         if not any(path.startswith(prefix) for prefix in EXCLUDED_PATHS)
     ]
-
-
-def insert_wagtail_pages_schema(endpoints):
-    """
-    Insert Wagtail pages schema into the OpenAPI endpoints.
-    """
-
-    from cms.wagtail_api.schema.views import (  # noqa: PLC0415
-        WagtailCertificatePagesSchemaView,
-        WagtailCoursePagesSchemaView,
-        WagtailPagesRetrieveSchemaView,
-        WagtailPagesSchemaView,
-        WagtailProgramPagesSchemaView,
-    )
-
-    class WrappedPagesView(WagtailPagesSchemaView):
-        pass
-
-    class WrappedCertificateView(WagtailCertificatePagesSchemaView):
-        pass
-
-    class WrappedCourseView(WagtailCoursePagesSchemaView):
-        pass
-
-    class WrappedProgramView(WagtailProgramPagesSchemaView):
-        pass
-
-    class WrappedPagesRetrieveView(WagtailPagesRetrieveSchemaView):
-        pass
-
-    pages_view = WrappedPagesView.as_view()
-    certificate_view = WrappedCertificateView.as_view()
-    course_view = WrappedCourseView.as_view()
-    program_view = WrappedProgramView.as_view()
-    retrieve_view = WrappedPagesRetrieveView.as_view()
-
-    # manually attach the class for schema inspection
-    pages_view.cls = WrappedPagesView
-    certificate_view.cls = WrappedCertificateView
-    course_view.cls = WrappedCourseView
-    program_view.cls = WrappedProgramView
-    retrieve_view.cls = WrappedPagesRetrieveView
-    endpoints.append(
-        (
-            "/api/v2/pages/",
-            "^api/v2/pages/$",
-            "GET",
-            pages_view,
-        )
-    )
-    endpoints.append(
-        (
-            "/api/v2/pages/?fields=*&type=cms.certificatepage",
-            "^api/v2/pages/?fields=*&type=cms.certificatepage$",
-            "GET",
-            certificate_view,
-        )
-    )
-    endpoints.append(
-        (
-            "/api/v2/pages/?fields=*&type=cms.coursepage",
-            "^api/v2/pages/?fields=*&type=cms.coursepage$",
-            "GET",
-            course_view,
-        )
-    )
-    endpoints.append(
-        (
-            "/api/v2/pages/?fields=*&type=cms.programpage",
-            "^api/v2/pages/?fields=*&type=cms.programpage$",
-            "GET",
-            program_view,
-        )
-    )
-    endpoints.append(
-        (
-            "/api/v2/pages/{id}/",
-            "^api/v2/pages/(?P<id>[0-9]+)/$",
-            "GET",
-            retrieve_view,
-        )
-    )
-    return endpoints

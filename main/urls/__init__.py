@@ -25,7 +25,7 @@ from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
 from cms.views import instructor_page
-from cms.wagtail_api.urls import api_router as wagtail_api_router
+from cms.wagtail_api.router import api_router as wagtail_api_router
 from main.views import (
     cms_signin_redirect_to_site_signin,
     index,

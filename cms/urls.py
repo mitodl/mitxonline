@@ -20,6 +20,8 @@ from cms.constants import COURSE_INDEX_SLUG, PROGRAM_INDEX_SLUG
 
 detail_path_char_pattern = r"\w\-\.+:"
 
+app_name = "cms"
+
 if WAGTAIL_APPEND_SLASH:
     custom_serve_pattern = (
         rf"^({COURSE_INDEX_SLUG}/(?:[{detail_path_char_pattern}]+/)*)$"
