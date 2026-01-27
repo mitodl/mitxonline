@@ -461,6 +461,20 @@ class ContractPage(Page, ClusterableModel):
 
         return Discount.objects.filter(products__product__in=self.get_products()).all()
 
+    def get_unused_discounts(self):
+        """Get discounts that haven't been used yet."""
+
+        return (
+            self.get_discounts()
+            .annotate(order_redemptions_count=models.Count("order_redemptions"))
+            .annotate(contract_redemptions_count=models.Count("contract_redemptions"))
+            .exclude(
+                models.Q(order_redemptions_count__gt=0)
+                | models.Q(contract_redemptions_count__gt=0)
+            )
+            .all()
+        )
+
     def add_program_courses(self, program, order=None):
         """
         Add a program, and then queue adding all its courses.

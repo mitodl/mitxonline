@@ -135,7 +135,7 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
 class OrganizationPageAdmin(ReadOnlyModelAdmin):
     """Admin for organization pages."""
 
-    list_display = ["id", "slug", "name", "org_key"]
+    list_display = ["id", "slug", "name", "org_key", "sso_organization_id",]
     fields = [
         "id",
         "slug",

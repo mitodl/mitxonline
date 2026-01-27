@@ -121,10 +121,12 @@ class DiscountProductAdmin(admin.ModelAdmin):
     search_fields = [
         "discount__discount_type",
         "discount__redemption_type",
+        "discount__discount_code",
         "product__description",
         "product__price",
     ]
     list_display = ["id", "discount", "product"]
+    list_filter = ["product"]
     raw_id_fields = ("discount", "product")
 
 

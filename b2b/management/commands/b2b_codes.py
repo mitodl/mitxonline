@@ -3,6 +3,7 @@
 import csv
 import json
 import logging
+import uuid
 from pathlib import Path
 
 from django.conf import settings
@@ -12,11 +13,31 @@ from django.db.models import Count, Q
 from rich.console import Console
 from rich.table import Table
 
+from b2b.api import (
+    ensure_contract_run_pricing,
+    ensure_contract_run_products,
+    ensure_enrollment_codes_exist,
+    get_contract_products_with_bad_pricing,
+    get_contract_runs_without_products,
+)
+from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import ContractPage, DiscountContractAttachmentRedemption
 from courses.models import CourseRun
-from ecommerce.models import DiscountRedemption, OrderStatus
+from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
+from ecommerce.models import Discount, DiscountRedemption, OrderStatus
 
 log = logging.getLogger(__name__)
+
+
+def is_valid_uuid(test_uuid: str) -> bool:
+    """Determine if the string is a UUID or not."""
+
+    try:
+        uuid.UUID(str(test_uuid))
+    except ValueError:
+        return False
+
+    return True
 
 
 class Command(BaseCommand):
@@ -57,6 +78,7 @@ class Command(BaseCommand):
         contract_id = kwargs.pop("contract", False)
         org_id = kwargs.pop("organization", False)
         if contract_id:
+            self.stdout.write(f"Filtering by contract: {contract_id}")
             if contract_id.isdecimal():
                 contracts = ContractPage.objects.filter(id=contract_id).all()
             else:
@@ -73,17 +95,20 @@ class Command(BaseCommand):
                 msg = f"Identifier {contract_id} not found."
                 raise CommandError(msg)
         elif org_id:
+            self.stdout.write(f"Filtering by organization: {org_id}")
             if org_id.isdecimal():
                 contracts = ContractPage.objects.filter(organization__id=org_id).all()
+            elif is_valid_uuid(org_id):
+                contracts = ContractPage.objects.filter(organization__sso_organization_id=org_id).all()
             else:
                 contracts = ContractPage.objects.filter(
                     Q(organization__slug=org_id)
-                    | Q(organization__sso_organization_id=org_id)
+                    | Q(organization__org_key=org_id)
                 ).all()
         elif allow_everything:
             self.stdout.write(
                 self.style.WARNING(
-                    "No contract or org specified - returning all contracts."
+                    "No contract or org specified - operating on all contracts."
                 )
             )
             contracts = ContractPage.objects.all()
@@ -98,13 +123,17 @@ class Command(BaseCommand):
     ):
         """Handle the output for the check command."""
 
+        if len(output_data) == 0:
+            self.stdout.write(self.style.ERROR("Nothing to output."))
+            return
+
         if output_format not in ["csv", "json"]:
             # Output using Rich - this goes straight to the console.
             console = Console()
             table = Table(title=table_name)
 
             for col_name in output_data[0]:
-                table.add_column(col_name)
+                table.add_column(col_name, overflow="fold")
 
             for row in output_data:
                 table.add_row(*row.values())
@@ -168,6 +197,7 @@ class Command(BaseCommand):
 
         codes = []
         content_type = ContentType.objects.get_for_model(CourseRun)
+        contract_products = contract.get_products()
 
         for discount in discounts:
             code = {
@@ -195,7 +225,8 @@ class Command(BaseCommand):
                 [
                     {**code, "Course Run": dp.product.purchasable_object.courseware_id}
                     for dp in discount.products.filter(
-                        product__content_type=content_type
+                        product__content_type=content_type,
+                        product__in=contract_products
                     ).all()
                 ]
             )
@@ -319,11 +350,190 @@ class Command(BaseCommand):
 
         return
 
-    def handle_validate(self):
+    def handle_validate(self, **kwargs):
         """Validate and fix enrollment codes."""
 
-    def handle_expire(self):
-        """Expire enrollment codes."""
+        contracts = self._get_contract_list(**kwargs, allow_everything=False)
+
+        for contract in contracts:
+            # Step 1: check if the contract should have codes
+
+            self.stdout.write(f"Contract {contract} is type {contract.membership_type}")
+
+            if (
+                contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+                and not contract.enrollment_fixed_price
+            ):
+                # This is a managed contract with no price - people are added to
+                # this automatically, so there shouldn't be any unredeemed codes.
+
+                total_codes = contract.get_discounts()
+                unredeemed_codes = (
+                    contract.get_discounts()
+                    .annotate(order_redemptions_count=Count("order_redemptions"))
+                    .annotate(contract_redemptions_count=Count("contract_redemptions"))
+                    .exclude(
+                        Q(order_redemptions_count__lt=0)
+                        | Q(contract_redemptions_count__lt=0)
+                    )
+                    .all()
+                )
+
+                if total_codes.count() > unredeemed_codes.count():
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Contract {contract} has too many codes: {unredeemed_codes.count()} available out of {total_codes.count()} total, expecting 0."
+                        )
+                    )
+
+                    removed_codes = ",".join(
+                        [code.discount_code for code in unredeemed_codes]
+                    )
+
+                    # Remove unredeemed codes.
+                    unredeemed_codes.delete()
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Removed codes: {removed_codes}")
+                    )
+            else:
+                # This contract requires enrollment codes. Check to make sure
+                # we have the proper amount and that they're set up correctly.
+
+                # Step 1: check for products for the associated course runs
+
+                if get_contract_runs_without_products(contract).count() > 0:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Contract {contract} has associated course runs that are missing products."
+                        )
+                    )
+
+                    new_products = ensure_contract_run_products(contract)
+
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Added {len(new_products)} products.")
+                    )
+
+                # Step 2: make sure the products have the right pricing
+
+                if get_contract_products_with_bad_pricing(contract).count() > 0:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Contract {contract} has course runs with products that have incorrect pricing."
+                        )
+                    )
+
+                    fixed_products = ensure_contract_run_pricing(contract)
+
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Updated {fixed_products} products.")
+                    )
+
+                # Step 3: figure out what codes should be there
+
+                expected_amount = (
+                    0
+                    if not contract.enrollment_fixed_price
+                    else contract.enrollment_fixed_price
+                )
+
+                if contract.max_learners:
+                    expected_codes_count = (
+                        contract.max_learners * contract.get_course_runs().count()
+                    )
+                    code_redemption_type = REDEMPTION_TYPE_ONE_TIME
+                else:
+                    expected_codes_count = contract.get_course_runs().count()
+                    code_redemption_type = REDEMPTION_TYPE_UNLIMITED
+
+                total_code_count = contract.get_discounts().count()
+
+                self.stdout.write(
+                    f"Found {total_code_count} enrollment codes, expected {expected_codes_count}"
+                )
+
+                if expected_codes_count != total_code_count:
+                    # We either have too many or too few codes.
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Code count for {contract} is not what is expected: expected {expected_codes_count}, got {total_code_count}"
+                        )
+                    )
+
+                    ensure_enrollment_codes_exist(contract)
+
+                # Step 4: make sure the codes are the right type and amount
+
+                bad_settings_codes_qs = contract.get_discounts().exclude(
+                    redemption_type=code_redemption_type, amount=expected_amount
+                )
+
+                if bad_settings_codes_qs.count() > 0:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Contract {contract} has {bad_settings_codes_qs.count()} codes with bad settings"
+                        )
+                    )
+
+                    bad_codes = bad_settings_codes_qs.all()
+
+                    for code in bad_codes:
+                        code.redemption_type = code_redemption_type
+                        code.amount = expected_amount
+
+                    updated_count = Discount.objects.bulk_update(
+                        bad_codes, ["redemption_type", "amount"]
+                    )
+
+                    self.stdout.write(f"Updated {updated_count} codes.")
+
+        self.stdout.write(self.style.SUCCESS(f"Checked {len(contracts)} contracts."))
+
+    def handle_expire(self, **kwargs):
+        """Expire (delete) unused enrollment codes."""
+
+        contracts = self._get_contract_list(**kwargs, allow_everything=False)
+        dry_run = kwargs.pop("expire", True)
+
+        if len(contracts) > 0:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"WARNING: Expiring codes from {len(contracts)} contracts."
+                )
+            )
+
+        if not dry_run:
+            self.stdout.write(
+                self.style.WARNING(
+                    "WARNING: Expire mode active - will deactivate/delete codes."
+                )
+            )
+
+        removed_codes = []
+
+        for contract in contracts:
+            discounts = contract.get_unused_discounts()
+            contract_products = contract.get_products().all()
+
+            for discount in discounts:
+                code = [
+                    str(contract),
+                    discount.discount_code,
+                    "detached",
+                ]
+
+                if not dry_run:
+                    discount.products.filter(product__in=contract_products).delete()
+                if discount.products.count() == (1 if dry_run else 0):
+                    if not dry_run:
+                        discount.delete()
+                    code[2] = "deleted"
+
+                removed_codes.append(code)
+
+        self.stdout.write(self.style.SUCCESS(f"{len(removed_codes)} codes removed."))
+
+        [self.stdout.write(",".join(code)) for code in removed_codes]
 
     def add_arguments(self, parser):
         """Add arguments to the command."""
@@ -390,8 +600,9 @@ class Command(BaseCommand):
 
         expire_parser.add_argument(
             "--expire",
-            help="Expire the codes without prompting.",
-            action="store_true",
+            help="Actually expire the codes. (Default is to not make changes.)",
+            action="store_false",
+            default=True,
         )
 
     def handle(self, *args, **kwargs):
@@ -401,10 +612,10 @@ class Command(BaseCommand):
 
         if op == "output":
             self.handle_output(*args, **kwargs)
-        elif op == "validate":
-            self.handle_validate()
+        elif op in ["validate", "fix", "check"]:
+            self.handle_validate(*args, **kwargs)
         elif op == "expire":
-            self.handle_expire()
+            self.handle_expire(*args, **kwargs)
         else:
             msg = f"Invalid subcommand {op}"
             raise CommandError(msg)
