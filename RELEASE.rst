@@ -1,6 +1,24 @@
 Release Notes
 =============
 
+Version 0.137.9
+---------------
+
+- Call clear_expired to clear tokens (#3248)
+- Update python 3.11 (#3105)
+- Update dependency ubuntu to v24 (#3246)
+- [pre-commit.ci] pre-commit autoupdate (#3228)
+- Add ability to specify a certificate uuid directly to generate vc (#3240)
+- Update actions/cache digest to 8b402f5 (#3242)
+- Update actions/setup-python digest to a309ff8 (#3243)
+- Update dependency pytest-cov to v7 (#3204)
+- Improve v2/courses program field spec (#3238)
+- Tweaks to `create_courseware_page` to populate a bit more data (#3237)
+- Add order history/receipt APIs to OpenAPI spec. (#3234)
+- add test for v2/courses api programs property (#3229)
+- Add celery task to run cleartokens every week (#3232)
+- Courses v2 org id tests (#3230)
+
 Version 0.137.7 (Released January 21, 2026)
 ---------------
 
