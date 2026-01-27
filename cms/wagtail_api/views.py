@@ -5,6 +5,7 @@ Views for Wagtail API
 from enum import Enum
 
 from django.db.models import F
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from wagtail.api.v2.views import PagesAPIViewSet
@@ -33,6 +34,61 @@ class PageType(Enum):
         return [cls.COURSE.value, cls.PROGRAM.value, cls.CERTIFICATE.value]
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="List all Wagtail Pages",
+        description="Returns pages of all types",
+        operation_id="pages_list",
+        parameters=[
+            OpenApiParameter(
+                name="type",
+                required=False,
+                type=str,
+                description="Filter by Wagtail page type",
+            ),
+            OpenApiParameter(
+                name="fields",
+                required=False,
+                type=str,
+                description="Specify fields (e.g. `*`)",
+            ),
+        ],
+        responses=PageListSerializer,
+    ),
+    retreive=extend_schema(
+        summary="Get Wagtail Page Details",
+        description="Returns details of a specific Wagtail page by ID",
+        operation_id="pages_retrieve",
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="ID of the Wagtail page",
+            ),
+            OpenApiParameter(
+                name="revision_id",
+                required=False,
+                type=int,
+                description="Optional certificate revision ID to retrieve a specific revision of the certificate page",
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(
+                response={
+                    "oneOf": [
+                        {"$ref": "#/components/schemas/CoursePageItem"},
+                        {"$ref": "#/components/schemas/ProgramPageItem"},
+                        {"$ref": "#/components/schemas/CertificatePage"},
+                        {"$ref": "#/components/schemas/Page"},
+                    ]
+                },
+                description="Returns a page of any known Wagtail page type",
+            )
+        },
+    ),
+)
 class WagtailPagesAPIViewSet(PagesAPIViewSet):
     """
     Custom API viewset for Wagtail pages with

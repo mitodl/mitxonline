@@ -105,33 +105,6 @@ class PageMetaSerializer(serializers.Serializer):
     last_published_at = serializers.DateTimeField(allow_null=True)
 
 
-class PageSerializer(serializers.Serializer):
-    """
-    Serializer for individual Wagtail pages.
-    """
-
-    id = serializers.IntegerField()
-    title = serializers.CharField()
-    meta = PageMetaSerializer()
-
-
-class PageListMetaSerializer(serializers.Serializer):
-    """
-    Serializer for metadata of a list of Wagtail pages.
-    """
-
-    total_count = serializers.IntegerField()
-
-
-class PageListSerializer(serializers.Serializer):
-    """
-    Serializer for a list of Wagtail pages.
-    """
-
-    meta = PageListMetaSerializer()
-    items = PageSerializer(many=True)
-
-
 class CertificatePageSerializer(serializers.Serializer):
     """
     Serializer for certificate pages, including overrides and signatory items.
@@ -144,15 +117,6 @@ class CertificatePageSerializer(serializers.Serializer):
     CEUs = serializers.CharField()  # assuming it's returned as a string
     overrides = OverrideSerializer(many=True)
     signatory_items = SignatoryItemSerializer(many=True)
-
-
-class CertificatePageListSerializer(serializers.Serializer):
-    """
-    Serializer for a list of certificate pages.
-    """
-
-    meta = PageListMetaSerializer()
-    items = CertificatePageSerializer(many=True)
 
 
 class CoursePageItemSerializer(serializers.ModelSerializer):
@@ -202,15 +166,6 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
     certificate_page = CertificatePageSerializer(allow_null=True)
     course_details = CourseSerializer()
     topic_list = TopicSerializer(many=True)
-
-
-class CoursePageListSerializer(serializers.Serializer):
-    """
-    Serializer for a list of course pages, including metadata and items.
-    """
-
-    meta = PageListMetaSerializer()
-    items = CoursePageItemSerializer(many=True)
 
 
 class ProgramPageItemSerializer(serializers.ModelSerializer):
@@ -267,10 +222,28 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
     program_details = ProgramSerializer()
 
 
-class ProgramPageListSerializer(serializers.Serializer):
+class PageSerializer(serializers.Serializer):
     """
-    Serializer for a list of program pages, including metadata and items.
+    Serializer for individual Wagtail pages.
+    """
+
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    meta = PageMetaSerializer()
+
+
+class PageListMetaSerializer(serializers.Serializer):
+    """
+    Serializer for metadata of a list of Wagtail pages.
+    """
+
+    total_count = serializers.IntegerField()
+
+
+class PageListSerializer(serializers.Serializer):
+    """
+    Serializer for a list of Wagtail pages.
     """
 
     meta = PageListMetaSerializer()
-    items = ProgramPageItemSerializer(many=True)
+    items = PageSerializer(many=True)

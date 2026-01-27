@@ -20,8 +20,12 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
+from wagtail import urls as wagtail_urls
+from wagtail.admin import urls as wagtailadmin_urls
+from wagtail.documents import urls as wagtaildocs_urls
 
 from cms.views import instructor_page
+from cms.wagtail_api.router import api_router as wagtail_api_router
 from main.views import (
     cms_signin_redirect_to_site_signin,
     index,
@@ -56,9 +60,6 @@ urlpatterns = [
     path("", include("flexiblepricing.urls")),
     path("", include("mitol.google_sheets.urls")),
     path("", include("b2b.urls")),
-    path("api/v0/", include("main.urls.v0")),
-    path("api/v1/", include("main.urls.v1")),
-    path("api/v2/", include("main.urls.v2")),
     re_path(r"", include("mitol.scim.urls")),
     re_path(r"^dashboard/", index, name="user-dashboard"),
     # Staff dashboard authentication redirect
@@ -93,6 +94,10 @@ urlpatterns = [
     re_path(
         r"^cms/login", cms_signin_redirect_to_site_signin, name="wagtailadmin_login"
     ),
+    path("cms/", include(wagtailadmin_urls)),
+    path("documents/", include(wagtaildocs_urls)),
+    path("api/v2/", wagtail_api_router.urls),
+    path("", include(wagtail_urls)),
     path("", include("cms.urls")),
     # Example view
     path("", index, name="main-index"),

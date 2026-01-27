@@ -2,22 +2,24 @@
 Views for Wagtail API Schema
 """
 
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.response import Response
-from rest_framework.views import APIView
-
-from .serializers import (
+from cms.wagtail_apit.schema.serializers import (
     CertificatePageListSerializer,
     CoursePageListSerializer,
     PageListSerializer,
     ProgramPageListSerializer,
 )
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from main.versioning import V2Versioning
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 
 class WagtailPagesSchemaView(APIView):
     """
     View for listing all Wagtail pages with schema documentation.
     """
+
+    versioning_class = V2Versioning
 
     @extend_schema(
         summary="List all Wagtail Pages",
@@ -56,6 +58,8 @@ class WagtailCertificatePagesSchemaView(APIView):
     View for listing all Certificate Pages with schema documentation.
     """
 
+    versioning_class = V2Versioning
+
     @extend_schema(
         summary="List all Certificate Pages",
         description="Returns pages of type cms.CertificatePage",
@@ -77,6 +81,8 @@ class WagtailCoursePagesSchemaView(APIView):
     """
     View for listing all Course Pages with schema documentation.
     """
+
+    versioning_class = V2Versioning
 
     @extend_schema(
         summary="List all Course Pages",
@@ -108,6 +114,8 @@ class WagtailProgramPagesSchemaView(APIView):
     View for listing all Program Pages with schema documentation.
     """
 
+    versioning_class = V2Versioning
+
     @extend_schema(
         summary="List all Program Pages",
         description="Returns pages of type cms.ProgramPage",
@@ -137,6 +145,8 @@ class WagtailPagesRetrieveSchemaView(APIView):
     """
     View for retrieving details of a specific Wagtail page with schema documentation.
     """
+
+    versioning_class = V2Versioning
 
     @extend_schema(
         summary="Get Wagtail Page Details",
