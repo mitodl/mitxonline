@@ -1,16 +1,13 @@
 from django.apps import apps
 from django.conf import settings
 from django.core.management import BaseCommand
-from django.db import connection
+from django.db import connection, models
 from django.utils import timezone
 
 
 class Command(BaseCommand):
     """
-    Performs chunked deletion of expired OAuth2 access tokens.
-    This is a slight modification of the standard `cleartokens` management command
-    that queries for records by ID in order to avoid sequential scans in favor
-    of an index scan w/ subsequent filter.
+    Deletes expired OAuth2 access tokens in chunks to avoid long-running transactions.
     """
 
     def add_arguments(self, parser):
@@ -27,9 +24,6 @@ class Command(BaseCommand):
             action="store_true",
         )
 
-    def get_refresh_token_model(self):
-        return apps.get_model(settings.OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL)
-
     def get_access_token_model(self):
         """Return the AccessToken model that is active in this project."""
         return apps.get_model(settings.OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL)
@@ -45,7 +39,6 @@ class Command(BaseCommand):
         batch_size = kwargs["batch_size"]
         execute = kwargs["execute"]
         access_token_model = self.get_access_token_model()
-        refresh_token_model = self.get_refresh_token_model()
         # Quick and dirty, get the minimum ID to start from. This is the literal table name in prod.
         min_id, max_id = self.get_min_and_max_id()
         lower_id = min_id
@@ -58,34 +51,21 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"Querying for tokens with IDs between {lower_id} and {upper_id}"
             )
-            # Annoyingly, we need to check against another table (the refresh token table) to see
-            # if a token has an associated refresh token. This is why the original script has uses a Q expression
-            # However, that table is _much_ smaller than the access token table, so we will just make
-            # multiple queries, do the accounting in Python and run the delete by ID knowing that the vast majority of refresh token queries will be empty
-
-            # If we decide that we don't care about the presence of refresh tokens, we can simplify this greatly.
-            potential_deletion_ids = set(
-                access_token_model.objects.filter(
-                    id__gt=lower_id, id__lte=upper_id, expires__lt=now
-                ).values_list("id", flat=True)
+            deletion_queryset = access_token_model.objects.filter(
+                models.Q(refresh_token__isnull=True, expires__lt=now),
+                id__gt=lower_id,
+                id__lte=upper_id,
             )
-
-            # Now filter out any tokens that have a matching refresh token
-            refresh_token_qs = set(
-                refresh_token_model.objects.filter(
-                    access_token_id__in=potential_deletion_ids
-                ).values_list("access_token_id", flat=True)
-            )
-            token_ids_to_delete = potential_deletion_ids - refresh_token_qs
 
             if execute:
-                batch_delete_count = access_token_model.objects.filter(
-                    id__in=token_ids_to_delete
-                ).delete()
+                batch_delete_count = deletion_queryset.delete()
                 self.stdout.write(f"Deleted {batch_delete_count} records")
                 total_deleted += batch_delete_count
             else:
-                self.stdout.write(f"Would delete tokens: {token_ids_to_delete}")
+                self.stdout.write(
+                    f"Would execute deletion query: {deletion_queryset.query}"
+                )
 
-            lower_id = upper_id
+            lower_id = upper_id + 1
             upper_id = lower_id + batch_size
+            self.stdout.write(self.style.SUCCESS(f"Deleted {total_deleted} records"))
