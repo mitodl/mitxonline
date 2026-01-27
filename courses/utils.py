@@ -266,7 +266,7 @@ def get_courseware_url(courseware_id: str) -> str:
 
     Configuration Settings:
     - OPENEDX_COURSE_BASE_URL: the base URL for edX course pages (e.g., https://edx.example.com)
-    
+
     Args:
         courseware_id (str): The readable ID of the course run (e.g., course-v1:MITx+18.01x+3T2023)
 
