@@ -3,7 +3,6 @@
 from datetime import date, datetime
 
 import pytest
-import pytz
 from mitol.common.utils.urls import remove_password_from_url
 
 from main.models import AuditModel
@@ -78,7 +77,7 @@ def test_parse_supplied_data():
     assert successful_return.year == 2022
     assert successful_return.month == 7
     assert successful_return.day == 1
-    assert successful_return.tzinfo == pytz.timezone(TIME_ZONE)
+    assert successful_return.tzinfo == ZoneInfo(TIME_ZONE)
 
     with pytest.raises(Exception):  # noqa: B017, PT011
         parse_supplied_date("this date isn't a date at all")
@@ -93,7 +92,7 @@ def test_date_to_datetime():
     assert successful_return.year == 2022
     assert successful_return.month == 7
     assert successful_return.day == 1
-    assert successful_return.tzinfo == pytz.timezone(TIME_ZONE)
+    assert successful_return.tzinfo == ZoneInfo(TIME_ZONE)
 
     with pytest.raises(AttributeError):
         date_to_datetime("this date isn't a date at all", TIME_ZONE)

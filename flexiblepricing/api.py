@@ -263,7 +263,7 @@ def determine_courseware_flexible_price_discount(product, user):
                     Q(tier__discount__activation_date=None)
                     | Q(
                         tier__discount__activation_date__lte=datetime.now(
-                            pytz.timezone(TIME_ZONE)
+                            ZoneInfo(TIME_ZONE)
                         )
                     )
                 )
@@ -271,7 +271,7 @@ def determine_courseware_flexible_price_discount(product, user):
                     Q(tier__discount__expiration_date=None)
                     | Q(
                         tier__discount__expiration_date__gte=datetime.now(
-                            pytz.timezone(TIME_ZONE)
+                            ZoneInfo(TIME_ZONE)
                         )
                     )
                 )

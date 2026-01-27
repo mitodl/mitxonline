@@ -5,7 +5,6 @@ from datetime import datetime
 from email.utils import parseaddr
 
 import pytest
-import pytz
 from django.conf import settings
 
 from users.utils import (
@@ -39,7 +38,7 @@ def test_format_recipient(user):
 def test_determine_approx_age():
     """Verify that determine_approx_age works correctly"""
 
-    now = datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+    now = datetime.now(tz=ZoneInfo(settings.TIME_ZONE))
     test_year = now.year - random.randrange(0, 50)  # noqa: S311
     test_age = now.year - test_year
 

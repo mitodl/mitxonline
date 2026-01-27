@@ -16,9 +16,9 @@ available for enrollment and must also have a product associated with it.
 
 import csv
 import uuid
+from zoneinfo import ZoneInfo
 
 import dateutil
-import pytz
 from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Q
@@ -67,7 +67,7 @@ class Command(BaseCommand):
             if expiration_date.utcoffset() is not None:
                 expiration_date = expiration_date - expiration_date.utcoffset()
 
-            expiration_date = expiration_date.replace(tzinfo=pytz.timezone(TIME_ZONE))
+            expiration_date = expiration_date.replace(tzinfo=ZoneInfo(TIME_ZONE))
         else:
             expiration_date = None
 

@@ -8,7 +8,6 @@ from types import SimpleNamespace
 import factory
 import faker
 import pytest
-import pytz
 import wagtail_factories
 from factory import SubFactory, fuzzy
 from factory.django import DjangoModelFactory
@@ -113,26 +112,26 @@ class CourseRunFactory(DjangoModelFactory):
     run_tag = factory.Sequence("R{0}".format)
     courseware_url_path = factory.Faker("uri")
     start_date = factory.Faker(
-        "date_time_this_month", before_now=True, after_now=False, tzinfo=pytz.utc
+        "date_time_this_month", before_now=True, after_now=False, tzinfo=ZoneInfo("UTC")
     )
     end_date = factory.Faker(
-        "date_time_this_year", before_now=False, after_now=True, tzinfo=pytz.utc
+        "date_time_this_year", before_now=False, after_now=True, tzinfo=ZoneInfo("UTC")
     )
     certificate_available_date = factory.Faker(
-        "date_time_this_year", before_now=False, after_now=True, tzinfo=pytz.utc
+        "date_time_this_year", before_now=False, after_now=True, tzinfo=ZoneInfo("UTC")
     )
 
     enrollment_start = factory.Faker(
-        "date_time_this_month", before_now=True, after_now=False, tzinfo=pytz.utc
+        "date_time_this_month", before_now=True, after_now=False, tzinfo=ZoneInfo("UTC")
     )
     enrollment_end = factory.Faker(
-        "date_time_this_month", before_now=False, after_now=True, tzinfo=pytz.utc
+        "date_time_this_month", before_now=False, after_now=True, tzinfo=ZoneInfo("UTC")
     )
     expiration_date = factory.Faker(
-        "date_time_between", start_date="+1y", end_date="+2y", tzinfo=pytz.utc
+        "date_time_between", start_date="+1y", end_date="+2y", tzinfo=ZoneInfo("UTC")
     )
     upgrade_deadline = factory.Faker(
-        "date_time_between", start_date="+1y", end_date="+2y", tzinfo=pytz.utc
+        "date_time_between", start_date="+1y", end_date="+2y", tzinfo=ZoneInfo("UTC")
     )
 
     live = True
@@ -144,17 +143,17 @@ class CourseRunFactory(DjangoModelFactory):
 
     class Params:
         past_start = factory.Trait(
-            start_date=factory.Faker("past_datetime", tzinfo=pytz.utc)
+            start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC"))
         )
         past_enrollment_end = factory.Trait(
-            enrollment_end=factory.Faker("past_datetime", tzinfo=pytz.utc)
+            enrollment_end=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC"))
         )
         in_progress = factory.Trait(
-            start_date=factory.Faker("past_datetime", tzinfo=pytz.utc),
-            end_date=factory.Faker("future_datetime", tzinfo=pytz.utc),
+            start_date=factory.Faker("past_datetime", tzinfo=ZoneInfo("UTC")),
+            end_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
         )
         in_future = factory.Trait(
-            start_date=factory.Faker("future_datetime", tzinfo=pytz.utc), end_date=None
+            start_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")), end_date=None
         )
 
 

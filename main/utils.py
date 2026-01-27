@@ -6,9 +6,9 @@ import json
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Set, Tuple, TypeVar, Union  # noqa: UP035
 from urllib.parse import quote_plus
+from zoneinfo import ZoneInfo
 
 import dateutil
-import pytz
 import redis_lock
 from django.conf import settings
 from django.core.cache import caches
@@ -183,7 +183,7 @@ def parse_supplied_date(datearg):
     if retDate.utcoffset() is not None:
         retDate = retDate - retDate.utcoffset()
 
-    retDate = retDate.replace(tzinfo=pytz.timezone(TIME_ZONE))
+    retDate = retDate.replace(tzinfo=ZoneInfo(TIME_ZONE))
     return retDate  # noqa: RET504
 
 
@@ -195,7 +195,7 @@ def format_decimal(amount: Decimal):
 def now_datetime_with_tz():
     """Return now with the configured timezone."""
 
-    return datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+    return datetime.now(tz=ZoneInfo(settings.TIME_ZONE))
 
 
 def date_to_datetime(date: date, tzinfo: str | None = None) -> datetime:
@@ -203,7 +203,7 @@ def date_to_datetime(date: date, tzinfo: str | None = None) -> datetime:
 
     ret_date = datetime.fromisocalendar(*date.isocalendar())
     if tzinfo:
-        ret_date = ret_date.replace(tzinfo=pytz.timezone(tzinfo))
+        ret_date = ret_date.replace(tzinfo=ZoneInfo(tzinfo))
     return ret_date
 
 

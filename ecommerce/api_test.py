@@ -2,9 +2,9 @@
 
 import random
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
-import pytz
 import reversion
 from CyberSource.rest import ApiException
 from django.conf import settings
@@ -544,7 +544,7 @@ def test_process_cybersource_payment_decline_response(  # noqa: PLR0913
             redeemed_by=user,
             redeemed_discount=discount,
             redeemed_order=order,
-            redemption_date=datetime.now(pytz.timezone(settings.TIME_ZONE)),
+            redemption_date=datetime.now(ZoneInfo(settings.TIME_ZONE)),
         ).save()
         order.refresh_from_db()
 

@@ -537,13 +537,13 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
 
         expired_delta = timedelta(days=30)
         discount.activation_date = (
-            datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta - expired_delta
+            datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta - expired_delta
         )
         discount.expiration_date = (
-            datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta
+            datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta
         )
         with freezegun.freeze_time(
-            datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta * 3
+            datetime.now(ZoneInfo(TIME_ZONE)) - expired_delta * 3
         ):
             discount.save()
             discount.refresh_from_db()

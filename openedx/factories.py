@@ -34,7 +34,7 @@ class OpenEdxApiAuthFactory(DjangoModelFactory):
     user = SubFactory("users.factories.UserFactory", no_openedx_api_auth=True)
     refresh_token = Faker("pystr", max_chars=30)
     access_token = Faker("pystr", max_chars=30)
-    access_token_expires_on = Faker("future_datetime", end_date="+10h", tzinfo=pytz.utc)
+    access_token_expires_on = Faker("future_datetime", end_date="+10h", tzinfo=ZoneInfo("UTC"))
 
     class Meta:
         model = OpenEdxApiAuth
