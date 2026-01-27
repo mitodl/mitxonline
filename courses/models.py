@@ -1205,13 +1205,13 @@ class CourseRun(TimestampedModel):
     def courseware_url(self):
         """
         Full URL for this CourseRun as it exists in the courseware.
-        
+
         This is computed based on the courseware_id (readable_id) using the pattern:
         <edX base URL>/learn/course/<courseware_id>/home
-        
+
         Returns None if `has_courseware_url` is False. This flag is used for test/placeholder
         runs that should not expose a public courseware URL.
-        
+
         Configuration Settings:
         - OPENEDX_BASE_REDIRECT_URL: the base URL for edX redirects
 
@@ -1221,9 +1221,9 @@ class CourseRun(TimestampedModel):
         # Some course runs (test data, placeholders) should not have a URL
         if not self.has_courseware_url:
             return None
-        
+
         from courses.utils import get_courseware_url
-        
+
         return get_courseware_url(self.courseware_id)
 
     @property

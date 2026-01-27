@@ -4,7 +4,6 @@ import logging
 from collections.abc import Iterable
 from decimal import Decimal
 from typing import Union
-from urllib.parse import quote, urljoin
 from uuid import uuid4
 
 import reversion

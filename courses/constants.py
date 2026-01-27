@@ -50,6 +50,6 @@ COURSE_KEY_PATTERN = r"^course-v1:[^+]+\+[^+]+\+[^+]+$"
 #
 # Configuration Settings:
 # - OPENEDX_BASE_REDIRECT_URL: the base URL for edX redirects (e.g., https://edx.example.com)
-# 
+#
 # The generated URL uses the pattern: {OPENEDX_BASE_REDIRECT_URL}/learn/course/{readable_id}/home
 COURSEWARE_URL_PATTERN_TEMPLATE = "/learn/course/{courseware_id}/home"
