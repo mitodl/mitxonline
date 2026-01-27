@@ -1,3 +1,5 @@
+import time
+
 from django.apps import apps
 from django.conf import settings
 from django.core.management import BaseCommand
@@ -23,6 +25,12 @@ class Command(BaseCommand):
             help="If provided, actually delete the tokens instead of just reporting how many would be deleted.",
             action="store_true",
         )
+        parser.add_argument(
+            "--sleep",
+            help="If provided, sleep this many seconds between batches.",
+            type=float,
+            default=0.0,
+        )
 
     def get_access_token_model(self):
         """Return the AccessToken model that is active in this project."""
@@ -38,6 +46,7 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):  # noqa: ARG002
         batch_size = kwargs["batch_size"]
         execute = kwargs["execute"]
+        sleep = kwargs["sleep"]
         access_token_model = self.get_access_token_model()
         min_id, max_id = self.get_min_and_max_id()
         lower_id = min_id
@@ -67,5 +76,6 @@ class Command(BaseCommand):
 
             lower_id = upper_id
             upper_id = lower_id + batch_size
+            time.sleep(sleep)
 
         self.stdout.write(self.style.SUCCESS(f"Deleted {total_deleted} records"))
