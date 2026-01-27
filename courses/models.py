@@ -1213,7 +1213,7 @@ class CourseRun(TimestampedModel):
         runs that should not expose a public courseware URL.
         
         Configuration Settings:
-        - OPENEDX_BASE_REDIRECT_URL: the base URL for edX redirects
+        - OPENEDX_COURSE_BASE_URL: the base URL for edX course pages
 
         Returns:
             str or None: Full URL or None if has_courseware_url is False or courseware_id is not set
