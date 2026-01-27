@@ -91,6 +91,7 @@ authlib = "^1.6.3"
 trino = "^0.336.0"
 granian = "^2.5.4"
 mitol-django-olposthog = "^2025.8.1"
+django-removals = "^1.1.6"
 
 
 [tool.poetry.group.dev.dependencies]
