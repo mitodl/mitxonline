@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.9
+Version 0.137.9 (Released January 27, 2026)
 ---------------
 
 - Call clear_expired to clear tokens (#3248)
