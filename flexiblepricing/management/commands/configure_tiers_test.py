@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from io import StringIO
+from zoneinfo import ZoneInfo
 
 import faker
 import pytest

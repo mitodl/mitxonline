@@ -4,7 +4,7 @@ MITxOnline ecommerce serializers
 
 from decimal import Decimal
 
-import ZoneInfo(tzinfo)
+from zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers

@@ -3,6 +3,7 @@
 import random
 from datetime import datetime
 from email.utils import parseaddr
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.conf import settings

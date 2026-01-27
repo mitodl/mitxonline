@@ -5,6 +5,7 @@ import logging
 from collections import namedtuple
 from datetime import datetime
 from typing import Union
+from zoneinfo import ZoneInfo
 
 import pytz
 import requests

@@ -20,6 +20,7 @@ docs/source/commands/configure_tiers.rst.
 import csv
 from argparse import FileType
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import pytz
 from django.conf import settings

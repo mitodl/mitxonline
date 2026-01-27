@@ -1,6 +1,7 @@
 import operator as op
 import random
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import freezegun
 import pytest

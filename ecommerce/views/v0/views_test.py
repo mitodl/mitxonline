@@ -4,6 +4,7 @@ import operator as op
 import random
 from datetime import datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import freezegun
 import pytest

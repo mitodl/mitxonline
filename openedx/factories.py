@@ -1,6 +1,7 @@
 """Courseware factories"""
 
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 import faker
 import pytz

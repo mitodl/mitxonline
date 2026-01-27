@@ -5,6 +5,7 @@ Fixtures for hubspot_sync tests
 from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
 import pytz

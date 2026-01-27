@@ -1,6 +1,7 @@
 """Utils tests"""
 
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 from mitol.common.utils.urls import remove_password_from_url

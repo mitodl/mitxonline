@@ -3,8 +3,8 @@ MITxOnline ecommerce serializers
 """
 
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
-import ZoneInfo(tzinfo)
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
