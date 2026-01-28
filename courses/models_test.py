@@ -36,6 +36,7 @@ from courses.models import (
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
 )
+from courses.utils import get_courseware_url
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import format_as_iso8601
@@ -163,9 +164,6 @@ def test_courseware_url_preserves_none_for_fake_runs(settings):
 
 def test_get_courseware_url_utility_function(settings):
     """Test the get_courseware_url utility function directly"""
-    from courses.utils import get_courseware_url
-
-    settings.OPENEDX_COURSE_BASE_URL = "https://edx.example.com"
 
     # Test with valid courseware_id
     url = get_courseware_url("course-v1:MITx+18.01x+3T2023")
@@ -176,9 +174,6 @@ def test_get_courseware_url_utility_function(settings):
 
 def test_get_courseware_url_with_none(settings):
     """Test that get_courseware_url returns None for empty/None courseware_id"""
-    from courses.utils import get_courseware_url
-
-    settings.OPENEDX_COURSE_BASE_URL = "https://edx.example.com"
 
     assert get_courseware_url(None) is None
     assert get_courseware_url("") is None
@@ -186,9 +181,6 @@ def test_get_courseware_url_with_none(settings):
 
 def test_get_courseware_url_with_complex_courseware_id(settings):
     """Test get_courseware_url with various realistic courseware_id formats"""
-    from courses.utils import get_courseware_url
-
-    settings.OPENEDX_COURSE_BASE_URL = "https://edx.example.com"
 
     test_ids = [
         "course-v1:MITx+18.01x+1T2023",
