@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.137.10
+----------------
+
+- Chunked oauth access token delete by primary key (#3253)
+- Changes to create_courseware to allow creating CMS pages for course/program, certificate pages and signatories (#3245)
+- Add django-removals to system checks (#3244)
+- Add b2b_codes management command (#3231)
+
 Version 0.137.9 (Released January 27, 2026)
 ---------------
 
