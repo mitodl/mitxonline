@@ -16,8 +16,12 @@ from b2b import factories
 from b2b.api import (
     create_b2b_enrollment,
     create_contract_run,
+    ensure_contract_run_pricing,
+    ensure_contract_run_products,
     ensure_enrollment_codes_exist,
     get_active_contracts_from_basket_items,
+    get_contract_products_with_bad_pricing,
+    get_contract_runs_without_products,
     import_and_create_contract_run,
     process_add_org_membership,
     process_remove_org_membership,
@@ -343,6 +347,37 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
             for code in contract.get_discounts():
                 assert code.amount == assert_price
                 assert code.products.filter(product=product).exists()
+
+
+def test_ensure_enrollment_codes_clears_extras():
+    """Test that ensure_enrollment_codes clears extra codes."""
+
+    contract = ContractPageFactory.create(
+        max_learners=10,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+    )
+    run = CourseRunFactory.create(b2b_contract=contract)
+    product = ProductFactory.create(purchasable_object=run)
+
+    created, updated, errors = ensure_enrollment_codes_exist(contract)
+
+    assert created == 10
+    assert updated == 0
+    assert errors == 0
+
+    random_extra_code = UnlimitedUseDiscountFactory.create()
+    DiscountProduct.objects.create(discount=random_extra_code, product=product)
+
+    assert contract.get_discounts().count() == 11
+
+    created, updated, errors = ensure_enrollment_codes_exist(contract)
+
+    assert created == 0
+    assert updated == 11  # it updates all of them, then removes things
+    assert errors == 1
+
+    assert contract.get_discounts().count() == 10
 
 
 @pytest.mark.parametrize("user_authenticated", [True, False])
@@ -1178,3 +1213,51 @@ def test_import_and_create_contract_run_with_string_departments(mocker):
         require_designated_source_run=False,
     )
     assert result == (mock_run, mock_product)
+
+
+def test_get_runs_without_products():
+    """Test that a run without products is caught by the validator."""
+
+    contract = ContractPageFactory.create()
+
+    run = CourseRunFactory.create(b2b_contract=contract)
+
+    assert run in get_contract_runs_without_products(contract)
+
+
+def test_get_contract_products_with_bad_pricing():
+    """Test that products that have bad pricing are caught by the validator."""
+
+    contract = ContractPageFactory.create(enrollment_fixed_price=19)
+
+    run = CourseRunFactory.create(b2b_contract=contract)
+    product = ProductFactory.create(price=76, purchasable_object=run)
+
+    assert product in get_contract_products_with_bad_pricing(contract)
+
+
+def test_ensure_contract_run_products():
+    """Test that a run without products is caught by the validator."""
+
+    contract = ContractPageFactory.create()
+
+    run = CourseRunFactory.create(b2b_contract=contract)
+
+    created_products = ensure_contract_run_products(contract)
+
+    assert len(created_products) == 1
+    assert created_products[0].purchasable_object == run
+
+
+def test_ensure_contract_run_pricing():
+    """Test that runs with bad pricing get fixed."""
+
+    contract = ContractPageFactory.create(enrollment_fixed_price=19)
+
+    run = CourseRunFactory.create(b2b_contract=contract)
+    product = ProductFactory.create(price=76, purchasable_object=run)
+
+    ensure_contract_run_pricing(contract)
+
+    product.refresh_from_db()
+    assert product.price == contract.enrollment_fixed_price
