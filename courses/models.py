@@ -1222,7 +1222,8 @@ class CourseRun(TimestampedModel):
         if not self.has_courseware_url:
             return None
 
-        from courses.utils import get_courseware_url # noqa: PLC0415
+        from courses.utils import get_courseware_url  # noqa: PLC0415
+
         return get_courseware_url(self.courseware_id)
 
     @property
