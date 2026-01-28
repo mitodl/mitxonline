@@ -36,7 +36,6 @@ from courses.constants import (
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
-from openedx.utils import edx_redirect_url
 
 User = get_user_model()
 
@@ -1068,7 +1067,10 @@ class CourseRun(TimestampedModel):
         max_length=100,
         help_text="A string that identifies the set of runs that this run belongs to (example: 'R2')",
     )
-    courseware_url_path = models.CharField(max_length=500, blank=True, null=True)  # noqa: DJ001
+    has_courseware_url = models.BooleanField(
+        default=True,
+        help_text="Whether this course run should expose a courseware URL. Set to False for test/placeholder runs.",
+    )
     start_date = models.DateTimeField(
         null=True,
         blank=True,
@@ -1202,16 +1204,27 @@ class CourseRun(TimestampedModel):
     @property
     def courseware_url(self):
         """
-        Full URL for this CourseRun as it exists in the courseware
+        Full URL for this CourseRun as it exists in the courseware.
+
+        This is computed based on the courseware_id (readable_id) using the pattern:
+        <edX base URL>/learn/course/<courseware_id>/home
+
+        Returns None if `has_courseware_url` is False. This flag is used for test/placeholder
+        runs that should not expose a public courseware URL.
+
+        Configuration Settings:
+        - OPENEDX_COURSE_BASE_URL: the base URL for edX course pages
 
         Returns:
-            str or None: Full URL or None
+            str or None: Full URL or None if has_courseware_url is False or courseware_id is not set
         """
-        return (
-            edx_redirect_url(self.courseware_url_path)
-            if self.courseware_url_path
-            else None
-        )
+        # Some course runs (test data, placeholders) should not have a URL
+        if not self.has_courseware_url:
+            return None
+
+        from courses.utils import get_courseware_url  # noqa: PLC0415
+
+        return get_courseware_url(self.courseware_id)
 
     @property
     def text_id(self):
