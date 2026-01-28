@@ -25,7 +25,6 @@ from treebeard.mp_tree import MP_Node
 from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.fields import RichTextField
 from wagtail.models import ClusterableModel, Orderable, Page, Revision
-from courses.utils import get_courseware_url
 
 from courses.constants import (
     AVAILABILITY_ANYTIME,
@@ -34,6 +33,7 @@ from courses.constants import (
     ENROLLABLE_ITEM_ID_SEPARATOR,
     SYNCED_COURSE_RUN_FIELD_MSG,
 )
+from courses.utils import get_courseware_url
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
