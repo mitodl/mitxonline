@@ -523,7 +523,7 @@ def ensure_contract_run_products(contract: ContractPage) -> list[Product]:
     ]
 
 
-def ensure_contract_run_pricing(contract: ContractPage):
+def ensure_contract_run_pricing(contract: ContractPage) -> int:
     """Ensure the contract runs are all priced correctly."""
 
     products = contract.get_products()
@@ -535,7 +535,7 @@ def ensure_contract_run_pricing(contract: ContractPage):
             else Decimal(0)
         )
 
-    Product.objects.bulk_update(products, ["price"])
+    return Product.objects.bulk_update(products, ["price"])
 
 
 def _get_discount_defaults(discount_amount: Decimal) -> dict:

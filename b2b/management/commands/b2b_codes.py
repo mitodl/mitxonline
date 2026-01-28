@@ -99,11 +99,12 @@ class Command(BaseCommand):
             if org_id.isdecimal():
                 contracts = ContractPage.objects.filter(organization__id=org_id).all()
             elif is_valid_uuid(org_id):
-                contracts = ContractPage.objects.filter(organization__sso_organization_id=org_id).all()
+                contracts = ContractPage.objects.filter(
+                    organization__sso_organization_id=org_id
+                ).all()
             else:
                 contracts = ContractPage.objects.filter(
-                    Q(organization__slug=org_id)
-                    | Q(organization__org_key=org_id)
+                    Q(organization__slug=org_id) | Q(organization__org_key=org_id)
                 ).all()
         elif allow_everything:
             self.stdout.write(
@@ -226,7 +227,7 @@ class Command(BaseCommand):
                     {**code, "Course Run": dp.product.purchasable_object.courseware_id}
                     for dp in discount.products.filter(
                         product__content_type=content_type,
-                        product__in=contract_products
+                        product__in=contract_products,
                     ).all()
                 ]
             )
@@ -356,9 +357,39 @@ class Command(BaseCommand):
         contracts = self._get_contract_list(**kwargs, allow_everything=False)
 
         for contract in contracts:
-            # Step 1: check if the contract should have codes
-
             self.stdout.write(f"Contract {contract} is type {contract.membership_type}")
+
+            # Step 1: check for products for the associated course runs
+
+            if get_contract_runs_without_products(contract).count() > 0:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Contract {contract} has associated course runs that are missing products."
+                    )
+                )
+
+                new_products = ensure_contract_run_products(contract)
+
+                self.stdout.write(
+                    self.style.SUCCESS(f"Added {len(new_products)} products.")
+                )
+
+            # Step 2: make sure the products have the right pricing
+
+            if get_contract_products_with_bad_pricing(contract).count() > 0:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Contract {contract} has course runs with products that have incorrect pricing."
+                    )
+                )
+
+                fixed_products = ensure_contract_run_pricing(contract)
+
+                self.stdout.write(
+                    self.style.SUCCESS(f"Updated {fixed_products} products.")
+                )
+
+            # Step 3: check if the contract should have codes
 
             if (
                 contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
@@ -367,17 +398,12 @@ class Command(BaseCommand):
                 # This is a managed contract with no price - people are added to
                 # this automatically, so there shouldn't be any unredeemed codes.
 
+                # Step 4: remove any unused codes, since we shouldn't have any.
+                # There may be redeemed codes, because this contract may have
+                # changed types or prices at some point. Those are left alone.
+
                 total_codes = contract.get_discounts()
-                unredeemed_codes = (
-                    contract.get_discounts()
-                    .annotate(order_redemptions_count=Count("order_redemptions"))
-                    .annotate(contract_redemptions_count=Count("contract_redemptions"))
-                    .exclude(
-                        Q(order_redemptions_count__lt=0)
-                        | Q(contract_redemptions_count__lt=0)
-                    )
-                    .all()
-                )
+                unredeemed_codes = contract.get_unused_discounts()
 
                 if total_codes.count() > unredeemed_codes.count():
                     self.stdout.write(
@@ -399,37 +425,7 @@ class Command(BaseCommand):
                 # This contract requires enrollment codes. Check to make sure
                 # we have the proper amount and that they're set up correctly.
 
-                # Step 1: check for products for the associated course runs
-
-                if get_contract_runs_without_products(contract).count() > 0:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Contract {contract} has associated course runs that are missing products."
-                        )
-                    )
-
-                    new_products = ensure_contract_run_products(contract)
-
-                    self.stdout.write(
-                        self.style.SUCCESS(f"Added {len(new_products)} products.")
-                    )
-
-                # Step 2: make sure the products have the right pricing
-
-                if get_contract_products_with_bad_pricing(contract).count() > 0:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Contract {contract} has course runs with products that have incorrect pricing."
-                        )
-                    )
-
-                    fixed_products = ensure_contract_run_pricing(contract)
-
-                    self.stdout.write(
-                        self.style.SUCCESS(f"Updated {fixed_products} products.")
-                    )
-
-                # Step 3: figure out what codes should be there
+                # Step 4: figure out what codes should be there
 
                 expected_amount = (
                     0
@@ -462,7 +458,7 @@ class Command(BaseCommand):
 
                     ensure_enrollment_codes_exist(contract)
 
-                # Step 4: make sure the codes are the right type and amount
+                # Step 5: make sure the codes are the right type and amount
 
                 bad_settings_codes_qs = contract.get_discounts().exclude(
                     redemption_type=code_redemption_type, amount=expected_amount
