@@ -140,6 +140,7 @@ def test_get_courseware_url_with_none(settings):
     assert get_courseware_url(None) is None
     assert get_courseware_url("") is None
 
+
 @pytest.mark.parametrize("end_days,expected", [[-1, True], [1, False], [None, False]])  # noqa: PT006, PT007
 def test_course_run_past(end_days, expected):
     """
