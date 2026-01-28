@@ -1223,6 +1223,7 @@ class CourseRun(TimestampedModel):
             return None
 
         from courses.utils import get_courseware_url
+
         return get_courseware_url(self.courseware_id)
 
     @property
