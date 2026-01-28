@@ -3,8 +3,8 @@ MITxOnline ecommerce serializers
 """
 
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
-import pytz
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
@@ -721,10 +721,10 @@ class BulkDiscountSerializer(serializers.Serializer):
     one_time = serializers.BooleanField(default=False)
     one_time_per_user = serializers.BooleanField(default=False)
     activates = serializers.DateTimeField(
-        required=False, default_timezone=pytz.timezone(TIME_ZONE)
+        required=False, default_timezone=ZoneInfo(TIME_ZONE)
     )
     expires = serializers.DateTimeField(
-        required=False, default_timezone=pytz.timezone(TIME_ZONE)
+        required=False, default_timezone=ZoneInfo(TIME_ZONE)
     )
     count = serializers.IntegerField(required=False)
     prefix = serializers.CharField(max_length=63, required=False)

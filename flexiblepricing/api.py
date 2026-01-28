@@ -5,8 +5,8 @@ import logging
 from collections import namedtuple
 from datetime import datetime
 from typing import Union
+from zoneinfo import ZoneInfo
 
-import pytz
 import requests
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
@@ -263,7 +263,7 @@ def determine_courseware_flexible_price_discount(product, user):
                     Q(tier__discount__activation_date=None)
                     | Q(
                         tier__discount__activation_date__lte=datetime.now(
-                            pytz.timezone(TIME_ZONE)
+                            ZoneInfo(TIME_ZONE)
                         )
                     )
                 )
@@ -271,7 +271,7 @@ def determine_courseware_flexible_price_discount(product, user):
                     Q(tier__discount__expiration_date=None)
                     | Q(
                         tier__discount__expiration_date__gte=datetime.now(
-                            pytz.timezone(TIME_ZONE)
+                            ZoneInfo(TIME_ZONE)
                         )
                     )
                 )

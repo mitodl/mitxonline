@@ -5,9 +5,9 @@ Fixtures for hubspot_sync tests
 from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
-import pytz
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from mitol.hubspot_api.factories import HubspotObjectFactory
@@ -20,14 +20,14 @@ from users.models import User
 # pylint: disable=redefined-outer-name
 
 TIMESTAMPS = [
-    datetime(2017, 1, 1, tzinfo=pytz.utc),
-    datetime(2017, 1, 2, tzinfo=pytz.utc),
-    datetime(2017, 1, 3, tzinfo=pytz.utc),
-    datetime(2017, 1, 4, tzinfo=pytz.utc),
-    datetime(2017, 1, 5, tzinfo=pytz.utc),
-    datetime(2017, 1, 6, tzinfo=pytz.utc),
-    datetime(2017, 1, 7, tzinfo=pytz.utc),
-    datetime(2017, 1, 8, tzinfo=pytz.utc),
+    datetime(2017, 1, 1, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 2, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 3, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 4, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 5, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 6, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 7, tzinfo=ZoneInfo("UTC")),
+    datetime(2017, 1, 8, tzinfo=ZoneInfo("UTC")),
 ]
 
 FAKE_OBJECT_ID = 1234

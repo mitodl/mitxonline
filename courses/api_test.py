@@ -7,11 +7,11 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 from urllib.parse import quote
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import factory
 import faker
 import pytest
-import pytz
 import responses
 import reversion
 from django.core.exceptions import ValidationError
@@ -142,7 +142,7 @@ def courses_api_logs(mocker):
 def _mock_edx_course_detail(coursekey, settings):
     """Make a fake course detail record for the given key."""
 
-    fake_date = FAKE.date_time(tzinfo=pytz.timezone(settings.TIME_ZONE))
+    fake_date = FAKE.date_time(tzinfo=ZoneInfo(settings.TIME_ZONE))
 
     return {
         "blocks_url": f"http://192.168.33.10:8000/api/courses/v1/blocks/?course_id={quote(coursekey)}",
@@ -2430,7 +2430,9 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
 
     # Mock enrollment created_on date
     mock_enrollment = Mock()
-    mock_enrollment.created_on = datetime(2024, 1, 15, 10, 30, 0, tzinfo=pytz.UTC)
+    mock_enrollment.created_on = datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=ZoneInfo("UTC")
+    )
     mock_enrollment_get.return_value = mock_enrollment
 
     # Mock thumbnail URL
@@ -2445,7 +2447,7 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
     # Create certificate with controlled values
     course_run_cert = CourseRunCertificateFactory.create(
         uuid=UUID("12345678-1234-5678-1234-567812345678"),
-        issue_date=datetime(2024, 6, 1, 12, 0, 0, tzinfo=pytz.UTC),
+        issue_date=datetime(2024, 6, 1, 12, 0, 0, tzinfo=ZoneInfo("UTC")),
     )
 
     # Set controlled values on related objects
@@ -2532,7 +2534,9 @@ def test_program_certificate_verifiable_credentials_signing_payload(
 
     # Mock enrollment created_on date
     mock_enrollment = Mock()
-    mock_enrollment.created_on = datetime(2024, 2, 20, 14, 45, 0, tzinfo=pytz.UTC)
+    mock_enrollment.created_on = datetime(
+        2024, 2, 20, 14, 45, 0, tzinfo=ZoneInfo("UTC")
+    )
     mock_enrollment_get.return_value = mock_enrollment
 
     # Mock thumbnail URL
@@ -2547,7 +2551,7 @@ def test_program_certificate_verifiable_credentials_signing_payload(
     # Create program certificate with controlled values
     program_cert = ProgramCertificateFactory.create(
         uuid=UUID("87654321-4321-8765-4321-876543218765"),
-        issue_date=datetime(2024, 7, 15, 16, 30, 0, tzinfo=pytz.UTC),
+        issue_date=datetime(2024, 7, 15, 16, 30, 0, tzinfo=ZoneInfo("UTC")),
     )
 
     # Set controlled values on related objects

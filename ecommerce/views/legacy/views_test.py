@@ -1,10 +1,10 @@
 import operator as op
 import random
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import freezegun
 import pytest
-import pytz
 import reversion
 from django.forms.models import model_to_dict
 from django.test.client import Client
@@ -406,21 +406,21 @@ def test_redeem_time_limited_discount(  # noqa: PLR0913
     check_delta = timedelta(days=30)
 
     if time == "valid":
-        discount.activation_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
-        discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) + check_delta
+        discount.activation_date = datetime.now(ZoneInfo(TIME_ZONE)) - check_delta
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) + check_delta
     elif time == "past":
         discount.activation_date = (
-            datetime.now(pytz.timezone(TIME_ZONE)) - check_delta - check_delta
+            datetime.now(ZoneInfo(TIME_ZONE)) - check_delta - check_delta
         )
-        discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) - check_delta
     elif time == "future":
-        discount.activation_date = datetime.now(pytz.timezone(TIME_ZONE)) + check_delta
+        discount.activation_date = datetime.now(ZoneInfo(TIME_ZONE)) + check_delta
         discount.expiration_date = (
-            datetime.now(pytz.timezone(TIME_ZONE)) + check_delta + check_delta
+            datetime.now(ZoneInfo(TIME_ZONE)) + check_delta + check_delta
         )
 
     mocked_date_delta = timedelta(days=90)
-    mocked_date_for_saving = datetime.now(pytz.timezone(TIME_ZONE)) - mocked_date_delta
+    mocked_date_for_saving = datetime.now(ZoneInfo(TIME_ZONE)) - mocked_date_delta
 
     with freezegun.freeze_time(mocked_date_for_saving):
         discount.save()
@@ -487,12 +487,12 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
 
     for discount in discounts:
         discount.activation_date = (
-            datetime.now(pytz.timezone(TIME_ZONE)) - check_delta - check_delta
+            datetime.now(ZoneInfo(TIME_ZONE)) - check_delta - check_delta
         )
-        discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
+        discount.expiration_date = datetime.now(ZoneInfo(TIME_ZONE)) - check_delta
 
         with freezegun.freeze_time(
-            datetime.now(pytz.timezone(TIME_ZONE)) - more_check_delta
+            datetime.now(ZoneInfo(TIME_ZONE)) - more_check_delta
         ):
             discount.save()
             discount.refresh_from_db()

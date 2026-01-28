@@ -5,8 +5,8 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import List  # noqa: UP035
+from zoneinfo import ZoneInfo
 
-import pytz
 import reversion
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -40,7 +40,6 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
-from main.settings import TIME_ZONE
 from openedx.api import create_user
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
@@ -276,7 +275,7 @@ class Discount(TimestampedModel):
 
     def check_date_validity(self):
         if self.expiration_date is not None and self.expiration_date < datetime.now(
-            pytz.timezone(TIME_ZONE)
+            ZoneInfo(settings.TIME_ZONE)
         ):
             raise ValidationError(
                 f"Expiration date {self.expiration_date} must be in the future."  # noqa: EM102
@@ -364,12 +363,12 @@ class Discount(TimestampedModel):
     def valid_now(self):
         """Returns True if the discount is valid right now"""
         if self.activation_date is not None and self.activation_date > datetime.now(
-            pytz.timezone(TIME_ZONE)
+            ZoneInfo(settings.TIME_ZONE)
         ):
             return False
 
         if self.expiration_date is not None and self.expiration_date <= datetime.now(  # noqa: SIM103
-            pytz.timezone(TIME_ZONE)
+            ZoneInfo(settings.TIME_ZONE)
         ):
             return False
 

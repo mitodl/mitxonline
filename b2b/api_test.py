@@ -1,10 +1,10 @@
 """Tests for B2B API functions."""
 
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import faker
 import pytest
-import pytz
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
@@ -95,10 +95,10 @@ def test_create_single_course_run(mocker, contract_ready_course, has_start, has_
     mocker.patch("openedx.tasks.clone_courserun.delay")
 
     contract = factories.ContractPageFactory(
-        contract_start=FAKE.past_datetime(tzinfo=pytz.timezone(settings.TIME_ZONE))
+        contract_start=FAKE.past_datetime(tzinfo=ZoneInfo(settings.TIME_ZONE))
         if has_start
         else None,
-        contract_end=FAKE.future_datetime(tzinfo=pytz.timezone(settings.TIME_ZONE))
+        contract_end=FAKE.future_datetime(tzinfo=ZoneInfo(settings.TIME_ZONE))
         if has_end
         else None,
     )

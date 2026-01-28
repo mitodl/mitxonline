@@ -20,8 +20,8 @@ docs/source/commands/configure_tiers.rst.
 import csv
 from argparse import FileType
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
-import pytz
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand, CommandError
@@ -98,7 +98,7 @@ class Command(BaseCommand):
 
         current_year = date.today().year  # noqa: DTZ011
         last_year = datetime(
-            current_year - 1, 1, 1, tzinfo=pytz.timezone(settings.TIME_ZONE)
+            current_year - 1, 1, 1, tzinfo=ZoneInfo(settings.TIME_ZONE)
         )
         discounts_and_tiers = [
             {
