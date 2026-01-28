@@ -1,6 +1,7 @@
 """Models for B2B data."""
 
 import logging
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -410,6 +411,15 @@ class ContractPage(Page, ClusterableModel):
             else False
         )
 
+    @property
+    def requires_enrollment_codes(self) -> bool:
+        """Return True if the contract should have enrollment codes."""
+
+        return (
+            self.enrollment_fixed_price is not None
+            and self.enrollment_fixed_price > Decimal(0)
+        ) or self.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
+
     def get_course_runs(self):
         """Get the runs associated with the contract."""
 
@@ -417,6 +427,17 @@ class ContractPage(Page, ClusterableModel):
 
         return (
             CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
+        )
+
+    def get_enrollments(self):
+        """Get the enrollments for the contract's runs"""
+
+        from courses.models import CourseRunEnrollment  # noqa: PLC0415
+
+        return (
+            CourseRunEnrollment.objects.prefetch_related("run", "run__course")
+            .filter(run__b2b_contract=self, change_status__isnull=True)
+            .all()
         )
 
     def get_products(self):
@@ -430,7 +451,7 @@ class ContractPage(Page, ClusterableModel):
         return Product.objects.filter(
             is_active=True,
             content_type=content_type,
-            object_id__in=[cr.id for cr in self.get_course_runs()],
+            object_id__in=self.get_course_runs().values_list("id", flat=True),
         ).all()
 
     def get_discounts(self):

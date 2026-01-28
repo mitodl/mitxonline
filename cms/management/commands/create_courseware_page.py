@@ -7,7 +7,10 @@ import sys
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.management import BaseCommand
 
-from cms.api import create_default_courseware_page
+from cms.api import (
+    create_default_courseware_page,
+    get_optional_placeholder_values_for_courseware_type,
+)
 from cms.models import Course, InstructorPage, InstructorPageLink, Program
 from cms.utils import get_page_editing_url
 
@@ -18,52 +21,6 @@ class Command(BaseCommand):
     """
 
     help = "Creates a basic draft about page for the given courseware object."
-
-    def get_optional_values_for_courseware_type(
-        self, courseware_type: Course | Program
-    ) -> dict:
-        """
-        Returns a dictionary of optional values to include when creating the page,
-        based on the type of courseware (Course or Program).
-        """
-
-        # Just some hardcoded example values for demonstration purposes.
-        # Might make sense to use faker for some of this or allow selection of values from different presets
-        # For now though, this sets up a page which is reasonably complete and can be immediately published
-        values = {
-            "price": [
-                (
-                    "price_details",
-                    {
-                        "text": "PLACEHOLDER - Three easy payments of 99.99",
-                        "link": "https://example.com/pricing",
-                    },
-                )
-            ],
-            "min_weeks": 1,
-            "max_weeks": 1,
-            "effort": "PLACEHOLDER - 1-2 hours per week",
-            "min_price": 37,
-            "max_price": 149,
-            "prerequisites": "PLACEHOLDER - No prerequisites, other than a willingness to learn",
-            "faq_url": "https://example.com",
-        }
-        if isinstance(courseware_type, Course):
-            values["about"] = (
-                "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
-            )
-            values["what_you_learn"] = (
-                "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
-            )
-        elif isinstance(courseware_type, Program):
-            values["about"] = (
-                "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
-            )
-            values["what_you_learn"] = (
-                "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
-            )
-
-        return values
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -123,7 +80,7 @@ class Command(BaseCommand):
             optional_kwargs = (
                 {}
                 if not include_optional_values
-                else self.get_optional_values_for_courseware_type(courseware)
+                else get_optional_placeholder_values_for_courseware_type(courseware)
             )
             page = create_default_courseware_page(
                 courseware,

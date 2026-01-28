@@ -1310,6 +1310,24 @@ redis = ">=4.0.2"
 hiredis = ["redis[hiredis] (>=4.0.2)"]
 
 [[package]]
+name = "django-removals"
+version = "1.1.6"
+description = "Tool for finding removed features in your Django project"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "django_removals-1.1.6-py3-none-any.whl", hash = "sha256:cb2643a6e927574eb792e0ea28e41d5d8bb20c8dc1ec917db50b904e0d0cadd7"},
+    {file = "django_removals-1.1.6.tar.gz", hash = "sha256:c452cabe5b2353f019c5b2731d24f3e1b308a5234f08124112dd5f66e623db24"},
+]
+
+[package.dependencies]
+django = ">=4.2"
+
+[package.extras]
+dev = ["ambient-package-update", "m2r2 (>=0.3,<1.0)", "pre-commit (>=4.3,<5.0)", "pytest-cov (>=7.0,<8.0)", "pytest-django (>=4.11,<5.0)", "pytest-mock (>=3.15,<4.0)", "sphinx (>=7.4,<8.0)", "sphinx-rtd-theme (>=3.0,<4.0)", "typer (>=0.19,<1.0)", "uv (>=0.9,<1.0)"]
+
+[[package]]
 name = "django-reversion"
 version = "5.1.0"
 description = "An extension to the Django web framework that provides version control for model instances."
@@ -6001,4 +6019,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "9ece6691009b45425eee807581bfad05397e18aad9a09ab857595ecffc30a127"
+content-hash = "f166c94efb1977ee3513795af224406f06ebf14df2c6efd4bcedcf85bbd09575"

@@ -8,13 +8,17 @@ from datetime import timedelta
 from typing import Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
 
+import requests
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.files.base import ContentFile
 from django.db.models import Case, IntegerField, When
 from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
+from wagtail.blocks import StreamValue
+from wagtail.images.models import Image
 from wagtail.models import Site
 from wagtail.rich_text import RichText
 
@@ -279,6 +283,108 @@ def get_wagtail_img_src(image_obj) -> str:
         if image_obj
         else ""
     )
+
+
+def create_default_signatory_page(
+    courseware: Union[Course, Program],
+    *,
+    include_placeholder_image: bool = False,
+):
+    # Import here to avoid circular imports
+    from cms.models import SignatoryIndexPage, SignatoryPage  # noqa: PLC0415
+
+    certificate_page = courseware.page.certificate_page
+    signatory_page = SignatoryPage(
+        name=f"PLACEHOLDER - {courseware.title} Signatory",
+        title_1=f"PLACEHOLDER - {courseware.title} Signatory Title 1",
+        title_2=f"PLACEHOLDER - {courseware.title} Signatory Title 2",
+        title_3=f"PLACEHOLDER - {courseware.title} Signatory Title 3",
+        organization=f"PLACEHOLDER - {courseware.title} Signatory Organization",
+    )
+    if include_placeholder_image:
+        filename = signatory_page.name.replace(" ", "_").lower()
+        image_url = f"https://placecats.com/{SignatoryPage.MINIMUM_IMAGE_WIDTH}/{SignatoryPage.MINIMUM_IMAGE_HEIGHT}"
+        response = requests.get(image_url, timeout=10)
+        response.raise_for_status()
+        image_file = ContentFile(response.content, name=filename)
+        signatory_image = Image(title=filename, file=image_file)
+        signatory_image.save()
+        signatory_page.signature_image = signatory_image
+
+    signatory_index = SignatoryIndexPage.objects.first()
+    signatory_index.add_child(instance=signatory_page)
+    signatory_page.refresh_from_db()
+
+    signatories = StreamValue(
+        certificate_page.signatories.stream_block,
+        [("signatory", signatory_page)],
+        is_lazy=False,
+    )
+    certificate_page.signatories = signatories
+    certificate_page.save()
+    return signatory_page
+
+
+def create_default_certificate_page(
+    courseware: Union[Course, Program],
+):
+    # Import here to avoid circular imports
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    cert_page = CertificatePage(
+        product_name=f"PLACEHOLDER - {courseware.title} Certificate",
+        CEUs=f"PLACEHOLDER - {courseware.title} CEUs",
+    )
+    courseware_page = courseware.page
+    courseware_page.add_child(instance=cert_page)
+    return cert_page
+
+
+def get_optional_placeholder_values_for_courseware_type(
+    courseware_type: Union[Course, Program],
+) -> dict:
+    """
+    Returns a dictionary of optional values to include when creating the page,
+    based on the type of courseware (Course or Program).
+    """
+
+    # Just some hardcoded example values for demonstration purposes.
+    # Might make sense to use faker for some of this or allow selection of values from different presets
+    # For now though, this sets up a page which is reasonably complete and can be immediately published
+    values = {
+        "price": [
+            (
+                "price_details",
+                {
+                    "text": "PLACEHOLDER - Three easy payments of 99.99",
+                    "link": "https://example.com/pricing",
+                },
+            )
+        ],
+        "min_weeks": 1,
+        "max_weeks": 1,
+        "effort": "PLACEHOLDER - 1-2 hours per week",
+        "min_price": 37,
+        "max_price": 149,
+        "prerequisites": "PLACEHOLDER - No prerequisites, other than a willingness to learn",
+        "faq_url": "https://example.com",
+    }
+    if isinstance(courseware_type, Course):
+        values["about"] = (
+            "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+        values["what_you_learn"] = (
+            "PLACEHOLDER - In this engineering course, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+    elif isinstance(courseware_type, Program):
+        values["about"] = (
+            "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+        values["what_you_learn"] = (
+            "PLACEHOLDER - In this engineering program, we will explore the processing and structure of cellular solids as they are created from polymers, metals, ceramics, glasses and composites."
+        )
+
+    return values
 
 
 def create_default_courseware_page(

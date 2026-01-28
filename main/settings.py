@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.137.9"
+VERSION = "0.137.10"
 
 log = logging.getLogger()
 
@@ -223,6 +223,7 @@ INSTALLED_APPS = (
     "django.contrib.humanize",
     "django.contrib.sites",
     "django_user_agents",
+    "django_removals",
     "oauth2_provider",
     "rest_framework",
     "anymail",
@@ -1568,4 +1569,10 @@ ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING = get_bool(
     name="ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING",
     default=False,
     description="Override posthog flag to enable the provisioning of verifiable credentials in dev.",
+)
+
+MIT_LEARN_ATTACH_URL = get_string(
+    name="MIT_LEARN_ATTACH_URL",
+    default="https://learn.mit.edu/enrollmentcode/",
+    description="The URL to use for generating contract attachment URLs for B2B.",
 )

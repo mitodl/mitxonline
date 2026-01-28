@@ -1948,6 +1948,9 @@ class SignatoryPage(Page):
         help_text="Signature image size must be at least 150x50 pixels.",
     )
 
+    MINIMUM_IMAGE_WIDTH = 150
+    MINIMUM_IMAGE_HEIGHT = 50
+
     class Meta:
         verbose_name = "Signatory"
 
