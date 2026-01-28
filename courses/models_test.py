@@ -120,7 +120,7 @@ def test_courseware_url_none_when_has_courseware_url_false(settings):
 
 def test_get_courseware_url_utility_function(settings):
     """Test the get_courseware_url utility function directly"""
-    from courses.utils import get_courseware_url # noqa: PLC0415
+    from courses.utils import get_courseware_url  # noqa: PLC0415
 
     settings.OPENEDX_COURSE_BASE_URL = "https://edx.example.com"
 
@@ -133,7 +133,7 @@ def test_get_courseware_url_utility_function(settings):
 
 def test_get_courseware_url_with_none(settings):
     """Test that get_courseware_url returns None for empty/None courseware_id"""
-    from courses.utils import get_courseware_url # noqa: PLC0415
+    from courses.utils import get_courseware_url  # noqa: PLC0415
 
     settings.OPENEDX_COURSE_BASE_URL = "https://edx.example.com"
 
