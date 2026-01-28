@@ -516,7 +516,7 @@ def ensure_contract_run_products(contract: ContractPage) -> list[Product]:
             price=contract.enrollment_fixed_price
             if contract.enrollment_fixed_price
             else Decimal(0),
-            active=True,
+            is_active=True,
             description=run.courseware_id,
         )
         for run in fixable_crs
@@ -618,7 +618,7 @@ def _handle_extra_enrollment_codes(contract: ContractPage, product: Product) -> 
         if unused_discount.products.count() == 0:
             unused_discount.delete()
 
-    return len(unused_discounts)
+    return remove_count
 
 
 def _ensure_discount_product_association(discount: Discount, product: Product) -> bool:
