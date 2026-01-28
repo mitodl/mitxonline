@@ -3,6 +3,7 @@ Creates a courseware object. This can be a program or a course (and optionally
 a course run).
 """
 
+from datetime import timedelta
 from typing import List, Union  # noqa: UP035
 
 from django.core.management import BaseCommand
@@ -15,7 +16,7 @@ from cms.api import (
     get_optional_placeholder_values_for_courseware_type,
 )
 from courses.models import Course, CourseRun, Department, Program
-from main.utils import parse_supplied_date
+from main.utils import now_datetime_with_tz, parse_supplied_date
 
 
 class Command(BaseCommand):
@@ -228,6 +229,32 @@ class Command(BaseCommand):
                 )
             )
             exit(-1)  # noqa: PLR1722
+
+        if kwargs.get("set_courserun_dates_automatically"):
+            start_date = (now_datetime_with_tz() - timedelta(days=1)).strftime(
+                "%Y-%m-%d"
+            )
+            enrollment_start = start_date
+            end_date = (now_datetime_with_tz() + timedelta(days=365)).strftime(
+                "%Y-%m-%d"
+            )
+            enrollment_end = end_date
+            upgrade_deadline = end_date
+
+            # Retain any explicitly set dates, generate fake ones for anything not set if automatic flag is set.
+            kwargs["start"] = kwargs["start"] if kwargs["start"] else start_date
+            kwargs["end"] = kwargs["end"] if kwargs["end"] else end_date
+            kwargs["enrollment_start"] = (
+                kwargs["enrollment_start"]
+                if kwargs["enrollment_start"]
+                else enrollment_start
+            )
+            kwargs["enrollment_end"] = (
+                kwargs["enrollment_end"] if kwargs["enrollment_end"] else enrollment_end
+            )
+            kwargs["upgrade"] = (
+                kwargs["upgrade"] if kwargs["upgrade"] else upgrade_deadline
+            )
 
         course_run = CourseRun.objects.create(
             course=course,
@@ -529,6 +556,11 @@ class Command(BaseCommand):
         parser.add_argument(
             "--create-signatory",
             help="If CMS page for certificate signatory doesn't exist, create it with a placeholder image.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--set-courserun-dates-automatically",
+            help="If specified, sets course dates automatically for any not explicitly provided when creating a course run.",
             action="store_true",
         )
 
