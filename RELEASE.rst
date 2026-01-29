@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.10
+Version 0.137.10 (Released January 29, 2026)
 ----------------
 
 - Chunked oauth access token delete by primary key (#3253)
