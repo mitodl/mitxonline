@@ -2628,3 +2628,56 @@ def test_program_certificate_verifiable_credentials_signing_payload(
     }
 
     assert payload == expected_payload
+
+
+@pytest.mark.parametrize(
+    "keep_failed_enrollments,flag_enabled,expected_behavior",  # noqa: PT006
+    [
+        [None, True, True],  # Feature flag enabled, parameter None -> keep failed enrollments
+        [None, False, False],  # Feature flag disabled, parameter None -> don't keep failed enrollments
+        [True, False, True],  # Explicit True overrides feature flag being False
+        [False, True, False],  # Explicit False overrides feature flag being True
+    ],
+)
+def test_create_run_enrollments_feature_flag(
+    mocker,
+    user,
+    keep_failed_enrollments,
+    flag_enabled,
+    expected_behavior,
+):
+    """
+    Test that create_run_enrollments respects the IGNORE_EDX_FAILURES feature flag
+    when keep_failed_enrollments parameter is None.
+    """
+    from main import features
+
+    num_runs = 2
+    runs = CourseRunFactory.create_batch(num_runs)
+    
+    # Mock the feature flag
+    mocker.patch(
+        "courses.api.is_enabled",
+        return_value=flag_enabled,
+    )
+    
+    # Mock the edX enrollment to fail
+    exception_cls = EdxApiEnrollErrorException
+    inner_exception = MockHttpError()
+    mocker.patch(
+        "courses.api.enroll_in_edx_course_runs",
+        side_effect=exception_cls(user, runs[0], inner_exception),
+    )
+    mocker.patch("courses.api.log.exception")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+    successful_enrollments, edx_request_success = create_run_enrollments(
+        user,
+        runs,
+        keep_failed_enrollments=keep_failed_enrollments,
+    )
+
+    # Verify behavior based on expected_behavior flag
+    expected_enrollments = num_runs if expected_behavior else 0
+    assert len(successful_enrollments) == expected_enrollments
+    assert edx_request_success is False
