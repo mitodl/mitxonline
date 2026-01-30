@@ -2681,3 +2681,57 @@ def test_create_run_enrollments_feature_flag(
     expected_enrollments = num_runs if expected_behavior else 0
     assert len(successful_enrollments) == expected_enrollments
     assert edx_request_success is False
+
+
+@pytest.mark.parametrize(
+    "keep_failed_enrollments,flag_enabled,expected_behavior",  # noqa: PT006
+    [
+        [None, True, True],  # Feature flag enabled, parameter None -> keep failed enrollments
+        [None, False, False],  # Feature flag disabled, parameter None -> don't keep failed enrollments
+        [True, False, True],  # Explicit True overrides feature flag being False
+        [False, True, False],  # Explicit False overrides feature flag being True
+    ],
+)
+def test_deactivate_run_enrollment_feature_flag(
+    mocker,
+    keep_failed_enrollments,
+    flag_enabled,
+    expected_behavior,
+):
+    """
+    Test that deactivate_run_enrollment respects the IGNORE_EDX_FAILURES feature flag
+    when keep_failed_enrollments parameter is None.
+    """
+    from main import features
+
+    # Create test enrollment
+    enrollment = CourseRunEnrollmentFactory()
+    
+    # Mock the feature flag
+    mocker.patch(
+        "courses.api.is_enabled",
+        return_value=flag_enabled,
+    )
+    
+    # Mock the unenroll to fail
+    mocker.patch(
+        "courses.api.unenroll_edx_course_run",
+        side_effect=Exception("edX API failure"),
+    )
+    mocker.patch("courses.api.log.exception")
+    
+    result = deactivate_run_enrollment(
+        enrollment,
+        change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+        keep_failed_enrollments=keep_failed_enrollments,
+    )
+
+    # Verify behavior based on expected_behavior flag
+    # When flag is enabled (expected_behavior=True), enrollment should be deactivated despite failure
+    # When flag is disabled (expected_behavior=False), function returns None
+    if expected_behavior:
+        assert result is not None
+        assert not result.active
+        assert result.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+    else:
+        assert result is None

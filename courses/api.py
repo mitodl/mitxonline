@@ -332,7 +332,7 @@ def downgrade_learner(enrollment):
 def deactivate_run_enrollment(
     run_enrollment,
     change_status,
-    keep_failed_enrollments=False,  # noqa: FBT002
+    keep_failed_enrollments=None,  # noqa: FBT002
 ):
     """
     Helper method to deactivate a CourseRunEnrollment
@@ -342,12 +342,16 @@ def deactivate_run_enrollment(
         change_status (str): The change status to set on the enrollment when deactivating
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
+            If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
 
     Returns:
         CourseRunEnrollment: The deactivated enrollment
     """
     from ecommerce.models import Line  # noqa: PLC0415
     from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id  # noqa: PLC0415
+
+    if keep_failed_enrollments is None:
+        keep_failed_enrollments = is_enabled(features.IGNORE_EDX_FAILURES)
 
     try:
         unenroll_edx_course_run(run_enrollment)
