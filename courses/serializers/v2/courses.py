@@ -118,11 +118,11 @@ class CourseSerializer(BaseCourseSerializer):
             programs_list = instance.programs
 
             if not self.context.get("org_id"):
-                program_qset = [
+                programs_list = [
                     program for program in programs_list if not program.b2b_only
                 ]
 
-            return BaseProgramSerializer(program_qset, many=True).data
+            return BaseProgramSerializer(programs_list, many=True).data
 
         return None
 
