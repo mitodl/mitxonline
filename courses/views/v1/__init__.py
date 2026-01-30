@@ -344,7 +344,9 @@ class CreateEnrollmentView(APIView):
         _, edx_request_success = create_run_enrollments(
             user=user,
             runs=[run],
-            keep_failed_enrollments=settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
 
         def respond(data, status=True):  # noqa: FBT002
@@ -355,7 +357,9 @@ class CreateEnrollmentView(APIView):
                 return Response("Ok" if status else "Fail")
             return HttpResponseRedirect(data)
 
-        if edx_request_success or settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False):
+        if edx_request_success or settings.FEATURES.get(
+            features.IGNORE_EDX_FAILURES, False
+        ):
             resp = respond(reverse("user-dashboard"))
             cookie_value = {
                 "type": USER_MSG_TYPE_ENROLLED,
@@ -441,7 +445,9 @@ class UserEnrollmentsApiViewSet(
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
             change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)

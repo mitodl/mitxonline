@@ -2633,8 +2633,16 @@ def test_program_certificate_verifiable_credentials_signing_payload(
 @pytest.mark.parametrize(
     "keep_failed_enrollments,flag_enabled,expected_behavior",  # noqa: PT006
     [
-        [None, True, True],  # Feature flag enabled, parameter None -> keep failed enrollments
-        [None, False, False],  # Feature flag disabled, parameter None -> don't keep failed enrollments
+        [
+            None,
+            True,
+            True,
+        ],  # Feature flag enabled, parameter None -> keep failed enrollments
+        [
+            None,
+            False,
+            False,
+        ],  # Feature flag disabled, parameter None -> don't keep failed enrollments
         [True, False, True],  # Explicit True overrides feature flag being False
         [False, True, False],  # Explicit False overrides feature flag being True
     ],
@@ -2650,17 +2658,16 @@ def test_create_run_enrollments_feature_flag(
     Test that create_run_enrollments respects the IGNORE_EDX_FAILURES feature flag
     when keep_failed_enrollments parameter is None.
     """
-    from main import features
 
     num_runs = 2
     runs = CourseRunFactory.create_batch(num_runs)
-    
+
     # Mock the feature flag
     mocker.patch(
         "courses.api.is_enabled",
         return_value=flag_enabled,
     )
-    
+
     # Mock the edX enrollment to fail
     exception_cls = EdxApiEnrollErrorException
     inner_exception = MockHttpError()
@@ -2686,8 +2693,16 @@ def test_create_run_enrollments_feature_flag(
 @pytest.mark.parametrize(
     "keep_failed_enrollments,flag_enabled,expected_behavior",  # noqa: PT006
     [
-        [None, True, True],  # Feature flag enabled, parameter None -> keep failed enrollments
-        [None, False, False],  # Feature flag disabled, parameter None -> don't keep failed enrollments
+        [
+            None,
+            True,
+            True,
+        ],  # Feature flag enabled, parameter None -> keep failed enrollments
+        [
+            None,
+            False,
+            False,
+        ],  # Feature flag disabled, parameter None -> don't keep failed enrollments
         [True, False, True],  # Explicit True overrides feature flag being False
         [False, True, False],  # Explicit False overrides feature flag being True
     ],
@@ -2702,24 +2717,23 @@ def test_deactivate_run_enrollment_feature_flag(
     Test that deactivate_run_enrollment respects the IGNORE_EDX_FAILURES feature flag
     when keep_failed_enrollments parameter is None.
     """
-    from main import features
 
     # Create test enrollment
     enrollment = CourseRunEnrollmentFactory()
-    
+
     # Mock the feature flag
     mocker.patch(
         "courses.api.is_enabled",
         return_value=flag_enabled,
     )
-    
+
     # Mock the unenroll to fail
     mocker.patch(
         "courses.api.unenroll_edx_course_run",
         side_effect=Exception("edX API failure"),
     )
     mocker.patch("courses.api.log.exception")
-    
+
     result = deactivate_run_enrollment(
         enrollment,
         change_status=ENROLL_CHANGE_STATUS_UNENROLLED,

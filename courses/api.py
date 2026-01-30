@@ -164,8 +164,10 @@ def create_run_enrollments(  # noqa: C901
             for all of the given course runs
     """
     if keep_failed_enrollments is None:
-        keep_failed_enrollments = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
-    
+        keep_failed_enrollments = settings.FEATURES.get(
+            features.IGNORE_EDX_FAILURES, False
+        )
+
     successful_enrollments = []
 
     def send_enrollment_emails():
@@ -331,7 +333,7 @@ def downgrade_learner(enrollment):
 def deactivate_run_enrollment(
     run_enrollment,
     change_status,
-    keep_failed_enrollments=None,  # noqa: FBT002
+    keep_failed_enrollments=None,
 ):
     """
     Helper method to deactivate a CourseRunEnrollment
@@ -350,7 +352,9 @@ def deactivate_run_enrollment(
     from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id  # noqa: PLC0415
 
     if keep_failed_enrollments is None:
-        keep_failed_enrollments = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
+        keep_failed_enrollments = settings.FEATURES.get(
+            features.IGNORE_EDX_FAILURES, False
+        )
 
     try:
         unenroll_edx_course_run(run_enrollment)
