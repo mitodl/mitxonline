@@ -408,7 +408,6 @@ def test_create_course_run(user_drf_client, course_runs, django_assert_max_num_q
         {
             "title": "New CourseRun Title",
             "courseware_id": "new-courserun-id",
-            "courseware_url_path": "http://example.com",
         }
     )
     request_url = reverse("v1:course_runs_api-list")

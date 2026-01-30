@@ -1286,7 +1286,6 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         live=live,
         is_self_paced=edx_course_run.is_self_paced(),
         is_source_run=is_source_run,
-        courseware_url_path=generate_openedx_course_url(edx_course_run.course_id),
     )
 
     course_page = None

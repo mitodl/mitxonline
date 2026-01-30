@@ -111,7 +111,6 @@ class CourseRunFactory(DjangoModelFactory):
         lambda number: f"course-v1:PyT+CR{FAKE.slug()}+R{number}"
     )
     run_tag = factory.Sequence("R{0}".format)
-    courseware_url_path = factory.Faker("uri")
     start_date = factory.Faker(
         "date_time_this_month", before_now=True, after_now=False, tzinfo=ZoneInfo("UTC")
     )
