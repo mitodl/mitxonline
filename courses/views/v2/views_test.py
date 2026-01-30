@@ -1601,3 +1601,97 @@ def test_add_verified_program_course_enrollment(
             assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
     else:
         assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    "with_b2b",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "single",
+    [
+        True,
+        False,
+    ],
+)
+def test_get_courses_b2b_runs(with_b2b, single, user_drf_client):
+    """
+    Test that the courses API returns courses with or without b2b runs.
+
+    By default courses should only have runs that aren't B2B runs. There are
+    other tests that test the result if you've specified an org/etc. so this
+    doesn't test that.
+    """
+
+    contract = ContractPageFactory.create() if with_b2b else None
+
+    test_course_run = CourseRunFactory.create(b2b_contract=contract)
+
+    url = reverse("v2:courses_api-list")
+    response_raw = user_drf_client.get(
+        url,
+        query_params=(
+            {"readable_id": test_course_run.course.readable_id} if single else {}
+        ),
+    )
+    assert response_raw.status_code < 300
+    response = response_raw.json()["results"]
+
+    assert len(response) == 1
+    returned_course = response[0]
+
+    assert returned_course["readable_id"] == test_course_run.course.readable_id
+
+    if with_b2b:
+        assert len(returned_course["courseruns"]) == 0
+    else:
+        assert len(returned_course["courseruns"]) == 1
+        assert (
+            returned_course["courseruns"][0]["courseware_id"]
+            == test_course_run.courseware_id
+        )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    "with_b2b",
+    [
+        True,
+        False,
+    ],
+)
+def test_get_courses_b2b_programs(with_b2b, user_drf_client):
+    """
+    Test that the courses API returns courses with or without b2b programs.
+
+    By default courses should only list programs that aren't marked as b2b_only.
+    Again, other tests handle filtering of that list so not testing that here.
+    """
+
+    program = ProgramFactory.create(b2b_only=with_b2b)
+
+    test_course_run = CourseRunFactory.create()
+    program.add_requirement(test_course_run.course)
+
+    url = reverse("v2:courses_api-list")
+    response_raw = user_drf_client.get(
+        url,
+        query_params={"readable_id": test_course_run.course.readable_id},
+    )
+    assert response_raw.status_code < 300
+    response = response_raw.json()["results"]
+
+    assert len(response) == 1
+    returned_course = response[0]
+
+    assert returned_course["readable_id"] == test_course_run.course.readable_id
+
+    if with_b2b:
+        assert len(returned_course["programs"]) == 0
+    else:
+        assert len(returned_course["programs"]) == 1
+        assert returned_course["programs"][0]["readable_id"] == program.readable_id
