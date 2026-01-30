@@ -4,6 +4,7 @@ import logging
 from typing import Tuple, Union  # noqa: UP035
 
 import django_filters
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
@@ -12,7 +13,6 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
-from mitol.olposthog.features import is_enabled
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, serializers, status, viewsets
@@ -344,7 +344,7 @@ class CreateEnrollmentView(APIView):
         _, edx_request_success = create_run_enrollments(
             user=user,
             runs=[run],
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False),
         )
 
         def respond(data, status=True):  # noqa: FBT002
@@ -355,7 +355,7 @@ class CreateEnrollmentView(APIView):
                 return Response("Ok" if status else "Fail")
             return HttpResponseRedirect(data)
 
-        if edx_request_success or is_enabled(features.IGNORE_EDX_FAILURES):
+        if edx_request_success or settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False):
             resp = respond(reverse("user-dashboard"))
             cookie_value = {
                 "type": USER_MSG_TYPE_ENROLLED,
@@ -441,7 +441,7 @@ class UserEnrollmentsApiViewSet(
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
             change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False),
         )
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)

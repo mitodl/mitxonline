@@ -5,13 +5,13 @@ Course API Views version 2
 import contextlib
 
 import django_filters
+from django.conf import settings
 from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from mitol.olposthog.features import is_enabled
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import (
     api_view,
@@ -511,7 +511,7 @@ class UserEnrollmentsApiViewSet(
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
             change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False),
         )
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)

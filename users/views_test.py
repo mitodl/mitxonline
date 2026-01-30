@@ -425,3 +425,68 @@ def test_update_user_no_name_change_edx(mocker, user_client, user, valid_address
     # Checks that update edx user was called not called when there is no change in user's name(Full Name)
     update_edx_mock.assert_not_called()
     update_edx_profile_mock.assert_called()
+
+
+@pytest.mark.parametrize(
+    "flag_enabled,task_raises,expect_error",  # noqa: PT006
+    [
+        [True, True, False],  # Flag enabled, task fails -> no error, just log
+        [False, True, True],  # Flag disabled, task fails -> error raised
+        [False, False, False],  # Flag disabled, task succeeds -> no error
+        [True, False, False],  # Flag enabled, task succeeds -> no error
+    ],
+)
+def test_update_user_edx_failures_feature_flag(
+    mocker, user_client, user, valid_address_dict, flag_enabled, task_raises, expect_error
+):
+    """
+    Test that CurrentUserRetrieveUpdateViewSet respects the IGNORE_EDX_FAILURES feature flag
+    when edX task calls fail.
+    """
+    from main import features
+
+    new_name = fuzzy.FuzzyText(prefix="Test-").fuzz()
+    
+    # Mock the feature flag
+    mocker.patch(
+        "users.views.is_enabled",
+        return_value=flag_enabled,
+    )
+    
+    # Mock the edX tasks
+    change_name_task_mock = mocker.patch(
+        "users.views.tasks.change_edx_user_name_async.delay"
+    )
+    update_profile_task_mock = mocker.patch(
+        "users.views.tasks.update_edx_user_profile.delay"
+    )
+    
+    # Configure task to raise exception if task_raises is True
+    if task_raises:
+        change_name_task_mock.side_effect = Exception("Task queue failure")
+        update_profile_task_mock.side_effect = Exception("Task queue failure")
+    
+    mocker.patch("users.views.log.exception")
+    payload = {
+        "name": new_name,
+        "email": user.email,
+        "legal_address": valid_address_dict,
+        "user_profile": None,
+    }
+    
+    if expect_error:
+        # When flag is disabled and task fails, expect an error
+        resp = user_client.patch(
+            reverse("users_api-me"), content_type="application/json", data=payload
+        )
+        # The response status will be 500 if the exception propagates
+        # (Django handles the exception and returns 500)
+        assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    else:
+        # When flag is enabled or task succeeds, expect 200
+        resp = user_client.patch(
+            reverse("users_api-me"), content_type="application/json", data=payload
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        # Checks that returned response has updated name
+        assert resp.data["name"] == new_name
