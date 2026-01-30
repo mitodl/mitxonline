@@ -3,6 +3,7 @@ Course API Views version 2
 """
 
 import contextlib
+import logging
 
 import django_filters
 from django.conf import settings
@@ -13,6 +14,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import mixins, serializers, status, viewsets
+
+log = logging.getLogger(__name__)
 from rest_framework.decorators import (
     api_view,
     permission_classes,
@@ -489,8 +492,16 @@ class UserEnrollmentsApiViewSet(
     def list(self, request, *args, **kwargs):
         """List user enrollments with optional sync."""
         if is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
-            with contextlib.suppress(Exception):
+            ignore_edx_failures = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
+            try:
                 sync_enrollments_with_edx(self.request.user)
+            except Exception:  # pylint: disable=broad-except
+                log.exception(
+                    "Failed to sync enrollments with edX for user: %s",
+                    self.request.user.id,
+                )
+                if not ignore_edx_failures:
+                    raise
         return super().list(request, *args, **kwargs)
 
     @extend_schema(
