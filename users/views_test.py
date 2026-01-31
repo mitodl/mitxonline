@@ -451,7 +451,7 @@ def test_update_user_edx_failures_feature_flag(
     """
 
     new_name = fuzzy.FuzzyText(prefix="Test-").fuzz()
-    
+
     # Mock the FEATURES dict for IGNORE_EDX_FAILURES
     mocker.patch(
         "users.views.settings.FEATURES.get",

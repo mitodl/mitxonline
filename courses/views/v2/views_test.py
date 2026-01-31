@@ -1605,10 +1605,20 @@ def test_add_verified_program_course_enrollment(
     "sync_on_load,flag_enabled,sync_raises,expect_error",  # noqa: PT006
     [
         [False, False, False, False],  # Sync disabled -> no sync, no error
-        [True, False, False, False],  # Sync enabled, flag disabled, no error -> no error
+        [
+            True,
+            False,
+            False,
+            False,
+        ],  # Sync enabled, flag disabled, no error -> no error
         [True, True, False, False],  # Sync enabled, flag enabled, no error -> no error
         [True, False, True, True],  # Sync enabled, flag disabled, error -> error raised
-        [True, True, True, False],  # Sync enabled, flag enabled, error -> no error (logged)
+        [
+            True,
+            True,
+            True,
+            False,
+        ],  # Sync enabled, flag enabled, error -> no error (logged)
     ],
 )
 def test_user_enrollments_list_sync_with_flag(
