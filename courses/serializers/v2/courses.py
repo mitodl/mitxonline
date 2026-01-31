@@ -296,7 +296,9 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
-            keep_failed_enrollments=settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
         return successful_enrollments
 

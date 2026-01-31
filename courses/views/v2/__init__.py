@@ -493,7 +493,9 @@ class UserEnrollmentsApiViewSet(
     def list(self, request, *args, **kwargs):
         """List user enrollments with optional sync."""
         if is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
-            ignore_edx_failures = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
+            ignore_edx_failures = settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            )
             try:
                 sync_enrollments_with_edx(self.request.user)
             except Exception:  # pylint: disable=broad-except
@@ -523,7 +525,9 @@ class UserEnrollmentsApiViewSet(
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
             change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)

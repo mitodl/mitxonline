@@ -59,9 +59,11 @@ class CurrentUserRetrieveUpdateViewSet(
         with transaction.atomic():
             user_name = request.user.name
             update_result = super().update(request, *args, **kwargs)
-            
-            ignore_edx_failures = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
-            
+
+            ignore_edx_failures = settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            )
+
             if user_name != request.data.get("name"):
                 try:
                     tasks.change_edx_user_name_async.delay(request.user.id)
@@ -72,7 +74,7 @@ class CurrentUserRetrieveUpdateViewSet(
                     )
                     if not ignore_edx_failures:
                         raise
-            
+
             try:
                 tasks.update_edx_user_profile.delay(request.user.id)
             except Exception:  # pylint: disable=broad-except
@@ -82,7 +84,7 @@ class CurrentUserRetrieveUpdateViewSet(
                 )
                 if not ignore_edx_failures:
                     raise
-            
+
             sync_hubspot_user(request.user)
             return update_result
 
