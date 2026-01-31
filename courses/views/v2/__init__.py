@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from mitol.olposthog.features import is_enabled
 from rest_framework import mixins, serializers, status, viewsets
 
 log = logging.getLogger(__name__)

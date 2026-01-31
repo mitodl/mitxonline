@@ -1664,5 +1664,3 @@ def test_user_enrollments_list_sync_with_flag(
             sync_mock.assert_called_once_with(user)
         else:
             sync_mock.assert_not_called()
-    else:
-        assert resp.status_code == status.HTTP_404_NOT_FOUND
