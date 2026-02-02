@@ -1662,11 +1662,11 @@ def test_user_enrollments_list_sync_with_flag(
 
     if expect_error:
         # When flag is disabled and sync fails, expect an error
-        resp = user_drf_client.get(reverse("v2:user_enrollments_list"))
+        resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
         assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     else:
         # When flag is enabled or sync succeeds, expect 200
-        resp = user_drf_client.get(reverse("v2:user_enrollments_list"))
+        resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
         assert resp.status_code == status.HTTP_200_OK
         # Verify sync was called or not called based on sync_on_load
         if sync_on_load:
