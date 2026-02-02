@@ -117,7 +117,7 @@ class CourseSerializer(BaseCourseSerializer):
         if self.context.get("include_programs", False):
             programs_list = instance.programs
 
-            if not self.context.get("org_id"):
+            if not self.context.get("org_id") and not self.context.get("contract_id"):
                 programs_list = [
                     program for program in programs_list if not program.b2b_only
                 ]
