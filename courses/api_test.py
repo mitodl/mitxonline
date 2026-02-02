@@ -2634,18 +2634,18 @@ def test_program_certificate_verifiable_credentials_signing_payload(
 @pytest.mark.parametrize(
     "keep_failed_enrollments,flag_enabled,expected_behavior",  # noqa: PT006
     [
-        [
+        (
             None,
             True,
             True,
-        ],  # Feature flag enabled, parameter None -> keep failed enrollments
-        [
+        ),  # Feature flag enabled, parameter None -> keep failed enrollments
+        (
             None,
             False,
             False,
-        ],  # Feature flag disabled, parameter None -> don't keep failed enrollments
-        [True, False, True],  # Explicit True overrides feature flag being False
-        [False, True, False],  # Explicit False overrides feature flag being True
+        ),  # Feature flag disabled, parameter None -> don't keep failed enrollments
+        (True, False, True),  # Explicit True overrides feature flag being False
+        (False, True, False),  # Explicit False overrides feature flag being True
     ],
 )
 def test_create_run_enrollments_feature_flag(
@@ -2694,18 +2694,18 @@ def test_create_run_enrollments_feature_flag(
 @pytest.mark.parametrize(
     "keep_failed_enrollments,flag_enabled,expected_behavior",  # noqa: PT006
     [
-        [
+        (
             None,
             True,
             True,
-        ],  # Feature flag enabled, parameter None -> keep failed enrollments
-        [
+        ),  # Feature flag enabled, parameter None -> keep failed enrollments
+        (
             None,
             False,
             False,
-        ],  # Feature flag disabled, parameter None -> don't keep failed enrollments
-        [True, False, True],  # Explicit True overrides feature flag being False
-        [False, True, False],  # Explicit False overrides feature flag being True
+        ),  # Feature flag disabled, parameter None -> don't keep failed enrollments
+        (True, False, True),  # Explicit True overrides feature flag being False
+        (False, True, False),  # Explicit False overrides feature flag being True
     ],
 )
 def test_deactivate_run_enrollment_feature_flag(

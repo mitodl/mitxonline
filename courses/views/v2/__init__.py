@@ -2,7 +2,6 @@
 Course API Views version 2
 """
 
-import contextlib
 import logging
 
 import django_filters
@@ -15,8 +14,6 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.olposthog.features import is_enabled
 from rest_framework import mixins, serializers, status, viewsets
-
-log = logging.getLogger(__name__)
 from rest_framework.decorators import (
     api_view,
     permission_classes,
@@ -28,6 +25,8 @@ from rest_framework.permissions import (
     IsAuthenticatedOrReadOnly,
 )
 from rest_framework.response import Response
+
+log = logging.getLogger(__name__)
 
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED

@@ -29,6 +29,7 @@ from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework.status import HTTP_404_NOT_FOUND
+from mitol.olposthog.features import is_enabled
 
 from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
