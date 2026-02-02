@@ -4,12 +4,32 @@ B2B system data can be (and sometimes is required to be) managed through a set o
 
 ## Management Commands
 
-There are three management commands:
+There are four management commands:
+- [](#b2b_codes) - utilities for enrollment codes
 - [](#b2b_contract) - manages contracts and organizations
 - [](#b2b_courseware) - manages courseware within a contract
 - [](#b2b_list) - lists out data
 
 This document will go over the basic use of the management commands. To get the full documentation for the command, run the command or subcommand with the `--help` option.
+
+### b2b_codes
+
+:Name: b2b_codes
+:Description: Utilities for managing enrollment codes within the system.
+:Subcommands:
+    `output` - outputs enrollment codes
+
+    `validate` - checks/fixes enrollment codes
+
+    `expire` - expire (remove) existing enrollment codes
+:Description:
+    The `b2b_codes` command allows you to output the list of codes, validate them, and expire unnecessary codes. The `output` subcommand takes over the functionality of the `b2b_list contract --codes` command.
+
+    `b2b_codes output`, by default, outputs a _functional_ set of B2B enrollment codes for a given contract or organization (or the entire system, but this is not recommended). It can also output _all_ the available codes, output usage information for the codes, or output usage statistics for codes. Code output can be in table, CSV, or JSON formats and can be redirected to a file for the latter two.
+
+    `b2b_codes validate` checks the codes within the contract or organization and ensures they're set up correctly. Attached course runs are checked to ensure they have a product. Products will be created for runs that don't have one, and existing products will be checked to ensure they have the correct pricing. Codes that aren't needed are removed, and the remainder are checked to ensure they have the correct redemption type and amounts set. Missing codes are created. (Codes that have been redeemed are not removed.)
+
+    `b2b_codes expire` removes unused codes from the contract or organization, and outputs a list of the codes that were removed. The main use case for this is if a contract's codes becomes public; the codes can be removed and `b2b_codes validate` can then be used to generate new ones.
 
 ### b2b_contract
 
