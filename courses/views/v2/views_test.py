@@ -72,6 +72,7 @@ from courses.views.test_utils import (
 )
 from courses.views.v2 import Pagination, ProgramFilterSet
 from ecommerce.models import Product
+from main import features
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
@@ -1611,7 +1612,7 @@ def test_add_verified_program_course_enrollment(
         (True, True, True),  # Sync enabled, flag enabled, error -> no error (logged)
     ],
 )
-def test_user_enrollments_list_sync_with_flag(
+def test_user_enrollments_list_sync_with_flag(  # noqa: PLR0913
     mocker,
     user_drf_client,
     user,
@@ -1623,7 +1624,6 @@ def test_user_enrollments_list_sync_with_flag(
     Test that UserEnrollmentsApiViewSet.list() respects IGNORE_EDX_FAILURES flag
     when syncing enrollments with edX.
     """
-    from main import features
 
     # Create a test enrollment
     CourseRunEnrollmentFactory.create(user=user)

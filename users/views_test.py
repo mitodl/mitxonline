@@ -435,12 +435,12 @@ def test_update_user_no_name_change_edx(mocker, user_client, user, valid_address
 @pytest.mark.parametrize(
     "flag_enabled,task_raises",  # noqa: PT006
     [
-        [True, True],  # Flag enabled, task fails -> no error, just log
-        [False, False],  # Flag disabled, task succeeds -> no error
-        [True, False],  # Flag enabled, task succeeds -> no error
+        (True, True),  # Flag enabled, task fails -> no error, just log
+        (False, False),  # Flag disabled, task succeeds -> no error
+        (True, False),  # Flag enabled, task succeeds -> no error
     ],
 )
-def test_update_user_edx_failures_feature_flag(
+def test_update_user_edx_failures_feature_flag(  # noqa: PLR0913
     mocker,
     user_client,
     user,
