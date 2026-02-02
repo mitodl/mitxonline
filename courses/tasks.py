@@ -14,6 +14,7 @@ from courses.models import (
     LearnerProgramRecordShare,
 )
 from main.celery import app
+from users.models import User
 
 log = logging.getLogger(__name__)
 
@@ -54,13 +55,22 @@ def subscribe_edx_course_emails(enrollment_id):
 
 
 @app.task
-def generate_course_certificates():
+def generate_course_certificates(force=False, username=None, courseware_id=None):  # noqa: FBT002
     """
     Task to generate certificates for courses.
     """
     from courses.api import generate_course_run_certificates
 
-    generate_course_run_certificates()
+    user = None
+    if username is not None:
+        try:
+            user = User.objects.get(edx_username=username)
+        except User.DoesNotExist:
+            log.info(f"User with username {username} does not exist.")  # noqa: G004
+            return
+    generate_course_run_certificates(
+        force=force, user=user, courseware_id=courseware_id
+    )
 
 
 @app.task
