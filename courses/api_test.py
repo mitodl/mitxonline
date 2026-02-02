@@ -14,6 +14,7 @@ import faker
 import pytest
 import responses
 import reversion
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory
 from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
@@ -2663,9 +2664,9 @@ def test_create_run_enrollments_feature_flag(
     runs = CourseRunFactory.create_batch(num_runs)
 
     # Mock the feature flag
-    mocker.patch(
-        "courses.api.is_enabled",
-        return_value=flag_enabled,
+    mocker.patch.dict(
+        settings.FEATURES,
+        {"IGNORE_EDX_FAILURES": flag_enabled},
     )
 
     # Mock the edX enrollment to fail
@@ -2722,9 +2723,9 @@ def test_deactivate_run_enrollment_feature_flag(
     enrollment = CourseRunEnrollmentFactory()
 
     # Mock the feature flag
-    mocker.patch(
-        "courses.api.is_enabled",
-        return_value=flag_enabled,
+    mocker.patch.dict(
+        settings.FEATURES,
+        {"IGNORE_EDX_FAILURES": flag_enabled},
     )
 
     # Mock the unenroll to fail
