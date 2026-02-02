@@ -314,7 +314,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
         return (
             Course.objects.select_related("page")
-            .prefetch_related("departments")
+            .prefetch_related("departments", "in_programs")
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
             .annotate(count_courseruns=Count("courseruns"))
             .order_by("title")

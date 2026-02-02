@@ -113,16 +113,31 @@ class CourseSerializer(BaseCourseSerializer):
 
     @extend_schema_field(BaseProgramSerializer(many=True, allow_null=True))
     def get_programs(self, instance):
-        """List programs, if we're to include them, excluding b2b only ones unless an org is set."""
+        """
+        Include appropriate programs.
+
+        If the org or contract ID is set, include only programs that match. If
+        neither is specified, filter programs that have "b2b_only" set.
+        """
         if self.context.get("include_programs", False):
-            programs_list = instance.programs
+            programs_qs = instance.in_programs
 
-            if not self.context.get("org_id") and not self.context.get("contract_id"):
-                programs_list = [
-                    program for program in programs_list if not program.b2b_only
-                ]
+            if self.context.get("org_id"):
+                programs_qs = programs_qs.filter(
+                    program__contract_memberships__contract__organization__pk=self.context.get(
+                        "org_id"
+                    )
+                )
+            elif self.context.get("contract_id"):
+                programs_qs = programs_qs.filter(
+                    program__contract_memberships__contract__pk=self.context.get(
+                        "contract_id"
+                    )
+                )
+            else:
+                programs_qs = programs_qs.filter(program__b2b_only=False)
 
-            return BaseProgramSerializer(programs_list, many=True).data
+            return BaseProgramSerializer(programs_qs.all(), many=True).data
 
         return None
 
