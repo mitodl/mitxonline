@@ -1648,10 +1648,9 @@ def test_user_enrollments_list_sync_with_flag(
     )
 
     # Mock the FEATURES dict for IGNORE_EDX_FAILURES
-    mocker.patch.object(
+    mocker.patch.dict(
         settings.FEATURES,
-        "get",
-        return_value=flag_enabled,
+        {"IGNORE_EDX_FAILURES": flag_enabled},
     )
 
     # Mock sync_enrollments_with_edx
