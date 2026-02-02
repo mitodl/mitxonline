@@ -26,8 +26,6 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-log = logging.getLogger(__name__)
-
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -72,6 +70,8 @@ from main import features
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+
+log = logging.getLogger(__name__)
 
 
 class Pagination(PageNumberPagination):
