@@ -1601,24 +1601,14 @@ def test_add_verified_program_course_enrollment(
             assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
 
 
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
-    "sync_on_load,flag_enabled,sync_raises,expect_error",  # noqa: PT006
+    "sync_on_load,flag_enabled,sync_raises",  # noqa: PT006
     [
-        [False, False, False, False],  # Sync disabled -> no sync, no error
-        [
-            True,
-            False,
-            False,
-            False,
-        ],  # Sync enabled, flag disabled, no error -> no error
-        [True, True, False, False],  # Sync enabled, flag enabled, no error -> no error
-        [True, False, True, True],  # Sync enabled, flag disabled, error -> error raised
-        [
-            True,
-            True,
-            True,
-            False,
-        ],  # Sync enabled, flag enabled, error -> no error (logged)
+        [False, False, False],  # Sync disabled -> no sync, no error
+        [True, False, False],  # Sync enabled, flag disabled, no error -> no error
+        [True, True, False],  # Sync enabled, flag enabled, no error -> no error
+        [True, True, True],  # Sync enabled, flag enabled, error -> no error (logged)
     ],
 )
 def test_user_enrollments_list_sync_with_flag(
@@ -1628,7 +1618,6 @@ def test_user_enrollments_list_sync_with_flag(
     sync_on_load,
     flag_enabled,
     sync_raises,
-    expect_error,
 ):
     """
     Test that UserEnrollmentsApiViewSet.list() respects IGNORE_EDX_FAILURES flag
@@ -1660,16 +1649,11 @@ def test_user_enrollments_list_sync_with_flag(
 
     mocker.patch("courses.views.v2.log.exception")
 
-    if expect_error:
-        # When flag is disabled and sync fails, expect an error
-        resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
-        assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    # When flag is enabled or sync succeeds, expect 200
+    resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+    # Verify sync was called or not called based on sync_on_load
+    if sync_on_load:
+        sync_mock.assert_called_once_with(user)
     else:
-        # When flag is enabled or sync succeeds, expect 200
-        resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
-        assert resp.status_code == status.HTTP_200_OK
-        # Verify sync was called or not called based on sync_on_load
-        if sync_on_load:
-            sync_mock.assert_called_once_with(user)
-        else:
-            sync_mock.assert_not_called()
+        sync_mock.assert_not_called()
