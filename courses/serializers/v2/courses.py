@@ -137,7 +137,11 @@ class CourseSerializer(BaseCourseSerializer):
             else:
                 programs_qs = programs_qs.filter(program__b2b_only=False)
 
-            return BaseProgramSerializer(programs_qs.all(), many=True).data
+            programs = [
+                req.program for req in programs_qs.prefetch_related("program").all()
+            ]
+
+            return BaseProgramSerializer(programs, many=True).data
 
         return None
 
