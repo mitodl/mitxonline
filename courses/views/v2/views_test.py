@@ -26,6 +26,7 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.models import ContractProgramItem
 from cms.factories import CoursePageFactory, ProgramPageFactory
 from cms.serializers import ProgramPageSerializer
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
@@ -1695,3 +1696,45 @@ def test_get_courses_b2b_programs(with_b2b, user_drf_client):
     else:
         assert len(returned_course["programs"]) == 1
         assert returned_course["programs"][0]["readable_id"] == program.readable_id
+
+
+def test_get_courses_with_specified_contract_programs(user, user_drf_client):
+    """
+    Test that specifying a contract when retrieving a course returns only
+    applicable B2B programs.
+
+    This is different than testing for the b2b flag alone - if we have a
+    contract ID specified, then the programs in the list should only be ones
+    attached to that contract.
+    """
+
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
+    other_contract = ContractPageFactory.create()
+
+    programs = ProgramFactory.create_batch(2)
+    course_run = CourseRunFactory.create(b2b_contract=contract)
+    CourseRunFactory.create(b2b_contract=other_contract, course=course_run.course)
+
+    for program in programs:
+        program.add_requirement(course_run.course)
+        program.save()
+
+    ContractProgramItem.objects.create(contract=contract, program=programs[0])
+
+    url = reverse("v2:courses_api-list")
+    response_raw = user_drf_client.get(
+        url,
+        query_params={
+            "readable_id": course_run.course.readable_id,
+            "contract_id": contract.id,
+        },
+    )
+    assert response_raw.status_code < 300
+    response = response_raw.json()["results"]
+
+    assert len(response[0]["programs"]) > 0
+
+    program_ids = [program["id"] for program in response[0]["programs"]]
+    assert programs[0].id in program_ids
+    assert programs[1].id not in program_ids
