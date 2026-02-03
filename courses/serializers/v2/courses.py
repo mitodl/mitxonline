@@ -247,6 +247,8 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
             courseruns = courseruns.filter(
                 b2b_contract__organization_id=self.context["org_id"]
             )
+        if "contract_id" in self.context:
+            courseruns = courseruns.filter(b2b_contract_id=self.context["contract_id"])
 
         return CourseRunSerializer(courseruns, many=True, read_only=True).data
 
