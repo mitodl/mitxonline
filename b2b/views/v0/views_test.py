@@ -19,6 +19,7 @@ from courses.models import CourseRunEnrollment
 from ecommerce.factories import ProductFactory
 from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+    USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
 from users.factories import UserFactory
@@ -289,7 +290,8 @@ def test_b2b_contract_attachment_full_contract(mocker):
 @pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("user_has_edx_user", [True, False])
 @pytest.mark.parametrize("has_price", [True, False])
-def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price):
+@pytest.mark.parametrize("run_is_enrollable", [True, False])
+def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrollable):
     """Make sure that hitting the enroll endpoint actually results in enrollments"""
 
     mocker.patch("openedx.tasks.clone_courserun.delay")
@@ -304,6 +306,10 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price):
     source_courserun = CourseRunFactory.create(is_source_run=True)
 
     courserun, _ = create_contract_run(contract, source_courserun.course)
+
+    if not run_is_enrollable:
+        courserun.live = False
+        courserun.save()
 
     user = UserFactory.create()
     user.b2b_contracts.add(contract)
@@ -320,14 +326,20 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price):
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
     resp = client.post(url)
 
+    if not run_is_enrollable:
+        assert resp.status_code == 406
+        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE
+        return
+
     if has_price:
         assert resp.status_code == 406
         assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT
-    else:
-        assert resp.status_code == 201
-        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+        return
 
-        user.refresh_from_db()
+    assert resp.status_code == 201
+    assert resp.json()["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 
-        assert user.edx_username
-        assert CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
+    user.refresh_from_db()
+
+    assert user.edx_username
+    assert CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
