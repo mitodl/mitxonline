@@ -4,7 +4,6 @@ import logging
 from collections.abc import Iterable
 from decimal import Decimal
 from typing import Union
-from urllib.parse import quote, urljoin
 from uuid import uuid4
 
 import reversion
@@ -258,7 +257,7 @@ def create_contract_run(
         year=now_in_utc().year,
         contract_id=contract.id,
     )
-    source_id = CourseKey.from_string(clone_course_run.courseware_id)
+    source_id = CourseKey.from_string(clone_course_run.readable_id)
     new_readable_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
 
     # Check first for an existing run with the same readable ID.
@@ -290,10 +289,6 @@ def create_contract_run(
         is_self_paced=True,
         live=True,
         b2b_contract=contract,
-        courseware_url_path=urljoin(
-            settings.OPENEDX_COURSE_BASE_URL,
-            f"{quote(new_readable_id)}{settings.OPENEDX_COURSE_BASE_URL_SUFFIX}",
-        ),
     )
     course_run.save()
 
@@ -516,14 +511,14 @@ def ensure_contract_run_products(contract: ContractPage) -> list[Product]:
             price=contract.enrollment_fixed_price
             if contract.enrollment_fixed_price
             else Decimal(0),
-            active=True,
+            is_active=True,
             description=run.courseware_id,
         )
         for run in fixable_crs
     ]
 
 
-def ensure_contract_run_pricing(contract: ContractPage):
+def ensure_contract_run_pricing(contract: ContractPage) -> int:
     """Ensure the contract runs are all priced correctly."""
 
     products = contract.get_products()
@@ -535,7 +530,7 @@ def ensure_contract_run_pricing(contract: ContractPage):
             else Decimal(0)
         )
 
-    Product.objects.bulk_update(products, ["price"])
+    return Product.objects.bulk_update(products, ["price"])
 
 
 def _get_discount_defaults(discount_amount: Decimal) -> dict:
@@ -578,6 +573,47 @@ def _update_discount(
         redemption_type=redemption_type,
         **defaults,
     )
+
+
+def _handle_extra_enrollment_codes(contract: ContractPage, product: Product) -> int:
+    """Remove any extra codes, so there's just enough for the given product."""
+
+    remove_count = contract.get_discounts().filter(
+        products__product=product
+    ).count() - (contract.max_learners or 1)
+
+    if remove_count <= 0:
+        log.info(
+            "_handle_extra_enrollment_codes: called for contract %s but no extra codes",
+            contract,
+        )
+        return 0
+
+    # Filter out the discounts that have been used for something - either for
+    # contract attachment or for enrollment.
+    unused_discounts = (
+        contract.get_unused_discounts().filter(products__product=product).all()
+    )
+
+    for unused_discount in unused_discounts[:remove_count]:
+        log.info(
+            "Removing extra discount %s for contract %s product %s",
+            unused_discount,
+            contract,
+            product,
+        )
+
+        # Remove the product from the discount - only remove the discount if
+        # there's no more product.
+
+        DiscountProduct.objects.filter(
+            discount=unused_discount, product=product
+        ).delete()
+        unused_discount.refresh_from_db()
+        if unused_discount.products.count() == 0:
+            unused_discount.delete()
+
+    return remove_count
 
 
 def _ensure_discount_product_association(discount: Discount, product: Product) -> bool:
@@ -676,7 +712,15 @@ def _handle_limited_seats(
 ) -> tuple[int, int, int]:
     """Handle limited seat contracts by creating/updating multiple discounts."""
     created = updated = errors = 0
-    discount_amount = contract.enrollment_fixed_price or 0
+    discount_amount = contract.enrollment_fixed_price or Decimal(0)
+
+    if not contract.max_learners:
+        log.info("Contract %s doesn't have a learner cap, skipping", contract)
+        return (
+            0,
+            0,
+            0,
+        )
 
     log.info(
         "Updating %s discount codes for product %s", len(product_discounts), product
@@ -704,15 +748,22 @@ def _handle_limited_seats(
         updated += 1
 
     # Create additional discounts if needed
-    create_count = contract.max_learners - len(product_discounts)
+    create_count = contract.max_learners - contract.get_discounts().count()
     log.info("Creating %s new discount codes for product %s", create_count, product)
 
     if create_count < 0:
         log.warning(
-            "ensure_enrollment_codes_exist: Seat limited contract %s product %s has too many discount codes: %s - skipping create",
+            "ensure_enrollment_codes_exist: Seat limited contract %s product %s has too many discount codes: %s - removing extras",
             contract,
             product,
-            len(product_discounts),
+            contract.get_products().count(),
+        )
+        errors = _handle_extra_enrollment_codes(contract, product)
+        log.warning(
+            "ensure_enrollment_codes_exist: Removed %s codes for %s product %s",
+            errors,
+            contract,
+            product,
         )
         return (created, updated, errors)
 

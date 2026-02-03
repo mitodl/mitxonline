@@ -3,11 +3,15 @@
 import faker
 import pytest
 
+from b2b.api import ensure_enrollment_codes_exist
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.models import DiscountContractAttachmentRedemption
 from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
 )
+from ecommerce.factories import ProductFactory
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -188,3 +192,33 @@ def test_remove_user_contracts_only_removes_managed_contracts():
     assert not user.b2b_contracts.filter(id=managed_contract.id).exists()
     assert not user.b2b_contracts.filter(id=sso_contract.id).exists()
     assert user.b2b_contracts.filter(id=code_contract.id).exists()
+
+
+def test_get_unused_discounts(user):
+    """Test that get_unused_discounts doesn't include invalid discounts"""
+
+    contract = ContractPageFactory.create(
+        integration_type=CONTRACT_MEMBERSHIP_CODE,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
+        max_learners=10,
+    )
+
+    run = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=run)
+
+    created, _, _ = ensure_enrollment_codes_exist(contract)
+
+    assert created == 10
+
+    code_to_use = contract.get_discounts().last()
+
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=code_to_use, user=user, contract=contract
+    )
+
+    assert contract.get_unused_discounts().count() == 9
+    assert (
+        not contract.get_unused_discounts()
+        .filter(discount_code=code_to_use.discount_code)
+        .exists()
+    )

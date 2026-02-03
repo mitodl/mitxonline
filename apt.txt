@@ -10,3 +10,21 @@ postgresql-client
 build-essential
 libcairo2-dev
 wget
+
+# Nice tools for operators
+# Like top but a bit nicer to use
+htop
+# Network grepping tool
+ngrep
+# Provides ps command, amongst others
+procps
+# Terminal multiplexer, lets us run long running commands in the background that other people can access
+screen
+# List open file handles, useful for debugging
+lsof
+# For checking network connectivity
+iputils-ping
+# Display text in terminal with paging
+less
+# Simple terminal text editor
+nano
