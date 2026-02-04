@@ -164,12 +164,10 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
 
     run = CourseRunWithCourseSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
-    certificate = serializers.SerializerMethodField(read_only=True)
     enrollment_mode = serializers.ChoiceField(
         (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
     )
     approved_flexible_price_exists = serializers.SerializerMethodField()
-    grades = serializers.SerializerMethodField(read_only=True)
 
     def create(self, validated_data):
         user = self.context["user"]
