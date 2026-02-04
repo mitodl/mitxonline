@@ -6195,6 +6195,7 @@ components:
       - b2b-error-missing-enrollment-code
       - b2b-error-invalid-enrollment-code
       - b2b-error-requires-checkout
+      - b2b-error-not-enrollable
       - b2b-enroll-success
       type: string
       description: |-
@@ -6204,6 +6205,7 @@ components:
         * `b2b-error-missing-enrollment-code` - b2b-error-missing-enrollment-code
         * `b2b-error-invalid-enrollment-code` - b2b-error-invalid-enrollment-code
         * `b2b-error-requires-checkout` - b2b-error-requires-checkout
+        * `b2b-error-not-enrollable` - b2b-error-not-enrollable
         * `b2b-enroll-success` - b2b-enroll-success
       x-enum-descriptions:
       - b2b-disallowed
@@ -6212,6 +6214,7 @@ components:
       - b2b-error-missing-enrollment-code
       - b2b-error-invalid-enrollment-code
       - b2b-error-requires-checkout
+      - b2b-error-not-enrollable
       - b2b-enroll-success
     SignatoryItem:
       type: object
