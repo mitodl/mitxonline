@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.137.11 (Released February 04, 2026)
+----------------
+
+- When requesting courses for a contract, filter runs by contract ID (#3263)
+- Add check to b2b enroll API to ensure the course is enrollable before continuing (#3261)
+- Tools for operators (#3258)
+- Add validate/expire functionality to b2b_codes, add discount code info command (#3256)
+- 1824 courseware url should be a computed property (#3254)
+- Remove deprecated pytz (#3252)
+
 Version 0.137.10 (Released January 29, 2026)
 ----------------
 
