@@ -15818,7 +15818,7 @@ __metadata:
     style-loader: 3.3.4
     styled-components: 4.4.1
     url-join: 4.0.1
-    validator: 13.15.22
+    validator: 13.15.26
     video.js: 7.21.7
     videojs-youtube: 2.6.1
     waait: 1.0.5
@@ -23265,10 +23265,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"validator@npm:13.15.22":
-  version: 13.15.22
-  resolution: "validator@npm:13.15.22"
-  checksum: 93b1b0b1797aaa984fda1c0529e69745ed87afcfa8a9ea15aa30a70796554a25f254759d2462c2000a692e5c6eae219e32449b86f8a9fd021135758df0dffe03
+"validator@npm:13.15.26":
+  version: 13.15.26
+  resolution: "validator@npm:13.15.26"
+  checksum: 2f9151d5b37b1ccf370fb547559ca197e40517e9c08bbea55997d3607b573edce0b1082640912dcea1656648d51271d70df37b95a15d039a0bc0033a66f77e22
   languageName: node
   linkType: hard
 
