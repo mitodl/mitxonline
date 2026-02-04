@@ -110,7 +110,7 @@ def test_create_user(user, mocker):
         (True, False, False),  # Flag enabled, nothing fails -> no error
     ],
 )
-def test_create_user_ignore_edx_failures_flag(
+def test_create_user_ignore_edx_failures_flag(  # noqa: PLR0913
     user,
     mocker,
     settings,
