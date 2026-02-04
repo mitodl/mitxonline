@@ -15872,7 +15872,7 @@ __metadata:
     react-dom: 17.0.2
     react-markdown: 8.0.7
     react-mde: 11.5.0
-    react-oidc-context: 2.1.0
+    react-oidc-context: 2.4.0
     react-scripts: 5.0.1
     typescript: 4.6.3
     web-vitals: 2.1.4
@@ -19404,13 +19404,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-oidc-context@npm:2.1.0":
-  version: 2.1.0
-  resolution: "react-oidc-context@npm:2.1.0"
+"react-oidc-context@npm:2.4.0":
+  version: 2.4.0
+  resolution: "react-oidc-context@npm:2.4.0"
   peerDependencies:
-    oidc-client-ts: ^2.0.0
+    oidc-client-ts: ^2.4.1
     react: ">=16.8.0"
-  checksum: 34c44ced6ce186a1f0043294e70754216ada0d178ccf2e6ff147bf94a13bf2877d80a2cd872b6a8cffa591ed7e10a9a16f273828ade78ea07b97a9ad46370d71
+  checksum: 18464a953f9cb55e93998c3efd81eaef177ebfe342ace0e853090ecaa18ef1e193d5ba15d1c984b771beef5939a83861d82ea1289accf550e0fd7c41d63f34d9
   languageName: node
   linkType: hard
 
