@@ -5623,14 +5623,14 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 
 [[package]]
 name = "wagtail"
-version = "7.2.1"
+version = "7.2.2"
 description = "A Django content management system."
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "wagtail-7.2.1-py3-none-any.whl", hash = "sha256:b29f9fc226fadf744cf6fd5a24ee1c2b7a00ade5f801c72069af8b453d6a1241"},
-    {file = "wagtail-7.2.1.tar.gz", hash = "sha256:388bb42c4818c081a4ddf36e6f4529bfbc54ed262a91b65b0e5f951476f2cf74"},
+    {file = "wagtail-7.2.2-py3-none-any.whl", hash = "sha256:2e62316717bd19c57de5e6cb7f800c8acdb51862b3067b9e788c0837bda9c9f0"},
+    {file = "wagtail-7.2.2.tar.gz", hash = "sha256:bf6adaa3acd90d9ee7734756dd7031b0901eedb80a4aa4e5188ab1e481ce30be"},
 ]
 
 [package.dependencies]
@@ -6019,4 +6019,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "9eb1b8bfb3abeb3e9d3b18294888a6356e57c639f1430948bc9bff216f1de919"
+content-hash = "8501e79bcbead6a2aefa6fcb7f98d6380eb746964bfef75b97fc9a1e80f4633a"
