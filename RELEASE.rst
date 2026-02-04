@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.11
+Version 0.137.11 (Released February 04, 2026)
 ----------------
 
 - When requesting courses for a contract, filter runs by contract ID (#3263)
