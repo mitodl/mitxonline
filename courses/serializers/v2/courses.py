@@ -103,8 +103,8 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_next_run_id(self, instance) -> int | None:
         """Get next run id"""
-        if self.context.get("org_id"):
-            run = instance.get_first_unexpired_org_run(
+        if self.context.get("org_id") or self.context.get("contract_id"):
+            run = instance.get_first_unexpired_b2b_run(
                 self.context.get("user_contracts")
             )
         else:

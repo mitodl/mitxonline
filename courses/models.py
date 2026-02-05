@@ -964,11 +964,12 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         return getattr(self.page, "ingest_content_files_for_ai", False)
 
-    def get_first_unexpired_org_run(self, user_contracts):
+    def get_first_unexpired_b2b_run(self, user_contracts):
         """
         Gets the first unexpired/enrollable CourseRun associated with both this
-        Course and the organization ID specified, according to the user's
-        contracts.
+        Course and the user's specified contracts.
+
+        First means in start date order ascending.
 
         Args:
         - user_contracts (list of int): the current user's contracts
