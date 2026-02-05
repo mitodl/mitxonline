@@ -470,7 +470,6 @@ class CertificatePage(CourseProgramChildPage):
             # Verify that the certificate in fact is for this same course
             if self.parent.product.id != self.certificate.get_courseware_object_id():
                 raise Http404()  # noqa: RSE102
-            start_date, end_date = self.certificate.start_end_dates
             CEUs = self.CEUs
 
             for override in self.overrides:  # pylint: disable=not-an-iterable
