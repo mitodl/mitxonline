@@ -884,6 +884,7 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
 
     contract = ContractPageFactory.create(organization=orgs[0])
     second_contract = ContractPageFactory.create(organization=orgs[1])
+    third_contract_first_org = ContractPageFactory.create(organization=orgs[0])
     test_user = UserFactory()
     test_user.b2b_organizations.add(contract.organization)
     test_user.b2b_contracts.add(contract)
@@ -949,6 +950,60 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     b2b_run.save()
 
     resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert not resp_course["next_run_id"]
+
+    # put the first run's date back
+    b2b_run.start_date = one_month_prior - timedelta(days=1)
+    b2b_run.enrollment_start = one_month_prior - timedelta(days=1)
+    b2b_run.save()
+
+    # create a run for the other org, same course, and starting before b2b_run
+    second_eligible_b2b_run = CourseRunFactory.create(
+        b2b_contract=third_contract_first_org,
+        start_date=one_month_prior - timedelta(days=5),
+        enrollment_start=one_month_prior - timedelta(days=5),
+        course=b2b_run.course,
+    )
+
+    # we're not in this contract so we should get the b2b_run id next
+    resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert resp_course["next_run_id"] == b2b_run.id
+
+    # add to the other contract
+    test_user.b2b_contracts.add(third_contract_first_org)
+    test_user.save()
+
+    # we should now get the second eligible run - our user is in both contracts
+    resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert resp_course["next_run_id"] == second_eligible_b2b_run.id
+
+    # same test as above, but filter on contract ID
+
+    url = reverse(
+        "v2:courses_api-detail",
+        kwargs={"pk": b2b_course.id},
+    )
+
+    resp = auth_api_client.get(f"{url}?contract_id={contract.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert resp_course["next_run_id"] == b2b_run.id
+
+    # kick the B2B run into the future and now we should get nothing again
+    b2b_run.enrollment_start = one_month_ahead
+    b2b_run.save()
+
+    resp = auth_api_client.get(f"{url}?contract_id={contract.id}")
 
     assert resp.status_code < 300
     resp_course = resp.json()

@@ -329,16 +329,40 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         if qp.get("include_approved_financial_aid"):
             added_context["include_approved_financial_aid"] = True
         if qp.get("org_id") or qp.get("contract_id"):
+            # If an org or contract is specified, we extract the user's contracts
+            # according to those params, so filtering on some course run data is
+            # correct (notably next_run_id).
+
+            added_context["user_contracts"] = []
+
             user = self.request.user
             if qp.get("org_id"):
                 added_context["org_id"] = qp.get("org_id")
+                added_context["user_contracts"] = (
+                    (
+                        user.b2b_contracts.filter(
+                            organization__pk=added_context["org_id"]
+                        )
+                        .values_list("id", flat=True)
+                        .all()
+                    )
+                    if hasattr(user, "b2b_contracts")
+                    else []
+                )
             if qp.get("contract_id"):
                 added_context["contract_id"] = qp.get("contract_id")
-            added_context["user_contracts"] = (
-                user.b2b_contracts.values_list("id", flat=True).all()
-                if user.is_authenticated and user.b2b_contracts
-                else []
-            )
+                # make sure we filter this - user should be in the contract we're
+                # filtering against
+                added_context["user_contracts"] = (
+                    (
+                        user.b2b_contracts.filter(pk=added_context["contract_id"])
+                        .values_list("id", flat=True)
+                        .all()
+                    )
+                    if hasattr(user, "b2b_contracts")
+                    else []
+                )
+
         return {**super().get_serializer_context(), **added_context}
 
     @extend_schema(
