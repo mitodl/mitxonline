@@ -21,6 +21,7 @@ from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from modelcluster.fields import ParentalKey
+from prefetch import Prefetcher, PrefetchManagerMixin, PrefetchQuerySet
 from treebeard.mp_tree import MP_Node
 from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.fields import RichTextField
@@ -177,7 +178,17 @@ class CoursesTopicQuerySet(models.QuerySet):
         return list(self.parent_topics().values_list("name", flat=True))
 
 
-class ActiveEnrollmentManager(models.Manager):
+class EnrollmentQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):
+    """QuerySet for Enrollment models"""
+
+
+class EnrollmentManager(
+    models.Manager.from_queryset(EnrollmentQuerySet), PrefetchManagerMixin
+):
+    """Base manager class for enrollments"""
+
+
+class ActiveEnrollmentManager(EnrollmentManager):
     """Query manager for active enrollment model objects"""
 
     def get_queryset(self):
@@ -1571,7 +1582,7 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
     )
 
     objects = ActiveEnrollmentManager()
-    all_objects = models.Manager()
+    all_objects = EnrollmentManager()
 
     @classmethod
     def get_audit_class(cls):
@@ -1693,6 +1704,46 @@ class CourseRunEnrollmentAudit(AuditModel):
         return "enrollment"
 
 
+class ProgramEnrollmentCertificatePrefetcher(Prefetcher):
+    """Prefetcher for ProgramEnrollment certificates"""
+
+    @staticmethod
+    def mapper(program_enrollment):
+        """Map each unrollment to (program_id, user_id)"""
+        return (program_enrollment.program_id, program_enrollment.user_id)
+
+    @staticmethod
+    def filter(program_and_user_ids):
+        id_filters = Q()
+
+        # django 5.1 supports this via
+        # django.db.models.fields.tuple_lookups.{Tuple,TupleIn}
+        for program_id, user_id in program_and_user_ids:
+            id_filters |= Q(program_id=program_id, user_id=user_id)
+
+        return ProgramCertificate.objects.filter(id_filters)
+
+    @staticmethod
+    def reverse_mapper(certificate):
+        return [(certificate.program_id, certificate.user_id)]
+
+    @staticmethod
+    def decorator(program_enrollment, certificates=()):
+        program_enrollment._certificate = certificates[0] if certificates else None  # noqa: SLF001
+
+
+class ProgramEnrollmentManager(EnrollmentManager):
+    """EnrollmentManager for ProgramEnrollment"""
+
+    prefetch_definitions = {"certificate": ProgramEnrollmentCertificatePrefetcher}
+
+
+class ActiveProgramEnrollmentManager(ActiveEnrollmentManager):
+    """ActiveEnrollmentManager for ProgramEnrollment"""
+
+    prefetch_definitions = ProgramEnrollmentManager.prefetch_definitions
+
+
 class ProgramEnrollment(EnrollmentModel):
     """
     Link between User and Program indicating a user's enrollment
@@ -1701,6 +1752,9 @@ class ProgramEnrollment(EnrollmentModel):
     program = models.ForeignKey(
         "courses.Program", on_delete=models.CASCADE, related_name="enrollments"
     )
+
+    objects = ActiveProgramEnrollmentManager()
+    all_objects = ProgramEnrollmentManager()
 
     class Meta:
         unique_together = ("user", "program")
@@ -1713,6 +1767,15 @@ class ProgramEnrollment(EnrollmentModel):
     @classmethod
     def get_audit_class(cls):
         return ProgramEnrollmentAudit
+
+    @cached_property
+    def certificate(self):
+        if hasattr(self, "_certificate"):
+            return self._certificate
+        else:
+            return ProgramCertificate.objects.filter(
+                program_id=self.program_id, user_id=self.user_id
+            ).first()
 
     def get_run_enrollments(self):
         """
