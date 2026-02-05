@@ -1275,6 +1275,27 @@ def test_filter_courses_with_contract_id_authenticated_user(
     assert course.title in titles
     assert unrelated_course.title not in titles
 
+    # Test that the contract runs are filtered according to the contract ID as well
+
+    other_contract = ContractPageFactory(organization=org, active=True)
+    unrelated_course_run = CourseRunFactory(course=course, b2b_contract=other_contract)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    test_course_runs = [
+        (
+            (
+                run["courseware_id"]
+                for run in test_course["courseruns"]
+                if test_course["id"] == course.id
+            )
+            for test_course in response.data["results"]
+        )
+    ]
+
+    assert unrelated_course_run.courseware_id not in test_course_runs
+
 
 @pytest.mark.django_db
 def test_filter_courses_with_contract_id_no_access(
