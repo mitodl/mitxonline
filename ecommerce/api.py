@@ -916,6 +916,7 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
             "redeemed_discount": discount,
             "redemption_date": now_in_utc(),
         }
+<<<<<<< HEAD
 
         if basket.discounts.count() > 0 and basket.basket_items.count() > 0:
             # Check to make sure the supplied discount can be applied. This means
@@ -983,6 +984,13 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
             redeemed_basket=basket,
             defaults=defaults,
             create_defaults=defaults,
+=======
+        BasketDiscount.objects.update_or_create(
+            redeemed_by=basket.user,
+            redeemed_basket=basket,
+            create_defaults=defaults,
+            defaults=defaults,
+>>>>>>> 2372d5b9 (WIP: start on plugin architecture)
         )
 
 
