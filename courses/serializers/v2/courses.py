@@ -277,6 +277,9 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
         if "contract_id" in self.context:
             courseruns = courseruns.filter(b2b_contract_id=self.context["contract_id"])
 
+        if "org_id" not in self.context and "contract_id" not in self.context:
+            courseruns = courseruns.filter(b2b_contract_id=None)
+
         return CourseRunSerializer(courseruns, many=True, read_only=True).data
 
     class Meta:
