@@ -333,23 +333,34 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             # according to those params, so filtering on some course run data is
             # correct (notably next_run_id).
 
-            user = self.request.user
             added_context["user_contracts"] = []
+
+            user = self.request.user
             if qp.get("org_id"):
                 added_context["org_id"] = qp.get("org_id")
                 added_context["user_contracts"] = (
-                    user.b2b_contracts.filter(organization__pk=added_context["org_id"])
-                    .values_list("id", flat=True)
-                    .all()
+                    (
+                        user.b2b_contracts.filter(
+                            organization__pk=added_context["org_id"]
+                        )
+                        .values_list("id", flat=True)
+                        .all()
+                    )
+                    if hasattr(user, "b2b_contracts")
+                    else []
                 )
             if qp.get("contract_id"):
                 added_context["contract_id"] = qp.get("contract_id")
                 # make sure we filter this - user should be in the contract we're
                 # filtering against
                 added_context["user_contracts"] = (
-                    user.b2b_contracts.filter(pk=added_context["contract_id"])
-                    .values_list("id", flat=True)
-                    .all()
+                    (
+                        user.b2b_contracts.filter(pk=added_context["contract_id"])
+                        .values_list("id", flat=True)
+                        .all()
+                    )
+                    if hasattr(user, "b2b_contracts")
+                    else []
                 )
 
         return {**super().get_serializer_context(), **added_context}
