@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.13
+Version 0.137.13 (Released February 05, 2026)
 ----------------
 
 - Add v3 for program enrollments (#3255)
