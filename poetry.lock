@@ -6009,4 +6009,12 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
+<<<<<<< HEAD
 content-hash = "53192c2b3ef9d2bf554973aace29e641f9f0ff346e47b6de50d0d93b07b060ba"
+=======
+<<<<<<< HEAD
+content-hash = "ad252199d1bdac9ad01390d4babfc6a159042a18c164514c9eea2076c8e7f38f"
+=======
+content-hash = "65af8263a106d38fdb2af8308315577d03e9f799b5d16b262078e3b57882ceb2"
+>>>>>>> 2372d5b9 (WIP: start on plugin architecture)
+>>>>>>> dc5e45f0 (WIP: start on plugin architecture)
