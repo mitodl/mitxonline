@@ -2,30 +2,30 @@
 
 from django.db import migrations
 
+
 def populate_min_max_price(apps, schema_editor):
-    CoursePage = apps.get_model('cms', 'CoursePage')
+    CoursePage = apps.get_model("cms", "CoursePage")
     for course in CoursePage.objects.filter(min_price=None):
         course.min_price = course.price if course.price is not None else 0
-        course.save(update_fields=['min_price'])
+        course.save(update_fields=["min_price"])
 
     for course in CoursePage.objects.filter(max_price=None):
         course.max_price = course.price if course.price is not None else 0
-        course.save(update_fields=['max_price'])
+        course.save(update_fields=["max_price"])
 
-    ProgramPage = apps.get_model('cms', 'ProgramPage')
+    ProgramPage = apps.get_model("cms", "ProgramPage")
     for program in ProgramPage.objects.filter(min_price=None):
         program.min_price = program.price if program.price is not None else 0
-        program.save(update_fields=['min_price'])
+        program.save(update_fields=["min_price"])
 
     for program in ProgramPage.objects.filter(max_price=None):
         program.max_price = program.price if program.price is not None else 0
-        program.save(update_fields=['max_price'])
+        program.save(update_fields=["max_price"])
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0054_alter_programpage_description'),
+        ("cms", "0054_alter_programpage_description"),
     ]
 
     operations = [
