@@ -437,19 +437,13 @@ class ProgramAdminForm(ModelForm):
         ]
 
     class Media:
-        try:
-            _css_files = [
+        css = {
+            "all": [
                 chunk["url"]
                 for chunk in webpack_loader_utils.get_files("requirementsAdmin", "css")
-            ]
-            _js_files = [
-                chunk["url"]
-                for chunk in webpack_loader_utils.get_files("requirementsAdmin", "js")
-            ]
-        except Exception:
-            # Fallback if webpack loader fails (e.g., in tests)
-            _css_files = []
-            _js_files = []
-
-        css = {"all": _css_files}
-        js = _js_files
+            ],
+        }
+        js = [
+            chunk["url"]
+            for chunk in webpack_loader_utils.get_files("requirementsAdmin", "js")
+        ]
