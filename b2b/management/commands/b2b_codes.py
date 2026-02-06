@@ -193,7 +193,9 @@ class Command(BaseCommand):
                 self.style.ERROR(f"Contract {contract} is overcommitted.")
             )
 
-    def _format_enrollment_codes(self, contract, discounts):
+    def _format_enrollment_codes(
+        self, contract, discounts, *, include_redemption_info=True
+    ):
         """Format the enrollment codes for output."""
 
         codes = []
@@ -210,17 +212,18 @@ class Command(BaseCommand):
                 "Attach Link": f"{settings.MIT_LEARN_ATTACH_URL}{discount.discount_code}/",
             }
 
-            attach_qs = discount.contract_redemptions.filter(contract=contract)
-            if attach_qs.count():
-                code["Attach Redemption"] = ",".join(
-                    [dcr.user.email for dcr in attach_qs.all()]
-                )
+            if include_redemption_info:
+                attach_qs = discount.contract_redemptions.filter(contract=contract)
+                if attach_qs.count():
+                    code["Attach Redemption"] = ",".join(
+                        [dcr.user.email for dcr in attach_qs.all()]
+                    )
 
-            enroll_qs = discount.order_redemptions
-            if enroll_qs.count():
-                code["Attach Redemption"] = ",".join(
-                    [ecr.redeemed_by.email for ecr in enroll_qs.all()]
-                )
+                enroll_qs = discount.order_redemptions
+                if enroll_qs.count():
+                    code["Enroll Redemption"] = ",".join(
+                        [ecr.redeemed_by.email for ecr in enroll_qs.all()]
+                    )
 
             codes.extend(
                 [
@@ -310,6 +313,7 @@ class Command(BaseCommand):
         #   seats, 19 occupied, you'd get back 81 codes.)
 
         codes = []
+        include_redemption_info = kwargs.pop("include_redemption_info", True)
 
         if kwargs.pop("all", False):
             for contract in contracts:
@@ -340,7 +344,13 @@ class Command(BaseCommand):
                 .all()[:remaining_discounts]
             )
 
-            codes.extend(self._format_enrollment_codes(contract, annotated_discounts))
+            codes.extend(
+                self._format_enrollment_codes(
+                    contract,
+                    annotated_discounts,
+                    include_redemption_info=include_redemption_info,
+                )
+            )
 
         self._output_code_data(
             kwargs.pop("output_format", "fancy"),
@@ -586,6 +596,13 @@ class Command(BaseCommand):
             "--all",
             action="store_true",
             help="Output all codes, rather than a usable subset.",
+        )
+        output_parser.add_argument(
+            "--no-redemptions",
+            default=True,
+            action="store_false",
+            dest="include_redemption_info",
+            help="Don't include user data for code redemptions. (Cleaner output for sending to clients. Does not apply to --all.)",
         )
 
         validate_parser.add_argument(
