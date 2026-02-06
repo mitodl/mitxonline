@@ -450,6 +450,6 @@ class ProgramAdminForm(ModelForm):
             # Fallback if webpack loader fails (e.g., in tests)
             _css_files = []
             _js_files = []
-        
+
         css = {"all": _css_files}
         js = _js_files

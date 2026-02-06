@@ -3,7 +3,6 @@
 import pytest
 
 from b2b.factories import ContractPageFactory
-from fixtures.common import user, user_drf_client  # noqa: F401
 from courses.factories import (
     CourseFactory,
     CourseRunCertificateFactory,
@@ -17,6 +16,7 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
+from fixtures.common import user, user_drf_client  # noqa: F401
 
 
 @pytest.fixture

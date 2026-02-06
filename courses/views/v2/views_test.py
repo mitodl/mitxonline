@@ -1976,11 +1976,11 @@ def test_course_list_excludes_programs(user_drf_client):
 
     assert resp.status_code == status.HTTP_200_OK
     courses_data = resp.json()["results"]
-    
+
     # Find our course in the results
     course_data = next((c for c in courses_data if c["id"] == course.id), None)
     assert course_data is not None
-    
+
     # Verify that programs field is None for listings without readable_id
     assert "programs" in course_data
     assert course_data["programs"] is None
@@ -2003,11 +2003,11 @@ def test_course_list_with_readable_id_includes_programs(user_drf_client):
 
     assert resp.status_code == status.HTTP_200_OK
     courses_data = resp.json()["results"]
-    
+
     # Find our course in the results
     course_data = next((c for c in courses_data if c["id"] == course.id), None)
     assert course_data is not None
-    
+
     # Verify that programs field is included for listings with readable_id query param
     assert "programs" in course_data
     assert course_data["programs"] is not None
