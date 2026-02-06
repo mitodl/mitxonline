@@ -11,6 +11,7 @@ import pytest
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from mitol.hubspot_api.factories import HubspotObjectFactory
+from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
 from ecommerce import factories
@@ -71,11 +72,16 @@ def hubspot_order():
         purchased_object=product.purchasable_object,
     )
 
-    HubspotObjectFactory.create(
-        content_object=order.purchaser,
-        content_type=ContentType.objects.get_for_model(User),
+    user_content_type = ContentType.objects.get_for_model(User)
+    if not HubspotObject.objects.filter(
+        content_type=user_content_type,
         object_id=order.purchaser.id,
-    )
+    ).exists():
+        HubspotObjectFactory.create(
+            content_object=order.purchaser,
+            content_type=user_content_type,
+            object_id=order.purchaser.id,
+        )
     HubspotObjectFactory.create(
         content_object=product,
         content_type=ContentType.objects.get_for_model(Product),
@@ -98,11 +104,16 @@ def hubspot_b2b_order():
         purchased_object=product.purchasable_object,
     )
 
-    HubspotObjectFactory.create(
-        content_object=order.purchaser,
-        content_type=ContentType.objects.get_for_model(User),
+    user_content_type = ContentType.objects.get_for_model(User)
+    if not HubspotObject.objects.filter(
+        content_type=user_content_type,
         object_id=order.purchaser.id,
-    )
+    ).exists():
+        HubspotObjectFactory.create(
+            content_object=order.purchaser,
+            content_type=user_content_type,
+            object_id=order.purchaser.id,
+        )
     HubspotObjectFactory.create(
         content_object=product,
         content_type=ContentType.objects.get_for_model(Product),

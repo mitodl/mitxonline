@@ -73,6 +73,69 @@ def test_make_contact_sync_message(user, mocker):
 
 
 @pytest.mark.django_db
+def test_make_contact_sync_message_minimal_user(mocker):
+    """
+    Test make_contact_sync_message serializes a user with minimal data (no legal_address or user_profile).
+
+    This simulates a user created through Keycloak/SCIM who hasn't completed registration yet.
+    The user should still have their name and email synced to Hubspot.
+    """
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    # Create user without legal_address and user_profile
+    user = UserFactory.create(
+        name="Test User",
+        email="testuser@example.com",
+        legal_address=None,
+        user_profile=None,
+        openedx_user=None,
+        openedx_api_auth=None,
+    )
+    contact_sync_message = api.make_contact_sync_message_from_user(user)
+
+    # Verify that name and email are included in the sync message
+    assert contact_sync_message.properties["name"] == "Test User"
+    assert contact_sync_message.properties["email"] == "testuser@example.com"
+
+    # When legal_address is None, country/state fields are not included
+    # This is expected behavior - Hubspot will preserve existing values
+    assert "country" not in contact_sync_message.properties
+    assert "state" not in contact_sync_message.properties
+
+    # When user_profile is None, profile fields are not included
+    assert "yearofbirth" not in contact_sync_message.properties
+    assert "gender" not in contact_sync_message.properties
+
+
+@pytest.mark.django_db
+def test_make_contact_sync_message_empty_name(mocker):
+    """
+    Test make_contact_sync_message with a user that has an empty name.
+
+    This simulates a user created through Keycloak/SCIM where name wasn't populated.
+    """
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    # Create user with empty name
+    user = UserFactory.create(
+        name="",
+        email="testuser@example.com",
+        legal_address=None,
+        user_profile=None,
+        openedx_user=None,
+        openedx_api_auth=None,
+    )
+    contact_sync_message = api.make_contact_sync_message_from_user(user)
+
+    # Name should be empty string, not omitted
+    assert "name" in contact_sync_message.properties
+    assert contact_sync_message.properties["name"] == ""
+    assert contact_sync_message.properties["email"] == "testuser@example.com"
+
+
+@pytest.mark.django_db
 def test_make_deal_sync_message(hubspot_order):
     """Test make_deal_sync_message serializes an order and returns a properly formatted sync message"""
     deal_sync_message = api.make_deal_sync_message_from_order(hubspot_order)
