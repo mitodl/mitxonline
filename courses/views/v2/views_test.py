@@ -1814,3 +1814,147 @@ def test_get_courses_with_specified_contract_programs(user, user_drf_client):
     program_ids = [program["id"] for program in response[0]["programs"]]
     assert programs[0].id in program_ids
     assert programs[1].id not in program_ids
+
+
+@pytest.mark.django_db
+def test_get_course_by_readable_id(user_drf_client):
+    """Test retrieving a course by readable_id in URL path"""
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course)
+
+    # Test retrieving by readable_id
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": course.readable_id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    course_data = resp.json()
+    assert course_data["id"] == course.id
+    assert course_data["readable_id"] == course.readable_id
+    assert course_data["title"] == course.title
+    # Single-object retrieval should include programs
+    assert "programs" in course_data
+
+
+@pytest.mark.django_db
+def test_get_course_by_pk(user_drf_client):
+    """Test retrieving a course by integer pk still works"""
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course)
+
+    # Test retrieving by pk
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": course.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    course_data = resp.json()
+    assert course_data["id"] == course.id
+    assert course_data["readable_id"] == course.readable_id
+    assert course_data["title"] == course.title
+    # Single-object retrieval should include programs
+    assert "programs" in course_data
+
+
+@pytest.mark.django_db
+def test_get_program_by_readable_id(user_drf_client):
+    """Test retrieving a program by readable_id in URL path"""
+    program = ProgramFactory.create()
+
+    # Test retrieving by readable_id
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": program.readable_id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    program_data = resp.json()
+    assert program_data["id"] == program.id
+    assert program_data["readable_id"] == program.readable_id
+    assert program_data["title"] == program.title
+
+
+@pytest.mark.django_db
+def test_get_program_by_pk(user_drf_client):
+    """Test retrieving a program by integer pk still works"""
+    program = ProgramFactory.create()
+
+    # Test retrieving by pk
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": program.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    program_data = resp.json()
+    assert program_data["id"] == program.id
+    assert program_data["readable_id"] == program.readable_id
+    assert program_data["title"] == program.title
+
+
+@pytest.mark.django_db
+def test_get_course_by_readable_id_includes_programs(user_drf_client):
+    """Test that retrieving a course by readable_id includes programs in response"""
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course)
+
+    program = ProgramFactory.create()
+    program.add_requirement(course)
+    program.refresh_from_db()
+
+    # Test retrieving by readable_id
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": course.readable_id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    course_data = resp.json()
+
+    # Verify that programs are included in the response
+    assert "programs" in course_data
+    assert course_data["programs"] is not None
+    assert len(course_data["programs"]) == 1
+    assert course_data["programs"][0]["id"] == program.id
+    assert course_data["programs"][0]["readable_id"] == program.readable_id
+    assert course_data["programs"][0]["title"] == program.title
+
+
+@pytest.mark.django_db
+def test_get_course_by_pk_includes_programs(user_drf_client):
+    """Test that retrieving a course by pk includes programs in response"""
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course)
+
+    program = ProgramFactory.create()
+    program.add_requirement(course)
+    program.refresh_from_db()
+
+    # Test retrieving by pk
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": course.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    course_data = resp.json()
+
+    # Verify that programs are included in the response for single-object retrieval
+    assert "programs" in course_data
+    assert course_data["programs"] is not None
+    assert len(course_data["programs"]) == 1
+    assert course_data["programs"][0]["id"] == program.id
+
+
+@pytest.mark.django_db
+def test_get_nonexistent_course_by_readable_id(user_drf_client):
+    """Test that requesting a nonexistent course by readable_id returns 404"""
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": "nonexistent-course-id"})
+    )
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_get_nonexistent_program_by_readable_id(user_drf_client):
+    """Test that requesting a nonexistent program by readable_id returns 404"""
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": "nonexistent-program-id"})
+    )
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
