@@ -130,3 +130,6 @@ docker-compose.*.yml
 
 
 certs/*
+
+# Local database file
+db.sqlite3
