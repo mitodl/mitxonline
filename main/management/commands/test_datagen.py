@@ -97,7 +97,7 @@ class Command(BaseCommand):
                 live=True,
                 create_run="PLACEHOLDER_Demo_Course_in_Program_Elective",
                 program="program-v1:PLACEHOLDER+PROGRAM",
-                required=True,  # Required or elective must be specified if course is in a program
+                elective=True,  # Required or elective must be specified if course is in a program
                 depts=["Science"],
                 create_depts=True,
                 create_page=True,
