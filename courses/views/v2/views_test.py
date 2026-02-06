@@ -350,8 +350,8 @@ def test_get_course_with_readable_id_includes_programs(user_drf_client):
 
 
 @pytest.mark.django_db
-def test_get_course_without_readable_id_excludes_programs(user_drf_client):
-    """Test that requesting a course without readable_id query param excludes programs from response"""
+def test_get_course_single_object_includes_programs(user_drf_client):
+    """Test that single-object retrieval now includes programs (new behavior)"""
     # Create a course and a program that includes it
     course = CourseFactory.create()
     CourseRunFactory.create(course=course)
@@ -360,7 +360,7 @@ def test_get_course_without_readable_id_excludes_programs(user_drf_client):
     program.add_requirement(course)
     program.refresh_from_db()
 
-    # Request the course without readable_id query param
+    # Request the course by pk (single-object retrieval)
     resp = user_drf_client.get(
         reverse("v2:courses_api-detail", kwargs={"pk": course.id})
     )
@@ -368,9 +368,10 @@ def test_get_course_without_readable_id_excludes_programs(user_drf_client):
     assert resp.status_code == status.HTTP_200_OK
     course_data = resp.json()
 
-    # Verify that programs field is None when readable_id is not provided
+    # Verify that programs field is now included for single-object retrieval
     assert "programs" in course_data
-    assert course_data["programs"] is None
+    assert course_data["programs"] is not None
+    assert len(course_data["programs"]) == 1
 
 
 @pytest.mark.django_db
@@ -1958,3 +1959,56 @@ def test_get_nonexistent_program_by_readable_id(user_drf_client):
         reverse("v2:programs_api-detail", kwargs={"pk": "nonexistent-program-id"})
     )
     assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_course_list_excludes_programs(user_drf_client):
+    """Test that listing courses without readable_id query param excludes programs"""
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course)
+
+    program = ProgramFactory.create()
+    program.add_requirement(course)
+    program.refresh_from_db()
+
+    # Request the course list without readable_id query param
+    resp = user_drf_client.get(reverse("v2:courses_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    courses_data = resp.json()["results"]
+    
+    # Find our course in the results
+    course_data = next((c for c in courses_data if c["id"] == course.id), None)
+    assert course_data is not None
+    
+    # Verify that programs field is None for listings without readable_id
+    assert "programs" in course_data
+    assert course_data["programs"] is None
+
+
+@pytest.mark.django_db
+def test_course_list_with_readable_id_includes_programs(user_drf_client):
+    """Test that listing courses with readable_id query param includes programs"""
+    course = CourseFactory.create()
+    CourseRunFactory.create(course=course)
+
+    program = ProgramFactory.create()
+    program.add_requirement(course)
+    program.refresh_from_db()
+
+    # Request the course list with readable_id query param
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-list"), {"readable_id": course.readable_id}
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    courses_data = resp.json()["results"]
+    
+    # Find our course in the results
+    course_data = next((c for c in courses_data if c["id"] == course.id), None)
+    assert course_data is not None
+    
+    # Verify that programs field is included for listings with readable_id query param
+    assert "programs" in course_data
+    assert course_data["programs"] is not None
+    assert len(course_data["programs"]) == 1
