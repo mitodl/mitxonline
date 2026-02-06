@@ -299,6 +299,7 @@ def test_get_course(
     course = courses[0]
     num_queries = num_queries_from_course(course, "v2")
 
+    mock_context["include_programs"] = True  # retrieve action always includes programs
     if include_finaid:
         mock_context["include_approved_financial_aid"] = True
 
