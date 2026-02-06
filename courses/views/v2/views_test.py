@@ -351,7 +351,7 @@ def test_get_course_with_readable_id_includes_programs(user_drf_client):
 
 @pytest.mark.django_db
 def test_get_course_single_object_includes_programs(user_drf_client):
-    """Test that single-object retrieval now includes programs (new behavior)"""
+    """Test that single-object retrieval includes programs"""
     # Create a course and a program that includes it
     course = CourseFactory.create()
     CourseRunFactory.create(course=course)
@@ -368,7 +368,7 @@ def test_get_course_single_object_includes_programs(user_drf_client):
     assert resp.status_code == status.HTTP_200_OK
     course_data = resp.json()
 
-    # Verify that programs field is now included for single-object retrieval
+    # Verify that programs field is included for single-object retrieval
     assert "programs" in course_data
     assert course_data["programs"] is not None
     assert len(course_data["programs"]) == 1
@@ -1839,7 +1839,7 @@ def test_get_course_by_readable_id(user_drf_client):
 
 @pytest.mark.django_db
 def test_get_course_by_pk(user_drf_client):
-    """Test retrieving a course by integer pk still works"""
+    """Test retrieving a course by integer pk"""
     course = CourseFactory.create()
     CourseRunFactory.create(course=course)
 
@@ -1876,7 +1876,7 @@ def test_get_program_by_readable_id(user_drf_client):
 
 @pytest.mark.django_db
 def test_get_program_by_pk(user_drf_client):
-    """Test retrieving a program by integer pk still works"""
+    """Test retrieving a program by integer pk"""
     program = ProgramFactory.create()
 
     # Test retrieving by pk
