@@ -105,14 +105,13 @@ class ReadableIdLookupMixin:
         """
         queryset = self.filter_queryset(self.get_queryset())
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
-        pk = self.kwargs[lookup_url_kwarg]
+        identifier = self.kwargs[lookup_url_kwarg]
 
-        # Try to get by integer pk first
-        if pk.isdigit():
-            filter_kwargs = {"pk": int(pk)}
-        else:
-            # Otherwise assume it's a readable_id
-            filter_kwargs = {"readable_id": pk}
+        filter_kwargs = (
+            {"pk": int(identifier)}
+            if identifier.isdigit()
+            else {"readable_id": identifier}
+        )
 
         obj = get_object_or_404(queryset, **filter_kwargs)
         self.check_object_permissions(self.request, obj)
