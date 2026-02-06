@@ -1,6 +1,9 @@
 """User views"""
 
+import logging
+
 import pycountry
+from django.conf import settings
 from django.db import transaction
 from mitol.common.utils import now_in_utc
 from oauth2_provider.contrib.rest_framework import IsAuthenticatedOrTokenHasScope
@@ -12,6 +15,7 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from hubspot_sync.task_helpers import sync_hubspot_user
+from main import features
 from main.permissions import UserIsOwnerPermission
 from main.views import RefinePagination
 from openedx import tasks
@@ -24,6 +28,8 @@ from users.serializers import (
     StaffDashboardUserSerializer,
     UserSerializer,
 )
+
+log = logging.getLogger(__name__)
 
 
 class UserRetrieveViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -53,9 +59,32 @@ class CurrentUserRetrieveUpdateViewSet(
         with transaction.atomic():
             user_name = request.user.name
             update_result = super().update(request, *args, **kwargs)
+
+            ignore_edx_failures = settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            )
+
             if user_name != request.data.get("name"):
-                tasks.change_edx_user_name_async.delay(request.user.id)
-            tasks.update_edx_user_profile.delay(request.user.id)
+                try:
+                    tasks.change_edx_user_name_async.delay(request.user.id)
+                except Exception:  # pylint: disable=broad-except
+                    log.exception(
+                        "Failed to queue edX user name change task for user: %s",
+                        request.user.id,
+                    )
+                    if not ignore_edx_failures:
+                        raise
+
+            try:
+                tasks.update_edx_user_profile.delay(request.user.id)
+            except Exception:  # pylint: disable=broad-except
+                log.exception(
+                    "Failed to queue edX user profile update task for user: %s",
+                    request.user.id,
+                )
+                if not ignore_edx_failures:
+                    raise
+
             sync_hubspot_user(request.user)
             return update_result
 

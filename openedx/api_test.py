@@ -100,6 +100,76 @@ def test_create_user(user, mocker):
     mock_create_edx_auth_token.assert_called_with(user)
 
 
+@pytest.mark.parametrize(
+    ("flag_enabled", "create_edx_user_raises", "create_auth_token_raises"),
+    [
+        (True, True, False),  # Flag enabled, create_edx_user fails -> no error
+        (True, False, True),  # Flag enabled, create_auth_token fails -> no error
+        (True, True, True),  # Flag enabled, both fail -> no error
+        (False, False, False),  # Flag disabled, nothing fails -> no error
+        (True, False, False),  # Flag enabled, nothing fails -> no error
+    ],
+)
+def test_create_user_ignore_edx_failures_flag(  # noqa: PLR0913
+    user,
+    mocker,
+    settings,
+    flag_enabled,
+    create_edx_user_raises,
+    create_auth_token_raises,
+):
+    """
+    Test that create_user respects the IGNORE_EDX_FAILURES feature flag
+    when edX API calls fail.
+    """
+    from main import features  # noqa: PLC0415
+
+    # Mock the FEATURES dict for IGNORE_EDX_FAILURES
+    mocker.patch.dict(
+        settings.FEATURES,
+        {features.IGNORE_EDX_FAILURES: flag_enabled},
+    )
+
+    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
+    mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
+    mocker.patch("openedx.api.log.exception")
+
+    if create_edx_user_raises:
+        mock_create_edx_user.side_effect = Exception("edX user creation failed")
+
+    if create_auth_token_raises:
+        mock_create_edx_auth_token.side_effect = Exception("Auth token creation failed")
+
+    # When flag is enabled, should not raise even if APIs fail
+    create_user(user)
+
+    mock_create_edx_user.assert_called_with(user, None)
+    # create_edx_auth_token should only be called if create_edx_user didn't raise
+    # or if we caught the exception
+    if not create_edx_user_raises or flag_enabled:
+        mock_create_edx_auth_token.assert_called_with(user)
+
+
+def test_create_user_ignore_edx_failures_flag_disabled_raises(user, mocker, settings):
+    """
+    Test that create_user raises exception when IGNORE_EDX_FAILURES is disabled
+    and edX API calls fail.
+    """
+    from main import features  # noqa: PLC0415
+
+    # Mock the FEATURES dict with IGNORE_EDX_FAILURES disabled
+    mocker.patch.dict(
+        settings.FEATURES,
+        {features.IGNORE_EDX_FAILURES: False},
+    )
+
+    mock_create_edx_user = mocker.patch("openedx.api.create_edx_user")
+    mock_create_edx_user.side_effect = Exception("edX user creation failed")
+
+    with pytest.raises(Exception, match="edX user creation failed"):
+        create_user(user)
+
+
 def edx_username_validation_response_mock(username_exists, settings):
     """
     Adds a mocked response from the EdX username validation API.

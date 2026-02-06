@@ -137,7 +137,7 @@ def create_run_enrollments(  # noqa: C901
     runs,
     *,
     change_status=None,
-    keep_failed_enrollments=False,
+    keep_failed_enrollments=None,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
 ):
     """
@@ -156,6 +156,7 @@ def create_run_enrollments(  # noqa: C901
         change_status (str): The status of the enrollment
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
+            If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
         mode (str): The course mode
 
     Returns:
@@ -163,6 +164,11 @@ def create_run_enrollments(  # noqa: C901
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
+    if keep_failed_enrollments is None:
+        keep_failed_enrollments = settings.FEATURES.get(
+            features.IGNORE_EDX_FAILURES, False
+        )
+
     successful_enrollments = []
 
     def send_enrollment_emails():
@@ -328,7 +334,7 @@ def downgrade_learner(enrollment):
 def deactivate_run_enrollment(
     run_enrollment,
     change_status,
-    keep_failed_enrollments=False,  # noqa: FBT002
+    keep_failed_enrollments=None,
 ):
     """
     Helper method to deactivate a CourseRunEnrollment
@@ -338,12 +344,18 @@ def deactivate_run_enrollment(
         change_status (str): The change status to set on the enrollment when deactivating
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
+            If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
 
     Returns:
         CourseRunEnrollment: The deactivated enrollment
     """
     from ecommerce.models import Line  # noqa: PLC0415
     from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id  # noqa: PLC0415
+
+    if keep_failed_enrollments is None:
+        keep_failed_enrollments = settings.FEATURES.get(
+            features.IGNORE_EDX_FAILURES, False
+        )
 
     try:
         unenroll_edx_course_run(run_enrollment)
