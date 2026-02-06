@@ -4,30 +4,41 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0055_populate_min_max_price'),
+        ("cms", "0055_populate_min_max_price"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='coursepage',
-            name='max_price',
-            field=models.SmallIntegerField(default=0, help_text='Specify the maximum product price. This is used by MIT Learn.'),
+            model_name="coursepage",
+            name="max_price",
+            field=models.SmallIntegerField(
+                default=0,
+                help_text="Specify the maximum product price. This is used by MIT Learn.",
+            ),
         ),
         migrations.AlterField(
-            model_name='coursepage',
-            name='min_price',
-            field=models.SmallIntegerField(default=0, help_text='Specify the minimum product price. This is used by MIT Learn.'),
+            model_name="coursepage",
+            name="min_price",
+            field=models.SmallIntegerField(
+                default=0,
+                help_text="Specify the minimum product price. This is used by MIT Learn.",
+            ),
         ),
         migrations.AlterField(
-            model_name='programpage',
-            name='max_price',
-            field=models.SmallIntegerField(default=0, help_text='Specify the maximum product price. This is used by MIT Learn.'),
+            model_name="programpage",
+            name="max_price",
+            field=models.SmallIntegerField(
+                default=0,
+                help_text="Specify the maximum product price. This is used by MIT Learn.",
+            ),
         ),
         migrations.AlterField(
-            model_name='programpage',
-            name='min_price',
-            field=models.SmallIntegerField(default=0, help_text='Specify the minimum product price. This is used by MIT Learn.'),
+            model_name="programpage",
+            name="min_price",
+            field=models.SmallIntegerField(
+                default=0,
+                help_text="Specify the minimum product price. This is used by MIT Learn.",
+            ),
         ),
     ]
