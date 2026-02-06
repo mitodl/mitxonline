@@ -73,7 +73,7 @@
                     {% endif %}
                     <span class="award-text">
                         {% if page.CEUs %} Awarded {{ CEUs }} Continuing Education Units (CEUs) <br> {% endif %}
-                        Issued: {{ end_date|date }}
+                        Issued: {{ issue_date |date }}
                     </span>
                     <div class="row justify-content-center certify-by-row">
                         {% for signatory in page.signatory_pages %}
