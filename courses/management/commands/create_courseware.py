@@ -48,7 +48,10 @@ class Command(BaseCommand):
                 courseware_object
             )
             courseware_page = create_default_courseware_page(
-                courseware_object, live=True, optional_kwargs=placeholder_values
+                courseware_object,
+                live=True,
+                optional_kwargs=placeholder_values,
+                include_in_learn_catalog=True,
             )
             courseware_page.save_revision().publish()
             self.stdout.write(
@@ -448,13 +451,6 @@ class Command(BaseCommand):
             type=str,
             help="(Course and course run only) Create a run with the specified tag.",
             metavar="create_run",
-        )
-
-        parser.add_argument(
-            "--run-url",
-            type=str,
-            nargs="?",
-            help="(Course and course run only) Create a run with the specified URL path.",
         )
 
         parser.add_argument(
