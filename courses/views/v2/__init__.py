@@ -93,6 +93,32 @@ class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
     pass
 
 
+class ReadableIdLookupMixin:
+    """
+    Mixin to support lookup by either integer pk or readable_id string.
+    """
+
+    def get_object(self):
+        """
+        Returns the object the view is displaying.
+        Supports lookup by either integer pk or readable_id string.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        pk = self.kwargs[lookup_url_kwarg]
+
+        # Try to get by integer pk first
+        if pk.isdigit():
+            filter_kwargs = {"pk": int(pk)}
+        else:
+            # Otherwise assume it's a readable_id
+            filter_kwargs = {"readable_id": pk}
+
+        obj = get_object_or_404(queryset, **filter_kwargs)
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+
 class ProgramFilterSet(django_filters.FilterSet):
     id = NumberInFilter(field_name="id", lookup_expr="in", label="Program ID")
     org_id = django_filters.NumberFilter(method="filter_by_org_id")
@@ -138,7 +164,7 @@ class ProgramFilterSet(django_filters.FilterSet):
         return queryset.filter(b2b_only=False)
 
 
-class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
+class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     """API viewset for Programs"""
 
     permission_classes = [IsAuthenticatedOrReadOnly]
@@ -146,6 +172,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProgramFilterSet
+    lookup_value_regex = "[^/]+"  # Accept any non-slash character
 
     def get_queryset(self):
         return (
@@ -300,7 +327,7 @@ class CourseFilterSet(django_filters.FilterSet):
         return queryset
 
 
-class CourseViewSet(viewsets.ReadOnlyModelViewSet):
+class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     """API view set for Courses"""
 
     pagination_class = Pagination
@@ -308,6 +335,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend]
     serializer_class = CourseWithCourseRunsSerializer
     filterset_class = CourseFilterSet
+    lookup_value_regex = "[^/]+"  # Accept any non-slash character
 
     def get_queryset(self):
         """Get the queryset for the viewset."""
@@ -324,7 +352,8 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     def get_serializer_context(self):
         added_context = {}
         qp = self.request.query_params
-        if qp.get("readable_id"):
+        # Include programs for single-object retrieval or when readable_id query param is present
+        if self.action == "retrieve" or qp.get("readable_id"):
             added_context["include_programs"] = True
         if qp.get("include_approved_financial_aid"):
             added_context["include_approved_financial_aid"] = True

@@ -16,6 +16,7 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
+from fixtures.common import user, user_drf_client  # noqa: F401
 
 
 @pytest.fixture
