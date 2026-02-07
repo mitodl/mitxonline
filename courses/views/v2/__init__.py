@@ -216,6 +216,14 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         operation_id="programs_retrieve_v2",
         description="API view set for Programs - v2",
+        parameters=[
+            OpenApiParameter(
+                "id",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value (pk) or readable_id string identifying this program.",
+            ),
+        ],
     )
     def retrieve(self, request, *args, **kwargs):
         """Retrieve a specific program."""
@@ -396,6 +404,14 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         operation_id="api_v2_courses_retrieve",
         description="Retrieve a specific course - API v2",
+        parameters=[
+            OpenApiParameter(
+                "id",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value (pk) or readable_id string identifying this course.",
+            ),
+        ],
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)

@@ -2559,7 +2559,8 @@ paths:
         name: id
         schema:
           type: string
-        description: A unique integer value (pk) or readable_id string identifying this course.
+        description: A unique integer value (pk) or readable_id string identifying
+          this course.
         required: true
       tags:
       - courses
@@ -2984,7 +2985,8 @@ paths:
         name: id
         schema:
           type: string
-        description: A unique integer value (pk) or readable_id string identifying this program.
+        description: A unique integer value (pk) or readable_id string identifying
+          this program.
         required: true
       tags:
       - programs
