@@ -299,6 +299,7 @@ def test_get_course(
     course = courses[0]
     num_queries = num_queries_from_course(course, "v2")
 
+    mock_context["include_programs"] = True  # retrieve action always includes programs
     if include_finaid:
         mock_context["include_approved_financial_aid"] = True
 
@@ -321,8 +322,13 @@ def test_get_course(
 
 
 @pytest.mark.django_db
-def test_get_course_with_readable_id_includes_programs(user_drf_client):
-    """Test that requesting a course with readable_id query param includes programs in response"""
+def test_retrievinng_single_course_by_pk_or_readable_id_includes_programs(
+    user_drf_client,
+):
+    """
+    Test that course can be requested by PK or readable_id, and either way, it
+    includes program info
+    """
     # Create a course and a program that includes it
     course = CourseFactory.create()
     CourseRunFactory.create(course=course)
@@ -334,7 +340,6 @@ def test_get_course_with_readable_id_includes_programs(user_drf_client):
     # Request the course with readable_id query param
     resp = user_drf_client.get(
         reverse("v2:courses_api-detail", kwargs={"pk": course.id}),
-        {"readable_id": course.readable_id},
     )
 
     assert resp.status_code == status.HTTP_200_OK
@@ -348,29 +353,16 @@ def test_get_course_with_readable_id_includes_programs(user_drf_client):
     assert course_data["programs"][0]["readable_id"] == program.readable_id
     assert course_data["programs"][0]["title"] == program.title
 
-
-@pytest.mark.django_db
-def test_get_course_without_readable_id_excludes_programs(user_drf_client):
-    """Test that requesting a course without readable_id query param excludes programs from response"""
-    # Create a course and a program that includes it
-    course = CourseFactory.create()
-    CourseRunFactory.create(course=course)
-
-    program = ProgramFactory.create()
-    program.add_requirement(course)
-    program.refresh_from_db()
-
-    # Request the course without readable_id query param
-    resp = user_drf_client.get(
-        reverse("v2:courses_api-detail", kwargs={"pk": course.id})
+    ## Check result is same if retrieving by readable_id:
+    resp1 = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": course.readable_id}),
+    )
+    resp2 = user_drf_client.get(
+        reverse("v2:courses_api-list"), {"readable_id": course.readable_id}
     )
 
-    assert resp.status_code == status.HTTP_200_OK
-    course_data = resp.json()
-
-    # Verify that programs field is None when readable_id is not provided
-    assert "programs" in course_data
-    assert course_data["programs"] is None
+    assert resp1.json() == resp.json()
+    assert resp2.json()["results"][0] == resp.json()
 
 
 @pytest.mark.django_db
@@ -1814,3 +1806,43 @@ def test_get_courses_with_specified_contract_programs(user, user_drf_client):
     program_ids = [program["id"] for program in response[0]["programs"]]
     assert programs[0].id in program_ids
     assert programs[1].id not in program_ids
+
+
+@pytest.mark.django_db
+def test_get_program_by_readable_id_or_pk(user_drf_client):
+    """Test retrieving a program by readable_id in URL path"""
+    program = ProgramFactory.create()
+
+    # Test retrieving by readable_id
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": program.readable_id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    program_data = resp.json()
+    assert program_data["id"] == program.id
+    assert program_data["readable_id"] == program.readable_id
+    assert program_data["title"] == program.title
+
+    resp1 = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": program.id})
+    )
+    assert resp1.json() == resp.json()
+
+
+@pytest.mark.django_db
+def test_get_nonexistent_course_by_readable_id(user_drf_client):
+    """Test that requesting a nonexistent course by readable_id returns 404"""
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": "nonexistent-course-id"})
+    )
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_get_nonexistent_program_by_readable_id(user_drf_client):
+    """Test that requesting a nonexistent program by readable_id returns 404"""
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": "nonexistent-program-id"})
+    )
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
