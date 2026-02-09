@@ -1,6 +1,30 @@
 Release Notes
 =============
 
+Version 0.137.13 (Released February 05, 2026)
+----------------
+
+- Add v3 for program enrollments (#3255)
+- Fixes next_run_id when org/contract filters are specified (#3272)
+- Revert "Update dependency webpack-dev-server to v5 [SECURITY] (#3000)" (#3267)
+- Update dependency wagtail to v7.2.2 [SECURITY] (#3264)
+- Update dependency django-debug-toolbar to v6 (#3203)
+- Update dependency validator to v13.15.26 (#3162)
+- Update dependency react-oidc-context to v2.4.0 (#3082)
+- Fix issue with OpenAPI spec (#3266)
+- Update dependency @sentry/browser to v10.38.0 (#3061)
+- Update dependency webpack-dev-server to v5 [SECURITY] (#3000)
+
+Version 0.137.11 (Released February 04, 2026)
+----------------
+
+- When requesting courses for a contract, filter runs by contract ID (#3263)
+- Add check to b2b enroll API to ensure the course is enrollable before continuing (#3261)
+- Tools for operators (#3258)
+- Add validate/expire functionality to b2b_codes, add discount code info command (#3256)
+- 1824 courseware url should be a computed property (#3254)
+- Remove deprecated pytz (#3252)
+
 Version 0.137.10 (Released January 29, 2026)
 ----------------
 

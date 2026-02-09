@@ -1131,14 +1131,14 @@ test = ["djangorestframework", "graphene-django", "pytest", "pytest-cov", "pytes
 
 [[package]]
 name = "django-debug-toolbar"
-version = "4.4.6"
+version = "6.2.0"
 description = "A configurable set of panels that display various debug information about the current request/response."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "django_debug_toolbar-4.4.6-py3-none-any.whl", hash = "sha256:3beb671c9ec44ffb817fad2780667f172bd1c067dbcabad6268ce39a81335f45"},
-    {file = "django_debug_toolbar-4.4.6.tar.gz", hash = "sha256:36e421cb908c2f0675e07f9f41e3d1d8618dc386392ec82d23bcfcd5d29c7044"},
+    {file = "django_debug_toolbar-6.2.0-py3-none-any.whl", hash = "sha256:1575461954e6befa720e999dec13fe4f1cc8baf40b6c3ac2aec5f340c0f9c85f"},
+    {file = "django_debug_toolbar-6.2.0.tar.gz", hash = "sha256:dc1c174d8fb0ea01435e02d9ceef735cf62daf37c1a6a5692d33b4127327679b"},
 ]
 
 [package.dependencies]
@@ -1289,6 +1289,21 @@ Django = "*"
 
 [package.extras]
 testing = ["django-modelcluster"]
+
+[[package]]
+name = "django-prefetch"
+version = "1.2.3"
+description = "Simple and generic model related data prefetch framework for Django solving the \"1+N queries\" problem that happens when you need related data for your objects."
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
+groups = ["main"]
+files = [
+    {file = "django-prefetch-1.2.3.tar.gz", hash = "sha256:a232a63fa6c244fd14a1f1649052e3201476858dffa3f37875e13c032a09cdf4"},
+    {file = "django_prefetch-1.2.3-py2.py3-none-any.whl", hash = "sha256:6059c24ddbb896a0413caea5d9e5f08154882f5049c077cb936c9b817022b6ef"},
+]
+
+[package.dependencies]
+Django = ">=1.9"
 
 [[package]]
 name = "django-redis"
@@ -5623,14 +5638,14 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 
 [[package]]
 name = "wagtail"
-version = "7.2.1"
+version = "7.2.2"
 description = "A Django content management system."
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "wagtail-7.2.1-py3-none-any.whl", hash = "sha256:b29f9fc226fadf744cf6fd5a24ee1c2b7a00ade5f801c72069af8b453d6a1241"},
-    {file = "wagtail-7.2.1.tar.gz", hash = "sha256:388bb42c4818c081a4ddf36e6f4529bfbc54ed262a91b65b0e5f951476f2cf74"},
+    {file = "wagtail-7.2.2-py3-none-any.whl", hash = "sha256:2e62316717bd19c57de5e6cb7f800c8acdb51862b3067b9e788c0837bda9c9f0"},
+    {file = "wagtail-7.2.2.tar.gz", hash = "sha256:bf6adaa3acd90d9ee7734756dd7031b0901eedb80a4aa4e5188ab1e481ce30be"},
 ]
 
 [package.dependencies]
@@ -6019,4 +6034,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "f166c94efb1977ee3513795af224406f06ebf14df2c6efd4bcedcf85bbd09575"
+content-hash = "1f2f551ac4a942b932c1e1b019ed76fbaa748e60cd24318572b9594f0267f752"
