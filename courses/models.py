@@ -1651,7 +1651,7 @@ class CourseRunEnrollmentGradesPrefetcher(Prefetcher):
 
     @staticmethod
     def mapper(course_run_enrollment):
-        """Map each unrollment to (program_id, user_id)"""
+        """Map each enrollment to (run_id, user_id)"""
         return (course_run_enrollment.run_id, course_run_enrollment.user_id)
 
     @staticmethod
@@ -1718,17 +1718,8 @@ class CourseRunEnrollment(EnrollmentModel):
     def get_audit_class(cls):
         return CourseRunEnrollmentAudit
 
-    @property
-    def highest_grade(self):
-        """Returns the highest grade achieved for the course run."""
-        return (
-            self.grades.filter(course_run=self, user=self.user)
-            .order_by("-grade")
-            .first()
-        )
-
     @cached_property
-    def certificate(self):
+    def certificate(self) -> CourseRunCertificate | None:
         if hasattr(self, "_certificate"):
             return self._certificate
         else:
@@ -1737,12 +1728,14 @@ class CourseRunEnrollment(EnrollmentModel):
             ).first()
 
     @cached_property
-    def grades(self):
+    def grades(self) -> list["CourseRunGrade"]:
         if hasattr(self, "_grades"):
             return self._grades
         else:
-            return CourseRunGrade.objects.filter(
-                course_run_id=self.run_id, user_id=self.user_id
+            return list(
+                CourseRunGrade.objects.filter(
+                    course_run_id=self.run_id, user_id=self.user_id
+                )
             )
 
     @classmethod
