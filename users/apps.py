@@ -8,4 +8,4 @@ class UsersConfig(AppConfig):
 
     def ready(self):
         """Import signals when the app is ready"""
-        import users.signals  # noqa: F401
+        import users.signals  # noqa: F401, PLC0415
