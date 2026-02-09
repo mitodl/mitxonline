@@ -1623,7 +1623,7 @@ class CourseRunEnrollmentCertificatePrefetcher(Prefetcher):
 
     @staticmethod
     def mapper(course_run_enrollment):
-        """Map each unrollment to (program_id, user_id)"""
+        """Map each enrollment to (run_id, user_id)"""
         return (course_run_enrollment.run_id, course_run_enrollment.user_id)
 
     @staticmethod
