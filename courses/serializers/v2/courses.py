@@ -103,8 +103,8 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_next_run_id(self, instance) -> int | None:
         """Get next run id"""
-        if self.context.get("org_id"):
-            run = instance.get_first_unexpired_org_run(
+        if self.context.get("org_id") or self.context.get("contract_id"):
+            run = instance.get_first_unexpired_b2b_run(
                 self.context.get("user_contracts")
             )
         else:
@@ -113,8 +113,35 @@ class CourseSerializer(BaseCourseSerializer):
 
     @extend_schema_field(BaseProgramSerializer(many=True, allow_null=True))
     def get_programs(self, instance):
+        """
+        Include appropriate programs.
+
+        If the org or contract ID is set, include only programs that match. If
+        neither is specified, filter programs that have "b2b_only" set.
+        """
         if self.context.get("include_programs", False):
-            return BaseProgramSerializer(instance.programs, many=True).data
+            programs_qs = instance.in_programs
+
+            if self.context.get("org_id"):
+                programs_qs = programs_qs.filter(
+                    program__contract_memberships__contract__organization__pk=self.context.get(
+                        "org_id"
+                    )
+                )
+            elif self.context.get("contract_id"):
+                programs_qs = programs_qs.filter(
+                    program__contract_memberships__contract__pk=self.context.get(
+                        "contract_id"
+                    )
+                )
+            else:
+                programs_qs = programs_qs.filter(program__b2b_only=False)
+
+            programs = [
+                req.program for req in programs_qs.prefetch_related("program").all()
+            ]
+
+            return BaseProgramSerializer(programs, many=True).data
 
         return None
 
@@ -247,6 +274,11 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
             courseruns = courseruns.filter(
                 b2b_contract__organization_id=self.context["org_id"]
             )
+        if "contract_id" in self.context:
+            courseruns = courseruns.filter(b2b_contract_id=self.context["contract_id"])
+
+        if "org_id" not in self.context and "contract_id" not in self.context:
+            courseruns = courseruns.filter(b2b_contract_id=None)
 
         return CourseRunSerializer(courseruns, many=True, read_only=True).data
 

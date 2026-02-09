@@ -26,6 +26,7 @@ from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.models import ContractProgramItem
 from cms.factories import CoursePageFactory, ProgramPageFactory
 from cms.serializers import ProgramPageSerializer
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
@@ -885,6 +886,7 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
 
     contract = ContractPageFactory.create(organization=orgs[0])
     second_contract = ContractPageFactory.create(organization=orgs[1])
+    third_contract_first_org = ContractPageFactory.create(organization=orgs[0])
     test_user = UserFactory()
     test_user.b2b_organizations.add(contract.organization)
     test_user.b2b_contracts.add(contract)
@@ -950,6 +952,60 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     b2b_run.save()
 
     resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert not resp_course["next_run_id"]
+
+    # put the first run's date back
+    b2b_run.start_date = one_month_prior - timedelta(days=1)
+    b2b_run.enrollment_start = one_month_prior - timedelta(days=1)
+    b2b_run.save()
+
+    # create a run for the other org, same course, and starting before b2b_run
+    second_eligible_b2b_run = CourseRunFactory.create(
+        b2b_contract=third_contract_first_org,
+        start_date=one_month_prior - timedelta(days=5),
+        enrollment_start=one_month_prior - timedelta(days=5),
+        course=b2b_run.course,
+    )
+
+    # we're not in this contract so we should get the b2b_run id next
+    resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert resp_course["next_run_id"] == b2b_run.id
+
+    # add to the other contract
+    test_user.b2b_contracts.add(third_contract_first_org)
+    test_user.save()
+
+    # we should now get the second eligible run - our user is in both contracts
+    resp = auth_api_client.get(f"{url}?org_id={contract.organization.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert resp_course["next_run_id"] == second_eligible_b2b_run.id
+
+    # same test as above, but filter on contract ID
+
+    url = reverse(
+        "v2:courses_api-detail",
+        kwargs={"pk": b2b_course.id},
+    )
+
+    resp = auth_api_client.get(f"{url}?contract_id={contract.id}")
+
+    assert resp.status_code < 300
+    resp_course = resp.json()
+    assert resp_course["next_run_id"] == b2b_run.id
+
+    # kick the B2B run into the future and now we should get nothing again
+    b2b_run.enrollment_start = one_month_ahead
+    b2b_run.save()
+
+    resp = auth_api_client.get(f"{url}?contract_id={contract.id}")
 
     assert resp.status_code < 300
     resp_course = resp.json()
@@ -1274,6 +1330,27 @@ def test_filter_courses_with_contract_id_authenticated_user(
     titles = [result["title"] for result in response.data["results"]]
     assert course.title in titles
     assert unrelated_course.title not in titles
+
+    # Test that the contract runs are filtered according to the contract ID as well
+
+    other_contract = ContractPageFactory(organization=org, active=True)
+    unrelated_course_run = CourseRunFactory(course=course, b2b_contract=other_contract)
+
+    url = reverse("v2:courses_api-list")
+    response = client.get(url, {"contract_id": contract.id})
+
+    test_course_runs = [
+        (
+            (
+                run["courseware_id"]
+                for run in test_course["courseruns"]
+                if test_course["id"] == course.id
+            )
+            for test_course in response.data["results"]
+        )
+    ]
+
+    assert unrelated_course_run.courseware_id not in test_course_runs
 
 
 @pytest.mark.django_db
@@ -1656,4 +1733,140 @@ def test_user_enrollments_list_sync_with_flag(  # noqa: PLR0913
     if sync_on_load:
         sync_mock.assert_called_once_with(user)
     else:
-        sync_mock.assert_not_called()
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    "with_b2b",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "single",
+    [
+        True,
+        False,
+    ],
+)
+def test_get_courses_b2b_runs(with_b2b, single, user_drf_client):
+    """
+    Test that the courses API returns courses with or without b2b runs.
+
+    By default courses should only have runs that aren't B2B runs. There are
+    other tests that test the result if you've specified an org/etc. so this
+    doesn't test that.
+    """
+
+    contract = ContractPageFactory.create() if with_b2b else None
+
+    test_course_run = CourseRunFactory.create(b2b_contract=contract)
+
+    url = reverse("v2:courses_api-list")
+    response_raw = user_drf_client.get(
+        url,
+        query_params=(
+            {"readable_id": test_course_run.course.readable_id} if single else {}
+        ),
+    )
+    assert response_raw.status_code < 300
+    response = response_raw.json()["results"]
+
+    assert len(response) == 1
+    returned_course = response[0]
+
+    assert returned_course["readable_id"] == test_course_run.course.readable_id
+
+    if with_b2b:
+        assert len(returned_course["courseruns"]) == 0
+    else:
+        assert len(returned_course["courseruns"]) == 1
+        assert (
+            returned_course["courseruns"][0]["courseware_id"]
+            == test_course_run.courseware_id
+        )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    "with_b2b",
+    [
+        True,
+        False,
+    ],
+)
+def test_get_courses_b2b_programs(with_b2b, user_drf_client):
+    """
+    Test that the courses API returns courses with or without b2b programs.
+
+    By default courses should only list programs that aren't marked as b2b_only.
+    Again, other tests handle filtering of that list so not testing that here.
+    """
+
+    program = ProgramFactory.create(b2b_only=with_b2b)
+
+    test_course_run = CourseRunFactory.create()
+    program.add_requirement(test_course_run.course)
+
+    url = reverse("v2:courses_api-list")
+    response_raw = user_drf_client.get(
+        url,
+        query_params={"readable_id": test_course_run.course.readable_id},
+    )
+    assert response_raw.status_code < 300
+    response = response_raw.json()["results"]
+
+    assert len(response) == 1
+    returned_course = response[0]
+
+    assert returned_course["readable_id"] == test_course_run.course.readable_id
+
+    if with_b2b:
+        assert len(returned_course["programs"]) == 0
+    else:
+        assert len(returned_course["programs"]) == 1
+        assert returned_course["programs"][0]["readable_id"] == program.readable_id
+
+
+def test_get_courses_with_specified_contract_programs(user, user_drf_client):
+    """
+    Test that specifying a contract when retrieving a course returns only
+    applicable B2B programs.
+
+    This is different than testing for the b2b flag alone - if we have a
+    contract ID specified, then the programs in the list should only be ones
+    attached to that contract.
+    """
+
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
+    other_contract = ContractPageFactory.create()
+
+    programs = ProgramFactory.create_batch(2)
+    course_run = CourseRunFactory.create(b2b_contract=contract)
+    CourseRunFactory.create(b2b_contract=other_contract, course=course_run.course)
+
+    for program in programs:
+        program.add_requirement(course_run.course)
+        program.save()
+
+    ContractProgramItem.objects.create(contract=contract, program=programs[0])
+
+    url = reverse("v2:courses_api-list")
+    response_raw = user_drf_client.get(
+        url,
+        query_params={
+            "readable_id": course_run.course.readable_id,
+            "contract_id": contract.id,
+        },
+    )
+    assert response_raw.status_code < 300
+    response = response_raw.json()["results"]
+
+    assert len(response[0]["programs"]) > 0
+
+    program_ids = [program["id"] for program in response[0]["programs"]]
+    assert programs[0].id in program_ids
+    assert programs[1].id not in program_ids

@@ -72,6 +72,7 @@ def create_courses_from_data_list(course_data_list):
                 min_weekly_hours=course_data["min_weekly_hours"],
                 max_weekly_hours=course_data["max_weekly_hours"],
                 length=course_data["length"],
+                include_in_learn_catalog=True,
             )
             course_cms_page.custom_tabs = ["content", "instructors", "faq"]
             course_index = CourseIndexPage.objects.first()

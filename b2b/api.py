@@ -862,6 +862,12 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
     if not purchasable_object or not purchasable_object.b2b_contract:
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT}
 
+    if (
+        isinstance(purchasable_object, CourseRun)
+        and not purchasable_object.is_enrollable
+    ):
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+
     if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
 
