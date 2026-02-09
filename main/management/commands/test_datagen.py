@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001 TD002 FIX002 TD003
+# ruff: noqa: ERA001
 """
 Meta-command to help set up a freshly configured MITxOnline instance.
 
@@ -127,14 +127,20 @@ class Command(BaseCommand):
                 readable_ids="course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+REQUIRED,course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+ELECTIVE,course-v1:PLACEHOLDER+COURSE,program-v1:PLACEHOLDER+PROGRAM",
             )
 
-            # Step 7: create the products
-            # TODO: Unclear if I need this... comment out for now.
-            # self.stdout.write(
-            #     self.style.SUCCESS("Creating the devstack course products...")
-            # )
-            #
-            # call_command("create_product", "course-v1:edX+E2E-101+course", 999)
-            # call_command("create_product", "course-v1:edX+DemoX+Demo_Course", 999)
+            # create_product only works for Courses. We need to see if products for programs are useful.
+            # Having this allows us to select a certificate course and get to the checkout page.
+            call_command(
+                "create_product",
+                "course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+REQUIRED+PLACEHOLDER_Demo_Course_in_Program_Required",
+                999,
+            )
+            call_command(
+                "create_product",
+                "course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+ELECTIVE+PLACEHOLDER_Demo_Course_in_Program_Elective",
+                999,
+            )
+            # I don't understand the revision system here.
+            # It seems like we create revisions in create_product, but configure instance called the scripts after those commands.
             # call_command(
             #     "createinitialrevisions", "ecommerce.Product", comment="Initial revision."
             # )
