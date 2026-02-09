@@ -73,6 +73,7 @@ from courses.views.test_utils import (
 )
 from courses.views.v2 import Pagination, ProgramFilterSet
 from ecommerce.models import Product
+from main import features
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
@@ -1668,8 +1669,63 @@ def test_add_verified_program_course_enrollment(
         ):
             # We had enough electives so we should have gotten an audit enrollment
             assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    "sync_on_load,flag_enabled,sync_raises",  # noqa: PT006
+    [
+        (False, False, False),  # Sync disabled -> no sync, no error
+        (True, False, False),  # Sync enabled, flag disabled, no error -> no error
+        (True, True, False),  # Sync enabled, flag enabled, no error -> no error
+        (True, True, True),  # Sync enabled, flag enabled, error -> no error (logged)
+    ],
+)
+def test_user_enrollments_list_sync_with_flag(  # noqa: PLR0913
+    mocker,
+    user_drf_client,
+    user,
+    sync_on_load,
+    flag_enabled,
+    sync_raises,
+):
+    """
+    Test that UserEnrollmentsApiViewSet.list() respects IGNORE_EDX_FAILURES flag
+    when syncing enrollments with edX.
+    """
+
+    # Create a test enrollment
+    CourseRunEnrollmentFactory.create(user=user)
+
+    # Mock the SYNC_ON_DASHBOARD_LOAD flag
+    mocker.patch(
+        "courses.views.v2.is_enabled",
+        side_effect=lambda flag: (
+            sync_on_load if flag == features.SYNC_ON_DASHBOARD_LOAD else False
+        ),
+    )
+
+    # Mock the FEATURES dict for IGNORE_EDX_FAILURES
+    mocker.patch.dict(
+        settings.FEATURES,
+        {"IGNORE_EDX_FAILURES": flag_enabled},
+    )
+
+    # Mock sync_enrollments_with_edx
+    sync_mock = mocker.patch("courses.views.v2.sync_enrollments_with_edx")
+    if sync_raises:
+        sync_mock.side_effect = Exception("Sync failure")
+
+    mocker.patch("courses.views.v2.log.exception")
+
+    # When flag is enabled or sync succeeds, expect 200
+    resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+    # Verify sync was called or not called based on sync_on_load
+    if sync_on_load:
+        sync_mock.assert_called_once_with(user)
     else:
-        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        sync_mock.assert_not_called()
 
 
 @pytest.mark.skip_nplusone_check

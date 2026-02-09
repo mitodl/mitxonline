@@ -29,6 +29,7 @@ from rest_framework import status
 import courses.models
 from authentication import api as auth_api
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from main import features
 from main.utils import get_partitioned_set_difference, get_redis_lock
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -80,10 +81,23 @@ def create_user(user, edx_username=None):
 
     Args:
         user (user.models.User): the application user
+        edx_username (str): the username to use in Open edX (optional)
     """
+    ignore_edx_failures = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
 
-    create_edx_user(user, edx_username)
-    create_edx_auth_token(user)
+    try:
+        create_edx_user(user, edx_username)
+    except Exception:
+        log.exception("Failed to create edX user for user: %s", user.id)
+        if not ignore_edx_failures:
+            raise
+
+    try:
+        create_edx_auth_token(user)
+    except Exception:
+        log.exception("Failed to create edX auth token for user: %s", user.id)
+        if not ignore_edx_failures:
+            raise
 
 
 def _build_user_data(user, current_username, access_token):
@@ -381,7 +395,18 @@ def create_edx_user(user, edx_username=None):
         user (user.models.User): the application user
         edx_username (str): the username to use in Open edX
     """
-    application = Application.objects.get(name=settings.OPENEDX_OAUTH_APP_NAME)
+    ignore_edx_failures = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
+
+    try:
+        application = Application.objects.get(name=settings.OPENEDX_OAUTH_APP_NAME)
+    except Application.DoesNotExist:
+        log.exception(
+            "create_edx_user: OpenEdX OAuth application not found for user: %s", user.id
+        )
+        if not ignore_edx_failures:
+            raise
+        return False
+
     expiry_date = now_in_utc() + timedelta(hours=settings.OPENEDX_TOKEN_EXPIRES_HOURS)
     access_token = AccessToken.objects.create(
         user=user, application=application, token=generate_token(), expires=expiry_date
@@ -409,7 +434,13 @@ def create_edx_user(user, edx_username=None):
             open_edx_user.save()
             return False
 
-    return _create_edx_user_request(open_edx_user, user, access_token)
+    try:
+        return _create_edx_user_request(open_edx_user, user, access_token)
+    except Exception:
+        log.exception("create_edx_user: failed to create edX user for: %s", user.id)
+        if not ignore_edx_failures:
+            raise
+        return False
 
 
 def reconcile_edx_username(user, *, desired_username=None):

@@ -2,9 +2,10 @@
 Course API Views version 2
 """
 
-import contextlib
+import logging
 
 import django_filters
+from django.conf import settings
 from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -69,6 +70,8 @@ from main import features
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+
+log = logging.getLogger(__name__)
 
 
 class Pagination(PageNumberPagination):
@@ -557,8 +560,18 @@ class UserEnrollmentsApiViewSet(
     def list(self, request, *args, **kwargs):
         """List user enrollments with optional sync."""
         if is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
-            with contextlib.suppress(Exception):
+            ignore_edx_failures = settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            )
+            try:
                 sync_enrollments_with_edx(self.request.user)
+            except Exception:  # pylint: disable=broad-except
+                log.exception(
+                    "Failed to sync enrollments with edX for user: %s",
+                    self.request.user.id,
+                )
+                if not ignore_edx_failures:
+                    raise
         return super().list(request, *args, **kwargs)
 
     @extend_schema(
@@ -579,7 +592,9 @@ class UserEnrollmentsApiViewSet(
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
             change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)

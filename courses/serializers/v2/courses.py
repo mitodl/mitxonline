@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
-from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -328,7 +328,9 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
-            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
         )
         return successful_enrollments
 
