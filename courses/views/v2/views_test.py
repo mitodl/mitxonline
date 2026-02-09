@@ -1733,7 +1733,7 @@ def test_user_enrollments_list_sync_with_flag(  # noqa: PLR0913
     if sync_on_load:
         sync_mock.assert_called_once_with(user)
     else:
-        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        sync_mock.assert_not_called()
 
 
 @pytest.mark.skip_nplusone_check
