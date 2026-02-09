@@ -1,21 +1,24 @@
 # ruff: noqa: ERA001
 """
-Meta-command to help set up a freshly configured MITxOnline instance.
+Sets up test data for e2e playwright tests as defined in mit-learn.
 
-Running this will perform the following functions:
+Running this will perform the following functions in a transaction:
 - Creating a program.
 - Creating financial assistance tiers, and a flexible price request form for
   the program.
-- Creating course entries for the default courses.
+- Creating course entries for the default courses w/ courseruns.
 - Creating product entries and course about pages for these courses.
-- CMS pages for the program and courses.
+- CMS pages for the program and courses, instructor pages and certificate pages.
 
 The product for the courses will both be $999 so they are under the limit
 for test CyberSource transactions.
 
 
 What doesn't this do?
-- Any user management.
+- Set up organizations/contracts. This will be something we want to add shortly.
+- Any user management. We need to figure out what this should look like in service of mutative tests.
+- Sync w/ any external datasource (i.e. edx).
+- Attempt to overwrite existing state/blow away any modifications. We will need to solve this somehow for things like courseruns which expire, but we can start here.
 """
 
 from django.core.management import BaseCommand, call_command
@@ -26,17 +29,6 @@ class Command(BaseCommand):
     """
     Bootstraps necessary course-related data for core tests.
     """
-
-    def add_arguments(self, parser):
-        """Parses command line arguments."""
-
-        parser.add_argument(
-            "--dont-create-superuser",
-            "-S",
-            help="Don't create a superuser account.",
-            action="store_false",
-            dest="superuser",
-        )
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
         """Coordinates the other commands."""
