@@ -551,7 +551,7 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         "user__email",
     ]
     list_filter = ["is_revoked", "course_run__course"]
-    raw_id_fields = ("user", "course_run")
+    raw_id_fields = ("user", "course_run", "verifiable_credential")
     autocomplete_fields = ("certificate_page_revision",)
 
     def get_readonly_fields(self, request, obj=None):
@@ -606,7 +606,7 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         "user__email",
     ]
     list_filter = ["program__title", "is_revoked"]
-    raw_id_fields = ("user",)
+    raw_id_fields = ("user", "verifiable_credential")
 
     @admin.display(
         description="Active",
