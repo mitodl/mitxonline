@@ -1239,22 +1239,24 @@ taggit = ["django-taggit (>=3.1)"]
 
 [[package]]
 name = "django-oauth-toolkit"
-version = "2.4.0"
+version = "3.1.0"
 description = "OAuth2 Provider for Django"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "django_oauth_toolkit-2.4.0-py3-none-any.whl", hash = "sha256:4931d6bf64b6aee32a42f989f218769d1876f3daa53c6bf883d8ab793fb302ee"},
-    {file = "django_oauth_toolkit-2.4.0.tar.gz", hash = "sha256:8975eaf697413a8d54208ee068bc5ad6d1ed76f1df84e4882fbb25e7e6966e1b"},
+    {file = "django_oauth_toolkit-3.1.0-py3-none-any.whl", hash = "sha256:10ddc90804297d913dfb958edd58d5fac541eb1ca912f47893ca1e482bb2a11f"},
+    {file = "django_oauth_toolkit-3.1.0.tar.gz", hash = "sha256:d5a59d07588cfefa8818e99d65040a252eb2ede22512483e2240c91d0b885c8e"},
 ]
 
 [package.dependencies]
-django = ">=3.2,<4.0.0 || >4.0.0"
-jwcrypto = ">=0.8.0"
-oauthlib = ">=3.1.0"
-pytz = ">=2024.1"
+django = ">=4.2"
+jwcrypto = ">=1.5.0"
+oauthlib = ">=3.2.2"
 requests = ">=2.13.0"
+
+[package.extras]
+dev = ["m2r", "pytest", "pytest-cov", "sphinx-rtd-theme"]
 
 [[package]]
 name = "django-object-actions"
@@ -6008,4 +6010,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "6f10ecaf959baf53e40335a3a196ef6c356610b8d78371f4ce9c88b74032b406"
+content-hash = "ad252199d1bdac9ad01390d4babfc6a159042a18c164514c9eea2076c8e7f38f"
