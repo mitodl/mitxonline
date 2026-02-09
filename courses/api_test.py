@@ -1987,9 +1987,11 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
 
     mocked_create_mode = mocker.patch(
         "edx_api.course_detail.CourseModes.create_course_mode",
-        side_effect=lambda mode_slug, *args, **kwargs: audit_mode  # noqa: ARG005
-        if mode_slug == "audit"
-        else verified_mode,
+        side_effect=lambda mode_slug, *args, **kwargs: (
+            audit_mode
+            if mode_slug == "audit"
+            else verified_mode
+        ),
     )
 
     audit_created, verified_created = check_course_modes(run)
