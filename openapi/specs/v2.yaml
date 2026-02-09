@@ -3984,6 +3984,7 @@ components:
           type: string
           readOnly: true
           nullable: true
+          maxLength: 6
         passed:
           type: boolean
           readOnly: true
