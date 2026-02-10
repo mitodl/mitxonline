@@ -6,11 +6,8 @@ Running this will perform the following functions in a transaction:
 - Creating financial assistance tiers, and a flexible price request form for
   the program.
 - Creating course entries for the default courses w/ courseruns.
-- Creating product entries and course about pages for these courses.
+- Creating product entries and course about pages for these courses, each of which is set to 999 dollars
 - CMS pages for the program and courses, instructor pages and certificate pages.
-
-The product for the courses will both be $999 so they are under the limit
-for test CyberSource transactions.
 
 
 What doesn't this do?
@@ -67,7 +64,7 @@ class Command(BaseCommand):
             call_command(
                 "create_courseware",
                 "course",
-                "course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+REQUIRED",
+                "course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_REQUIRED",  # This course ID must have one plus, course runs must have 2.
                 "PLACEHOLDER - Demonstration Course in Program (Required)",
                 live=True,
                 create_run="PLACEHOLDER_Demo_Course_in_Program_Required",
@@ -83,7 +80,7 @@ class Command(BaseCommand):
             call_command(
                 "create_courseware",
                 "course",
-                "course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+ELECTIVE",
+                "course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_ELECTIVE",
                 "PLACEHOLDER - Demonstration Course in Program (Elective)",
                 live=True,
                 create_run="PLACEHOLDER_Demo_Course_in_Program_Elective",
@@ -115,18 +112,18 @@ class Command(BaseCommand):
             call_command(
                 "create_instructor_pages",
                 fake=True,
-                readable_ids="course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+REQUIRED,course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+ELECTIVE,course-v1:PLACEHOLDER+COURSE,program-v1:PLACEHOLDER+PROGRAM",
+                readable_ids="course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_REQUIRED,course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_ELECTIVE,course-v1:PLACEHOLDER+COURSE,program-v1:PLACEHOLDER+PROGRAM",
             )
 
             # create_product only works for Courses. We need to see if products for programs are useful.
             # Having this allows us to select a certificate course and get to the checkout page.
             call_command(
                 "create_product",
-                "course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+REQUIRED+PLACEHOLDER_Demo_Course_in_Program_Required",
+                "course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_REQUIRED+PLACEHOLDER_Demo_Course_in_Program_Required",
                 999,
             )
             call_command(
                 "create_product",
-                "course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+ELECTIVE+PLACEHOLDER_Demo_Course_in_Program_Elective",
+                "course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_ELECTIVE+PLACEHOLDER_Demo_Course_in_Program_Elective",
                 999,
             )
