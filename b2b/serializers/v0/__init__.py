@@ -6,6 +6,7 @@ from rest_framework import serializers
 from b2b.models import ContractPage, OrganizationPage, UserOrganization
 from cms.api import get_wagtail_img_src
 from main.constants import USER_MSG_TYPE_B2B_CHOICES
+from main.serializers import RichTextSerializer
 
 
 class ContractPageSerializer(serializers.ModelSerializer):
@@ -15,6 +16,7 @@ class ContractPageSerializer(serializers.ModelSerializer):
 
     membership_type = serializers.CharField()
     programs = serializers.SerializerMethodField()
+    welcome_message_extra = RichTextSerializer()
 
     @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_programs(self, instance):
