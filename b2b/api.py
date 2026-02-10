@@ -90,6 +90,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
     ingest_content_files_for_ai: bool = True,
     skip_edx: bool = False,
     require_designated_source_run: bool = False,
+    org_prefix=UAI_COURSEWARE_ID_PREFIX,
 ):
     """
     Create a contract run for the given course, importing it from edX if necessary.
@@ -178,6 +179,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
         run.course,
         skip_edx=skip_edx,
         require_designated_source_run=require_designated_source_run,
+        org_prefix=org_prefix,
     )
 
 
@@ -187,6 +189,7 @@ def create_contract_run(
     *,
     skip_edx=False,
     require_designated_source_run=True,
+    org_prefix=UAI_COURSEWARE_ID_PREFIX,
 ) -> tuple[CourseRun, Product]:
     """
     Create a run for the specified contract.
@@ -228,6 +231,7 @@ def create_contract_run(
     Keyword Args:
         skip_edx (bool): Don't try to create a course run in edX.
         require_designated_source_run (bool): Require a flagged source run.
+        org_prefix (str): Organization prefix. For UAI courses, this should be "UAI_".
     Returns:
         CourseRun: The created CourseRun object.
         Product: The created Product object.
@@ -253,12 +257,21 @@ def create_contract_run(
         msg = f"No course runs available for {course}."
         raise SourceCourseIncompleteError(msg)
 
+    source_id = CourseKey.from_string(clone_course_run.readable_id)
+    new_course_key = (
+        f"course-v1:{org_prefix}{contract.organization.org_key}+{source_id.course}"
+    )
+
+    run_count = (
+        CourseRun.objects.filter(courseware_id__startswith=new_course_key).count() + 1
+    )
+
     new_run_tag = B2B_RUN_TAG_FORMAT.format(
         year=now_in_utc().year,
         contract_id=contract.id,
+        run_idx=run_count,
     )
-    source_id = CourseKey.from_string(clone_course_run.readable_id)
-    new_readable_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
+    new_readable_id = f"{new_course_key}+{new_run_tag}"
 
     # Check first for an existing run with the same readable ID.
     if CourseRun.objects.filter(course=course, courseware_id=new_readable_id).exists():

@@ -61,6 +61,6 @@ CONTRACT_MEMBERSHIP_TYPE_CHOICES = list(
     )
 )
 
-B2B_RUN_TAG_FORMAT = "{year}_C{contract_id}"
+B2B_RUN_TAG_FORMAT = "{run_idx}T{contract_id}C{year}"
 
 ORG_KEY_MAX_LENGTH = 30

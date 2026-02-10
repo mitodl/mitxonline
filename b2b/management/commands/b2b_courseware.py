@@ -8,10 +8,12 @@ import logging
 from argparse import RawTextHelpFormatter
 
 from django.core.management import BaseCommand, CommandError
+from opaque_keys import InvalidKeyError
 
 from b2b.api import create_contract_run, import_and_create_contract_run
 from b2b.models import ContractPage, ContractProgramItem
 from courses.api import resolve_courseware_object_from_id
+from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import CourseRun
 
 log = logging.getLogger(__name__)
@@ -27,7 +29,7 @@ Courseware objects can be course runs, courses, or programs. specified by their 
 Specifying courseware: You must specify one courseware item (of any type). You can specify more than one by adding "--also <courseware id>" to the end of the command. You can repeat this as many times as necessary.
 
 To add courseware:
-   b2b_courseware add [--import <departments>] [--no-create-runs] [--force] <contract> <courseware> [--also <courseware>] [--also <courseware>...]
+   b2b_courseware add [--import <departments>] [--no-create-runs] [--force] [--prefix <prefix>] <contract> <courseware> [--also <courseware>] [--also <courseware>...]
 
 Example: b2b_courseware add contract-100-101 program-v1:UAI+Fundamentals --also course-v1:UAI_C100+14.314x+2025_C101
 
@@ -53,11 +55,29 @@ Specifying a course will unlink any of the course's runs that are attached to th
 Specifying a program will only unlink the program from the contract, unless "--remove-program-runs" is set. If it is, then all the runs that belong to both the contract and the program's courses will be removed from the contract. Note that doing this and then re-adding the program will *not* re-attach the existing runs to the contract - you will need to do that manually.
     """
 
-    def create_run(self, contract, courseware, *, skip_edx=False):
+    def create_run(
+        self,
+        contract,
+        courseware,
+        *,
+        skip_edx=False,
+        org_prefix=UAI_COURSEWARE_ID_PREFIX,
+    ):
         """Create a run for the specified contract."""
-        run_tuple = create_contract_run(
-            contract=contract, course=courseware, skip_edx=skip_edx
-        )
+        try:
+            run_tuple = create_contract_run(
+                contract=contract,
+                course=courseware,
+                skip_edx=skip_edx,
+                org_prefix=org_prefix,
+            )
+        except InvalidKeyError:
+            self.stderr.write(
+                self.style.ERROR(
+                    f"Invalid key error for course {courseware}. Is the course's readable ID configured correctly?"
+                )
+            )
+            return False
 
         if not run_tuple:
             self.stdout.write(
@@ -124,6 +144,12 @@ Specifying a program will only unlink the program from the contract, unless "--r
             dest="can_import",
             type=str,
         )
+        add_subparser.add_argument(
+            "--prefix",
+            help=f"Organization prefix for the resulting course run. (Defaults to {UAI_COURSEWARE_ID_PREFIX}.)",
+            type=str,
+            default=UAI_COURSEWARE_ID_PREFIX,
+        )
 
         remove_subparser = subparsers.add_parser(
             "remove",
@@ -144,6 +170,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
         create_runs = kwargs.pop("create_runs")
         force_associate = kwargs.pop("force")
         can_import = kwargs.pop("can_import")
+        org_prefix = kwargs.pop("prefix")
 
         managed = skipped = 0
 
@@ -172,6 +199,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     departments=can_import.split(sep=","),
                     create_cms_page=True,
                     create_depts=True,
+                    org_prefix=org_prefix,
                 )
 
                 if not imported_run:
@@ -251,7 +279,9 @@ Specifying a program will only unlink the program from the contract, unless "--r
             elif create_runs:
                 # This is a course, so create a run (unless we've been told not to).
 
-                if self.create_run(contract, courseware, skip_edx=create_runs):
+                if self.create_run(
+                    contract, courseware, skip_edx=create_runs, org_prefix=org_prefix
+                ):
                     managed += 1
                 else:
                     skipped += 1

@@ -113,7 +113,7 @@ def test_create_single_course_run(mocker, contract_ready_course, has_start, has_
 
     assert run.course == source_course
     assert run.run_tag == B2B_RUN_TAG_FORMAT.format(
-        year=now_time.year, contract_id=contract.id
+        run_idx=1, year=now_time.year, contract_id=contract.id
     )
     assert run.b2b_contract == contract
 
