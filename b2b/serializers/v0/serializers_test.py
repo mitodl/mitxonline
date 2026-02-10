@@ -1,5 +1,7 @@
 """Tests for B2B serializers (v0)."""
 
+import re
+
 import pytest
 
 from b2b.factories import ContractPageFactory
@@ -18,11 +20,10 @@ def test_contract_page_serializer_expands_embeds():
 
     serializer = ContractPageSerializer(contract)
     result = serializer.data["welcome_message_extra"]
-
-    # Embed should be expanded to iframe
-    assert "<embed" not in result
-    assert "<iframe" in result
-    assert "youtube.com" in result
-
-    # Plain HTML should be preserved
-    assert "<p>Hello, world</p>" in result
+    pattern = (
+        r"<p>Hello, world</p><div>\s*"
+        r'<iframe\s+[^>]*src="https://www\.youtube\.com/embed/_AXZSRtsASE\?feature=oembed"[^>]*>'
+        r"</iframe>\s*"
+        r"</div>"
+    )
+    assert re.match(pattern, result, re.DOTALL)
