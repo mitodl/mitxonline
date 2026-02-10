@@ -150,23 +150,33 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     enrollment_mode = serializers.ChoiceField(
         (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
     )
-    approved_flexible_price_exists = serializers.SerializerMethodField()
     grades = CourseRunGradeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = models.CourseRunEnrollment
+        fields = [
+            "id",
+            "edx_emails_subscription",
+            "certificate",
+            "enrollment_mode",
+            "grades",
+        ]
+
+
+class BaseCourseRunEnrollmentWithFlexiblePriceSerializer(
+    BaseCourseRunEnrollmentSerializer
+):
+    approved_flexible_price_exists = serializers.SerializerMethodField()
 
     @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
 
-    class Meta:
+    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
         model = models.CourseRunEnrollment
         fields = [
-            "run",
-            "id",
-            "edx_emails_subscription",
-            "certificate",
-            "enrollment_mode",
+            *BaseCourseRunEnrollmentSerializer.Meta.fields,
             "approved_flexible_price_exists",
-            "grades",
         ]
 
 
