@@ -1,4 +1,4 @@
-"""Course API v2 URL configuration."""
+"""Course API v3 URL configuration."""
 
 from rest_framework import routers
 
@@ -7,6 +7,11 @@ from courses.views import v3
 app_name = "courses"
 
 router = routers.SimpleRouter()
+router.register(
+    r"enrollments",
+    v3.UserEnrollmentsApiViewSet,
+    basename="user_enrollments_api",
+)
 router.register(
     r"program_enrollments",
     v3.UserProgramEnrollmentsViewSet,

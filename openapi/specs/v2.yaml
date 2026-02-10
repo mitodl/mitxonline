@@ -3076,6 +3076,95 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v3/enrollments/:
+    get:
+      operationId: user_enrollments_list_v3
+      description: List user enrollments with B2B organization and contract information
+        - API v3. Use ?exclude_b2b=true to filter out enrollments linked to course
+        runs with B2B contracts. Use ?org_id=<id> to filter enrollments by specific
+        B2B organization.
+      parameters:
+      - in: query
+        name: exclude_b2b
+        schema:
+          type: boolean
+        description: Exclude B2B enrollments (enrollments linked to course runs with
+          B2B contracts)
+      - in: query
+        name: org_id
+        schema:
+          type: number
+        description: Filter by B2B organization ID
+      tags:
+      - enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseRunEnrollmentV3'
+          description: ''
+    post:
+      operationId: user_enrollments_create_v3
+      description: Create a new user enrollment - API v3
+      tags:
+      - enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentV3Request'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentV3Request'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CourseRunEnrollmentV3Request'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollmentV3'
+          description: ''
+  /api/v3/enrollments/{id}/:
+    get:
+      operationId: enrollments_retrieve
+      description: API view set for user enrollments - v3
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course run enrollment.
+        required: true
+      tags:
+      - enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollmentV3'
+          description: ''
+    delete:
+      operationId: user_enrollments_destroy_v3
+      description: Unenroll from a course - API v3
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course run enrollment.
+        required: true
+      tags:
+      - enrollments
+      responses:
+        '204':
+          description: No response body
   /api/v3/program_enrollments/:
     get:
       operationId: v3_program_enrollments_list
@@ -3932,10 +4021,6 @@ components:
       type: object
       description: CourseRunEnrollment model serializer
       properties:
-        run:
-          allOf:
-          - $ref: '#/components/schemas/V1CourseRunWithCourse'
-          readOnly: true
         id:
           type: integer
           readOnly: true
@@ -3950,13 +4035,17 @@ components:
           allOf:
           - $ref: '#/components/schemas/EnrollmentModeEnum'
           readOnly: true
-        approved_flexible_price_exists:
-          type: boolean
-          readOnly: true
         grades:
           type: array
           items:
             $ref: '#/components/schemas/CourseRunGrade'
+          readOnly: true
+        approved_flexible_price_exists:
+          type: boolean
+          readOnly: true
+        run:
+          allOf:
+          - $ref: '#/components/schemas/V1CourseRunWithCourse'
           readOnly: true
       required:
       - approved_flexible_price_exists
@@ -3980,10 +4069,6 @@ components:
       type: object
       description: CourseRunEnrollment model serializer
       properties:
-        run:
-          allOf:
-          - $ref: '#/components/schemas/V2CourseRunWithCourse'
-          readOnly: true
         id:
           type: integer
           readOnly: true
@@ -3998,13 +4083,17 @@ components:
           allOf:
           - $ref: '#/components/schemas/EnrollmentModeEnum'
           readOnly: true
-        approved_flexible_price_exists:
-          type: boolean
-          readOnly: true
         grades:
           type: array
           items:
             $ref: '#/components/schemas/CourseRunGrade'
+          readOnly: true
+        approved_flexible_price_exists:
+          type: boolean
+          readOnly: true
+        run:
+          allOf:
+          - $ref: '#/components/schemas/V2CourseRunWithCourse'
           readOnly: true
         b2b_organization_id:
           type: integer
@@ -4024,6 +4113,60 @@ components:
       - id
       - run
     CourseRunEnrollmentRequestV2Request:
+      type: object
+      description: CourseRunEnrollment model serializer
+      properties:
+        edx_emails_subscription:
+          type: boolean
+        run_id:
+          type: integer
+          writeOnly: true
+      required:
+      - run_id
+    CourseRunEnrollmentV3:
+      type: object
+      description: CourseRunEnrollment model serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        edx_emails_subscription:
+          type: boolean
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/V3CourseRunCertificate'
+          readOnly: true
+          nullable: true
+        enrollment_mode:
+          allOf:
+          - $ref: '#/components/schemas/EnrollmentModeEnum'
+          readOnly: true
+        grades:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseRunGrade'
+          readOnly: true
+        run:
+          allOf:
+          - $ref: '#/components/schemas/CourseRunWithCourseV3'
+          readOnly: true
+        b2b_organization_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        b2b_contract_id:
+          type: integer
+          nullable: true
+          readOnly: true
+      required:
+      - b2b_contract_id
+      - b2b_organization_id
+      - certificate
+      - enrollment_mode
+      - grades
+      - id
+      - run
+    CourseRunEnrollmentV3Request:
       type: object
       description: CourseRunEnrollment model serializer
       properties:
@@ -4183,6 +4326,217 @@ components:
       - is_upgradable
       - products
       - run_tag
+      - title
+    CourseRunWithCourseV3:
+      type: object
+      description: CourseRun serializer
+      properties:
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_url:
+          type: string
+          nullable: true
+          description: Get the courseware URL
+          readOnly: true
+        courseware_id:
+          type: string
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_upgradable:
+          type: boolean
+          description: Check if the course run is upgradable
+          readOnly: true
+        is_enrollable:
+          type: boolean
+          description: Check if the course run is enrollable
+          readOnly: true
+        is_archived:
+          type: boolean
+          description: Check if the course run is archived
+          readOnly: true
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        id:
+          type: integer
+          readOnly: true
+        live:
+          type: boolean
+        course_number:
+          type: string
+          description: Get the course number
+          readOnly: true
+        course:
+          allOf:
+          - $ref: '#/components/schemas/CourseV3'
+          readOnly: true
+      required:
+      - course
+      - course_number
+      - courseware_id
+      - courseware_url
+      - id
+      - is_archived
+      - is_enrollable
+      - is_upgradable
+      - run_tag
+      - title
+    CourseRunWithCourseV3Request:
+      type: object
+      description: CourseRun serializer
+      properties:
+        title:
+          type: string
+          minLength: 1
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          minLength: 1
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        live:
+          type: boolean
+      required:
+      - courseware_id
+      - run_tag
+      - title
+    CourseV3:
+      type: object
+      description: Course serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        type:
+          type: string
+          description: Returns the type of object this is serializing.
+          readOnly: true
+      required:
+      - id
+      - readable_id
+      - title
+      - type
+    CourseV3Request:
+      type: object
+      description: Course serializer
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        readable_id:
+          type: string
+          minLength: 1
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+      required:
+      - readable_id
       - title
     CourseWithCourseRunsSerializerV2:
       type: object
@@ -8298,6 +8652,24 @@ components:
       - certificate
       - enrollments
       - program
+    V3CourseRunCertificate:
+      type: object
+      description: CourseRunCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/<uuid>/
+            Example: /certificate/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+          readOnly: true
+      required:
+      - link
+      - uuid
     V3ProgramCertificate:
       type: object
       description: ProgramCertificate model serializer
