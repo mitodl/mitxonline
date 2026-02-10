@@ -3,24 +3,52 @@
 from django.db import migrations
 
 
+def extract_numeric_prices(price_stream):
+    """
+    Extracts the first and second integer found in the text of the price StreamField block.
+    Returns (min_price, max_price) as integers, or (None, None) if not found.
+    """
+    import re
+    if not price_stream:
+        return (None, None)
+    for block in price_stream:
+        text = block.value.get("text")
+        if text:
+            # Find all numbers in the string
+            price_nums = re.findall(r"\d+", text)
+            if price_nums:
+                min_price = int(price_nums[0])
+                max_price = int(price_nums[1]) if len(price_nums) > 1 else min_price
+                return (min_price, max_price)
+    return (None, None)
+
+
 def populate_min_max_price(apps, schema_editor):
     CoursePage = apps.get_model("cms", "CoursePage")
-    for course in CoursePage.objects.filter(min_price=None):
-        course.min_price = course.price if course.price is not None else 0
-        course.save(update_fields=["min_price"])
-
-    for course in CoursePage.objects.filter(max_price=None):
-        course.max_price = course.price if course.price is not None else 0
-        course.save(update_fields=["max_price"])
+    for course in CoursePage.objects.all():
+        min_price, max_price = extract_numeric_prices(course.price)
+        updated = False
+        if min_price is not None and course.min_price != min_price:
+            course.min_price = min_price
+            updated = True
+        if max_price is not None and course.max_price != max_price:
+            course.max_price = max_price
+            updated = True
+        if updated:
+            course.save(update_fields=[f for f in ["min_price", "max_price"] if getattr(course, f) is not None])
 
     ProgramPage = apps.get_model("cms", "ProgramPage")
-    for program in ProgramPage.objects.filter(min_price=None):
-        program.min_price = program.price if program.price is not None else 0
-        program.save(update_fields=["min_price"])
-
-    for program in ProgramPage.objects.filter(max_price=None):
-        program.max_price = program.price if program.price is not None else 0
-        program.save(update_fields=["max_price"])
+    for program in ProgramPage.objects.all():
+        min_price, max_price = extract_numeric_prices(program.price)
+        updated = False
+        if min_price is not None and program.min_price != min_price:
+            program.min_price = min_price
+            updated = True
+        if max_price is not None and program.max_price != max_price:
+            program.max_price = max_price
+            updated = True
+        if updated:
+            program.save(update_fields=[f for f in ["min_price", "max_price"] if getattr(program, f) is not None])
 
 
 class Migration(migrations.Migration):
