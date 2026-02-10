@@ -1,9 +1,10 @@
 """Tests for Ecommerce api"""
 
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import freezegun
 import pytest
 import reversion
 from CyberSource.rest import ApiException
@@ -12,6 +13,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory
 from django.urls import reverse
 from factory import Faker, fuzzy
+from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import ProcessorResponse
 from reversion.models import Version
 
@@ -22,10 +24,12 @@ from courses.factories import (
     ProgramFactory,
 )
 from ecommerce.api import (
+    apply_discount_to_basket,
     check_and_process_pending_orders_for_resolution,
     check_for_duplicate_discount_redemptions,
     create_verified_program_course_run_enrollment,
     create_verified_program_discount,
+    get_auto_apply_discounts_for_basket,
     process_cybersource_payment_response,
     refund_order,
     unenroll_learner_from_order,
@@ -47,14 +51,19 @@ from ecommerce.factories import (
 )
 from ecommerce.models import (
     Basket,
+    BasketDiscount,
     BasketItem,
+    DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
     Order,
     OrderStatus,
     Product,
     Transaction,
+    UserDiscount,
 )
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
@@ -803,3 +812,197 @@ def test_create_vpcre_bad_basket(
         create_verified_program_course_run_enrollment(request, courserun, program)
 
     assert "not empty" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "better_discount",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "is_valid",
+    [
+        True,
+        False,
+    ],
+)
+def test_apply_discount_to_basket(user, better_discount, is_valid):
+    """
+    Test that applying a discount to a basket works as expected.
+
+    A new discount should only apply if it's valid (not expired, not finaid unless
+    the flag is set, applies to the user/product in the basket) and it provides
+    a better discount than anything else that's applied already.
+    """
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    existing_discount = UnlimitedUseDiscountFactory.create(
+        amount=100, discount_type="fixed-price"
+    )
+    BasketDiscount.objects.create(
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+        redeemed_discount=existing_discount,
+        redeemed_basket=basket,
+    )
+
+    new_discount = UnlimitedUseDiscountFactory.create(
+        amount=(50 if better_discount else 150), discount_type="fixed-price"
+    )
+
+    if not is_valid:
+        new_discount.activation_date = now_in_utc() + timedelta(days=30)
+        new_discount.save()
+
+    apply_discount_to_basket(basket, new_discount)
+
+    if better_discount and is_valid:
+        assert basket.discounts.filter(redeemed_discount=new_discount).exists()
+    else:
+        assert basket.discounts.filter(redeemed_discount=existing_discount).exists()
+
+
+def test_get_auto_apply_discounts(user):
+    """
+    Test that the auto-apply discount function works as expected.
+
+    Depending on what the user's basket has in it, we should get back any of:
+    - User discounts (if there's any assigned)
+    - Product discounts (if there's any assigned)
+    - Financial assistance tier discount (if the user has finaid)
+    - Nothing, if none of these apply
+    """
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 0
+
+    # test with regular discounts
+    # (though we'll assign one to the product, and one to the user)
+    plain_discount = UnlimitedUseDiscountFactory.create(automatic=False)
+    plain_attached_product_discount = UnlimitedUseDiscountFactory.create(
+        automatic=False
+    )
+    plain_attached_user_discount = UnlimitedUseDiscountFactory.create(automatic=False)
+    DiscountProduct.objects.create(
+        discount=plain_attached_product_discount, product=product
+    )
+    UserDiscount.objects.create(discount=plain_attached_user_discount, user=user)
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 0
+
+    # set the product discount to auto-apply, we should see that now
+    plain_attached_product_discount.automatic = True
+    plain_attached_product_discount.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 1
+    assert plain_discount.id not in discounts.all().values_list("id", flat=True)
+    assert plain_attached_product_discount.id in discounts.all().values_list(
+        "id", flat=True
+    )
+
+    # set the user discount to auto-apply, we should see both of the assigned ones now
+    plain_attached_user_discount.automatic = True
+    plain_attached_user_discount.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 2
+    assert plain_discount.id not in discounts.all().values_list("id", flat=True)
+    assert plain_attached_user_discount.id in discounts.all().values_list(
+        "id", flat=True
+    )
+
+    # make the regular one auto too - that should apply regardless
+    plain_discount.automatic = True
+    plain_discount.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 3
+    assert plain_discount.id in discounts.all().values_list("id", flat=True)
+
+    # add some financial assistance discounts
+    finaid_tier = FlexiblePriceTierFactory(courseware_object=run.course)
+    FlexiblePriceFactory(
+        user=user,
+        courseware_object=run.course,
+        tier=finaid_tier,
+        status=FlexiblePriceStatus.APPROVED,
+    )
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 4
+    assert finaid_tier.discount.id in discounts.all().values_list("id", flat=True)
+
+    # test with a new user, a new basket, and a new product
+    # we should only see the plain_discount (because it got set to automatic
+    # earlier and it's not attached to anything in particular)
+
+    new_user = UserFactory.create()
+    new_basket = Basket.objects.create(user=new_user)
+    new_product = ProductFactory.create()
+    BasketItem.objects.create(basket=new_basket, product=new_product)
+
+    discounts = get_auto_apply_discounts_for_basket(new_basket.id)
+
+    assert discounts.count() == 1
+    assert plain_discount.id in discounts.all().values_list("id", flat=True)
+
+
+def test_get_auto_apply_discounts_respects_dates(user):
+    """Test that the auto-apply discount function respects dates set on the Discount."""
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    # no dates
+    plain_discount_1 = UnlimitedUseDiscountFactory.create(automatic=True)
+    plain_discount_2 = UnlimitedUseDiscountFactory.create(automatic=True)
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+    assert discounts.count() == 2
+    assert plain_discount_1.id in discounts.all().values_list("id", flat=True)
+    assert plain_discount_2.id in discounts.all().values_list("id", flat=True)
+
+    # expiration only
+    plain_discount_1.expiration_date = now_in_utc() + timedelta(days=30)
+    plain_discount_1.save()
+
+    past_expiry = now_in_utc() - timedelta(days=30)
+    with freezegun.freeze_time(past_expiry):
+        plain_discount_2.expiration_date = past_expiry + timedelta(days=1)
+        plain_discount_2.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+    assert discounts.count() == 1
+    assert plain_discount_1.id in discounts.all().values_list("id", flat=True)
+    assert plain_discount_2.id not in discounts.all().values_list("id", flat=True)
+
+    # activation - since discount 2 expires in the past, we shouldn't get any back now
+    plain_discount_1.activation_date = now_in_utc() + timedelta(days=1)
+    plain_discount_1.save()
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+    assert discounts.count() == 0

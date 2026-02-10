@@ -40,6 +40,7 @@ from ecommerce.api import (
 from ecommerce.exceptions import ProductBlockedError
 from ecommerce.models import (
     Basket,
+    BasketDiscount,
     BasketItem,
     Discount,
     DiscountProduct,
@@ -227,14 +228,27 @@ def _create_basket_from_product(
     (_, created) = BasketItem.objects.update_or_create(
         basket=basket, product=product, defaults={"quantity": quantity}
     )
-    auto_apply_discount_discounts = get_auto_apply_discounts_for_basket(basket.id)
-    for discount in auto_apply_discount_discounts:
-        apply_discount_to_basket(basket, discount)
 
+    existing_basket_discounts = [bd.redeemed_discount for bd in basket.discounts.all()]
+    discounts_to_apply = [
+        *existing_basket_discounts,
+        *list(get_auto_apply_discounts_for_basket(basket.id).all()),
+    ]
+
+    # Clear the discounts that are in the basket - we retained whatever was
+    # already applied above and will re-apply so the codes get re-checked. (So,
+    # if a code has now expired, you don't get it anymore.)
+    BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+
+    for discount in discounts_to_apply:
+        apply_discount_to_basket(basket, discount, allow_finaid=True)
+
+    # Order matters - apply the code supplied last so we can always attach a
+    # better-value discount by hand if we want. (Also, turn off finaid flag here.)
     if discount_code:
         try:
-            discount = Discount.objects.get(discount_code=discount_code)
-            apply_discount_to_basket(basket, discount)
+            supplied_discount = Discount.objects.get(discount_code=discount_code)
+            apply_discount_to_basket(basket, supplied_discount)
         except Discount.DoesNotExist:
             pass
 

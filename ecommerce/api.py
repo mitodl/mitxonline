@@ -852,6 +852,12 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
     """
     Get the auto-apply discounts that can be applied to a basket.
 
+    This includes the financial assistant discounts for the user and products,
+    if there are any, since those are also automatically applied regardless of
+    the flag on the discount. This does not include B2B discounts because those
+    are applied in a different manner - either through a separate API, or by the
+    learner via the cart interface.
+
     Args:
         basket_id (int): The ID of the basket to get the auto-apply discounts for.
 
@@ -861,11 +867,27 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
     basket = Basket.objects.get(pk=basket_id)
     products = basket.get_products()
 
+    finaid_discounts = []
+
+    for product in products:
+        finaid_discount = determine_courseware_flexible_price_discount(
+            product, basket.user
+        )
+
+        if finaid_discount:
+            finaid_discounts.append(finaid_discount.id)
+
     return Discount.objects.filter(
-        Q(products__product__in=products) | Q(products__isnull=True),
-        Q(user_discount_discount__user=basket.user)
-        | Q(user_discount_discount__isnull=True),
-        automatic=True,
+        Q(activation_date__lte=now_in_utc()) | Q(activation_date=None),
+        Q(expiration_date__gt=now_in_utc()) | Q(expiration_date=None),
+    ).filter(
+        Q(
+            Q(products__product__in=products) | Q(products__isnull=True),
+            Q(user_discount_discount__user=basket.user)
+            | Q(user_discount_discount__isnull=True),
+            Q(automatic=True),
+        )
+        | Q(pk__in=finaid_discounts)
     )
 
 
@@ -873,17 +895,39 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
     """
     Apply a discount to a basket.
 
+    Validates the discount, then ensures that it's better than existing discounts,
+    and finally applies it if needed.
+
     Args:
         discount (Discount): The Discount to apply to the basket.
     Keyword Args:
         allow_finaid (bool): Allow a financial assistance discount through.
     """
     if discount.is_valid(basket, allow_finaid=allow_finaid):
-        BasketDiscount.objects.create(
+        if basket.discounts.count() > 0 and basket.basket_items.count() > 0:
+            # Check each item in the basket. This logic will have to change if
+            # we opt to support >1 discount in the basket.
+            found_better = False
+
+            for item in basket.basket_items.all():
+                if item.discounted_price >= discount.discount_product(
+                    item.product, basket.user
+                ):
+                    found_better = True
+                    continue
+
+            if not found_better:
+                return
+
+        defaults = {
+            "redeemed_discount": discount,
+            "redemption_date": now_in_utc(),
+        }
+        BasketDiscount.objects.update_or_create(
             redeemed_by=basket.user,
-            redeemed_discount=discount,
             redeemed_basket=basket,
-            redemption_date=now_in_utc(),
+            defaults=defaults,
+            create_defaults=defaults,
         )
 
 
