@@ -9,6 +9,7 @@ def extract_numeric_prices(price_stream):
     Returns (min_price, max_price) as integers, or (None, None) if not found.
     """
     import re
+
     if not price_stream:
         return (None, None)
     for block in price_stream:
@@ -35,7 +36,13 @@ def populate_min_max_price(apps, schema_editor):
             course.max_price = max_price
             updated = True
         if updated:
-            course.save(update_fields=[f for f in ["min_price", "max_price"] if getattr(course, f) is not None])
+            course.save(
+                update_fields=[
+                    f
+                    for f in ["min_price", "max_price"]
+                    if getattr(course, f) is not None
+                ]
+            )
 
     ProgramPage = apps.get_model("cms", "ProgramPage")
     for program in ProgramPage.objects.all():
@@ -48,7 +55,13 @@ def populate_min_max_price(apps, schema_editor):
             program.max_price = max_price
             updated = True
         if updated:
-            program.save(update_fields=[f for f in ["min_price", "max_price"] if getattr(program, f) is not None])
+            program.save(
+                update_fields=[
+                    f
+                    for f in ["min_price", "max_price"]
+                    if getattr(program, f) is not None
+                ]
+            )
 
 
 class Migration(migrations.Migration):
