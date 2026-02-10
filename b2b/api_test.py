@@ -14,6 +14,7 @@ from opaque_keys.edx.keys import CourseKey
 
 from b2b import factories
 from b2b.api import (
+    _handle_extra_enrollment_codes,
     create_b2b_enrollment,
     create_contract_run,
     ensure_contract_run_pricing,
@@ -51,6 +52,7 @@ from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMI
 from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
+    OneTimeDiscountFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
 )
@@ -1261,3 +1263,47 @@ def test_ensure_contract_run_pricing():
 
     product.refresh_from_db()
     assert product.price == contract.enrollment_fixed_price
+
+
+def test_remove_extra_codes():
+    """
+    Test that extra codes are removed for a contract/product as we expect.
+
+    If there are too many codes for the product, it should remove the extras.
+    It should additionally remove them from the _end_ of the list because the
+    b2b_codes output command grabs the codes in database order.
+    """
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        max_learners=5,
+    )
+    run = CourseRunFactory.create(b2b_contract=contract)
+    product = ProductFactory.create(price=76, purchasable_object=run)
+
+    ensure_enrollment_codes_exist(contract)
+
+    codes_we_should_keep = [
+        code.discount_code for code in contract.get_discounts().all()
+    ]
+
+    assert len(codes_we_should_keep) == 5
+
+    more_codes = OneTimeDiscountFactory.create_batch(5)
+
+    for code in more_codes:
+        DiscountProduct.objects.create(discount=code, product=product)
+
+    assert contract.get_discounts().count() == 10
+
+    # Just testing the extra code culling - don't want to run the whole stack
+
+    removed_count = _handle_extra_enrollment_codes(contract, product)
+
+    assert removed_count == 5
+
+    codes_we_have = [code.discount_code for code in contract.get_discounts().all()]
+
+    for code in codes_we_have:
+        assert code in codes_we_should_keep

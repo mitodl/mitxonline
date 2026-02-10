@@ -592,7 +592,10 @@ def _handle_extra_enrollment_codes(contract: ContractPage, product: Product) -> 
     # Filter out the discounts that have been used for something - either for
     # contract attachment or for enrollment.
     unused_discounts = (
-        contract.get_unused_discounts().filter(products__product=product).all()
+        contract.get_unused_discounts()
+        .filter(products__product=product)
+        .order_by("-id")
+        .all()
     )
 
     for unused_discount in unused_discounts[:remove_count]:
