@@ -424,7 +424,7 @@ class UserEnrollmentsApiViewSet(
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
             .select_related("run__course__page", "user", "run")
-            .all()
+            .prefetch("certificate", "grades")
         )
 
     def get_serializer_context(self):

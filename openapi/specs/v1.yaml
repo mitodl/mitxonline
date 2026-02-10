@@ -3882,8 +3882,8 @@ components:
         certificate:
           allOf:
           - $ref: '#/components/schemas/CourseRunCertificate'
-          nullable: true
           readOnly: true
+          nullable: true
         enrollment_mode:
           allOf:
           - $ref: '#/components/schemas/EnrollmentModeEnum'
@@ -3930,8 +3930,8 @@ components:
         certificate:
           allOf:
           - $ref: '#/components/schemas/CourseRunCertificate'
-          nullable: true
           readOnly: true
+          nullable: true
         enrollment_mode:
           allOf:
           - $ref: '#/components/schemas/EnrollmentModeEnum'
@@ -3981,14 +3981,18 @@ components:
           format: double
           maximum: 1.0
           minimum: 0.0
+          readOnly: true
         letter_grade:
           type: string
+          readOnly: true
           nullable: true
           maxLength: 6
         passed:
           type: boolean
+          readOnly: true
         set_by_admin:
           type: boolean
+          readOnly: true
         grade_percent:
           type: number
           format: double
@@ -3998,6 +4002,9 @@ components:
       required:
       - grade
       - grade_percent
+      - letter_grade
+      - passed
+      - set_by_admin
     CourseRunV2:
       type: object
       description: CourseRun model serializer

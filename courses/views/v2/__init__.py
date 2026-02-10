@@ -529,20 +529,23 @@ class UserEnrollmentsApiViewSet(
     filter_backends = [DjangoFilterBackend]
     filterset_class = UserEnrollmentFilterSet
 
+    queryset = (
+        CourseRunEnrollment.objects.select_related(
+            "user",
+            "run",
+            "run__b2b_contract",
+        )
+        .prefetch_related(
+            "run__b2b_contract__organization",
+            "run__course__page",
+        )
+        .prefetch("certificate", "grades")
+    )
+
     @extend_schema_get_queryset(CourseRunEnrollment.objects.none())
     def get_queryset(self):
         """Get the queryset for user enrollments."""
-        return (
-            CourseRunEnrollment.objects.filter(user=self.request.user)
-            .select_related(
-                "run__course__page",
-                "user",
-                "run",
-                "run__b2b_contract",
-                "run__b2b_contract__organization",
-            )
-            .all()
-        )
+        return super().get_queryset().filter(user=self.request.user)
 
     def get_serializer_context(self):
         """Get the serializer context."""

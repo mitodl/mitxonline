@@ -115,71 +115,26 @@ class CourseRunCertificateSerializer(serializers.ModelSerializer):
 class CourseRunGradeSerializer(serializers.ModelSerializer):
     """CourseRunGrade serializer"""
 
-    grade = serializers.FloatField(min_value=0.0, max_value=1.0)
+    grade = serializers.FloatField(read_only=True, min_value=0.0, max_value=1.0)
+    letter_grade = serializers.CharField(read_only=True, max_length=6, allow_null=True)
 
     class Meta:
         model = models.CourseRunGrade
         fields = ["grade", "letter_grade", "passed", "set_by_admin", "grade_percent"]
+        read_only_fields = ["passed", "set_by_admin", "grade_percent"]
 
 
 class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
-    certificate = serializers.SerializerMethodField(read_only=True)
+    certificate = CourseRunCertificateSerializer(read_only=True, allow_null=True)
     enrollment_mode = serializers.ChoiceField(
         (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
     )
     approved_flexible_price_exists = serializers.SerializerMethodField()
-    grades = serializers.SerializerMethodField(read_only=True)
-
-    @extend_schema_field(CourseRunCertificateSerializer(allow_null=True))
-    def get_certificate(self, enrollment):
-        """
-        Resolve a certificate for this enrollment if it exists
-        """
-        # When create method is called it returns list object of enrollments
-        if isinstance(enrollment, list):
-            enrollment = enrollment[0] if enrollment else None
-
-        # No need to include a certificate if there is no corresponding wagtail page
-        # to support the render
-        try:
-            if (
-                not enrollment
-                or not enrollment.run.course.page
-                or not enrollment.run.course.page.certificate_page
-            ):
-                return None
-        except models.Course.page.RelatedObjectDoesNotExist:
-            return None
-
-        # Using IDs because we don't need the actual record and this avoids redundant queries
-        user_id = enrollment.user_id
-        course_run_id = enrollment.run_id
-        try:
-            return CourseRunCertificateSerializer(
-                models.CourseRunCertificate.objects.get(
-                    user_id=user_id, course_run_id=course_run_id
-                )
-            ).data
-        except models.CourseRunCertificate.DoesNotExist:
-            return None
+    grades = CourseRunGradeSerializer(many=True, read_only=True)
 
     @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
-
-    @extend_schema_field(CourseRunGradeSerializer(many=True))
-    def get_grades(self, instance):
-        instance_run = instance[0].run if isinstance(instance, list) else instance.run
-        instance_user = (
-            instance[0].user if isinstance(instance, list) else instance.user
-        )
-
-        return CourseRunGradeSerializer(
-            instance=models.CourseRunGrade.objects.filter(
-                user=instance_user, course_run=instance_run
-            ).all(),
-            many=True,
-        ).data
 
     class Meta:
         model = models.CourseRunEnrollment
