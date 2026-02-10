@@ -1,4 +1,3 @@
-# ruff: noqa: ERA001
 """
 Sets up test data for e2e playwright tests as defined in mit-learn.
 
@@ -131,8 +130,3 @@ class Command(BaseCommand):
                 "course-v1:PLACEHOLDER+COURSE+IN+PROGRAM+ELECTIVE+PLACEHOLDER_Demo_Course_in_Program_Elective",
                 999,
             )
-            # I don't understand the revision system here.
-            # It seems like we create revisions in create_product, but configure instance called the scripts after those commands.
-            # call_command(
-            #     "createinitialrevisions", "ecommerce.Product", comment="Initial revision."
-            # )
