@@ -478,6 +478,11 @@ def test_create_basket_with_product(  # noqa: PLR0913
         if bad_discount:
             assert (
                 not Basket.objects.get(id=basket_id)
+                .discounts.filter(redeemed_discount=discount)
+                .exists()
+            )
+            assert (
+                Basket.objects.get(id=basket_id)
                 .discounts.filter(redeemed_discount=ex_discount)
                 .exists()
             )
