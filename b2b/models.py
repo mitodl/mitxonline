@@ -256,7 +256,7 @@ class ContractPage(Page, ClusterableModel):
         max_length=255, blank=True, help_text="A welcome message for learners."
     )
     welcome_message_extra = RichTextField(
-        blank=True, help_text="Additional welcome message content for learners."
+        blank=True, help_text="Additional welcome message content for learners (html)."
     )
     integration_type = models.CharField(
         max_length=255,
