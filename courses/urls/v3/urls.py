@@ -8,6 +8,11 @@ app_name = "courses"
 
 router = routers.SimpleRouter()
 router.register(
+    r"enrollments",
+    v3.UserEnrollmentsApiViewSet,
+    basename="user_enrollments_api",
+)
+router.register(
     r"program_enrollments",
     v3.UserProgramEnrollmentsViewSet,
     basename="user_program_enrollments_api",

@@ -10,7 +10,9 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import (
     IsAuthenticated,
 )
+from rest_framework.response import Response
 
+from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     CourseRunEnrollment,
@@ -74,18 +76,11 @@ class UserEnrollmentsApiViewSet(
     filter_backends = [DjangoFilterBackend]
     filterset_class = UserEnrollmentFilterSet
 
-    queryset = (
-        CourseRunEnrollment.objects.select_related(
-            "user",
-            "run",
-            "run__b2b_contract",
-        )
-        .prefetch_related(
-            "run__b2b_contract__organization",
-            "run__course__page",
-        )
-        .prefetch("certificate", "grades")
-    )
+    queryset = CourseRunEnrollment.objects.select_related(
+        # these possibly get joined anyway via filer, so select over prefetch
+        "run",
+        "run__b2b_contract",
+    ).prefetch("certificate", "grades")
 
     def get_queryset(self):
         """Get the queryset for user enrollments."""
