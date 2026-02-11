@@ -120,6 +120,7 @@ paths:
         - 201: Code successfully redeemed and user attached to new contract(s)
         - 200: Code valid but user already attached to all associated contracts
         - 404: Invalid or expired enrollment code
+        - 409: Code valid but no available seats in associated contract(s)
         - list of ContractPageSerializer - the contracts for the user
       parameters:
       - in: path
