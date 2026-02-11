@@ -29,6 +29,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Force creation of the page (only for a course)",
         )
+        parser.add_argument(
+            "--live",
+            action="store_true",
+            help="Publish the Finaid page immediately.",
+        )
 
         parser.add_argument(
             "--slug",

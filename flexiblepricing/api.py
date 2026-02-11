@@ -424,6 +424,8 @@ def create_default_flexible_pricing_page(
     else:
         slug = slugify(title)
 
+    live = kwargs.get("live", False)
+
     form_page = FlexiblePricingRequestForm(
         intro=FINAID_FORM_TEXTS["intro"],
         title=title,
@@ -433,7 +435,7 @@ def create_default_flexible_pricing_page(
         application_approved_text=FINAID_FORM_TEXTS["approved"],
         application_approved_no_discount_text=FINAID_FORM_TEXTS["approved_no_discount"],
         application_denied_text=FINAID_FORM_TEXTS["denied"],
-        live=False,
+        live=live,
     )
     parent_page.add_child(instance=form_page)
 

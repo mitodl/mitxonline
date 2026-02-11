@@ -17,8 +17,13 @@ What doesn't this do?
 - Attempt to overwrite existing state/blow away any modifications. We will need to solve this somehow for things like courseruns which expire, but we can start here.
 """
 
+import sys
+
+from django.conf import settings
 from django.core.management import BaseCommand, call_command
 from django.db import transaction
+
+PLACEHOLDER_PROGRAM_ID = "program-v1:PLACEHOLDER+PROGRAM"
 
 
 class Command(BaseCommand):
@@ -38,7 +43,7 @@ class Command(BaseCommand):
             call_command(
                 "create_courseware",
                 "program",
-                "program-v1:PLACEHOLDER+PROGRAM",
+                PLACEHOLDER_PROGRAM_ID,
                 "PLACEHOLDER - Data, Economics and Development Policy",
                 live=True,
                 depts=["PLACEHOLDER - Economics"],
@@ -49,16 +54,29 @@ class Command(BaseCommand):
                 set_courserun_dates_automatically=True,
             )
 
-            # Step 4: create the financial aid form
+            # Step 2: create the financial aid form
             self.stdout.write(
                 self.style.SUCCESS(
                     "Creating the Placeholder financial assistance form..."
                 )
             )
 
-            call_command("create_finaid_form", "program-v1:PLACEHOLDER+PROGRAM")
+            if not settings.OPEN_EXCHANGE_RATES_APP_ID:
+                self.stderr.write(
+                    self.style.WARNING(
+                        "OPEN_EXCHANGE_RATES_APP_ID not set. Please set value from RC to continue"
+                    )
+                )
+                sys.exit(1)
+            call_command("create_finaid_form", PLACEHOLDER_PROGRAM_ID, live=True)
+            call_command(
+                "load_country_income_thresholds",
+                "flexiblepricing/data/country_income_thresholds.csv",
+            )
+            call_command("configure_tiers", program=PLACEHOLDER_PROGRAM_ID)
+            call_command("update_exchange_rates")
 
-            # Step 5: create the courses (incld. course runs)
+            # Step 3: create the courses (incld. course runs)
             self.stdout.write(self.style.SUCCESS("Creating courses and runs"))
 
             call_command(
@@ -68,7 +86,7 @@ class Command(BaseCommand):
                 "PLACEHOLDER - Demonstration Course in Program (Required)",
                 live=True,
                 create_run="PLACEHOLDER_Demo_Course_in_Program_Required",
-                program="program-v1:PLACEHOLDER+PROGRAM",
+                program=PLACEHOLDER_PROGRAM_ID,
                 required=True,  # Required or elective must be specified if course is in a program
                 depts=["Science"],
                 create_depts=True,
@@ -84,7 +102,7 @@ class Command(BaseCommand):
                 "PLACEHOLDER - Demonstration Course in Program (Elective)",
                 live=True,
                 create_run="PLACEHOLDER_Demo_Course_in_Program_Elective",
-                program="program-v1:PLACEHOLDER+PROGRAM",
+                program=PLACEHOLDER_PROGRAM_ID,
                 elective=True,  # Required or elective must be specified if course is in a program
                 depts=["Science"],
                 create_depts=True,
@@ -112,7 +130,7 @@ class Command(BaseCommand):
             call_command(
                 "create_instructor_pages",
                 fake=True,
-                readable_ids="course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_REQUIRED,course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_ELECTIVE,course-v1:PLACEHOLDER+COURSE,program-v1:PLACEHOLDER+PROGRAM",
+                readable_ids=f"course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_REQUIRED,course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_ELECTIVE,course-v1:PLACEHOLDER+COURSE,{PLACEHOLDER_PROGRAM_ID}",
             )
 
             # create_product only works for Courses. We need to see if products for programs are useful.
