@@ -8,6 +8,7 @@ from django.core.management import BaseCommand
 from cms.models import Course, Program
 from cms.utils import get_page_editing_url
 from flexiblepricing.api import create_default_flexible_pricing_page
+from flexiblepricing.utils import ensure_flexprice_form_fields
 
 
 class Command(BaseCommand):
@@ -75,6 +76,10 @@ class Command(BaseCommand):
                 **kwargs,
             )
             if page:
+                if kwargs.get("live", False):
+                    # If this page was published immediately, this ensures it'll populate things like the list of countries
+                    ensure_flexprice_form_fields(page)
+
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"Created financial assistance form for {courseware.readable_id} successfully.\n"

@@ -68,13 +68,13 @@ class Command(BaseCommand):
                     )
                 )
                 sys.exit(1)
-            call_command("create_finaid_form", PLACEHOLDER_PROGRAM_ID, live=True)
             call_command(
                 "load_country_income_thresholds",
                 "flexiblepricing/data/country_income_thresholds.csv",
             )
             call_command("configure_tiers", program=PLACEHOLDER_PROGRAM_ID)
             call_command("update_exchange_rates")
+            call_command("create_finaid_form", PLACEHOLDER_PROGRAM_ID, live=True)
 
             # Step 3: create the courses (incld. course runs)
             self.stdout.write(self.style.SUCCESS("Creating courses and runs"))
