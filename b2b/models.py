@@ -245,7 +245,7 @@ class ContractProgramItem(Orderable):
             create_program_contract_runs.delay(
                 self.contract.id,
                 self.program.id,
-                org_prefix=self.contract.organization.org_prefix,
+                org_prefix=self.contract.organization.org_key_prefix,
             )
             log.info(
                 "Queued contract run creation for program %s in contract %s",
