@@ -881,13 +881,9 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
         Q(activation_date__lte=now_in_utc()) | Q(activation_date=None),
         Q(expiration_date__gt=now_in_utc()) | Q(expiration_date=None),
     ).filter(
-        Q(
-            Q(products__product__in=products) | Q(products__isnull=True),
-            Q(user_discount_discount__user=basket.user)
-            | Q(user_discount_discount__isnull=True),
-            Q(automatic=True),
-        )
+        Q(user_discount_discount__user=basket.user)
         | Q(pk__in=finaid_discounts)
+        | Q(automatic=True)
     )
 
 
