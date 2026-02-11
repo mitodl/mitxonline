@@ -247,6 +247,11 @@ def test_b2b_contract_attachment_full_contract(mocker):
     ensure_enrollment_codes_exist(contract)
     contract_code = contract.get_discounts().first()
 
+    # Fill the contract to capacity with another user
+    existing_user = UserFactory.create()
+    existing_user.b2b_contracts.add(contract)
+    existing_user.save()
+
     user = UserFactory.create()
     client = APIClient()
     client.force_login(user)
@@ -256,28 +261,13 @@ def test_b2b_contract_attachment_full_contract(mocker):
     )
     resp = client.post(url)
 
-    # Successfully attached - should return 201
-    assert resp.status_code == 201
-    mocked_attach_user.assert_called()
+    # Contract is full - should return an error and not attach user
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "Contract is full."
+    mocked_attach_user.assert_not_called()
 
     user.refresh_from_db()
-    assert user.b2b_contracts.filter(pk=contract.id).exists()
-
-    user = UserFactory.create()
-    client = APIClient()
-    client.force_login(user)
-
-    mocked_attach_user.reset_mock()
-
-    url = reverse(
-        "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
-    )
-    resp = client.post(url)
-
-    # Code already used for attachment and contract has max_learners=1 - should return 404
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "Invalid or expired enrollment code."
-    mocked_attach_user.assert_not_called()
+    assert not user.b2b_contracts.filter(pk=contract.id).exists()
 
     user.refresh_from_db()
     assert not user.b2b_organizations.filter(pk=contract.organization.id).exists()
