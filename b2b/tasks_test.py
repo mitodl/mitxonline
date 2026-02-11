@@ -61,8 +61,8 @@ def test_create_program_contract_runs_success(mocker):
 
     assert result.successful()
     assert mock_create_contract_run.call_count == 2
-    mock_create_contract_run.assert_any_call(contract, course1)
-    mock_create_contract_run.assert_any_call(contract, course2)
+    mock_create_contract_run.assert_any_call(contract, course1, org_prefix=None)
+    mock_create_contract_run.assert_any_call(contract, course2, org_prefix=None)
 
     expected_lock_key = f"create_program_contract_runs_lock:{contract.id}:{program.id}"
     mock_cache_add.assert_called_once()
@@ -167,7 +167,9 @@ def test_create_program_contract_runs_courses_without_source_runs(mocker):
     )
 
     assert result.successful()
-    mock_create_contract_run.assert_called_once_with(contract, course_with_source)
+    mock_create_contract_run.assert_called_once_with(
+        contract, course_with_source, org_prefix=None
+    )
 
     final_log_call = mock_log_info.call_args_list[-1]
     assert "Completed contract run creation" in final_log_call[0][0]
@@ -271,7 +273,7 @@ def test_create_program_contract_runs_source_run_by_tag(mocker):
     )
 
     assert result.successful()
-    mock_create_contract_run.assert_called_once_with(contract, course)
+    mock_create_contract_run.assert_called_once_with(contract, course, org_prefix=None)
 
 
 def test_create_program_contract_runs_mixed_source_run_types(mocker):
@@ -309,8 +311,8 @@ def test_create_program_contract_runs_mixed_source_run_types(mocker):
 
     assert result.successful()
     assert mock_create_contract_run.call_count == 2
-    mock_create_contract_run.assert_any_call(contract, course1)
-    mock_create_contract_run.assert_any_call(contract, course2)
+    mock_create_contract_run.assert_any_call(contract, course1, org_prefix=None)
+    mock_create_contract_run.assert_any_call(contract, course2, org_prefix=None)
 
 
 def test_create_program_contract_runs_logging_output(mocker):
