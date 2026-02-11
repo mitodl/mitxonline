@@ -133,7 +133,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):  # pylint: disable=unused-argument  # noqa: ARG002
         use_fake_data = options["fake"]
-        readable_ids = options["readable_ids"].split(",")
+        readable_ids = (
+            options["readable_ids"].split(",") if options["readable_ids"] else []
+        )
         link_instructor_id = options["link_instructor_id"]
         if link_instructor_id:
             instructor_page = InstructorPage.objects.filter(
