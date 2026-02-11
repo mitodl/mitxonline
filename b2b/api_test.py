@@ -17,6 +17,7 @@ from b2b.api import (
     _handle_extra_enrollment_codes,
     create_b2b_enrollment,
     create_contract_run,
+    create_contract_run_key,
     ensure_contract_run_pricing,
     ensure_contract_run_products,
     ensure_enrollment_codes_exist,
@@ -36,7 +37,7 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_NONSSO,
     CONTRACT_MEMBERSHIP_SSO,
 )
-from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
+from b2b.exceptions import SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import OrganizationIndexPage, OrganizationPage, UserOrganization
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
@@ -533,21 +534,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
 
     contract = factories.ContractPageFactory.create()
     course = CourseFactory.create()
-    source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
     mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
-    this_year = now_in_utc().year
-
-    if source_run_exists:
-        # This should be the default, but need to test the case in which the
-        # source run isn't configured.
-        source_course_run_key = (
-            f"course-v1:{source_course_key.org}+{source_course_key.course}+SOURCE"
-        )
-        CourseRunFactory.create(
-            course=course, courseware_id=source_course_run_key, run_tag="SOURCE"
-        )
-
-    target_course_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_course_key.course}+{this_year}_C{contract.id}"
 
     if not source_run_exists:
         with pytest.raises(SourceCourseIncompleteError) as exc:
@@ -556,16 +543,31 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
         assert "No course runs available" in str(exc)
         return
 
+    source_course_run_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
+    source_run = CourseRunFactory.create(
+        course=course, courseware_id=str(source_course_run_key), run_tag="SOURCE"
+    )
+
+    target_course_id = create_contract_run_key(source_run, contract)
+
     if run_exists:
+        # This behavior is different than it was
+        # We used to raise an exception if this was the case - now we index the
+        # runs, so we _can_ rerun things.
         collision_run = CourseRunFactory.create(
-            course=course, courseware_id=target_course_id
+            course=course,
+            courseware_id=target_course_id,
+            b2b_contract=contract,
         )
 
-        with pytest.raises(TargetCourseRunExistsError) as exc:
-            create_contract_run(contract, course)
+        new_run, _ = create_contract_run(contract, course)
 
-        target_course_key = CourseKey.from_string(collision_run.courseware_id)
-        assert f"courseware ID {target_course_key} already exists" in str(exc)
+        collision_key = CourseKey.from_string(collision_run.courseware_id)
+        new_run_key = CourseKey.from_string(new_run.courseware_id)
+
+        # If the run tag format changes then this will fail.
+        collision_idx = collision_key.run[0]
+        assert new_run_key.run[0] == str(int(collision_idx) + 1)
         return
 
     assert not course.courseruns.filter(courseware_id=target_course_id).exists()
@@ -1056,6 +1058,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
             existing_run.course,
             skip_edx=False,
             require_designated_source_run=False,
+            org_prefix=UAI_COURSEWARE_ID_PREFIX,
         )
         assert result == (mock_run, mock_product)
     else:
@@ -1099,6 +1102,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
                 imported_course,
                 skip_edx=False,
                 require_designated_source_run=False,
+                org_prefix=UAI_COURSEWARE_ID_PREFIX,
             )
             assert result == (mock_run, mock_product)
         else:
@@ -1176,6 +1180,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
         imported_course,
         skip_edx=True,
         require_designated_source_run=True,
+        org_prefix=UAI_COURSEWARE_ID_PREFIX,
     )
 
     assert result == (mock_run, mock_product)
@@ -1213,6 +1218,7 @@ def test_import_and_create_contract_run_with_string_departments(mocker):
         existing_run.course,
         skip_edx=False,
         require_designated_source_run=False,
+        org_prefix=UAI_COURSEWARE_ID_PREFIX,
     )
     assert result == (mock_run, mock_product)
 

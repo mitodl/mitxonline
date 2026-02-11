@@ -61,7 +61,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
         courseware,
         *,
         skip_edx=False,
-        org_prefix=UAI_COURSEWARE_ID_PREFIX,
+        org_prefix=None,
     ):
         """Create a run for the specified contract."""
         try:
@@ -146,9 +146,8 @@ Specifying a program will only unlink the program from the contract, unless "--r
         )
         add_subparser.add_argument(
             "--prefix",
-            help=f"Organization prefix for the resulting course run. (Defaults to {UAI_COURSEWARE_ID_PREFIX}.)",
+            help=f"Organization prefix for the resulting course run. (Defaults to the org setting, or {UAI_COURSEWARE_ID_PREFIX}.)",
             type=str,
-            default=UAI_COURSEWARE_ID_PREFIX,
         )
 
         remove_subparser = subparsers.add_parser(
