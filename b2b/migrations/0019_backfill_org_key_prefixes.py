@@ -28,7 +28,7 @@ def reverse_backfill(apps, schema_editor):
 
     backfilled_orgs = OrganizationPage.objects.using(db_alias).all()
     for org in backfilled_orgs:
-        org.org_key_prefix = None
+        org.org_key_prefix = ""
 
     OrganizationPage.objects.using(db_alias).bulk_update(
         backfilled_orgs, ["org_key_prefix"]
