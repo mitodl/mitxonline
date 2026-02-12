@@ -17,7 +17,8 @@ class ContractPageSerializer(serializers.ModelSerializer):
     membership_type = serializers.CharField()
     programs = serializers.SerializerMethodField()
     welcome_message_extra = RichTextSerializer(
-        help_text=ContractPage._meta.get_field("welcome_message_extra").help_text  # noqa: SLF001, not private https://docs.djangoproject.com/en/5.0/ref/models/meta/
+        help_text=ContractPage._meta.get_field("welcome_message_extra").help_text,  # noqa: SLF001, not private https://docs.djangoproject.com/en/5.0/ref/models/meta/
+        read_only=True,
     )
 
     @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))

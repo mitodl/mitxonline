@@ -3493,6 +3493,7 @@ components:
           description: A welcome message for learners.
         welcome_message_extra:
           type: string
+          readOnly: true
           description: Additional welcome message content for learners.
         integration_type:
           allOf:
