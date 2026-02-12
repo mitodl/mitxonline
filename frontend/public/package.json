@@ -60,7 +60,7 @@
     "isomorphic-fetch": "2.2.1",
     "jquery": "3.7.1",
     "jsdom": "16.7.0",
-    "lodash": "4.17.21",
+    "lodash": "4.17.23",
     "mini-css-extract-plugin": "2.9.4",
     "mocha": "9.2.2",
     "moment": "2.30.1",
