@@ -29,10 +29,10 @@ def populate_min_max_price(apps, schema_editor):
     for course in CoursePage.objects.all():
         min_price, max_price = extract_numeric_prices(course.price)
         updated = False
-        if min_price is not None and course.min_price != min_price:
+        if min_price is not None and course.min_price is None:
             course.min_price = min_price
             updated = True
-        if max_price is not None and course.max_price != max_price:
+        if max_price is not None and course.max_price is None:
             course.max_price = max_price
             updated = True
         if updated:
@@ -48,10 +48,10 @@ def populate_min_max_price(apps, schema_editor):
     for program in ProgramPage.objects.all():
         min_price, max_price = extract_numeric_prices(program.price)
         updated = False
-        if min_price is not None and program.min_price != min_price:
+        if min_price is not None and program.min_price is None:
             program.min_price = min_price
             updated = True
-        if max_price is not None and program.max_price != max_price:
+        if max_price is not None and program.max_price is None:
             program.max_price = max_price
             updated = True
         if updated:
