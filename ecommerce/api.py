@@ -891,8 +891,20 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
     """
     Apply a discount to a basket.
 
-    Validates the discount, then ensures that it's better than existing discounts,
-    and finally applies it if needed.
+    Discount application is subject to rules:
+    - The discount itself must be valid on its face (not inactive, applies to products, etc.)
+    - The discount is not a financial assistance tier discount, unless allow_finaid is set
+    - The discount provides a better price to the learner than any other applied discount
+    - The discount is not overriding a user discount
+
+    If a user discount is supplied to this function, then that discount will be
+    applied _unless_ a financial assistance discount is also applied. User
+    discounts take precedence over any other discount, other than financial
+    assistance discounts.
+
+    This function is not for use with B2B or verified program enrollment code
+    redemption. Those use cases have their own redemption code paths because
+    they need different verification steps.
 
     Args:
         discount (Discount): The Discount to apply to the basket.
@@ -901,19 +913,46 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
     """
     if discount.is_valid(basket, allow_finaid=allow_finaid):
         if basket.discounts.count() > 0 and basket.basket_items.count() > 0:
-            # Check each item in the basket. This logic will have to change if
-            # we opt to support >1 discount in the basket.
-            found_better = False
+            # Check to make sure the supplied discount can be applied. This means
+            # that it should not override any user discounts that are applied,
+            # and it should be better than the other discounts in the basket.
 
-            for item in basket.basket_items.all():
-                if item.discounted_price >= discount.discount_product(
-                    item.product, basket.user
+            if discount.user_discount_discount.filter(user=basket.user).exists():
+                # This is a user discount.
+                # Check for an existing tier discount - user discount shouldn't override that
+                finaid_discounts = [
+                    discount
+                    for discount in basket.discounts.all()
+                    if discount.flexible_price_tiers.count() > 0
+                ]
+
+                if len(finaid_discounts) > 1:
+                    # There is a finaid discount, so don't apply this user one.
+                    return
+            else:
+                if (
+                    not (allow_finaid and discount.flexible_price_tiers.exists())
+                    and basket.discounts.filter(
+                        redeemed_discount__user_discount_discount__user=basket.user
+                    ).count()
+                    > 0
                 ):
-                    found_better = True
-                    continue
+                    # This basket has a user discount applied; this isn't a
+                    # finaid discount that we're permitting to be applied; so
+                    # skip this one.
+                    return
 
-            if not found_better:
-                return
+                found_better = False
+
+                for item in basket.basket_items.all():
+                    if item.discounted_price >= discount.discount_product(
+                        item.product, basket.user
+                    ):
+                        found_better = True
+                        break
+
+                if not found_better:
+                    return
 
         defaults = {
             "redeemed_discount": discount,

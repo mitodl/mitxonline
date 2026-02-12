@@ -869,14 +869,59 @@ def test_apply_discount_to_basket(user, better_discount, is_valid):
         assert basket.discounts.filter(redeemed_discount=existing_discount).exists()
 
 
-def test_get_auto_apply_discounts(user):
+@pytest.mark.parametrize(
+    "is_better",
+    [
+        True,
+        False,
+    ],
+)
+def test_apply_discount_to_basket_with_user_discount(user, is_better):
+    """
+    Test that apply_discount_to_basket function works properly with a user discount applied.
+
+    User discounts should take precedence over anything that the learner is
+    applying, whether or not it's a better discount.
+    """
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    user_discount = UnlimitedUseDiscountFactory.create(
+        amount=200, discount_type="fixed_price"
+    )
+    apply_discount = UnlimitedUseDiscountFactory.create(
+        amount=(50 if is_better else 300), discount_type="fixed_price"
+    )
+
+    UserDiscount.objects.create(user=user, discount=user_discount)
+
+    # Shortcut all the verifications for the user discount and just apply it
+    # since we expect it to be there.
+    BasketDiscount.objects.create(
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+        redeemed_discount=user_discount,
+        redeemed_basket=basket,
+    )
+
+    apply_discount_to_basket(basket, apply_discount)
+
+    assert basket.discounts.count() == 1
+    assert basket.discounts.filter(redeemed_discount=user_discount).exists()
+
+
+def test_get_auto_apply_discounts(user):  # noqa: PLR0915
     """
     Test that the auto-apply discount function works as expected.
 
     Depending on what the user's basket has in it, we should get back any of:
     - User discounts (if there's any assigned)
-    - Product discounts (if there's any assigned)
     - Financial assistance tier discount (if the user has finaid)
+    - Discounts marked as "automatic"
     - Nothing, if none of these apply
     """
 
@@ -891,7 +936,9 @@ def test_get_auto_apply_discounts(user):
     assert discounts.count() == 0
 
     # test with regular discounts
-    # (though we'll assign one to the product, and one to the user)
+    # we'll assign one to the product, but that doesn't make it automatically
+    # applicable (unless automatic=True). we'll add a user to the user one later.
+
     plain_discount = UnlimitedUseDiscountFactory.create(automatic=False)
     plain_attached_product_discount = UnlimitedUseDiscountFactory.create(
         automatic=False
@@ -900,13 +947,12 @@ def test_get_auto_apply_discounts(user):
     DiscountProduct.objects.create(
         discount=plain_attached_product_discount, product=product
     )
-    UserDiscount.objects.create(discount=plain_attached_user_discount, user=user)
 
     discounts = get_auto_apply_discounts_for_basket(basket.id)
 
     assert discounts.count() == 0
 
-    # set the product discount to auto-apply, we should see that now
+    # set the product discount to auto-apply, we should just see that now
     plain_attached_product_discount.automatic = True
     plain_attached_product_discount.save()
 
@@ -918,8 +964,8 @@ def test_get_auto_apply_discounts(user):
         "id", flat=True
     )
 
-    # set the user discount to auto-apply, we should see both of the assigned ones now
-    plain_attached_user_discount.automatic = True
+    # attach the user, we should see both it and the auto product ones now
+    UserDiscount.objects.create(discount=plain_attached_user_discount, user=user)
     plain_attached_user_discount.save()
 
     discounts = get_auto_apply_discounts_for_basket(basket.id)
@@ -930,7 +976,7 @@ def test_get_auto_apply_discounts(user):
         "id", flat=True
     )
 
-    # make the regular one auto too - that should apply regardless
+    # make the regular one auto too - now we should have 3
     plain_discount.automatic = True
     plain_discount.save()
 
@@ -953,13 +999,36 @@ def test_get_auto_apply_discounts(user):
     assert discounts.count() == 4
     assert finaid_tier.discount.id in discounts.all().values_list("id", flat=True)
 
+    # test with a new basket and a new product, but for the same user
+    # we should get the plain discount and the user discount. we should _also_
+    # get the product discount, because the discount itself is automatic (but
+    # it won't apply, because it won't be valid)
+
+    new_product = ProductFactory.create()
+    basket.delete()
+    basket = Basket.objects.create(user=user)
+    BasketItem.objects.create(basket=basket, product=new_product)
+
+    discounts = get_auto_apply_discounts_for_basket(basket.id)
+
+    assert discounts.count() == 3
+    assert plain_discount.id in discounts.all().values_list("id", flat=True)
+    assert plain_attached_user_discount.id in discounts.all().values_list(
+        "id", flat=True
+    )
+    assert plain_attached_product_discount.id in discounts.all().values_list(
+        "id", flat=True
+    )
+
+    plain_attached_product_discount.automatic = False
+    plain_attached_product_discount.save()
+
     # test with a new user, a new basket, and a new product
     # we should only see the plain_discount (because it got set to automatic
     # earlier and it's not attached to anything in particular)
 
     new_user = UserFactory.create()
     new_basket = Basket.objects.create(user=new_user)
-    new_product = ProductFactory.create()
     BasketItem.objects.create(basket=new_basket, product=new_product)
 
     discounts = get_auto_apply_discounts_for_basket(new_basket.id)
