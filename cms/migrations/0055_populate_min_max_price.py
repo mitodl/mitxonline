@@ -26,21 +26,21 @@ def extract_numeric_prices(price_stream):
 
 def populate_min_max_price(apps, schema_editor):
     CoursePage = apps.get_model("cms", "CoursePage")
-    for course in CoursePage.objects.all():
-        min_price, max_price = extract_numeric_prices(course.price)
+    for course_page in CoursePage.objects.all():
+        min_price, max_price = extract_numeric_prices(course_page.price)
         updated = False
-        if min_price is not None and course.min_price is None:
-            course.min_price = min_price
+        if course_page.min_price is None:
+            course_page.min_price = min_price if min_price is not None else 0
             updated = True
-        if max_price is not None and course.max_price is None:
-            course.max_price = max_price
+        if course_page.max_price is None:
+            course_page.max_price = max_price if max_price is not None else 0
             updated = True
         if updated:
-            course.save(
+            course_page.save(
                 update_fields=[
                     f
                     for f in ["min_price", "max_price"]
-                    if getattr(course, f) is not None
+                    if getattr(course_page, f) is not None
                 ]
             )
 
@@ -48,11 +48,11 @@ def populate_min_max_price(apps, schema_editor):
     for program in ProgramPage.objects.all():
         min_price, max_price = extract_numeric_prices(program.price)
         updated = False
-        if min_price is not None and program.min_price is None:
-            program.min_price = min_price
+        if program.min_price is None:
+            program.min_price = min_price if min_price is not None else 0
             updated = True
-        if max_price is not None and program.max_price is None:
-            program.max_price = max_price
+        if program.max_price is None:
+            program.max_price = max_price if max_price is not None else 0
             updated = True
         if updated:
             program.save(
