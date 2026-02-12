@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             name="org_key_prefix",
             field=models.CharField(
                 blank=True,
-                default="course-v1:UAI_",
+                default="UAI_",
                 help_text="The prefix to append to the org key (defaults to UAI_).",
                 max_length=30,
             ),
