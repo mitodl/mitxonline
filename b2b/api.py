@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Count, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -75,6 +76,7 @@ def ensure_b2b_organization_index() -> OrganizationIndexPage:
     return org_index_page
 
 
+@transaction.atomic
 def create_contract_run_key(
     source_course: CourseRun, contract: ContractPage, *, org_prefix: str | None = None
 ) -> str:
@@ -105,13 +107,30 @@ def create_contract_run_key(
     new_course_key = (
         f"course-v1:{org_prefix}{contract.organization.org_key}+{source_id.course}"
     )
-    run_count = (
-        CourseRun.objects.filter(courseware_id__startswith=new_course_key).count() + 1
+    mostly_run_tag = B2B_RUN_TAG_FORMAT.format(
+        run_idx="",
+        contract_id=contract.id,
+        year=now_in_utc().year,
     )
+    run_idx = 1
+
+    last_run_tag = (
+        CourseRun.objects.filter(
+            courseware_id__startswith=new_course_key,
+            courseware_id__endswith=mostly_run_tag,
+        )
+        .select_for_update()
+        .order_by("-courseware_id")
+        .first()
+    )
+    if last_run_tag:
+        run_idx, _ = CourseKey.from_string(last_run_tag.courseware_id).run.split("T")
+        run_idx = int(run_idx) + 1
+
     new_run_tag = B2B_RUN_TAG_FORMAT.format(
         year=now_in_utc().year,
         contract_id=contract.id,
-        run_idx=run_count,
+        run_idx=run_idx,
     )
     # Validate and return
     return str(CourseKey.from_string(f"{new_course_key}+{new_run_tag}"))
