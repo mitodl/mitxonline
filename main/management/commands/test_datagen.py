@@ -86,6 +86,7 @@ class Command(BaseCommand):
                 "PLACEHOLDER - Demonstration Course in Program (Required)",
                 live=True,
                 create_run="PLACEHOLDER_Demo_Course_in_Program_Required",
+                create_run_as_sourcerun=True,
                 program=PLACEHOLDER_PROGRAM_ID,
                 required=True,  # Required or elective must be specified if course is in a program
                 depts=["Science"],
@@ -102,6 +103,7 @@ class Command(BaseCommand):
                 "PLACEHOLDER - Demonstration Course in Program (Elective)",
                 live=True,
                 create_run="PLACEHOLDER_Demo_Course_in_Program_Elective",
+                create_run_as_sourcerun=True,
                 program=PLACEHOLDER_PROGRAM_ID,
                 elective=True,  # Required or elective must be specified if course is in a program
                 depts=["Science"],
@@ -119,6 +121,7 @@ class Command(BaseCommand):
                 "PLACEHOLDER - E2E Test Course",
                 live=True,
                 create_run="PLACEHOLDER_E2E_Test_Course",
+                create_run_as_sourcerun=True,
                 depts=["Math"],
                 create_depts=True,
                 create_page=True,
@@ -144,4 +147,21 @@ class Command(BaseCommand):
                 "create_product",
                 "course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_ELECTIVE+PLACEHOLDER_Demo_Course_in_Program_Elective",
                 999,
+            )
+
+            # Create an organization and enrollment code contract along w/ their CMS pages (which are live)
+            call_command(
+                "b2b_contract",
+                "create",
+                "test_organization",
+                "test_contract",
+                "code",
+                description="This is a test contract",
+                create=True,
+                org_key="test_organization",
+            )
+
+            # This will result in the creation of enrollment codes for the contract above.
+            call_command(
+                "b2b_courseware", "add", "test_contract", PLACEHOLDER_PROGRAM_ID
             )
