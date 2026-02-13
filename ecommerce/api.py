@@ -887,7 +887,7 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
     )
 
 
-def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):
+def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):  # noqa: C901
     """
     Apply a discount to a basket.
 
@@ -912,6 +912,11 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
         allow_finaid (bool): Allow a financial assistance discount through.
     """
     if discount.is_valid(basket, allow_finaid=allow_finaid):
+        defaults = {
+            "redeemed_discount": discount,
+            "redemption_date": now_in_utc(),
+        }
+
         if basket.discounts.count() > 0 and basket.basket_items.count() > 0:
             # Check to make sure the supplied discount can be applied. This means
             # that it should not override any user discounts that are applied,
@@ -931,15 +936,32 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
                     # There is a finaid discount, so don't apply this user one.
                     return
             else:
-                if discount.flexible_price_tiers.exists() and not allow_finaid:
+                is_finaid_discount = discount.flexible_price_tiers.exists()
+                has_user_discount = (
+                    basket.discounts.filter(
+                        redeemed_discount__user_discount_discount__user=basket.user
+                    ).count()
+                    > 0
+                )
+
+                if is_finaid_discount and not allow_finaid:
                     # Financial assistance discount; bail unless the flag is set
                     return
 
-                if basket.discounts.filter(
-                    redeemed_discount__user_discount_discount__user=basket.user
-                ).count() > 0 and not (
-                    allow_finaid and discount.flexible_price_tiers.exists()
-                ):
+                if has_user_discount and is_finaid_discount and allow_finaid:
+                    # Basket has a user discount applied; this is a finaid
+                    # discount (and we're allowed to apply it); apply the
+                    # discount without further evaluation.
+
+                    BasketDiscount.objects.update_or_create(
+                        redeemed_by=basket.user,
+                        redeemed_basket=basket,
+                        defaults=defaults,
+                        create_defaults=defaults,
+                    )
+                    return
+
+                if has_user_discount:
                     # This basket has a user discount applied; this isn't a
                     # finaid discount that we're permitting to be applied; so
                     # skip this one.
@@ -956,10 +978,6 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
                 if not found_better:
                     return
 
-        defaults = {
-            "redeemed_discount": discount,
-            "redemption_date": now_in_utc(),
-        }
         BasketDiscount.objects.update_or_create(
             redeemed_by=basket.user,
             redeemed_basket=basket,
