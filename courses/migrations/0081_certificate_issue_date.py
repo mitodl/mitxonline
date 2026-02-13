@@ -18,9 +18,8 @@ def populate_issue_date(apps, schema):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0080_set_grade_run_related_name'),
+        ("courses", "0080_set_grade_run_related_name"),
     ]
 
     operations = [

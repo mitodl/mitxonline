@@ -5,20 +5,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0081_certificate_issue_date'),
+        ("courses", "0081_certificate_issue_date"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='courseruncertificate',
-            name='issue_date',
-            field=models.DateTimeField(db_index=True, default=django.utils.timezone.now),
+            model_name="courseruncertificate",
+            name="issue_date",
+            field=models.DateTimeField(
+                db_index=True, default=django.utils.timezone.now
+            ),
         ),
         migrations.AlterField(
-            model_name='programcertificate',
-            name='issue_date',
-            field=models.DateTimeField(db_index=True, default=django.utils.timezone.now),
+            model_name="programcertificate",
+            name="issue_date",
+            field=models.DateTimeField(
+                db_index=True, default=django.utils.timezone.now
+            ),
         ),
     ]
