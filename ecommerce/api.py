@@ -921,21 +921,24 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
                 # This is a user discount.
                 # Check for an existing tier discount - user discount shouldn't override that
                 finaid_discounts = [
-                    discount
-                    for discount in basket.discounts.all()
-                    if discount.flexible_price_tiers.count() > 0
+                    basket_discount
+                    for basket_discount in basket.discounts.all()
+                    if basket_discount.redeemed_discount.flexible_price_tiers.count()
+                    > 0
                 ]
 
-                if len(finaid_discounts) > 1:
+                if len(finaid_discounts) > 0:
                     # There is a finaid discount, so don't apply this user one.
                     return
             else:
-                if (
-                    not (allow_finaid and discount.flexible_price_tiers.exists())
-                    and basket.discounts.filter(
-                        redeemed_discount__user_discount_discount__user=basket.user
-                    ).count()
-                    > 0
+                if discount.flexible_price_tiers.exists() and not allow_finaid:
+                    # Financial assistance discount; bail unless the flag is set
+                    return
+
+                if basket.discounts.filter(
+                    redeemed_discount__user_discount_discount__user=basket.user
+                ).count() > 0 and not (
+                    allow_finaid and discount.flexible_price_tiers.exists()
                 ):
                     # This basket has a user discount applied; this isn't a
                     # finaid discount that we're permitting to be applied; so

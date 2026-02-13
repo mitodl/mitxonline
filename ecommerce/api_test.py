@@ -34,7 +34,11 @@ from ecommerce.api import (
     refund_order,
     unenroll_learner_from_order,
 )
-from ecommerce.constants import TRANSACTION_TYPE_PAYMENT, TRANSACTION_TYPE_REFUND
+from ecommerce.constants import (
+    DISCOUNT_TYPE_FIXED_PRICE,
+    TRANSACTION_TYPE_PAYMENT,
+    TRANSACTION_TYPE_REFUND,
+)
 from ecommerce.exceptions import (
     VerifiedProgramInvalidBasketError,
     VerifiedProgramNoEnrollmentError,
@@ -891,10 +895,10 @@ def test_apply_discount_to_basket_with_user_discount(user, is_better):
     BasketItem.objects.create(basket=basket, product=product, quantity=1)
 
     user_discount = UnlimitedUseDiscountFactory.create(
-        amount=200, discount_type="fixed_price"
+        amount=200, discount_type=DISCOUNT_TYPE_FIXED_PRICE
     )
     apply_discount = UnlimitedUseDiscountFactory.create(
-        amount=(50 if is_better else 300), discount_type="fixed_price"
+        amount=(50 if is_better else 300), discount_type=DISCOUNT_TYPE_FIXED_PRICE
     )
 
     UserDiscount.objects.create(user=user, discount=user_discount)
@@ -912,6 +916,67 @@ def test_apply_discount_to_basket_with_user_discount(user, is_better):
 
     assert basket.discounts.count() == 1
     assert basket.discounts.filter(redeemed_discount=user_discount).exists()
+
+
+@pytest.mark.parametrize("apply_finaid_first", [True, False])
+def test_apply_discount_to_basket_with_user_discount_and_finaid(
+    user, apply_finaid_first
+):
+    """
+    Test that apply_discount_to_basket function works properly with a finaid discount
+    and user discount applied.
+
+    User discounts should take precedence over anything that the learner is
+    applying, whether or not it's a better discount, unless there's a financial
+    assistance discount applied.
+    """
+
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+    finaid_tier = FlexiblePriceTierFactory(courseware_object=run.course)
+    FlexiblePriceFactory(
+        user=user,
+        courseware_object=run.course,
+        tier=finaid_tier,
+        status=FlexiblePriceStatus.APPROVED,
+    )
+    finaid_tier.discount.discount_type = DISCOUNT_TYPE_FIXED_PRICE
+    finaid_tier.discount.amount = 100
+    finaid_tier.discount.save()
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    user_discount = UnlimitedUseDiscountFactory.create(
+        amount=200, discount_type=DISCOUNT_TYPE_FIXED_PRICE
+    )
+    UserDiscount.objects.create(user=user, discount=user_discount)
+
+    BasketDiscount.objects.create(
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+        redeemed_discount=finaid_tier.discount if apply_finaid_first else user_discount,
+        redeemed_basket=basket,
+    )
+
+    apply_discount_to_basket(
+        basket,
+        user_discount if apply_finaid_first else finaid_tier.discount,
+        allow_finaid=True,
+    )
+
+    assert basket.discounts.count() == 1
+    assert basket.discounts.filter(redeemed_discount=finaid_tier.discount).exists()
+
+    regular_discount = UnlimitedUseDiscountFactory.create(
+        amount=50, discount_type=DISCOUNT_TYPE_FIXED_PRICE
+    )
+    apply_discount_to_basket(basket, regular_discount)
+
+    assert basket.discounts.count() == 1
+    # The finaid discount should override the user discount, so we should now
+    # have the regular discount, because it's better.
+    assert basket.discounts.filter(redeemed_discount=regular_discount).exists()
 
 
 def test_get_auto_apply_discounts(user):  # noqa: PLR0915
