@@ -20,7 +20,7 @@ def populate_issue_date(apps, schema):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('courses', '0079_remove_courserun_courseware_url_path'),
+        ('courses', '0080_set_grade_run_related_name'),
     ]
 
     operations = [
