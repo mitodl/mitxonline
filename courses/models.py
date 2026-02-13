@@ -6,6 +6,7 @@ Course models
 import logging
 import uuid
 from decimal import ROUND_HALF_EVEN, Decimal
+from django.utils import timezone
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -1346,13 +1347,18 @@ class BaseCertificate(models.Model):
         help_text="Indicates whether or not the certificate is revoked",
         verbose_name="revoked",
     )
-    issue_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    issue_date = models.DateTimeField(null=False, blank=False, db_index=True, default=timezone.now)
     verifiable_credential = models.OneToOneField(
         VerifiableCredential, on_delete=models.SET_NULL, blank=True, null=True
     )
 
     class Meta:
         abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self.issue_date:
+            self.issue_date = getattr(self, "created_on", None)
+        super().save(*args, **kwargs)
 
     def get_certified_object_id(self):
         """Gets the id of the certificate's program/run"""
