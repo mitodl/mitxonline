@@ -948,9 +948,8 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
                 found_better = False
 
                 for item in basket.basket_items.all():
-                    if item.discounted_price >= discount.discount_product(
-                        item.product, basket.user
-                    ):
+                    test_price = discount.discount_product(item.product, basket.user)
+                    if test_price and item.discounted_price >= test_price:
                         found_better = True
                         break
 
