@@ -132,11 +132,13 @@ class AttachContractApi(APIView):
             # a contract that is actually full. In that case we want to return
             # 409 (Contract is full) instead of a generic 404.
 
-            fallback_discounts = Discount.objects.filter(
-                Q(activation_date__isnull=True) | Q(activation_date__lte=now)
-            ).filter(
-                Q(expiration_date__isnull=True) | Q(expiration_date__gte=now)
-            ).filter(discount_code=enrollment_code)
+            fallback_discounts = (
+                Discount.objects.filter(
+                    Q(activation_date__isnull=True) | Q(activation_date__lte=now)
+                )
+                .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
+                .filter(discount_code=enrollment_code)
+            )
 
             for discount in fallback_discounts:
                 for contract in discount.b2b_contracts():
