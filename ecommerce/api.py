@@ -852,6 +852,12 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
     """
     Get the auto-apply discounts that can be applied to a basket.
 
+    This includes the financial assistant discounts for the user and products,
+    if there are any, since those are also automatically applied regardless of
+    the flag on the discount. This does not include B2B discounts because those
+    are applied in a different manner - either through a separate API, or by the
+    learner via the cart interface.
+
     Args:
         basket_id (int): The ID of the basket to get the auto-apply discounts for.
 
@@ -861,17 +867,44 @@ def get_auto_apply_discounts_for_basket(basket_id: int) -> QuerySet[Discount]:
     basket = Basket.objects.get(pk=basket_id)
     products = basket.get_products()
 
+    finaid_discounts = []
+
+    for product in products:
+        finaid_discount = determine_courseware_flexible_price_discount(
+            product, basket.user
+        )
+
+        if finaid_discount:
+            finaid_discounts.append(finaid_discount.id)
+
     return Discount.objects.filter(
-        Q(products__product__in=products) | Q(products__isnull=True),
+        Q(activation_date__lte=now_in_utc()) | Q(activation_date=None),
+        Q(expiration_date__gt=now_in_utc()) | Q(expiration_date=None),
+    ).filter(
         Q(user_discount_discount__user=basket.user)
-        | Q(user_discount_discount__isnull=True),
-        automatic=True,
+        | Q(pk__in=finaid_discounts)
+        | Q(automatic=True)
     )
 
 
-def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):
+def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid=False):  # noqa: C901
     """
     Apply a discount to a basket.
+
+    Discount application is subject to rules:
+    - The discount itself must be valid on its face (not inactive, applies to products, etc.)
+    - The discount is not a financial assistance tier discount, unless allow_finaid is set
+    - The discount provides a better price to the learner than any other applied discount
+    - The discount is not overriding a user discount
+
+    If a user discount is supplied to this function, then that discount will be
+    applied _unless_ a financial assistance discount is also applied. User
+    discounts take precedence over any other discount, other than financial
+    assistance discounts.
+
+    This function is not for use with B2B or verified program enrollment code
+    redemption. Those use cases have their own redemption code paths because
+    they need different verification steps.
 
     Args:
         discount (Discount): The Discount to apply to the basket.
@@ -879,11 +912,77 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
         allow_finaid (bool): Allow a financial assistance discount through.
     """
     if discount.is_valid(basket, allow_finaid=allow_finaid):
-        BasketDiscount.objects.create(
+        defaults = {
+            "redeemed_discount": discount,
+            "redemption_date": now_in_utc(),
+        }
+
+        if basket.discounts.count() > 0 and basket.basket_items.count() > 0:
+            # Check to make sure the supplied discount can be applied. This means
+            # that it should not override any user discounts that are applied,
+            # and it should be better than the other discounts in the basket.
+
+            if discount.user_discount_discount.filter(user=basket.user).exists():
+                # This is a user discount.
+                # Check for an existing tier discount - user discount shouldn't override that
+                finaid_discounts = [
+                    basket_discount
+                    for basket_discount in basket.discounts.all()
+                    if basket_discount.redeemed_discount.flexible_price_tiers.count()
+                    > 0
+                ]
+
+                if len(finaid_discounts) > 0:
+                    # There is a finaid discount, so don't apply this user one.
+                    return
+            else:
+                is_finaid_discount = discount.flexible_price_tiers.exists()
+                has_user_discount = (
+                    basket.discounts.filter(
+                        redeemed_discount__user_discount_discount__user=basket.user
+                    ).count()
+                    > 0
+                )
+
+                if is_finaid_discount and not allow_finaid:
+                    # Financial assistance discount; bail unless the flag is set
+                    return
+
+                if has_user_discount and is_finaid_discount and allow_finaid:
+                    # Basket has a user discount applied; this is a finaid
+                    # discount (and we're allowed to apply it); apply the
+                    # discount without further evaluation.
+
+                    BasketDiscount.objects.update_or_create(
+                        redeemed_by=basket.user,
+                        redeemed_basket=basket,
+                        defaults=defaults,
+                        create_defaults=defaults,
+                    )
+                    return
+
+                if has_user_discount:
+                    # This basket has a user discount applied; this isn't a
+                    # finaid discount that we're permitting to be applied; so
+                    # skip this one.
+                    return
+
+                found_better = False
+
+                for item in basket.basket_items.all():
+                    test_price = discount.discount_product(item.product, basket.user)
+                    if test_price and item.discounted_price >= test_price:
+                        found_better = True
+                        break
+
+                if not found_better:
+                    return
+
+        BasketDiscount.objects.update_or_create(
             redeemed_by=basket.user,
-            redeemed_discount=discount,
             redeemed_basket=basket,
-            redemption_date=now_in_utc(),
+            defaults=defaults,
+            create_defaults=defaults,
         )
 
 
