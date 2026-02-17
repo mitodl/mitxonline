@@ -648,10 +648,6 @@ def test_discount_redemptions_api(
 
     discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
 
-    discount.amount = 0
-    discount.discount_type = "fixed-price"
-    discount.save()
-
     # permissions testing
     resp = user_drf_client.get(
         reverse("v0:discounts_api-detail", kwargs={"pk": discount.id})
