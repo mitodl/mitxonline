@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.138.0
+---------------
+
+- Hubspot sync for SCIM created users (#3269)
+- Make min max product price required (#3262)
+- Improve rich text field serialization (#3287)
+- Update dependency webpack-dev-server to v5 [SECURITY] (#3270)
+- [pre-commit.ci] pre-commit autoupdate (#3247)
+- Update dependency lodash to v4.17.23 [SECURITY] (#3239)
+- Update actions/cache digest to cdf6c1f (#3282)
+- Test datagen for playwright test (#3280)
+
 Version 0.137.14 (Released February 17, 2026)
 ----------------
 
