@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.137.14
+Version 0.137.14 (Released February 17, 2026)
 ----------------
 
 - Improve /api/v2/enrollments/ performance (#3268)
