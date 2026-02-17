@@ -283,6 +283,7 @@ class Command(BaseCommand):
             upgrade_deadline=(
                 parse_supplied_date(kwargs["upgrade"]) if kwargs["upgrade"] else None
             ),
+            is_source_run=kwargs.get("create_run_as_sourcerun", False),
         )
 
         self.stdout.write(
@@ -451,6 +452,11 @@ class Command(BaseCommand):
             type=str,
             help="(Course and course run only) Create a run with the specified tag.",
             metavar="create_run",
+        )
+        parser.add_argument(
+            "--create-run-as-sourcerun",
+            action="store_true",
+            help="When specified with --create-run, creates the course run as a source run.",
         )
 
         parser.add_argument(
