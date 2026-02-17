@@ -1158,3 +1158,8 @@ def test_courserun_qs_b2b_flags():
     assert CourseRun.objects.available(include_b2b=True).count() == 6
     assert CourseRun.objects.count() == 6
     assert CourseRun.objects.exclude_b2b().count() == 3
+
+
+def test_program_requirements_root_node_collation():
+    """Ensure we can create a bunch of programs ()"""
+    ProgramFactory.create_batch(100)

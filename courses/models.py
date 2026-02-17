@@ -2089,6 +2089,10 @@ class ProgramRequirement(MP_Node):
     # extended alphabet from the default to the recommended one for postgres
     alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
+    # we override to use C collation so that lowercase letters sort after uppercase
+    # regardless of the DB's underlying OS collation
+    path = models.CharField(max_length=255, unique=True, db_collation="C")
+
     node_type = models.CharField(  # noqa: DJ001
         choices=ProgramRequirementNodeType.choices,
         max_length=len(max(ProgramRequirementNodeType.values, key=len)),
