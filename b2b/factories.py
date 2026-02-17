@@ -39,8 +39,10 @@ class OrganizationPageFactory(wagtail_factories.PageFactory):
     logo = None
     sso_organization_id = LazyAttribute(lambda _: uuid4())
     parent = LazyAttribute(
-        lambda _: OrganizationIndexPage.objects.first()
-        or OrganizationIndexPageFactory.create()
+        lambda _: (
+            OrganizationIndexPage.objects.first()
+            or OrganizationIndexPageFactory.create()
+        )
     )
     slug = LazyAttribute(lambda _: FAKE.unique.slug())
 
@@ -56,9 +58,9 @@ class ContractPageFactory(wagtail_factories.PageFactory):
     organization = SubFactory(OrganizationPageFactory)
     parent = LazyAttribute(lambda o: o.organization)
     integration_type = LazyFunction(
-        lambda: CONTRACT_MEMBERSHIP_NONSSO
-        if FAKE.boolean()
-        else CONTRACT_MEMBERSHIP_SSO
+        lambda: (
+            CONTRACT_MEMBERSHIP_NONSSO if FAKE.boolean() else CONTRACT_MEMBERSHIP_SSO
+        )
     )
     membership_type = LazyAttribute(lambda o: o.integration_type)
     slug = LazyAttribute(lambda _: FAKE.unique.slug())

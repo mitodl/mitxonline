@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 0.137.14 (Released February 17, 2026)
+----------------
+
+- Improve /api/v2/enrollments/ performance (#3268)
+- Fix redemption display error; add toggle to turn redemption data off (#3281)
+- Trim extra enrollment codes from the end of the list, rather than the top (#3284)
+- Remove Syria as from restricted list (#3286)
+- Ignore edx failures variable usage (#3260)
+- api/v2/courses, api/v2/programs retrieve by readable_id (#3278)
+- Upgrading django-oauth-toolkit to 3.1 (#3142)
+- Remove unused newrelic (#3285)
+- Update newrelic to 11.4 (#3283)
+- Make verifiable_credential a raw_id field vs a lookup (#3279)
+- Update populate_course_data to include_in_learn_catalog (#3276)
+- Filter b2b courseware objects from the v2 courses api (#3259)
+
 Version 0.137.13 (Released February 05, 2026)
 ----------------
 

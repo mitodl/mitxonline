@@ -170,8 +170,9 @@ class InstructorIndexPageFactory(wagtail_factories.PageFactory):
 class InstructorPageFactory(wagtail_factories.PageFactory):
     feature_image = factory.SubFactory(wagtail_factories.ImageFactory)
     parent = LazyAttribute(
-        lambda _: InstructorIndexPage.objects.first()
-        or InstructorIndexPageFactory.create()
+        lambda _: (
+            InstructorIndexPage.objects.first() or InstructorIndexPageFactory.create()
+        )
     )
     title = factory.Faker("name")
     instructor_name = factory.Faker("name")

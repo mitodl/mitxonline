@@ -364,6 +364,7 @@ def get_optional_placeholder_values_for_courseware_type(
         "min_weeks": 1,
         "max_weeks": 1,
         "effort": "PLACEHOLDER - 1-2 hours per week",
+        "length": "PLACEHOLDER - 1 week",
         "min_price": 37,
         "max_price": 149,
         "prerequisites": "PLACEHOLDER - No prerequisites, other than a willingness to learn",
@@ -449,16 +450,11 @@ def create_default_courseware_page(
         raise ValidationError(f"No valid index page found for {courseware}.")  # noqa: B904, EM102
 
     if isinstance(courseware, Course):
-        page = CoursePage(
-            course=courseware, **page_framework, **course_only_kwargs, **optional_kwargs
-        )
+        merged_kwargs = page_framework | course_only_kwargs | optional_kwargs
+        page = CoursePage(course=courseware, **merged_kwargs)
     else:
-        page = ProgramPage(
-            program=courseware,
-            **page_framework,
-            **program_only_kwargs,
-            **optional_kwargs,
-        )
+        merged_kwargs = page_framework | program_only_kwargs | optional_kwargs
+        page = ProgramPage(program=courseware, **merged_kwargs)
 
     parent_page.add_child(instance=page)
 

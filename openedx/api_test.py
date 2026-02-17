@@ -397,16 +397,18 @@ def test_create_edx_user_409_errors(settings, error_data, lti_fix_response_statu
         (
             [],
             "José",
-            lambda username: username.startswith("José_")
-            and len(username) > len("José"),
+            lambda username: (
+                username.startswith("José_") and len(username) > len("José")
+            ),
             "with empty suggestions (non-ASCII fallback)",
             False,
         ),
         (
             [],
             "José",
-            lambda username: username.startswith("José_")
-            and len(username) > len("José"),
+            lambda username: (
+                username.startswith("José_") and len(username) > len("José")
+            ),
             "with empty suggestions (non-ASCII fallback)",
             True,
         ),
