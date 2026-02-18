@@ -79,6 +79,9 @@ class Command(BaseCommand):
             type=str,
             help="Optionally enroll the new user in the specified courseware.",
         )
+        parser.add_argument(
+            "--password", default=None, help="The learner's password.", type=str
+        )
 
     def handle(self, *args, **kwargs):  # noqa: ARG002
         if User.objects.filter(
@@ -92,9 +95,12 @@ class Command(BaseCommand):
         validate_iso_3166_1_code(kwargs["countrycode"])
         validate_email_addresses([kwargs["email"]])
 
-        password = getpass(
-            f"Creating user {kwargs['username']}. Please enter their new password: "
-        )
+        if kwargs.get("password"):
+            password = kwargs["password"]
+        else:
+            password = getpass(
+                f"Creating user {kwargs['username']}. Please enter their new password: "
+            )
 
         new_account = User.objects.create_user(
             kwargs["username"], kwargs["email"], password

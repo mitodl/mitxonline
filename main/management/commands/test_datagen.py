@@ -18,10 +18,15 @@ What doesn't this do?
 """
 
 import sys
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.management import BaseCommand, call_command
 from django.db import transaction
+
+from b2b.api import _create_discount_with_product
+from b2b.models import ContractPage
+from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
 
 PLACEHOLDER_PROGRAM_ID = "program-v1:PLACEHOLDER+PROGRAM"
 
@@ -161,7 +166,32 @@ class Command(BaseCommand):
                 org_key="test_organization",
             )
 
-            # This will result in the creation of enrollment codes for the contract above.
             call_command(
                 "b2b_courseware", "add", "test_contract", PLACEHOLDER_PROGRAM_ID
+            )
+
+            # Marginally scuffed, but we want to create codes with known values for use in tests
+            contract = ContractPage.objects.get(name="test_contract")
+            products = contract.get_products()
+            course_runs_map = {run.id: run for run in contract.get_course_runs()}
+            for product in products:
+                corresponding_run = course_runs_map[product.object_id]
+                # Run tag includes the current year, so it's not ideal, but it's stable enough for us to start with.
+                code = corresponding_run.courseware_id
+                self.stdout.write(f"Creating discount with code: {code}")
+                _create_discount_with_product(
+                    product, Decimal(0), REDEMPTION_TYPE_UNLIMITED, code_override=code
+                )
+
+            # In the future, it might make more sense to use one of the Keycloak provided users.
+            # Since they're provisioned at first login, I'm not sure if I can create them here without screwing up their use for manual login
+            call_command(
+                "create_user",
+                "testlearner",
+                "testlearner@mitxonline.odl.local",
+                "Test",
+                "Learner",
+                "Test Learner",
+                "US",
+                password="testpassword123",  # noqa: S106
             )

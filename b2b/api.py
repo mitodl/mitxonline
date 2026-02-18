@@ -615,12 +615,15 @@ def _get_discount_defaults(discount_amount: Decimal) -> dict:
 
 
 def _create_discount_with_product(
-    product: Product, discount_amount: Decimal, redemption_type: str
+    product: Product,
+    discount_amount: Decimal,
+    redemption_type: str,
+    code_override: str | None = None,
 ) -> Discount:
     """Create a discount and associate it with a product."""
     defaults = _get_discount_defaults(discount_amount)
     discount = Discount(
-        discount_code=uuid4(),
+        discount_code=uuid4() if code_override is None else code_override,
         redemption_type=redemption_type,
         **defaults,
     )
