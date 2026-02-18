@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from courses import models
+from courses.api import create_run_enrollments
 from courses.serializers.v1.base import (
+    BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
     BaseCourseSerializer,
-    CourseRunGradeSerializer,
 )
 from courses.serializers.v3.certificates import CourseRunCertificateSerializer
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from main import features
 
 log = logging.getLogger(__name__)
 
@@ -38,15 +41,12 @@ class CourseRunWithCourseSerializer(BaseCourseRunSerializer):
 
 
 @extend_schema_serializer(component_name="CourseRunEnrollmentV3")
-class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
+class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
     """CourseRunEnrollment model serializer"""
 
     run = CourseRunWithCourseSerializer(read_only=True)
-    enrollment_mode = serializers.ChoiceField(
-        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
-    )
+    run_id = serializers.IntegerField(write_only=True)
     certificate = CourseRunCertificateSerializer(read_only=True, allow_null=True)
-    grades = CourseRunGradeSerializer(many=True, read_only=True)
 
     b2b_organization_id = serializers.SerializerMethodField(read_only=True)
     b2b_contract_id = serializers.SerializerMethodField(read_only=True)
@@ -63,14 +63,31 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         """Get the B2B contract ID if this enrollment is associated with a B2B contract."""
         return enrollment.run.b2b_contract_id
 
-    class Meta:
+    def create(self, validated_data):
+        """Create a new course run enrollment."""
+        user = self.context["user"]
+        run_id = validated_data["run_id"]
+        run = models.CourseRun.objects.filter(id=run_id).first()
+
+        if run is None or run.b2b_contract_id is not None:
+            raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+
+        successful_enrollments, _ = create_run_enrollments(
+            user,
+            [run],
+            keep_failed_enrollments=settings.FEATURES.get(
+                features.IGNORE_EDX_FAILURES, False
+            ),
+        )
+        return successful_enrollments
+
+    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
         model = models.CourseRunEnrollment
         fields = [
-            "id",
+            *BaseCourseRunEnrollmentSerializer.Meta.fields,
             "run",
+            "run_id",
             "b2b_organization_id",
             "b2b_contract_id",
-            "enrollment_mode",
             "certificate",
-            "grades",
         ]
