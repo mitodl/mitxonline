@@ -91,11 +91,8 @@ trino = "^0.336.0"
 granian = "^2.5.4"
 mitol-django-olposthog = "^2025.8.1"
 django-removals = "^1.1.6"
-<<<<<<< HEAD
 django-prefetch = "^1.2.3"
-=======
 pluggy = "^1.6.0"
->>>>>>> 2372d5b9 (WIP: start on plugin architecture)
 
 
 [tool.poetry.group.dev.dependencies]
