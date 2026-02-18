@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.138.1
+Version 0.138.1 (Released February 18, 2026)
 ---------------
 
 - Fix program requirement root node ordering (#3294)
