@@ -3,9 +3,9 @@ from rest_framework import serializers
 
 from courses.models import (
     Program,
-    ProgramCertificate,
     ProgramEnrollment,
 )
+from courses.serializers.v3.certificates import ProgramCertificateSerializer
 
 
 @extend_schema_serializer(
@@ -23,15 +23,6 @@ class SimpleProgramSerializer(serializers.ModelSerializer):
             "program_type",
             "live",
         ]
-
-
-@extend_schema_serializer(component_name="V3ProgramCertificate")
-class ProgramCertificateSerializer(serializers.ModelSerializer):
-    """ProgramCertificate model serializer"""
-
-    class Meta:
-        model = ProgramCertificate
-        fields = ["uuid", "link"]
 
 
 @extend_schema_serializer(component_name="V3UserProgramEnrollment")

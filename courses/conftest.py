@@ -92,7 +92,7 @@ def course_catalog_data(
     for idx in range(course_catalog_course_count):
         course, course_runs_for_course = _create_course(idx)
         courses.append(course)
-        course_runs.append(course_runs_for_course)
+        course_runs.extend(course_runs_for_course)
     for _ in range(course_catalog_program_count):
         program = _create_program(programs, courses, fake)
         programs.append(program)
@@ -157,7 +157,9 @@ def _create_program(programs, courses, fake):
 class B2BCourses(NamedTuple):
     organizations: list[OrganizationPage]
     contracts_by_org_id: dict[int, ContractPage]
-    course_runs_by_contract_id: dict[int, CourseRun]
+    course_runs: list[CourseRun]
+    course_runs_by_contract_id: dict[int, list[CourseRun]]
+    course_runs_by_org_id: dict[int, list[CourseRun]]
 
 
 @pytest.fixture
@@ -167,25 +169,31 @@ def b2b_courses(fake, course_catalog_data):
     organizations = OrganizationPageFactory.create_batch(3)
     contracts = []
     contracts_by_org_id = {}
+    course_runs = []
     course_runs_by_contract_id = defaultdict(list)
+    course_runs_by_org_id = defaultdict(list)
 
     for org in organizations:
         org_contracts = ContractPageFactory.create_batch(3)
         contracts_by_org_id[org.id] = org_contracts
-        contracts.append(org_contracts)
+        contracts.extend(org_contracts)
 
-    for run in fake.random_sample(runs, length=ceil(len(courses) * 0.5)):
+    for run in fake.random_sample(runs, length=ceil(len(runs) * 0.5)):
         contract = fake.random_element(elements=contracts)
 
         run.b2b_contract = contract
         run.save()
 
+        course_runs.append(run)
         course_runs_by_contract_id[contract.id].append(run)
+        course_runs_by_org_id[contract.organization_id].append(run)
 
     return B2BCourses(
         organizations=organizations,
         contracts_by_org_id=contracts_by_org_id,
+        course_runs=course_runs,
         course_runs_by_contract_id=course_runs_by_contract_id,
+        course_runs_by_org_id=course_runs_by_org_id,
     )
 
 
@@ -193,16 +201,16 @@ def b2b_courses(fake, course_catalog_data):
 def user_run_enrollment_count(request, course_catalog_data: CourseCatalogData):
     course_count = len(course_catalog_data.courses)
     count = getattr(request, "param", ceil(course_count * 0.7))
-    assert count <= course_count, "Cannot have more certificates than courses"
+    if count > course_count:
+        return pytest.fail("Cannot have more certificates than courses")
     return count
 
 
 @pytest.fixture
 def user_run_certificate_count(request, user_run_enrollment_count):
     count = getattr(request, "param", ceil(user_run_enrollment_count * 0.7))
-    assert count <= user_run_enrollment_count, (
-        "Cannot have more run certificates than run enrollments"
-    )
+    if count > user_run_enrollment_count:
+        return pytest.fail("Cannot have more run certificates than run enrollments")
     return count
 
 
@@ -210,16 +218,18 @@ def user_run_certificate_count(request, user_run_enrollment_count):
 def user_program_enrollment_count(request, course_catalog_data):
     program_count = len(course_catalog_data.programs)
     count = getattr(request, "param", ceil(program_count * 0.7))
-    assert count <= program_count, "Cannot have more certificates than programs"
+    if count > program_count:
+        return pytest.fail("Cannot have more certificates than programs")
     return count
 
 
 @pytest.fixture
 def user_program_certificate_count(request, user_program_enrollment_count):
     count = getattr(request, "param", ceil(user_program_enrollment_count * 0.7))
-    assert count <= user_program_enrollment_count, (
-        "Cannot have more program certificates than program enrollments"
-    )
+    if count > user_program_enrollment_count:
+        return pytest.fail(
+            "Cannot have more program certificates than program enrollments"
+        )
     return count
 
 
@@ -280,7 +290,7 @@ def user_with_enrollments_and_certificates(
     runs_to_enroll_in = fake.random_sample(
         course_runs, length=user_enrollment_config.run_enrollment_count
     )
-    runs_with_certificate = fake.ransom_sample(
+    runs_with_certificate = fake.random_sample(
         runs_to_enroll_in, length=user_enrollment_config.run_certificate_count
     )
 

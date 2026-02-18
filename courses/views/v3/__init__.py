@@ -3,6 +3,7 @@ Course API Views version 2
 """
 
 import django_filters
+from django.conf import settings
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -20,6 +21,7 @@ from courses.models import (
 )
 from courses.serializers.v3.courses import CourseRunEnrollmentSerializer
 from courses.serializers.v3.programs import ProgramEnrollmentSerializer
+from main import features
 
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
@@ -76,11 +78,15 @@ class UserEnrollmentsApiViewSet(
     filter_backends = [DjangoFilterBackend]
     filterset_class = UserEnrollmentFilterSet
 
-    queryset = CourseRunEnrollment.objects.select_related(
-        # these possibly get joined anyway via filer, so select over prefetch
-        "run",
-        "run__b2b_contract",
-    ).prefetch("certificate", "grades")
+    queryset = (
+        CourseRunEnrollment.objects.select_related(
+            # these possibly get joined anyway via filer, so select over prefetch
+            "run",
+            "run__b2b_contract",
+        )
+        .prefetch("certificate")
+        .order_by("id")
+    )
 
     def get_queryset(self):
         """Get the queryset for user enrollments."""

@@ -1,5 +1,5 @@
 """
-Tests for courses api views v2
+Tests for courses api views v3
 """
 
 import pytest
@@ -7,68 +7,127 @@ from django.db.models import Q
 from django.urls import reverse
 from rest_framework import status
 
-from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from courses.conftest import CourseCatalogData, UserWithEnrollmentsAndCerts
+from courses.conftest import B2BCourses, UserWithEnrollmentsAndCerts
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
-from courses.factories import (
-    CourseFactory,
-    CourseRunEnrollmentFactory,
-    CourseRunFactory,
-)
 from courses.models import (
     ProgramEnrollment,
 )
 from courses.serializers.v3.programs import SimpleProgramSerializer
-from courses.test_utils import maybe_serialize_program_cert
+from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
 
-pytestmark = [pytest.mark.django_db]
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True),
+    pytest.mark.parametrize("course_catalog_program_count", [20], indirect=True),
+    pytest.mark.usefixtures("b2b_courses", "course_catalog_data"),
+]
 
 
-@pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
-@pytest.mark.parametrize("course_catalog_program_count", [20], indirect=True)
-def test_user_enrollments_b2b_organization(
-    b2b_courses: B2BCourses,
-    course_catalog_data: CourseCatalogData,
+def test_user_enrollments(
+    user_drf_client,
     user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
 ):
     """Test that user enrollments can be filtered by B2B organization ID"""
-
-    org = OrganizationPageFactory.create()
-    contract = ContractPageFactory.create(organization=org)
-
-    regular_course = CourseFactory.create()
-    regular_run = CourseRunFactory.create(course=regular_course)
-
-    b2b_course = CourseFactory.create()
-    b2b_run = CourseRunFactory.create(course=b2b_course, b2b_contract=contract)
-
-    CourseRunEnrollmentFactory.create(user=user, run=regular_run)
-    b2b_enrollment = CourseRunEnrollmentFactory.create(user=user, run=b2b_run)
-
-    resp = user_drf_client.get(reverse("v2:user-enrollments-api-list"))
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
     assert resp.status_code == status.HTTP_200_OK
-    assert len(resp.json()) == 2
+    assert resp.json() == [
+        {
+            "id": enrollment.id,
+            "run_id": enrollment.run.id,
+            "course_id": enrollment.run.course_id,
+            "b2b_contract_id": enrollment.run.b2b_contract_id,
+            "b2b_organization_id": enrollment.run.b2b_contract.organization_id
+            if enrollment.run.b2b_contract
+            else None,
+            "enrollment_mode": enrollment.enrollment_mode,
+            "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+        }
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+    ]
+
+
+def test_user_enrollments_filter_org_id(
+    user_drf_client,
+    b2b_courses: B2BCourses,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+    org = b2b_courses.organizations[0]
+
+    for org in b2b_courses.organizations:
+        resp = user_drf_client.get(
+            reverse("v3:user_enrollments_api-list"), {"org_id": org.id}
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json() == [
+            {
+                "id": enrollment.id,
+                "run_id": enrollment.run.id,
+                "course_id": enrollment.run.course_id,
+                "b2b_contract_id": enrollment.run.b2b_contract_id,
+                "b2b_organization_id": enrollment.run.b2b_contract.organization_id
+                if enrollment.run.b2b_contract
+                else None,
+                "enrollment_mode": enrollment.enrollment_mode,
+                "certificate": maybe_serialize_course_cert(
+                    enrollment.run, enrollment.user
+                ),
+            }
+            for enrollment in user_with_enrollments_and_certificates.run_enrollments
+            if enrollment.run in b2b_courses.course_runs_by_org_id[org.id]
+        ]
 
     resp = user_drf_client.get(
-        reverse("v2:user-enrollments-api-list"), {"org_id": org.id}
+        reverse("v3:user_enrollments_api-list"), {"org_id": 99999}
     )
     assert resp.status_code == status.HTTP_200_OK
-    data = resp.json()
-    assert len(data) == 1
-    assert data[0]["id"] == b2b_enrollment.id
-    assert data[0]["b2b_organization_id"] == org.id
-    assert data[0]["b2b_contract_id"] == contract.id
+    assert resp.json() == []
+
+
+def test_user_enrollments_filter_exclude_b2b(
+    user_drf_client,
+    b2b_courses: B2BCourses,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-list"), {"exclude_b2b": True}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == [
+        {
+            "id": enrollment.id,
+            "run_id": enrollment.run.id,
+            "course_id": enrollment.run.course_id,
+            "b2b_contract_id": None,
+            "b2b_organization_id": None,
+            "enrollment_mode": enrollment.enrollment_mode,
+            "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+        }
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+        if enrollment.run not in b2b_courses.course_runs
+    ]
 
     resp = user_drf_client.get(
-        reverse("v2:user-enrollments-api-list"), {"org_id": 99999}
+        reverse("v3:user_enrollments_api-list"), {"exclude_b2b": False}
     )
     assert resp.status_code == status.HTTP_200_OK
-    assert len(resp.json()) == 0
+    assert resp.json() == [
+        {
+            "id": enrollment.id,
+            "run_id": enrollment.run.id,
+            "course_id": enrollment.run.course_id,
+            "b2b_contract_id": enrollment.run.b2b_contract_id,
+            "b2b_organization_id": enrollment.run.b2b_contract.organization_id
+            if enrollment.run.b2b_contract
+            else None,
+            "enrollment_mode": enrollment.enrollment_mode,
+            "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+        }
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+    ]
 
 
-@pytest.mark.usefixtures("b2b_courses")
-@pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
-@pytest.mark.parametrize("course_catalog_program_count", [20], indirect=True)
 def test_program_enrollments(
     user_drf_client,
     user_with_enrollments_and_certificates,
@@ -78,7 +137,7 @@ def test_program_enrollments(
     Tests the program enrollments API, which should show the user's enrollment
     in programs with the course runs that apply.
     """
-    user = user_with_enrollments_and_certificates
+    user = user_with_enrollments_and_certificates.user
 
     program_enrollments = (
         ProgramEnrollment.objects.filter(user=user)

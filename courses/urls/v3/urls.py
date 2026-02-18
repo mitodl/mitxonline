@@ -1,4 +1,4 @@
-"""Course API v2 URL configuration."""
+"""Course API v3 URL configuration."""
 
 from rest_framework import routers
 
