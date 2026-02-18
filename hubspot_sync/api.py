@@ -722,10 +722,14 @@ def upsert_custom_properties():
     """Create or update all custom properties and groups"""
     for ecommerce_object_type, ecommerce_object in CUSTOM_ECOMMERCE_PROPERTIES.items():
         for group in ecommerce_object["groups"]:
-            log.debug("Adding group %", group)
+            log.debug("Adding group %s", group["name"])
             sync_property_group(ecommerce_object_type, group["name"], group["label"])
         for obj_property in ecommerce_object["properties"]:
-            log.debug("Adding property %", obj_property)
+            log.debug(
+                "Adding property %s for %s",
+                obj_property.get("name"),
+                ecommerce_object_type,
+            )
             sync_object_property(ecommerce_object_type, obj_property)
     sync_object_property("contacts", _get_course_run_certificate_hubspot_property())
     sync_object_property("contacts", _get_program_certificate_hubspot_property())
