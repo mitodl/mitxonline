@@ -3,17 +3,14 @@ Course API Views version 2
 """
 
 import django_filters
-from django.conf import settings
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import mixins, status, viewsets
+from rest_framework import viewsets
 from rest_framework.permissions import (
     IsAuthenticated,
 )
-from rest_framework.response import Response
 
-from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     CourseRunEnrollment,
@@ -21,7 +18,6 @@ from courses.models import (
 )
 from courses.serializers.v3.courses import CourseRunEnrollmentSerializer
 from courses.serializers.v3.programs import ProgramEnrollmentSerializer
-from main import features
 
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
@@ -60,17 +56,8 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
         "Use ?exclude_b2b=true to filter out enrollments linked to course runs with B2B contracts. "
         "Use ?org_id=<id> to filter enrollments by specific B2B organization.",
     ),
-    create=extend_schema(
-        operation_id="user_enrollments_create_v3",
-        description="Create a new user enrollment - API v3",
-    ),
 )
-class UserEnrollmentsApiViewSet(
-    mixins.CreateModelMixin,
-    mixins.ListModelMixin,
-    mixins.DestroyModelMixin,
-    viewsets.GenericViewSet,
-):
+class UserEnrollmentsApiViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for user enrollments - v3"""
 
     serializer_class = CourseRunEnrollmentSerializer
@@ -95,24 +82,6 @@ class UserEnrollmentsApiViewSet(
     def get_serializer_context(self):
         """Get the serializer context."""
         return {"user": self.request.user}
-
-    @extend_schema(
-        operation_id="user_enrollments_destroy_v3",
-        description="Unenroll from a course - API v3",
-    )
-    def destroy(self, request, *args, **kwargs):  # noqa: ARG002
-        """Unenroll from a course."""
-        enrollment = self.get_object()
-        deactivated_enrollment = deactivate_run_enrollment(
-            enrollment,
-            change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=settings.FEATURES.get(
-                features.IGNORE_EDX_FAILURES, False
-            ),
-        )
-        if deactivated_enrollment is None:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @extend_schema_view(

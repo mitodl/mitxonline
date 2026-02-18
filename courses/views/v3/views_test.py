@@ -23,7 +23,30 @@ pytestmark = [
 ]
 
 
-def test_user_enrollments(
+def test_user_enrollments_detail(
+    user_drf_client,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+    enrollment = user_with_enrollments_and_certificates.run_enrollments[0]
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-detail", kwargs={"pk": enrollment.id})
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == {
+        "id": enrollment.id,
+        "run_id": enrollment.run.id,
+        "course_id": enrollment.run.course_id,
+        "b2b_contract_id": enrollment.run.b2b_contract_id,
+        "b2b_organization_id": enrollment.run.b2b_contract.organization_id
+        if enrollment.run.b2b_contract
+        else None,
+        "enrollment_mode": enrollment.enrollment_mode,
+        "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+    }
+
+
+def test_user_enrollments_list(
     user_drf_client,
     user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
 ):
@@ -46,7 +69,7 @@ def test_user_enrollments(
     ]
 
 
-def test_user_enrollments_filter_org_id(
+def test_user_enrollments_list_filter_org_id(
     user_drf_client,
     b2b_courses: B2BCourses,
     user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
@@ -84,7 +107,7 @@ def test_user_enrollments_filter_org_id(
     assert resp.json() == []
 
 
-def test_user_enrollments_filter_exclude_b2b(
+def test_user_enrollments_list_filter_exclude_b2b(
     user_drf_client,
     b2b_courses: B2BCourses,
     user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
