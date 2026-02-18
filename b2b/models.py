@@ -26,6 +26,7 @@ from b2b.constants import (
 )
 from b2b.exceptions import TargetCourseRunExistsError
 from b2b.tasks import queue_enrollment_code_check
+from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
 
 log = logging.getLogger(__name__)
@@ -78,6 +79,12 @@ class OrganizationPage(Page):
         max_length=30,
         help_text="The short key used for the organization (for edX).",
         unique=True,
+    )
+    org_key_prefix = models.CharField(
+        max_length=30,
+        help_text="The prefix to append to the org key (defaults to UAI_).",
+        blank=True,
+        default=UAI_COURSEWARE_ID_PREFIX,
     )
     description = RichTextField(
         blank=True, help_text="Any useful extra information about the organization"
@@ -235,7 +242,11 @@ class ContractProgramItem(Orderable):
         if is_new and not skip_run_creation:
             from b2b.tasks import create_program_contract_runs  # noqa: PLC0415
 
-            create_program_contract_runs.delay(self.contract.id, self.program.id)
+            create_program_contract_runs.delay(
+                self.contract.id,
+                self.program.id,
+                org_prefix=self.contract.organization.org_key_prefix,
+            )
             log.info(
                 "Queued contract run creation for program %s in contract %s",
                 self.program.id,
@@ -507,7 +518,7 @@ class ContractPage(Page, ClusterableModel):
             | models.Q(courseruns__run_tag="SOURCE")
         ).all():
             try:
-                create_contract_run(self, course)
+                create_contract_run(self, course, no_reruns=True)
                 managed += 1
             except TargetCourseRunExistsError:  # noqa: PERF203
                 skipped_run_creation += 1

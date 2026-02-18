@@ -1,9 +1,11 @@
 """Tests for B2B API functions."""
 
+from datetime import timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import faker
+import freezegun
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
@@ -17,6 +19,7 @@ from b2b.api import (
     _handle_extra_enrollment_codes,
     create_b2b_enrollment,
     create_contract_run,
+    create_contract_run_key,
     ensure_contract_run_pricing,
     ensure_contract_run_products,
     ensure_enrollment_codes_exist,
@@ -36,7 +39,7 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_NONSSO,
     CONTRACT_MEMBERSHIP_SSO,
 )
-from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
+from b2b.exceptions import SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import OrganizationIndexPage, OrganizationPage, UserOrganization
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
@@ -113,7 +116,7 @@ def test_create_single_course_run(mocker, contract_ready_course, has_start, has_
 
     assert run.course == source_course
     assert run.run_tag == B2B_RUN_TAG_FORMAT.format(
-        year=now_time.year, contract_id=contract.id
+        run_idx=1, year=now_time.year, contract_id=contract.id
     )
     assert run.b2b_contract == contract
 
@@ -533,21 +536,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
 
     contract = factories.ContractPageFactory.create()
     course = CourseFactory.create()
-    source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
     mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
-    this_year = now_in_utc().year
-
-    if source_run_exists:
-        # This should be the default, but need to test the case in which the
-        # source run isn't configured.
-        source_course_run_key = (
-            f"course-v1:{source_course_key.org}+{source_course_key.course}+SOURCE"
-        )
-        CourseRunFactory.create(
-            course=course, courseware_id=source_course_run_key, run_tag="SOURCE"
-        )
-
-    target_course_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_course_key.course}+{this_year}_C{contract.id}"
 
     if not source_run_exists:
         with pytest.raises(SourceCourseIncompleteError) as exc:
@@ -556,16 +545,31 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
         assert "No course runs available" in str(exc)
         return
 
+    source_course_run_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
+    source_run = CourseRunFactory.create(
+        course=course, courseware_id=str(source_course_run_key), run_tag="SOURCE"
+    )
+
+    target_course_id = create_contract_run_key(source_run, contract)
+
     if run_exists:
+        # This behavior is different than it was
+        # We used to raise an exception if this was the case - now we index the
+        # runs, so we _can_ rerun things.
         collision_run = CourseRunFactory.create(
-            course=course, courseware_id=target_course_id
+            course=course,
+            courseware_id=target_course_id,
+            b2b_contract=contract,
         )
 
-        with pytest.raises(TargetCourseRunExistsError) as exc:
-            create_contract_run(contract, course)
+        new_run, _ = create_contract_run(contract, course)
 
-        target_course_key = CourseKey.from_string(collision_run.courseware_id)
-        assert f"courseware ID {target_course_key} already exists" in str(exc)
+        collision_key = CourseKey.from_string(collision_run.courseware_id)
+        new_run_key = CourseKey.from_string(new_run.courseware_id)
+
+        # If the run tag format changes then this will fail.
+        collision_idx = collision_key.run[0]
+        assert new_run_key.run[0] == str(int(collision_idx) + 1)
         return
 
     assert not course.courseruns.filter(courseware_id=target_course_id).exists()
@@ -1056,6 +1060,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
             existing_run.course,
             skip_edx=False,
             require_designated_source_run=False,
+            org_prefix=UAI_COURSEWARE_ID_PREFIX,
         )
         assert result == (mock_run, mock_product)
     else:
@@ -1099,6 +1104,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
                 imported_course,
                 skip_edx=False,
                 require_designated_source_run=False,
+                org_prefix=UAI_COURSEWARE_ID_PREFIX,
             )
             assert result == (mock_run, mock_product)
         else:
@@ -1176,6 +1182,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
         imported_course,
         skip_edx=True,
         require_designated_source_run=True,
+        org_prefix=UAI_COURSEWARE_ID_PREFIX,
     )
 
     assert result == (mock_run, mock_product)
@@ -1213,6 +1220,7 @@ def test_import_and_create_contract_run_with_string_departments(mocker):
         existing_run.course,
         skip_edx=False,
         require_designated_source_run=False,
+        org_prefix=UAI_COURSEWARE_ID_PREFIX,
     )
     assert result == (mock_run, mock_product)
 
@@ -1307,3 +1315,94 @@ def test_remove_extra_codes():
 
     for code in codes_we_have:
         assert code in codes_we_should_keep
+
+
+def test_create_contract_run_key():
+    """Test that contract course run keys are generated properly."""
+
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+    source_run_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
+    source_run = CourseRunFactory.create(
+        course=course, courseware_id=str(source_run_key), run_tag="SOURCE"
+    )
+
+    year = now_in_utc().year
+    contract_id = contract.id
+    run_idx = "1"
+
+    new_course_key = CourseKey.from_string(
+        create_contract_run_key(source_run, contract)
+    )
+
+    assert (
+        new_course_key.org
+        == f"{contract.organization.org_key_prefix}{contract.organization.org_key}"
+    )
+    assert new_course_key.course == source_run_key.course
+    assert new_course_key.run == B2B_RUN_TAG_FORMAT.format(
+        run_idx=run_idx, contract_id=contract_id, year=year
+    )
+
+    courserun = CourseRunFactory.create(
+        course=course, courseware_id=str(new_course_key)
+    )
+
+    # Test index incrementing - first, naturally
+
+    run_idx = "2"
+
+    new_course_key = CourseKey.from_string(
+        create_contract_run_key(source_run, contract)
+    )
+
+    assert (
+        new_course_key.org
+        == f"{contract.organization.org_key_prefix}{contract.organization.org_key}"
+    )
+    assert new_course_key.course == source_run_key.course
+    assert new_course_key.run == B2B_RUN_TAG_FORMAT.format(
+        run_idx=run_idx, contract_id=contract_id, year=year
+    )
+
+    # Now, test when we've manually adjusted the index
+
+    out_of_sequence_run_tag = CourseKey.from_string(courserun.courseware_id)
+    _, run_tag_remainder = out_of_sequence_run_tag.run.split("T")
+    courserun.courseware_id = f"course-v1:{out_of_sequence_run_tag.org}+{out_of_sequence_run_tag.course}+99T{run_tag_remainder}"
+
+    courserun.save()
+
+    run_idx = "100"
+
+    new_course_key = CourseKey.from_string(
+        create_contract_run_key(source_run, contract)
+    )
+
+    assert (
+        new_course_key.org
+        == f"{contract.organization.org_key_prefix}{contract.organization.org_key}"
+    )
+    assert new_course_key.course == source_run_key.course
+    assert new_course_key.run == B2B_RUN_TAG_FORMAT.format(
+        run_idx=run_idx, contract_id=contract_id, year=year
+    )
+
+    next_year = now_in_utc() + timedelta(days=366)
+
+    with freezegun.freeze_time(next_year):
+        # If it's next year, the index should become 1 again.
+        run_idx = "1"
+
+        new_course_key = CourseKey.from_string(
+            create_contract_run_key(source_run, contract)
+        )
+
+        assert (
+            new_course_key.org
+            == f"{contract.organization.org_key_prefix}{contract.organization.org_key}"
+        )
+        assert new_course_key.course == source_run_key.course
+        assert new_course_key.run == B2B_RUN_TAG_FORMAT.format(
+            run_idx=run_idx, contract_id=contract_id, year=next_year.year
+        )
