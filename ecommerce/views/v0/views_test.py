@@ -661,7 +661,7 @@ def test_discount_redemptions_api(
 
     # create basket with discount, then check for redemptions
 
-    basket = create_basket(user, products)  # noqa: F841
+    create_basket(user, products)
 
     resp = user_drf_client.post(
         reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
@@ -669,10 +669,10 @@ def test_discount_redemptions_api(
 
     assert resp.status_code == 200
 
-    resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
 
     # 100% discount will redirect to user dashboard
-    assert resp.status_code == 200 or resp.status_code == 302  # noqa: PLR1714
+    assert resp.status_code == 200
 
     resp = admin_drf_client.get(
         reverse("v0:discounts_api-redemptions-list", args=[discount.id]),
