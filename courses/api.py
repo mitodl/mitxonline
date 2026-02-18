@@ -282,13 +282,18 @@ def create_run_enrollments(  # noqa: C901
     return successful_enrollments, edx_request_success
 
 
-def create_program_enrollments(user, programs):
+def create_program_enrollments(
+    user, programs, *, enrollment_mode=EDX_DEFAULT_ENROLLMENT_MODE
+):
     """
     Creates local records of a user's enrollment in programs
 
     Args:
         user (User): The user to enroll
         programs (iterable of Program): The course runs to enroll in
+
+    Kwargs:
+        enrollment_mode (str): The mode the enrollment should be in
 
     Returns:
         list of ProgramEnrollment: A list of enrollment objects that were successfully created
@@ -299,6 +304,12 @@ def create_program_enrollments(user, programs):
             enrollment, created = ProgramEnrollment.all_objects.get_or_create(
                 user=user,
                 program=program,
+                defaults={
+                    "enrollment_mode": enrollment_mode,
+                },
+                create_defaults={
+                    "enrollment_mode": enrollment_mode,
+                },
             )
             if not created and not enrollment.active:
                 enrollment.reactivate_and_save()
