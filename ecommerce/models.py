@@ -40,8 +40,7 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
-from openedx.api import create_user
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from main.plugin_manager import get_plugin_manager
 from users.models import User
 
 User = get_user_model()  # noqa: F811
@@ -769,24 +768,15 @@ class Order(TimestampedModel):
         send_ecommerce_order_receipt.delay(self.id)
 
     def create_enrollments(self):
-        """Enroll the user appropriately after the transaction has completed."""
-
-        from courses.api import create_run_enrollments  # noqa: PLC0415
+        """Create enrollments using the process_transaction_line hook."""
 
         if not self.is_fulfilled:
             return
 
-        # Check for an edX user, and create one if there's not one
-        if not self.purchaser.edx_username:
-            create_user(self.purchaser)
-            self.purchaser.refresh_from_db()
+        pm = get_plugin_manager()
 
-        create_run_enrollments(
-            self.purchaser,
-            self.purchased_runs,
-            mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            keep_failed_enrollments=True,
-        )
+        for line in self.lines.all():
+            pm.hook.process_transaction_line(args={"line": line})
 
 
 class PendingOrder(Order):
