@@ -3075,6 +3075,56 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v3/enrollments/:
+    get:
+      operationId: user_enrollments_list_v3
+      description: List user enrollments with B2B organization and contract information
+        - API v3. Use ?exclude_b2b=true to filter out enrollments linked to course
+        runs with B2B contracts. Use ?org_id=<id> to filter enrollments by specific
+        B2B organization.
+      parameters:
+      - in: query
+        name: exclude_b2b
+        schema:
+          type: boolean
+        description: Exclude B2B enrollments (enrollments linked to course runs with
+          B2B contracts)
+      - in: query
+        name: org_id
+        schema:
+          type: number
+        description: Filter by B2B organization ID
+      tags:
+      - enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseRunEnrollmentV3'
+          description: ''
+  /api/v3/enrollments/{id}/:
+    get:
+      operationId: enrollments_retrieve
+      description: API view set for user enrollments - v3
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this course run enrollment.
+        required: true
+      tags:
+      - enrollments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRunEnrollmentV3'
+          description: ''
   /api/v3/program_enrollments/:
     get:
       operationId: v3_program_enrollments_list
@@ -3969,6 +4019,44 @@ components:
           type: integer
           writeOnly: true
       required:
+      - run_id
+    CourseRunEnrollmentV3:
+      type: object
+      description: CourseRunEnrollment model serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        run_id:
+          type: integer
+          readOnly: true
+        course_id:
+          type: integer
+          readOnly: true
+        b2b_organization_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        b2b_contract_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        enrollment_mode:
+          allOf:
+          - $ref: '#/components/schemas/EnrollmentModeEnum'
+          readOnly: true
+        certificate:
+          allOf:
+          - $ref: '#/components/schemas/V3CourseRunCertificate'
+          readOnly: true
+          nullable: true
+      required:
+      - b2b_contract_id
+      - b2b_organization_id
+      - certificate
+      - course_id
+      - enrollment_mode
+      - id
       - run_id
     CourseRunGrade:
       type: object
@@ -7955,6 +8043,24 @@ components:
       - certificate
       - enrollments
       - program
+    V3CourseRunCertificate:
+      type: object
+      description: CourseRunCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          description: |-
+            Get the link at which this certificate will be served
+            Format: /certificate/<uuid>/
+            Example: /certificate/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+          readOnly: true
+      required:
+      - link
+      - uuid
     V3ProgramCertificate:
       type: object
       description: ProgramCertificate model serializer
