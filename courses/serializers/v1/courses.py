@@ -176,6 +176,9 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
             run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
+
+        if run.b2b_contract is not None:
+            raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
         successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
