@@ -35,8 +35,12 @@ def test_user_enrollments_detail(
     assert resp.status_code == status.HTTP_200_OK
     assert resp.json() == {
         "id": enrollment.id,
-        "run_id": enrollment.run.id,
-        "course_id": enrollment.run.course_id,
+        "run": {
+            "id": enrollment.run.id,
+            "course": {
+                "id": enrollment.run.course_id,
+            },
+        },
         "b2b_contract_id": enrollment.run.b2b_contract_id,
         "b2b_organization_id": enrollment.run.b2b_contract.organization_id
         if enrollment.run.b2b_contract

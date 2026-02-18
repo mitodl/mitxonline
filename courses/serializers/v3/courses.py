@@ -8,22 +8,45 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from courses import models
+from courses.serializers.v1.base import (
+    BaseCourseRunSerializer,
+    BaseCourseSerializer,
+    CourseRunGradeSerializer,
+)
 from courses.serializers.v3.certificates import CourseRunCertificateSerializer
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
 
+@extend_schema_serializer(component_name="CourseV3")
+class CourseSerializer(BaseCourseSerializer):
+    """Course serializer"""
+
+
+@extend_schema_serializer(component_name="CourseRunWithCourseV3")
+class CourseRunWithCourseSerializer(BaseCourseRunSerializer):
+    """CourseRun serializer"""
+
+    course = CourseSerializer(read_only=True)
+
+    class Meta(BaseCourseRunSerializer.Meta):
+        fields = [
+            *BaseCourseRunSerializer.Meta.fields,
+            "course",
+        ]
+
+
 @extend_schema_serializer(component_name="CourseRunEnrollmentV3")
 class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
     """CourseRunEnrollment model serializer"""
 
-    course_id = serializers.IntegerField(read_only=True, source="run.course_id")
-    run_id = serializers.IntegerField(read_only=True)
+    run = CourseRunWithCourseSerializer(read_only=True)
     enrollment_mode = serializers.ChoiceField(
         (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
     )
     certificate = CourseRunCertificateSerializer(read_only=True, allow_null=True)
+    grades = CourseRunGradeSerializer(many=True, read_only=True)
 
     b2b_organization_id = serializers.SerializerMethodField(read_only=True)
     b2b_contract_id = serializers.SerializerMethodField(read_only=True)
@@ -44,10 +67,10 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         model = models.CourseRunEnrollment
         fields = [
             "id",
-            "run_id",
-            "course_id",
+            "run",
             "b2b_organization_id",
             "b2b_contract_id",
             "enrollment_mode",
             "certificate",
+            "grades",
         ]

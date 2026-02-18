@@ -71,7 +71,8 @@ class UserEnrollmentsApiViewSet(viewsets.ReadOnlyModelViewSet):
             "run",
             "run__b2b_contract",
         )
-        .prefetch("certificate")
+        .prefetch_related("run__course")
+        .prefetch("certificate", "grades")
         .order_by("id")
     )
 

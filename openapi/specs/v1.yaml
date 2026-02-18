@@ -4027,11 +4027,9 @@ components:
         id:
           type: integer
           readOnly: true
-        run_id:
-          type: integer
-          readOnly: true
-        course_id:
-          type: integer
+        run:
+          allOf:
+          - $ref: '#/components/schemas/CourseRunWithCourseV3'
           readOnly: true
         b2b_organization_id:
           type: integer
@@ -4050,14 +4048,19 @@ components:
           - $ref: '#/components/schemas/V3CourseRunCertificate'
           readOnly: true
           nullable: true
+        grades:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseRunGrade'
+          readOnly: true
       required:
       - b2b_contract_id
       - b2b_organization_id
       - certificate
-      - course_id
       - enrollment_mode
+      - grades
       - id
-      - run_id
+      - run
     CourseRunGrade:
       type: object
       description: CourseRunGrade serializer
@@ -4202,6 +4205,131 @@ components:
       - products
       - run_tag
       - title
+    CourseRunWithCourseV3:
+      type: object
+      description: CourseRun serializer
+      properties:
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_url:
+          type: string
+          nullable: true
+          description: Get the courseware URL
+          readOnly: true
+        courseware_id:
+          type: string
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_upgradable:
+          type: boolean
+          description: Check if the course run is upgradable
+          readOnly: true
+        is_enrollable:
+          type: boolean
+          description: Check if the course run is enrollable
+          readOnly: true
+        is_archived:
+          type: boolean
+          description: Check if the course run is archived
+          readOnly: true
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        id:
+          type: integer
+          readOnly: true
+        live:
+          type: boolean
+        course_number:
+          type: string
+          description: Get the course number
+          readOnly: true
+        course:
+          allOf:
+          - $ref: '#/components/schemas/CourseV3'
+          readOnly: true
+      required:
+      - course
+      - course_number
+      - courseware_id
+      - courseware_url
+      - id
+      - is_archived
+      - is_enrollable
+      - is_upgradable
+      - run_tag
+      - title
+    CourseV3:
+      type: object
+      description: Course serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        type:
+          type: string
+          description: Returns the type of object this is serializing.
+          readOnly: true
+      required:
+      - id
+      - readable_id
+      - title
+      - type
     CourseWithCourseRunsSerializerV2:
       type: object
       description: Course model serializer - also serializes child course runs
