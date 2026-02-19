@@ -120,65 +120,115 @@ class AttachContractApi(APIView):
         - 201: Code successfully redeemed and user attached to new contract(s)
         - 200: Code valid but user already attached to all associated contracts
         - 404: Invalid or expired enrollment code
+        - 409: Code valid but no available seats in associated contract(s)
         - list of ContractPageSerializer - the contracts for the user
         """
-
         now = now_in_utc()
 
-        def get_active_user_contracts(user):
-            """Helper to get active contracts for a user."""
-            return user.b2b_contracts.filter(active=True).exclude(
-                Q(contract_start__gt=now) | Q(contract_end__lt=now)
+        try:
+            code = self._get_valid_discount(enrollment_code, now)
+        except Discount.DoesNotExist:
+            # If no valid discount is found, check whether this code belongs to
+            # a contract that is actually full. In that case we want to return
+            # 409 (Contract is full) instead of a generic 404.
+
+            fallback_discounts = (
+                Discount.objects.filter(
+                    Q(activation_date__isnull=True) | Q(activation_date__lte=now)
+                )
+                .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
+                .filter(discount_code=enrollment_code)
             )
 
-        try:
-            code = (
-                Discount.objects.annotate(Count("contract_redemptions"))
-                .filter(Q(activation_date__isnull=True) | Q(activation_date__lte=now))
-                .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
-                .filter(
-                    Q(redemption_type=REDEMPTION_TYPE_UNLIMITED)
-                    | Q(contract_redemptions__count__lt=1)
-                )
-                .get(discount_code=enrollment_code)
-            )
-        except Discount.DoesNotExist:
+            for discount in fallback_discounts:
+                for contract in discount.b2b_contracts():
+                    if not contract.active:
+                        continue
+
+                    if contract.contract_start and contract.contract_start > now:
+                        continue
+
+                    if contract.contract_end and contract.contract_end < now:
+                        continue
+
+                    if contract.is_full():
+                        return Response(
+                            {"detail": "Contract is full."},
+                            status=status.HTTP_409_CONFLICT,
+                        )
+
             return Response(
                 {"detail": "Invalid or expired enrollment code."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        contracts = self._get_eligible_contracts(request.user, code, now)
+        contracts_attached, contract_full = self._attach_user_to_contracts(
+            request.user, contracts, code
+        )
+
+        active_contracts = self._get_active_user_contracts(request.user, now)
+        serialized_contracts = ContractPageSerializer(active_contracts, many=True).data
+
+        if contracts_attached:
+            return Response(serialized_contracts, status=status.HTTP_201_CREATED)
+
+        if contract_full:
+            return Response(
+                {"detail": "Contract is full."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return Response(serialized_contracts, status=status.HTTP_200_OK)
+
+    def _get_active_user_contracts(self, user, now):
+        """Return active contracts for a user at the given time."""
+        return user.b2b_contracts.filter(active=True).exclude(
+            Q(contract_start__gt=now) | Q(contract_end__lt=now)
+        )
+
+    def _get_valid_discount(self, enrollment_code, now):
+        """Return a valid discount for the given enrollment code and time."""
+        return (
+            Discount.objects.annotate(Count("contract_redemptions"))
+            .filter(Q(activation_date__isnull=True) | Q(activation_date__lte=now))
+            .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
+            .filter(
+                Q(redemption_type=REDEMPTION_TYPE_UNLIMITED)
+                | Q(contract_redemptions__count__lt=1)
+            )
+            .get(discount_code=enrollment_code)
+        )
+
+    def _get_eligible_contracts(self, user, code, now):
+        """Return contracts associated with the code that the user can join."""
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
-        contracts = (
+        return (
             ContractPage.objects.filter(pk__in=contract_ids)
-            .exclude(pk__in=request.user.b2b_contracts.all())
+            .exclude(pk__in=user.b2b_contracts.all())
             .exclude(Q(contract_end__lt=now) | Q(contract_start__gt=now))
             .all()
         )
 
+    def _attach_user_to_contracts(self, user, contracts, code):
+        """Attach the user to eligible contracts and track redemption state."""
         contracts_attached = False
+        contract_full = False
+
         for contract in contracts:
             if contract.is_full():
+                contract_full = True
                 continue
 
             process_add_org_membership(
-                request.user, contract.organization, keep_until_seen=True
+                user, contract.organization, keep_until_seen=True
             )
-            request.user.b2b_contracts.add(contract)
+            user.b2b_contracts.add(contract)
             DiscountContractAttachmentRedemption.objects.create(
-                user=request.user, discount=code, contract=contract
+                user=user, discount=code, contract=contract
             )
             contracts_attached = True
 
-        request.user.save()
+        user.save()
 
-        response_status = (
-            status.HTTP_201_CREATED if contracts_attached else status.HTTP_200_OK
-        )
-
-        return Response(
-            ContractPageSerializer(
-                get_active_user_contracts(request.user), many=True
-            ).data,
-            status=response_status,
-        )
+        return contracts_attached, contract_full
