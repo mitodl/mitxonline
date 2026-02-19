@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.138.2
+---------------
+
+- add enrollment_mode to the v3 program enrollments response (#3305)
+- Fix very occasionally flaky test_discount_redemptions_api test (#3302)
+- Updates for B2B course run key generation (#3292)
+- Adds a test contract and org to test_datagen (#3295)
+- Fix v0/baskets/create_from_product so that baskets get discounts as we expect (#3290)
+
 Version 0.138.1 (Released February 18, 2026)
 ---------------
 
