@@ -21,8 +21,8 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from reversion.models import Version
 
-from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from b2b.factories import ContractPageFactory
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     BlockedCountryFactory,
@@ -542,9 +542,7 @@ def test_user_enrollments_create_b2b_run_invalid(user_drf_client, user):
     )
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {
-        "errors": {"run_id": f"Invalid course run id: {run.id}"}
-    }
+    assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
 
 
 @pytest.mark.parametrize(

@@ -1051,6 +1051,7 @@ def test_user_enrollments_b2b_organization_filter(user_drf_client, user):
     assert resp.status_code == status.HTTP_200_OK
     assert len(resp.json()) == 0
 
+
 def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user):
     """v2 enrollments API should reject creating enrollments for B2B course runs."""
     contract = ContractPageFactory.create()
@@ -1062,9 +1063,8 @@ def test_user_enrollments_create_b2b_run_invalid_v2(user_drf_client, user):
     )
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {
-        "errors": {"run_id": f"Invalid course run id: {run.id}"}
-    }
+    assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
+
 
 def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     """Test that filtering programs by org works as expected."""
