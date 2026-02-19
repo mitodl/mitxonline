@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.138.3 (Released February 19, 2026)
+---------------
+
+- restrict enrolling into b2b courses from the enrollment api (#3306)
+- 10129 attach endpoint doesnt error when the contract is full (#3293)
+
 Version 0.138.2 (Released February 19, 2026)
 ---------------
 
