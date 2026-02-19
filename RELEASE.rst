@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.138.3
+Version 0.138.3 (Released February 19, 2026)
 ---------------
 
 - restrict enrolling into b2b courses from the enrollment api (#3306)
