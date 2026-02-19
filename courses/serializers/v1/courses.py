@@ -173,9 +173,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         user = self.context["user"]
         run_id = validated_data["run_id"]
         try:
-            run = models.CourseRun.objects.select_related("b2b_contract").get(
-                id=run_id
-            )
+            run = models.CourseRun.objects.select_related("b2b_contract").get(id=run_id)
         except models.CourseRun.DoesNotExist:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
 
