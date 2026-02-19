@@ -692,7 +692,7 @@ class OrderFlow:
         self.create_transaction(payment_data)
 
         # record all the courseruns in the order
-        self.create_paid_courseruns()
+        # self.create_paid_courseruns()
 
         # No email is required as this order is generated from management command
         # Skip receipt emails for UAI orders
@@ -776,7 +776,7 @@ class Order(TimestampedModel):
         pm = get_plugin_manager()
 
         for line in self.lines.all():
-            pm.hook.process_transaction_line(args={"line": line})
+            pm.hook.process_transaction_line(line=line)
 
 
 class PendingOrder(Order):
@@ -787,7 +787,7 @@ class PendingOrder(Order):
         self,
         products: List[Product],  # noqa: UP006
         user: User,
-        discounts: List[Discount] = None,  # noqa: UP006, RUF013
+        discounts: List[Discount] | None = None,  # noqa: UP006
     ):
         """
         Returns an existing PendingOrder if one already exists with the same:
@@ -809,7 +809,7 @@ class PendingOrder(Order):
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
         for product in products:
-            product_versions.append(Version.objects.get_for_object(product).first())
+            product_versions.append(Version.objects.get_for_object(product).get())
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
@@ -856,14 +856,14 @@ class PendingOrder(Order):
         # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
         total = 0
         for i, product in enumerate(products):
-            line, _ = order.lines.get_or_create(
+            line, _ = Line.objects.get_or_create(
                 order=order,
                 purchased_object_id=product.object_id,
                 purchased_content_type_id=product.content_type_id,
-                defaults=dict(  # noqa: C408
-                    product_version=product_versions[i],
-                    quantity=1,
-                ),
+                defaults={
+                    "product_version": product_versions[i],
+                    "quantity": 1,
+                },
             )
             total += line.discounted_price
 

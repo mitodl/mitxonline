@@ -6,6 +6,7 @@ import pytest
 import reversion
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils import now_in_utc
 from reversion.models import Version
@@ -763,3 +764,36 @@ def test_discount_with_expiration_date_in_past_is_not_valid_for_basket():
         )
 
     assert not discount.is_valid(basket_item.basket)
+
+
+@pytest.mark.skip_nplusone_check
+def test_process_transaction_line_hooks(mocker, user, user_drf_client):
+    """Test that the hooks get called after the order is completed."""
+
+    mocked_create_run_enrollment = mocker.patch(
+        "ecommerce.hooks.process_transaction_line._create_courserun_enrollment"
+    )
+    mocked_create_program_enrollment = mocker.patch(
+        "ecommerce.hooks.process_transaction_line._create_program_enrollment"
+    )
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(
+        amount=100, discount_type=DISCOUNT_TYPE_PERCENT_OFF
+    )
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+    BasketDiscount.objects.create(
+        redeemed_by=basket.user,
+        redemption_date=now_in_utc(),
+        redeemed_basket=basket,
+        redeemed_discount=discount,
+    )
+
+    result = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert result.status_code == 200
+
+    assert mocked_create_run_enrollment.called
+    assert not mocked_create_program_enrollment.called
