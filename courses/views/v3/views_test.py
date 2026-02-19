@@ -52,6 +52,7 @@ def test_program_enrollments(
             "certificate": maybe_serialize_program_cert(
                 program_enrollment.program, user
             ),
+            "enrollment_mode": program_enrollment.enrollment_mode,
         }
         for program_enrollment in program_enrollments
     ]

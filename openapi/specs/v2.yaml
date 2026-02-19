@@ -8010,6 +8010,10 @@ components:
           - $ref: '#/components/schemas/V3ProgramCertificate'
           readOnly: true
           nullable: true
+        enrollment_mode:
+          type: string
+          nullable: true
+          maxLength: 20
       required:
       - certificate
       - program

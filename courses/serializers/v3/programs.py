@@ -45,4 +45,4 @@ class ProgramEnrollmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProgramEnrollment
-        fields = ("program", "certificate")
+        fields = ("program", "certificate", "enrollment_mode")
