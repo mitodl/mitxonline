@@ -21,6 +21,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from reversion.models import Version
 
+from b2b.factories import ContractPageFactory
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
@@ -528,6 +529,20 @@ def test_user_enrollments_create_invalid(user_drf_client, user):
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {"errors": {"run_id": "Invalid course run id: 1234"}}
+
+
+def test_user_enrollments_create_b2b_run_invalid(user_drf_client, user):
+    """Creating an enrollment for a B2B course run via the public API should be rejected."""
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course, b2b_contract=contract)
+
+    resp = user_drf_client.post(
+        reverse("v1:user-enrollments-api-list"), data={"run_id": run.id}
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {"errors": {"run_id": f"Invalid course run id: {run.id}"}}
 
 
 @pytest.mark.parametrize(
