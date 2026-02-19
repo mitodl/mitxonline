@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.138.2
+Version 0.138.2 (Released February 19, 2026)
 ---------------
 
 - add enrollment_mode to the v3 program enrollments response (#3305)
