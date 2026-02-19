@@ -2,7 +2,7 @@
 
 import pluggy
 
-hookspec = pluggy.HookspecMarker("unified_ecommerce")
+hookspec = pluggy.HookspecMarker("mitxonline")
 
 
 @hookspec
