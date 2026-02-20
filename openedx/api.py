@@ -48,6 +48,7 @@ from openedx.exceptions import (
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
+        UserCreateInTransactionError,
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import SyncResult, edx_url
@@ -395,6 +396,10 @@ def create_edx_user(user, edx_username=None):
         user (user.models.User): the application user
         edx_username (str): the username to use in Open edX
     """
+    if not transaction.get_autocommit():
+        # note: this would be a programming error if you hit this code
+        raise UserCreateInTransactionError()
+
     ignore_edx_failures = settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False)
 
     try:

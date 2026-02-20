@@ -10,6 +10,7 @@ import factory
 import pytest
 import responses
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
 from mitol.common.utils.user import _reformat_for_username, usernameify
@@ -64,6 +65,7 @@ from openedx.exceptions import (
     OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
+    UserCreateInTransactionError,
     UserNameUpdateFailedException,
 )
 from openedx.factories import OpenEdxApiAuthFactory
@@ -76,8 +78,9 @@ pytestmark = [pytest.mark.django_db]
 
 
 @pytest.fixture
-def application(settings):
+def application(settings, request):
     """Test data and settings needed for create_edx_user tests"""
+    print(request.fixturenames)
     settings.OPENEDX_OAUTH_APP_NAME = "test_app_name"
     settings.OPENEDX_API_BASE_URL = "http://example.com"
     settings.OPENEDX_OAUTH_PROVIDER = "test_provider"
@@ -470,6 +473,23 @@ def test_create_edx_user_conflict(  # noqa: PLR0913
     assert expected_username_pattern(edx_user.edx_username), (
         f"Username {edx_user.edx_username} doesn't match expected pattern for {test_description}"
     )
+
+
+def test_create_edx_user_transaction():
+    """Veryify that """
+    assert transaction.get_autocommit() is True
+
+    user = UserFactory.create(no_openedx_user=True)
+
+    assert user.openedx_users.count() == 0
+
+    with transaction.atomic():
+        with pytest.raises(UserCreateInTransactionError):
+            create_edx_user(user)
+
+    user.refresh_from_db()
+
+    assert user.openedx_users.count() == 0
 
 
 @pytest.mark.parametrize(
