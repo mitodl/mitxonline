@@ -428,7 +428,14 @@ def test_create_run_enrollments_creation_fail(mocker, user):
     assert edx_request_success is True
 
 
-def test_create_program_enrollments(user):
+@pytest.mark.parametrize(
+    "mode",
+    [
+        EDX_ENROLLMENT_AUDIT_MODE,
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    ],
+)
+def test_create_program_enrollments(user, mode):
     """
     create_program_enrollments should create or reactivate local enrollment records
     """
@@ -443,8 +450,7 @@ def test_create_program_enrollments(user):
     )
 
     successful_enrollments = create_program_enrollments(
-        user,
-        programs,
+        user, programs, enrollment_mode=mode
     )
     assert len(successful_enrollments) == num_programs
     enrollments = ProgramEnrollment.objects.order_by("program__id").all()
@@ -453,6 +459,7 @@ def test_create_program_enrollments(user):
         assert enrollment.change_status is None
         assert enrollment.active is True
         assert enrollment.program == program
+        assert enrollment.enrollment_mode == mode
 
 
 def test_create_program_enrollments_creation_fail(mocker, user):

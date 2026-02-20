@@ -20,7 +20,9 @@ from courses.factories import (
     BlockedCountryFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    ProgramFactory,
 )
+from courses.models import ProgramEnrollment
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
@@ -69,6 +71,7 @@ from main.constants import (
 )
 from main.settings import TIME_ZONE
 from main.test_utils import assert_drf_json_equal
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = pytest.mark.django_db
 
@@ -1237,3 +1240,23 @@ def test_order_receipt_retrieve(user, user_drf_client):
     # The TransactionFactory creates a transaction with no payment data so this
     # should be None.
     assert receipt["transactions"]["card_number"] is None
+
+
+@pytest.mark.skip_nplusone_check
+def test_program_product_purchasing(user, user_drf_client):
+    """Test that we can purchase products that are for programs."""
+
+    program = ProgramFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=program, price=0)
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert "no_checkout" in resp.json()
+
+    assert ProgramEnrollment.objects.filter(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exists()
