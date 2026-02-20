@@ -11,6 +11,20 @@ from ecommerce.serializers import ProductFlexibilePriceSerializer
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
+class EnrollmentModeSerializer(serializers.ModelSerializer):
+    """Enrollment mode serializer."""
+
+    class Meta:
+        """Meta opts for the serializer"""
+
+        model = models.EnrollmentMode
+        fields = [
+            "mode_slug",
+            "mode_display_name",
+            "requires_payment",
+        ]
+
+
 class BaseCourseSerializer(serializers.ModelSerializer):
     """Basic course model serializer"""
 
@@ -45,6 +59,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     is_enrollable = serializers.SerializerMethodField()
     course_number = serializers.SerializerMethodField()
     courseware_url = serializers.SerializerMethodField()
+    enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
 
     def get_courseware_url(self, instance) -> str | None:
         """Get the courseware URL"""
@@ -87,6 +102,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "id",
             "live",
             "course_number",
+            "enrollment_modes",
         ]
 
 
@@ -94,6 +110,7 @@ class BaseProgramSerializer(serializers.ModelSerializer):
     """Basic program model serializer"""
 
     type = serializers.SerializerMethodField(read_only=True)
+    enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
 
     @staticmethod
     def get_type(obj) -> str:  # noqa: ARG004
@@ -101,7 +118,7 @@ class BaseProgramSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Program
-        fields = ["title", "readable_id", "id", "type"]
+        fields = ["title", "readable_id", "id", "type", "enrollment_modes"]
 
 
 class CourseRunCertificateSerializer(serializers.ModelSerializer):
