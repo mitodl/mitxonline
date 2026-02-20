@@ -307,12 +307,12 @@ def create_program_enrollments(
                 defaults={
                     "enrollment_mode": enrollment_mode,
                 },
-                create_defaults={
-                    "enrollment_mode": enrollment_mode,
-                },
             )
             if not created and not enrollment.active:
                 enrollment.reactivate_and_save()
+
+            if not created and enrollment.enrollment_mode != enrollment_mode:
+                enrollment.update_mode_and_save(enrollment_mode)
         except:  # pylint: disable=bare-except  # noqa: PERF203, E722
             mail_api.send_enrollment_failure_message(
                 user, program, details=format_exc()

@@ -22,7 +22,7 @@ from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
 
-from courses.models import CourseRun, PaidCourseRun
+from courses.models import CourseRun, PaidCourseRun, Program
 from courses.utils import is_uai_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -125,6 +125,7 @@ class Basket(TimestampedModel):
             [  # noqa: C419
                 item.product.purchasable_object.course.is_country_blocked(user)
                 for item in basket_items
+                if isinstance(item.product.purchasable_object, CourseRun)
             ]
         )
 
@@ -677,11 +678,16 @@ class OrderFlow:
             amount=self.order.total_price_paid,
         )
 
-    def create_paid_courseruns(self):
-        for run in self.order.purchased_runs:
-            PaidCourseRun.objects.get_or_create(
-                order=self.order, course_run=run, user=self.order.purchaser
-            )
+    def create_enrollments(self):
+        """Create enrollments using the process_transaction_line hook."""
+
+        if not self.order.is_fulfilled:
+            return
+
+        pm = get_plugin_manager()
+
+        for line in self.order.lines.all():
+            pm.hook.process_transaction_line(line=line)
 
     @state.transition(
         source=OrderStatus.PENDING,
@@ -692,7 +698,7 @@ class OrderFlow:
         self.create_transaction(payment_data)
 
         # record all the courseruns in the order
-        # self.create_paid_courseruns()
+        self.create_enrollments()
 
         # No email is required as this order is generated from management command
         # Skip receipt emails for UAI orders
@@ -766,17 +772,6 @@ class Order(TimestampedModel):
 
     def send_ecommerce_order_receipt(self):
         send_ecommerce_order_receipt.delay(self.id)
-
-    def create_enrollments(self):
-        """Create enrollments using the process_transaction_line hook."""
-
-        if not self.is_fulfilled:
-            return
-
-        pm = get_plugin_manager()
-
-        for line in self.lines.all():
-            pm.hook.process_transaction_line(line=line)
 
 
 class PendingOrder(Order):
@@ -1071,6 +1066,17 @@ class Line(TimestampedModel):
             Product.all_objects.get(pk=self.product_version.field_dict["id"]),
             self.product_version,
         )
+
+    @cached_property
+    def courseware(self):
+        """Return a string representation of the courseware object."""
+
+        if isinstance(self.purchased_object, CourseRun):
+            return self.purchased_object.course.title
+        elif isinstance(self.purchased_object, Program):
+            return self.purchased_object.readable_id
+        else:
+            return "Invalid Product"
 
     def __str__(self):
         return f"{self.product_version}"
