@@ -48,9 +48,8 @@ def test_admin_refund_order_get_not_found(client, admin_user):
 
     messages = list(get_messages(response.wsgi_request))
     assert len(messages) == 1
-    assert (
-        f"Order {missing_order_id} could not be found - is it Fulfilled?"
-        == str(messages[0].message)
+    assert f"Order {missing_order_id} could not be found - is it Fulfilled?" == str(
+        messages[0].message
     )
 
 
@@ -67,9 +66,8 @@ def test_admin_refund_order_get_not_fulfilled(client, admin_user):
 
     messages = list(get_messages(response.wsgi_request))
     assert len(messages) == 1
-    assert (
-        f"Order {order.id} could not be found - is it Fulfilled?"
-        == str(messages[0].message)
+    assert f"Order {order.id} could not be found - is it Fulfilled?" == str(
+        messages[0].message
     )
 
 
@@ -146,10 +144,7 @@ def test_admin_refund_order_post_refund_failed(client, admin_user, mocker):
 
     messages = list(get_messages(response.wsgi_request))
     assert len(messages) == 1
-    assert (
-        str(messages[0].message)
-        == f"Order {order.reference_number} refund failed."
-    )
+    assert str(messages[0].message) == f"Order {order.reference_number} refund failed."
 
 
 def test_admin_refund_order_post_invalid_form(client, admin_user, mocker):
@@ -197,10 +192,7 @@ def test_admin_refund_order_post_not_implemented(client, admin_user, mocker):
 
     messages = list(get_messages(response.wsgi_request))
     assert len(messages) == 1
-    assert (
-        str(messages[0].message)
-        == f"Order {order.id} can't be refunded."
-    )
+    assert str(messages[0].message) == f"Order {order.id} can't be refunded."
 
 
 def test_admin_refund_order_post_order_not_found(client, admin_user):
