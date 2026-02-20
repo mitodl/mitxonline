@@ -202,7 +202,6 @@ def generate_checkout_payload(request, *, skip_discount_check=False):  # noqa: P
             )
 
         order.refresh_from_db()
-        order.create_enrollments()
 
         return {
             "no_checkout": True,
@@ -210,7 +209,7 @@ def generate_checkout_payload(request, *, skip_discount_check=False):  # noqa: P
                 reverse("user-dashboard"),
                 {
                     "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-                    "run": order.lines.first().purchased_object.course.title,
+                    "run": order.lines.first().courseware,
                 },
             ),
             "order_id": order.id,

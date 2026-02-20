@@ -92,6 +92,7 @@ granian = "^2.5.4"
 mitol-django-olposthog = "^2025.8.1"
 django-removals = "^1.1.6"
 django-prefetch = "^1.2.3"
+pluggy = "^1.6.0"
 
 
 [tool.poetry.group.dev.dependencies]
