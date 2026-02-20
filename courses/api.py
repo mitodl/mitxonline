@@ -69,6 +69,7 @@ from ecommerce.models import OrderStatus, Product
 from main import features
 from openedx.api import (
     create_edx_course_mode,
+    create_user,
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
     get_edx_api_course_list_client,
@@ -133,12 +134,33 @@ def get_user_relevant_program_course_run_qset(
     return enrollable_run_qset.order_by("enrollment_start")
 
 
-def create_run_enrollments(  # noqa: C901
+def _enroll_learner_into_associated_programs(run, user):
+    """
+    Enrolls the learner into all programs for which the course they are enrolling into
+    is associated as a requirement or elective.  If a program enrollment already exists
+    then the change_status of that program_enrollment is checked to ensure it equals None.
+    """
+    for program in run.course.programs:
+        if not program.live:
+            continue
+        program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
+            user=user,
+            program=program,
+            defaults=dict(  # noqa: C408
+                change_status=None,
+            ),
+        )
+        if program_enrollment.change_status is not None:
+            program_enrollment.reactivate_and_save()
+
+
+def create_run_enrollments(  # noqa: C901,PLR0913
     user,
     runs,
     *,
     change_status=None,
     keep_failed_enrollments=None,
+    create_courseware_user=False,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
 ):
     """
@@ -170,30 +192,14 @@ def create_run_enrollments(  # noqa: C901
             features.IGNORE_EDX_FAILURES, False
         )
 
-    successful_enrollments = []
+    if create_courseware_user:
+        create_user(user)
+        user.refresh_from_db()
 
-    def send_enrollment_emails():
+    def _subscribe_to_edx_course_emails():
         subscribe_edx_course_emails.delay(enrollment.id)
 
-    def _enroll_learner_into_associated_programs():
-        """
-        Enrolls the learner into all programs for which the course they are enrolling into
-        is associated as a requirement or elective.  If a program enrollment already exists
-        then the change_status of that program_enrollment is checked to ensure it equals None.
-        """
-        for program in run.course.programs:
-            if not program.live:
-                continue
-            program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
-                user=user,
-                program=program,
-                defaults=dict(  # noqa: C408
-                    change_status=None,
-                ),
-            )
-            if program_enrollment.change_status is not None:
-                program_enrollment.reactivate_and_save()
-
+    successful_enrollments = []
     edx_request_success = True
     if not runs[0].is_fake_course_run:
         # Make the API call to enroll the user in edX only if the run is not a fake course run
@@ -233,7 +239,7 @@ def create_run_enrollments(  # noqa: C901
                 ),
             )
 
-            _enroll_learner_into_associated_programs()
+            _enroll_learner_into_associated_programs(run, user)
 
             # If the run is associated with a B2B contract, add the contract
             # to the user's contract list and update their org memberships
@@ -267,7 +273,7 @@ def create_run_enrollments(  # noqa: C901
                     if enrollment_mode_changed:
                         enrollment.enrollment_mode = mode
                     enrollment.reactivate_and_save()
-                    transaction.on_commit(send_enrollment_emails)
+                    transaction.on_commit(_subscribe_to_edx_course_emails)
         except:  # pylint: disable=bare-except  # noqa: PERF203, E722
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())
             log.exception(

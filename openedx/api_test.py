@@ -10,6 +10,7 @@ import factory
 import pytest
 import responses
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
 from mitol.common.utils.user import _reformat_for_username, usernameify
@@ -64,6 +65,7 @@ from openedx.exceptions import (
     OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
+    UserCreateInTransactionError,
     UserNameUpdateFailedException,
 )
 from openedx.factories import OpenEdxApiAuthFactory
@@ -72,10 +74,12 @@ from openedx.utils import SyncResult
 from users.factories import UserFactory
 
 User = get_user_model()
-pytestmark = [pytest.mark.django_db]
+pytestmark = [
+    pytest.mark.django_db,
+]
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def application(settings):
     """Test data and settings needed for create_edx_user tests"""
     settings.OPENEDX_OAUTH_APP_NAME = "test_app_name"
@@ -472,6 +476,21 @@ def test_create_edx_user_conflict(  # noqa: PLR0913
     )
 
 
+@pytest.mark.usefixtures("application")
+def test_create_edx_user_transaction():
+    """Verify that create_edx_user fails if called from inside a transaction"""
+    user = UserFactory.create(no_openedx_user=True)
+
+    assert user.openedx_users.count() == 0
+
+    with transaction.atomic(), pytest.raises(UserCreateInTransactionError):
+        create_edx_user(user)
+
+    user.refresh_from_db()
+
+    assert user.openedx_users.count() == 0
+
+
 @pytest.mark.parametrize(
     ("base_username", "expected_prefix"),
     [
@@ -815,7 +834,8 @@ def test_enroll_pro_unknown_fail(settings, mocker, user):
     mock_client.enrollments.create_student_enrollment = mocker.Mock(
         side_effect=ValueError("Unexpected error")
     )
-    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mocker.patch("openedx.api.existing_edx_enrollment", return_value=None)
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
     mocker.patch("openedx.api.repair_faulty_edx_user", return_value=(None, None))
     course_run = CourseRunFactory.build()
 

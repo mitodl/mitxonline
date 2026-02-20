@@ -9,6 +9,7 @@ from b2b.serializers.v0 import ContractPageSerializer
 
 
 @pytest.mark.django_db
+@pytest.mark.disable_responses
 def test_contract_page_serializer_expands_embeds():
     """Test that welcome_message_extra expands embed tags and preserves HTML."""
     contract = ContractPageFactory.create(
@@ -26,4 +27,6 @@ def test_contract_page_serializer_expands_embeds():
         r"</iframe>\s*"
         r"</div>"
     )
-    assert re.match(pattern, result, re.DOTALL)
+    assert re.match(pattern, result, re.DOTALL), (
+        f"Content did not match expectation: {result}"
+    )

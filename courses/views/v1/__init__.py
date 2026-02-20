@@ -76,7 +76,6 @@ from main.constants import (
 from main.utils import encode_json_cookie_value, redirect_with_user_message
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import (
-    create_user,
     subscribe_to_edx_course_emails,
     sync_enrollments_with_edx,
     unsubscribe_from_edx_course_emails,
@@ -344,13 +343,10 @@ class CreateEnrollmentView(APIView):
         if resp is not None:
             return resp
 
-        if not user.openedx_user_exists:
-            create_user(user)
-            user.refresh_from_db()
-
         _, edx_request_success = create_run_enrollments(
             user=user,
             runs=[run],
+            create_courseware_user=True,
             keep_failed_enrollments=settings.FEATURES.get(
                 features.IGNORE_EDX_FAILURES, False
             ),
