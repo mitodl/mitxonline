@@ -4,11 +4,9 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0081_alter_courserungrade_letter_grade'),
-        ('courses', '0081_set_program_requirement_path_collation'),
+        ("courses", "0081_alter_courserungrade_letter_grade"),
+        ("courses", "0081_set_program_requirement_path_collation"),
     ]
 
-    operations = [
-    ]
+    operations = []
