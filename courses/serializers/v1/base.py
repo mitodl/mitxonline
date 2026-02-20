@@ -116,7 +116,7 @@ class CourseRunGradeSerializer(serializers.ModelSerializer):
     """CourseRunGrade serializer"""
 
     grade = serializers.FloatField(read_only=True, min_value=0.0, max_value=1.0)
-    letter_grade = serializers.CharField(read_only=True, max_length=6, allow_null=True)
+    letter_grade = serializers.CharField(read_only=True, max_length=10, allow_null=True)
 
     class Meta:
         model = models.CourseRunGrade

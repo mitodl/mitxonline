@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.138.4
+---------------
+
+- Merge migration conflict courses 0081 (#3311)
+- [pre-commit.ci] pre-commit autoupdate (#3299)
+- Update letter_grade to allow more chars (#3289)
+- Update dependency webpack to v5.104.1 [SECURITY] (#3274)
+- Update actions/setup-python digest to a309ff8 (#3297)
+
 Version 0.138.3 (Released February 19, 2026)
 ---------------
 
