@@ -133,20 +133,16 @@ export class CartPage extends React.Component<Props, CartState> {
       cartItems.length > 0 &&
       userFlexiblePriceExists === false
     ) {
-      if (
-        cartItems[0].product &&
-        cartItems[0].product.purchasable_object &&
-        cartItems[0].product.purchasable_object.course.page &&
-        cartItems[0].product.purchasable_object.course.page
-          .financial_assistance_form_url
-      ) {
+      const purchasableObject = cartItems[0].product && cartItems[0].product.purchasable_object
+      const financialAssistanceUrl =
+        purchasableObject &&
+        purchasableObject.course &&
+        purchasableObject.course.page &&
+        purchasableObject.course.page.financial_assistance_form_url
+
+      if (financialAssistanceUrl) {
         return (
-          <a
-            href={
-              cartItems[0].product.purchasable_object.course.page
-                .financial_assistance_form_url
-            }
-          >
+          <a href={financialAssistanceUrl}>
             Need financial assistance?
           </a>
         )
