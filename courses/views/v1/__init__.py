@@ -119,7 +119,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return (
             Program.objects.filter(b2b_only=False)
-            .prefetch_related("departments")
+            .prefetch_related("departments", "enrollment_modes")
             .select_related("page")
         )
 
@@ -189,7 +189,9 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = (
                 Course.objects.filter()
                 .select_related("page")
-                .prefetch_related("courseruns", "departments")
+                .prefetch_related(
+                    "courseruns", "departments", "courseruns__enrollment_modes"
+                )
                 .all()
             )
 
@@ -253,7 +255,11 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             return (
                 CourseRun.objects.select_related("course")
-                .prefetch_related("course__departments", "course__page")
+                .prefetch_related(
+                    "course__departments",
+                    "course__page",
+                    "enrollment_modes",
+                )
                 .filter(live=True)
             )
 
