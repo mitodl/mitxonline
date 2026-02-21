@@ -1508,6 +1508,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "page": dict(
                     ProgramPageSerializer(program_enrollment.program.page).data
                 ),
+                "products": [],
                 "courses": [
                     course.id
                     for course in courses_by_program_id[program_enrollment.program.id]

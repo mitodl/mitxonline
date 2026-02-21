@@ -718,6 +718,27 @@ def test_checkout_product_cart(  # noqa: PLR0913
         assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
 
 
+def test_checkout_cart_with_program_product(user, user_drf_client):
+    """
+    Verifies that the cart API returns program product data correctly.
+    """
+    program = ProgramFactory.create()
+    product = ProductFactory.create(purchasable_object=program)
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    data = resp.json()
+    assert len(data["basket_items"]) == 1
+
+    purchasable_object = data["basket_items"][0]["product"]["purchasable_object"]
+    assert purchasable_object["id"] == program.id
+    assert purchasable_object["title"] == program.title
+    assert purchasable_object["readable_id"] == program.readable_id
+
+
 def test_checkout_product_with_program_id(user, user_client):
     """
     Verifies that /cart/add?program_id=? url adds the program to the cart

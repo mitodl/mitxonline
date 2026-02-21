@@ -285,6 +285,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     b2b_only = models.BooleanField(
         default=False, help_text="Indicates if the program is B2B only"
     )
+    products = GenericRelation("ecommerce.Product", related_query_name="programs")
 
     @cached_property
     def page(self):
