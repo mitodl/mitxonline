@@ -5,14 +5,14 @@ from django.db import migrations, models
 
 def populate_issue_date(apps, schema):
     CourseRunCertificate = apps.get_model("courses", "CourseRunCertificate")
-    CourseRunCertificate.objects.filter(
-        issue_date__isnull=True
-    ).update(issue_date=models.F("created_on"))
+    CourseRunCertificate.objects.filter(issue_date__isnull=True).update(
+        issue_date=models.F("created_on")
+    )
 
     ProgramCertificate = apps.get_model("courses", "ProgramCertificate")
-    ProgramCertificate.objects.filter(
-        issue_date__isnull=True
-    ).update(issue_date=models.F("created_on"))
+    ProgramCertificate.objects.filter(issue_date__isnull=True).update(
+        issue_date=models.F("created_on")
+    )
 
 
 class Migration(migrations.Migration):
