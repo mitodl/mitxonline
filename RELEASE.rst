@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.138.5
+---------------
+
+- Update certificate to show issue date (#3271)
+- chore(deps): update redis docker tag to v8.6.0 (#3320)
+- chore(deps): update postgres docker tag to v15.16 (#3319)
+- chore(deps): update dependency ruff to ^0.15 (#3318)
+- chore(deps): update dependency responses to ^0.26.0 (#3317)
+- Update migrate_edx_data command to set edx_enrolled and edx_emails_subscription (#3310)
+- chore: Created an AGENTS.md file to help give context to agentic tools (#3288)
+
 Version 0.138.4 (Released February 23, 2026)
 ---------------
 
