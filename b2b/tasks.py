@@ -29,7 +29,9 @@ def queue_organization_sync():
 
 
 @app.task(bind=True)
-def create_program_contract_runs(self, contract_id: int, program_id: int):
+def create_program_contract_runs(
+    self, contract_id: int, program_id: int, org_prefix: str | None = None
+):
     """
     Create contract runs for all courses in a program.
 
@@ -40,13 +42,9 @@ def create_program_contract_runs(self, contract_id: int, program_id: int):
         program_id: The ID of the Program
     """
     from django.db.models import Q
-    from mitol.common.utils import now_in_utc
-    from opaque_keys.edx.keys import CourseKey
 
     from b2b.api import create_contract_run
-    from b2b.constants import B2B_RUN_TAG_FORMAT
     from b2b.models import ContractPage
-    from courses.constants import UAI_COURSEWARE_ID_PREFIX
     from courses.models import CourseRun, Program
 
     lock_key = f"create_program_contract_runs_lock:{contract_id}:{program_id}"
@@ -90,17 +88,8 @@ def create_program_contract_runs(self, contract_id: int, program_id: int):
             if not clone_course_run:
                 continue
 
-            new_run_tag = B2B_RUN_TAG_FORMAT.format(
-                year=now_in_utc().year,
-                contract_id=contract.id,
-            )
-            source_id = CourseKey.from_string(clone_course_run.courseware_id)
-            new_readable_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
-
             # Check if run already exists
-            if CourseRun.objects.filter(
-                course=course, courseware_id=new_readable_id
-            ).exists():
+            if CourseRun.objects.filter(course=course, b2b_contract=contract).exists():
                 skipped_count += 1
                 log.debug(
                     "Contract run already exists for course %s in contract %s",
@@ -110,7 +99,7 @@ def create_program_contract_runs(self, contract_id: int, program_id: int):
                 continue
 
             # Create the run
-            create_contract_run(contract, course)
+            create_contract_run(contract, course, org_prefix=org_prefix)
             created_count += 1
             log.info(
                 "Created contract run for course %s in program %s for contract %s",

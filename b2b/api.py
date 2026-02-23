@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Count, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -75,6 +76,66 @@ def ensure_b2b_organization_index() -> OrganizationIndexPage:
     return org_index_page
 
 
+@transaction.atomic
+def create_contract_run_key(
+    source_course: CourseRun, contract: ContractPage, *, org_prefix: str | None = None
+) -> str:
+    """
+    Create a course key for a contract course run for the specified source course
+    and contract.
+
+    The format for the run tag is in the B2B_RUN_TAG_FORMAT constant; if this
+    changes, you will likely need to change it here too.
+
+    Args:
+    - source_course (CourseRun): the source course to get the original key from
+    - contract (ContractPage): the contract the target run is for
+    Kwargs:
+    - org_prefix (str|None): the prefix to use for the org part of the key
+    Returns:
+    - str, the new key
+    """
+
+    if not org_prefix:
+        org_prefix = (
+            contract.organization.org_key_prefix
+            if contract.organization.org_key_prefix
+            else UAI_COURSEWARE_ID_PREFIX
+        )
+
+    source_id = CourseKey.from_string(source_course.readable_id)
+    new_course_key = (
+        f"course-v1:{org_prefix}{contract.organization.org_key}+{source_id.course}"
+    )
+    mostly_run_tag = B2B_RUN_TAG_FORMAT.format(
+        run_idx="",
+        contract_id=contract.id,
+        year=now_in_utc().year,
+    )
+    run_idx = 1
+
+    last_run_tag = (
+        CourseRun.objects.filter(
+            courseware_id__startswith=new_course_key,
+            courseware_id__endswith=mostly_run_tag,
+        )
+        .select_for_update()
+        .order_by("-courseware_id")
+        .first()
+    )
+    if last_run_tag:
+        run_idx, _ = CourseKey.from_string(last_run_tag.courseware_id).run.split("T")
+        run_idx = int(run_idx) + 1
+
+    new_run_tag = B2B_RUN_TAG_FORMAT.format(
+        year=now_in_utc().year,
+        contract_id=contract.id,
+        run_idx=run_idx,
+    )
+    # Validate and return
+    return str(CourseKey.from_string(f"{new_course_key}+{new_run_tag}"))
+
+
 def import_and_create_contract_run(  # noqa: PLR0913
     contract: ContractPage,
     course_run_id: str,
@@ -90,6 +151,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
     ingest_content_files_for_ai: bool = True,
     skip_edx: bool = False,
     require_designated_source_run: bool = False,
+    org_prefix=UAI_COURSEWARE_ID_PREFIX,
 ):
     """
     Create a contract run for the given course, importing it from edX if necessary.
@@ -178,15 +240,18 @@ def import_and_create_contract_run(  # noqa: PLR0913
         run.course,
         skip_edx=skip_edx,
         require_designated_source_run=require_designated_source_run,
+        org_prefix=org_prefix,
     )
 
 
-def create_contract_run(
+def create_contract_run(  # noqa: PLR0913
     contract: ContractPage,
     course: Course,
     *,
     skip_edx=False,
     require_designated_source_run=True,
+    org_prefix: str | None = UAI_COURSEWARE_ID_PREFIX,
+    no_reruns: bool = False,
 ) -> tuple[CourseRun, Product]:
     """
     Create a run for the specified contract.
@@ -228,6 +293,8 @@ def create_contract_run(
     Keyword Args:
         skip_edx (bool): Don't try to create a course run in edX.
         require_designated_source_run (bool): Require a flagged source run.
+        org_prefix (str): Organization prefix. For UAI courses, this should be "UAI_".
+        no_reruns (bool): Don't rerun the course - raise an exception instead.
     Returns:
         CourseRun: The created CourseRun object.
         Product: The created Product object.
@@ -253,15 +320,19 @@ def create_contract_run(
         msg = f"No course runs available for {course}."
         raise SourceCourseIncompleteError(msg)
 
-    new_run_tag = B2B_RUN_TAG_FORMAT.format(
-        year=now_in_utc().year,
-        contract_id=contract.id,
+    new_course_key = CourseKey.from_string(
+        create_contract_run_key(
+            source_course=clone_course_run, contract=contract, org_prefix=org_prefix
+        )
     )
-    source_id = CourseKey.from_string(clone_course_run.readable_id)
-    new_readable_id = f"{UAI_COURSEWARE_ID_PREFIX}{contract.organization.org_key}+{source_id.course}+{new_run_tag}"
+    new_readable_id = str(new_course_key)
+    new_run_tag = new_course_key.run
 
     # Check first for an existing run with the same readable ID.
-    if CourseRun.objects.filter(course=course, courseware_id=new_readable_id).exists():
+    if (
+        CourseRun.objects.filter(course=course, b2b_contract=contract).exists()
+        and no_reruns
+    ):
         msg = f"Can't create a run for {course} and contract {contract}: courseware ID {new_readable_id} already exists."
         raise TargetCourseRunExistsError(msg)
 
@@ -592,7 +663,10 @@ def _handle_extra_enrollment_codes(contract: ContractPage, product: Product) -> 
     # Filter out the discounts that have been used for something - either for
     # contract attachment or for enrollment.
     unused_discounts = (
-        contract.get_unused_discounts().filter(products__product=product).all()
+        contract.get_unused_discounts()
+        .filter(products__product=product)
+        .order_by("-id")
+        .all()
     )
 
     for unused_discount in unused_discounts[:remove_count]:

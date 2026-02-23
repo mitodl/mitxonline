@@ -8,12 +8,11 @@ from django.core.management import BaseCommand
 from wagtail.images.models import Image
 
 from cms.models import (
-    CoursePage,
     InstructorIndexPage,
     InstructorPage,
     InstructorPageLink,
 )
-from courses.models import Course
+from courses.models import Course, Program
 
 
 class Command(BaseCommand):
@@ -34,9 +33,9 @@ class Command(BaseCommand):
             help="If true, generate fake data instead of real data.",
         )
         parser.add_argument(
-            "--readable-id",
+            "--readable-ids",
             type=str,
-            default=None,
+            default="",
             help="The course to link the instructor to",
         )
         parser.add_argument(
@@ -60,7 +59,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--link-instructor-id",
             type=str,
-            default=None,
+            default="",
             help="If specified, skip creation and only link the instructor with this ID to the course",
         )
 
@@ -116,11 +115,16 @@ class Command(BaseCommand):
             }
         return instructor_payload
 
-    def link_instructor_to_course(self, instructor_page, readable_id):
-        course = Course.objects.filter(readable_id=readable_id).first()
-        if not course:
+    def link_instructor_to_course_or_program(self, instructor_page, readable_id):
+        courseware_object = Course.objects.filter(readable_id=readable_id).first()
+
+        if not courseware_object:
+            courseware_object = Program.objects.filter(readable_id=readable_id).first()
+
+        if not courseware_object:
             self.error(f"Could not find course with id {readable_id}")
-        page = CoursePage.objects.filter(course_id=course.id).first()
+
+        page = courseware_object.page
         if not page:
             self.error(
                 f"Course {readable_id} does not have a CMS page to link to. Consider creating one with create_courseware_page and rerunning with ./manage.py create_instructor_pages --link-instructor-id='{instructor_page.id}' --readable-id='{readable_id}'."
@@ -129,7 +133,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):  # pylint: disable=unused-argument  # noqa: ARG002
         use_fake_data = options["fake"]
-        readable_id = options["readable_id"]
+        readable_ids = (
+            options["readable_ids"].split(",") if options["readable_ids"] else []
+        )
         link_instructor_id = options["link_instructor_id"]
         if link_instructor_id:
             instructor_page = InstructorPage.objects.filter(
@@ -149,5 +155,6 @@ class Command(BaseCommand):
             instructor_index_page.add_child(instance=instructor_page)
             instructor_page.save_revision().publish()
 
-        if readable_id:
-            self.link_instructor_to_course(instructor_page, readable_id)
+        if readable_ids:
+            for readable_id in readable_ids:
+                self.link_instructor_to_course_or_program(instructor_page, readable_id)

@@ -88,7 +88,7 @@ urlpatterns = [
     re_path(r"^orders/receipt/.*", index, name="order-receipt"),
     re_path(r"^records/.*", index, name="learner-records"),
     re_path(r"^catalog/", index, name="catalog"),
-    path("api/instructor/<int:id>/", instructor_page, name="cms_instructor_page"),
+    path("api/instructor/<int:pk>/", instructor_page, name="cms_instructor_page"),
     re_path(r"^health/", include("health_check.urls")),
     # Wagtail
     re_path(

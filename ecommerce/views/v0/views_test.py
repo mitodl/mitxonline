@@ -378,16 +378,25 @@ def test_create_basket_with_products(
 
 
 @pytest.mark.parametrize(
-    ("existing_basket", "add_discount", "bad_discount"),
+    (
+        "existing_basket",
+        "add_discount",
+        "bad_discount",
+        "existing_discount",
+    ),
     [
-        (True, False, False),
-        (False, True, False),
-        (False, False, False),
-        (False, True, True),
+        (True, False, False, "no"),
+        (False, True, False, "no"),
+        (False, False, False, "no"),
+        (False, True, True, "no"),
+        (True, True, False, "better"),
+        (True, True, True, "better"),
+        (True, True, False, "worse"),
+        (True, True, True, "worse"),
     ],
 )
-def test_create_basket_with_product(
-    user, user_client, existing_basket, add_discount, bad_discount
+def test_create_basket_with_product(  # noqa: PLR0913
+    user, user_client, existing_basket, add_discount, bad_discount, existing_discount
 ):
     """Test creating a basket with a single product, and/or a discount."""
 
@@ -401,6 +410,21 @@ def test_create_basket_with_product(
     )
 
     if add_discount:
+        if existing_discount in ["better", "worse"]:
+            # Create and apply a discount that is either better or worse than
+            # the one that'll be "supplied" below.
+
+            ex_discount = DiscountFactory(
+                discount_type="fixed-price",
+                amount=150 if existing_discount == "worse" else 50,
+            )
+            BasketDiscount.objects.create(
+                redeemed_basket=basket,
+                redeemed_discount=ex_discount,
+                redeemed_by=user,
+                redemption_date=now_in_utc(),
+            )
+
         if bad_discount:
             discount = DiscountFactory(
                 discount_type="fixed-price", amount=100, max_redemptions=1
@@ -436,7 +460,7 @@ def test_create_basket_with_product(
         assert basket
         assert basket_id == basket.id
 
-    if add_discount:
+    if add_discount and existing_discount == "no":
         if bad_discount:
             assert (
                 not Basket.objects.get(id=basket_id)
@@ -447,6 +471,29 @@ def test_create_basket_with_product(
             assert (
                 Basket.objects.get(id=basket_id)
                 .discounts.filter(redeemed_discount=discount)
+                .exists()
+            )
+
+    if add_discount and existing_discount != "no":
+        if bad_discount:
+            assert (
+                not Basket.objects.get(id=basket_id)
+                .discounts.filter(redeemed_discount=discount)
+                .exists()
+            )
+            assert (
+                Basket.objects.get(id=basket_id)
+                .discounts.filter(redeemed_discount=ex_discount)
+                .exists()
+            )
+        else:
+            assert (
+                Basket.objects.get(id=basket_id)
+                .discounts.filter(
+                    redeemed_discount=(
+                        discount if existing_discount == "worse" else ex_discount
+                    )
+                )
                 .exists()
             )
 
@@ -614,7 +661,7 @@ def test_discount_redemptions_api(
 
     # create basket with discount, then check for redemptions
 
-    basket = create_basket(user, products)  # noqa: F841
+    create_basket(user, products)
 
     resp = user_drf_client.post(
         reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
@@ -622,10 +669,10 @@ def test_discount_redemptions_api(
 
     assert resp.status_code == 200
 
-    resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
 
     # 100% discount will redirect to user dashboard
-    assert resp.status_code == 200 or resp.status_code == 302  # noqa: PLR1714
+    assert resp.status_code == 200
 
     resp = admin_drf_client.get(
         reverse("v0:discounts_api-redemptions-list", args=[discount.id]),

@@ -32,7 +32,7 @@ x-extra-hosts:
 
 services:
   db:
-    image: postgres:15.15
+    image: postgres:15.16
     ports:
       - "5432"
     environment:
@@ -42,7 +42,7 @@ services:
       - ./config/db:/docker-entrypoint-initdb.d
 
   redis:
-    image: redis:8.4.0
+    image: redis:8.6.0
     ports:
       - "6379"
 

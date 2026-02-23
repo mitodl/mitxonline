@@ -32,5 +32,6 @@ def test_serialize_program_enrollment(user, with_certificate):
             "certificate": {"uuid": certificate.uuid, "link": certificate.link}
             if with_certificate
             else None,
+            "enrollment_mode": enrollment.enrollment_mode,
         },
     )

@@ -1,6 +1,59 @@
 Release Notes
 =============
 
+Version 0.138.4 (Released February 23, 2026)
+---------------
+
+- Merge migration conflict courses 0081 (#3311)
+- [pre-commit.ci] pre-commit autoupdate (#3299)
+- Update letter_grade to allow more chars (#3289)
+- Update dependency webpack to v5.104.1 [SECURITY] (#3274)
+- Update actions/setup-python digest to a309ff8 (#3297)
+
+Version 0.138.3 (Released February 19, 2026)
+---------------
+
+- restrict enrolling into b2b courses from the enrollment api (#3306)
+- 10129 attach endpoint doesnt error when the contract is full (#3293)
+
+Version 0.138.2 (Released February 19, 2026)
+---------------
+
+- add enrollment_mode to the v3 program enrollments response (#3305)
+- Fix very occasionally flaky test_discount_redemptions_api test (#3302)
+- Updates for B2B course run key generation (#3292)
+- Adds a test contract and org to test_datagen (#3295)
+- Fix v0/baskets/create_from_product so that baskets get discounts as we expect (#3290)
+
+Version 0.138.1 (Released February 18, 2026)
+---------------
+
+- Fix program requirement root node ordering (#3294)
+- Hubspot sync for SCIM created users (#3269)
+- Make min max product price required (#3262)
+- Improve rich text field serialization (#3287)
+- Update dependency webpack-dev-server to v5 [SECURITY] (#3270)
+- [pre-commit.ci] pre-commit autoupdate (#3247)
+- Update dependency lodash to v4.17.23 [SECURITY] (#3239)
+- Update actions/cache digest to cdf6c1f (#3282)
+- Test datagen for playwright test (#3280)
+
+Version 0.137.14 (Released February 17, 2026)
+----------------
+
+- Improve /api/v2/enrollments/ performance (#3268)
+- Fix redemption display error; add toggle to turn redemption data off (#3281)
+- Trim extra enrollment codes from the end of the list, rather than the top (#3284)
+- Remove Syria as from restricted list (#3286)
+- Ignore edx failures variable usage (#3260)
+- api/v2/courses, api/v2/programs retrieve by readable_id (#3278)
+- Upgrading django-oauth-toolkit to 3.1 (#3142)
+- Remove unused newrelic (#3285)
+- Update newrelic to 11.4 (#3283)
+- Make verifiable_credential a raw_id field vs a lookup (#3279)
+- Update populate_course_data to include_in_learn_catalog (#3276)
+- Filter b2b courseware objects from the v2 courses api (#3259)
+
 Version 0.137.13 (Released February 05, 2026)
 ----------------
 

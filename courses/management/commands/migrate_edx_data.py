@@ -364,6 +364,8 @@ class Command(BaseCommand):
                 user_id=row["user_mitxonline_id"],
                 run_id=row["courserun_id"],
                 enrollment_mode=row["courserunenrollment_enrollment_mode"],
+                edx_enrolled=True,
+                edx_emails_subscription=False,
                 active=True,
             )
             for row in rows
@@ -372,7 +374,11 @@ class Command(BaseCommand):
             return 0
 
         CourseRunEnrollment.objects.bulk_create(
-            new_enrollment_objects, batch_size=batch_size, ignore_conflicts=True
+            new_enrollment_objects,
+            batch_size=batch_size,
+            update_conflicts=True,
+            update_fields=["edx_enrolled", "edx_emails_subscription"],
+            unique_fields=["user_id", "run_id"],
         )
         return len(new_enrollment_objects)
 

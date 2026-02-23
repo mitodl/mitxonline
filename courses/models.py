@@ -1618,6 +1618,77 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
         return self.save_and_log(None if no_user else self.user)
 
 
+class CourseRunEnrollmentCertificatePrefetcher(Prefetcher):
+    """Prefetcher for CourseRunEnrollment certificates"""
+
+    @staticmethod
+    def mapper(course_run_enrollment):
+        """Map each enrollment to (run_id, user_id)"""
+        return (course_run_enrollment.run_id, course_run_enrollment.user_id)
+
+    @staticmethod
+    def filter(course_run_and_user_ids):
+        id_filters = Q()
+
+        # django 5.1 supports this via
+        # django.db.models.fields.tuple_lookups.{Tuple,TupleIn}
+        for course_run_id, user_id in course_run_and_user_ids:
+            id_filters |= Q(course_run_id=course_run_id, user_id=user_id)
+
+        return CourseRunCertificate.objects.filter(id_filters)
+
+    @staticmethod
+    def reverse_mapper(certificate):
+        return [(certificate.course_run_id, certificate.user_id)]
+
+    @staticmethod
+    def decorator(course_run_enrollment, certificates=None):
+        course_run_enrollment._certificate = certificates[0] if certificates else None  # noqa: SLF001
+
+
+class CourseRunEnrollmentGradesPrefetcher(Prefetcher):
+    """Prefetcher for CourseRunEnrollment grades"""
+
+    @staticmethod
+    def mapper(course_run_enrollment):
+        """Map each enrollment to (run_id, user_id)"""
+        return (course_run_enrollment.run_id, course_run_enrollment.user_id)
+
+    @staticmethod
+    def filter(course_run_and_user_ids):
+        id_filters = Q()
+
+        # django 5.1 supports this via
+        # django.db.models.fields.tuple_lookups.{Tuple,TupleIn}
+        for course_run_id, user_id in course_run_and_user_ids:
+            id_filters |= Q(course_run_id=course_run_id, user_id=user_id)
+
+        return CourseRunGrade.objects.filter(id_filters)
+
+    @staticmethod
+    def reverse_mapper(grade):
+        return [(grade.course_run_id, grade.user_id)]
+
+    @staticmethod
+    def decorator(course_run_enrollment, grades=None):
+        course_run_enrollment._grades = grades or []  # noqa: SLF001
+
+
+class CourseRunEnrollmentManager(EnrollmentManager):
+    """EnrollmentManager for CourseRunEnrollment"""
+
+    prefetch_definitions = {
+        "certificate": CourseRunEnrollmentCertificatePrefetcher,
+        "grades": CourseRunEnrollmentGradesPrefetcher,
+    }
+
+
+class ActiveCourseRunEnrollmentManager(ActiveEnrollmentManager):
+    """ActiveEnrollmentManager for CourseRunEnrollment"""
+
+    prefetch_definitions = CourseRunEnrollmentManager.prefetch_definitions
+
+
 class CourseRunEnrollment(EnrollmentModel):
     """
     Link between User and CourseRun indicating a user's enrollment
@@ -1632,6 +1703,9 @@ class CourseRunEnrollment(EnrollmentModel):
     )
     edx_emails_subscription = models.BooleanField(default=True)
 
+    objects = ActiveCourseRunEnrollmentManager()
+    all_objects = CourseRunEnrollmentManager()
+
     class Meta:
         unique_together = ("user", "run")
 
@@ -1644,14 +1718,25 @@ class CourseRunEnrollment(EnrollmentModel):
     def get_audit_class(cls):
         return CourseRunEnrollmentAudit
 
-    @property
-    def highest_grade(self):
-        """Returns the highest grade achieved for the course run."""
-        return (
-            self.grades.filter(course_run=self, user=self.user)
-            .order_by("-grade")
-            .first()
-        )
+    @cached_property
+    def certificate(self) -> CourseRunCertificate | None:
+        if hasattr(self, "_certificate"):
+            return self._certificate
+        else:
+            return CourseRunCertificate.objects.filter(
+                course_run_id=self.run_id, user_id=self.user_id
+            ).first()
+
+    @cached_property
+    def grades(self) -> list["CourseRunGrade"]:
+        if hasattr(self, "_grades"):
+            return self._grades
+        else:
+            return list(
+                CourseRunGrade.objects.filter(
+                    course_run_id=self.run_id, user_id=self.user_id
+                )
+            )
 
     @classmethod
     def get_program_run_enrollments(cls, user, program):
@@ -1813,11 +1898,13 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
     """
 
     user = models.ForeignKey(User, null=False, on_delete=models.CASCADE)
-    course_run = models.ForeignKey(CourseRun, null=False, on_delete=models.CASCADE)
+    course_run = models.ForeignKey(
+        CourseRun, null=False, on_delete=models.CASCADE, related_name="grades"
+    )
     grade = models.FloatField(
         null=False, validators=[MinValueValidator(0.0), MaxValueValidator(2.0)]
     )
-    letter_grade = models.CharField(max_length=6, blank=True, null=True)  # noqa: DJ001
+    letter_grade = models.CharField(max_length=10, blank=True, null=True)  # noqa: DJ001
     passed = models.BooleanField(default=False)
     set_by_admin = models.BooleanField(default=False)
 
@@ -2001,6 +2088,10 @@ class ProgramRequirement(MP_Node):
 
     # extended alphabet from the default to the recommended one for postgres
     alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+    # we override to use C collation so that lowercase letters sort after uppercase
+    # regardless of the DB's underlying OS collation
+    path = models.CharField(max_length=255, unique=True, db_collation="C")
 
     node_type = models.CharField(  # noqa: DJ001
         choices=ProgramRequirementNodeType.choices,

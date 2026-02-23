@@ -14,6 +14,7 @@ from b2b.keycloak_admin_dataclasses import (
 from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
 from cms.factories import HomePageFactory
 from cms.models import HomePage
+from courses.constants import UAI_COURSEWARE_ID_PREFIX
 
 FAKE = faker.Faker()
 
@@ -35,12 +36,15 @@ class OrganizationPageFactory(wagtail_factories.PageFactory):
 
     name = LazyAttribute(lambda _: FAKE.unique.company())
     org_key = LazyAttribute(lambda _: FAKE.unique.text(max_nb_chars=5))
+    org_key_prefix = UAI_COURSEWARE_ID_PREFIX
     description = LazyAttribute(lambda _: FAKE.unique.text())
     logo = None
     sso_organization_id = LazyAttribute(lambda _: uuid4())
     parent = LazyAttribute(
-        lambda _: OrganizationIndexPage.objects.first()
-        or OrganizationIndexPageFactory.create()
+        lambda _: (
+            OrganizationIndexPage.objects.first()
+            or OrganizationIndexPageFactory.create()
+        )
     )
     slug = LazyAttribute(lambda _: FAKE.unique.slug())
 
@@ -56,9 +60,9 @@ class ContractPageFactory(wagtail_factories.PageFactory):
     organization = SubFactory(OrganizationPageFactory)
     parent = LazyAttribute(lambda o: o.organization)
     integration_type = LazyFunction(
-        lambda: CONTRACT_MEMBERSHIP_NONSSO
-        if FAKE.boolean()
-        else CONTRACT_MEMBERSHIP_SSO
+        lambda: (
+            CONTRACT_MEMBERSHIP_NONSSO if FAKE.boolean() else CONTRACT_MEMBERSHIP_SSO
+        )
     )
     membership_type = LazyAttribute(lambda o: o.integration_type)
     slug = LazyAttribute(lambda _: FAKE.unique.slug())

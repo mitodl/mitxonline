@@ -87,6 +87,7 @@ from flexiblepricing.models import (
     FlexiblePricingRequestSubmission,
 )
 from main import features
+from main.serializers import RichTextSerializer
 from main.views import get_base_context
 
 log = logging.getLogger()
@@ -635,8 +636,8 @@ class InstructorPage(Page):
         APIField("title"),
         APIField("instructor_name"),
         APIField("instructor_title"),
-        APIField("instructor_bio_short"),
-        APIField("instructor_bio_long"),
+        APIField("instructor_bio_short", serializer=RichTextSerializer()),
+        APIField("instructor_bio_long", serializer=RichTextSerializer()),
         APIField("feature_image", serializer=ImageSerializer()),
     ]
 
@@ -1106,14 +1107,16 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     )
 
     min_price = models.SmallIntegerField(
-        null=True,
-        blank=True,
+        default=0,
+        null=False,
+        blank=False,
         help_text="Specify the minimum product price. This is used by MIT Learn.",
     )
 
     max_price = models.SmallIntegerField(
-        null=True,
-        blank=True,
+        default=0,
+        null=False,
+        blank=False,
         help_text="Specify the maximum product price. This is used by MIT Learn.",
     )
 
@@ -1186,7 +1189,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         ),
     ]
     api_fields = [
-        APIField("description"),
+        APIField("description", serializer=RichTextSerializer()),
         APIField("length"),
         APIField("effort"),
         APIField("min_weekly_hours"),
@@ -1196,10 +1199,10 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         APIField("price"),
         APIField("min_price"),
         APIField("max_price"),
-        APIField("prerequisites"),
+        APIField("prerequisites", serializer=RichTextSerializer()),
         APIField("faq_url"),
-        APIField("about"),
-        APIField("what_you_learn"),
+        APIField("about", serializer=RichTextSerializer()),
+        APIField("what_you_learn", serializer=RichTextSerializer()),
         APIField("feature_image", serializer=ImageSerializer()),
         APIField("video_url"),
         APIField("faculty_section_title"),

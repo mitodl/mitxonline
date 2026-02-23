@@ -1,13 +1,10 @@
 """Tests for B2B tasks."""
 
 import pytest
-from mitol.common.utils import now_in_utc
-from opaque_keys.edx.keys import CourseKey
 
-from b2b.constants import B2B_RUN_TAG_FORMAT
+from b2b.api import create_contract_run_key
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.tasks import create_program_contract_runs
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
 from courses.models import ProgramRequirement, ProgramRequirementNodeType
 
@@ -64,8 +61,8 @@ def test_create_program_contract_runs_success(mocker):
 
     assert result.successful()
     assert mock_create_contract_run.call_count == 2
-    mock_create_contract_run.assert_any_call(contract, course1)
-    mock_create_contract_run.assert_any_call(contract, course2)
+    mock_create_contract_run.assert_any_call(contract, course1, org_prefix=None)
+    mock_create_contract_run.assert_any_call(contract, course2, org_prefix=None)
 
     expected_lock_key = f"create_program_contract_runs_lock:{contract.id}:{program.id}"
     mock_cache_add.assert_called_once()
@@ -113,12 +110,11 @@ def test_create_program_contract_runs_skips_existing_runs(mocker):
         courseware_id="course-v1:MITx+testcourse+SOURCE",
     )
 
-    current_year = now_in_utc().year
-    new_run_tag = B2B_RUN_TAG_FORMAT.format(year=current_year, contract_id=contract.id)
-    source_id = CourseKey.from_string(source_run.courseware_id)
-    existing_courseware_id = f"{UAI_COURSEWARE_ID_PREFIX}{organization.org_key}+{source_id.course}+{new_run_tag}"
+    existing_courseware_id = create_contract_run_key(source_run, contract)
 
-    CourseRunFactory.create(course=course, courseware_id=existing_courseware_id)
+    CourseRunFactory.create(
+        course=course, courseware_id=existing_courseware_id, b2b_contract=contract
+    )
 
     mocker.patch("django.core.cache.cache.add", return_value=True)
     mocker.patch("django.core.cache.cache.delete")
@@ -171,7 +167,9 @@ def test_create_program_contract_runs_courses_without_source_runs(mocker):
     )
 
     assert result.successful()
-    mock_create_contract_run.assert_called_once_with(contract, course_with_source)
+    mock_create_contract_run.assert_called_once_with(
+        contract, course_with_source, org_prefix=None
+    )
 
     final_log_call = mock_log_info.call_args_list[-1]
     assert "Completed contract run creation" in final_log_call[0][0]
@@ -275,7 +273,7 @@ def test_create_program_contract_runs_source_run_by_tag(mocker):
     )
 
     assert result.successful()
-    mock_create_contract_run.assert_called_once_with(contract, course)
+    mock_create_contract_run.assert_called_once_with(contract, course, org_prefix=None)
 
 
 def test_create_program_contract_runs_mixed_source_run_types(mocker):
@@ -313,8 +311,8 @@ def test_create_program_contract_runs_mixed_source_run_types(mocker):
 
     assert result.successful()
     assert mock_create_contract_run.call_count == 2
-    mock_create_contract_run.assert_any_call(contract, course1)
-    mock_create_contract_run.assert_any_call(contract, course2)
+    mock_create_contract_run.assert_any_call(contract, course1, org_prefix=None)
+    mock_create_contract_run.assert_any_call(contract, course2, org_prefix=None)
 
 
 def test_create_program_contract_runs_logging_output(mocker):
