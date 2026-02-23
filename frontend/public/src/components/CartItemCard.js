@@ -1,11 +1,11 @@
 // @flow
-import React from "react";
-import type { Product } from "../flow/cartTypes";
-import { courseRunStatusMessage } from "../lib/courseApi";
+import React from "react"
+import type { Product } from "../flow/cartTypes"
+import { courseRunStatusMessage } from "../lib/courseApi"
 
 type Props = {
-  product: Product,
-};
+  product: Product
+}
 
 export class CartItemCard extends React.Component<Props> {
   renderLink(linkText: string, pageUrl: ?string) {
@@ -13,62 +13,62 @@ export class CartItemCard extends React.Component<Props> {
       <a href={pageUrl || "#"} target="_blank" rel="noopener noreferrer">
         {linkText}
       </a>
-    );
+    )
   }
 
   render() {
-    const { product } = this.props;
+    const { product } = this.props
     if (product.purchasable_object === null) {
-      return null;
+      return null
     }
 
-    const purchasableObject = product.purchasable_object;
-    const course = purchasableObject.course;
+    const purchasableObject = product.purchasable_object
+    const course = purchasableObject.course
     const isProgram =
-      course === undefined && purchasableObject.readable_id !== undefined;
+      course === undefined && purchasableObject.readable_id !== undefined
 
-    let title, abbreviation, image, detailLink, statusMessage;
+    let title, abbreviation, image, detailLink, statusMessage
 
     if (course !== undefined) {
       // CourseRun product
-      const pageUrl = course.page !== null ? course.page.page_url : null;
-      title = this.renderLink(course.title, pageUrl);
-      abbreviation = purchasableObject.course_number;
+      const pageUrl = course.page !== null ? course.page.page_url : null
+      title = this.renderLink(course.title, pageUrl)
+      abbreviation = purchasableObject.course_number
       image =
         course.page !== null ? (
           <img src={course.page.feature_image_src} alt="" />
-        ) : null;
-      detailLink = this.renderLink("Course details", pageUrl);
-      statusMessage = courseRunStatusMessage(purchasableObject);
+        ) : null
+      detailLink = this.renderLink("Course details", pageUrl)
+      statusMessage = courseRunStatusMessage(purchasableObject)
     } else if (isProgram) {
       // Program product
       const pageUrl =
-        purchasableObject.page !== null && purchasableObject.page !== undefined
-          ? purchasableObject.page.page_url
-          : null;
-      title = this.renderLink(purchasableObject.title, pageUrl);
-      abbreviation = null;
+        purchasableObject.page !== null && purchasableObject.page !== undefined ?
+          purchasableObject.page.page_url :
+          null
+      title = this.renderLink(purchasableObject.title, pageUrl)
+      abbreviation = null
       image =
         purchasableObject.page !== null &&
         purchasableObject.page !== undefined ? (
-          <img src={purchasableObject.page.feature_image_src} alt="" />
-        ) : null;
-      detailLink = this.renderLink("Program details", pageUrl);
-      statusMessage = null;
+            <img src={purchasableObject.page.feature_image_src} alt="" />
+          ) : null
+      detailLink = this.renderLink("Program details", pageUrl)
+      statusMessage = null
     } else {
       // Fallback (e.g., ProgramRun)
       title = (
         <a href="#" target="_blank" rel="noopener noreferrer">
           {product.description}
         </a>
-      );
-      abbreviation = purchasableObject.run_tag;
-      image = null;
-      detailLink = null;
-      statusMessage = null;
+      )
+      abbreviation = purchasableObject.run_tag
+      image = null
+      detailLink = null
+      statusMessage = null
     }
 
-    const cardKey = `cartsummarycard_${product.id}`;
+    const cardKey = `cartsummarycard_${product.id}`
 
     return (
       <div className="enrolled-item container card" key={cardKey}>
@@ -87,6 +87,6 @@ export class CartItemCard extends React.Component<Props> {
           </div>
         </div>{" "}
       </div>
-    );
+    )
   }
 }
