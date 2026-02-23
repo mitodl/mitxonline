@@ -23,7 +23,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "mode_slug",
-                    models.CharField(blank=True, default="audit", max_length=255),
+                    models.CharField(
+                        blank=True, default="audit", max_length=255, unique=True
+                    ),
                 ),
                 (
                     "mode_display_name",

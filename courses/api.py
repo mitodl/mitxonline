@@ -49,6 +49,7 @@ from courses.models import (
     CourseRunEnrollment,
     CourseRunGrade,
     Department,
+    EnrollmentMode,
     PaidCourseRun,
     Program,
     ProgramCertificate,
@@ -71,7 +72,6 @@ from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
     get_edx_api_course_list_client,
-    get_edx_api_course_mode_client,
     get_edx_course_modes,
     get_edx_grades_with_users,
     unenroll_edx_course_run,
@@ -90,6 +90,7 @@ from openedx.exceptions import (
 
 if TYPE_CHECKING:
     from django.db.models.query import QuerySet
+    from edx_api.course_detail.models import CourseMode
 
 
 log = logging.getLogger(__name__)
@@ -671,23 +672,80 @@ def sync_course_runs(runs):
     return success_count, failure_count
 
 
+def pull_course_modes(run: CourseRun) -> tuple[list[CourseMode], int]:
+    """
+    Pull the course modes for the given run and store them locally.
+
+    We only generally care about "audit" and "verified", but this will store any
+    others that happen to be configured as well.
+
+    Args:
+        run (CourseRun): CourseRun object to retrieve modes for
+    Returns:
+        tuple of edX modes retrieved and count of modes created
+    """
+
+    modes = get_edx_course_modes(course_id=run.courseware_id)
+    new_mode_count = 0
+
+    for edx_mode in modes:
+        mxo_mode, created = EnrollmentMode.objects.get_or_create(
+            mode_slug=edx_mode.mode_slug,
+            defaults={
+                "mode_display_name": edx_mode.mode_display_name,
+                "requires_payment": edx_mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE,
+            },
+        )
+
+        run.enrollment_modes.add(mxo_mode)
+
+        if created:
+            new_mode_count += 1
+
+    run.save()
+
+    return (modes, new_mode_count)
+
+
 def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
     """
     Check that the course has the course modes we expect.
 
     We expect an `audit` and a `verified` mode in our course runs. If these don't
-    exist for the given course, this will create them.
+    exist for the given course, this will create them on both the edX side and
+    on the MITx Online side. (If the default audit and verified modes don't exist,
+    then we'll make those too.)
 
     Args:
-        runs ([CourseRun]): list of CourseRun objects.
+        runs (CourseRun): CourseRun object to check
 
     Returns:
         (audit_created: bool, verified_created: bool): Tuple of mode status - true for created, false for found
     """
 
-    modes = get_edx_course_modes(course_id=run.courseware_id)
+    modes, _ = pull_course_modes(run)
 
     found_audit, found_verified = (False, False)
+
+    mxo_audit_mode = EnrollmentMode.objects.filter(
+        mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+    ).first()
+    mxo_verified_mode = EnrollmentMode.objects.filter(
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+    ).first()
+
+    if not mxo_audit_mode:
+        mxo_audit_mode = EnrollmentMode.objects.create(
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE,
+            mode_display_name=EDX_ENROLLMENT_AUDIT_MODE,
+        )
+
+    if not mxo_verified_mode:
+        mxo_verified_mode = EnrollmentMode.objects.create(
+            mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            mode_display_name=EDX_ENROLLMENT_VERIFIED_MODE,
+            requires_payment=True,
+        )
 
     for mode in modes:
         if mode.mode_slug == EDX_ENROLLMENT_AUDIT_MODE:
@@ -705,6 +763,7 @@ def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
             expiration_datetime=None,
             currency="USD",
         )
+        run.enrollment_modes.add(mxo_audit_mode)
 
     if not found_verified:
         create_edx_course_mode(
@@ -716,6 +775,10 @@ def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
             min_price=10,
             expiration_datetime=run.upgrade_deadline if run.upgrade_deadline else None,
         )
+        run.enrollment_modes.add(mxo_verified_mode)
+
+    if not (found_audit or found_verified):
+        run.save()
 
     # these are created flags, not found flags
     return (not found_audit, not found_verified)
@@ -731,7 +794,6 @@ def sync_course_mode(runs: list[CourseRun]) -> list[int]:
     Returns:
         [int, int]: Count of successful and failed operations
     """
-    api_client = get_edx_api_course_mode_client()
 
     success_count = 0
     failure_count = 0
@@ -739,9 +801,7 @@ def sync_course_mode(runs: list[CourseRun]) -> list[int]:
     # Iterate all eligible runs and sync if possible
     for run in runs:
         try:
-            course_modes = api_client.get_course_modes(
-                course_id=run.courseware_id,
-            )
+            course_modes, _ = pull_course_modes(run)
         except HTTPError as e:  # noqa: PERF203
             failure_count += 1
             if e.response.status_code == HTTP_404_NOT_FOUND:

@@ -253,7 +253,7 @@ class EnrollmentMode(models.Model):
     """Enrollment modes for the courseware object."""
 
     mode_slug = models.CharField(
-        max_length=255, blank=True, default=EDX_DEFAULT_ENROLLMENT_MODE
+        max_length=255, blank=True, default=EDX_DEFAULT_ENROLLMENT_MODE, unique=True
     )
     mode_display_name = models.CharField(
         max_length=255, blank=True, default=EDX_DEFAULT_ENROLLMENT_MODE

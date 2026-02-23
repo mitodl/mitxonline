@@ -48,6 +48,7 @@ from courses.api import (
     manage_program_certificate_access,
     override_user_grade,
     process_course_run_grade_certificate,
+    pull_course_modes,
     sync_course_mode,
     sync_course_runs,
 )
@@ -73,6 +74,7 @@ from courses.factories import (
 # pylint: disable=redefined-outer-name
 from courses.models import (
     CourseRunEnrollment,
+    EnrollmentMode,
     PaidCourseRun,
     ProgramCertificate,
     ProgramEnrollment,
@@ -1959,6 +1961,9 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
 
     run = CourseRunFactory.create()
 
+    # clear all of these - the appropriate ones should be created later
+    EnrollmentMode.objects.all().delete()
+
     return_modes = []
     audit_mode = CourseMode(
         {
@@ -1998,6 +2003,13 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
     assert audit_created != audit_exists
     assert verified_created != verified_exists
 
+    assert (
+        EnrollmentMode.objects.filter(
+            mode_slug__in=[EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
+        ).count()
+        == 2
+    )
+
     if not audit_exists:
         mocked_create_mode.assert_any_call(
             course_id=run.courseware_id,
@@ -2008,6 +2020,7 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
             expiration_datetime=None,
             min_price=0,
         )
+        assert run.enrollment_modes.filter(mode_slug=EDX_ENROLLMENT_AUDIT_MODE).exists()
 
     if not verified_exists:
         mocked_create_mode.assert_any_call(
@@ -2019,6 +2032,9 @@ def test_check_course_modes(mocker, audit_exists, verified_exists):
             expiration_datetime=str(run.upgrade_deadline),
             min_price=10,
         )
+        assert run.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+        ).exists()
 
 
 @pytest.mark.parametrize(
@@ -2750,3 +2766,59 @@ def test_deactivate_run_enrollment_feature_flag(
         assert result.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
     else:
         assert result is None
+
+
+@pytest.mark.parametrize(
+    "no_initial_modes",
+    [
+        True,
+        False,
+    ],
+)
+def test_pull_course_modes(mocker, no_initial_modes):
+    """Test that we can pull the course modes from edX and store them."""
+
+    run = CourseRunFactory.create()
+
+    if no_initial_modes:
+        EnrollmentMode.objects.all().delete()
+
+    return_modes = [
+        CourseMode(
+            {
+                "course_id": run.courseware_id,
+                "mode_slug": "audit",
+                "mode_display_name": "Audit",
+            }
+        ),
+        CourseMode(
+            {
+                "course_id": run.courseware_id,
+                "mode_slug": "verified",
+                "mode_display_name": "Verified",
+            }
+        ),
+        CourseMode(
+            {
+                "course_id": run.courseware_id,
+                "mode_slug": "bonus",
+                "mode_display_name": "Bonus Mode!",
+            }
+        ),
+    ]
+
+    mocked_get_modes = mocker.patch(
+        "edx_api.course_detail.CourseModes.get_course_modes", return_value=return_modes
+    )
+
+    returned_modes, created_count = pull_course_modes(run)
+
+    assert created_count == 3 if no_initial_modes else 1
+    mocked_get_modes.assert_called()
+
+    expected_modes = [
+        returned_mode
+        for returned_mode in returned_modes
+        if returned_mode.mode_slug in ["audit", "verified", "bonus"]
+    ]
+    assert len(expected_modes) == 3
