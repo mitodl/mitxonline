@@ -72,7 +72,7 @@ def test_admin_refund_order_get_not_fulfilled(client, admin_user):
 
 
 @pytest.mark.parametrize(
-    "perform_unenrolls, expected_message_suffix",
+    ("perform_unenrolls", "expected_message_suffix"),
     [
         (False, "refunded."),
         (True, "refunded and unenrollment is in progress."),
