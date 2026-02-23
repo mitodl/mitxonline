@@ -14,6 +14,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, RegexVa
 from django.db import models
 from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.db.models.constraints import CheckConstraint, UniqueConstraint
+from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django_countries.fields import CountryField
@@ -1346,13 +1347,20 @@ class BaseCertificate(models.Model):
         help_text="Indicates whether or not the certificate is revoked",
         verbose_name="revoked",
     )
-    issue_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    issue_date = models.DateTimeField(
+        null=False, blank=False, db_index=True, default=timezone.now
+    )
     verifiable_credential = models.OneToOneField(
         VerifiableCredential, on_delete=models.SET_NULL, blank=True, null=True
     )
 
     class Meta:
         abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self.issue_date:
+            self.issue_date = getattr(self, "created_on", None)
+        super().save(*args, **kwargs)
 
     def get_certified_object_id(self):
         """Gets the id of the certificate's program/run"""

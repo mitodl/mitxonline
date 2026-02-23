@@ -462,7 +462,7 @@ class CertificatePage(CourseProgramChildPage):
                 "uuid": "fake-uuid",
                 "learner_name": "Anthony M. Stark",
                 "product_name": product_name,
-                "end_date": datetime.now(),  # noqa: DTZ005
+                "issue_date": datetime.now(),  # noqa: DTZ005
                 "CEUs": self.CEUs,
                 "is_program_certificate": is_program_certificate,
             }
@@ -470,7 +470,6 @@ class CertificatePage(CourseProgramChildPage):
             # Verify that the certificate in fact is for this same course
             if self.parent.product.id != self.certificate.get_courseware_object_id():
                 raise Http404()  # noqa: RSE102
-            start_date, end_date = self.certificate.start_end_dates
             CEUs = self.CEUs
 
             for override in self.overrides:  # pylint: disable=not-an-iterable
@@ -493,8 +492,7 @@ class CertificatePage(CourseProgramChildPage):
                 "product_name": product_name,
                 "certificate_user": self.certificate.user,
                 "learner_name": self.certificate.user.get_full_name(),
-                "start_date": start_date,
-                "end_date": end_date,
+                "issue_date": self.certificate.issue_date,
                 "CEUs": CEUs,
                 "is_program_certificate": is_program_certificate,
                 "program_type": (
