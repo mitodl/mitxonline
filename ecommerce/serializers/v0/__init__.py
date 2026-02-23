@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
-from cms.serializers import CoursePageSerializer
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
 from ecommerce.constants import (
@@ -21,7 +21,6 @@ from ecommerce.constants import (
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.models import Basket, BasketItem, Order, Product
-from ecommerce.serializers import ProgramProductPurchasableObjectSerializer
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
@@ -157,6 +156,19 @@ class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProgramPageObjectField(serializers.RelatedField):
+    def to_representation(self, value):
+        return ProgramPageSerializer(instance=value).data
+
+
+class ProgramProductPurchasableObjectSerializer(serializers.ModelSerializer):
+    page = ProgramPageObjectField(read_only=True)
+
+    class Meta:
+        model = Program
+        fields = ["id", "title", "readable_id", "page"]
+
+
 class InvalidPurchasableObjectTypeError(Exception):
     """Exception raised for invalid purchasable object types."""
 
@@ -193,6 +205,15 @@ class InvalidPurchasableObjectTypeError(Exception):
                     "enrollment_start": {"type": "string", "format": "date-time"},
                     "enrollment_end": {"type": "string", "format": "date-time"},
                     "course_number": {"type": "string"},
+                },
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "readable_id": {"type": "string"},
+                    "page": {"type": "object"},
                 },
             },
         ]
