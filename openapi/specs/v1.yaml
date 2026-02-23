@@ -5864,6 +5864,16 @@ components:
                 format: date-time
               course_number:
                 type: string
+          - type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              readable_id:
+                type: string
+              page:
+                type: object
           readOnly: true
       required:
       - description
@@ -7792,6 +7802,12 @@ components:
           description: Get the max weekly hours of the course from the course page
             CMS.
           readOnly: true
+        products:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ProductFlexibilePrice'
+          readOnly: true
       required:
       - certificate_type
       - collections
@@ -7806,6 +7822,7 @@ components:
       - min_weekly_hours
       - min_weeks
       - page
+      - products
       - readable_id
       - req_tree
       - required_prerequisites
