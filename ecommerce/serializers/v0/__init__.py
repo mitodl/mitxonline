@@ -10,7 +10,7 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer
-from courses.models import Course, CourseRun, ProgramRun
+from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
@@ -21,6 +21,7 @@ from ecommerce.constants import (
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.models import Basket, BasketItem, Order, Product
+from ecommerce.serializers import ProgramProductPurchasableObjectSerializer
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
@@ -198,7 +199,7 @@ class InvalidPurchasableObjectTypeError(Exception):
     }
 )
 class ProductPurchasableObjectField(serializers.RelatedField):
-    """Field for serializing purchasable objects (CourseRun or ProgramRun)"""
+    """Field for serializing purchasable objects (CourseRun, ProgramRun, or Program)"""
 
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
@@ -206,6 +207,8 @@ class ProductPurchasableObjectField(serializers.RelatedField):
             return ProgramRunProductPurchasableObjectSerializer(instance=value).data
         elif isinstance(value, CourseRun):
             return CourseRunProductPurchasableObjectSerializer(instance=value).data
+        elif isinstance(value, Program):
+            return ProgramProductPurchasableObjectSerializer(instance=value).data
 
         error_message = (
             f"Unexpected type for Product.purchasable_object: {value.__class__}"
