@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0082_merge_0081"),
+        ("courses", "0084_certificate_issue_date_set_deafault"),
     ]
 
     operations = [

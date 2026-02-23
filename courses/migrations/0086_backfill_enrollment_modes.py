@@ -62,7 +62,7 @@ def remove_modes(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0083_add_enrollment_modes"),
+        ("courses", "0085_add_enrollment_modes"),
     ]
 
     operations = [
