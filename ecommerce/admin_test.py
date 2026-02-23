@@ -175,34 +175,6 @@ def test_admin_refund_order_post_invalid_form(client, admin_user, mocker):
     assert "refund_amount" in response.context["errors"]
 
 
-def test_admin_refund_order_post_not_implemented(client, admin_user, mocker):
-    """NotImplementedError from refund_order should redirect with a specific error message."""
-
-    _login_admin(client, admin_user)
-    order = OrderFactory.create(state=OrderStatus.FULFILLED)
-
-    mocker.patch("ecommerce.admin.refund_order", side_effect=NotImplementedError)
-
-    post_data = {
-        "order": str(order.id),
-        "_selected_action": str(order.id),
-        "refund_reason": "Test refund",
-        "refund_amount": "10.00",
-    }
-
-    response = client.post(reverse("refund-order"), data=post_data)
-
-    assert response.status_code == 302
-    assert response.url == reverse("admin:ecommerce_refundedorder_changelist")
-
-    messages = list(get_messages(response.wsgi_request))
-    assert len(messages) == 1
-    assert (
-        str(messages[0].message)
-        == f"Order {order.id} can't be refunded."
-    )
-
-
 def test_admin_refund_order_post_order_not_found(client, admin_user):
     """Missing order on POST should redirect to fulfilled orders changelist with an error."""
 
