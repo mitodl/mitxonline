@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.138.4
+Version 0.138.4 (Released February 23, 2026)
 ---------------
 
 - Merge migration conflict courses 0081 (#3311)
