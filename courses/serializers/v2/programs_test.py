@@ -16,6 +16,7 @@ from courses.factories import (  # noqa: F401
 from courses.models import CoursesTopic, Department, ProgramCollectionItem
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.programs import (
+    ProgramDetailSerializer,
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
 )
@@ -153,6 +154,26 @@ def test_serialize_program(
             "max_price": program_with_empty_requirements.page.max_price,
         },
     )
+
+
+def test_serialize_program_with_products(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """Test Program serialization includes product data"""
+    from ecommerce.factories import ProductFactory  # noqa: PLC0415
+
+    product = ProductFactory.create(purchasable_object=program_with_empty_requirements)
+
+    data = ProgramDetailSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    assert len(data["products"]) == 1
+    assert data["products"][0]["id"] == product.id
+    assert data["products"][0]["price"] == str(product.price)
+    assert data["products"][0]["is_active"] == product.is_active
+    assert data["products"][0]["description"] == product.description
 
 
 def test_program_requirement_tree_serializer_save():

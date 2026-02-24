@@ -2975,7 +2975,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedV2ProgramList'
+                $ref: '#/components/schemas/PaginatedV2ProgramDetailList'
           description: ''
   /api/v2/programs/{id}/:
     get:
@@ -2998,7 +2998,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/V2Program'
+                $ref: '#/components/schemas/V2ProgramDetail'
           description: ''
   /api/v2/verifiable_course_credential/{credential_id}/download/:
     get:
@@ -3157,6 +3157,26 @@ components:
       - readable_id
       - title
       - type
+    BaseProduct:
+      type: object
+      description: Simple serializer for Product without related purchasable objects
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+      required:
+      - description
+      - id
+      - price
     BaseProgram:
       type: object
       description: Basic program model serializer
@@ -5568,7 +5588,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/V2ProgramCollection'
-    PaginatedV2ProgramList:
+    PaginatedV2ProgramDetailList:
       type: object
       required:
       - count
@@ -5590,7 +5610,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/V2Program'
+            $ref: '#/components/schemas/V2ProgramDetail'
     PartnerSchool:
       type: object
       properties:
@@ -5864,6 +5884,16 @@ components:
                 format: date-time
               course_number:
                 type: string
+          - type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              readable_id:
+                type: string
+              page:
+                type: object
           readOnly: true
       required:
       - description
@@ -7887,6 +7917,209 @@ components:
       - programs
       - title
       - updated_on
+    V2ProgramDetail:
+      type: object
+      description: Extended Program serializer that includes products. Used by the
+        programs API.
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        courses:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+        collections:
+          type: array
+          items:
+            type: integer
+          readOnly: true
+        requirements:
+          type: object
+          properties:
+            courses:
+              type: object
+              properties:
+                required:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of required courses with id and readable_id
+                electives:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of elective courses with id and readable_id
+            programs:
+              type: object
+              properties:
+                required:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of required programs with id and readable_id
+                electives:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      readable_id:
+                        type: string
+                  description: List of elective programs with id and readable_id
+          readOnly: true
+        req_tree:
+          type: array
+          items:
+            $ref: '#/components/schemas/V2ProgramRequirement'
+          readOnly: true
+        page:
+          allOf:
+          - $ref: '#/components/schemas/ProgramPage'
+          readOnly: true
+        program_type:
+          type: string
+          nullable: true
+          maxLength: 255
+        certificate_type:
+          type: string
+          readOnly: true
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+          readOnly: true
+        live:
+          type: boolean
+        topics:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+          readOnly: true
+        availability:
+          $ref: '#/components/schemas/AvailabilityEnum'
+        start_date:
+          type: string
+          nullable: true
+          description: Get the start date of the program by finding the first available
+            run.
+          readOnly: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+        required_prerequisites:
+          type: boolean
+          description: Check if the prerequisites field is populated in the program
+            page CMS.
+          readOnly: true
+        duration:
+          type: string
+          nullable: true
+          description: Get the length/duration field from the program page CMS.
+          readOnly: true
+        min_weeks:
+          type: integer
+          nullable: true
+          description: Get the min weeks of the program from the CMS page.
+          readOnly: true
+        max_weeks:
+          type: integer
+          nullable: true
+          description: Get the max weeks of the program from the CMS page.
+          readOnly: true
+        min_price:
+          type: integer
+          nullable: true
+          description: Get the min price of the product from the CMS page.
+          readOnly: true
+        max_price:
+          type: integer
+          nullable: true
+          description: Get the max price of the product from the CMS page.
+          readOnly: true
+        time_commitment:
+          type: string
+          nullable: true
+          description: Get the effort/time_commitment field from the program page
+            CMS.
+          readOnly: true
+        min_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the min weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+        max_weekly_hours:
+          type: string
+          nullable: true
+          description: Get the max weekly hours of the course from the course page
+            CMS.
+          readOnly: true
+        products:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/BaseProduct'
+          readOnly: true
+      required:
+      - certificate_type
+      - collections
+      - courses
+      - departments
+      - duration
+      - id
+      - max_price
+      - max_weekly_hours
+      - max_weeks
+      - min_price
+      - min_weekly_hours
+      - min_weeks
+      - page
+      - products
+      - readable_id
+      - req_tree
+      - required_prerequisites
+      - requirements
+      - start_date
+      - time_commitment
+      - title
+      - topics
     V2ProgramRequirement:
       type: object
       description: Serializer for a ProgramRequirement

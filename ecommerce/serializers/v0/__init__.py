@@ -9,8 +9,8 @@ from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
-from cms.serializers import CoursePageSerializer
-from courses.models import Course, CourseRun, ProgramRun
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
@@ -156,6 +156,19 @@ class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProgramPageObjectField(serializers.RelatedField):
+    def to_representation(self, value):
+        return ProgramPageSerializer(instance=value).data
+
+
+class ProgramProductPurchasableObjectSerializer(serializers.ModelSerializer):
+    page = ProgramPageObjectField(read_only=True)
+
+    class Meta:
+        model = Program
+        fields = ["id", "title", "readable_id", "page"]
+
+
 class InvalidPurchasableObjectTypeError(Exception):
     """Exception raised for invalid purchasable object types."""
 
@@ -194,11 +207,20 @@ class InvalidPurchasableObjectTypeError(Exception):
                     "course_number": {"type": "string"},
                 },
             },
+            {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "readable_id": {"type": "string"},
+                    "page": {"type": "object"},
+                },
+            },
         ]
     }
 )
 class ProductPurchasableObjectField(serializers.RelatedField):
-    """Field for serializing purchasable objects (CourseRun or ProgramRun)"""
+    """Field for serializing purchasable objects (CourseRun, ProgramRun, or Program)"""
 
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
@@ -206,6 +228,8 @@ class ProductPurchasableObjectField(serializers.RelatedField):
             return ProgramRunProductPurchasableObjectSerializer(instance=value).data
         elif isinstance(value, CourseRun):
             return CourseRunProductPurchasableObjectSerializer(instance=value).data
+        elif isinstance(value, Program):
+            return ProgramProductPurchasableObjectSerializer(instance=value).data
 
         error_message = (
             f"Unexpected type for Product.purchasable_object: {value.__class__}"
