@@ -111,7 +111,7 @@ dev = [
     "responses>=0.26.0,<0.27",
     "ruff>=0.15,<0.16",
     "semantic-version>=2.10.0,<3",
-    "wagtail-factories>=4.2,<5",
+    "wagtail-factories>=4.2,<4.3",
     "pytest-xdist[psutil]>=3.6.1,<4",
 ]
 
@@ -120,7 +120,7 @@ package = false
 default-groups = "all"
 
 [tool.uv.sources]
-django-health-check = { git = "https://github.com/revsys/django-health-check", rev = "53f9bdc3a7acc8a577319987fef0bd3040eef4b4" }
+django-health-check = { git = "https://github.com/revsys/django-health-check", rev = "53f9bdc3a7acc8a577319987fef0bd3040eef4b4" } # pragma: allowlist secret
 
 [tool.uv.build-backend]
 module-root = ""
