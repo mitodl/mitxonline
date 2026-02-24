@@ -727,25 +727,20 @@ def check_course_modes(run: CourseRun) -> tuple[bool, bool]:
 
     found_audit, found_verified = (False, False)
 
-    mxo_audit_mode = EnrollmentMode.objects.filter(
-        mode_slug=EDX_ENROLLMENT_AUDIT_MODE
-    ).first()
-    mxo_verified_mode = EnrollmentMode.objects.filter(
-        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
-    ).first()
-
-    if not mxo_audit_mode:
-        mxo_audit_mode = EnrollmentMode.objects.create(
-            mode_slug=EDX_ENROLLMENT_AUDIT_MODE,
-            mode_display_name=EDX_ENROLLMENT_AUDIT_MODE,
-        )
-
-    if not mxo_verified_mode:
-        mxo_verified_mode = EnrollmentMode.objects.create(
-            mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
-            mode_display_name=EDX_ENROLLMENT_VERIFIED_MODE,
-            requires_payment=True,
-        )
+    mxo_audit_mode, _ = EnrollmentMode.objects.get_or_create(
+        mode_slug=EDX_ENROLLMENT_AUDIT_MODE,
+        defaults={
+            "mode_display_name": EDX_ENROLLMENT_AUDIT_MODE,
+            "requires_payment": False,
+        },
+    )
+    mxo_verified_mode, _ = EnrollmentMode.objects.get_or_create(
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+        defaults={
+            "mode_display_name": EDX_ENROLLMENT_VERIFIED_MODE,
+            "requires_payment": True,
+        },
+    )
 
     for mode in modes:
         if mode.mode_slug == EDX_ENROLLMENT_AUDIT_MODE:
