@@ -15,6 +15,7 @@ def test_base_program_serializer():
         "readable_id": program.readable_id,
         "id": program.id,
         "type": "program",
+        "enrollment_modes": [],
     }
 
 

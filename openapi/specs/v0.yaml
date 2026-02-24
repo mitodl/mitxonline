@@ -3194,7 +3194,13 @@ components:
         type:
           type: string
           readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrollmentMode'
+          readOnly: true
       required:
+      - enrollment_modes
       - id
       - readable_id
       - title
@@ -4111,6 +4117,11 @@ components:
           type: string
           description: Get the course number
           readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrollmentMode'
+          readOnly: true
         products:
           type: array
           items:
@@ -4128,6 +4139,7 @@ components:
       - course_number
       - courseware_id
       - courseware_url
+      - enrollment_modes
       - id
       - is_archived
       - is_enrollable
@@ -4518,6 +4530,18 @@ components:
       - percent-off
       - dollars-off
       - fixed-price
+    EnrollmentMode:
+      type: object
+      description: Enrollment mode serializer.
+      properties:
+        mode_slug:
+          type: string
+          maxLength: 255
+        mode_display_name:
+          type: string
+          maxLength: 255
+        requires_payment:
+          type: boolean
     EnrollmentModeEnum:
       enum:
       - audit
@@ -4529,6 +4553,18 @@ components:
       x-enum-descriptions:
       - audit
       - verified
+    EnrollmentModeRequest:
+      type: object
+      description: Enrollment mode serializer.
+      properties:
+        mode_slug:
+          type: string
+          maxLength: 255
+        mode_display_name:
+          type: string
+          maxLength: 255
+        requires_payment:
+          type: boolean
     ErrorEnum:
       enum:
       - enroll-blocked
@@ -6906,6 +6942,11 @@ components:
           type: string
           description: Get the course number
           readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrollmentMode'
+          readOnly: true
         products:
           type: array
           items:
@@ -6920,6 +6961,7 @@ components:
       - course_number
       - courseware_id
       - courseware_url
+      - enrollment_modes
       - id
       - is_archived
       - is_enrollable
@@ -7014,6 +7056,11 @@ components:
           type: string
           description: Get the course number
           readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrollmentMode'
+          readOnly: true
         products:
           type: array
           items:
@@ -7034,6 +7081,7 @@ components:
       - course_number
       - courseware_id
       - courseware_url
+      - enrollment_modes
       - id
       - is_archived
       - is_enrollable
@@ -7547,6 +7595,11 @@ components:
           type: string
           description: Get the course number
           readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrollmentMode'
+          readOnly: true
         products:
           type: array
           items:
@@ -7569,6 +7622,7 @@ components:
       - course_number
       - courseware_id
       - courseware_url
+      - enrollment_modes
       - id
       - is_archived
       - is_enrollable
