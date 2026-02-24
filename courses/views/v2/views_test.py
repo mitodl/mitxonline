@@ -58,6 +58,7 @@ from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
 )
 from courses.serializers.v2.programs import (
+    ProgramDetailSerializer,
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
 )
@@ -111,7 +112,7 @@ def test_get_programs(
         if hasattr(program, "_courses_with_requirements_data"):
             delattr(program, "_courses_with_requirements_data")
         assert_drf_json_equal(
-            program_data, ProgramSerializer(program).data, ignore_order=True
+            program_data, ProgramDetailSerializer(program).data, ignore_order=True
         )
 
 
@@ -175,7 +176,7 @@ def test_get_program(
     duplicate_queries_check(context)
     program_data = resp.json()
     assert_drf_json_equal(
-        program_data, ProgramSerializer(program).data, ignore_order=True
+        program_data, ProgramDetailSerializer(program).data, ignore_order=True
     )
 
 
@@ -1508,7 +1509,6 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "page": dict(
                     ProgramPageSerializer(program_enrollment.program.page).data
                 ),
-                "products": [],
                 "courses": [
                     course.id
                     for course in courses_by_program_id[program_enrollment.program.id]

@@ -148,7 +148,6 @@ class ProgramSerializer(serializers.ModelSerializer):
     min_price = serializers.SerializerMethodField()
     max_price = serializers.SerializerMethodField()
     start_date = serializers.SerializerMethodField()
-    products = ProductRelatedField(many=True, read_only=True)
 
     def get_courses(self, instance) -> list[int]:
         return [course[0].id for course in instance.courses if course[0].live]
@@ -547,8 +546,17 @@ class ProgramSerializer(serializers.ModelSerializer):
             "time_commitment",
             "min_weekly_hours",
             "max_weekly_hours",
-            "products",
         ]
+
+
+@extend_schema_serializer(component_name="V2ProgramDetailSerializer")
+class ProgramDetailSerializer(ProgramSerializer):
+    """Extended Program serializer that includes products. Used by the programs API."""
+
+    products = ProductRelatedField(many=True, read_only=True)
+
+    class Meta(ProgramSerializer.Meta):
+        fields = [*ProgramSerializer.Meta.fields, "products"]
 
 
 class ProgramCertificateSerializer(serializers.ModelSerializer):

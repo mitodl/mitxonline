@@ -16,6 +16,7 @@ from courses.factories import (  # noqa: F401
 from courses.models import CoursesTopic, Department, ProgramCollectionItem
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.programs import (
+    ProgramDetailSerializer,
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
 )
@@ -151,7 +152,6 @@ def test_serialize_program(
             "min_weekly_hours": program_with_empty_requirements.page.min_weekly_hours,
             "min_price": program_with_empty_requirements.page.min_price,
             "max_price": program_with_empty_requirements.page.max_price,
-            "products": [],
         },
     )
 
@@ -165,7 +165,7 @@ def test_serialize_program_with_products(
 
     product = ProductFactory.create(purchasable_object=program_with_empty_requirements)
 
-    data = ProgramSerializer(
+    data = ProgramDetailSerializer(
         instance=program_with_empty_requirements, context=mock_context
     ).data
 
