@@ -250,6 +250,7 @@ class BaseProductSerializer(serializers.ModelSerializer):
         model = models.Product
 
 
+@extend_schema_serializer(component_name="V0Product")
 class ProductSerializer(BaseProductSerializer):
     """Serializes a product, including the purchasable object."""
 
