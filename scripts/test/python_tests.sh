@@ -9,7 +9,7 @@ echohighlight() {
 function run_test {
 	# shellcheck disable=SC2145
 	echohighlight "[TEST SUITE] $@"
-	poetry run "$@"
+	uv run "$@"
 	local test_status=$?
 	if [ $test_status -ne 0 ]; then
 		status=$test_status
