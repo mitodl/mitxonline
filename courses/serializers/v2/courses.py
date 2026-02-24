@@ -21,9 +21,9 @@ from courses.serializers.v1.base import (
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
+from ecommerce.serializers import ProductSerializer
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
-from ecommerce.serializers import ProductSerializer
 
 log = logging.getLogger(__name__)
 
