@@ -281,7 +281,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
     mocker.patch("openedx.tasks.clone_courserun.delay")
     mocked_ensure_call = mocker.patch("b2b.tasks.queue_enrollment_code_check.delay")
     max_learners = FAKE.random_int(min=1, max=15) if has_learner_cap else None
-    price = FAKE.random_int(min=0, max=100) if has_price else None
+    price = FAKE.random_int(min=1, max=100) if has_price else None
     assert_price = price if price else Decimal(0)
 
     contract = factories.ContractPageFactory(
@@ -326,7 +326,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
     #   no longer have discounts.
     if update_no_price or update_sso or update_change_price:
         if update_change_price:
-            price = FAKE.random_int(min=0, max=100)
+            price = FAKE.random_int(min=1, max=100)
             assert_price = price if price else Decimal(0)
             contract.enrollment_fixed_price = price
         if update_no_price:
