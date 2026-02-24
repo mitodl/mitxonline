@@ -21,25 +21,25 @@ MITx Online is a Django-based web platform for managing MIT online courses and p
 **Run tests:**
 ```bash
 # Full test suite with parallel execution
-poetry run pytest -n logical
+uv run pytest -n logical
 
 # Single test file
-poetry run pytest courses/api_test.py
+uv run pytest courses/api_test.py
 
 # Single test function
-poetry run pytest courses/api_test.py::test_function_name
+uv run pytest courses/api_test.py::test_function_name
 
 # With coverage
-poetry run pytest --cov . --cov-report html
+uv run pytest --cov . --cov-report html
 ```
 
 **Linting and formatting:**
 ```bash
 # Format code (ruff)
-poetry run ruff format .
+uv run ruff format .
 
 # Lint with auto-fix
-poetry run ruff check --fix .
+uv run ruff check --fix .
 
 # Pre-commit hooks (runs all checks)
 pre-commit run --all-files
@@ -199,7 +199,7 @@ course = CourseFactory.create()
 
 **Always check for missing migrations before committing:**
 ```bash
-poetry run python manage.py makemigrations --check --dry-run
+uv run python manage.py makemigrations --check --dry-run
 ```
 
 Test suite includes checks for:
@@ -250,9 +250,9 @@ These provide standard patterns used across MIT ODL projects.
 
 ### Dependency Management
 
-**Python:** Use Poetry for dependency management:
+**Python:** Use uv for dependency management:
 ```bash
-docker compose run --rm web poetry add <package>
+docker compose run --rm web uv add <package>
 docker compose build web celery  # Rebuild images after changes
 ```
 
@@ -298,16 +298,16 @@ Optional OIDC authentication via Keycloak:
 The test suite uses `pytest-django` with parallel execution via `pytest-xdist`:
 ```bash
 # Single test module
-poetry run pytest courses/models_test.py
+uv run pytest courses/models_test.py
 
 # Single test class
-poetry run pytest courses/models_test.py::TestCourse
+uv run pytest courses/models_test.py::TestCourse
 
 # Single test method
-poetry run pytest courses/models_test.py::TestCourse::test_course_creation
+uv run pytest courses/models_test.py::TestCourse::test_course_creation
 
 # With debugging (disables parallel execution)
-poetry run pytest -n0 -s courses/models_test.py::test_function
+uv run pytest -n0 -s courses/models_test.py::test_function
 ```
 
 ### Common Management Commands
@@ -331,7 +331,7 @@ manage.py collectstatic              # Collect static files
 Generate and view API schema:
 ```bash
 # Generate schema
-poetry run python manage.py spectacular --file schema.yml
+uv run python manage.py spectacular --file schema.yml
 
 # View in browser
 # Navigate to http://mitxonline.odl.local:8013/api/schema/swagger-ui/
