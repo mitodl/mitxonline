@@ -82,18 +82,9 @@ class UserProgramEnrollmentsViewSet(
             response_serializer = ProgramEnrollmentSerializer(existing_enrollment)
             return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-        # Create the enrollment
-        enrollment = self.perform_create(request.user, program)
-        response_serializer = ProgramEnrollmentSerializer(enrollment)
-        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-
-    def perform_create(self, user, program):
-        """
-        Create a program enrollment via courses.api.
-
-        Uses the default enrollment mode (audit).
-        """
-        enrollments = create_program_enrollments(user, [program])
+        # Create the enrollment using default enrollment mode (audit)
+        enrollments = create_program_enrollments(request.user, [program])
         if not enrollments:
             raise ValueError("Failed to create program enrollment.")  # noqa: EM101
-        return enrollments[0]
+        response_serializer = ProgramEnrollmentSerializer(enrollments[0])
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
