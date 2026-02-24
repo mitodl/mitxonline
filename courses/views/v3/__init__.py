@@ -73,10 +73,13 @@ class UserProgramEnrollmentsViewSet(
         program = serializer.program
 
         # Check if the user already has an active enrollment for this program
-        existing_enrollment = ProgramEnrollment.objects.filter(
-            user=request.user,
-            program=program,
-        ).first()
+        existing_enrollment = (
+            self.get_queryset()
+            .filter(
+                program=program,
+            )
+            .first()
+        )
 
         if existing_enrollment:
             response_serializer = ProgramEnrollmentSerializer(existing_enrollment)
