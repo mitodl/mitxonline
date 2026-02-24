@@ -130,3 +130,5 @@ docker-compose.*.yml
 
 
 certs/*
+
+.claude/
