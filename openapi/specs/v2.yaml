@@ -3157,6 +3157,26 @@ components:
       - readable_id
       - title
       - type
+    BaseProduct:
+      type: object
+      description: Simple serializer for Product without related purchasable objects
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+      required:
+      - description
+      - id
+      - price
     BaseProgram:
       type: object
       description: Basic program model serializer
@@ -8075,7 +8095,7 @@ components:
           type: array
           items:
             allOf:
-            - $ref: '#/components/schemas/ProductFlexibilePrice'
+            - $ref: '#/components/schemas/BaseProduct'
           readOnly: true
       required:
       - certificate_type

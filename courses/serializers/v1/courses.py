@@ -16,7 +16,7 @@ from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
     BaseCourseSerializer,
-    ProductRelatedField,
+    ProductFlexiblePriceRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists
@@ -83,7 +83,7 @@ class CourseSerializer(BaseCourseSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductRelatedField(many=True, read_only=True)
+    products = ProductFlexiblePriceRelatedField(many=True, read_only=True)
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
@@ -135,7 +135,7 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
     is_enrollable = serializers.SerializerMethodField()
     is_archived = serializers.SerializerMethodField()
     course_number = serializers.SerializerMethodField()
-    products = ProductRelatedField(
+    products = ProductFlexiblePriceRelatedField(
         many=True,
         read_only=True,
         help_text="List of products associated with this course run",
