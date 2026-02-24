@@ -715,7 +715,7 @@ def test_create_finaid_form(courseware_type, force_course, gen_slug, gen_title):
     if test_kwargs["title"] is not None:
         assert generated_page.title == test_kwargs["title"]
 
-    assert generated_page.get_parent() == page
+    assert generated_page.get_parent().specific == page
 
     if (
         courseware_type == "course"
