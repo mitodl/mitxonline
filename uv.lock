@@ -2388,8 +2388,6 @@ dependencies = [
     { name = "trino" },
     { name = "ulid-py" },
     { name = "user-util" },
-    { name = "uwsgi" },
-    { name = "uwsgitop" },
     { name = "wagtail" },
     { name = "wagtail-metadata" },
 ]
@@ -2417,6 +2415,10 @@ dev = [
     { name = "ruff" },
     { name = "semantic-version" },
     { name = "wagtail-factories" },
+]
+prod = [
+    { name = "uwsgi" },
+    { name = "uwsgitop" },
 ]
 
 [package.metadata]
@@ -2496,8 +2498,6 @@ requires-dist = [
     { name = "trino", specifier = ">=0.336.0,<0.337" },
     { name = "ulid-py", specifier = ">=1.1.0,<2" },
     { name = "user-util", specifier = ">=0.1.5,<0.2" },
-    { name = "uwsgi", specifier = ">=2.0.19,<3" },
-    { name = "uwsgitop", specifier = ">=0.12,<0.13" },
     { name = "wagtail", specifier = "==7.2.2" },
     { name = "wagtail-metadata", specifier = ">=5.0.0,<6" },
 ]
@@ -2525,6 +2525,10 @@ dev = [
     { name = "ruff", specifier = ">=0.15,<0.16" },
     { name = "semantic-version", specifier = ">=2.10.0,<3" },
     { name = "wagtail-factories", specifier = ">=4.2,<5" },
+]
+prod = [
+    { name = "uwsgi", specifier = ">=2.0.19,<3" },
+    { name = "uwsgitop", specifier = ">=0.12,<0.13" },
 ]
 
 [[package]]
