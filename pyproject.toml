@@ -28,7 +28,7 @@ dependencies = [
     "django-reversion>=5.1.0,<6",
     "django-robots==6.1",
     "django-storages>=1.11.1,<2",
-    "django-treebeard>=4.5.1,<5",
+    "django-treebeard>=4.5.1,<4.8",
     "django-user-agents>=0.4.0,<0.5",
     "django-viewflow>=2.2.7,<3",
     "django-webpack-loader>=3.0.0,<4",

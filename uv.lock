@@ -1074,14 +1074,14 @@ wheels = [
 
 [[package]]
 name = "django-treebeard"
-version = "4.8.0"
+version = "4.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7a/d2/615c2d33b3b55e106ee590b164c0d4a8372527293c85c61175e81ded2aea/django_treebeard-4.8.0.tar.gz", hash = "sha256:61b8076b576107da21f6f6040774c0d17025200c2efdb70dd1f14b18c9206c3a", size = 292517, upload-time = "2025-12-03T03:58:40.625Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bb/24/eaccbce17355380cb3a8fe6ad92a85b76453dc1f0ecd04f48bfe8929065b/django-treebeard-4.7.1.tar.gz", hash = "sha256:846e462904b437155f76e04907ba4e48480716855f88b898df4122bdcfbd6e98", size = 294139, upload-time = "2024-01-31T16:35:19.751Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/aa/3a/3731f6d5696b5dfd1c7830a64450e1f49b512cb192b2d3e37b72cc75470b/django_treebeard-4.8.0-py3-none-any.whl", hash = "sha256:ecaa7a0bbfa86a48fc91ff335513e83c841cdfe1add6229d04ac7096198d5d51", size = 70997, upload-time = "2025-12-03T03:58:37.292Z" },
+    { url = "https://files.pythonhosted.org/packages/87/79/259966820614746cc4d81762edf97a53bf1e3b8e74797c010d310c6f4a8f/django_treebeard-4.7.1-py3-none-any.whl", hash = "sha256:995c7120153ab999898fe3043bbdcd8a0fc77cc106eb94de7350e9d02c885135", size = 93210, upload-time = "2024-01-31T16:35:17.843Z" },
 ]
 
 [[package]]
@@ -2448,7 +2448,7 @@ requires-dist = [
     { name = "django-reversion", specifier = ">=5.1.0,<6" },
     { name = "django-robots", specifier = "==6.1" },
     { name = "django-storages", specifier = ">=1.11.1,<2" },
-    { name = "django-treebeard", specifier = ">=4.5.1,<5" },
+    { name = "django-treebeard", specifier = ">=4.5.1,<4.8" },
     { name = "django-user-agents", specifier = ">=0.4.0,<0.5" },
     { name = "django-viewflow", specifier = ">=2.2.7,<3" },
     { name = "django-webpack-loader", specifier = ">=3.0.0,<4" },
