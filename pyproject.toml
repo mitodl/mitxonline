@@ -98,7 +98,7 @@ dev = [
     "django-debug-toolbar>=6.0.0,<7",
     "django-zeal>=2.0.4,<3",
     "factory-boy>=3.2.0,<4",
-    "faker>=40.0.0,<41",
+    "faker>=40.0.0,<=40.1.0",
     "flaky>=3.7.0,<4",
     "freezegun>=1.2,<2",
     "ipdb>=0.13.13,<0.14",
