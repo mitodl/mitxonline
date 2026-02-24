@@ -7,7 +7,7 @@ from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.utils import get_approved_flexible_price_exists
-from ecommerce.serializers import ProductFlexibilePriceSerializer
+from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
@@ -149,12 +149,19 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         ]
 
 
-@extend_schema_field(ProductFlexibilePriceSerializer)
+@extend_schema_field(BaseProductSerializer)
 class ProductRelatedField(serializers.RelatedField):
-    """serializer for the Product generic field"""
+    """Simple serializer for the Product generic field"""
 
     def to_representation(self, instance):
-        serializer = ProductFlexibilePriceSerializer(
+        return BaseProductSerializer(instance=instance, context=self.context).data
+
+
+@extend_schema_field(ProductFlexibilePriceSerializer)
+class ProductFlexiblePriceRelatedField(serializers.RelatedField):
+    """Serializer for the Product generic field, including flexible price data"""
+
+    def to_representation(self, instance):
+        return ProductFlexibilePriceSerializer(
             instance=instance, context=self.context
-        )
-        return serializer.data
+        ).data

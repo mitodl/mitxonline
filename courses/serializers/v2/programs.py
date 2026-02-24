@@ -17,6 +17,7 @@ from courses.serializers.base import (
     get_thumbnail_url,
 )
 from courses.serializers.utils import get_unique_topics_from_courses
+from courses.serializers.v1.base import ProductRelatedField
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
 from main.serializers import StrictFieldsSerializer
@@ -546,6 +547,16 @@ class ProgramSerializer(serializers.ModelSerializer):
             "min_weekly_hours",
             "max_weekly_hours",
         ]
+
+
+@extend_schema_serializer(component_name="V2ProgramDetailSerializer")
+class ProgramDetailSerializer(ProgramSerializer):
+    """Extended Program serializer that includes products. Used by the programs API."""
+
+    products = ProductRelatedField(many=True, read_only=True)
+
+    class Meta(ProgramSerializer.Meta):
+        fields = [*ProgramSerializer.Meta.fields, "products"]
 
 
 class ProgramCertificateSerializer(serializers.ModelSerializer):
