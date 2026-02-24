@@ -54,7 +54,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter to only return active contracts by default."""
-        return ContractPage.objects.filter(active=True)
+        return ContractPage.objects.filter(active=True).prefetch_related("programs")
 
 
 class Enroll(APIView):

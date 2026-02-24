@@ -244,14 +244,15 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         if relevant_to:
             course = Course.objects.filter(readable_id=relevant_to).first()
             if course:
-                return get_relevant_course_run_qset(course)
+                return get_relevant_course_run_qset(course).prefetch_related("products")
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
-                return (
+                qs = (
                     get_user_relevant_program_course_run_qset(program)
                     if program
                     else Program.objects.none()
                 )
+                return qs.prefetch_related("products") if qs else qs
         else:
             return (
                 CourseRun.objects.select_related("course")
@@ -259,6 +260,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
                     "course__departments",
                     "course__page",
                     "enrollment_modes",
+                    "products",
                 )
                 .filter(live=True)
             )
@@ -429,8 +431,8 @@ class UserEnrollmentsApiViewSet(
     def get_queryset(self):
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
-            .select_related("run__course__page", "user", "run")
-            .prefetch("certificate", "grades")
+            .select_related("run__course__page", "user", "run", "run__course")
+            .prefetch_related("certificate", "grades", "run__enrollment_modes")
         )
 
     def get_serializer_context(self):
@@ -528,24 +530,51 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                 "program",
                 "program__page",
             )
+            .prefetch_related("program__courses")
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .order_by("-id")
         )
+
+        # Collect all course IDs upfront for batch lookup
+        all_course_ids = set()
+        for enrollment in program_enrollments:
+            courses = [course[0] for course in enrollment.program.courses]
+            all_course_ids.update(c.id for c in courses)
+
+        # Fetch all enrollments at once instead of per-program
+        all_enrollments = (
+            CourseRunEnrollment.objects.filter(
+                user=request.user, run__course__in=all_course_ids
+            )
+            .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+            .select_related("run__course__page")
+            .order_by("-id")
+        )
+
+        # Build a map of course_id -> enrollments for O(1) lookup
+        enrollments_by_course = {}
+        for enrollment in all_enrollments:
+            course_id = enrollment.run.course_id
+            if course_id not in enrollments_by_course:
+                enrollments_by_course[course_id] = []
+            enrollments_by_course[course_id].append(enrollment)
 
         program_list = []
 
         for enrollment in program_enrollments:
             courses = [course[0] for course in enrollment.program.courses]
 
+            # Collect all enrollments for this program's courses
+            program_enrollments_list = []
+            for course in courses:
+                program_enrollments_list.extend(
+                    enrollments_by_course.get(course.id, [])
+                )
+
             program_list.append(
                 {
-                    "enrollments": CourseRunEnrollment.objects.filter(
-                        user=request.user, run__course__in=courses
-                    )
-                    .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-                    .select_related("run__course__page")
-                    .order_by("-id"),
+                    "enrollments": program_enrollments_list,
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
