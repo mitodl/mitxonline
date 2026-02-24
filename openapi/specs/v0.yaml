@@ -4095,7 +4095,7 @@ components:
           type: array
           items:
             allOf:
-            - $ref: '#/components/schemas/ProductFlexibilePrice'
+            - $ref: '#/components/schemas/Product'
           readOnly: true
         approved_flexible_price_exists:
           type: boolean
@@ -7521,7 +7521,7 @@ components:
           type: array
           items:
             allOf:
-            - $ref: '#/components/schemas/ProductFlexibilePrice'
+            - $ref: '#/components/schemas/Product'
           readOnly: true
         approved_flexible_price_exists:
           type: boolean
