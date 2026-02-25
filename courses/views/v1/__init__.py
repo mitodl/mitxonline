@@ -247,12 +247,12 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
                 return get_relevant_course_run_qset(course).prefetch_related("products")
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
-                qs = (
-                    get_user_relevant_program_course_run_qset(program)
-                    if program
-                    else Program.objects.none()
-                )
-                return qs.prefetch_related("products") if qs else qs
+                if program:
+                    return get_user_relevant_program_course_run_qset(
+                        program
+                    ).prefetch_related("products")
+                else:
+                    return CourseRun.objects.none()
         else:
             return (
                 CourseRun.objects.select_related("course")
@@ -431,8 +431,8 @@ class UserEnrollmentsApiViewSet(
     def get_queryset(self):
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
-            .select_related("run__course__page", "user", "run", "run__course")
-            .prefetch_related("run__enrollment_modes")
+            .select_related("run__course__page", "user", "run")
+            .prefetch("certificate", "grades")
         )
 
     def get_serializer_context(self):
