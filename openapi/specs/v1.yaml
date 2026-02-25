@@ -3091,6 +3091,30 @@ paths:
                 items:
                   $ref: '#/components/schemas/V3UserProgramEnrollment'
           description: ''
+    post:
+      operationId: v3_program_enrollments_create
+      description: |-
+        Create a program enrollment for the authenticated user.
+
+        Returns 200 if the user already has an active enrollment,
+        201 if a new enrollment was created or an inactive one was reactivated.
+      tags:
+      - program_enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/V3ProgramEnrollmentRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/V3ProgramEnrollmentRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/V3ProgramEnrollmentRequestRequest'
+        required: true
+      responses:
+        '201':
+          description: No response body
   /api/v3/program_enrollments/{program_id}/:
     get:
       operationId: v3_program_enrollments_retrieve
@@ -8261,6 +8285,17 @@ components:
       required:
       - link
       - uuid
+    V3ProgramEnrollmentRequestRequest:
+      type: object
+      description: |-
+        Serializer for creating a program enrollment.
+        Accepts a program_id and validates it corresponds to a live program.
+      properties:
+        program_id:
+          type: integer
+          writeOnly: true
+      required:
+      - program_id
     V3SimpleProgram:
       type: object
       description: Program Model Serializer v2
