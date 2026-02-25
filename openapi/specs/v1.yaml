@@ -1720,7 +1720,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedV0ProductList'
+                $ref: '#/components/schemas/PaginatedProductList'
           description: ''
   /api/v0/products/{id}/:
     get:
@@ -1740,7 +1740,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/V0Product'
+                $ref: '#/components/schemas/Product'
           description: ''
   /api/v0/products/{id}/user_flexible_price/:
     get:
@@ -1788,7 +1788,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedV0ProductList'
+                $ref: '#/components/schemas/PaginatedProductList'
           description: ''
     post:
       operationId: products_all_create
@@ -1801,20 +1801,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/V0ProductRequest'
+              $ref: '#/components/schemas/ProductRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/V0ProductRequest'
+              $ref: '#/components/schemas/ProductRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/V0ProductRequest'
+              $ref: '#/components/schemas/ProductRequest'
         required: true
       responses:
         '201':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/V0Product'
+                $ref: '#/components/schemas/Product'
           description: ''
   /api/v0/products/all/{id}/:
     get:
@@ -1836,7 +1836,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/V0Product'
+                $ref: '#/components/schemas/Product'
           description: ''
     put:
       operationId: products_all_update
@@ -1856,20 +1856,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/V0ProductRequest'
+              $ref: '#/components/schemas/ProductRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/V0ProductRequest'
+              $ref: '#/components/schemas/ProductRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/V0ProductRequest'
+              $ref: '#/components/schemas/ProductRequest'
         required: true
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/V0Product'
+                $ref: '#/components/schemas/Product'
           description: ''
     patch:
       operationId: products_all_partial_update
@@ -1889,19 +1889,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedV0ProductRequest'
+              $ref: '#/components/schemas/PatchedProductRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedV0ProductRequest'
+              $ref: '#/components/schemas/PatchedProductRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedV0ProductRequest'
+              $ref: '#/components/schemas/PatchedProductRequest'
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/V0Product'
+                $ref: '#/components/schemas/Product'
           description: ''
     delete:
       operationId: products_all_destroy
@@ -4505,7 +4505,7 @@ components:
         discount:
           $ref: '#/components/schemas/V0Discount'
         product:
-          $ref: '#/components/schemas/V0Product'
+          $ref: '#/components/schemas/Product'
       required:
       - discount
       - id
@@ -4516,7 +4516,7 @@ components:
         discount:
           $ref: '#/components/schemas/V0DiscountRequest'
         product:
-          $ref: '#/components/schemas/V0ProductRequest'
+          $ref: '#/components/schemas/ProductRequest'
       required:
       - discount
       - product
@@ -4941,7 +4941,7 @@ components:
           type: integer
         product:
           allOf:
-          - $ref: '#/components/schemas/V0Product'
+          - $ref: '#/components/schemas/Product'
           readOnly: true
       required:
       - id
@@ -5504,6 +5504,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderHistory'
+    PaginatedProductList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
     PaginatedStaffDashboardUserList:
       type: object
       required:
@@ -5573,29 +5596,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/V0Discount'
-    PaginatedV0ProductList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?offset=400&limit=100
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?offset=200&limit=100
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/V0Product'
     PaginatedV1CourseWithCourseRunsList:
       type: object
       required:
@@ -5738,7 +5738,7 @@ components:
         discount:
           $ref: '#/components/schemas/V0DiscountRequest'
         product:
-          $ref: '#/components/schemas/V0ProductRequest'
+          $ref: '#/components/schemas/ProductRequest'
     PatchedDiscountRedemptionRequest:
       type: object
       description: Serializes a discount redemption.
@@ -5759,6 +5759,20 @@ components:
         income_threshold_usd:
           type: number
           format: double
+    PatchedProductRequest:
+      type: object
+      description: Serializes a product, including the purchasable object.
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
     PatchedUpdateCourseRunEnrollmentRequest:
       type: object
       properties:
@@ -5845,20 +5859,6 @@ components:
           nullable: true
           description: If set, this discount code will not be redeemable after this
             date.
-    PatchedV0ProductRequest:
-      type: object
-      description: Serializes a product, including the purchasable object.
-      properties:
-        price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
-        description:
-          type: string
-          minLength: 1
-        is_active:
-          type: boolean
-          description: Controls visibility of the product in the app.
     PaymentTypeEnum:
       enum:
       - marketing
@@ -5898,6 +5898,85 @@ components:
       - id
       - type
       - value
+    Product:
+      type: object
+      description: Serializes a product, including the purchasable object.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+        purchasable_object:
+          oneOf:
+          - type: object
+            properties:
+              id:
+                type: integer
+              run_tag:
+                type: string
+              start_date:
+                type: string
+                format: date-time
+              end_date:
+                type: string
+                format: date-time
+          - type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              run_tag:
+                type: string
+              start_date:
+                type: string
+                format: date-time
+              end_date:
+                type: string
+                format: date-time
+              course:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  title:
+                    type: string
+                  page:
+                    type: object
+              readable_id:
+                type: string
+              enrollment_start:
+                type: string
+                format: date-time
+              enrollment_end:
+                type: string
+                format: date-time
+              course_number:
+                type: string
+          - type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              readable_id:
+                type: string
+              page:
+                type: object
+          readOnly: true
+      required:
+      - description
+      - id
+      - price
+      - purchasable_object
     ProductFlexibilePrice:
       type: object
       description: Simple serializer for Product without related purchasable objects
@@ -5967,6 +6046,23 @@ components:
       - id
       - price
       - product_flexible_price
+    ProductRequest:
+      type: object
+      description: Serializes a product, including the purchasable object.
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+      required:
+      - description
+      - price
     Program:
       type: object
       properties:
@@ -6800,102 +6896,6 @@ components:
       - discount_code
       - discount_type
       - redemption_type
-    V0Product:
-      type: object
-      description: Serializes a product, including the purchasable object.
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
-        description:
-          type: string
-        is_active:
-          type: boolean
-          description: Controls visibility of the product in the app.
-        purchasable_object:
-          oneOf:
-          - type: object
-            properties:
-              id:
-                type: integer
-              run_tag:
-                type: string
-              start_date:
-                type: string
-                format: date-time
-              end_date:
-                type: string
-                format: date-time
-          - type: object
-            properties:
-              id:
-                type: integer
-              title:
-                type: string
-              run_tag:
-                type: string
-              start_date:
-                type: string
-                format: date-time
-              end_date:
-                type: string
-                format: date-time
-              course:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                  title:
-                    type: string
-                  page:
-                    type: object
-              readable_id:
-                type: string
-              enrollment_start:
-                type: string
-                format: date-time
-              enrollment_end:
-                type: string
-                format: date-time
-              course_number:
-                type: string
-          - type: object
-            properties:
-              id:
-                type: integer
-              title:
-                type: string
-              readable_id:
-                type: string
-              page:
-                type: object
-          readOnly: true
-      required:
-      - description
-      - id
-      - price
-      - purchasable_object
-    V0ProductRequest:
-      type: object
-      description: Serializes a product, including the purchasable object.
-      properties:
-        price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
-        description:
-          type: string
-          minLength: 1
-        is_active:
-          type: boolean
-          description: Controls visibility of the product in the app.
-      required:
-      - description
-      - price
     V1BaseCourseRun:
       type: object
       description: CourseRun model serializer
