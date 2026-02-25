@@ -253,7 +253,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
                     else Program.objects.none()
                 )
         else:
-            products_prefetch = Prefetch("products", Product.objects.active())
+            products_prefetch = Prefetch("products", Product.objects.filter(is_active=True))
             return (
                 CourseRun.objects.select_related("course")
                 .prefetch_related(
