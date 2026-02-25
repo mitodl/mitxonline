@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.138.5
+Version 0.138.5 (Released February 25, 2026)
 ---------------
 
 - Update certificate to show issue date (#3271)
