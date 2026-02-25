@@ -35,13 +35,30 @@ jobs:
         run: cat Aptfile | sudo xargs apt-get install
 
       - name: Install uv
+<<<<<<< Updated upstream
         uses: astral-sh/setup-uv@v6
+||||||| Stash base
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.11"
+=======
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+>>>>>>> Stashed changes
 
       - name: Install Python
         run: uv python install 3.11
 
       - name: Install dependencies
+<<<<<<< Updated upstream
         run: uv sync --frozen --no-group prod
+||||||| Stash base
+        run: poetry install --no-interaction
+=======
+        run: uv sync --locked --no-group prod
+>>>>>>> Stashed changes
 
       - name: Create test local state
         run: ./scripts/test/stub-data.sh
