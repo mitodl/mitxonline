@@ -18,23 +18,14 @@ from courses.serializers.v1.base import (
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
+    ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
-from ecommerce.serializers import ProductSerializer
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
-
-
-@extend_schema_field(ProductSerializer)
-class V2ProductRelatedField(serializers.RelatedField):
-    """Serializer for the Product."""
-
-    def to_representation(self, instance):
-        serializer = ProductSerializer(instance=instance, context=self.context)
-        return serializer.data
 
 
 @extend_schema_serializer(component_name="V2Course")
@@ -242,7 +233,7 @@ class CourseSerializer(BaseCourseSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = V2ProductRelatedField(many=True, read_only=True)
+    products = ProductRelatedField(many=True, read_only=True)
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
