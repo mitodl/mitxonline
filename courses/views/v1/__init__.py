@@ -535,45 +535,19 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             .order_by("-id")
         )
 
-        # Collect all course IDs upfront for batch lookup
-        all_course_ids = set()
-        for enrollment in program_enrollments:
-            courses = [course[0] for course in enrollment.program.courses]
-            all_course_ids.update(c.id for c in courses)
-
-        # Fetch all enrollments at once instead of per-program
-        all_enrollments = (
-            CourseRunEnrollment.objects.filter(
-                user=request.user, run__course__in=all_course_ids
-            )
-            .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-            .select_related("run__course__page")
-            .order_by("-id")
-        )
-
-        # Build a map of course_id -> enrollments for O(1) lookup
-        enrollments_by_course = {}
-        for enrollment in all_enrollments:
-            course_id = enrollment.run.course_id
-            if course_id not in enrollments_by_course:
-                enrollments_by_course[course_id] = []
-            enrollments_by_course[course_id].append(enrollment)
-
         program_list = []
 
         for enrollment in program_enrollments:
             courses = [course[0] for course in enrollment.program.courses]
 
-            # Collect all enrollments for this program's courses
-            program_enrollments_list = []
-            for course in courses:
-                program_enrollments_list.extend(
-                    enrollments_by_course.get(course.id, [])
-                )
-
             program_list.append(
                 {
-                    "enrollments": program_enrollments_list,
+                    "enrollments": CourseRunEnrollment.objects.filter(
+                        user=request.user, run__course__in=courses
+                    )
+                    .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+                    .select_related("run__course__page")
+                    .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
