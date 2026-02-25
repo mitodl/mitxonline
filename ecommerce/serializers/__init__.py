@@ -86,55 +86,55 @@ class InvalidPurchasableObjectTypeError(Exception):
     """Exception raised for invalid purchasable object types."""
 
 
-@extend_schema_field(
-    {
-        "oneOf": [
-            {
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer"},
-                    "run_tag": {"type": "string"},
-                    "start_date": {"type": "string", "format": "date-time"},
-                    "end_date": {"type": "string", "format": "date-time"},
-                },
-            },
-            {
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer"},
-                    "title": {"type": "string"},
-                    "run_tag": {"type": "string"},
-                    "start_date": {"type": "string", "format": "date-time"},
-                    "end_date": {"type": "string", "format": "date-time"},
-                    "course": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "integer"},
-                            "title": {"type": "string"},
-                            "page": {"type": "object"},
-                        },
-                    },
-                    "readable_id": {"type": "string"},
-                    "enrollment_start": {"type": "string", "format": "date-time"},
-                    "enrollment_end": {"type": "string", "format": "date-time"},
-                    "course_number": {"type": "string"},
-                },
-            },
-            {
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer"},
-                    "title": {"type": "string"},
-                    "readable_id": {"type": "string"},
-                    "page": {"type": "object"},
-                },
-            },
-        ]
-    }
-)
 class ProductPurchasableObjectField(serializers.RelatedField):
     """Field for serializing purchasable objects (CourseRun, ProgramRun, or Program)"""
 
+    @extend_schema_field(
+        {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "run_tag": {"type": "string"},
+                        "start_date": {"type": "string", "format": "date-time"},
+                        "end_date": {"type": "string", "format": "date-time"},
+                    },
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "title": {"type": "string"},
+                        "run_tag": {"type": "string"},
+                        "start_date": {"type": "string", "format": "date-time"},
+                        "end_date": {"type": "string", "format": "date-time"},
+                        "course": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "integer"},
+                                "title": {"type": "string"},
+                                "page": {"type": "object"},
+                            },
+                        },
+                        "readable_id": {"type": "string"},
+                        "enrollment_start": {"type": "string", "format": "date-time"},
+                        "enrollment_end": {"type": "string", "format": "date-time"},
+                        "course_number": {"type": "string"},
+                    },
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "title": {"type": "string"},
+                        "readable_id": {"type": "string"},
+                        "page": {"type": "object"},
+                    },
+                },
+            ]
+        }
+    )
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
         if isinstance(value, ProgramRun):
