@@ -432,7 +432,7 @@ class UserEnrollmentsApiViewSet(
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
             .select_related("run__course__page", "user", "run", "run__course")
-            .prefetch_related("certificate", "grades", "run__enrollment_modes")
+            .prefetch_related("run__enrollment_modes")
         )
 
     def get_serializer_context(self):
@@ -530,7 +530,6 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                 "program",
                 "program__page",
             )
-            .prefetch_related("program__courses")
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .order_by("-id")
