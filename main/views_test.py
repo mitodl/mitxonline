@@ -30,3 +30,22 @@ def test_never_cache_react_views(staff_client, url_name):
         response.headers["Cache-Control"]
         == "max-age=0, no-cache, no-store, must-revalidate, private"
     )
+
+
+@pytest.mark.parametrize(
+    ("path", "expect_noindex"),
+    [
+        ("/records/", True),
+        ("/records/programs/some-uuid/", True),
+        ("/dashboard/", False),
+    ],
+)
+def test_noindex_meta_on_learner_records(client, settings, path, expect_noindex):
+    """Learner records pages should include a noindex meta tag, even in production."""
+    settings.ENVIRONMENT = "production"  # Other envs always have noindex
+    response = client.get(path)
+    content = response.content.decode()
+    if expect_noindex:
+        assert '<meta name="robots" content="noindex">' in content
+    else:
+        assert '<meta name="robots" content="noindex">' not in content
