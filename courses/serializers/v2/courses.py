@@ -18,7 +18,7 @@ from courses.serializers.v1.base import (
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
-    ProductRelatedField,
+    ProductFlexiblePriceRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
@@ -233,7 +233,7 @@ class CourseSerializer(BaseCourseSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductRelatedField(many=True, read_only=True)
+    products = ProductFlexiblePriceRelatedField(many=True, read_only=True)
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
@@ -268,7 +268,9 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
         """Get the course runs for the given instance."""
-        courseruns = instance.courseruns.order_by("id")
+        courseruns = instance.courseruns.prefetch_related("enrollment_modes").order_by(
+            "id"
+        )
 
         if "org_id" in self.context:
             courseruns = courseruns.filter(

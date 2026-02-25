@@ -29,6 +29,7 @@ from ecommerce.serializers import (
     CourseRunProductPurchasableObjectSerializer,
     ProductFlexibilePriceSerializer,
     ProductSerializer,
+    ProgramProductPurchasableObjectSerializer,
     ProgramRunProductPurchasableObjectSerializer,
     TransactionLineSerializer,
     TransactionOrderSerializer,
@@ -101,6 +102,29 @@ def test_product_program_serializer(mock_context):
             "is_active": product.is_active,
             "price": str(product.price),
             "purchasable_object": run_serialized,
+        },
+    )
+
+
+def test_product_program_object_serializer(mock_context):
+    """
+    Tests serialization of a product that has an associated program (not program run).
+    """
+    program = ProgramFactory.create()
+    product = ProductFactory.create(purchasable_object=program)
+    product_serialized = ProductSerializer(instance=product).data
+    program_serialized = ProgramProductPurchasableObjectSerializer(
+        instance=program
+    ).data
+
+    assert_drf_json_equal(
+        product_serialized,
+        {
+            "description": product.description,
+            "id": product.id,
+            "is_active": product.is_active,
+            "price": str(product.price),
+            "purchasable_object": program_serialized,
         },
     )
 
@@ -210,6 +234,26 @@ def test_basket_with_product_serializer():
     assert serialized_basket["total_price"] == basket_item.product.price
     assert serialized_basket["discounted_price"] == discount_price
     assert len(serialized_basket["discounts"]) == 1
+
+
+def test_basket_with_program_product_serializer():
+    """
+    Tests serialization of a basket with a program product.
+    """
+    program = ProgramFactory.create()
+    product = ProductFactory.create(purchasable_object=program)
+    basket_item = BasketItemFactory.create(product=product)
+
+    serialized_basket = BasketWithProductSerializer(basket_item.basket).data
+
+    assert serialized_basket["total_price"] == product.price
+    assert len(serialized_basket["basket_items"]) == 1
+
+    basket_item_data = serialized_basket["basket_items"][0]
+    purchasable_object = basket_item_data["product"]["purchasable_object"]
+    assert purchasable_object["id"] == program.id
+    assert purchasable_object["title"] == program.title
+    assert purchasable_object["readable_id"] == program.readable_id
 
 
 @pytest.mark.parametrize(

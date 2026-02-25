@@ -46,3 +46,23 @@ class ProgramEnrollmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProgramEnrollment
         fields = ("program", "certificate", "enrollment_mode")
+
+
+@extend_schema_serializer(component_name="V3ProgramEnrollmentRequest")
+class ProgramEnrollmentCreateSerializer(serializers.Serializer):
+    """
+    Serializer for creating a program enrollment.
+    Accepts a program_id and validates it corresponds to a live program.
+    """
+
+    program_id = serializers.IntegerField(write_only=True)
+
+    def validate_program_id(self, value):
+        """Validate that the program_id corresponds to a live program."""
+        try:
+            program = Program.objects.get(id=value, live=True)
+        except Program.DoesNotExist as err:
+            msg = f"Invalid program_id: {value}"
+            raise serializers.ValidationError(msg) from err
+        self.program = program
+        return value

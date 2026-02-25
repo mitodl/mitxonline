@@ -249,6 +249,28 @@ class Department(TimestampedModel):
         super().save(*args, **kwargs)
 
 
+class EnrollmentMode(models.Model):
+    """Enrollment modes for the courseware object."""
+
+    mode_slug = models.CharField(
+        max_length=255, blank=True, default=EDX_DEFAULT_ENROLLMENT_MODE, unique=True
+    )
+    mode_display_name = models.CharField(
+        max_length=255, blank=True, default=EDX_DEFAULT_ENROLLMENT_MODE
+    )
+    requires_payment = models.BooleanField(default=False, blank=True)
+
+    def __str__(self):
+        return self.mode_display_name
+
+    def save(self, *args, **kwargs):
+        """If display name isn't set, make it the slug."""
+        if not self.mode_display_name:
+            self.mode_display_name = self.mode_slug
+
+        super().save(*args, **kwargs)
+
+
 class Program(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course program"""
 
@@ -280,11 +302,15 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     )
     enrollment_start = models.DateTimeField(null=True, blank=True, db_index=True)
     enrollment_end = models.DateTimeField(null=True, blank=True, db_index=True)
+    enrollment_modes = models.ManyToManyField(
+        EnrollmentMode, blank=True, related_name="+"
+    )
     start_date = models.DateTimeField(null=True, blank=True, db_index=True)
     end_date = models.DateTimeField(null=True, blank=True, db_index=True)
     b2b_only = models.BooleanField(
         default=False, help_text="Indicates if the program is B2B only"
     )
+    products = GenericRelation("ecommerce.Product", related_query_name="programs")
 
     @cached_property
     def page(self):
@@ -543,6 +569,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                     "course__courseruns",
                     queryset=CourseRun.objects.filter(live=True).order_by("id"),
                 ),
+                "course__courseruns__enrollment_modes",
             )
         )
 
@@ -1131,6 +1158,9 @@ class CourseRun(TimestampedModel):
     is_self_paced = models.BooleanField(default=False)
     products = GenericRelation(
         "ecommerce.Product", related_query_name="courserunproducts"
+    )
+    enrollment_modes = models.ManyToManyField(
+        EnrollmentMode, blank=True, related_name="+"
     )
 
     b2b_contract = models.ForeignKey(

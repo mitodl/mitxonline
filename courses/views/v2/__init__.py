@@ -35,6 +35,7 @@ from courses.models import (
     CourseRunEnrollment,
     CoursesTopic,
     Department,
+    EnrollmentMode,
     Program,
     ProgramCertificate,
     ProgramCollection,
@@ -57,7 +58,7 @@ from courses.serializers.v2.departments import (
 )
 from courses.serializers.v2.programs import (
     ProgramCollectionSerializer,
-    ProgramSerializer,
+    ProgramDetailSerializer,
     UserProgramEnrollmentDetailSerializer,
 )
 from courses.utils import (
@@ -170,7 +171,7 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     """API viewset for Programs"""
 
     permission_classes = [IsAuthenticatedOrReadOnly]
-    serializer_class = ProgramSerializer
+    serializer_class = ProgramDetailSerializer
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProgramFilterSet
@@ -182,6 +183,10 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
             .select_related("page", "page__feature_image")
             .prefetch_related(
                 Prefetch("departments", queryset=Department.objects.only("id", "name")),
+                Prefetch(
+                    "enrollment_modes",
+                    queryset=EnrollmentMode.objects.only("id", "mode_slug"),
+                ),
                 Prefetch(
                     "all_requirements",
                     queryset=ProgramRequirement.objects.select_related(
@@ -212,6 +217,7 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                     "collection_memberships__collection",
                     queryset=ProgramCollection.objects.only("id", "title"),
                 ),
+                "products",
             )
             .order_by("title")
         )

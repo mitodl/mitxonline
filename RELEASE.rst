@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.138.7
+---------------
+
+- Add noindex meta tag to learner records and certificate pages (#3328)
+- add a program enrollment endpoint (#3332)
+- Adds enrollment modes to course runs and programs (#3314)
+- Expose programs on product API results, display in UI (#3322)
+- Update ecommerce post-checkout code to handle program purchasing (#3304)
+- Add unit tests for AdminRefundOrder view (#3313)
+- Support Claude Code better (gitignore, CLAUDE.md) (#3323)
+
 Version 0.138.5 (Released February 25, 2026)
 ---------------
 

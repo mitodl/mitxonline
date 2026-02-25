@@ -13,8 +13,8 @@ from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
 
 from b2b.factories import ContractPageFactory
-from courses.factories import CourseRunFactory, ProgramRunFactory
-from courses.models import CourseRunEnrollment, PaidCourseRun
+from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
+from courses.models import CourseRunEnrollment, PaidCourseRun, ProgramEnrollment
 from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
@@ -58,6 +58,7 @@ from main.constants import (
 from main.settings import TIME_ZONE
 from main.test_utils import assert_drf_json_equal
 from main.utils import encode_json_cookie_value
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -717,6 +718,27 @@ def test_checkout_product_cart(  # noqa: PLR0913
         assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
 
 
+def test_checkout_cart_with_program_product(user, user_drf_client):
+    """
+    Verifies that the cart API returns program product data correctly.
+    """
+    program = ProgramFactory.create()
+    product = ProductFactory.create(purchasable_object=program)
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    data = resp.json()
+    assert len(data["basket_items"]) == 1
+
+    purchasable_object = data["basket_items"][0]["product"]["purchasable_object"]
+    assert purchasable_object["id"] == program.id
+    assert purchasable_object["title"] == program.title
+    assert purchasable_object["readable_id"] == program.readable_id
+
+
 def test_checkout_product_with_program_id(user, user_client):
     """
     Verifies that /cart/add?program_id=? url adds the program to the cart
@@ -1225,13 +1247,15 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
 
 
 def test_checkout_interstitial_google_analytics_object(
-    settings, user, user_client, products
+    mocker, settings, user, user_client, products
 ):
     """
     Tests that the interstitial page receives the correct GA structure
     """
+
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     settings.FEATURES[features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH] = True
+    settings.POSTHOG_ENABLED = False
 
     product = products[0]
     basket = create_basket_with_product(user, product)
@@ -1248,3 +1272,24 @@ def test_checkout_interstitial_google_analytics_object(
         assert isinstance(item["discount"], float)
         assert isinstance(item["price"], float)
         assert isinstance(item["quantity"], int)
+
+
+@pytest.mark.skip_nplusone_check
+def test_program_product_purchasing(user, user_drf_client):
+    """Test that we can purchase products that are for programs."""
+
+    program = ProgramFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=program, price=0)
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+
+    with pytest.raises(TypeError) as exc:
+        user_drf_client.post(reverse("checkout_api-start_checkout"))
+
+    assert "HttpResponseRedirect" in str(exc)
+
+    assert ProgramEnrollment.objects.filter(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exists()

@@ -22,7 +22,7 @@ from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
 
-from courses.models import CourseRun, PaidCourseRun
+from courses.models import CourseRun, PaidCourseRun, Program
 from courses.utils import is_uai_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -40,8 +40,7 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
-from openedx.api import create_user
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from main.plugin_manager import get_plugin_manager
 from users.models import User
 
 User = get_user_model()  # noqa: F811
@@ -126,6 +125,7 @@ class Basket(TimestampedModel):
             [  # noqa: C419
                 item.product.purchasable_object.course.is_country_blocked(user)
                 for item in basket_items
+                if isinstance(item.product.purchasable_object, CourseRun)
             ]
         )
 
@@ -678,11 +678,16 @@ class OrderFlow:
             amount=self.order.total_price_paid,
         )
 
-    def create_paid_courseruns(self):
-        for run in self.order.purchased_runs:
-            PaidCourseRun.objects.get_or_create(
-                order=self.order, course_run=run, user=self.order.purchaser
-            )
+    def create_enrollments(self):
+        """Create enrollments using the process_transaction_line hook."""
+
+        if not self.order.is_fulfilled:
+            return
+
+        pm = get_plugin_manager()
+
+        for line in self.order.lines.all():
+            pm.hook.process_transaction_line(line=line)
 
     @state.transition(
         source=OrderStatus.PENDING,
@@ -693,7 +698,7 @@ class OrderFlow:
         self.create_transaction(payment_data)
 
         # record all the courseruns in the order
-        self.create_paid_courseruns()
+        self.create_enrollments()
 
         # No email is required as this order is generated from management command
         # Skip receipt emails for UAI orders
@@ -768,26 +773,6 @@ class Order(TimestampedModel):
     def send_ecommerce_order_receipt(self):
         send_ecommerce_order_receipt.delay(self.id)
 
-    def create_enrollments(self):
-        """Enroll the user appropriately after the transaction has completed."""
-
-        from courses.api import create_run_enrollments  # noqa: PLC0415
-
-        if not self.is_fulfilled:
-            return
-
-        # Check for an edX user, and create one if there's not one
-        if not self.purchaser.edx_username:
-            create_user(self.purchaser)
-            self.purchaser.refresh_from_db()
-
-        create_run_enrollments(
-            self.purchaser,
-            self.purchased_runs,
-            mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            keep_failed_enrollments=True,
-        )
-
 
 class PendingOrder(Order):
     """An order that is pending payment"""
@@ -797,7 +782,7 @@ class PendingOrder(Order):
         self,
         products: List[Product],  # noqa: UP006
         user: User,
-        discounts: List[Discount] = None,  # noqa: UP006, RUF013
+        discounts: List[Discount] | None = None,  # noqa: UP006
     ):
         """
         Returns an existing PendingOrder if one already exists with the same:
@@ -819,7 +804,7 @@ class PendingOrder(Order):
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
         for product in products:
-            product_versions.append(Version.objects.get_for_object(product).first())
+            product_versions.append(Version.objects.get_for_object(product).get())
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
@@ -866,14 +851,14 @@ class PendingOrder(Order):
         # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
         total = 0
         for i, product in enumerate(products):
-            line, _ = order.lines.get_or_create(
+            line, _ = Line.objects.get_or_create(
                 order=order,
                 purchased_object_id=product.object_id,
                 purchased_content_type_id=product.content_type_id,
-                defaults=dict(  # noqa: C408
-                    product_version=product_versions[i],
-                    quantity=1,
-                ),
+                defaults={
+                    "product_version": product_versions[i],
+                    "quantity": 1,
+                },
             )
             total += line.discounted_price
 
@@ -1081,6 +1066,17 @@ class Line(TimestampedModel):
             Product.all_objects.get(pk=self.product_version.field_dict["id"]),
             self.product_version,
         )
+
+    @cached_property
+    def courseware(self):
+        """Return a string representation of the courseware object."""
+
+        if isinstance(self.purchased_object, CourseRun):
+            return self.purchased_object.course.title
+        elif isinstance(self.purchased_object, Program):
+            return self.purchased_object.readable_id
+        else:
+            return "Invalid Product"
 
     def __str__(self):
         return f"{self.product_version}"

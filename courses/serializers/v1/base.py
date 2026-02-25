@@ -7,8 +7,22 @@ from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.utils import get_approved_flexible_price_exists
-from ecommerce.serializers import ProductFlexibilePriceSerializer
+from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+
+
+class EnrollmentModeSerializer(serializers.ModelSerializer):
+    """Enrollment mode serializer."""
+
+    class Meta:
+        """Meta opts for the serializer"""
+
+        model = models.EnrollmentMode
+        fields = [
+            "mode_slug",
+            "mode_display_name",
+            "requires_payment",
+        ]
 
 
 class BaseCourseSerializer(serializers.ModelSerializer):
@@ -45,6 +59,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     is_enrollable = serializers.SerializerMethodField()
     course_number = serializers.SerializerMethodField()
     courseware_url = serializers.SerializerMethodField()
+    enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
 
     def get_courseware_url(self, instance) -> str | None:
         """Get the courseware URL"""
@@ -87,6 +102,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "id",
             "live",
             "course_number",
+            "enrollment_modes",
         ]
 
 
@@ -94,6 +110,7 @@ class BaseProgramSerializer(serializers.ModelSerializer):
     """Basic program model serializer"""
 
     type = serializers.SerializerMethodField(read_only=True)
+    enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
 
     @staticmethod
     def get_type(obj) -> str:  # noqa: ARG004
@@ -101,7 +118,7 @@ class BaseProgramSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Program
-        fields = ["title", "readable_id", "id", "type"]
+        fields = ["title", "readable_id", "id", "type", "enrollment_modes"]
 
 
 class CourseRunCertificateSerializer(serializers.ModelSerializer):
@@ -149,12 +166,19 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         ]
 
 
-@extend_schema_field(ProductFlexibilePriceSerializer)
+@extend_schema_field(BaseProductSerializer)
 class ProductRelatedField(serializers.RelatedField):
-    """serializer for the Product generic field"""
+    """Simple serializer for the Product generic field"""
 
     def to_representation(self, instance):
-        serializer = ProductFlexibilePriceSerializer(
+        return BaseProductSerializer(instance=instance, context=self.context).data
+
+
+@extend_schema_field(ProductFlexibilePriceSerializer)
+class ProductFlexiblePriceRelatedField(serializers.RelatedField):
+    """Serializer for the Product generic field, including flexible price data"""
+
+    def to_representation(self, instance):
+        return ProductFlexibilePriceSerializer(
             instance=instance, context=self.context
-        )
-        return serializer.data
+        ).data
