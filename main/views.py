@@ -30,11 +30,11 @@ def get_base_context(request):  # noqa: ARG001
 
 
 @never_cache
-def index(request, **kwargs):  # noqa: ARG001
+def index(request, **kwargs):
     """
     The index view. Display available programs
     """
-    context = get_base_context(request)
+    context = {**get_base_context(request), **kwargs}
     return render(request, "index.html", context=context)
 
 

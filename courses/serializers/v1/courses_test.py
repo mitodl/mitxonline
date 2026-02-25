@@ -158,6 +158,7 @@ def test_serialize_course_run():
                 course_run.certificate_available_date
             ),
             "course_number": course_run.course_number,
+            "enrollment_modes": [],
         },
     )
 
@@ -191,6 +192,7 @@ def test_serialize_course_run_with_course():
         "approved_flexible_price_exists": False,
         "live": True,
         "run_tag": course_run.run_tag,
+        "enrollment_modes": [],
     }
 
 
