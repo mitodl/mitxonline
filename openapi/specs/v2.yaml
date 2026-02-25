@@ -3177,6 +3177,23 @@ components:
       - description
       - id
       - price
+    BaseProductRequest:
+      type: object
+      description: Simple serializer for Product without related purchasable objects
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+      required:
+      - description
+      - price
     BaseProgram:
       type: object
       description: Basic program model serializer
@@ -4115,7 +4132,7 @@ components:
           type: array
           items:
             allOf:
-            - $ref: '#/components/schemas/Product'
+            - $ref: '#/components/schemas/BaseProduct'
           readOnly: true
         approved_flexible_price_exists:
           type: boolean
@@ -5821,85 +5838,6 @@ components:
       - id
       - type
       - value
-    Product:
-      type: object
-      description: Simple serializer for Product without related purchasable objects
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
-        description:
-          type: string
-        is_active:
-          type: boolean
-          description: Controls visibility of the product in the app.
-        purchasable_object:
-          oneOf:
-          - type: object
-            properties:
-              id:
-                type: integer
-              run_tag:
-                type: string
-              start_date:
-                type: string
-                format: date-time
-              end_date:
-                type: string
-                format: date-time
-          - type: object
-            properties:
-              id:
-                type: integer
-              title:
-                type: string
-              run_tag:
-                type: string
-              start_date:
-                type: string
-                format: date-time
-              end_date:
-                type: string
-                format: date-time
-              course:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                  title:
-                    type: string
-                  page:
-                    type: object
-              readable_id:
-                type: string
-              enrollment_start:
-                type: string
-                format: date-time
-              enrollment_end:
-                type: string
-                format: date-time
-              course_number:
-                type: string
-          - type: object
-            properties:
-              id:
-                type: integer
-              title:
-                type: string
-              readable_id:
-                type: string
-              page:
-                type: object
-          readOnly: true
-      required:
-      - description
-      - id
-      - price
-      - purchasable_object
     ProductFlexibilePrice:
       type: object
       description: Simple serializer for Product without related purchasable objects
@@ -5969,23 +5907,6 @@ components:
       - id
       - price
       - product_flexible_price
-    ProductRequest:
-      type: object
-      description: Simple serializer for Product without related purchasable objects
-      properties:
-        price:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
-        description:
-          type: string
-          minLength: 1
-        is_active:
-          type: boolean
-          description: Controls visibility of the product in the app.
-      required:
-      - description
-      - price
     Program:
       type: object
       properties:
@@ -7647,7 +7568,7 @@ components:
           type: array
           items:
             allOf:
-            - $ref: '#/components/schemas/Product'
+            - $ref: '#/components/schemas/BaseProduct'
           readOnly: true
         approved_flexible_price_exists:
           type: boolean
