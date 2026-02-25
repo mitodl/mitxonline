@@ -40,7 +40,6 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
-from main.models import PrefetchGenericQuerySet
 from main.plugin_manager import get_plugin_manager
 from users.models import User
 
@@ -60,11 +59,6 @@ class ProductsQuerySet(models.QuerySet):
     def delete(self):
         self.update(is_active=False)
 
-
-class ProductQuerySet(PrefetchGenericQuerySet):
-    def active(self):
-        """Filters for active products only"""
-        return self.filter(is_active=True)
 
 class ActiveUndeleteManager(models.Manager):
     """Query manager for active objects"""
