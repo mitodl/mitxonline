@@ -7,29 +7,41 @@ from courses.factories import CourseFactory, CourseRunFactory
 
 
 @pytest.fixture
-def contract_ready_course():
-    """
-    Creates a contract-ready course - i.e. a course with a SOURCE run
+def make_contract_ready_course():
+    """Return a function that can be used to generate a contract-ready course"""
 
-    Returns: tuple, course and course run
-    """
+    def _contract_ready_course():
+        """
+        Creates a contract-ready course - i.e. a course with a SOURCE run
 
-    course = CourseFactory.create()
-    source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
-    source_course_run_key = (
-        f"course-v1:{source_course_key.org}+{source_course_key.course}+SOURCE"
-    )
-    source_course_run = CourseRunFactory.create(
-        course=course,
-        courseware_id=source_course_run_key,
-        run_tag="SOURCE",
-        start_date=None,
-        end_date=None,
-        enrollment_start=None,
-        enrollment_end=None,
-    )
+        Returns: tuple, course and course run
+        """
 
-    return (course, source_course_run)
+        course = CourseFactory.create()
+        source_course_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
+        source_course_run_key = (
+            f"course-v1:{source_course_key.org}+{source_course_key.course}+SOURCE"
+        )
+        source_course_run = CourseRunFactory.create(
+            course=course,
+            courseware_id=source_course_run_key,
+            run_tag="SOURCE",
+            start_date=None,
+            end_date=None,
+            enrollment_start=None,
+            enrollment_end=None,
+        )
+
+        return (course, source_course_run)
+
+    return _contract_ready_course
+
+
+@pytest.fixture
+def contract_ready_course(make_contract_ready_course):
+    """Return a single contract-ready course"""
+
+    return make_contract_ready_course()
 
 
 @pytest.fixture
