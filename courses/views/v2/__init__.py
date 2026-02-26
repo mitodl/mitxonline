@@ -766,10 +766,10 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     id_parameter = OpenApiParameter(
-        name="id",
+        name="program_id",
         type=OpenApiTypes.INT,
         location=OpenApiParameter.PATH,
-        description="Program enrollment ID",
+        description="Program ID",
         required=True,
     )
 
@@ -843,12 +843,12 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         are so there's nothing to process there.
         """
 
-        program = Program.objects.get(pk=pk)
-        ProgramEnrollment.objects.update_or_create(
-            user=request.user,
-            program=program,
-            defaults={"change_status": ENROLL_CHANGE_STATUS_UNENROLLED},
-        )
+        program = get_object_or_404(Program, pk=pk)
+        enrollment = ProgramEnrollment.objects.filter(
+            user=request.user, program=program
+        ).first()
+        if enrollment:
+            enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_UNENROLLED)
 
         return self.list(request)
 

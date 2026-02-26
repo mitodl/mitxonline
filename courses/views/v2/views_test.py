@@ -1917,3 +1917,40 @@ def test_get_nonexistent_program_by_readable_id(user_drf_client):
         reverse("v2:programs_api-detail", kwargs={"pk": "nonexistent-program-id"})
     )
     assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_program_enrollment_destroy_program_not_found(user_drf_client):
+    """Test that destroying a program enrollment for a nonexistent program returns 404."""
+    resp = user_drf_client.delete(
+        reverse("v2:user_program_enrollments_api-detail", kwargs={"pk": 999999})
+    )
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_program_enrollment_destroy_no_enrollment_is_idempotent(user_drf_client):
+    """Test that destroying when the user has no enrollment is idempotent (returns 200 with empty list)."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.delete(
+        reverse("v2:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == []
+
+
+@pytest.mark.django_db
+def test_program_enrollment_destroy(user_drf_client, user):
+    """Test that destroying a program enrollment deactivates it."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    resp = user_drf_client.delete(
+        reverse("v2:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+    )
+    assert resp.status_code == status.HTTP_200_OK
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+    assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
