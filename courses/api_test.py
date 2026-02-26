@@ -53,6 +53,7 @@ from courses.api import (
     sync_course_runs,
 )
 from courses.constants import (
+    ALL_ENROLL_CHANGE_STATUSES,
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
@@ -437,31 +438,54 @@ def test_create_run_enrollments_creation_fail(mocker, user):
         EDX_ENROLLMENT_VERIFIED_MODE,
     ],
 )
-def test_create_program_enrollments(user, mode):
+def test_create_program_enrollments_creation(user, mode):
     """
-    create_program_enrollments should create or reactivate local enrollment records
+    create_program_enrollments should create local enrollment records for a user with no
+    existing program enrollments.
     """
     num_programs = 2
     programs = ProgramFactory.create_batch(num_programs)
-    # Create an existing deactivate enrollment to test that it gets reactivated
-    ProgramEnrollmentFactory.create(
-        user=user,
-        program=programs[0],
-        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
-        active=False,
-    )
 
     successful_enrollments = create_program_enrollments(
         user, programs, enrollment_mode=mode
     )
     assert len(successful_enrollments) == num_programs
-    enrollments = ProgramEnrollment.objects.order_by("program__id").all()
+    enrollments = ProgramEnrollment.objects.filter(user=user).order_by("program__id")
     assert len(enrollments) == len(programs)
     for program, enrollment in zip(programs, enrollments):
         assert enrollment.change_status is None
         assert enrollment.active is True
         assert enrollment.program == program
         assert enrollment.enrollment_mode == mode
+
+
+@pytest.mark.parametrize("active", [True, False])
+@pytest.mark.parametrize("change_status", [None, *ALL_ENROLL_CHANGE_STATUSES])
+def test_create_program_enrollments_reactivation(user, active, change_status):
+    """
+    create_program_enrollments should reactivate existing enrollments when change_status
+    is not None, irrespective of active=True/False.
+    """
+    program = ProgramFactory.create()
+    ProgramEnrollmentFactory.create(
+        user=user,
+        program=program,
+        change_status=change_status,
+        active=active,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    successful_enrollments = create_program_enrollments(
+        user,
+        [program],
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    assert len(successful_enrollments) == 1
+    enrollment = ProgramEnrollment.all_objects.get(user=user, program=program)
+    expected_active = True if change_status is not None else active
+    assert enrollment.change_status is None
+    assert enrollment.active is expected_active
 
 
 def test_create_program_enrollments_creation_fail(mocker, user):
