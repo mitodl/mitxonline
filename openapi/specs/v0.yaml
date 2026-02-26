@@ -3218,13 +3218,7 @@ components:
         type:
           type: string
           readOnly: true
-        enrollment_modes:
-          type: array
-          items:
-            $ref: '#/components/schemas/EnrollmentMode'
-          readOnly: true
       required:
-      - enrollment_modes
       - id
       - readable_id
       - title
