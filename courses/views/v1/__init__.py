@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
@@ -581,12 +582,12 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         are so there's nothing to process there.
         """
 
-        program = Program.objects.get(pk=pk)
-        ProgramEnrollment.objects.update_or_create(
-            user=request.user,
-            program=program,
-            defaults={"change_status": ENROLL_CHANGE_STATUS_UNENROLLED},
-        )
+        program = get_object_or_404(Program, pk=pk)
+        enrollment = ProgramEnrollment.objects.filter(
+            user=request.user, program=program
+        ).first()
+        if enrollment:
+            enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_UNENROLLED)
 
         return self.list(request)
 
