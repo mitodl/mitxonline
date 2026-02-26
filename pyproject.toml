@@ -1,11 +1,11 @@
-[tool.poetry]
-name = "MITx Online"
+[project]
+name = "mitxonline"
 version = "0.69.1"
 description = "MITx Online"
 authors = [{ name = "MIT ODL" }]
-requires-python = ">=3.11,<4"
+requires-python = "~=3.11.0"
 readme = "README.md"
-license = "BSD-3"
+license = { text = "BSD-3" }
 dependencies = [
     "beautifulsoup4>=4.8.2,<5",
     "bleach>=6.0.0,<7",

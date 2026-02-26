@@ -40,11 +40,13 @@ COPY pyproject.toml /src
 COPY uv.lock /src
 COPY mitol_*.gz /src
 
-RUN chown -R mitodl:mitodl /src
+RUN chown -R mitodl:mitodl /src && \
+    mkdir -p /opt/venv && \
+    chown -R mitodl:mitodl /opt/venv
 
 USER mitodl
 WORKDIR /src
-RUN uv sync --frozen --no-install-project
+RUN uv sync --frozen --no-install-project --group prod
 
 
 FROM uv AS code
