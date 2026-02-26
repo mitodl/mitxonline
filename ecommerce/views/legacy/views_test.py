@@ -1120,7 +1120,6 @@ def test_checkout_api_result_program_accept(
     settings,
     user,
     user_client,
-    api_client,
     mocker,
 ):
     """
@@ -1150,9 +1149,9 @@ def test_checkout_api_result_program_accept(
         "transaction_id": "12345",
     }
 
-    resp = api_client.post(reverse("checkout_result_api"), payload)
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
 
-    assert resp.status_code == 200
+    assert resp.status_code == 302
 
     order = Order.objects.get(state=OrderStatus.FULFILLED, purchaser=user)
     assert USER_MSG_COOKIE_NAME in resp.cookies
