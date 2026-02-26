@@ -822,6 +822,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "title": program_enrollment.program.title,
                 "live": program_enrollment.program.live,
                 "departments": [],
+                "enrollment_modes": [],
                 "readable_id": program_enrollment.program.readable_id,
                 "req_tree": list(
                     ProgramRequirementTreeSerializer(

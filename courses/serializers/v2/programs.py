@@ -17,7 +17,7 @@ from courses.serializers.base import (
     get_thumbnail_url,
 )
 from courses.serializers.utils import get_unique_topics_from_courses
-from courses.serializers.v1.base import ProductRelatedField
+from courses.serializers.v1.base import EnrollmentModeSerializer, ProductRelatedField
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
 from main.serializers import StrictFieldsSerializer
@@ -148,6 +148,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     min_price = serializers.SerializerMethodField()
     max_price = serializers.SerializerMethodField()
     start_date = serializers.SerializerMethodField()
+    enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
 
     def get_courses(self, instance) -> list[int]:
         return [course[0].id for course in instance.courses if course[0].live]
@@ -546,6 +547,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "time_commitment",
             "min_weekly_hours",
             "max_weekly_hours",
+            "enrollment_modes",
         ]
 
 
