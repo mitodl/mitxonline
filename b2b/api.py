@@ -50,7 +50,6 @@ from ecommerce.models import (
 )
 from main import constants as main_constants
 from main.utils import date_to_datetime
-from openedx.api import create_user
 from openedx.tasks import clone_courserun
 
 log = logging.getLogger(__name__)
@@ -1023,11 +1022,6 @@ def create_b2b_enrollment(request, product: Product):
     validation_error = _validate_b2b_enrollment_prerequisites(request.user, product)
     if validation_error:
         return validation_error
-
-    # Check for an edX user, and create one if there's not one
-    if not request.user.edx_username:
-        create_user(request.user)
-        request.user.refresh_from_db()
 
     # Prepare the basket for enrollment
     basket = _prepare_basket_for_b2b_enrollment(request, product)

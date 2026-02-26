@@ -29,6 +29,7 @@ from ecommerce.api import (
     check_for_duplicate_discount_redemptions,
     create_verified_program_course_run_enrollment,
     create_verified_program_discount,
+    establish_basket,
     get_auto_apply_discounts_for_basket,
     process_cybersource_payment_response,
     refund_order,
@@ -69,6 +70,7 @@ from ecommerce.models import (
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.factories import OpenEdxUserFactory
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -1139,3 +1141,32 @@ def test_get_auto_apply_discounts_respects_dates(user):
 
     discounts = get_auto_apply_discounts_for_basket(basket.id)
     assert discounts.count() == 0
+
+
+def test_establish_basket_calls_create_user(mocker):
+    """Test that establish_basket calls create_user if there's no edX username."""
+
+    mocked_create_user_from_id = mocker.patch("openedx.tasks.create_user_from_id.delay")
+
+    user = UserFactory.create(no_openedx_api_auth=True, no_openedx_user=True)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    basket = establish_basket(request)
+
+    mocked_create_user_from_id.assert_called_once()
+    mocked_create_user_from_id.reset_mock()
+
+    OpenEdxUserFactory.create(user=user)
+    del user.openedx_user
+
+    basket.delete()
+
+    user.refresh_from_db()
+    request.user = user
+
+    assert user.edx_username
+
+    establish_basket(request)
+
+    assert not mocked_create_user_from_id.called

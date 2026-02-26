@@ -72,6 +72,7 @@ from main.constants import (
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import parse_supplied_date, redirect_with_user_message
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.tasks import create_user_from_id
 
 log = logging.getLogger(__name__)
 
@@ -447,9 +448,13 @@ def process_cybersource_payment_response(request, order):
 
 def establish_basket(request):
     """
-    Gets or creates the user's basket. (This may get some more logic later.)
+    Gets or creates the user's basket. Queue creation of their edX user if necessary.
     """
     user = request.user
+
+    if not user.edx_username:
+        create_user_from_id.delay(user.id)
+
     (basket, is_new) = Basket.objects.get_or_create(user=user)
 
     if is_new:

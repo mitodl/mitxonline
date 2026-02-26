@@ -5,7 +5,6 @@ import logging
 import pluggy
 
 from courses.models import CourseRun, PaidCourseRun, PaidProgram, Program
-from openedx.api import create_user
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 hookimpl = pluggy.HookimplMarker("mitxonline")
@@ -25,11 +24,6 @@ def _create_courserun_enrollment(line) -> str | None:
     if not isinstance(purchased_run, CourseRun):
         log.debug("Item purchased %s is not a course run, skipping", purchased_run)
         return None
-
-    # Check for an edX user, and create one if there's not one
-    if not line.order.purchaser.edx_username:
-        create_user(line.order.purchaser)
-        line.order.purchaser.refresh_from_db()
 
     create_run_enrollments(
         line.order.purchaser,
