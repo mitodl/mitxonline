@@ -2885,7 +2885,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: Program enrollment ID
+        description: Program ID
         required: true
       tags:
       - program_enrollments
@@ -2907,7 +2907,7 @@ paths:
         name: id
         schema:
           type: integer
-        description: Program enrollment ID
+        description: Program ID
         required: true
       tags:
       - program_enrollments
@@ -3134,6 +3134,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/V3UserProgramEnrollment'
           description: ''
+    delete:
+      operationId: v3_program_enrollments_destroy
+      description: |-
+        Unenroll the user from this program.
+
+        Returns 204 No Content. Idempotent - returns 204 even if not currently
+        enrolled. Returns 404 if the program does not exist.
+      parameters:
+      - in: path
+        name: program_id
+        schema:
+          type: integer
+        description: Program ID
+        required: true
+      tags:
+      - program_enrollments
+      responses:
+        '204':
+          description: No response body
   /enrollments/:
     post:
       operationId: api_enrollments_create

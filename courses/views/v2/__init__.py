@@ -766,7 +766,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     id_parameter = OpenApiParameter(
-        name="program_id",
+        name="id",
         type=OpenApiTypes.INT,
         location=OpenApiParameter.PATH,
         description="Program ID",
