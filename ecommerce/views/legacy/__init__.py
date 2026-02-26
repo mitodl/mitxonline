@@ -760,7 +760,7 @@ class CheckoutCallbackView(View):
                 reverse("user-dashboard"),
                 {
                     "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
-                    "run": order.lines.first().purchased_object.course.title,
+                    "run": order.lines.first().courseware,
                 },
             )
         else:
