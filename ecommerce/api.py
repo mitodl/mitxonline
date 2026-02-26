@@ -71,6 +71,7 @@ from main.constants import (
 )
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import parse_supplied_date, redirect_with_user_message
+from openedx.api import create_user
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.tasks import create_user_from_id
 
@@ -446,14 +447,23 @@ def process_cybersource_payment_response(request, order):
     return return_message
 
 
-def establish_basket(request):
+def establish_basket(request, *, no_delay=False):
     """
     Gets or creates the user's basket. Queue creation of their edX user if necessary.
+
+    Kwargs:
+        no_delay (bool): don't queue the edX user creation
     """
     user = request.user
 
     if not user.edx_username:
-        create_user_from_id.delay(user.id)
+        if no_delay:
+            create_user(user)
+            # The openedx_user is a cached property, so delete the cached value
+            del user.openedx_user
+        else:
+            log.warning("Queueing creation")
+            create_user_from_id.delay(user.id)
 
     (basket, is_new) = Basket.objects.get_or_create(user=user)
 

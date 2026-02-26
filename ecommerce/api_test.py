@@ -1143,22 +1143,36 @@ def test_get_auto_apply_discounts_respects_dates(user):
     assert discounts.count() == 0
 
 
-def test_establish_basket_calls_create_user(mocker):
+@pytest.mark.parametrize(
+    "no_delay",
+    [
+        True,
+        False,
+    ],
+)
+def test_establish_basket_calls_create_user(mocker, no_delay):
     """Test that establish_basket calls create_user if there's no edX username."""
 
-    mocked_create_user_from_id = mocker.patch("openedx.tasks.create_user_from_id.delay")
+    if no_delay:
+        expected_run_mock = mocker.patch("ecommerce.api.create_user")
+        expected_skip_mock = mocker.patch("openedx.tasks.create_user_from_id.delay")
+    else:
+        expected_run_mock = mocker.patch("openedx.tasks.create_user_from_id.delay")
+        expected_skip_mock = mocker.patch("ecommerce.api.create_user")
 
     user = UserFactory.create(no_openedx_api_auth=True, no_openedx_user=True)
     request = RequestFactory().get("/")
     request.user = user
 
-    basket = establish_basket(request)
+    basket = establish_basket(request, no_delay=no_delay)
 
-    mocked_create_user_from_id.assert_called_once()
-    mocked_create_user_from_id.reset_mock()
+    expected_run_mock.assert_called_once()
+    expected_run_mock.reset_mock()
+    expected_skip_mock.assert_not_called()
 
     OpenEdxUserFactory.create(user=user)
-    del user.openedx_user
+    if not no_delay:
+        del user.openedx_user
 
     basket.delete()
 
@@ -1169,4 +1183,4 @@ def test_establish_basket_calls_create_user(mocker):
 
     establish_basket(request)
 
-    assert not mocked_create_user_from_id.called
+    assert not expected_run_mock.called

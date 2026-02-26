@@ -956,9 +956,9 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     """
     from ecommerce.api import establish_basket  # noqa: PLC0415
 
-    basket = establish_basket(request)
-    # Clear the basket. For Unified Ecommerce, we may want to change this.
-    # But MITx Online only allows one item per cart and not clearing it is confusing.
+    # Establish and clear the basket. If the user doesn't have an edX username,
+    # don't wait to create one.
+    basket = establish_basket(request, no_delay=True)
     basket.basket_items.all().delete()
     basket.discounts.all().delete()
 

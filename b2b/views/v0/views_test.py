@@ -337,8 +337,9 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
 def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrollable):
     """Make sure that hitting the enroll endpoint actually results in enrollments"""
 
+    mocked_create_from_id = mocker.patch("openedx.tasks.create_user_from_id")
     mocker.patch("openedx.tasks.clone_courserun.delay")
-    mocker.patch("openedx.api._create_edx_user_request")
+    mocked_create_user_request = mocker.patch("openedx.api._create_edx_user_request")
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
 
     contract = ContractPageFactory.create(
@@ -354,14 +355,21 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrol
         courserun.live = False
         courserun.save()
 
-    user = UserFactory.create()
+    user = UserFactory.create(no_openedx_user=(not user_has_edx_user))
+
+    if user_has_edx_user:
+        assert user.openedx_user
+    else:
+        assert not user.openedx_user
+
     user.b2b_contracts.add(contract)
-
-    if not user_has_edx_user:
-        user.openedx_users.all().delete()
-
     user.save()
     user.refresh_from_db()
+
+    if user_has_edx_user:
+        assert user.openedx_user
+    else:
+        assert not user.openedx_user
 
     client = APIClient()
     client.force_login(user)
@@ -384,5 +392,10 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrol
 
     user.refresh_from_db()
 
+    if not user_has_edx_user:
+        mocked_create_user_request.assert_called()
+        mocked_create_from_id.assert_not_called()
+
+    del user.openedx_user
     assert user.edx_username
     assert CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
