@@ -462,7 +462,6 @@ def establish_basket(request, *, no_delay=False):
             # The openedx_user is a cached property, so delete the cached value
             del user.openedx_user
         else:
-            log.warning("Queueing creation")
             create_user_from_id.delay(user.id)
 
     (basket, is_new) = Basket.objects.get_or_create(user=user)
