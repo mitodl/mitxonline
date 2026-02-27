@@ -128,3 +128,7 @@ class EdxApiRegistrationValidationException(Exception):  # noqa: N818
 
 class OpenEdxUserMissingError(Exception):
     """We tried to do something that requires an Open edX user, and there isn't one."""
+
+
+class UserCreateInTransactionError(Exception):
+    """We attempted to create a user in openedx while in a transaction"""

@@ -4,8 +4,10 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.db import transaction
 from mitol.common.utils.urls import remove_password_from_url
 
+from main.exceptions import UnexpectedTransactionAtomicError
 from main.models import AuditModel
 from main.settings import TIME_ZONE
 from main.utils import (
@@ -13,7 +15,9 @@ from main.utils import (
     get_field_names,
     get_js_settings,
     get_partitioned_set_difference,
+    is_in_transaction,
     parse_supplied_date,
+    raise_on_transaction_atomic,
 )
 
 
@@ -97,3 +101,32 @@ def test_date_to_datetime():
 
     with pytest.raises(AttributeError):
         date_to_datetime("this date isn't a date at all", TIME_ZONE)
+
+
+@pytest.mark.django_db
+def test_is_in_transaction(settings):
+    """Test that is_in_transaction functions correctly"""
+    assert is_in_transaction() is False
+
+    with transaction.atomic():
+        assert is_in_transaction() is True
+
+    settings.ENVIRONMENT = "dev"
+
+    assert is_in_transaction() is True
+
+
+@pytest.mark.django_db
+def test_raise_on_transaction_atomic():
+    """Test that raise_on_transaction_atomic correctly raises exceptions when in a transaction"""
+
+    with raise_on_transaction_atomic():
+        pass
+
+    with pytest.raises(UnexpectedTransactionAtomicError), transaction.atomic():  # noqa: SIM117
+        with raise_on_transaction_atomic():
+            pass
+
+    with pytest.raises(AttributeError), transaction.atomic():  # noqa: SIM117
+        with raise_on_transaction_atomic(AttributeError):
+            pass

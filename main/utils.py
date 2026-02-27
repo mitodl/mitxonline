@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Set, Tuple, TypeVar, Union  # noqa: UP035
@@ -13,11 +14,13 @@ import redis_lock
 from django.conf import settings
 from django.core.cache import caches
 from django.core.serializers import serialize
+from django.db import connection
 from django.http import HttpRequest, HttpResponseRedirect
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
 
 from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
+from main.exceptions import UnexpectedTransactionAtomicError
 from main.settings import TIME_ZONE
 
 if TYPE_CHECKING:
@@ -212,3 +215,34 @@ def get_redis_lock(name, **kwargs):
     redis_cache = caches["redis"]
     client = redis_cache.client.get_client()
     return redis_lock.Lock(client, name, **kwargs)
+
+
+def is_in_transaction() -> bool:
+    """Return True if we're in a transaction"""
+    if settings.ENVIRONMENT == "pytest":
+        # if we're running under pytest, tests that use django_db get wrapped in a
+        # transaction.atomic(), so the logic for whether we're in a transaction inside
+        # these tests is actually dependent on there being more than that one wrapper atomic block
+        return len(connection.atomic_blocks) > 1
+
+    return connection.in_atomic_block
+
+
+class raise_on_transaction_atomic(contextlib.ContextDecorator):  # noqa: N801
+    """
+    Context manager / decorator that will raise the passed exception
+    if this wrapped function or context executes while a
+    transaction.atomic() is active.
+
+    If an exception type isn't passed UnexpectedTransactionAtomicError is used.
+    """
+
+    def __init__(self, exc=UnexpectedTransactionAtomicError):
+        self.exc = exc
+
+    def __enter__(self):
+        if is_in_transaction():
+            raise self.exc
+
+    def __exit__(self, *_exc):
+        pass
