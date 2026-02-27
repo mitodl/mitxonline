@@ -329,19 +329,6 @@ class CourseFilterSet(django_filters.FilterSet):
             else get_unenrollable_courses(queryset)
         )
 
-    def filter_queryset(self, queryset):
-        queryset = super().filter_queryset(queryset)
-        # perform additional filtering
-
-        filter_keys = self.form.cleaned_data.keys()
-
-        if "courserun_is_enrollable" not in filter_keys:
-            queryset = queryset.prefetch_related(
-                Prefetch("courseruns", queryset=CourseRun.objects.order_by("id")),
-            )
-
-        return queryset
-
 
 class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     """API view set for Courses"""
@@ -356,9 +343,13 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Get the queryset for the viewset."""
 
+        course_runs_prefetch = Prefetch(
+            "courseruns",
+            queryset=CourseRun.objects.order_by("id").prefetch_related("products"),
+        )
         return (
             Course.objects.select_related("page")
-            .prefetch_related("departments", "in_programs")
+            .prefetch_related("departments", "in_programs", course_runs_prefetch)
             .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
             .annotate(count_courseruns=Count("courseruns"))
             .order_by("title")

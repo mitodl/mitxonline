@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -190,7 +190,9 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 Course.objects.filter()
                 .select_related("page")
                 .prefetch_related(
-                    "courseruns", "departments", "courseruns__enrollment_modes"
+                    "courseruns",
+                    "departments",
+                    "courseruns__enrollment_modes",
                 )
                 .all()
             )
