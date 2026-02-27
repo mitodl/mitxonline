@@ -4,7 +4,14 @@ import logging
 from argparse import RawTextHelpFormatter
 from decimal import Decimal
 
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
+from opaque_keys import InvalidKeyError
+
+from b2b.api import create_contract_run, import_and_create_contract_run
+from b2b.models import ContractPage, ContractProgramItem
+from courses.api import resolve_courseware_object_from_id
+from courses.constants import UAI_COURSEWARE_ID_PREFIX
+from courses.models import CourseRun
 
 log = logging.getLogger(__name__)
 
@@ -27,16 +34,9 @@ In either case, the command will try to create a new run. If it exists in edX al
         parser.formatter_class = RawTextHelpFormatter
 
         parser.add_argument(
-            "--course",
-            help="The course (readable ID or numeric ID) to re-run. The course must have a source run. Either this or --course-run must be specified.",
+            "course",
+            help="The course or course run (readable ID or numeric ID) to re-run. If specifying a course, the course must have a source run set up.",
             type=str,
-        )
-
-        parser.add_argument(
-            "--course-run",
-            "--run",
-            type=str,
-            help="The course run (readable ID or numeric ID) to re-run. Either this or --course must be specified.",
         )
 
         parser.add_argument(
@@ -73,3 +73,34 @@ In either case, the command will try to create a new run. If it exists in edX al
             type=Decimal,
             help="If set, create a new product for the new run with the specified price.",
         )
+
+    def handle(self, *args, **kwargs):  # noqa: ARG002
+        """Create the re-run according to the options passed."""
+
+        course_opt = kwargs.pop("course", None)
+
+        courseware = resolve_courseware_object_from_id(course_opt)
+
+        if not courseware:
+            msg = f"Course/run {course_opt} not found."
+            raise CommandError(msg)
+
+        if not courseware.is_run:
+            source = courseware.courseruns.filter(is_source_run=True)
+
+            if source.count() > 1:
+                msg = f"Course {course_opt} has more than one source run"
+                raise CommandError(msg)
+
+            if source.count() < 1:
+                msg = f"Course {course_opt} has no source run"
+                raise CommandError(msg)
+
+            courseware = source.first()
+
+        # next steps for this:
+        # - look through create_contract_run and either adapt or something to create the run
+        # - make new key for the new run
+        # - grab products and recreate where necessary
+        # - update upstream course where necessary
+        
