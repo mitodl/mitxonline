@@ -35,7 +35,6 @@ from courses.models import (
     CourseRunEnrollment,
     CoursesTopic,
     Department,
-    EnrollmentMode,
     Program,
     ProgramCertificate,
     ProgramCollection,
@@ -182,11 +181,8 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
             Program.objects.filter()
             .select_related("page", "page__feature_image")
             .prefetch_related(
+                "enrollment_modes",
                 Prefetch("departments", queryset=Department.objects.only("id", "name")),
-                Prefetch(
-                    "enrollment_modes",
-                    queryset=EnrollmentMode.objects.only("id", "mode_slug"),
-                ),
                 Prefetch(
                     "all_requirements",
                     queryset=ProgramRequirement.objects.select_related(

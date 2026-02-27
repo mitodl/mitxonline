@@ -1471,6 +1471,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "end_date": None,
                 "enrollment_end": None,
                 "enrollment_start": None,
+                "enrollment_modes": [],
                 "duration": _get_page_prop(program_enrollment, "length"),
                 "time_commitment": _get_page_prop(program_enrollment, "effort"),
                 "min_price": _get_page_prop(program_enrollment, "min_price"),

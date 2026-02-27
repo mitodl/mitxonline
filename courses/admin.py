@@ -22,6 +22,7 @@ from courses.models import (
     CourseRunGrade,
     CourseRunGradeAudit,
     Department,
+    EnrollmentMode,
     LearnerProgramRecordShare,
     PaidCourseRun,
     PaidProgram,
@@ -655,3 +656,19 @@ class ProgramCollectionItemAdmin(admin.ModelAdmin):
     list_display = ("id", "collection", "program", "sort_order")
     list_filter = ["collection"]
     ordering = ("collection", "sort_order")
+
+
+@admin.register(EnrollmentMode)
+class EnrollmentModeAdmin(admin.ModelAdmin):
+    """Admin for EnrollmentMode"""
+
+    model = EnrollmentMode
+    list_display = (
+        "id",
+        "mode_slug",
+        "mode_display_name",
+        "requires_payment",
+    )
+    list_filter = [
+        "requires_payment",
+    ]

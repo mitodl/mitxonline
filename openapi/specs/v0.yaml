@@ -3237,13 +3237,7 @@ components:
         type:
           type: string
           readOnly: true
-        enrollment_modes:
-          type: array
-          items:
-            $ref: '#/components/schemas/EnrollmentMode'
-          readOnly: true
       required:
-      - enrollment_modes
       - id
       - readable_id
       - title
@@ -7303,9 +7297,15 @@ components:
           readOnly: true
         live:
           type: boolean
+        enrollment_modes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrollmentMode'
+          readOnly: true
       required:
       - courses
       - departments
+      - enrollment_modes
       - id
       - page
       - readable_id
@@ -7919,12 +7919,18 @@ components:
           description: Get the max weekly hours of the course from the course page
             CMS.
           readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrollmentMode'
+          readOnly: true
       required:
       - certificate_type
       - collections
       - courses
       - departments
       - duration
+      - enrollment_modes
       - id
       - max_price
       - max_weekly_hours
@@ -8188,6 +8194,11 @@ components:
           description: Get the max weekly hours of the course from the course page
             CMS.
           readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrollmentMode'
+          readOnly: true
         products:
           type: array
           items:
@@ -8200,6 +8211,7 @@ components:
       - courses
       - departments
       - duration
+      - enrollment_modes
       - id
       - max_price
       - max_weekly_hours

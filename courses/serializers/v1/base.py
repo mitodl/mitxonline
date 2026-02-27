@@ -110,7 +110,6 @@ class BaseProgramSerializer(serializers.ModelSerializer):
     """Basic program model serializer"""
 
     type = serializers.SerializerMethodField(read_only=True)
-    enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
 
     @staticmethod
     def get_type(obj) -> str:  # noqa: ARG004
@@ -118,7 +117,12 @@ class BaseProgramSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Program
-        fields = ["title", "readable_id", "id", "type", "enrollment_modes"]
+        fields = [
+            "title",
+            "readable_id",
+            "id",
+            "type",
+        ]
 
 
 class CourseRunCertificateSerializer(serializers.ModelSerializer):

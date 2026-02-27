@@ -14,6 +14,7 @@ from courses.serializers.base import (
 from courses.serializers.v1.base import (
     CourseRunCertificateSerializer,
     CourseRunGradeSerializer,
+    EnrollmentModeSerializer,
 )
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
@@ -86,6 +87,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
     departments = DepartmentSerializer(many=True, read_only=True)
+    enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
 
     @extend_schema_field(CourseWithCourseRunsSerializer)
     def get_courses(self, instance):
@@ -156,6 +158,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "program_type",
             "departments",
             "live",
+            "enrollment_modes",
         ]
 
 
