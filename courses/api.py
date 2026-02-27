@@ -309,7 +309,7 @@ def create_program_enrollments(
                     "enrollment_mode": enrollment_mode,
                 },
             )
-            if not created and not enrollment.active:
+            if not created and enrollment.change_status is not None:
                 enrollment.reactivate_and_save()
 
             if not created and enrollment.enrollment_mode != enrollment_mode:

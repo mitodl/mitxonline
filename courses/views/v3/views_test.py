@@ -161,3 +161,42 @@ def test_create_program_enrollment_unauthenticated():
         status.HTTP_401_UNAUTHORIZED,
         status.HTTP_403_FORBIDDEN,
     )
+
+
+def test_destroy_program_enrollment_program_not_found(user_drf_client):
+    """DELETE for a nonexistent program returns 404."""
+    resp = user_drf_client.delete(
+        reverse("v3:user_program_enrollments_api-detail", kwargs={"program_id": 999999})
+    )
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_destroy_program_enrollment_no_enrollment_is_idempotent(user_drf_client):
+    """DELETE when the user has no enrollment is idempotent - returns 204 with no body."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.delete(
+        reverse(
+            "v3:user_program_enrollments_api-detail", kwargs={"program_id": program.id}
+        )
+    )
+    assert resp.status_code == status.HTTP_204_NO_CONTENT
+    assert not resp.content
+
+
+def test_destroy_program_enrollment(user_drf_client, user):
+    """DELETE deactivates the enrollment and returns 204 with no body."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    resp = user_drf_client.delete(
+        reverse(
+            "v3:user_program_enrollments_api-detail", kwargs={"program_id": program.id}
+        )
+    )
+    assert resp.status_code == status.HTTP_204_NO_CONTENT
+    assert not resp.content
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is False
+    assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
