@@ -897,7 +897,7 @@ def test_discount_redemptions_api(
 
     discount = DiscountFactory.create(
         discount_type=DISCOUNT_TYPE_FIXED_PRICE,
-        amount=0 if zerovalue else random.randrange(1, 99),  # noqa: S311
+        amount=int(not zerovalue),
     )
 
     # permissions testing
