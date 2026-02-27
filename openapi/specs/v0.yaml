@@ -3201,6 +3201,23 @@ components:
       - description
       - id
       - price
+    BaseProductRequest:
+      type: object
+      description: Simple serializer for Product without related purchasable objects
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        description:
+          type: string
+          minLength: 1
+        is_active:
+          type: boolean
+          description: Controls visibility of the product in the app.
+      required:
+      - description
+      - price
     BaseProgram:
       type: object
       description: Basic program model serializer
@@ -4150,7 +4167,7 @@ components:
           type: array
           items:
             allOf:
-            - $ref: '#/components/schemas/ProductFlexibilePrice'
+            - $ref: '#/components/schemas/BaseProduct'
           readOnly: true
         approved_flexible_price_exists:
           type: boolean
@@ -7628,7 +7645,7 @@ components:
           type: array
           items:
             allOf:
-            - $ref: '#/components/schemas/ProductFlexibilePrice'
+            - $ref: '#/components/schemas/BaseProduct'
           readOnly: true
         approved_flexible_price_exists:
           type: boolean
