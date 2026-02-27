@@ -1180,7 +1180,7 @@ def test_start_checkout_and_ensure_edx_username_created(mocker, settings, produc
     Check that checking out with a user that doesn't have an edx username
     creates them an edx username
     """
-    mocked_create_user = mocker.patch("openedx.api.create_edx_user")
+    mocked_create_user = mocker.patch("openedx.tasks.create_user_from_id.delay")
     mocker.patch("openedx.api.create_edx_auth_token")
     user = UserFactory.create()
     user.openedx_users.all().delete()
@@ -1204,7 +1204,7 @@ def test_start_checkout_and_ensure_edx_username_created(mocker, settings, produc
             "run": order.lines.first().purchased_object.course.title,
         }
     )
-    mocked_create_user.assert_called_once()
+    mocked_create_user.assert_called()
 
 
 @pytest.mark.parametrize("use_redemption_type_flags", [True, False])

@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 import pytest
+import responses
 import reversion
 
 from ecommerce.factories import ProductFactory
@@ -38,6 +39,7 @@ def test_mail_api_task_called(  # noqa: PLR0913
 
 
 @pytest.mark.skip_nplusone_check
+@responses.activate
 def test_mail_api_receipt_generation(  # noqa: PLR0913
     settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
@@ -48,6 +50,7 @@ def test_mail_api_receipt_generation(  # noqa: PLR0913
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_send_message = mocker.patch("mitol.mail.api.send_message")
+    responses.get("https://fonts.googleapis.com/css")
 
     with django_capture_on_commit_callbacks(execute=True):
         order = create_order_receipt(mocker, user, products, user_client)
@@ -64,6 +67,7 @@ def test_mail_api_receipt_generation(  # noqa: PLR0913
 
 
 @pytest.mark.skip_nplusone_check
+@responses.activate
 def test_mail_api_refund_email_generation(
     settings, mocker, user, products, user_client
 ):
@@ -73,6 +77,7 @@ def test_mail_api_refund_email_generation(
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     order = create_order_receipt(mocker, user, products, user_client)
+    responses.get("https://fonts.googleapis.com/css")
 
     mock_send_message = mocker.patch("mitol.mail.api.send_message")
 
