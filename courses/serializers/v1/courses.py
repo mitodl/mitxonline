@@ -13,7 +13,7 @@ from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.serializers.v1.base import (
-    BaseCourseRunEnrollmentSerializer,
+    BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     ProductFlexiblePriceRelatedField,
@@ -21,7 +21,6 @@ from courses.serializers.v1.base import (
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists
 from main import features
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
 class CourseSerializer(BaseCourseSerializer):
@@ -159,15 +158,11 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
         ]
 
 
-class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
+class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSerializer):
     """CourseRunEnrollment model serializer"""
 
     run = CourseRunWithCourseSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
-    enrollment_mode = serializers.ChoiceField(
-        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
-    )
-    approved_flexible_price_exists = serializers.SerializerMethodField()
 
     def create(self, validated_data):
         user = self.context["user"]
@@ -189,7 +184,9 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
 
         return successful_enrollments[0] if successful_enrollments else None
 
-    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
-        fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [  # noqa: RUF005
+    class Meta(BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta):
+        fields = [
+            *BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta.fields,
+            "run",
             "run_id",
         ]

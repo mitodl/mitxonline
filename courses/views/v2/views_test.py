@@ -1407,7 +1407,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
     Tests the program enrollments API, which should show the user's enrollment
     in programs with the course runs that apply.
     """
-    user = user_with_enrollments_and_certificates
+    user = user_with_enrollments_and_certificates.user
 
     program_enrollments = (
         ProgramEnrollment.objects.filter(user=user)

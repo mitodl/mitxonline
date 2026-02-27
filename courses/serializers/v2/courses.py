@@ -14,7 +14,7 @@ from courses import models
 from courses.api import create_run_enrollments
 from courses.serializers.utils import get_topics_from_page
 from courses.serializers.v1.base import (
-    BaseCourseRunEnrollmentSerializer,
+    BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
@@ -23,7 +23,6 @@ from courses.serializers.v1.base import (
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
 from main import features
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
@@ -305,15 +304,11 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
 
 
 @extend_schema_serializer(component_name="CourseRunEnrollmentRequestV2")
-class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
+class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSerializer):
     """CourseRunEnrollment model serializer"""
 
     run = CourseRunWithCourseSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
-    enrollment_mode = serializers.ChoiceField(
-        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
-    )
-    approved_flexible_price_exists = serializers.SerializerMethodField()
     b2b_organization_id = serializers.SerializerMethodField()
     b2b_contract_id = serializers.SerializerMethodField()
 
@@ -351,8 +346,10 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
             return enrollment.run.b2b_contract.id
         return None
 
-    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
-        fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [  # noqa: RUF005
+    class Meta(BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta):
+        fields = [
+            *BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta.fields,
+            "run",
             "run_id",
             "b2b_organization_id",
             "b2b_contract_id",
