@@ -53,6 +53,7 @@ from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
 )
 from main.settings import TIME_ZONE
@@ -1112,6 +1113,55 @@ def test_checkout_api_result_verification_failure(
 
     # checkout_result_api will always respond with a 403 if validate_processor_response returns False
     assert resp.status_code == 403
+
+
+@pytest.mark.skip_nplusone_check
+def test_checkout_api_result_program_accept(
+    settings,
+    user,
+    user_client,
+    mocker,
+):
+    """
+    Tests that an ACCEPT response from CyberSource works for a program product,
+    i.e., does not raise AttributeError accessing .course on a Program object.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+
+    program = ProgramFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=program)
+
+    basket = create_basket_with_product(user, product)
+
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
+    assert resp.status_code == 200
+
+    payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+
+    assert resp.status_code == 302
+
+    order = Order.objects.get(state=OrderStatus.FULFILLED, purchaser=user)
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
+            "run": order.lines.first().courseware,
+        }
+    )
+    assert not Basket.objects.filter(id=basket.id).exists()
 
 
 @pytest.mark.skip_nplusone_check
