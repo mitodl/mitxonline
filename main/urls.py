@@ -45,9 +45,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("hijack/", include("hijack.urls")),
     path("robots.txt", include("robots.urls")),
-    re_path(r"^api/schema/$", SpectacularAPIView.as_view(), name="schema"),
-    re_path(
-        r"^api/schema/swagger-ui/$",
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "api/schema/swagger-ui/",
         SpectacularSwaggerView.as_view(url_name="schema"),
         name="swagger",
     ),
@@ -60,11 +60,11 @@ urlpatterns = [
     path("", include("flexiblepricing.urls")),
     path("", include("mitol.google_sheets.urls")),
     path("", include("b2b.urls")),
-    re_path(r"", include("mitol.scim.urls")),
+    path("", include("mitol.scim.urls")),
     re_path(r"^dashboard/", index, name="user-dashboard"),
     # Staff dashboard authentication redirect
-    re_path(
-        r"^staff-dashboard/$",
+    path(
+        "staff-dashboard/",
         staff_dashboard_signin_redirect_to_site_signin,
         name="staff-dashboard-login",
     ),

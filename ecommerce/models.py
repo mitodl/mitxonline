@@ -709,7 +709,7 @@ class OrderFlow:
 class Order(TimestampedModel):
     """An order containing information for a purchase."""
 
-    state = models.CharField(max_length=150, choices=OrderStatus.choices)
+    state = models.CharField(max_length=150, choices=OrderStatus)
     purchaser = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
