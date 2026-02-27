@@ -782,7 +782,7 @@ def _handle_unlimited_seats(
 
 
 def _handle_limited_seats(
-    contract: ContractPage, product: Product, product_discounts: list[Discount]
+    contract: ContractPage, product: Product
 ) -> tuple[int, int, int]:
     """Handle limited seat contracts by creating/updating multiple discounts."""
     created = updated = errors = 0
@@ -800,7 +800,9 @@ def _handle_limited_seats(
         )
 
     log.info(
-        "Updating %s discount codes for product %s", len(product_discounts), product
+        "Updating %s discount codes for product %s",
+        contract_product_discounts_qset.count(),
+        product,
     )
 
     # Update existing discounts
@@ -912,20 +914,16 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     total_created = total_updated = total_errors = 0
 
     for product in products:
-        product_discounts = list(
-            Discount.objects.filter(products__product=product).distinct()
-        )
-
         if not contract.max_learners:
             # Unlimited seats - one discount per product
             created, updated, errors = _handle_unlimited_seats(
-                contract, product, product_discounts
+                contract,
+                product,
+                Discount.objects.filter(products__product=product).distinct(),
             )
         else:
             # Limited seats - multiple discounts per product
-            created, updated, errors = _handle_limited_seats(
-                contract, product, product_discounts
-            )
+            created, updated, errors = _handle_limited_seats(contract, product)
 
         total_created += created
         total_updated += updated
