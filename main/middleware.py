@@ -24,6 +24,10 @@ class CachelessAPIMiddleware(MiddlewareMixin):
 
         return response
 
+    async def aprocess_request(self, request):
+        # Call the sync version for compatibility
+        return self.process_request(request)
+
 
 class HostBasedCSRFMiddleware(CsrfViewMiddleware):
     """
