@@ -434,6 +434,7 @@ class ProgramAdminForm(ModelForm):
             "enrollment_start",
             "enrollment_end",
             "b2b_only",
+            "enrollment_modes",
         ]
 
     class Media:
