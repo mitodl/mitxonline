@@ -152,6 +152,7 @@ def test_serialize_program(
             "min_weekly_hours": program_with_empty_requirements.page.min_weekly_hours,
             "min_price": program_with_empty_requirements.page.min_price,
             "max_price": program_with_empty_requirements.page.max_price,
+            "enrollment_modes": [],
         },
     )
 

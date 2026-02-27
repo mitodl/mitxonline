@@ -105,6 +105,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             "program_type": "Series",
             "departments": [],
             "live": True,
+            "enrollment_modes": [],
         },
     )
 
