@@ -781,11 +781,14 @@ def _handle_unlimited_seats(
 
 
 def _handle_limited_seats(
-    contract: ContractPage, product: Product, product_discounts: list[Discount]
+    contract: ContractPage, product: Product
 ) -> tuple[int, int, int]:
     """Handle limited seat contracts by creating/updating multiple discounts."""
     created = updated = errors = 0
     discount_amount = contract.enrollment_fixed_price or Decimal(0)
+    contract_product_discounts_qset = contract.get_discounts().filter(
+        products__product=product
+    )
 
     if not contract.max_learners:
         log.info("Contract %s doesn't have a learner cap, skipping", contract)
@@ -796,11 +799,13 @@ def _handle_limited_seats(
         )
 
     log.info(
-        "Updating %s discount codes for product %s", len(product_discounts), product
+        "Updating %s discount codes for product %s",
+        contract_product_discounts_qset.count(),
+        product,
     )
 
     # Update existing discounts
-    for discount in product_discounts:
+    for discount in contract_product_discounts_qset.all():
         _update_discount(discount, discount_amount, REDEMPTION_TYPE_ONE_TIME)
         discount.refresh_from_db()
 
@@ -821,15 +826,22 @@ def _handle_limited_seats(
         updated += 1
 
     # Create additional discounts if needed
-    create_count = contract.max_learners - contract.get_discounts().count()
-    log.info("Creating %s new discount codes for product %s", create_count, product)
+    current_discount_count = contract_product_discounts_qset.count()
+    create_count = contract.max_learners - current_discount_count
+    log.info(
+        "Contract %s has %s max learners and product %s has %s discounts",
+        contract,
+        contract.max_learners,
+        product,
+        current_discount_count,
+    )
 
     if create_count < 0:
         log.warning(
             "ensure_enrollment_codes_exist: Seat limited contract %s product %s has too many discount codes: %s - removing extras",
             contract,
             product,
-            contract.get_products().count(),
+            current_discount_count,
         )
         errors = _handle_extra_enrollment_codes(contract, product)
         log.warning(
@@ -839,6 +851,8 @@ def _handle_limited_seats(
             product,
         )
         return (created, updated, errors)
+
+    log.info("Creating %s discounts for product %s", create_count, product)
 
     for _ in range(create_count):
         discount = _create_discount_with_product(
@@ -899,20 +913,16 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     total_created = total_updated = total_errors = 0
 
     for product in products:
-        product_discounts = list(
-            Discount.objects.filter(products__product=product).distinct()
-        )
-
         if not contract.max_learners:
             # Unlimited seats - one discount per product
             created, updated, errors = _handle_unlimited_seats(
-                contract, product, product_discounts
+                contract,
+                product,
+                Discount.objects.filter(products__product=product).distinct(),
             )
         else:
             # Limited seats - multiple discounts per product
-            created, updated, errors = _handle_limited_seats(
-                contract, product, product_discounts
-            )
+            created, updated, errors = _handle_limited_seats(contract, product)
 
         total_created += created
         total_updated += updated

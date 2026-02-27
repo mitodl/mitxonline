@@ -36,6 +36,7 @@ from b2b.api import (
 )
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
+    CONTRACT_MEMBERSHIP_CODE,
     CONTRACT_MEMBERSHIP_NONSSO,
     CONTRACT_MEMBERSHIP_SSO,
 )
@@ -1406,3 +1407,58 @@ def test_create_contract_run_key():
         assert new_course_key.run == B2B_RUN_TAG_FORMAT.format(
             run_idx=run_idx, contract_id=contract_id, year=next_year.year
         )
+
+
+@pytest.mark.parametrize("has_learner_cap", [True, False])
+def test_ensure_enrollment_codes_courseware_changes(
+    mocker, make_contract_ready_course, has_learner_cap
+):
+    """
+    Test that ensure_enrollment_codes works properly when there are courseware changes.
+
+    If a course is added to the contract, then the system should make an
+    appropriate amount of new codes for the contract.
+    """
+
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    mocked_ensure_call = mocker.patch("b2b.tasks.queue_enrollment_code_check.delay")
+    max_learners = FAKE.random_int(min=10, max=15) if has_learner_cap else None
+
+    contract = factories.ContractPageFactory(
+        integration_type=CONTRACT_MEMBERSHIP_CODE,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
+        max_learners=max_learners,
+    )
+
+    max_learners = max_learners if max_learners else 1
+
+    (course, _) = make_contract_ready_course()
+
+    assert contract.get_discounts().count() == 0
+
+    _, product = create_contract_run(contract, course)
+    assert mocked_ensure_call.called
+
+    ensure_enrollment_codes_exist(contract)
+
+    assert contract.get_discounts().count() == max_learners
+    assert (
+        contract.get_discounts().filter(products__product=product).count()
+        == max_learners
+    )
+
+    (course, _) = make_contract_ready_course()
+    _, product_2 = create_contract_run(contract, course)
+    assert mocked_ensure_call.called
+
+    ensure_enrollment_codes_exist(contract)
+
+    assert contract.get_discounts().count() == (2 * max_learners)
+    assert (
+        contract.get_discounts().filter(products__product=product).count()
+        == max_learners
+    )
+    assert (
+        contract.get_discounts().filter(products__product=product_2).count()
+        == max_learners
+    )
