@@ -22,7 +22,7 @@
     "@babel/preset-react": "7.28.5",
     "@babel/register": "7.28.3",
     "@fancyapps/fancybox": "3.5.7",
-    "@json-editor/json-editor": "2.15.2",
+    "@json-editor/json-editor": "2.16.0",
     "@material/layout-grid": "0.41.0",
     "@material/top-app-bar": "1.1.1",
     "@sentry/browser": "10.38.0",
