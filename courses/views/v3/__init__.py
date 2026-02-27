@@ -6,33 +6,27 @@ import django_filters
 from django.conf import settings
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
-from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import viewsets
-from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import (
     IsAuthenticated,
 )
 from rest_framework.response import Response
 
-from courses.api import create_program_enrollments
-from courses.api import deactivate_run_enrollment
+from courses.api import create_program_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
-    Program,
     CourseRunEnrollment,
+    Program,
     ProgramEnrollment,
 )
+from courses.serializers.v3.courses import CourseRunEnrollmentSerializer
 from courses.serializers.v3.programs import (
     ProgramEnrollmentCreateSerializer,
     ProgramEnrollmentSerializer,
 )
-from courses.serializers.v3.programs import ProgramEnrollmentSerializer
-from courses.serializers.v3.courses import CourseRunEnrollmentSerializer
-from courses.serializers.v3.programs import ProgramEnrollmentSerializer
 from main import features
 
 
