@@ -16,6 +16,7 @@ from b2b.factories import ContractPageFactory
 from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
 from courses.models import CourseRunEnrollment, PaidCourseRun, ProgramEnrollment
 from ecommerce.constants import (
+    DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -878,16 +879,26 @@ def test_discount_rest_api(admin_drf_client, user_drf_client):
     assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
 
 
+@pytest.mark.parametrize(
+    "zerovalue",
+    [
+        True,
+        False,
+    ],
+)
 @pytest.mark.skip_nplusone_check
 def test_discount_redemptions_api(
-    user, products, discounts, admin_drf_client, user_drf_client
+    user, products, admin_drf_client, user_drf_client, zerovalue
 ):
     """
     Tests pulling redemeptions from a discount after submitting an order with
     one in it.
     """
 
-    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+        amount=0 if zerovalue else random.randrange(1, 99),  # noqa: S311
+    )
 
     # permissions testing
     resp = user_drf_client.get(
@@ -900,7 +911,7 @@ def test_discount_redemptions_api(
 
     # create basket with discount, then check for redemptions
 
-    basket = create_basket(user, products)  # noqa: F841
+    create_basket(user, products)
 
     resp = user_drf_client.post(
         reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
@@ -908,10 +919,16 @@ def test_discount_redemptions_api(
 
     assert resp.status_code == 200
 
-    resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
+    if zerovalue:
+        with pytest.raises(TypeError) as exc:
+            resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
+
+        assert "HttpResponseRedirect" in str(exc)
+    else:
+        resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
+        assert resp.status_code == 200
 
     # 100% discount will redirect to user dashboard
-    assert resp.status_code == 200 or resp.status_code == 302  # noqa: PLR1714
 
     resp = admin_drf_client.get(f"/api/discounts/{discount.id}/redemptions/")
     assert resp.status_code == 200
