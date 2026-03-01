@@ -244,14 +244,15 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         if relevant_to:
             course = Course.objects.filter(readable_id=relevant_to).first()
             if course:
-                return get_relevant_course_run_qset(course)
+                return get_relevant_course_run_qset(course).prefetch_related("products")
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
-                return (
-                    get_user_relevant_program_course_run_qset(program)
-                    if program
-                    else Program.objects.none()
-                )
+                if program:
+                    return get_user_relevant_program_course_run_qset(
+                        program
+                    ).prefetch_related("products")
+                else:
+                    return CourseRun.objects.none()
         else:
             return (
                 CourseRun.objects.select_related("course")
@@ -259,6 +260,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
                     "course__departments",
                     "course__page",
                     "enrollment_modes",
+                    "products",
                 )
                 .filter(live=True)
             )
