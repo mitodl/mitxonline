@@ -30,11 +30,7 @@ import courses.models
 from authentication import api as auth_api
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from main import features
-from main.utils import (
-    get_partitioned_set_difference,
-    get_redis_lock,
-    raise_on_transaction_atomic,
-)
+from main.utils import get_partitioned_set_difference, get_redis_lock
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
@@ -51,7 +47,6 @@ from openedx.exceptions import (
     OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
-    UserCreateInTransactionError,
     UserNameUpdateFailedException,
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
@@ -392,7 +387,6 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901, 
         lock.release()
 
 
-@raise_on_transaction_atomic(UserCreateInTransactionError)
 def create_edx_user(user, edx_username=None):
     """
     Makes a request to create an equivalent user in Open edX

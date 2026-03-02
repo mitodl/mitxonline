@@ -12,7 +12,3 @@ def exception_handler(exc, context):
             detail={"errors": exc.detail}, code=exc.status_code
         )
     return views.exception_handler(exc, context)
-
-
-class UnexpectedTransactionAtomicError(Exception):
-    """We attempted to run a function marked invalid for transactions while in a transaction"""

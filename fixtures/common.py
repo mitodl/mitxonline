@@ -70,11 +70,10 @@ def admin_drf_client(admin_user):
 
 
 @pytest.fixture
-def mocked_responses(request):
+def mocked_responses():
     """Mocked responses for requests library"""
-    if not request.node.get_closest_marker("disable_responses"):
-        with responses.RequestsMock() as rsps:
-            yield rsps
+    with responses.RequestsMock() as rsps:
+        yield rsps
 
 
 @pytest.fixture
