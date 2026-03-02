@@ -376,11 +376,17 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 courseware.save()
 
                 # Deactivate products for this run
+                # Use all_objects so we can find products regardless of
+                # their current is_active state, and evaluate to a list so
+                # subsequent updates don't affect the collection we use
+                # below when removing discount associations.
                 content_type = ContentType.objects.get_for_model(CourseRun)
-                run_products = Product.objects.filter(
-                    content_type=content_type,
-                    object_id=courseware.id,
-                ).all()
+                run_products = list(
+                    Product.all_objects.filter(
+                        content_type=content_type,
+                        object_id=courseware.id,
+                    ).all()
+                )
 
                 for product in run_products:
                     if product.is_active:
