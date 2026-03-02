@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.139.1
+---------------
+
+- Revert "Fix create_user and usages to be more robust (#3330)"
+- Fix and enhance flaky test_discount_redemptions_api tests (#3340)
+- Fix create_user and usages to be more robust (#3330)
+- display program enrollment_modes in django admin (#3341)
+- Add enrollment modes to the program APIs (#3339)
+- Fix program enroll / unenroll APIs (#3336)
+- Fix some issues with ensure_enrollment_codes_exist (#3329)
+- Fix 500 error on program checkout completion (#3338)
+- Move calls to create_user to earlier in the ecommerce process (#3337)
+- chore: migrate from poetry/pip to uv for dependency management (#3327)
+
 Version 0.138.7 (Released March 02, 2026)
 ---------------
 
