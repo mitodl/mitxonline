@@ -306,7 +306,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         return True
 
-    def handle_remove(self, contract, coursewares, **kwargs):
+    def handle_remove(self, contract, coursewares, **kwargs):  # noqa: C901
         """Handle removing courseware from a contract."""
 
         remove_runs = kwargs.pop("remove_program_runs")
