@@ -59,7 +59,9 @@ def test_b2b_courseware_remove_run_without_enrollments_unlinks_and_deactivates(m
     assert not Discount.objects.filter(id=discount.id).exists()
 
 
-def test_b2b_courseware_remove_run_with_enrollments_keeps_contract_and_deactivates(mocker):
+def test_b2b_courseware_remove_run_with_enrollments_keeps_contract_and_deactivates(
+    mocker,
+):
     """Removing a run with enrollments should keep contract link but deactivate run/products/codes."""
 
     mocker.patch("b2b.management.commands.b2b_courseware.update_edx_course")

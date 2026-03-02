@@ -9,6 +9,7 @@ from argparse import RawTextHelpFormatter
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand, CommandError
+from mitol.common.utils.datetime import now_in_utc
 from opaque_keys import InvalidKeyError
 
 from b2b.api import create_contract_run, import_and_create_contract_run
@@ -17,7 +18,6 @@ from courses.api import resolve_courseware_object_from_id
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount, DiscountProduct, Product
-from mitol.common.utils.datetime import now_in_utc
 from openedx.api import update_edx_course
 
 log = logging.getLogger(__name__)
@@ -365,7 +365,11 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
                 # Deactivate the run for future enrollments
                 now = now_in_utc()
-                if courseware.live or courseware.enrollment_end is None or courseware.enrollment_end > now:
+                if (
+                    courseware.live
+                    or courseware.enrollment_end is None
+                    or courseware.enrollment_end > now
+                ):
                     courseware.live = False
                     courseware.enrollment_end = now
 
@@ -408,9 +412,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 # overwritten by the next sync from edX.
                 try:
                     pacing_type = (
-                        "self_paced"
-                        if courseware.is_self_paced
-                        else "instructor_paced"
+                        "self_paced" if courseware.is_self_paced else "instructor_paced"
                     )
 
                     course_params = [
@@ -428,7 +430,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                             course_params.append(courseware.enrollment_end)
 
                     update_edx_course(*course_params)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     log.exception(
                         "Failed to update enrollment end date on edX for %s",
                         courseware.courseware_id,
