@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.138.7
+Version 0.138.7 (Released March 02, 2026)
 ---------------
 
 - Add noindex meta tag to learner records and certificate pages (#3328)
