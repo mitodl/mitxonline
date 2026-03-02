@@ -273,6 +273,7 @@ INSTALLED_APPS = (
     "micromasters_import",
     # ol-django apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
+    "mitol.observability.apps.ObservabilityConfig",
     "mitol.google_sheets.apps.GoogleSheetsApp",
     "mitol.google_sheets_refunds.apps.GoogleSheetsRefundsApp",
     "mitol.google_sheets_deferrals.apps.GoogleSheetsDeferralsApp",
@@ -696,47 +697,8 @@ DJANGO_LOG_LEVEL = get_string(
 
 HOSTNAME = platform.node().split(".")[0]
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
-    "formatters": {
-        "verbose": {
-            "format": (
-                "[%(asctime)s] %(levelname)s %(process)d [%(name)s] "
-                "%(filename)s:%(lineno)d - "
-                f"[{HOSTNAME}] - %(message)s"
-            ),
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        }
-    },
-    "handlers": {
-        "console": {
-            "level": "DEBUG",
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "mail_admins": {
-            "level": "ERROR",
-            "filters": ["require_debug_false"],
-            "class": "django.utils.log.AdminEmailHandler",
-        },
-    },
-    "loggers": {
-        "django": {
-            "propagate": True,
-            "level": DJANGO_LOG_LEVEL,
-            "handlers": ["console"],
-        },
-        "django.request": {
-            "handlers": ["mail_admins"],
-            "level": DJANGO_LOG_LEVEL,
-            "propagate": True,
-        },
-        "zeal": {"handlers": ["console"], "level": "ERROR"},
-    },
-    "root": {"handlers": ["console"], "level": LOG_LEVEL},
-}
+# LOGGING is provided by mitol-django-observability (structlog-based, JSON in prod)
+from mitol.observability.settings.logging import LOGGING  # noqa: E402, F401
 
 # server-status
 STATUS_TOKEN = get_string(
