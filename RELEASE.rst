@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.139.1
+Version 0.139.1 (Released March 03, 2026)
 ---------------
 
 - Revert "Fix create_user and usages to be more robust (#3330)"
