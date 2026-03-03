@@ -48,6 +48,16 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--use-specific-course",
+            type=str,
+            nargs="?",
+            help=(
+                "Readable ID of an existing Course to use as the base course "
+                "for the imported run(s), instead of deriving it from the course key."
+            ),
+        )
+
+        parser.add_argument(
             "--program",
             type=str,
             nargs="?",
@@ -267,6 +277,7 @@ class Command(BaseCommand):
             run_data = import_courserun_from_edx(
                 course_key=edx_course.course_id,
                 live=kwargs.get("live", False),
+                use_specific_course=kwargs.get("use_specific_course"),
                 price=price,
                 block_countries=kwargs.get("block_countries"),
                 departments=kwargs.get("depts"),
