@@ -89,8 +89,8 @@ describe("DashboardPage", () => {
     let mockLocation, posthogIdentifyStub, checkFeatureFlagStub, clock
 
     beforeEach(() => {
-      // Mock window.location.href
-      mockLocation = { href: "" }
+      // Mock window.location.href and search
+      mockLocation = { href: "", search: "" }
       sandbox.stub(window, "location").value(mockLocation)
 
       // Mock PostHog methods
@@ -154,6 +154,34 @@ describe("DashboardPage", () => {
 
       // Verify redirect happened
       assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard")
+    })
+
+    it("preserves query parameters in the redirect URL", async () => {
+      const mockUser = makeUser()
+      mockUser.global_id = "test-guid-123"
+
+      mockLocation.search = "?a=1&b=2"
+
+      checkFeatureFlagStub
+        .withArgs("redirect-to-learn-dashboard", "test-guid-123")
+        .returns(true)
+
+      await renderPage(
+        {
+          entities: {
+            enrollments: userEnrollments,
+            currentUser: mockUser
+          }
+        },
+        { currentUser: mockUser }
+      )
+
+      clock.tick(500)
+
+      assert.equal(
+        mockLocation.href,
+        "https://learn.mit.edu/dashboard?a=1&b=2"
+      )
     })
 
     it("does not redirect when feature flag is disabled", async () => {

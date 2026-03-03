@@ -28,6 +28,7 @@ from cms.views import instructor_page
 from cms.wagtail_api.urls import api_router as wagtail_api_router
 from main.views import (
     cms_signin_redirect_to_site_signin,
+    dashboard,
     index,
     refine,
     staff_dashboard_signin_redirect_to_site_signin,
@@ -61,7 +62,7 @@ urlpatterns = [
     path("", include("mitol.google_sheets.urls")),
     path("", include("b2b.urls")),
     re_path(r"", include("mitol.scim.urls")),
-    re_path(r"^dashboard/", index, name="user-dashboard"),
+    re_path(r"^dashboard/", dashboard, name="user-dashboard"),
     # Staff dashboard authentication redirect
     re_path(
         r"^staff-dashboard/$",
