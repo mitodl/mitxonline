@@ -291,23 +291,25 @@ class Command(BaseCommand):
                 is_source_run=kwargs.get("source_course", False),
             )
 
-            if run_data:
-                (run, page, product) = run_data
+            if not isinstance(run_data, tuple) or len(run_data) != 3:  # noqa: PLR2004
+                continue
 
-                success_count += 1
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Created new run {run.courseware_id} in course {run.course.readable_id}"
-                    )
+            run, page, product = run_data
+
+            success_count += 1
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Created new run {run.courseware_id} in course {run.course.readable_id}"
                 )
+            )
 
-                if page:
-                    self.stdout.write(self.style.SUCCESS(f"\t --> Created page {page}"))
+            if page:
+                self.stdout.write(self.style.SUCCESS(f"\t --> Created page {page}"))
 
-                if product:
-                    self.stdout.write(
-                        self.style.SUCCESS(f"\t --> Created product {product}")
-                    )
+            if product:
+                self.stdout.write(
+                    self.style.SUCCESS(f"\t --> Created product {product}")
+                )
 
         self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))
         return None
