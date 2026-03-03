@@ -1542,7 +1542,32 @@ def update_edx_course(  # noqa: PLR0913
     )
 
 
-def process_course_run_clone(target_id: int, *, base_id: int | str | None = None, set_ingest_flag: bool = True):
+def fix_cloned_run_data(target_course: CourseRun, edx_client) -> CourseRun:
+    """Fix the title, pacing, and dates for a newly cloned run."""
+
+    course_params = [
+        target_course.readable_id,
+        target_course.title,
+        "self_paced" if target_course.is_self_paced else "instructor_paced",
+    ]
+
+    if target_course.start_date and target_course.end_date:
+        course_params.append(target_course.start_date)
+        course_params.append(target_course.end_date)
+
+        if target_course.enrollment_start and target_course.enrollment_end:
+            course_params.append(target_course.enrollment_start)
+            course_params.append(target_course.enrollment_end)
+
+    return update_edx_course(
+        *course_params,
+        client=edx_client,
+    )
+
+
+def process_course_run_clone(
+    target_course: CourseRun, *, base_course: CourseRun | str = None
+):
     """
     Clone a course run, using details from CourseRun objects in MITx Online.
 
@@ -1551,20 +1576,22 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
     in edX. This will assume there's a base course run that uses the readable ID
     of the underlying _Course_ record, and will clone that. Some of the data from
     the CourseRun will then be copied over into the newly cloned edX run (dates,
-    etc.) and the URL will be backfilled into the CourseRun.
+    etc.).
 
     If a different course run needs to be used as the base course, you can
-    set that. Pass either the PK of the course or the readable ID. If a readable
-    ID is passed, it will be supplied verbatim to the clone API. (In other words,
-    it can be a course that MITx Online doesn't know about.)
+    set that. Pass either the CourseRun or a string course run key of the run to
+    clone.
 
     Args:
-    - target_id (int): The PK of the target course (i.e. the one we're creating)
-    - base_id (int|str): The PK or readable ID of the base course to clone.
+    - target_course (CourseRun): The PK of the target course run (i.e. the one we're creating)
+    Kwargs:
+    - base_course (str|CourseRun): The base course run to clone.
     Returns:
     bool, whether or not it worked
     """
     from courses.api import check_course_modes  # noqa: PLC0415
+
+    CourseRunModel = courses.models.CourseRun.objects
 
     edx_client = get_edx_api_jwt_client(
         settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
@@ -1572,24 +1599,27 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
         use_studio=True,
     )
 
-    target_course = courses.models.CourseRun.objects.get(pk=target_id)
-    base_course = target_course.course.readable_id
+    if base_course:
+        base_course_key = (
+            base_course if isinstance(base_course, str) else base_course.readable_id
+        )
+    elif CourseRunModel.filter(
+        course=target_course.course, is_source_run=True
+    ).exists():
+        base_course_key = (
+            CourseRunModel.filter(course=target_course.course, is_source_run=True)
+            .first()
+            .readable_id
+        )
+    else:
+        msg = (
+            f"Can't determine what run to clone for target {target_course.readable_id}."
+        )
+        raise ValueError(msg)
 
-    if base_id:
-        if base_id is int:
-            if courses.models.Course.objects.filter(pk=base_id).exists():
-                base_course = courses.models.Course.objects.get(pk=base_id).readable_id
-            elif courses.models.CourseRun.objects.filter(pk=base_id).exists():
-                base_course = courses.models.CourseRun.objects.get(
-                    pk=base_id
-                ).readable_id
-            else:
-                msg = f"Specified base course {base_id} doesn't exist."
-                raise ValueError(msg)
-        else:
-            base_course = str(base_id)
-
-    get_edx_course(base_course, client=edx_client)
+    # Ensure the base course exists on the edX side. You may pass a key in that
+    # does not exist in MITx Online, so we can't just check locally.
+    get_edx_course(base_course_key, client=edx_client)
 
     try:
         get_edx_course(target_course.readable_id, client=edx_client)
@@ -1600,10 +1630,12 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
         # An HTTP error is good in this case. We don't want the target course to exist.
         pass
 
-    resp = clone_edx_course(base_course, target_course.readable_id, client=edx_client)
+    resp = clone_edx_course(
+        base_course_key, target_course.readable_id, client=edx_client
+    )
 
     if not resp:
-        msg = f"Couldn't clone {base_course} to {target_course.readable_id}."
+        msg = f"Couldn't clone {base_course_key} to {target_course.readable_id}."
         raise ValueError(msg)
 
     # We should have the target course in edX now. We need to update it with the
@@ -1627,26 +1659,13 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
             course_params.append(target_course.enrollment_start)
             course_params.append(target_course.enrollment_end)
 
-    resp = update_edx_course(
+    update_edx_course(
         *course_params,
         client=edx_client,
     )
 
     # Ensure the new course has the proper modes in it.
     check_course_modes(target_course)
-
-    # Set the ingestion flag on the course run to True
-    # Defaults to True for the benefit of B2B courses, which should always have
-    # this flag set.
-    if set_ingest_flag:
-        if target_course.course.page:
-            target_course.course.page.ingest_content_files_for_ai = True
-            target_course.course.save()
-        else:
-            log.warning(
-                "Warning: processed course run clone for %s but can't set the ingestion flag because there's no CoursePage",
-                target_course,
-            )
 
 
 def get_edx_course_modes(

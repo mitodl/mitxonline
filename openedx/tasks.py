@@ -104,7 +104,27 @@ def update_edx_user_profile(user_id):
 
 
 @app.task
-def clone_courserun(target_id: int, *, base_id: int | str | None = None):
+def clone_courserun(
+    target_id: int, *, base_id: int | str | None = None, set_ingest_flag: bool = True
+):
     """Queue call to clone an existing course run."""
 
-    api.process_course_run_clone(target_id, base_id=base_id)
+    from courses.models import CourseRun  # noqa: PLC0415
+
+    target_course = CourseRun.objects.get(pk=target_id)
+    base_course = CourseRun.objects.get(pk=base_id) if base_id is int else base_id
+
+    api.process_course_run_clone(target_course, base_course=base_course)
+
+    # Set the ingestion flag on the course run to True
+    # Defaults to True for the benefit of B2B courses, which should always have
+    # this flag set.
+    if set_ingest_flag:
+        if target_course.course.page:
+            target_course.course.page.ingest_content_files_for_ai = True
+            target_course.course.save()
+        else:
+            log.warning(
+                "Warning: processed course run clone for %s but can't set the ingestion flag because there's no CoursePage",
+                target_course,
+            )
