@@ -18,7 +18,7 @@ from courses.serializers.v1.base import (
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
-    ProductFlexiblePriceRelatedField,
+    ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
@@ -233,7 +233,7 @@ class CourseSerializer(BaseCourseSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductFlexiblePriceRelatedField(many=True, read_only=True)
+    products = ProductRelatedField(many=True, read_only=True)
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
