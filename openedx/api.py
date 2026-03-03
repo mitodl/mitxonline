@@ -1542,7 +1542,7 @@ def update_edx_course(  # noqa: PLR0913
     )
 
 
-def process_course_run_clone(target_id: int, *, base_id: int | str | None = None):
+def process_course_run_clone(target_id: int, *, base_id: int | str | None = None, set_ingest_flag: bool = True):
     """
     Clone a course run, using details from CourseRun objects in MITx Online.
 
@@ -1636,17 +1636,17 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
     check_course_modes(target_course)
 
     # Set the ingestion flag on the course run to True
-    # All B2B courses should be flagged for content file ingestion - we can
-    # toggle it off manually if necessary.
-    # In the odd chance we don't have a page, trigger a warning.
-    if target_course.course.page:
-        target_course.course.page.ingest_content_files_for_ai = True
-        target_course.course.save()
-    else:
-        log.warning(
-            "Warning: processed course run clone for %s but can't set the ingestion flag because there's no CoursePage",
-            target_course,
-        )
+    # Defaults to True for the benefit of B2B courses, which should always have
+    # this flag set.
+    if set_ingest_flag:
+        if target_course.course.page:
+            target_course.course.page.ingest_content_files_for_ai = True
+            target_course.course.save()
+        else:
+            log.warning(
+                "Warning: processed course run clone for %s but can't set the ingestion flag because there's no CoursePage",
+                target_course,
+            )
 
 
 def get_edx_course_modes(
