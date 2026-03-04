@@ -630,7 +630,7 @@ export class EnrolledItemCard extends React.Component<
             <div className="img-container">
               <img
                 src={
-                  enrollment.program.page.feature_image_src ||
+                  enrollment.program.page?.feature_image_src ||
                   DEFAULT_COURSE_IMG
                 }
                 alt=""
