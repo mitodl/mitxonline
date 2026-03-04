@@ -667,7 +667,10 @@ export class CatalogPage extends React.Component<Props> {
           <div className="col catalog-item">
             <img
               src={course?.page?.feature_image_src || DEFAULT_COURSE_IMG}
-              key={course.id + (course?.page?.feature_image_src || DEFAULT_COURSE_IMG)}
+              key={
+                course.id +
+                (course?.page?.feature_image_src || DEFAULT_COURSE_IMG)
+              }
               alt=""
             />
             <div className="catalog-item-description">
@@ -694,7 +697,10 @@ export class CatalogPage extends React.Component<Props> {
             <div className="program-image-and-badge">
               <img
                 src={program?.page?.feature_image_src || DEFAULT_COURSE_IMG}
-                key={program.id + (program?.page?.feature_image_src || DEFAULT_COURSE_IMG)}
+                key={
+                  program.id +
+                  (program?.page?.feature_image_src || DEFAULT_COURSE_IMG)
+                }
                 alt=""
               />
               <div className="program-type-badge">{program.program_type}</div>
