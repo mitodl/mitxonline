@@ -411,7 +411,10 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     discount.refresh_from_db()
 
                     # If the discount no longer applies to any products, remove it
-                    if discount.products.count() == 0:
+                    if discount.products.count() == 0 and not (
+                        discount.order_redemptions.exists()
+                        or discount.contract_redemptions.exists()
+                    ):
                         discount.delete()
 
                 # Attempt to push the new enrollment_end to edX so it isn't
