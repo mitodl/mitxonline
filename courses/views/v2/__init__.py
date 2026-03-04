@@ -357,8 +357,7 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
             count_b2b_courseruns=Count("courseruns__b2b_contract__id")
         )
         queryset = queryset.annotate(count_courseruns=Count("courseruns"))
-        queryset = queryset.order_by("title").distinct()
-        return queryset
+        return  queryset.order_by("title").distinct()
 
     def get_serializer_context(self):
         added_context = {}
