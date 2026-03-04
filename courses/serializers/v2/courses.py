@@ -258,6 +258,14 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
 
+    def get_products(self, obj):
+        # Use prefetched products if available to avoid N+1 queries
+        if hasattr(obj, "prefetched_products"):
+            return ProductRelatedField(many=True, read_only=True).to_representation(obj.prefetched_products)
+        return ProductRelatedField(many=True, read_only=True).to_representation(obj.products.all())
+
+    products = serializers.SerializerMethodField(method_name="get_products")
+
 
 @extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
 class CourseWithCourseRunsSerializer(CourseSerializer):

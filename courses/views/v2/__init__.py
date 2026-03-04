@@ -6,7 +6,8 @@ import logging
 
 import django_filters
 from django.conf import settings
-from django.db.models import Count, Prefetch, Q
+from django.contrib.contenttypes.models import ContentType
+from django.db.models import Count, GenericPrefetch, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -66,6 +67,7 @@ from courses.utils import (
     get_unenrollable_courses,
 )
 from ecommerce.api import create_verified_program_course_run_enrollment
+from ecommerce.models import Product
 from main import features
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
@@ -339,18 +341,21 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Get the queryset for the viewset."""
 
+        queryset = Course.objects.select_related("page")
+        products_generic_prefetch = GenericPrefetch(
+            "products",
+            queryset=Product.objects.all(),
+            to_attr="prefetched_products"
+        )
         course_runs_prefetch = Prefetch(
             "courseruns",
-            queryset=CourseRun.objects.order_by("id").prefetch_related("products"),
+            queryset=CourseRun.objects.order_by("id").prefetch_related(products_generic_prefetch)
         )
-        return (
-            Course.objects.select_related("page")
-            .prefetch_related("departments", "in_programs", course_runs_prefetch)
-            .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
-            .annotate(count_courseruns=Count("courseruns"))
-            .order_by("title")
-            .distinct()
-        )
+        queryset = queryset.prefetch_related("departments", "in_programs", course_runs_prefetch)
+        queryset = queryset.annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
+        queryset = queryset.annotate(count_courseruns=Count("courseruns"))
+        queryset = queryset.order_by("title").distinct()
+        return queryset
 
     def get_serializer_context(self):
         added_context = {}
