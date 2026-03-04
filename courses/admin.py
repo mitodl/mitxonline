@@ -57,8 +57,15 @@ class ProgramAdmin(admin.ModelAdmin):
     model = Program
     form = ProgramAdminForm
     search_fields = ["title", "readable_id", "program_type"]
-    list_display = ("id", "title", "live", "readable_id", "program_type")
-    list_filter = ["live", "program_type", "departments"]
+    list_display = (
+        "id",
+        "title",
+        "live",
+        "readable_id",
+        "program_type",
+        "display_mode",
+    )
+    list_filter = ["live", "program_type", "display_mode", "departments"]
     inlines = [ProgramContractPageInline]
 
 
