@@ -6,7 +6,8 @@ import logging
 
 import django_filters
 from django.conf import settings
-from django.db.models import Count, GenericPrefetch, Prefetch, Q
+from django.contrib.contenttypes.prefetch import GenericPrefetch
+from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
