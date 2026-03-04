@@ -1,6 +1,8 @@
 /* global SETTINGS:false */
 import React from "react"
 import moment from "moment"
+
+const DEFAULT_COURSE_IMG = "/static/images/mit-dome.png"
 import {
   parseDateString,
   formatPrettyDateTimeAmPmTz,
@@ -463,25 +465,19 @@ export class EnrolledItemCard extends React.Component<
     return (
       <div className="enrolled-item container card" key={enrollment.run.id}>
         <div className="row flex-grow-1 enrolled-item-info">
-          {enrollment.run.course.feature_image_src && (
-            <div className="col-12 col-md-auto p-0">
-              <div className="img-container">
-                <img src={enrollment.run.course.feature_image_src} alt="" />
+          {(() => {
+            const imgSrc =
+              enrollment.run.course.feature_image_src ||
+              enrollment.run.course.page?.feature_image_src ||
+              DEFAULT_COURSE_IMG
+            return (
+              <div className="col-12 col-md-auto p-0">
+                <div className="img-container">
+                  <img src={imgSrc} alt="" />
+                </div>
               </div>
-            </div>
-          )}
-          {!enrollment.run.course.feature_image_src &&
-            enrollment.run.course.page &&
-            enrollment.run.course.page.feature_image_src && (
-            <div className="col-12 col-md-auto p-0">
-              <div className="img-container">
-                <img
-                  src={enrollment.run.course.page.feature_image_src}
-                  alt=""
-                />
-              </div>
-            </div>
-          )}
+            )
+          })()}
 
           <div className="col-12 col-md course-card-text-details d-grid">
             <div className="d-flex justify-content-between flex-nowrap w-100">
@@ -632,7 +628,7 @@ export class EnrolledItemCard extends React.Component<
         <div className="row flex-grow-1 enrolled-item-info">
           <div className="col-12 col-md-auto p-0">
             <div className="img-container">
-              <img src={enrollment.program.page.feature_image_src} alt="" />
+              <img src={enrollment.program.page.feature_image_src || DEFAULT_COURSE_IMG} alt="" />
             </div>
           </div>
 
