@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.139.2
+Version 0.139.2 (Released March 04, 2026)
 ---------------
 
 - Update featured courses deafult refresh (#3349)
