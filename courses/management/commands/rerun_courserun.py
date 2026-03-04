@@ -6,13 +6,10 @@ from decimal import Decimal
 
 import reversion
 from django.core.management import BaseCommand, CommandError
-from django.db import transaction
 from opaque_keys.edx.keys import CourseKey
 
-from courses.api import resolve_courseware_object_from_id
-from courses.models import CourseRun
+from courses.api import rerun_course_run, resolve_courseware_object_from_id
 from ecommerce.models import Product
-from openedx.api import process_course_run_clone
 
 log = logging.getLogger(__name__)
 
@@ -69,7 +66,7 @@ In either case, the command will try to create a new run. If it exists in edX al
             help="If set, create a new product for the new run with the specified price.",
         )
 
-    def handle(self, *args, **kwargs):  # noqa: ARG002, C901
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         """Create the re-run according to the options passed."""
 
         course_opt = kwargs.pop("course", None)
@@ -93,6 +90,13 @@ In either case, the command will try to create a new run. If it exists in edX al
 
             run_to_clone = source.first()
 
+        run_tag = kwargs.pop("run_tag", None)
+        org = kwargs.pop("organization", None)
+
+        if not run_tag:
+            msg = "Run tag is required."
+            raise CommandError(msg)
+
         # next steps for this:
         # - look through create_contract_run and either adapt or something to create the run
         # - make new key for the new run
@@ -101,65 +105,23 @@ In either case, the command will try to create a new run. If it exists in edX al
 
         self.stdout.write(f"Rerunning {run_to_clone.courseware_id}...")
 
-        new_key = CourseKey.from_string(run_to_clone.courseware_id)
+        new_course_run = rerun_course_run(run_to_clone, run_tag, organization=org)
 
-        run_tag = kwargs.pop("run_tag")
-
-        if not run_tag:
-            msg = "Run tag is required."
-            raise CommandError(msg)
-
-        org = kwargs.pop("organization")
-
-        if not org:
-            org = new_key.org
-
-        new_key = new_key.replace(run=run_tag)
-        new_key = new_key.replace(org=org)
-        self.stdout.write(f"The new course's key will be: {new_key}")
-
-        with transaction.atomic():
-            # This gets wrapped in a transaction so we can bail out if the edX
-            # process fails. There is the potential that the edX process will
-            # half succeed, which means we'll have an edX course that we're stuck
-            # with and no course run locally. Need to fix this.
-            new_course_run = CourseRun.objects.create(
-                course=run_to_clone.course,
-                title=run_to_clone.title,
-                courseware_id=str(new_key),
-                run_tag=str(new_key),
-                start_date=run_to_clone.start_date,
-                end_date=run_to_clone.end_date,
-                enrollment_start=run_to_clone.start_date,
-                enrollment_end=run_to_clone.end_date,
-                certificate_available_date=run_to_clone.start_date,
-                is_self_paced=run_to_clone.is_self_paced,
-                live=run_to_clone.live,
-            )
-
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Made new MITx Online course run {new_course_run.id}: {new_course_run}"
-                )
-            )
-
-            if not process_course_run_clone(new_course_run.id, base_id=run_to_clone.courseware_id, set_ingest_flag=False):
-                msg = f"Unable to re-run {run_to_clone} to {new_course_run}."
-                raise CommandError(msg)
-
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Made new edX course run {new_course_run}"
-                )
-            )
+        self.stdout.write(self.style.SUCCESS(f"Created new run {new_course_run}"))
 
         if kwargs.pop("change_course_org", False):
-            self.stdout.write(f"Updating the org key on course {run_to_clone.course} to {org}...")
+            self.stdout.write(
+                f"Updating the org key on course {run_to_clone.course} to {org}..."
+            )
 
-            course_key = CourseKey.from_string(f"{run_to_clone.course.readable_id}+RunTag")
+            course_key = CourseKey.from_string(
+                f"{run_to_clone.course.readable_id}+RunTag"
+            )
             course_key = course_key.replace(org=org)
 
-            run_to_clone.course.readable_id = f"{course_key.CANONICAL_NAMESPACE}:{course_key.org}+{course_key.course}"
+            run_to_clone.course.readable_id = (
+                f"{course_key.CANONICAL_NAMESPACE}:{course_key.org}+{course_key.course}"
+            )
             run_to_clone.course.save()
 
             self.stdout.write(
@@ -171,7 +133,9 @@ In either case, the command will try to create a new run. If it exists in edX al
         keeping_product = kwargs.pop("keep_product", False)
 
         if keeping_product:
-            self.stdout.write(f"Copying products for {run_to_clone} to {new_course_run}")
+            self.stdout.write(
+                f"Copying products for {run_to_clone} to {new_course_run}"
+            )
 
             with reversion.create_revision():
                 for original_product in run_to_clone.products.all():

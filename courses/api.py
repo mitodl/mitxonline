@@ -1601,16 +1601,16 @@ def rerun_course_run(  # noqa: PLR0913
     base_run: CourseRun,
     run_tag: str,
     *,
-    courseware_id: str,
-    organization: str,
-    title: str,
-    start_date: datetime,
-    end_date: datetime,
-    enrollment_start: datetime,
-    enrollment_end: datetime,
-    is_self_paced: bool,
-    live: bool,
-    enrollment_modes: list[EnrollmentMode],
+    courseware_id: str | None = None,
+    organization: str | None = None,
+    title: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    enrollment_start: datetime | None = None,
+    enrollment_end: datetime | None = None,
+    is_self_paced: bool | None = None,
+    live: bool | None = None,
+    enrollment_modes: list[EnrollmentMode] | None = None,
 ) -> CourseRun:
     """
     Re-run an existing course run.
@@ -1660,26 +1660,29 @@ def rerun_course_run(  # noqa: PLR0913
 
         target_run_id = str(base_key)
 
-    new_run = CourseRun.objects.create(
-        course=base_run.course,
-        title=title if title else base_run.title,
-        courseware_id=target_run_id,
-        run_tag=run_tag,
-        start_date=start_date if start_date else base_run.start_date,
-        end_date=end_date if end_date else base_run.end_date,
-        enrollment_start=enrollment_start
-        if enrollment_start
-        else base_run.enrollment_start,
-        enrollment_end=enrollment_end if enrollment_end else base_run.enrollment_end,
-        is_self_paced=is_self_paced if is_self_paced else base_run.is_self_paced,
-        live=live if live else base_run.live,
-    )
+    with transaction.atomic():
+        new_run = CourseRun.objects.create(
+            course=base_run.course,
+            title=title if title else base_run.title,
+            courseware_id=target_run_id,
+            run_tag=run_tag,
+            start_date=start_date if start_date else base_run.start_date,
+            end_date=end_date if end_date else base_run.end_date,
+            enrollment_start=enrollment_start
+            if enrollment_start
+            else base_run.enrollment_start,
+            enrollment_end=enrollment_end
+            if enrollment_end
+            else base_run.enrollment_end,
+            is_self_paced=is_self_paced if is_self_paced else base_run.is_self_paced,
+            live=live if live else base_run.live,
+        )
 
-    for mode in (
-        enrollment_modes if enrollment_modes else base_run.enrollment_modes.all()
-    ):
-        new_run.enrollment_modes.add(mode)
+        for mode in (
+            enrollment_modes if enrollment_modes else base_run.enrollment_modes.all()
+        ):
+            new_run.enrollment_modes.add(mode)
 
-    process_course_run_clone(new_run, base_run.courseware_id)
+        process_course_run_clone(new_run, base_run.courseware_id)
 
     return new_run
