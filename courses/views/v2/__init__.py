@@ -348,21 +348,29 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
         courserun_content_type = ContentType.objects.get_for_model(CourseRun)
         # 2. Create a Prefetch object to specify the queryset for the 'tags' relation
         # This internal queryset only fetches products related to the CourseRun content type
-        courserun_product_queryset = Product.objects.filter(content_type=courserun_content_type)
+        courserun_product_queryset = Product.objects.filter(
+            content_type=courserun_content_type
+        )
         # 3. Use prefetch_related on main queryset, referencing the reverse relation's name (e.g., 'products')
         products_prefetch = Prefetch(
             "products",
             queryset=courserun_product_queryset,
-            to_attr="prefetched_products"
+            to_attr="prefetched_products",
         )
         course_runs_prefetch = Prefetch(
             "courseruns",
-            queryset=CourseRun.objects.order_by("id").prefetch_related(products_prefetch)
+            queryset=CourseRun.objects.order_by("id").prefetch_related(
+                products_prefetch
+            ),
         )
-        queryset = queryset.prefetch_related("departments", "in_programs", course_runs_prefetch)
-        queryset = queryset.annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
+        queryset = queryset.prefetch_related(
+            "departments", "in_programs", course_runs_prefetch
+        )
+        queryset = queryset.annotate(
+            count_b2b_courseruns=Count("courseruns__b2b_contract__id")
+        )
         queryset = queryset.annotate(count_courseruns=Count("courseruns"))
-        return  queryset.order_by("title").distinct()
+        return queryset.order_by("title").distinct()
 
     def get_serializer_context(self):
         added_context = {}
