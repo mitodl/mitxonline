@@ -1297,6 +1297,13 @@ class CourseRun(TimestampedModel):
         """Flag to indicate if this is a run"""
         return True
 
+    @cached_property
+    def edx_modes(self):
+        """Get the edX course modes for this course."""
+        from openedx.api import get_edx_course_modes  # noqa: PLC0415
+
+        return get_edx_course_modes(self.courseware_id)
+
     def __str__(self):
         title = f"{self.courseware_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
