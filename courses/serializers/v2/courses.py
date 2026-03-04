@@ -261,9 +261,12 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     def get_products(self, obj):
         # Use prefetched products if available to avoid N+1 queries
         if hasattr(obj, "prefetched_products"):
-            return ProductRelatedField(many=True, read_only=True).to_representation(obj.prefetched_products)
-        return ProductRelatedField(many=True, read_only=True).to_representation(obj.products.all())
-
+            return ProductRelatedField(many=True, read_only=True).to_representation(
+                obj.prefetched_products
+            )
+        return ProductRelatedField(many=True, read_only=True).to_representation(
+            obj.products.all()
+        )
 
 
 @extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
@@ -280,9 +283,17 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
         org_id = self.context.get("org_id")
         contract_id = self.context.get("contract_id")
         if org_id:
-            courseruns = [run for run in courseruns if getattr(run.b2b_contract, "organization_id", None) == int(org_id)]
+            courseruns = [
+                run
+                for run in courseruns
+                if getattr(run.b2b_contract, "organization_id", None) == int(org_id)
+            ]
         if contract_id:
-            courseruns = [run for run in courseruns if getattr(run.b2b_contract, "id", None) == int(contract_id)]
+            courseruns = [
+                run
+                for run in courseruns
+                if getattr(run.b2b_contract, "id", None) == int(contract_id)
+            ]
         if not org_id and not contract_id:
             courseruns = [run for run in courseruns if run.b2b_contract_id is None]
         return CourseRunSerializer(courseruns, many=True, read_only=True).data
