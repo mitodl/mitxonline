@@ -2048,7 +2048,7 @@ requires-dist = [
     { name = "trino", specifier = ">=0.336.0,<0.337" },
     { name = "ulid-py", specifier = ">=1.1.0,<2" },
     { name = "user-util", specifier = ">=0.1.5,<0.2" },
-    { name = "wagtail", specifier = "==7.2.2" },
+    { name = "wagtail", specifier = "==7.2.3" },
     { name = "wagtail-metadata", specifier = ">=5.0.0,<6" },
 ]
 
@@ -3591,7 +3591,7 @@ wheels = [
 
 [[package]]
 name = "wagtail"
-version = "7.2.2"
+version = "7.2.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyascii" },
@@ -3613,9 +3613,9 @@ dependencies = [
     { name = "telepath" },
     { name = "willow", extra = ["heif"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/83/42/5fee22c57ae36492c5e9f7875178a59b9558a6ae8e0258c37b2590c7a0e9/wagtail-7.2.2.tar.gz", hash = "sha256:bf6adaa3acd90d9ee7734756dd7031b0901eedb80a4aa4e5188ab1e481ce30be", size = 6767233, upload-time = "2026-02-03T12:10:32.417Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d2/f1/0744cffed74758a2ae2419f0da298403e6bec60bc17570d56a25bb6c96b5/wagtail-7.2.3.tar.gz", hash = "sha256:2f602e17f7932af88de8c83420849c31a062a40290e4a045357bb4a56a1dee60", size = 6771628, upload-time = "2026-03-03T15:53:20.551Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/12/99/8e66ad7eaf8789269136b3c86c31d50f2134131815c65d405618495fa7c2/wagtail-7.2.2-py3-none-any.whl", hash = "sha256:2e62316717bd19c57de5e6cb7f800c8acdb51862b3067b9e788c0837bda9c9f0", size = 9238344, upload-time = "2026-02-03T12:10:29.738Z" },
+    { url = "https://files.pythonhosted.org/packages/30/97/1eb476ad4803ecb72cb389ad504ba073d39bbad7c4c8198afe058fc6e55b/wagtail-7.2.3-py3-none-any.whl", hash = "sha256:3c13304a69b8f2b457b3fd5f1b8951588338c936589df745dd2a82a0a4fddd21", size = 9238760, upload-time = "2026-03-03T15:53:13.553Z" },
 ]
 
 [[package]]
