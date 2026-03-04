@@ -6,6 +6,7 @@ import logging
 
 import django_filters
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.prefetch import GenericPrefetch
 from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
@@ -343,9 +344,15 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
 
         queryset = Course.objects.select_related("page")
         # Use Prefetch for reverse GenericRelation (products on CourseRun)
+        # 1. Get the ContentType object for the CourseRun model
+        courserun_content_type = ContentType.objects.get_for_model(CourseRun)
+        # 2. Create a Prefetch object to specify the queryset for the 'tags' relation
+        # This internal queryset only fetches products related to the CourseRun content type
+        courserun_product_queryset = Product.objects.filter(content_type=courserun_content_type)
+        # 3. Use prefetch_related on main queryset, referencing the reverse relation's name (e.g., 'products')
         products_prefetch = Prefetch(
             "products",
-            queryset=Product.objects.all(),
+            queryset=courserun_product_queryset,
             to_attr="prefetched_products"
         )
         course_runs_prefetch = Prefetch(
