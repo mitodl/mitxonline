@@ -233,7 +233,7 @@ class CourseSerializer(BaseCourseSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductRelatedField(many=True, read_only=True)
+    products = serializers.SerializerMethodField(method_name="get_products")
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
@@ -264,7 +264,6 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             return ProductRelatedField(many=True, read_only=True).to_representation(obj.prefetched_products)
         return ProductRelatedField(many=True, read_only=True).to_representation(obj.products.all())
 
-    products = serializers.SerializerMethodField(method_name="get_products")
 
 
 @extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")

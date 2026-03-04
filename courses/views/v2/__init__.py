@@ -6,7 +6,6 @@ import logging
 
 import django_filters
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, GenericPrefetch, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
