@@ -33,6 +33,7 @@ from courses.constants import (
     AVAILABILITY_CHOICES,
     ENROLL_CHANGE_STATUS_CHOICES,
     ENROLLABLE_ITEM_ID_SEPARATOR,
+    PROGRAM_DISPLAY_MODE_CHOICES,
     SYNCED_COURSE_RUN_FIELD_MSG,
 )
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
@@ -304,6 +305,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     enrollment_end = models.DateTimeField(null=True, blank=True, db_index=True)
     enrollment_modes = models.ManyToManyField(
         EnrollmentMode, blank=True, related_name="+"
+    )
+    display_mode = models.CharField(
+        max_length=32,
+        choices=PROGRAM_DISPLAY_MODE_CHOICES,
+        blank=True,
+        null=True,
+        help_text="Set to 'course' to treat this program as a course in APIs.",
     )
     start_date = models.DateTimeField(null=True, blank=True, db_index=True)
     end_date = models.DateTimeField(null=True, blank=True, db_index=True)
