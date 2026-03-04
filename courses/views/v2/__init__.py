@@ -342,23 +342,20 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
         """Get the queryset for the viewset."""
 
         queryset = Course.objects.select_related("page")
-        products_generic_prefetch = GenericPrefetch(
-            "products", queryset=Product.objects.all(), to_attr="prefetched_products"
+        # Use Prefetch for reverse GenericRelation (products on CourseRun)
+        products_prefetch = Prefetch(
+            "products",
+            queryset=Product.objects.all(),
+            to_attr="prefetched_products"
         )
         course_runs_prefetch = Prefetch(
             "courseruns",
-            queryset=CourseRun.objects.order_by("id").prefetch_related(
-                products_generic_prefetch
-            ),
+            queryset=CourseRun.objects.order_by("id").prefetch_related(products_prefetch)
         )
-        queryset = queryset.prefetch_related(
-            "departments", "in_programs", course_runs_prefetch
-        )
-        queryset = queryset.annotate(
-            count_b2b_courseruns=Count("courseruns__b2b_contract__id")
-        )
+        queryset = queryset.prefetch_related("departments", "in_programs", course_runs_prefetch)
+        queryset = queryset.annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
         queryset = queryset.annotate(count_courseruns=Count("courseruns"))
-        return queryset.order_by("title").distinct()
+        return  queryset.order_by("title").distinct()
 
     def get_serializer_context(self):
         added_context = {}
