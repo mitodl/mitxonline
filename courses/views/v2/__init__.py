@@ -333,7 +333,12 @@ class CourseFilterSet(django_filters.FilterSet):
 
         if "courserun_is_enrollable" not in filter_keys:
             queryset = queryset.prefetch_related(
-                Prefetch("courseruns", queryset=CourseRun.objects.order_by("id")),
+                Prefetch(
+                    "courseruns",
+                    queryset=CourseRun.objects.order_by("id").prefetch_related(
+                        "products"
+                    ),
+                ),
             )
 
         return queryset
