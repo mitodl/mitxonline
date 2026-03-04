@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.139.2
+---------------
+
+- Update featured courses deafult refresh (#3349)
+- MITx Online needs a management command for removing runs from contracts (#3344)
+- fix(deps): update dependency wagtail to v7.2.3 [security] (#3348)
+- Remove non-functional product_flexible_price from v2/courses apis (#3326)
+- Configurable learn dashboard redirect (#3233)
+
 Version 0.139.1 (Released March 03, 2026)
 ---------------
 
