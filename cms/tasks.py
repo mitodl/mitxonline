@@ -97,7 +97,7 @@ def queue_fastly_full_purge():
 
 
 @app.task
-@single_task(10)
+@single_task(30)
 def refresh_featured_homepage_items():
     """
     Refresh the featured homepage items in the redis cache.
