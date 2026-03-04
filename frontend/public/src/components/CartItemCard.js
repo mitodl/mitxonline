@@ -38,7 +38,10 @@ export class CartItemCard extends React.Component<Props> {
       abbreviation = purchasableObject.course_number
       image =
         course.page !== null ? (
-          <img src={course.page.feature_image_src || DEFAULT_COURSE_IMG} alt="" />
+          <img
+            src={course.page.feature_image_src || DEFAULT_COURSE_IMG}
+            alt=""
+          />
         ) : null
       detailLink = this.renderLink("Course details", pageUrl)
       statusMessage = courseRunStatusMessage(purchasableObject)
@@ -53,7 +56,10 @@ export class CartItemCard extends React.Component<Props> {
       image =
         purchasableObject.page !== null &&
         purchasableObject.page !== undefined ? (
-            <img src={purchasableObject.page.feature_image_src || DEFAULT_COURSE_IMG} alt="" />
+            <img
+              src={purchasableObject.page.feature_image_src || DEFAULT_COURSE_IMG}
+              alt=""
+            />
           ) : null
       detailLink = this.renderLink("Program details", pageUrl)
       statusMessage = null

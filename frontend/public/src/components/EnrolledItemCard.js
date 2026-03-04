@@ -628,7 +628,13 @@ export class EnrolledItemCard extends React.Component<
         <div className="row flex-grow-1 enrolled-item-info">
           <div className="col-12 col-md-auto p-0">
             <div className="img-container">
-              <img src={enrollment.program.page.feature_image_src || DEFAULT_COURSE_IMG} alt="" />
+              <img
+                src={
+                  enrollment.program.page.feature_image_src ||
+                  DEFAULT_COURSE_IMG
+                }
+                alt=""
+              />
             </div>
           </div>
 
