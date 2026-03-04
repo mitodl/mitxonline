@@ -1,7 +1,6 @@
 from urllib.parse import urljoin
 
 from django.conf import settings
-from django.templatetags.static import static
 from rest_framework import serializers
 
 from courses import models
@@ -9,14 +8,14 @@ from courses import models
 
 def get_thumbnail_url(page):
     """
-    Get the thumbnail URL or else return a default image URL.
+    Get the thumbnail URL or return None if no image is configured.
 
     Args:
         page (cms.models.ProductPage): A product page
 
     Returns:
-        str:
-            A page URL
+        str | None:
+            A fully-qualified page image URL, or None if no image is set.
     """
     relative_url = (
         page.feature_image.file.url
@@ -24,8 +23,10 @@ def get_thumbnail_url(page):
         and page.feature_image
         and page.feature_image.file
         and page.feature_image.file.url
-        else static("images/mit-dome.png")
+        else None
     )
+    if relative_url is None:
+        return None
     return urljoin(settings.SITE_BASE_URL, relative_url)
 
 

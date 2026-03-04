@@ -46,7 +46,7 @@ const displayedCourse = {
         }
       ],
       page: {
-        feature_image_src:             "/static/images/mit-dome.png",
+        feature_image_src:             null,
         page_url:                      "/courses/course-v1:edX+E2E-101/",
         financial_assistance_form_url: "",
         description:                   "E2E Test Course",
@@ -64,7 +64,7 @@ const displayedCourse = {
     }
   ],
   page: {
-    feature_image_src:             "/static/images/mit-dome.png",
+    feature_image_src:             null,
     page_url:                      "/courses/course-v1:edX+E2E-101/",
     financial_assistance_form_url: "",
     description:                   "E2E Test Course",
@@ -126,8 +126,7 @@ const displayedProgram = {
     }
   ],
   page: {
-    feature_image_src:
-      "http://mitxonline.odl.local:8013/static/images/mit-dome.png"
+    feature_image_src: null
   },
   program_type: "Series",
   departments:  [

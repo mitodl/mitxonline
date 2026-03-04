@@ -54,7 +54,7 @@ class FacultySerializer(serializers.Serializer):
     instructor_title = serializers.CharField()
     instructor_bio_short = serializers.CharField()
     instructor_bio_long = serializers.CharField()
-    feature_image_src = serializers.CharField()
+    feature_image_src = serializers.CharField(allow_null=True)
 
 
 class PriceItemSerializer(serializers.Serializer):
