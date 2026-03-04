@@ -6,7 +6,11 @@ from django.core.management import call_command
 from b2b.factories import ContractPageFactory
 from b2b.models import DiscountContractAttachmentRedemption
 from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
-from ecommerce.factories import DiscountFactory, DiscountRedemptionFactory, ProductFactory
+from ecommerce.factories import (
+    DiscountFactory,
+    DiscountRedemptionFactory,
+    ProductFactory,
+)
 from ecommerce.models import Discount, DiscountProduct
 
 pytestmark = [pytest.mark.django_db]
@@ -112,7 +116,9 @@ def test_b2b_courseware_remove_run_does_not_delete_used_discount_order_redemptio
 
     call_command("b2b_courseware", "remove", str(contract.id), run.courseware_id)
 
-    assert not DiscountProduct.objects.filter(product=product, discount=discount).exists()
+    assert not DiscountProduct.objects.filter(
+        product=product, discount=discount
+    ).exists()
 
     assert Discount.objects.filter(id=discount.id).exists()
 
@@ -138,6 +144,8 @@ def test_b2b_courseware_remove_run_does_not_delete_used_discount_contract_attach
 
     call_command("b2b_courseware", "remove", str(contract.id), run.courseware_id)
 
-    assert not DiscountProduct.objects.filter(product=product, discount=discount).exists()
+    assert not DiscountProduct.objects.filter(
+        product=product, discount=discount
+    ).exists()
 
     assert Discount.objects.filter(id=discount.id).exists()
