@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.139.3
+---------------
+
+- Make featured homepage courses cache robust against task failures (#3353)
+
 Version 0.139.2 (Released March 04, 2026)
 ---------------
 
