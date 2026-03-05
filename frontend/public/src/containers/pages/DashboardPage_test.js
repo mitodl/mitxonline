@@ -178,10 +178,7 @@ describe("DashboardPage", () => {
 
       clock.tick(500)
 
-      assert.equal(
-        mockLocation.href,
-        "https://learn.mit.edu/dashboard?a=1&b=2"
-      )
+      assert.equal(mockLocation.href, "https://learn.mit.edu/dashboard?a=1&b=2")
     })
 
     it("does not redirect when feature flag is disabled", async () => {
