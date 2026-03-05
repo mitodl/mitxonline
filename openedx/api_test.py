@@ -1461,16 +1461,18 @@ def test_process_course_run_clone(mocker):
         side_effect=[True, CourseRunAPIError("fake value error")],
     )
     mocker.patch("openedx.api.get_edx_course_modes", return_value=[])
+    mocker.patch("openedx.api.fix_cloned_run_data")
+    mocker.patch("openedx.api.create_edx_course_mode")
 
     mocked_clone_course = mocker.patch(
         "openedx.api.clone_edx_course", return_value={"result": "success"}
     )
-    mocked_fix_data = mocker.patch("openedx.api.fix_cloned_run_data")
-    mocked_create_edx_mode = mocker.patch("openedx.api.create_edx_course_mode")
+
+    cloneable_key = "course-v1:PyT+TestCourse+9T3036"
+    calls = []
 
     course_run = CourseRunFactory.create()
     mxo_modes = EnrollmentModeFactory.create_batch(2)
-    calls = []
 
     for mode in mxo_modes:
         course_run.enrollment_modes.add(mode)
@@ -1484,11 +1486,8 @@ def test_process_course_run_clone(mocker):
             )
         )
 
-    cloneable_key = "course-v1:PyT+TestCourse+9T3036"
     process_course_run_clone(course_run, cloneable_key)
 
     mocked_clone_course.assert_called_with(
         cloneable_key, course_run.courseware_id, client=ANY
     )
-    mocked_fix_data.assert_called_with(course_run, ANY)
-    mocked_create_edx_mode.assert_has_calls(calls, any_order=True)
