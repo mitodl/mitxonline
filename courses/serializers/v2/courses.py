@@ -260,13 +260,9 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     def get_products(self, obj):
         # Use prefetched products if available to avoid N+1 queries
-        if hasattr(obj, "prefetched_products"):
-            return ProductRelatedField(many=True, read_only=True).to_representation(
-                obj.prefetched_products
-            )
-        return ProductRelatedField(many=True, read_only=True).to_representation(
-            obj.products.all()
-        )
+        products = obj.prefetched_products if hasattr(obj, "prefetched_products") else obj.products.all()
+        from courses.serializers.v1.base import BaseProductSerializer
+        return BaseProductSerializer(products, many=True, context=self.context).data
 
 
 @extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
