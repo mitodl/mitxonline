@@ -1674,8 +1674,10 @@ def rerun_course_run(  # noqa: PLR0913
             enrollment_end=enrollment_end
             if enrollment_end
             else base_run.enrollment_end,
-            is_self_paced=is_self_paced if is_self_paced else base_run.is_self_paced,
-            live=live if live else base_run.live,
+            is_self_paced=is_self_paced
+            if is_self_paced is not None
+            else base_run.is_self_paced,
+            live=live if live is not None else base_run.live,
         )
 
         for mode in (
