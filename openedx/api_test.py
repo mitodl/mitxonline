@@ -3,13 +3,14 @@
 # pylint: disable=redefined-outer-name
 import itertools
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import ANY, call, patch
 from urllib.parse import parse_qsl
 
 import factory
 import pytest
 import responses
 from django.contrib.auth import get_user_model
+from edx_api.course_runs.exceptions import CourseRunAPIError
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
 from mitol.common.utils.user import _reformat_for_username, usernameify
@@ -18,7 +19,11 @@ from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
 from rest_framework import status
 
-from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    EnrollmentModeFactory,
+)
 from main.test_utils import MockHttpError, MockResponse
 from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
@@ -34,6 +39,8 @@ from openedx.api import (
     get_edx_api_client,
     get_edx_retirement_service_client,
     get_valid_edx_api_auth,
+    process_course_run_clone,
+    push_edx_modes_from_run,
     reconcile_edx_username,
     repair_all_faulty_openedx_users,
     repair_faulty_edx_user,
@@ -1410,3 +1417,78 @@ def test_update_edx_user_profile_error(mock_session, mock_get_auth, mocker, user
         with pytest.raises(EdxApiUserUpdateError) as exc:
             update_edx_user_profile(user)
         assert "Error updating Open edX user" in str(exc.value)
+
+
+def test_push_edx_modes_from_run(mocker):
+    """Test that we can push modes into edX from a course"""
+
+    mocked_edx_modes = mocker.patch("openedx.api.get_edx_course_modes", return_value=[])
+    mocked_create_edx_mode = mocker.patch("openedx.api.create_edx_course_mode")
+
+    course_run = CourseRunFactory.create()
+    mxo_modes = EnrollmentModeFactory.create_batch(2)
+    calls = []
+
+    for mode in mxo_modes:
+        course_run.enrollment_modes.add(mode)
+        calls.append(
+            call(
+                course_id=course_run.courseware_id,
+                mode_slug=mode.mode_slug,
+                mode_display_name=mode.mode_display_name,
+                min_price=(1 if mode.requires_payment else 0),
+                client=ANY,
+            )
+        )
+
+    assert course_run.edx_modes == []
+    assert course_run.enrollment_modes.count() == 2
+    assert mocked_edx_modes.called
+
+    created = push_edx_modes_from_run(course_run)
+
+    assert created == course_run.enrollment_modes.count()
+    assert mocked_create_edx_mode.called
+    mocked_create_edx_mode.assert_has_calls(calls, any_order=True)
+
+
+def test_process_course_run_clone(mocker):
+    """Test that the course run clone calls the edX APIs properly."""
+
+    mocker.patch("openedx.api.get_edx_api_jwt_client")
+    mocker.patch(
+        "openedx.api.get_edx_course",
+        side_effect=[True, CourseRunAPIError("fake value error")],
+    )
+    mocker.patch("openedx.api.get_edx_course_modes", return_value=[])
+
+    mocked_clone_course = mocker.patch(
+        "openedx.api.clone_edx_course", return_value={"result": "success"}
+    )
+    mocked_fix_data = mocker.patch("openedx.api.fix_cloned_run_data")
+    mocked_create_edx_mode = mocker.patch("openedx.api.create_edx_course_mode")
+
+    course_run = CourseRunFactory.create()
+    mxo_modes = EnrollmentModeFactory.create_batch(2)
+    calls = []
+
+    for mode in mxo_modes:
+        course_run.enrollment_modes.add(mode)
+        calls.append(
+            call(
+                course_id=course_run.courseware_id,
+                mode_slug=mode.mode_slug,
+                mode_display_name=mode.mode_display_name,
+                min_price=(1 if mode.requires_payment else 0),
+                client=ANY,
+            )
+        )
+
+    cloneable_key = "course-v1:PyT+TestCourse+9T3036"
+    process_course_run_clone(course_run, cloneable_key)
+
+    mocked_clone_course.assert_called_with(
+        cloneable_key, course_run.courseware_id, client=ANY
+    )
+    mocked_fix_data.assert_called_with(course_run, ANY)
+    mocked_create_edx_mode.assert_has_calls(calls, any_order=True)
