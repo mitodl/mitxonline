@@ -21,6 +21,7 @@ from cms.api import (
     get_home_page,
     get_wagtail_img_src,
 )
+from cms.constants import FEATURED_ITEMS_CACHE_KEY
 from cms.exceptions import WagtailSpecificPageError
 from cms.factories import CoursePageFactory, HomePageFactory, ProgramPageFactory
 from cms.models import (
@@ -576,10 +577,8 @@ def test_create_featured_items_mixed_course_types():
 @pytest.mark.django_db
 def test_create_featured_items_cache_no_expiry():
     """Test that cache is set with timeout=None so it never auto-expires"""
-    from unittest.mock import patch
-
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(FEATURED_ITEMS_CACHE_KEY)
 
     # Create a simple course to have something to cache
     course = CourseFactory.create(page=None, live=True)
@@ -593,13 +592,22 @@ def test_create_featured_items_cache_no_expiry():
     run.is_self_paced = True
     run.save()
 
-    with patch.object(redis_cache, "set", wraps=redis_cache.set) as mock_set:
-        create_featured_items()
-        # Verify cache.set was called with timeout=None
-        mock_set.assert_called_once()
-        assert mock_set.call_args.kwargs.get("timeout") is None
+    create_featured_items()
 
     # Verify cache is still set and correct
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(FEATURED_ITEMS_CACHE_KEY)
     assert cache_value is not None
     assert len(cache_value) == 1
+
+    redis_client = redis_cache.client.get_client()
+    # redis returns -1 for a key being present with no expiry
+    # see https://redis.io/docs/latest/commands/ttl/
+    # note that the actual key in redis is prefixed with ":1:"
+    # we use the raw client, not the one provided by redis_django,
+    # because the latter rewrites the return values
+    ttl = redis_client.ttl(f":1:{FEATURED_ITEMS_CACHE_KEY}")
+    assert ttl == -1, (
+        f"Key `{FEATURED_ITEMS_CACHE_KEY}` is missing"
+        if ttl == -2
+        else f"Unexpected ttl value `{ttl}` for `{FEATURED_ITEMS_CACHE_KEY}`"
+    )
