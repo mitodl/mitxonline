@@ -21,6 +21,7 @@ from courses.serializers.v1.base import (
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
+from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -264,7 +265,6 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             if hasattr(obj, "prefetched_products")
             else obj.products.all()
         )
-        from courses.serializers.v1.base import BaseProductSerializer
 
         return BaseProductSerializer(products, many=True, context=self.context).data
 
