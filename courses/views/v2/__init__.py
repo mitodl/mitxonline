@@ -358,9 +358,11 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
         )
         course_runs_prefetch = Prefetch(
             "courseruns",
-            queryset=CourseRun.objects.order_by("id").prefetch_related(
+            queryset=CourseRun.objects.prefetch_related(
                 products_prefetch
-            ),
+            ).prefetch_related("enrollment_modes").order_by(
+            "id"
+        )
         )
         queryset = queryset.prefetch_related(
             "departments", "in_programs", course_runs_prefetch

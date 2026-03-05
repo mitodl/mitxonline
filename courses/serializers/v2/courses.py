@@ -279,21 +279,14 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
         # Use prefetched course runs to preserve prefetched products
-        courseruns = instance.courseruns.prefetch_related("enrollment_modes").order_by(
-            "id"
-        )
+        courseruns = instance.courseruns.all()
         if "org_id" in self.context:
-            courseruns = courseruns.filter(
-                b2b_contract__organization_id=self.context["org_id"]
-            )
+            courseruns = [run for run in courseruns if getattr(run.b2b_contract, "organization_id", None) == int(self.context["org_id"])]
         if "contract_id" in self.context:
-            courseruns = courseruns.filter(b2b_contract_id=self.context["contract_id"])
-
+            courseruns = [run for run in courseruns if getattr(run.b2b_contract, "id", None) == int(self.context["contract_id"])]
         if "org_id" not in self.context and "contract_id" not in self.context:
-            courseruns = courseruns.filter(b2b_contract_id=None)
-        return CourseRunSerializer(
-            courseruns, many=True, read_only=True, context=self.context
-        ).data
+            courseruns = [run for run in courseruns if run.b2b_contract_id is None]
+        return CourseRunSerializer(courseruns, many=True, read_only=True, context=self.context).data
 
     class Meta:
         model = models.Course
