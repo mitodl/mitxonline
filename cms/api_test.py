@@ -376,7 +376,22 @@ def test_create_featured_items():
 
 @pytest.mark.django_db
 def test_create_featured_items_no_courses():
-    """Test create_featured_items with no courses at all"""
+    """Test create_featured_items with no courses leaves stale cache intact"""
+    redis_cache = caches["redis"]
+    stale_value = [999]
+    redis_cache.set("CMS_homepage_featured_courses", stale_value)
+
+    result = create_featured_items()
+    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+
+    # Returns empty list but does NOT wipe stale cache data
+    assert result == []
+    assert cache_value == stale_value
+
+
+@pytest.mark.django_db
+def test_create_featured_items_no_courses_no_prior_cache():
+    """Test create_featured_items with no courses and no prior cache entry"""
     redis_cache = caches["redis"]
     redis_cache.delete("CMS_homepage_featured_courses")
 
@@ -384,14 +399,15 @@ def test_create_featured_items_no_courses():
     cache_value = redis_cache.get("CMS_homepage_featured_courses")
 
     assert result == []
-    assert cache_value == []
+    assert cache_value is None
 
 
 @pytest.mark.django_db
 def test_create_featured_items_no_enrollable_courses():
-    """Test create_featured_items with courses but no enrollable runs"""
+    """Test create_featured_items with courses but no enrollable runs leaves stale cache intact"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    stale_value = [888]
+    redis_cache.set("CMS_homepage_featured_courses", stale_value)
 
     # Create course with no enrollable runs
     course = CourseFactory.create(page=None, live=True)
@@ -401,8 +417,9 @@ def test_create_featured_items_no_enrollable_courses():
     result = create_featured_items()
     cache_value = redis_cache.get("CMS_homepage_featured_courses")
 
+    # Returns empty list but does NOT wipe stale cache data
     assert result == []
-    assert cache_value == []
+    assert cache_value == stale_value
 
 
 @pytest.mark.django_db
@@ -557,8 +574,10 @@ def test_create_featured_items_mixed_course_types():
 
 
 @pytest.mark.django_db
-def test_create_featured_items_cache_expiration():
-    """Test that cache is set with correct expiration time"""
+def test_create_featured_items_cache_no_expiry():
+    """Test that cache is set with timeout=None so it never auto-expires"""
+    from unittest.mock import patch
+
     redis_cache = caches["redis"]
     redis_cache.delete("CMS_homepage_featured_courses")
 
@@ -574,12 +593,13 @@ def test_create_featured_items_cache_expiration():
     run.is_self_paced = True
     run.save()
 
-    create_featured_items()
+    with patch.object(redis_cache, "set", wraps=redis_cache.set) as mock_set:
+        create_featured_items()
+        # Verify cache.set was called with timeout=None
+        mock_set.assert_called_once()
+        assert mock_set.call_args.kwargs.get("timeout") is None
 
-    # Verify cache is set
+    # Verify cache is still set and correct
     cache_value = redis_cache.get("CMS_homepage_featured_courses")
     assert cache_value is not None
     assert len(cache_value) == 1
-
-    # Note: TTL testing would require mocking or actual time measurement
-    # which might be flaky, so we just verify the cache is set
