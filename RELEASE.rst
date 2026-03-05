@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.139.4
+---------------
+
+- Fix error when a basket converts to an order, and has a product that has versions (#3355)
+- 10316 import courserun should allow the runs course to be set manually (#3347)
+
 Version 0.139.3 (Released March 05, 2026)
 ---------------
 
