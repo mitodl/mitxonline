@@ -296,7 +296,7 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
             ]
         if not org_id and not contract_id:
             courseruns = [run for run in courseruns if run.b2b_contract_id is None]
-        return CourseRunSerializer(courseruns, many=True, read_only=True).data
+        return CourseRunSerializer(courseruns, many=True, read_only=True, context=self.context).data
 
     class Meta:
         model = models.Course
