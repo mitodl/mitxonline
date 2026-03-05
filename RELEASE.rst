@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.139.4
+Version 0.139.4 (Released March 05, 2026)
 ---------------
 
 - Fix error when a basket converts to an order, and has a product that has versions (#3355)
