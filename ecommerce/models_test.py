@@ -460,6 +460,21 @@ def test_pending_order_with_multiple_product_versions(basket, reuse):
         assert order.total_price_paid == 750
 
 
+def test_pending_order_with_bad_product_versions(basket):
+    """
+    Test that creating a PendingOrder with a basket item for a product with
+    bad (i.e. no) versions works as expected
+    """
+
+    product = ProductFactory.create(price=500)
+    assert Version.objects.get_for_object(product).count() == 0
+
+    basket_item = BasketItem(product=product, basket=basket, quantity=1)
+    basket_item.save()
+    with pytest.raises(ValueError, match=r".*is improperly constructed: no versions"):
+        PendingOrder.create_from_basket(basket)
+
+
 def test_pending_order_is_reused(basket):
     """
     Test that creating a second PendingOrder's with the same associated Product is
