@@ -21,6 +21,7 @@ from cms.api import (
     get_home_page,
     get_wagtail_img_src,
 )
+from cms.constants import FEATURED_ITEMS_CACHE_KEY
 from cms.exceptions import WagtailSpecificPageError
 from cms.factories import CoursePageFactory, HomePageFactory, ProgramPageFactory
 from cms.models import (
@@ -376,7 +377,22 @@ def test_create_featured_items():
 
 @pytest.mark.django_db
 def test_create_featured_items_no_courses():
-    """Test create_featured_items with no courses at all"""
+    """Test create_featured_items with no courses leaves stale cache intact"""
+    redis_cache = caches["redis"]
+    stale_value = [999]
+    redis_cache.set("CMS_homepage_featured_courses", stale_value)
+
+    result = create_featured_items()
+    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+
+    # Returns empty list but does NOT wipe stale cache data
+    assert result == []
+    assert cache_value == stale_value
+
+
+@pytest.mark.django_db
+def test_create_featured_items_no_courses_no_prior_cache():
+    """Test create_featured_items with no courses and no prior cache entry"""
     redis_cache = caches["redis"]
     redis_cache.delete("CMS_homepage_featured_courses")
 
@@ -384,14 +400,15 @@ def test_create_featured_items_no_courses():
     cache_value = redis_cache.get("CMS_homepage_featured_courses")
 
     assert result == []
-    assert cache_value == []
+    assert cache_value is None
 
 
 @pytest.mark.django_db
 def test_create_featured_items_no_enrollable_courses():
-    """Test create_featured_items with courses but no enrollable runs"""
+    """Test create_featured_items with courses but no enrollable runs leaves stale cache intact"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    stale_value = [888]
+    redis_cache.set("CMS_homepage_featured_courses", stale_value)
 
     # Create course with no enrollable runs
     course = CourseFactory.create(page=None, live=True)
@@ -401,8 +418,9 @@ def test_create_featured_items_no_enrollable_courses():
     result = create_featured_items()
     cache_value = redis_cache.get("CMS_homepage_featured_courses")
 
+    # Returns empty list but does NOT wipe stale cache data
     assert result == []
-    assert cache_value == []
+    assert cache_value == stale_value
 
 
 @pytest.mark.django_db
@@ -557,10 +575,10 @@ def test_create_featured_items_mixed_course_types():
 
 
 @pytest.mark.django_db
-def test_create_featured_items_cache_expiration():
-    """Test that cache is set with correct expiration time"""
+def test_create_featured_items_cache_no_expiry():
+    """Test that cache is set with timeout=None so it never auto-expires"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(FEATURED_ITEMS_CACHE_KEY)
 
     # Create a simple course to have something to cache
     course = CourseFactory.create(page=None, live=True)
@@ -576,10 +594,20 @@ def test_create_featured_items_cache_expiration():
 
     create_featured_items()
 
-    # Verify cache is set
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    # Verify cache is still set and correct
+    cache_value = redis_cache.get(FEATURED_ITEMS_CACHE_KEY)
     assert cache_value is not None
     assert len(cache_value) == 1
 
-    # Note: TTL testing would require mocking or actual time measurement
-    # which might be flaky, so we just verify the cache is set
+    redis_client = redis_cache.client.get_client()
+    # redis returns -1 for a key being present with no expiry
+    # see https://redis.io/docs/latest/commands/ttl/
+    # note that the actual key in redis is prefixed with ":1:"
+    # we use the raw client, not the one provided by redis_django,
+    # because the latter rewrites the return values
+    ttl = redis_client.ttl(f":1:{FEATURED_ITEMS_CACHE_KEY}")
+    assert ttl == -1, (
+        f"Key `{FEATURED_ITEMS_CACHE_KEY}` is missing"
+        if ttl == -2
+        else f"Unexpected ttl value `{ttl}` for `{FEATURED_ITEMS_CACHE_KEY}`"
+    )
