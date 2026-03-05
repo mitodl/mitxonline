@@ -109,7 +109,7 @@ In either case, the command will try to create a new run. If it exists in edX al
 
         self.stdout.write(self.style.SUCCESS(f"Created new run {new_course_run}"))
 
-        if kwargs.pop("change_course_org", False):
+        if org and kwargs.pop("change_course_org", False):
             self.stdout.write(
                 f"Updating the org key on course {run_to_clone.course} to {org}..."
             )
