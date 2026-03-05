@@ -18,7 +18,6 @@ from courses.serializers.v1.base import (
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
-    ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
@@ -260,8 +259,13 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     def get_products(self, obj):
         # Use prefetched products if available to avoid N+1 queries
-        products = obj.prefetched_products if hasattr(obj, "prefetched_products") else obj.products.all()
+        products = (
+            obj.prefetched_products
+            if hasattr(obj, "prefetched_products")
+            else obj.products.all()
+        )
         from courses.serializers.v1.base import BaseProductSerializer
+
         return BaseProductSerializer(products, many=True, context=self.context).data
 
 
