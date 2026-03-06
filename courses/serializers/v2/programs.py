@@ -532,6 +532,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "certificate_type",
             "departments",
             "live",
+            "display_mode",
             "topics",
             "availability",
             "start_date",
