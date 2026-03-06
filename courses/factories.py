@@ -23,6 +23,7 @@ from courses.models import (
     CourseRunGrade,
     CoursesTopic,
     Department,
+    EnrollmentMode,
     LearnerProgramRecordShare,
     PartnerSchool,
     Program,
@@ -32,6 +33,7 @@ from courses.models import (
     ProgramRequirementNodeType,
     ProgramRun,
 )
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 FAKE = faker.Factory.create()
@@ -41,6 +43,10 @@ DEPARTMENTS = {
     dept["slug"]: dept["name"]
     for dept in json.loads(Path("courses/test_data/departments.json").read_text())
 }
+MODES = [
+    EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+]
 
 
 class DepartmentFactory(DjangoModelFactory):
@@ -51,6 +57,17 @@ class DepartmentFactory(DjangoModelFactory):
         model = Department
 
         django_get_or_create = ("slug",)
+
+
+class EnrollmentModeFactory(DjangoModelFactory):
+    """Factory for EnrollmentModes."""
+
+    mode_slug = factory.Iterator(MODES)
+    mode_display_name = factory.LazyAttribute(lambda emode: emode.mode_slug)
+
+    class Meta:
+        model = EnrollmentMode
+        django_get_or_create = ("mode_slug",)
 
 
 class ProgramFactory(DjangoModelFactory):
