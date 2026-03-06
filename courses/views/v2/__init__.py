@@ -6,6 +6,7 @@ import logging
 
 import django_filters
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -66,6 +67,7 @@ from courses.utils import (
     get_unenrollable_courses,
 )
 from ecommerce.api import create_verified_program_course_run_enrollment
+from ecommerce.models import Product
 from main import features
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
@@ -325,19 +327,6 @@ class CourseFilterSet(django_filters.FilterSet):
             else get_unenrollable_courses(queryset)
         )
 
-    def filter_queryset(self, queryset):
-        queryset = super().filter_queryset(queryset)
-        # perform additional filtering
-
-        filter_keys = self.form.cleaned_data.keys()
-
-        if "courserun_is_enrollable" not in filter_keys:
-            queryset = queryset.prefetch_related(
-                Prefetch("courseruns", queryset=CourseRun.objects.order_by("id")),
-            )
-
-        return queryset
-
 
 class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     """API view set for Courses"""
@@ -352,14 +341,35 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Get the queryset for the viewset."""
 
-        return (
-            Course.objects.select_related("page")
-            .prefetch_related("departments", "in_programs")
-            .annotate(count_b2b_courseruns=Count("courseruns__b2b_contract__id"))
-            .annotate(count_courseruns=Count("courseruns"))
-            .order_by("title")
-            .distinct()
+        queryset = Course.objects.select_related("page")
+        # Use Prefetch for reverse GenericRelation (products on CourseRun)
+        # 1. Get the ContentType object for the CourseRun model
+        courserun_content_type = ContentType.objects.get_for_model(CourseRun)
+        # 2. Create a Prefetch object to specify the queryset for the 'tags' relation
+        # This internal queryset only fetches products related to the CourseRun content type
+        courserun_product_queryset = Product.objects.filter(
+            content_type=courserun_content_type
         )
+        # 3. Use prefetch_related on main queryset, referencing the reverse relation's name (e.g., 'products')
+        products_prefetch = Prefetch(
+            "products",
+            queryset=courserun_product_queryset,
+            to_attr="prefetched_products",
+        )
+        course_runs_prefetch = Prefetch(
+            "courseruns",
+            queryset=CourseRun.objects.order_by("id")
+            .select_related("b2b_contract")
+            .prefetch_related("enrollment_modes", products_prefetch),
+        )
+        queryset = queryset.prefetch_related(
+            "departments", "in_programs", course_runs_prefetch
+        )
+        queryset = queryset.annotate(
+            count_b2b_courseruns=Count("courseruns__b2b_contract__id")
+        )
+        queryset = queryset.annotate(count_courseruns=Count("courseruns"))
+        return queryset.order_by("title").distinct()
 
     def get_serializer_context(self):
         added_context = {}
