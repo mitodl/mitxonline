@@ -1673,6 +1673,9 @@ class CourseRunEnrollmentCertificatePrefetcher(Prefetcher):
 
     @staticmethod
     def filter(course_run_and_user_ids):
+        if not course_run_and_user_ids:
+            return CourseRunCertificate.objects.none()
+
         id_filters = Q()
 
         # django 5.1 supports this via
@@ -1701,6 +1704,9 @@ class CourseRunEnrollmentGradesPrefetcher(Prefetcher):
 
     @staticmethod
     def filter(course_run_and_user_ids):
+        if not course_run_and_user_ids:
+            return CourseRunGrade.objects.none()
+
         id_filters = Q()
 
         # django 5.1 supports this via
