@@ -1268,6 +1268,9 @@ def add_user_org_membership(org, user):
     - bool: True if the user was added, False otherwise.
     """
 
+    if not org.sso_organization_id:
+        return False
+
     org_model = get_keycloak_model(OrganizationRepresentation, "organizations")
 
     kc_org = org_model.get(org.sso_organization_id)
