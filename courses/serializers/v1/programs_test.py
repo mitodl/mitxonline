@@ -417,12 +417,14 @@ def test_learner_record_serializer(
     assert course_0_payload == serialized_data["program"]["courses"][0]
 
 
-def test_program_serializer_returns_default_image():
-    """If the program has no page, we should still get a featured_image_url."""
+def test_program_serializer_returns_null_image_when_no_page():
+    """If the program has no page, feature_image_src should be None (null)."""
 
     program = ProgramFactory.create(page=None)
+    page_data = ProgramSerializer(program).data["page"]
 
-    assert "feature_image_src" in ProgramSerializer(program).data["page"]
+    assert "feature_image_src" in page_data
+    assert page_data["feature_image_src"] is None
 
 
 @pytest.mark.parametrize(

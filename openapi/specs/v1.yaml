@@ -3687,7 +3687,7 @@ components:
       properties:
         feature_image_src:
           type: string
-          description: Serializes the source of the feature_image
+          nullable: true
           readOnly: true
         page_url:
           type: string
@@ -4661,6 +4661,7 @@ components:
           type: string
         feature_image_src:
           type: string
+          nullable: true
       required:
       - feature_image_src
       - id
@@ -6094,7 +6095,7 @@ components:
       properties:
         feature_image_src:
           type: string
-          description: Serializes the source of the feature_image
+          nullable: true
           readOnly: true
         page_url:
           type: string

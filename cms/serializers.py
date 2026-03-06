@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import bleach
-from django.templatetags.static import static
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cms import models
 from cms.api import get_wagtail_img_src
 from cms.models import FlexiblePricingRequestForm, ProgramPage
-from courses.constants import DEFAULT_COURSE_IMG_PATH
 
 
 class BaseCoursePageSerializer(serializers.ModelSerializer):
@@ -22,14 +20,12 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
     effort = serializers.SerializerMethodField()
     length = serializers.SerializerMethodField()
 
-    @extend_schema_field(str)
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_feature_image_src(self, instance):
-        """Serializes the source of the feature_image"""
-        feature_img_src = None
+        """Serializes the source of the feature_image, or None if not set."""
         if hasattr(instance, "feature_image"):
-            feature_img_src = get_wagtail_img_src(instance.feature_image)
-
-        return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
+            return get_wagtail_img_src(instance.feature_image) or None
+        return None
 
     @extend_schema_field(serializers.URLField)
     def get_page_url(self, instance):
@@ -280,14 +276,12 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         """Helper method to construct financial assistance URL"""
         return f"{page.get_url()}{slug}/" if page and slug else ""
 
-    @extend_schema_field(str)
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_feature_image_src(self, instance):
-        """Serializes the source of the feature_image"""
-        feature_img_src = None
+        """Serializes the source of the feature_image, or None if not set."""
         if hasattr(instance, "feature_image"):
-            feature_img_src = get_wagtail_img_src(instance.feature_image)
-
-        return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
+            return get_wagtail_img_src(instance.feature_image) or None
+        return None
 
     @extend_schema_field(serializers.URLField)
     def get_page_url(self, instance):
@@ -385,14 +379,12 @@ class InstructorPageSerializer(serializers.ModelSerializer):
 
     feature_image_src = serializers.SerializerMethodField()
 
-    @extend_schema_field(str)
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_feature_image_src(self, instance):
-        """Serializes the source of the feature_image"""
-        feature_img_src = None
+        """Serializes the source of the feature_image, or None if not set."""
         if hasattr(instance, "feature_image"):
-            feature_img_src = get_wagtail_img_src(instance.feature_image)
-
-        return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
+            return get_wagtail_img_src(instance.feature_image) or None
+        return None
 
     class Meta:
         model = models.InstructorPage
