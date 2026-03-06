@@ -373,6 +373,13 @@ class CertificatePage(CourseProgramChildPage):
         use_json_field=True,
     )
 
+    verifiable_credential_criteria = models.CharField(  # noqa: DJ001
+        max_length=250,
+        null=True,
+        blank=True,
+        help_text="For verifiable credentials issued for this certificate, this is the criteria narrative field. It should be something descriptive, like a list of completed courses, and may be plaintext or markdown",
+    )
+
     content_panels = [
         FieldPanel("product_name"),
         FieldPanel("CEUs"),
