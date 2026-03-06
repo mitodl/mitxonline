@@ -143,6 +143,9 @@ class OrganizationPage(Page):
 
         from b2b.api import add_user_org_membership  # noqa: PLC0415
 
+        if not self.sso_organization_id:
+            return False
+
         try:
             return add_user_org_membership(self, user)
         except HTTPError:
