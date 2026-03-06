@@ -5,7 +5,7 @@ from urllib.parse import quote_plus
 import pytest
 from django.core.mail import EmailMessage
 from django.shortcuts import reverse
-from django.test.client import RequestFactory
+from django.test import RequestFactory
 from mitol.common.pytest_utils import any_instance_of
 
 from mail import verification_api
