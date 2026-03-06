@@ -104,9 +104,10 @@ export class DashboardPage extends React.Component<
             )
 
             if (flagEnabled) {
-              window.location.href =
+              const baseUrl =
                 SETTINGS.mit_learn_dashboard_url ||
                 "https://learn.mit.edu/dashboard"
+              window.location.href = baseUrl + window.location.search
               return
             }
           }

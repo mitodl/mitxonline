@@ -9,3 +9,5 @@ ENABLE_GOOGLE_ANALYTICS_DATA_PUSH = "mitxonline-4099-dedp-google-analytics"
 ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING = (
     "mitxonline-verifiable-credentials-provisioning"
 )
+
+REDIRECT_LEARN_DASHBOARD = "redirect-to-learn-dashboard"
