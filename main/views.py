@@ -51,7 +51,9 @@ def dashboard(request, **kwargs):
     if request.user.is_authenticated:
         global_id = request.user.global_id
         if global_id and is_enabled(
-            features.REDIRECT_LEARN_DASHBOARD, opt_unique_id=global_id
+            features.REDIRECT_LEARN_DASHBOARD,
+            default=False,
+            opt_unique_id=global_id,
         ):
             redirect_url = settings.MIT_LEARN_DASHBOARD_URL
             if qs := request.META.get("QUERY_STRING"):
