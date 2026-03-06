@@ -153,6 +153,7 @@ def test_serialize_program(
             "min_price": program_with_empty_requirements.page.min_price,
             "max_price": program_with_empty_requirements.page.max_price,
             "enrollment_modes": [],
+            "display_mode": None,
         },
     )
 

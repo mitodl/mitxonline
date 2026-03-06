@@ -22,6 +22,7 @@ class SimpleProgramSerializer(serializers.ModelSerializer):
             "id",
             "program_type",
             "live",
+            "display_mode",
         ]
 
 

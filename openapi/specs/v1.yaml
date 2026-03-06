@@ -3237,6 +3237,16 @@ components:
         type:
           type: string
           readOnly: true
+        display_mode:
+          nullable: true
+          description: |-
+            Set to 'course' to treat this program as a course in APIs.
+
+            * `course` - course
+          oneOf:
+          - $ref: '#/components/schemas/DisplayModeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
       required:
       - id
       - readable_id
@@ -4565,6 +4575,13 @@ components:
       - percent-off
       - dollars-off
       - fixed-price
+    DisplayModeEnum:
+      enum:
+      - course
+      type: string
+      description: '* `course` - course'
+      x-enum-descriptions:
+      - course
     EnrollmentMode:
       type: object
       description: Enrollment mode serializer.
@@ -7839,6 +7856,16 @@ components:
           readOnly: true
         live:
           type: boolean
+        display_mode:
+          nullable: true
+          description: |-
+            Set to 'course' to treat this program as a course in APIs.
+
+            * `course` - course
+          oneOf:
+          - $ref: '#/components/schemas/DisplayModeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
         topics:
           type: array
           items:
@@ -8114,6 +8141,16 @@ components:
           readOnly: true
         live:
           type: boolean
+        display_mode:
+          nullable: true
+          description: |-
+            Set to 'course' to treat this program as a course in APIs.
+
+            * `course` - course
+          oneOf:
+          - $ref: '#/components/schemas/DisplayModeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
         topics:
           type: array
           items:
@@ -8343,6 +8380,16 @@ components:
           maxLength: 255
         live:
           type: boolean
+        display_mode:
+          nullable: true
+          description: |-
+            Set to 'course' to treat this program as a course in APIs.
+
+            * `course` - course
+          oneOf:
+          - $ref: '#/components/schemas/DisplayModeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
       required:
       - id
       - readable_id

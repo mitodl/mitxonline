@@ -1467,6 +1467,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 )
                 != "",
                 "topics": [],
+                "display_mode": None,
                 "start_date": ANY_STR,
                 "end_date": None,
                 "enrollment_end": None,

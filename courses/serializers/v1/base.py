@@ -122,6 +122,7 @@ class BaseProgramSerializer(serializers.ModelSerializer):
             "readable_id",
             "id",
             "type",
+            "display_mode",
         ]
 
 
