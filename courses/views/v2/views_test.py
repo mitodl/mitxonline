@@ -44,7 +44,7 @@ from courses.models import (
     Course,
     CourseRunEnrollment,
     Program,
-    ProgramEnrollment,
+    ProgramEnrollment, CourseRun,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
@@ -73,6 +73,7 @@ from courses.views.test_utils import (
     num_queries_from_programs,
 )
 from courses.views.v2 import Pagination, ProgramFilterSet
+from ecommerce.factories import ProductFactory
 from ecommerce.models import Product
 from main import features
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
@@ -1955,3 +1956,30 @@ def test_program_enrollment_destroy(user_drf_client, user):
     enrollment.refresh_from_db()
     assert enrollment.active is False
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+
+
+@pytest.mark.django_db
+def test_course_run_and_product_prefetch_optimized(user_drf_client, django_assert_max_num_queries):
+    """
+    Verify that querying courses with multiple courseruns and products is optimized and does not result in N+1 queries.
+    """
+    from courses.models import CourseRun
+    from ecommerce.factories import ProductFactory
+    course = CourseFactory()
+    num_courseruns = 5
+    courseruns = [CourseRunFactory(course=course) for _ in range(num_courseruns)]
+    for run in courseruns:
+        ProductFactory(
+            purchasable_object=run,
+        )
+    max_expected_queries = 6
+    with django_assert_max_num_queries(max_expected_queries) as context:
+        resp = user_drf_client.get(reverse("v2:courses_api-list"), {"page_size": 10})
+        duplicate_queries_check(context)
+
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()["results"]
+    assert len(data) == 1
+    assert len(data[0]["courseruns"]) == num_courseruns
+    for run_data in data[0]["courseruns"]:
+        assert len(run_data["products"]) == 1
