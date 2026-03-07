@@ -44,7 +44,7 @@ from courses.models import (
     Course,
     CourseRunEnrollment,
     Program,
-    ProgramEnrollment, CourseRun,
+    ProgramEnrollment,
 )
 from courses.serializers.v2.certificates import (
     CourseRunCertificateSerializer,
@@ -2005,12 +2005,13 @@ def test_program_enrollment_destroy(user_drf_client, user):
 
 
 @pytest.mark.django_db
-def test_course_run_and_product_prefetch_optimized(user_drf_client, django_assert_max_num_queries):
+def test_course_run_and_product_prefetch_optimized(
+    user_drf_client, django_assert_max_num_queries
+):
     """
     Verify that querying courses with multiple courseruns and products is optimized and does not result in N+1 queries.
     """
-    from courses.models import CourseRun
-    from ecommerce.factories import ProductFactory
+
     course = CourseFactory()
     num_courseruns = 5
     courseruns = [CourseRunFactory(course=course) for _ in range(num_courseruns)]
