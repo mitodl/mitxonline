@@ -317,6 +317,16 @@ class ContractPage(Page, ClusterableModel):
         null=True,
         help_text="The fixed price for enrollment under this contract. (Set to zero or leave blank for free.)",
     )
+    google_sheet_target = models.CharField(
+        blank=True,
+        default="",
+        help_text="The URL for the Google Sheet to use to send codes and updates.",
+    )
+    google_sheet_target_tab = models.CharField(
+        blank=True,
+        default="Sheet1",
+        help_text="The index or title of the worksheet in the Google Sheet to put the codes.",
+    )
 
     @property
     def programs(self):
