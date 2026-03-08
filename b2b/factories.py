@@ -35,7 +35,7 @@ class OrganizationPageFactory(wagtail_factories.PageFactory):
     """OrganizationPage factory class"""
 
     name = LazyAttribute(lambda _: FAKE.unique.company())
-    org_key = LazyAttribute(lambda _: FAKE.unique.text(max_nb_chars=5))
+    org_key = LazyAttribute(lambda _: FAKE.unique.random_letters(max_nb_chars=5))
     org_key_prefix = UAI_COURSEWARE_ID_PREFIX
     description = LazyAttribute(lambda _: FAKE.unique.text())
     logo = None

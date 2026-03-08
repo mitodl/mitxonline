@@ -4,7 +4,9 @@ import uuid
 
 import pytest
 from faker import Faker
+from faker.providers import BaseProvider
 from hubspot.crm.objects import SimplePublicObject
+from opaque_keys.edx.keys import CourseKey
 
 from fixtures.b2b import *  # noqa: F403
 from fixtures.common import *  # noqa: F403
@@ -84,4 +86,45 @@ def pytest_configure(config):
 @pytest.fixture(autouse=True, scope="module")
 def fake() -> Faker:
     """Fixture to provide a Faker instance"""
-    return Faker()
+    faker = Faker()
+    faker.add_provider(CourseKeyProvider)
+
+    return faker
+
+
+class CourseKeyProvider(BaseProvider):
+    """Generates fake course keys (readable ID/courseware ID)."""
+
+    def coursekey(self, *, keytype: str | None = "course") -> str:
+        """
+        Generate and return a fake course key, ensuring that it is "valid".
+
+        Program keys aren't technically valid because programs don't exist in the
+        edX opaque key system, but it'll at least be in the proper format.
+
+        Args:
+            keytype (str): what kind of key to generate (course or program, default course)
+        Returns:
+            str, the course key
+        """
+
+        org_part = self.random_uppercase_letters(length=3)
+        course_major = self.random_int(1, 99)
+        course_minor = self.hexify("^^^^x", upper=True)
+        semester_index = self.random_digit_above_two()
+        semester_year = self.random_int(1900, 3000)
+
+        key_object = str(
+            CourseKey(
+                {
+                    "org": f"Py{org_part}",
+                    "course": f"{course_major}.{course_minor}",
+                    "run": f"{semester_index}T{semester_year}",
+                }
+            )
+        )
+
+        if keytype == "program":
+            key_object = key_object.replace("course-v1", "program-v1")
+
+        return key_object
