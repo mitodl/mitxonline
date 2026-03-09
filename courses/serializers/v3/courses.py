@@ -78,7 +78,11 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
                 features.IGNORE_EDX_FAILURES, False
             ),
         )
-        return successful_enrollments
+        if not successful_enrollments:
+            msg = "Unable to create course run enrollment"
+            raise ValueError(msg)
+
+        return successful_enrollments[0]
 
     class Meta(BaseCourseRunEnrollmentSerializer.Meta):
         model = models.CourseRunEnrollment
