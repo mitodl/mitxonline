@@ -306,7 +306,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     enrollment_modes = models.ManyToManyField(
         EnrollmentMode, blank=True, related_name="+"
     )
-    display_mode = models.CharField(
+    display_mode = models.CharField(  # noqa: DJ001
         max_length=32,
         choices=PROGRAM_DISPLAY_MODE_CHOICES,
         blank=True,
