@@ -452,5 +452,12 @@ describe("utility functions", () => {
       }
       assert.equal(getStartDateText(course), "Start Anytime")
     })
+    it("displays 'Start Anytime' for a direct course run with no start date", () => {
+      const courseRun = {
+        start_date:    null,
+        is_self_paced: false
+      }
+      assert.equal(getStartDateText(courseRun), "Start Anytime")
+    })
   })
 })

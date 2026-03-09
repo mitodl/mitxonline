@@ -335,6 +335,7 @@ export const reverseCompareCourseRunStartDates = (
 /**
  * Returns the text to be displayed on a course catalog card's tag.
  * This text will either be "Start Anytime" or "Start Date: <most recent, future, start date for the course>".
+ * If the course run has no start date, return 'Start Anytime'.
  * If the course run with the earliest start date, and associated with the course,
  * has a start date that is in the future, return 'Starts: <earliest course run start date>'.
  * If the course run with the earliest start date, and associated with the course,
