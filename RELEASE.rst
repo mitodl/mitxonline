@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.140.1
+Version 0.140.1 (Released March 09, 2026)
 ---------------
 
 - Fix unbound query issue with program enrollments (#3366)
