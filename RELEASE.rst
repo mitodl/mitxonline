@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.140.1
+---------------
+
+- Fix unbound query issue with program enrollments (#3366)
+- Fix performance for enrollments API w/ 0 results (#3360)
+- Add command to re-run an existing course run (#3352)
+- Adding prefetch for products in courses api (#3331)
+
 Version 0.139.4 (Released March 05, 2026)
 ---------------
 
