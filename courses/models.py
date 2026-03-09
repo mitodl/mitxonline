@@ -1850,6 +1850,9 @@ class ProgramEnrollmentCertificatePrefetcher(Prefetcher):
 
     @staticmethod
     def filter(program_and_user_ids):
+        if not program_and_user_ids:
+            return ProgramCertificate.objects.none()
+
         id_filters = Q()
 
         # django 5.1 supports this via
