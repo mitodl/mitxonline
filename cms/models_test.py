@@ -14,7 +14,7 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import caches
 from django.forms import ChoiceField
 from django.http import Http404, HttpResponse
-from django.test.client import RequestFactory
+from django.test import RequestFactory
 from django.urls import resolve, reverse
 from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
