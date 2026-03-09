@@ -1,5 +1,7 @@
 """Tests for models."""
 
+from uuid import uuid4
+
 import faker
 import pytest
 
@@ -222,3 +224,27 @@ def test_get_unused_discounts(user):
         .filter(discount_code=code_to_use.discount_code)
         .exists()
     )
+
+
+@pytest.mark.parametrize(
+    "has_keycloak_id",
+    [
+        True,
+        False,
+    ],
+)
+def test_attach_user_no_sso_id(mocker, has_keycloak_id):
+    """Test that attach_user bails out if there's no Keycloak ID"""
+
+    patched_add_membership = mocker.patch(
+        "b2b.api.add_user_org_membership", return_value=True
+    )
+
+    org = OrganizationPageFactory.create(
+        sso_organization_id=uuid4() if has_keycloak_id else None
+    )
+    user = UserFactory.create()
+
+    result = org.attach_user(user)
+    assert result == has_keycloak_id
+    assert patched_add_membership.called == has_keycloak_id
