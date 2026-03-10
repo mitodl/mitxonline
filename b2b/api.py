@@ -33,7 +33,7 @@ from b2b.models import (
 )
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
-from courses.models import Course, CourseRun, Department
+from courses.models import Course, CourseRun, Department, EnrollmentMode
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     PAYMENT_TYPE_SALES,
@@ -50,6 +50,7 @@ from ecommerce.models import (
 )
 from main import constants as main_constants
 from main.utils import date_to_datetime
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.tasks import clone_courserun
 
 log = logging.getLogger(__name__)
@@ -274,12 +275,10 @@ def create_contract_run(  # noqa: PLR0913
     the current year, and the contract ID. This means that the source course will
     have runs that have readable IDs that do not match the course ID.
 
-    The course key is generated according to a set algorithm. The new course key
-    will have the organization part set to "UAI_orgkey" and the run tag set to
-    "year_Cid" where orgkey is the organization key (set in the organization
-    record), year is the current year, and id is the ID of the contract. For more
-    information on the key format, see this discussion post:
-    https://github.com/mitodl/hq/discussions/7525
+    The course key is generated according to a set algorithm, which is implemented
+    in "create_course_run_key". Generally these now look like regular semester
+    run keys, but with extra data in them. For more information on the key format,
+    see this discussion post: https://github.com/mitodl/hq/discussions/7525
 
     A product will be created for the new contract course run, and its price will
     either be zero or the amount specified by the contract. (Free courses still
@@ -362,8 +361,14 @@ def create_contract_run(  # noqa: PLR0913
     )
     course_run.save()
 
+    required_modes = EnrollmentMode.objects.filter(
+        mode_slug__in=[EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
+    ).all()
+
+    [course_run.enrollment_modes.add(mode) for mode in required_modes]
+
     if not skip_edx:
-        clone_courserun.delay(course_run.id, base_id=clone_course_run.courseware_id)
+        clone_courserun.delay(course_run.id, clone_course_run.courseware_id)
 
     log.debug(
         "Created run %s for course %s in contract %s from course run %s",
@@ -1267,6 +1272,9 @@ def add_user_org_membership(org, user):
     Returns:
     - bool: True if the user was added, False otherwise.
     """
+
+    if not org.sso_organization_id:
+        return False
 
     org_model = get_keycloak_model(OrganizationRepresentation, "organizations")
 

@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.139.1"
+VERSION = "0.140.1"
 
 log = logging.getLogger()
 
@@ -955,7 +955,7 @@ REPAIR_OPENEDX_USERS_OFFSET = int(REPAIR_OPENEDX_USERS_FREQUENCY / 2)
 
 REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ = get_int(
     name="REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ",
-    default=86400,
+    default=180,
     description="How many seconds between refreshing featured items for the homepage cache",
 )
 

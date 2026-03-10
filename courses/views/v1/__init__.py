@@ -191,7 +191,9 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 Course.objects.filter()
                 .select_related("page")
                 .prefetch_related(
-                    "courseruns", "departments", "courseruns__enrollment_modes"
+                    "courseruns",
+                    "departments",
+                    "courseruns__enrollment_modes",
                 )
                 .all()
             )

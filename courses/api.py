@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import namedtuple
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from traceback import format_exc
 from typing import TYPE_CHECKING
@@ -74,6 +74,7 @@ from openedx.api import (
     get_edx_api_course_list_client,
     get_edx_course_modes,
     get_edx_grades_with_users,
+    process_course_run_clone,
     unenroll_edx_course_run,
 )
 from openedx.constants import (
@@ -1594,3 +1595,96 @@ def create_verifiable_credential(certificate: BaseCertificate, *, raise_on_error
         )
         if raise_on_error:
             raise
+
+
+def rerun_course_run(  # noqa: PLR0913
+    base_run: CourseRun,
+    run_tag: str,
+    *,
+    courseware_id: str | None = None,
+    organization: str | None = None,
+    title: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    enrollment_start: datetime | None = None,
+    enrollment_end: datetime | None = None,
+    is_self_paced: bool | None = None,
+    live: bool | None = None,
+    enrollment_modes: list[EnrollmentMode] | None = None,
+) -> CourseRun:
+    """
+    Re-run an existing course run.
+
+    Takes the specified base run and re-runs it in edX with the specified run tag.
+    The resulting run must not exist in edX.
+
+    By default, the created run will share all the same parameters as the base
+    run, other than the run tag.
+
+    When specifying start and end dates, be aware that course start and end must
+    be set to set enrollment start and end, and the enrollment start and end dates
+    must be before or equal to the course start and end dates respectively.
+
+    The organization option has nothing to do with B2B organizations. This is the
+    first part of the courseware ID after the `course-v1:` part.
+
+    Specifying a custom courseware ID will override the run tag and organization
+    settings passed in.
+
+    Args:
+    - base_run (CourseRun): the course to re-run
+    - run_tag (str): the new run tag to use
+    Keyword Args:
+    - courseware_id (str): new courseware/readable ID to use
+    - organization (str): new organization to use
+    - title (str): new course title
+    - start_date (DateTime): course start date
+    - end_date (DateTime): course end date
+    - enrollment_start (DateTime): enrollment start date
+    - enrollment_end (DateTime): enrollment end date
+    - is_self_paced (bool): course is self-paced
+    - live (bool): course is live (in MITx Online)
+    - enrollment_modes (list[EnrollmentMode]): modes to add to the new run
+    Returns:
+    - CourseRun, the created run
+    """
+
+    if courseware_id:
+        target_run_id = courseware_id
+    else:
+        base_key = CourseKey.from_string(base_run.courseware_id)
+
+        base_key = base_key.replace(run=run_tag)
+        if organization:
+            base_key = base_key.replace(org=organization)
+
+        target_run_id = str(base_key)
+
+    with transaction.atomic():
+        new_run = CourseRun.objects.create(
+            course=base_run.course,
+            title=title if title else base_run.title,
+            courseware_id=target_run_id,
+            run_tag=run_tag,
+            start_date=start_date if start_date else base_run.start_date,
+            end_date=end_date if end_date else base_run.end_date,
+            enrollment_start=enrollment_start
+            if enrollment_start
+            else base_run.enrollment_start,
+            enrollment_end=enrollment_end
+            if enrollment_end
+            else base_run.enrollment_end,
+            is_self_paced=is_self_paced
+            if is_self_paced is not None
+            else base_run.is_self_paced,
+            live=live if live is not None else base_run.live,
+        )
+
+        for mode in (
+            enrollment_modes if enrollment_modes else base_run.enrollment_modes.all()
+        ):
+            new_run.enrollment_modes.add(mode)
+
+        process_course_run_clone(new_run, base_run.courseware_id)
+
+    return new_run

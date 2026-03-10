@@ -23,7 +23,11 @@ from wagtail.models import Site
 from wagtail.rich_text import RichText
 
 from cms import models as cms_models
-from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
+from cms.constants import (
+    CERTIFICATE_INDEX_SLUG,
+    FEATURED_ITEMS_CACHE_KEY,
+    INSTRUCTOR_INDEX_SLUG,
+)
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
 from courses.models import Course, Program
@@ -477,9 +481,6 @@ def create_featured_items():
     Used only by cron task or management command.
     """
     redis_cache = caches["redis"]
-    cache_key = "CMS_homepage_featured_courses"
-
-    redis_cache.delete(cache_key)
 
     now = now_in_utc()
     end_of_day = now + timedelta(days=1)
@@ -491,7 +492,6 @@ def create_featured_items():
     )
 
     if not valid_course_ids:
-        redis_cache.set(cache_key, [])
         return []
 
     enrollable_courses_qs = Course.objects.select_related("page").filter(
@@ -504,7 +504,6 @@ def create_featured_items():
     )
 
     if not enrollable_courseruns.exists():
-        redis_cache.set(cache_key, [])
         return []
 
     self_paced_runs = []
@@ -537,7 +536,6 @@ def create_featured_items():
     all_course_ids = self_paced_course_ids + future_course_ids + started_course_ids
 
     if not all_course_ids:
-        redis_cache.set(cache_key, [])
         return []
 
     ordering = Case(
@@ -546,7 +544,8 @@ def create_featured_items():
     )
 
     # Store only course IDs to avoid pickling issues and ensure fresh data on retrieval
-    redis_cache.set(cache_key, all_course_ids)
+    # Use timeout=None so the cache never auto-expires; stale data is better than no data.
+    redis_cache.set(FEATURED_ITEMS_CACHE_KEY, all_course_ids, timeout=None)
 
     return list(
         Course.objects.filter(id__in=all_course_ids)

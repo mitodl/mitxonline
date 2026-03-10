@@ -48,6 +48,16 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--use-specific-course",
+            type=str,
+            nargs="?",
+            help=(
+                "Readable ID of an existing Course to use as the base course "
+                "for the imported run(s), instead of deriving it from the course key."
+            ),
+        )
+
+        parser.add_argument(
             "--program",
             type=str,
             nargs="?",
@@ -267,6 +277,7 @@ class Command(BaseCommand):
             run_data = import_courserun_from_edx(
                 course_key=edx_course.course_id,
                 live=kwargs.get("live", False),
+                use_specific_course=kwargs.get("use_specific_course"),
                 price=price,
                 block_countries=kwargs.get("block_countries"),
                 departments=kwargs.get("depts"),
@@ -280,23 +291,25 @@ class Command(BaseCommand):
                 is_source_run=kwargs.get("source_course", False),
             )
 
-            if run_data:
-                (run, page, product) = run_data
+            if not isinstance(run_data, tuple) or len(run_data) != 3:  # noqa: PLR2004
+                continue
 
-                success_count += 1
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Created new run {run.courseware_id} in course {run.course.readable_id}"
-                    )
+            run, page, product = run_data
+
+            success_count += 1
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Created new run {run.courseware_id} in course {run.course.readable_id}"
                 )
+            )
 
-                if page:
-                    self.stdout.write(self.style.SUCCESS(f"\t --> Created page {page}"))
+            if page:
+                self.stdout.write(self.style.SUCCESS(f"\t --> Created page {page}"))
 
-                if product:
-                    self.stdout.write(
-                        self.style.SUCCESS(f"\t --> Created product {product}")
-                    )
+            if product:
+                self.stdout.write(
+                    self.style.SUCCESS(f"\t --> Created product {product}")
+                )
 
         self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))
         return None

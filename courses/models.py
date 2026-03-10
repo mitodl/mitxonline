@@ -1305,6 +1305,13 @@ class CourseRun(TimestampedModel):
         """Flag to indicate if this is a run"""
         return True
 
+    @cached_property
+    def edx_modes(self):
+        """Get the edX course modes for this course."""
+        from openedx.api import get_edx_course_modes  # noqa: PLC0415
+
+        return get_edx_course_modes(self.courseware_id)
+
     def __str__(self):
         title = f"{self.courseware_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
@@ -1674,6 +1681,9 @@ class CourseRunEnrollmentCertificatePrefetcher(Prefetcher):
 
     @staticmethod
     def filter(course_run_and_user_ids):
+        if not course_run_and_user_ids:
+            return CourseRunCertificate.objects.none()
+
         id_filters = Q()
 
         # django 5.1 supports this via
@@ -1702,6 +1712,9 @@ class CourseRunEnrollmentGradesPrefetcher(Prefetcher):
 
     @staticmethod
     def filter(course_run_and_user_ids):
+        if not course_run_and_user_ids:
+            return CourseRunGrade.objects.none()
+
         id_filters = Q()
 
         # django 5.1 supports this via
@@ -1845,6 +1858,9 @@ class ProgramEnrollmentCertificatePrefetcher(Prefetcher):
 
     @staticmethod
     def filter(program_and_user_ids):
+        if not program_and_user_ids:
+            return ProgramCertificate.objects.none()
+
         id_filters = Q()
 
         # django 5.1 supports this via

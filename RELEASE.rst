@@ -1,6 +1,34 @@
 Release Notes
 =============
 
+Version 0.140.1 (Released March 09, 2026)
+---------------
+
+- Fix unbound query issue with program enrollments (#3366)
+- Fix performance for enrollments API w/ 0 results (#3360)
+- Add command to re-run an existing course run (#3352)
+- Adding prefetch for products in courses api (#3331)
+
+Version 0.139.4 (Released March 05, 2026)
+---------------
+
+- Fix error when a basket converts to an order, and has a product that has versions (#3355)
+- 10316 import courserun should allow the runs course to be set manually (#3347)
+
+Version 0.139.3 (Released March 05, 2026)
+---------------
+
+- Make featured homepage courses cache robust against task failures (#3353)
+
+Version 0.139.2 (Released March 04, 2026)
+---------------
+
+- Update featured courses deafult refresh (#3349)
+- MITx Online needs a management command for removing runs from contracts (#3344)
+- fix(deps): update dependency wagtail to v7.2.3 [security] (#3348)
+- Remove non-functional product_flexible_price from v2/courses apis (#3326)
+- Configurable learn dashboard redirect (#3233)
+
 Version 0.139.1 (Released March 03, 2026)
 ---------------
 

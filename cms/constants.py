@@ -10,3 +10,5 @@ SIGNATORY_INDEX_SLUG = "signatories"
 INSTRUCTOR_INDEX_SLUG = "instructors"
 
 ONE_MINUTE = 60
+
+FEATURED_ITEMS_CACHE_KEY = "CMS_homepage_featured_courses"

@@ -3,6 +3,7 @@
 import logging
 import random
 from datetime import datetime, timedelta
+from functools import partial
 from urllib.parse import parse_qs, urljoin, urlparse
 
 import requests
@@ -1542,29 +1543,59 @@ def update_edx_course(  # noqa: PLR0913
     )
 
 
-def process_course_run_clone(target_id: int, *, base_id: int | str | None = None):
+def fix_cloned_run_data(target_course: CourseRun, edx_client) -> CourseRun:
+    """Fix the title, pacing, and dates for a newly cloned run."""
+
+    course_params = [
+        target_course.readable_id,
+        target_course.title,
+        "self_paced" if target_course.is_self_paced else "instructor_paced",
+    ]
+
+    if target_course.start_date and target_course.end_date:
+        course_params.append(target_course.start_date)
+        course_params.append(target_course.end_date)
+
+        if target_course.enrollment_start and target_course.enrollment_end:
+            course_params.append(target_course.enrollment_start)
+            course_params.append(target_course.enrollment_end)
+
+    return update_edx_course(
+        *course_params,
+        client=edx_client,
+    )
+
+
+def process_course_run_clone(target_course: CourseRun, base_course_key: str):
     """
-    Clone a course run, using details from CourseRun objects in MITx Online.
+    Clone a course run in edX, using details from a set of MITx Online runs.
 
-    When we need a new course run (as a re-run or a special B2B course run), we
-    create the CourseRun object in the system, and then we need to make the run
-    in edX. This will assume there's a base course run that uses the readable ID
-    of the underlying _Course_ record, and will clone that. Some of the data from
-    the CourseRun will then be copied over into the newly cloned edX run (dates,
-    etc.) and the URL will be backfilled into the CourseRun.
+    In edX, re-running a course copies course content into the new run, and allows
+    you to change certain parameters of the resulting run. Depending on final setup,
+    the new run gets content updates from the parent course run.
 
-    If a different course run needs to be used as the base course, you can
-    set that. Pass either the PK of the course or the readable ID. If a readable
-    ID is passed, it will be supplied verbatim to the clone API. (In other words,
-    it can be a course that MITx Online doesn't know about.)
+    Re-running a course will instruct edX to re-run the specified base course,
+    using the parameters of the specified target course for the new run, including
+    the course run key (readable ID/courseware ID). Therefore, to use this, the
+    target_course must be set up properly before passing it in. Ensure that the
+    courseware ID is set up properly - including any run tag or organization field
+    changes - and that the run dates are set if necessary. Note that enrollment
+    dates can only be set if the course has a start and end date.
+
+    We'll kick off the re-run process, then update the new run with the data from
+    the target_course and ensure that the course modes are in as specified in the
+    target_course.
+
+    The base course can just be a course run key (as a string); it does not need
+    to exist in MITx Online.
+
+    The target course must _not_ exist in edX.
 
     Args:
-    - target_id (int): The PK of the target course (i.e. the one we're creating)
-    - base_id (int|str): The PK or readable ID of the base course to clone.
-    Returns:
-    bool, whether or not it worked
+    - target_course (CourseRun): The CourseRun to create in edX.
+    Kwargs:
+    - base_course_key (str): The key of the course to re-run.
     """
-    from courses.api import check_course_modes  # noqa: PLC0415
 
     edx_client = get_edx_api_jwt_client(
         settings.OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID,
@@ -1572,24 +1603,9 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
         use_studio=True,
     )
 
-    target_course = courses.models.CourseRun.objects.get(pk=target_id)
-    base_course = target_course.course.readable_id
-
-    if base_id:
-        if base_id is int:
-            if courses.models.Course.objects.filter(pk=base_id).exists():
-                base_course = courses.models.Course.objects.get(pk=base_id).readable_id
-            elif courses.models.CourseRun.objects.filter(pk=base_id).exists():
-                base_course = courses.models.CourseRun.objects.get(
-                    pk=base_id
-                ).readable_id
-            else:
-                msg = f"Specified base course {base_id} doesn't exist."
-                raise ValueError(msg)
-        else:
-            base_course = str(base_id)
-
-    get_edx_course(base_course, client=edx_client)
+    # Ensure the base course exists on the edX side. You may pass a key in that
+    # does not exist in MITx Online, so we can't just check locally.
+    get_edx_course(base_course_key, client=edx_client)
 
     try:
         get_edx_course(target_course.readable_id, client=edx_client)
@@ -1600,53 +1616,25 @@ def process_course_run_clone(target_id: int, *, base_id: int | str | None = None
         # An HTTP error is good in this case. We don't want the target course to exist.
         pass
 
-    resp = clone_edx_course(base_course, target_course.readable_id, client=edx_client)
+    resp = clone_edx_course(
+        base_course_key, target_course.readable_id, client=edx_client
+    )
 
     if not resp:
-        msg = f"Couldn't clone {base_course} to {target_course.readable_id}."
+        msg = f"Couldn't clone {base_course_key} to {target_course.readable_id}."
         raise ValueError(msg)
 
     # We should have the target course in edX now. We need to update it with the
     # data from our course run.
-
-    course_params = [
-        target_course.readable_id,
-        target_course.title,
-        "self_paced" if target_course.is_self_paced else "instructor_paced",
-    ]
-
-    # We can only specify the start and end dates if there are both of them.
-    # And, we can only specify enrollment start/stop if there are both of them
-    # and the course has start/end dates.
-
-    if target_course.start_date and target_course.end_date:
-        course_params.append(target_course.start_date)
-        course_params.append(target_course.end_date)
-
-        if target_course.enrollment_start and target_course.enrollment_end:
-            course_params.append(target_course.enrollment_start)
-            course_params.append(target_course.enrollment_end)
-
-    resp = update_edx_course(
-        *course_params,
-        client=edx_client,
+    # Run these after the transaction that this will most likely be
+    transaction.on_commit(
+        partial(fix_cloned_run_data, target_course=target_course, edx_client=edx_client)
     )
-
-    # Ensure the new course has the proper modes in it.
-    check_course_modes(target_course)
-
-    # Set the ingestion flag on the course run to True
-    # All B2B courses should be flagged for content file ingestion - we can
-    # toggle it off manually if necessary.
-    # In the odd chance we don't have a page, trigger a warning.
-    if target_course.course.page:
-        target_course.course.page.ingest_content_files_for_ai = True
-        target_course.course.save()
-    else:
-        log.warning(
-            "Warning: processed course run clone for %s but can't set the ingestion flag because there's no CoursePage",
-            target_course,
+    transaction.on_commit(
+        partial(
+            push_edx_modes_from_run, course_run=target_course, edx_client=edx_client
         )
+    )
 
 
 def get_edx_course_modes(
@@ -1753,3 +1741,27 @@ def delete_edx_course_mode(
         course_id=course_id,
         mode_slug=mode_slug,
     )
+
+
+def push_edx_modes_from_run(course_run: CourseRun, *, edx_client=None) -> int:
+    """Push course modes from the run into edX. Returns the number of modes created."""
+
+    existing_mode_slugs = [edx_mode.mode_slug for edx_mode in course_run.edx_modes]
+    created_count = 0
+
+    for mode in course_run.enrollment_modes.all():
+        if mode.mode_slug not in existing_mode_slugs:
+            # If the mode requires payment, the price gets set to a nominal amount
+            # because it just needs to be non-zero. edX doesn't need to know what
+            # the price actually is, which is sometimes ambiguous anyway.
+
+            create_edx_course_mode(
+                course_id=course_run.courseware_id,
+                mode_slug=mode.mode_slug,
+                mode_display_name=mode.mode_display_name,
+                min_price=(1 if mode.requires_payment else 0),
+                client=edx_client,
+            )
+            created_count += 1
+
+    return created_count

@@ -146,3 +146,31 @@ class TestImportCourserunCommand:
         command = import_courserun.Command()
         result = command.handle(contract="nonexistent-contract")
         assert result is False
+
+    def test_use_specific_course_flag_passed_to_api(
+        self, mocker, mock_edx_api_client, mock_edx_course_detail
+    ):
+        """Test that --use-specific-course is forwarded to the import API"""
+
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+
+        import_mock = mocker.patch(
+            "courses.management.commands.import_courserun.import_courserun_from_edx"
+        )
+
+        command = import_courserun.Command()
+
+        use_specific_course = "course-v1:MITx+6.00x"
+
+        command.handle(
+            courserun=mock_edx_course_detail.course_id,
+            use_specific_course=use_specific_course,
+        )
+
+        import_mock.assert_called_once()
+        _, kwargs = import_mock.call_args
+        assert kwargs["course_key"] == mock_edx_course_detail.course_id
+        assert kwargs["use_specific_course"] == use_specific_course

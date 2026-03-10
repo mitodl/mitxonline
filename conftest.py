@@ -84,4 +84,5 @@ def pytest_configure(config):
 @pytest.fixture(autouse=True, scope="module")
 def fake() -> Faker:
     """Fixture to provide a Faker instance"""
+
     return Faker()

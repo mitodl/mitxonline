@@ -18,10 +18,10 @@ from courses.serializers.v1.base import (
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
-    ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
+from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -233,7 +233,7 @@ class CourseSerializer(BaseCourseSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductRelatedField(many=True, read_only=True)
+    products = serializers.SerializerMethodField(method_name="get_products")
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
@@ -258,6 +258,17 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
 
+    @extend_schema_field(list)
+    def get_products(self, obj):
+        # Use prefetched products if available to avoid N+1 queries
+        products = (
+            obj.prefetched_products
+            if hasattr(obj, "prefetched_products")
+            else obj.products.all()
+        )
+
+        return BaseProductSerializer(products, many=True, context=self.context).data
+
 
 @extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
 class CourseWithCourseRunsSerializer(CourseSerializer):
@@ -267,22 +278,27 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
 
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
-        """Get the course runs for the given instance."""
-        courseruns = instance.courseruns.prefetch_related("enrollment_modes").order_by(
-            "id"
-        )
-
+        # Use prefetched course runs to preserve prefetched products
+        courseruns = instance.courseruns.all()
         if "org_id" in self.context:
-            courseruns = courseruns.filter(
-                b2b_contract__organization_id=self.context["org_id"]
-            )
+            courseruns = [
+                run
+                for run in courseruns
+                if getattr(run.b2b_contract, "organization_id", None)
+                == int(self.context["org_id"])
+            ]
         if "contract_id" in self.context:
-            courseruns = courseruns.filter(b2b_contract_id=self.context["contract_id"])
-
+            courseruns = [
+                run
+                for run in courseruns
+                if getattr(run.b2b_contract, "id", None)
+                == int(self.context["contract_id"])
+            ]
         if "org_id" not in self.context and "contract_id" not in self.context:
-            courseruns = courseruns.filter(b2b_contract_id=None)
-
-        return CourseRunSerializer(courseruns, many=True, read_only=True).data
+            courseruns = [run for run in courseruns if run.b2b_contract_id is None]
+        return CourseRunSerializer(
+            courseruns, many=True, read_only=True, context=self.context
+        ).data
 
     class Meta:
         model = models.Course

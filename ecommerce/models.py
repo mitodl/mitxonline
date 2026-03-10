@@ -804,7 +804,14 @@ class PendingOrder(Order):
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
         for product in products:
-            product_versions.append(Version.objects.get_for_object(product).get())
+            # Per docs, this should sort most recent first.
+            product_version = Version.objects.get_for_object(product).first()
+
+            if not product_version:
+                msg = f"Product {product} is improperly constructed: no versions"
+                raise ValueError(msg)
+
+            product_versions.append(product_version)
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
