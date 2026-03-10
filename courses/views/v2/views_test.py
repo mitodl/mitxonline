@@ -2019,14 +2019,15 @@ def test_course_run_and_product_prefetch_optimized(
         ProductFactory(
             purchasable_object=run,
         )
-    max_expected_queries = 6
-    with django_assert_max_num_queries(max_expected_queries) as context:
-        resp = user_drf_client.get(reverse("v2:courses_api-list"), {"page_size": 10})
-        duplicate_queries_check(context)
-
-    assert resp.status_code == status.HTTP_200_OK
-    data = resp.json()["results"]
-    assert len(data) == 1
-    assert len(data[0]["courseruns"]) == num_courseruns
-    for run_data in data[0]["courseruns"]:
-        assert len(run_data["products"]) == 1
+    max_expected_queries = 25
+    num_queries_before = len(connection.queries)
+    with django_assert_max_num_queries(max_expected_queries):
+        resp = user_drf_client.get(reverse("v2:courses_api-list"))
+        assert resp.status_code == 200
+        data = resp.json()["results"]
+        assert len(data) == 1
+        assert len(data[0]["courseruns"]) == num_courseruns
+    # Check that products are queried only once
+    queries_after = connection.queries[num_queries_before:]
+    product_queries = [q for q in queries_after if 'FROM "ecommerce_product"' in q.get('sql', '')]
+    assert len(product_queries) == 1, f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"

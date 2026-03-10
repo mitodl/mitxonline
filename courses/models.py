@@ -951,13 +951,15 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Gets active products for the first unexpired courserun for this course
 
         Returns:
-        - ProductsQuerySet
+        - ProductsQuerySet or list
         """
         relevant_run = self.first_unexpired_run
-
-        return (
-            relevant_run.products.filter(is_active=True).all() if relevant_run else None
-        )
+        if relevant_run is None:
+            return None
+        # Use prefetched products if available
+        if hasattr(relevant_run, "prefetched_products"):
+            return [p for p in relevant_run.prefetched_products if p.is_active]
+        return relevant_run.products.filter(is_active=True).all()
 
     @cached_property
     def first_unexpired_run(self):
