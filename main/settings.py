@@ -1123,6 +1123,7 @@ PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"  # noqa: S1
 import_settings_modules(
     "mitol.authentication.settings.djoser_settings",
     "mitol.payment_gateway.settings.cybersource",
+    "mitol.olposthog.settings.olposthog",
 )
 
 # mitol-django-common
@@ -1348,36 +1349,6 @@ HUBSPOT_TASK_DELAY = get_int(
     name="HUBSPOT_TASK_DELAY",
     default=60,
     description="Number of milliseconds to wait between consecutive Hubspot calls",
-)
-
-# PostHog related settings
-POSTHOG_PROJECT_API_KEY = get_string(
-    name="POSTHOG_PROJECT_API_KEY",
-    default="",
-    description="API token to communicate with PostHog",
-)
-
-POSTHOG_API_HOST = get_string(
-    name="POSTHOG_API_HOST",
-    default="",
-    description="API host for PostHog",
-)
-POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS = get_int(
-    name="POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS",
-    default=3000,
-    description="Timeout(MS) for PostHog feature flag requests.",
-)
-
-POSTHOG_MAX_RETRIES = get_int(
-    name="POSTHOG_MAX_RETRIES",
-    default=3,
-    description="Number of times that requests to PostHog should be retried after failing.",
-)
-
-POSTHOG_ENABLED = get_bool(
-    name="POSTHOG_ENABLED",
-    default=False,
-    description="Whether PostHog is enabled",
 )
 
 # HomePage Hubspot Form Settings
