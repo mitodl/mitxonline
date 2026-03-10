@@ -380,6 +380,11 @@ class CertificatePage(CourseProgramChildPage):
         help_text="For verifiable credentials issued for this certificate, this is the criteria narrative field. It should be something descriptive, like a list of completed courses, and may be plaintext or markdown",
     )
 
+    should_provision_verifiable_credential = models.BooleanField(
+        default=False,
+        help_text="Whether a verifiable credential should be provisioned for this certificate.",
+    )
+
     content_panels = [
         FieldPanel("product_name"),
         FieldPanel("CEUs"),
