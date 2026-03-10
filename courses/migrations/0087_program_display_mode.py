@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
                 max_length=32,
                 choices=[("course", "course")],
                 help_text=(
-                    "Set to 'course' to treat this program as a course in APIs."
+                    "Provide a hint to other services (frontends, aggregators) about how this program should treated."
                 ),
             ),
         ),
