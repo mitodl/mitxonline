@@ -25,7 +25,6 @@ from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
 )
-from mitol.olposthog.features import is_enabled
 from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -1558,14 +1557,20 @@ def request_verifiable_credential(payload) -> dict:
     return resp.json()
 
 
-def should_provision_verifiable_credential() -> bool:
-    return (
-        is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING, False)  # noqa: FBT003
-        or settings.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING
-    )
+def should_provision_verifiable_credential(
+    certificate: ProgramCertificate | CourseRunCertificate,
+) -> bool:
+    certificate_page_revision = certificate.certificate_page_revision
+    if certificate_page_revision:
+        certificate_page = certificate_page_revision.as_object()
+        return certificate_page.should_provision_verifiable_credential
+
+    return False
 
 
-def create_verifiable_credential(certificate: BaseCertificate, *, raise_on_error=False):
+def create_verifiable_credential(
+    certificate: ProgramCertificate | CourseRunCertificate, *, raise_on_error=False
+):
     """
     Create a verifiable credential for the given course run certificate.
 
@@ -1574,7 +1579,7 @@ def create_verifiable_credential(certificate: BaseCertificate, *, raise_on_error
         raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
     """
     try:
-        if not should_provision_verifiable_credential():
+        if not should_provision_verifiable_credential(certificate):
             return
         payload = get_verifiable_credentials_payload(certificate)
 
