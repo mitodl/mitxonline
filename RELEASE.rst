@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.141.3
+Version 1.141.3 (Released March 11, 2026)
 ---------------
 
 - Add filter to context to filter enrollable courseruns (#3377)
