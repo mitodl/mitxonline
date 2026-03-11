@@ -141,6 +141,24 @@ def test_serialize_course_required_prerequisites(
     )
 
 
+def test_course_with_course_runs_only_includes_enrollable_runs(mock_context, settings):
+    """CourseWithCourseRunsSerializer should only return enrollable course runs."""
+    # Create a course with two runs: one enrollable (default factory), one not enrollable
+    enrollable_run = CourseRunFactory.create()
+    course = enrollable_run.course
+
+    # Make a non-enrollable run for the same course by setting enrollment_end in the past
+    non_enrollable_run = CourseRunFactory.create(
+        course=course, past_enrollment_end=True
+    )
+
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+
+    # Only the enrollable run should be present
+    returned_run_ids = {run["id"] for run in data["courseruns"]}
+    assert returned_run_ids == {enrollable_run.id}
+
+
 class TestCourseRunEnrollmentSerializerV2:
     """Test the v2 CourseRunEnrollmentSerializer."""
 
