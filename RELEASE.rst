@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.141.3
+---------------
+
+- Add filter to context to filter enrollable courseruns (#3377)
+- correct default course / program image behavior (#3351)
+
 Version 0.141.1 (Released March 11, 2026)
 ---------------
 
