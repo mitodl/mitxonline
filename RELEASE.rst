@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.141.0 (Released March 11, 2026)
+---------------
+
+- 10405 add display mode field for mitxonline programs returned in the api (#3358)
+- Add server-side redirect for /dashboard to learn.mit.edu (#3356)
+- update olposthog (#3370)
+- Check for a null start date; emit nothing in that case (#3368)
+- Don't attempt to add users to Keycloak orgs if there's no org to add to (#3359)
+- Fix sometimes flaky program filter test bug (#3364)
+- Add search and filters to enrollment code attachment Django admin (#3362)
+
 Version 0.140.1 (Released March 09, 2026)
 ---------------
 
