@@ -248,7 +248,6 @@ def test_get_courses(
     params = {"page_size": 100}
 
     courses = Course.objects.order_by("title").prefetch_related("departments")
-
     if include_finaid is not None:
         mock_context["include_approved_financial_aid"] = include_finaid
         params["include_approved_financial_aid"] = include_finaid

@@ -279,6 +279,14 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     def get_courseruns(self, instance):
         # Use prefetched course runs to preserve prefetched products
         courseruns = instance.courseruns.all()
+        if hasattr(instance, "prefetched_courseruns"):
+            courseruns = instance.prefetched_courseruns
+        # Filter by enrollable status if context parameter is present
+        if "courserun_is_enrollable" in self.context:
+            courseruns = [
+                run for run in courseruns
+                if getattr(run, "is_enrollable", False) == True
+            ]
         if "org_id" in self.context:
             courseruns = [
                 run
