@@ -520,10 +520,11 @@ export class EnrolledItemCard extends React.Component<
                     className="btn btn-primary btn-gradient-red-to-blue disabled"
                     rel="noopener noreferrer"
                   >
-                    Starts{" "}
-                    {formatPrettyMonthDate(
-                      parseDateString(enrollment.run.start_date)
-                    )}
+                    {enrollment.run.start_date
+                      ? `Starts ${formatPrettyMonthDate(
+                          parseDateString(enrollment.run.start_date)
+                        )}`
+                      : "Coming Soon"}
                   </a>
                 )}
               </div>
