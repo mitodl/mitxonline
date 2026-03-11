@@ -2,6 +2,8 @@ import React from "react"
 import { CSSTransition, TransitionGroup } from "react-transition-group"
 import { getStartDateText } from "../../lib/util"
 
+const DEFAULT_COURSE_IMG = "/static/images/mit-dome.png"
+
 import {
   coursesCountSelector,
   coursesSelector,
@@ -664,8 +666,11 @@ export class CatalogPage extends React.Component<Props> {
         <a href={course.page.page_url} key={course.id}>
           <div className="col catalog-item">
             <img
-              src={course?.page?.feature_image_src}
-              key={course.id + course?.page?.feature_image_src}
+              src={course?.page?.feature_image_src || DEFAULT_COURSE_IMG}
+              key={
+                course.id +
+                (course?.page?.feature_image_src || DEFAULT_COURSE_IMG)
+              }
               alt=""
             />
             <div className="catalog-item-description">
@@ -691,8 +696,11 @@ export class CatalogPage extends React.Component<Props> {
           <div className="col catalog-item">
             <div className="program-image-and-badge">
               <img
-                src={program?.page?.feature_image_src}
-                key={program.id + program?.page?.feature_image_src}
+                src={program?.page?.feature_image_src || DEFAULT_COURSE_IMG}
+                key={
+                  program.id +
+                  (program?.page?.feature_image_src || DEFAULT_COURSE_IMG)
+                }
                 alt=""
               />
               <div className="program-type-badge">{program.program_type}</div>
