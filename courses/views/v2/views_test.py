@@ -1312,6 +1312,52 @@ def test_filter_by_contract_id_unauthenticated_user(
 
 
 @pytest.mark.django_db
+def test_filter_programs_by_org_and_contract_no_duplicates(
+    contract_ready_course, mock_course_run_clone
+):
+    """Filtering by both org_id and contract_id should not return duplicate programs."""
+
+    org = OrganizationPageFactory()
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+
+    # Two active contracts for the same organization
+    contract_primary = ContractPageFactory(active=True, organization=org)
+    contract_other = ContractPageFactory(active=True, organization=org)
+
+    # User only has access to the primary contract
+    user.b2b_contracts.add(contract_primary)
+
+    # Program shared by both contracts
+    program = ProgramFactory()
+    (course, _) = contract_ready_course
+    program.add_requirement(course)
+    program.refresh_from_db()
+
+    contract_primary.add_program_courses(program)
+    contract_other.add_program_courses(program)
+
+    request = Request(
+        RequestFactory().get(
+            "v2:programs_api-list",
+            {"org_id": org.id, "contract_id": contract_primary.id},
+        )
+    )
+    request.user = user
+
+    filterset = ProgramFilterSet(
+        data={"org_id": org.id, "contract_id": contract_primary.id},
+        queryset=Program.objects.all(),
+        request=request,
+    )
+
+    filtered = list(filterset.qs)
+    # The shared program should only appear once
+    assert program in filtered
+    assert len(filtered) == 1
+
+
+@pytest.mark.django_db
 def test_filter_courses_with_contract_id_authenticated_user(
     mocker, contract_ready_course, mock_course_run_clone
 ):
