@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.141.0
+Version 0.141.0 (Released March 11, 2026)
 ---------------
 
 - 10405 add display mode field for mitxonline programs returned in the api (#3358)
