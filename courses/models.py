@@ -1225,12 +1225,16 @@ class CourseRun(TimestampedModel):
         Checks if the course can be upgraded
         A null value means that the upgrade window is always open
         """
+        if hasattr(self, "prefetched_products"):
+            has_product = bool(self.prefetched_products)
+        else:
+            has_product = self.products.exists()
         return (
             self.live is True
             and (
                 self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
             )
-            and self.products.count() > 0
+            and has_product
         )
 
     @cached_property
