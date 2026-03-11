@@ -26,13 +26,13 @@ def openedx_private_auth_complete(request):  # noqa: ARG001
 @extend_schema(exclude=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def edx_course_staff_webhook(request):  # noqa: PLR0911
+def edx_enrollment_webhook(request):  # noqa: PLR0911
     """
-    Webhook endpoint that receives course staff addition notifications from Open edX.
+    Webhook endpoint that receives enrollment notifications from Open edX.
 
-    When an instructor or staff member is added to a course in Open edX, the
-    ol_openedx_course_staff_webhook plugin POSTs to this endpoint so MITx Online
-    can enroll them as an auditor in the corresponding course run.
+    When a user needs to be enrolled in a course (e.g., staff/instructor role added),
+    the Open edX plugin POSTs to this endpoint so MITx Online can enroll them as an
+    auditor in the corresponding course run.
 
     Expected payload:
         {
@@ -118,7 +118,7 @@ def edx_course_staff_webhook(request):  # noqa: PLR0911
 
     # --- Enroll user as auditor ---
     try:
-        enrollments, _edx_request_success = create_run_enrollments(
+        enrollments, edx_request_success = create_run_enrollments(
             user,
             [course_run],
             keep_failed_enrollments=True,
@@ -136,18 +136,26 @@ def edx_course_staff_webhook(request):  # noqa: PLR0911
 
     if enrollments:
         enrollment = enrollments[0]
+        if not edx_request_success:
+            log.warning(
+                "Webhook: Local enrollment created but edX API call failed for user %s in course run %s",
+                email,
+                course_id,
+            )
         log.info(
-            "Webhook: Successfully enrolled user %s in course run %s as auditor (role: %s, active: %s)",
+            "Webhook: Successfully enrolled user %s in course run %s as auditor (role: %s, active: %s, edx_synced: %s)",
             email,
             course_id,
             role,
             enrollment.active,
+            edx_request_success,
         )
         return Response(
             {
                 "message": "Enrollment successful",
                 "enrollment_id": enrollment.id,
                 "active": enrollment.active,
+                "edx_enrolled": enrollment.edx_enrolled,
             },
             status=status.HTTP_200_OK,
         )

@@ -12,7 +12,7 @@ from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
-WEBHOOK_URL = "openedx-course-staff-webhook"
+WEBHOOK_URL = "openedx-enrollment-webhook"
 TEST_WEBHOOK_KEY = "test-webhook-secret-key"
 
 
@@ -29,8 +29,8 @@ def test_openedx_private_auth_complete_view(client, route):
     assert response.status_code == status.HTTP_200_OK
 
 
-class TestEdxCourseStaffWebhook:
-    """Tests for the edx_course_staff_webhook view"""
+class TestEdxEnrollmentWebhook:
+    """Tests for the edx_enrollment_webhook view"""
 
     @pytest.fixture
     def api_client(self):
