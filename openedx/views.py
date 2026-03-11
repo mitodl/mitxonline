@@ -4,6 +4,7 @@ import logging
 
 from django.conf import settings
 from django.http import HttpResponse
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -22,6 +23,7 @@ def openedx_private_auth_complete(request):  # noqa: ARG001
     return HttpResponse(status=status.HTTP_200_OK)
 
 
+@extend_schema(exclude=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def edx_course_staff_webhook(request):  # noqa: PLR0911
