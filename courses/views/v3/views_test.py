@@ -8,20 +8,353 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from courses.conftest import B2BCourses, UserWithEnrollmentsAndCerts
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import ProgramEnrollmentFactory, ProgramFactory
 from courses.models import (
     ProgramEnrollment,
 )
 from courses.serializers.v3.programs import SimpleProgramSerializer
-from courses.test_utils import maybe_serialize_program_cert
+from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
+from main.test_utils import drf_datetime
 
-pytestmark = [pytest.mark.django_db]
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True),
+    pytest.mark.parametrize("course_catalog_program_count", [20], indirect=True),
+    pytest.mark.usefixtures("b2b_courses", "course_catalog_data"),
+]
 
 
-@pytest.mark.usefixtures("b2b_courses")
-@pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
-@pytest.mark.parametrize("course_catalog_program_count", [20], indirect=True)
+def test_user_enrollments_detail(
+    user_drf_client,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+    enrollment = user_with_enrollments_and_certificates.run_enrollments[0]
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-detail", kwargs={"pk": enrollment.id})
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == {
+        "id": enrollment.id,
+        "run": {
+            "id": enrollment.run.id,
+            "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
+            "is_enrollable": enrollment.run.is_enrollable,
+            "is_self_paced": enrollment.run.is_self_paced,
+            "is_upgradable": enrollment.run.is_upgradable,
+            "live": enrollment.run.live,
+            "run_tag": enrollment.run.run_tag,
+            "start_date": drf_datetime(enrollment.run.start_date),
+            "title": enrollment.run.title,
+            "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
+            "certificate_available_date": drf_datetime(
+                enrollment.run.certificate_available_date
+            ),
+            "course_number": enrollment.run.course_number,
+            "courseware_id": enrollment.run.courseware_id,
+            "courseware_url": enrollment.run.courseware_url,
+            "end_date": drf_datetime(enrollment.run.end_date)
+            if enrollment.run.end_date
+            else None,
+            "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
+            "enrollment_modes": [],
+            "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
+            "expiration_date": drf_datetime(enrollment.run.expiration_date),
+            "course": {
+                "id": enrollment.run.course_id,
+                "readable_id": enrollment.run.course.readable_id,
+                "title": "Test page",
+                "type": "course",
+            },
+        },
+        "edx_emails_subscription": enrollment.edx_emails_subscription,
+        "grades": [
+            {
+                "grade": grade.grade,
+                "letter_grade": grade.letter_grade,
+                "passed": grade.passed,
+                "set_by_admin": grade.set_by_admin,
+                "grade_percent": grade.grade_percent,
+            }
+            for grade in enrollment.grades
+        ],
+        "b2b_contract_id": enrollment.run.b2b_contract_id,
+        "b2b_organization_id": enrollment.run.b2b_contract.organization_id
+        if enrollment.run.b2b_contract
+        else None,
+        "enrollment_mode": enrollment.enrollment_mode,
+        "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+    }
+
+
+def test_user_enrollments_list(
+    user_drf_client,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == [
+        {
+            "id": enrollment.id,
+            "run": {
+                "id": enrollment.run.id,
+                "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
+                "is_enrollable": enrollment.run.is_enrollable,
+                "is_self_paced": enrollment.run.is_self_paced,
+                "is_upgradable": enrollment.run.is_upgradable,
+                "live": enrollment.run.live,
+                "run_tag": enrollment.run.run_tag,
+                "start_date": drf_datetime(enrollment.run.start_date),
+                "title": enrollment.run.title,
+                "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
+                "certificate_available_date": drf_datetime(
+                    enrollment.run.certificate_available_date
+                ),
+                "course_number": enrollment.run.course_number,
+                "courseware_id": enrollment.run.courseware_id,
+                "courseware_url": enrollment.run.courseware_url,
+                "end_date": drf_datetime(enrollment.run.end_date)
+                if enrollment.run.end_date
+                else None,
+                "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
+                "enrollment_modes": [],
+                "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
+                "expiration_date": drf_datetime(enrollment.run.expiration_date),
+                "course": {
+                    "id": enrollment.run.course_id,
+                    "readable_id": enrollment.run.course.readable_id,
+                    "title": "Test page",
+                    "type": "course",
+                },
+            },
+            "edx_emails_subscription": enrollment.edx_emails_subscription,
+            "grades": [
+                {
+                    "grade": grade.grade,
+                    "letter_grade": grade.letter_grade,
+                    "passed": grade.passed,
+                    "set_by_admin": grade.set_by_admin,
+                    "grade_percent": grade.grade_percent,
+                }
+                for grade in enrollment.grades
+            ],
+            "b2b_contract_id": enrollment.run.b2b_contract_id,
+            "b2b_organization_id": enrollment.run.b2b_contract.organization_id
+            if enrollment.run.b2b_contract
+            else None,
+            "enrollment_mode": enrollment.enrollment_mode,
+            "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+        }
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+    ]
+
+
+def test_user_enrollments_list_filter_org_id(
+    user_drf_client,
+    b2b_courses: B2BCourses,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+    org = b2b_courses.organizations[0]
+
+    for org in b2b_courses.organizations:
+        resp = user_drf_client.get(
+            reverse("v3:user_enrollments_api-list"), {"org_id": org.id}
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.json() == [
+            {
+                "id": enrollment.id,
+                "run": {
+                    "id": enrollment.run.id,
+                    "is_archived": enrollment.run.is_enrollable
+                    and enrollment.run.is_past,
+                    "is_enrollable": enrollment.run.is_enrollable,
+                    "is_self_paced": enrollment.run.is_self_paced,
+                    "is_upgradable": enrollment.run.is_upgradable,
+                    "live": enrollment.run.live,
+                    "run_tag": enrollment.run.run_tag,
+                    "start_date": drf_datetime(enrollment.run.start_date),
+                    "title": enrollment.run.title,
+                    "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
+                    "certificate_available_date": drf_datetime(
+                        enrollment.run.certificate_available_date
+                    ),
+                    "course_number": enrollment.run.course_number,
+                    "courseware_id": enrollment.run.courseware_id,
+                    "courseware_url": enrollment.run.courseware_url,
+                    "end_date": drf_datetime(enrollment.run.end_date)
+                    if enrollment.run.end_date
+                    else None,
+                    "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
+                    "enrollment_modes": [],
+                    "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
+                    "expiration_date": drf_datetime(enrollment.run.expiration_date),
+                    "course": {
+                        "id": enrollment.run.course_id,
+                        "readable_id": enrollment.run.course.readable_id,
+                        "title": "Test page",
+                        "type": "course",
+                    },
+                },
+                "edx_emails_subscription": enrollment.edx_emails_subscription,
+                "grades": [
+                    {
+                        "grade": grade.grade,
+                        "letter_grade": grade.letter_grade,
+                        "passed": grade.passed,
+                        "set_by_admin": grade.set_by_admin,
+                        "grade_percent": grade.grade_percent,
+                    }
+                    for grade in enrollment.grades
+                ],
+                "b2b_contract_id": enrollment.run.b2b_contract_id,
+                "b2b_organization_id": enrollment.run.b2b_contract.organization_id
+                if enrollment.run.b2b_contract
+                else None,
+                "enrollment_mode": enrollment.enrollment_mode,
+                "certificate": maybe_serialize_course_cert(
+                    enrollment.run, enrollment.user
+                ),
+            }
+            for enrollment in user_with_enrollments_and_certificates.run_enrollments
+            if enrollment.run in b2b_courses.course_runs_by_org_id[org.id]
+        ]
+
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-list"), {"org_id": 99999}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == []
+
+
+def test_user_enrollments_list_filter_exclude_b2b(
+    user_drf_client,
+    b2b_courses: B2BCourses,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+):
+    """Test that user enrollments can be filtered by B2B organization ID"""
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-list"), {"exclude_b2b": True}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == [
+        {
+            "id": enrollment.id,
+            "run": {
+                "id": enrollment.run.id,
+                "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
+                "is_enrollable": enrollment.run.is_enrollable,
+                "is_self_paced": enrollment.run.is_self_paced,
+                "is_upgradable": enrollment.run.is_upgradable,
+                "live": enrollment.run.live,
+                "run_tag": enrollment.run.run_tag,
+                "start_date": drf_datetime(enrollment.run.start_date),
+                "title": enrollment.run.title,
+                "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
+                "certificate_available_date": drf_datetime(
+                    enrollment.run.certificate_available_date
+                ),
+                "course_number": enrollment.run.course_number,
+                "courseware_id": enrollment.run.courseware_id,
+                "courseware_url": enrollment.run.courseware_url,
+                "end_date": drf_datetime(enrollment.run.end_date)
+                if enrollment.run.end_date
+                else None,
+                "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
+                "enrollment_modes": [],
+                "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
+                "expiration_date": drf_datetime(enrollment.run.expiration_date),
+                "course": {
+                    "id": enrollment.run.course_id,
+                    "readable_id": enrollment.run.course.readable_id,
+                    "title": "Test page",
+                    "type": "course",
+                },
+            },
+            "edx_emails_subscription": enrollment.edx_emails_subscription,
+            "grades": [
+                {
+                    "grade": grade.grade,
+                    "letter_grade": grade.letter_grade,
+                    "passed": grade.passed,
+                    "set_by_admin": grade.set_by_admin,
+                    "grade_percent": grade.grade_percent,
+                }
+                for grade in enrollment.grades
+            ],
+            "b2b_contract_id": None,
+            "b2b_organization_id": None,
+            "enrollment_mode": enrollment.enrollment_mode,
+            "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+        }
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+        if enrollment.run not in b2b_courses.course_runs
+    ]
+
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-list"), {"exclude_b2b": False}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == [
+        {
+            "id": enrollment.id,
+            "run": {
+                "id": enrollment.run.id,
+                "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
+                "is_enrollable": enrollment.run.is_enrollable,
+                "is_self_paced": enrollment.run.is_self_paced,
+                "is_upgradable": enrollment.run.is_upgradable,
+                "live": enrollment.run.live,
+                "run_tag": enrollment.run.run_tag,
+                "start_date": drf_datetime(enrollment.run.start_date),
+                "title": enrollment.run.title,
+                "upgrade_deadline": drf_datetime(enrollment.run.upgrade_deadline),
+                "certificate_available_date": drf_datetime(
+                    enrollment.run.certificate_available_date
+                ),
+                "course_number": enrollment.run.course_number,
+                "courseware_id": enrollment.run.courseware_id,
+                "courseware_url": enrollment.run.courseware_url,
+                "end_date": drf_datetime(enrollment.run.end_date)
+                if enrollment.run.end_date
+                else None,
+                "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
+                "enrollment_modes": [],
+                "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
+                "expiration_date": drf_datetime(enrollment.run.expiration_date),
+                "course": {
+                    "id": enrollment.run.course_id,
+                    "readable_id": enrollment.run.course.readable_id,
+                    "title": "Test page",
+                    "type": "course",
+                },
+            },
+            "edx_emails_subscription": enrollment.edx_emails_subscription,
+            "grades": [
+                {
+                    "grade": grade.grade,
+                    "letter_grade": grade.letter_grade,
+                    "passed": grade.passed,
+                    "set_by_admin": grade.set_by_admin,
+                    "grade_percent": grade.grade_percent,
+                }
+                for grade in enrollment.grades
+            ],
+            "b2b_contract_id": enrollment.run.b2b_contract_id,
+            "b2b_organization_id": enrollment.run.b2b_contract.organization_id
+            if enrollment.run.b2b_contract
+            else None,
+            "enrollment_mode": enrollment.enrollment_mode,
+            "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
+        }
+        for enrollment in user_with_enrollments_and_certificates.run_enrollments
+    ]
+
+
 def test_program_enrollments(
     user_drf_client,
     user_with_enrollments_and_certificates,
@@ -31,7 +364,7 @@ def test_program_enrollments(
     Tests the program enrollments API, which should show the user's enrollment
     in programs with the course runs that apply.
     """
-    user = user_with_enrollments_and_certificates
+    user = user_with_enrollments_and_certificates.user
 
     program_enrollments = (
         ProgramEnrollment.objects.filter(user=user)

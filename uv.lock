@@ -1,6 +1,6 @@
 version = 1
-revision = 3
-requires-python = "==3.11.*"
+revision = 2
+requires-python = ">=3.11.0, <3.12"
 
 [[package]]
 name = "amqp"
@@ -1798,7 +1798,7 @@ wheels = [
 
 [[package]]
 name = "mitol-django-olposthog"
-version = "2025.8.1"
+version = "2026.3.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
@@ -1806,9 +1806,9 @@ dependencies = [
     { name = "mitol-django-common" },
     { name = "posthog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bb/9f/275cd29a76432be4351eaa2e1fc51ea89dc8615bcd0edbf2b9a9675585a3/mitol_django_olposthog-2025.8.1.tar.gz", hash = "sha256:98dbb68b94c836626f0afce5b23c1c594e96d1ebf62bcd756d676cf8f89bf492", size = 4240, upload-time = "2025-08-01T11:15:53.271Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/5f/3e9a4ea3b699d803858440b10c0cff2981ae92c1975ca56ec462733740e0/mitol_django_olposthog-2026.3.6.tar.gz", hash = "sha256:6c03275b8ffa4a57fc533ddc9619262db4ce79a1970b3bd6dcb639c45a7494fc", size = 5624, upload-time = "2026-03-06T15:17:13.498Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/14/5cd6744f5c59ae65e4ca9e65bd83265fd6294fe1f4bca4f3109a088f911d/mitol_django_olposthog-2025.8.1-py3-none-any.whl", hash = "sha256:6bdd9926eacdc34770cc0841d268a99ca45a00ff2068209caf9df364c1fff6d1", size = 6817, upload-time = "2025-08-01T11:15:52.554Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/28/bb08ac8a36b5e4258866f04a9781461d3cc62d2ebda477b83c5b565ced21/mitol_django_olposthog-2026.3.6-py3-none-any.whl", hash = "sha256:9aaf4bcd396eb803a2e4130ad5892bed03ba50f56b211657a08da242cb15ba21", size = 9065, upload-time = "2026-03-06T15:17:12.759Z" },
 ]
 
 [[package]]
@@ -2019,7 +2019,7 @@ requires-dist = [
     { name = "mitol-django-google-sheets-refunds", specifier = ">=2025.6.13,<2026" },
     { name = "mitol-django-hubspot-api", specifier = "==2025.12.18" },
     { name = "mitol-django-mail", specifier = "==2023.12.19" },
-    { name = "mitol-django-olposthog", specifier = ">=2025.8.1,<2026" },
+    { name = "mitol-django-olposthog", specifier = ">=2026.3.6,<2027" },
     { name = "mitol-django-openedx", specifier = "==2023.12.19" },
     { name = "mitol-django-payment-gateway", specifier = "==2023.12.19" },
     { name = "mitol-django-scim", specifier = ">=2025.5.23" },
@@ -2528,7 +2528,7 @@ wheels = [
 
 [[package]]
 name = "posthog"
-version = "6.9.3"
+version = "7.9.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
@@ -2538,9 +2538,9 @@ dependencies = [
     { name = "six" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b3/03/ed31e77f260971ed633c13815107b08edf999c7d1ec769d6313765ec89cb/posthog-6.9.3.tar.gz", hash = "sha256:7d201774ea9eba156f1de46d34313e30b2384d523900fe8e425accc92486cc34", size = 126554, upload-time = "2025-11-11T17:56:58.191Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/63/f5/490fbe0cd357bf5efaa026200d2a29aaa5e39cd8272cfe0e2d449f46f2db/posthog-7.9.8.tar.gz", hash = "sha256:52b1fa5f3d3faf2ee2fb7f5eb375332905887f7c1e386ef45103448413bd3e57", size = 176688, upload-time = "2026-03-09T14:34:07.822Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a7/4b/e4759803793843ce2258ddef3b3a744bdf0318c77c3ac10560683a2eee60/posthog-6.9.3-py3-none-any.whl", hash = "sha256:c71e9cb7ac4ef13eb604f04c3161edd10b1d08a32499edd54437ba5eab591c58", size = 144740, upload-time = "2025-11-11T17:56:56.986Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/aa/8b3de1650e0c39223c7f9b7c0f4961f7d39bfa690fa800a9521565381ecb/posthog-7.9.8-py3-none-any.whl", hash = "sha256:2735bcc3232e22c88034454e820c1739f4b29e606d55f31e56b52202650e4330", size = 202361, upload-time = "2026-03-09T14:34:06.031Z" },
 ]
 
 [[package]]

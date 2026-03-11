@@ -4,15 +4,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0087_program_display_mode'),
+        ("courses", "0087_program_display_mode"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='program',
-            name='display_mode',
-            field=models.CharField(blank=True, choices=[('course', 'course')], help_text="Set to 'course' to treat this program as a course in APIs.", max_length=32, null=True),
+            model_name="program",
+            name="display_mode",
+            field=models.CharField(
+                blank=True,
+                choices=[("course", "course")],
+                help_text="Set to 'course' to treat this program as a course in APIs.",
+                max_length=32,
+                null=True,
+            ),
         ),
     ]
