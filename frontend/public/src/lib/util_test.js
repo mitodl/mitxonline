@@ -443,16 +443,16 @@ describe("utility functions", () => {
       const course = {
         courseruns: [
           {
-            start_date:     pastDate,
-            is_enrollable:  false,
-            is_self_paced:  false,
-            is_archived:    false
+            start_date:    pastDate,
+            is_enrollable: false,
+            is_self_paced: false,
+            is_archived:   false
           },
           {
-            start_date:     futureDate,
-            is_enrollable:  true,
-            is_self_paced:  false,
-            is_archived:    false
+            start_date:    futureDate,
+            is_enrollable: true,
+            is_self_paced: false,
+            is_archived:   false
           }
         ]
       }
