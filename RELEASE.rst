@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.141.1
+---------------
+
+- Add a /api/v3/enrollments/ API with reduced footprint (#3303)
+
 Version 0.141.0 (Released March 11, 2026)
 ---------------
 
