@@ -145,24 +145,24 @@ export const objectToFormData = (object: Object) => {
 }
 
 // Example return values: "January 1, 2019", "December 31, 2019"
-export const formatPrettyDate = (momentDate: Moment) =>
-  momentDate.format("MMMM D, YYYY")
+export const formatPrettyDate = (momentDate: ?Moment) =>
+  momentDate ? momentDate.format("MMMM D, YYYY") : ""
 
 // Example return values: "Jan 1, 2019", "Dec 31, 2019"
-export const formatPrettyShortDate = (momentDate: Moment) =>
-  momentDate.format("MMM D, YYYY")
+export const formatPrettyShortDate = (momentDate: ?Moment) =>
+  momentDate ? momentDate.format("MMM D, YYYY") : ""
 
-export const formatPrettyMonthDate = (momentDate: Moment) =>
-  momentDate.format("MMMM D")
+export const formatPrettyMonthDate = (momentDate: ?Moment) =>
+  momentDate ? momentDate.format("MMMM D") : ""
 
-export const formatPrettyDateUtc = (momentDate: Moment) =>
-  momentDate.tz("UTC").format("MMMM D, YYYY")
+export const formatPrettyDateUtc = (momentDate: ?Moment) =>
+  momentDate ? momentDate.tz("UTC").format("MMMM D, YYYY") : ""
 
-export const formatPrettyDateTimeAmPm = (momentDate: Moment) =>
-  momentDate.format("LLL")
+export const formatPrettyDateTimeAmPm = (momentDate: ?Moment) =>
+  momentDate ? momentDate.format("LLL") : ""
 
-export const formatPrettyDateTimeAmPmTz = (monthDate: Moment) =>
-  monthDate.tz(moment.tz.guess()).format("LLL z")
+export const formatPrettyDateTimeAmPmTz = (monthDate: ?Moment) =>
+  monthDate ? monthDate.tz(moment.tz.guess()).format("LLL z") : ""
 
 export const firstItem = R.view(R.lensIndex(0))
 

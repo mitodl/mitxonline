@@ -24,7 +24,7 @@ def openedx_private_auth_complete(request):  # noqa: ARG001
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def edx_course_staff_webhook(request):
+def edx_course_staff_webhook(request):  # noqa: PLR0911
     """
     Webhook endpoint that receives course staff addition notifications from Open edX.
 
@@ -55,7 +55,7 @@ def edx_course_staff_webhook(request):
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
-    token = auth_header[len("Bearer "):]
+    token = auth_header[len("Bearer ") :]
     if token != webhook_key:
         return Response(
             {"error": "Invalid webhook token"},
@@ -116,7 +116,7 @@ def edx_course_staff_webhook(request):
 
     # --- Enroll user as auditor ---
     try:
-        enrollments, edx_request_success = create_run_enrollments(
+        enrollments, _edx_request_success = create_run_enrollments(
             user,
             [course_run],
             keep_failed_enrollments=True,

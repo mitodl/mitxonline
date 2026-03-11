@@ -204,27 +204,27 @@ class Command(BaseCommand):
         # Step 2: create the program
         self.stdout.write(self.style.SUCCESS("Creating the DEDP program..."))
 
-        # call_command(
-        #     "create_courseware",
-        #     "program",
-        #     "program-v1:MITx+DEDP",
-        #     "Data, Economics and Development Policy",
-        #     live=True,
-        #     depts=["Economics"],
-        #     create_depts=True,
-        # )
+        call_command(
+            "create_courseware",
+            "program",
+            "program-v1:MITx+DEDP",
+            "Data, Economics and Development Policy",
+            live=True,
+            depts=["Economics"],
+            create_depts=True,
+        )
 
-        # # Step 3: create the program page
-        # self.stdout.write(self.style.SUCCESS("Creating the DEDP program about page..."))
+        # Step 3: create the program page
+        self.stdout.write(self.style.SUCCESS("Creating the DEDP program about page..."))
 
-        # call_command("create_courseware_page", "program-v1:MITx+DEDP")
+        call_command("create_courseware_page", "program-v1:MITx+DEDP")
 
-        # # Step 4: create the financial aid form
-        # self.stdout.write(
-        #     self.style.SUCCESS("Creating the DEDP financial asistance form...")
-        # )
+        # Step 4: create the financial aid form
+        self.stdout.write(
+            self.style.SUCCESS("Creating the DEDP financial asistance form...")
+        )
 
-        # call_command("create_finaid_form", "program-v1:MITx+DEDP")
+        call_command("create_finaid_form", "program-v1:MITx+DEDP")
 
         # Step 5: create the courses (incld. course runs and syncing)
         self.stdout.write(
@@ -238,6 +238,7 @@ class Command(BaseCommand):
             "Demonstration Course",
             live=True,
             create_run="Demo_Course",
+            run_url=f"http://{edx_host}/courses/course-v1:edX+DemoX+Demo_Course/",
             program="program-v1:MITx+DEDP",
             depts=["Science"],
             create_depts=True,
@@ -250,6 +251,7 @@ class Command(BaseCommand):
             "E2E Test Course",
             live=True,
             create_run="course",
+            run_url=f"http://{edx_host}/courses/course-v1:edX+E2E-101+course/",
             depts=["Math"],
             create_depts=True,
         )

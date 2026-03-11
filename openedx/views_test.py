@@ -13,7 +13,7 @@ from users.factories import UserFactory
 pytestmark = [pytest.mark.django_db]
 
 WEBHOOK_URL = "openedx-course-staff-webhook"
-TEST_WEBHOOK_KEY = "test-webhook-secret-key"  # noqa: S105
+TEST_WEBHOOK_KEY = "test-webhook-secret-key"
 
 
 @pytest.mark.parametrize(
@@ -110,7 +110,7 @@ class TestEdxCourseStaffWebhook:
     def test_wrong_token(self, api_client, webhook_payload, settings):
         """Test request with wrong Bearer token returns 403"""
         settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
-        response = self._post_webhook(api_client, webhook_payload, token="wrong-token")
+        response = self._post_webhook(api_client, webhook_payload, token="wrong-token")  # noqa: S106
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_webhook_key_not_configured(self, api_client, webhook_payload, settings):
@@ -198,9 +198,7 @@ class TestEdxCourseStaffWebhook:
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     @patch("openedx.views.create_run_enrollments")
-    def test_already_enrolled_user(
-        self, mock_create_enrollments, api_client, settings
-    ):
+    def test_already_enrolled_user(self, mock_create_enrollments, api_client, settings):
         """Test that webhook succeeds for an already-enrolled user (idempotent)"""
         settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
         user = UserFactory.create()
