@@ -2029,5 +2029,9 @@ def test_course_run_and_product_prefetch_optimized(
         assert len(data[0]["courseruns"]) == num_courseruns
     # Check that products are queried only once
     queries_after = connection.queries[num_queries_before:]
-    product_queries = [q for q in queries_after if 'FROM "ecommerce_product"' in q.get('sql', '')]
-    assert len(product_queries) == 1, f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
+    product_queries = [
+        q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
+    ]
+    assert len(product_queries) == 1, (
+        f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
+    )
