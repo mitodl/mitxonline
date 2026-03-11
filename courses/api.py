@@ -13,7 +13,6 @@ from urllib.parse import urlparse
 
 import requests
 import reversion
-from bs4 import BeautifulSoup
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -40,7 +39,6 @@ from courses.constants import (
     PROGRAM_TEXT_ID_PREFIX,
 )
 from courses.models import (
-    BaseCertificate,
     BlockedCountry,
     Course,
     CourseRun,
@@ -1422,26 +1420,37 @@ ENV_TO_LEARN_HOSTNAME_MAP = {
 }
 
 
-def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
+def get_verifiable_credentials_payload(
+    certificate: CourseRunCertificate | ProgramCertificate,
+) -> dict:
     # TODO: We could optimize these queries #noqa: TD002, TD003, FIX002
     # It's not a massive priority though, as we have a total of 20k certs in prod as of 12/25
     learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
         settings.ENVIRONMENT, "learn.mit.edu"
     )
 
+    if not certificate.certificate_page_revision:
+        # Shouldn't realistically hit this as long as we call should_provision_verifiable_credential first
+        log.error(
+            "Error creating verifiable credential - missing certificate page revision for certificate %s",
+            certificate,
+        )
+        raise InvalidCertificateError
+
+    certificate_page = certificate.certificate_page_revision.as_object()
+    if not certificate_page.verifiable_credential_criteria:
+        # If it's empty, we can't generate a valid payload as narrative is required.
+        log.error(
+            "Error creating verifiable credential - missing 'verifiable_credential_criteria' for certificate %s",
+            certificate,
+        )
+        raise InvalidCertificateError
+
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
         course_run = certificate.course_run
         course = course_run.course
         course_page = course.page
-        if not course_page.what_you_learn:
-            # If it's empty, we can't generate a valid payload as narrative is required.
-            log.error(
-                "Error creating verifiable credential - missing 'what_you_learn' for course page %s for certificate %s",
-                course_page.title,
-                certificate,
-            )
-            raise InvalidCertificateError
 
         course_url_id = course.readable_id
         url = f"https://{learn_hostname}/courses/{course_url_id}"
@@ -1452,10 +1461,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(course_page) if course_page.feature_image else ""
         )
-        soup = BeautifulSoup(course_page.what_you_learn, "html.parser")
-        narrative = "\n".join(
-            [f"- {stripped_string}" for stripped_string in soup.stripped_strings]
-        )
+        narrative = certificate_page.verifiable_credential_criteria
 
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
@@ -1469,9 +1475,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(program_page) if program_page.feature_image else ""
         )
-        narrative = "\n".join(
-            [f"- {program_course[0].title}" for program_course in program.courses]
-        )
+        narrative = certificate_page.verifiable_credential_criteria
     else:
         raise InvalidCertificateError
 
