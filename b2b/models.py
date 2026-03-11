@@ -356,6 +356,8 @@ class ContractPage(Page, ClusterableModel):
                 FieldPanel("membership_type"),
                 FieldPanel("max_learners"),
                 FieldPanel("enrollment_fixed_price"),
+                FieldPanel("google_sheet_target"),
+                FieldPanel("google_sheet_target_tab"),
             ],
             heading="Learner Provisioning",
             icon="user",
@@ -478,19 +480,26 @@ class ContractPage(Page, ClusterableModel):
             object_id__in=self.get_course_runs().values_list("id", flat=True),
         ).all()
 
-    def get_discounts(self):
-        """Get the discounts associated with the contract."""
+    @property
+    def discounts_qs(self):
+        """Get the discount queryset associated with the contract."""
 
         from ecommerce.models import Discount  # noqa: PLC0415
 
-        return Discount.objects.filter(products__product__in=self.get_products()).all()
+        return Discount.objects.filter(products__product__in=self.get_products())
+
+    def get_discounts(self):
+        """Get the discounts associated with the contract."""
+
+        return self.discounts_qs.all()
 
     def get_unused_discounts(self):
         """Get discounts that haven't been used yet."""
 
         return (
-            self.get_discounts()
-            .annotate(order_redemptions_count=models.Count("order_redemptions"))
+            self.discounts_qs.annotate(
+                order_redemptions_count=models.Count("order_redemptions")
+            )
             .annotate(contract_redemptions_count=models.Count("contract_redemptions"))
             .exclude(
                 models.Q(order_redemptions_count__gt=0)
