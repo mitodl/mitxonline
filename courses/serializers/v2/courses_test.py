@@ -148,7 +148,9 @@ def test_course_with_course_runs_only_includes_enrollable_runs(mock_context, set
     course = enrollable_run.course
 
     # Make a non-enrollable run for the same course by setting enrollment_end in the past
-    non_enrollable_run = CourseRunFactory.create(course=course, past_enrollment_end=True)  # noqa: F841
+    non_enrollable_run = CourseRunFactory.create(
+        course=course, past_enrollment_end=True
+    )
 
     data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 
