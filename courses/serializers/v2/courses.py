@@ -277,8 +277,9 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
 
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
-        # Use prefetched course runs to preserve prefetched products
-        courseruns = instance.courseruns.all()
+        # Use prefetched course runs to preserve prefetched products, but
+        # restrict to runs that are currently enrollable.
+        courseruns = instance.courseruns.enrollable().all()
         if "org_id" in self.context:
             courseruns = [
                 run
