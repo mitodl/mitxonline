@@ -381,7 +381,7 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
             added_context["include_approved_financial_aid"] = True
         if qp.get("courserun_is_enrollable") is not None:
             # Add courserun_is_enrollable to context if present in query params
-            added_context["courserun_is_enrollable"] = qp.get("courserun_is_enrollable")
+            added_context["courserun_is_enrollable"] = qp.get("courserun_is_enrollable", "").lower() == "true"
         if qp.get("org_id") or qp.get("contract_id"):
             # If an org or contract is specified, we extract the user's contracts
             # according to those params, so filtering on some course run data is
