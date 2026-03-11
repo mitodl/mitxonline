@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.141.2
+---------------
+
+- correct default course / program image behavior (#3351)
+
 Version 0.141.1 (Released March 11, 2026)
 ---------------
 
