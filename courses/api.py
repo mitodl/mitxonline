@@ -1547,7 +1547,9 @@ def request_verifiable_credential(payload) -> dict:
     return resp.json()
 
 
-def should_provision_verifiable_credential(certificate_page) -> bool:
+def should_provision_verifiable_credential(
+    certificate_page: CertificatePage | None,
+) -> bool:
     if not certificate_page:
         return False
 
@@ -1567,10 +1569,6 @@ def create_verifiable_credential(
     from cms.models import CertificatePage  # noqa: PLC0415
 
     try:
-        # This line seems clunky, but it might be necessary?
-        # Certificates have a foreign key to a specific revision of the certificate page, but that doesn't help us
-        # use the CMS flag as a toggle for whether or not to create a cert.
-
         # TODO: Need to confirm the desired functionality #noqa: FIX002, TD002, TD003
         # - freeze VCs using the state in the CMS page at the time of cert creation OR
         # - always look at the latest revision of the page to determine whether or not to create a VC?
