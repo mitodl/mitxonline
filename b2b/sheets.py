@@ -104,7 +104,7 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
             .order_by("-attach_redemption_count")[: self.contract_page.max_learners]
         )
 
-    def _write_row(self, row: int, columns: list):
+    def _write_row(self, row: int, columns: list) -> int:
         """
         Write the row to the current worksheet at the specified location.
 
@@ -132,6 +132,8 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
             self.last_blank_row = row
 
         self.worksheet.update_row(row, columns)
+
+        return row
 
     def _write_header(self):
         """Write/overwrite the header row."""
@@ -217,14 +219,14 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
     def check_code(self, discount: Discount, *, no_update: bool = False) -> int:
         """Check for the given enrollment code in the sheet."""
 
-        if discount.b2b_sheet_location:
+        if discount.b2b_sheet_location and int(discount.b2b_sheet_location) > 0:
             cached_row = self.worksheet.get_row(
                 int(discount.b2b_sheet_location),
                 include_tailing_empty=False,
                 returnas="matrix",
             )
 
-            if cached_row[0] == discount.discount_code:
+            if cached_row and cached_row[0] == discount.discount_code:
                 return int(discount.b2b_sheet_location)
 
         found_cell = self.worksheet.find(
@@ -263,9 +265,7 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
 
         update_col = self._get_discount_cells(discount)
 
-        self._write_row(row, update_col)
-
-        return row
+        return self._write_row(row, update_col)
 
     def update_sheet(self) -> int:
         """

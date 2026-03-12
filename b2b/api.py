@@ -31,6 +31,7 @@ from b2b.models import (
     OrganizationPage,
     UserOrganization,
 )
+from b2b.tasks import queue_contract_sheet_update_post_save
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun, Department, EnrollmentMode
@@ -932,6 +933,8 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
         total_created += created
         total_updated += updated
         total_errors += errors
+
+    queue_contract_sheet_update_post_save.delay(contract.id)
 
     return (total_created, total_updated, total_errors)
 
