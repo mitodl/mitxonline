@@ -2377,9 +2377,10 @@ def test_course_run_certificate_verifiable_credentials(
         "courses.api.request_verifiable_credential",
         side_effect=return_signed_credential,
     )
-    mocker.patch(
-        "courses.api.should_provision_verifiable_credential", return_value=True
-    )
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.should_provision_verifiable_credential = True
+    mocker.patch("courses.api.get_certificate_page", return_value=mock_certificate_page)
     passed_grade_with_enrollment.course_run.course.page.what_you_learn = (
         "Some learning content"
     )
@@ -2412,9 +2413,11 @@ def test_program_certificate_verifiable_credentials(
         "courses.api.request_verifiable_credential",
         side_effect=return_signed_credential,
     )
-    mocker.patch(
-        "courses.api.should_provision_verifiable_credential", return_value=True
-    )
+
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.should_provision_verifiable_credential = True
+    mocker.patch("courses.api.get_certificate_page", return_value=mock_certificate_page)
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunCertificateFactory.create_batch(

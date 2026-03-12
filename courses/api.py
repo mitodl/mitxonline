@@ -1556,6 +1556,19 @@ def should_provision_verifiable_credential(
     return certificate_page.should_provision_verifiable_credential
 
 
+def get_certificate_page(
+    certificate: CourseRunCertificate | ProgramCertificate,
+) -> CertificatePage | None:
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    certificate_page = None
+    if certificate.certificate_page_revision:
+        certificate_page = CertificatePage.objects.filter(
+            pk=int(certificate.certificate_page_revision.object_id),
+        ).first()
+    return certificate_page
+
+
 def create_verifiable_credential(
     certificate: ProgramCertificate | CourseRunCertificate, *, raise_on_error=False
 ):
@@ -1566,17 +1579,12 @@ def create_verifiable_credential(
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
         raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
     """
-    from cms.models import CertificatePage  # noqa: PLC0415
 
     try:
         # TODO: Need to confirm the desired functionality #noqa: FIX002, TD002, TD003
         # - freeze VCs using the state in the CMS page at the time of cert creation OR
         # - always look at the latest revision of the page to determine whether or not to create a VC?
-        certificate_page = None
-        if certificate.certificate_page_revision:
-            certificate_page = CertificatePage.objects.filter(
-                pk=int(certificate.certificate_page_revision.object_id),
-            ).first()
+        certificate_page = get_certificate_page(certificate)
 
         if not should_provision_verifiable_credential(certificate_page):
             return
