@@ -137,14 +137,22 @@ class ProgramFilterSet(django_filters.FilterSet):
 
     @property
     def qs(self):
-        """If the request isn't explicitly filtering on org_id or contract_id, exclude contracted courses."""
+        """Return the filtered queryset for Programs.
+
+        - Always de-duplicate results to avoid duplicate Programs when joins
+          (e.g., contract memberships) introduce multiple rows per Program.
+        - If the request isn't explicitly filtering on org_id or contract_id,
+          exclude B2B-only programs by default.
+        """
+
+        base_qs = super().qs.distinct()
 
         if "org_id" not in getattr(
             self.request, "GET", {}
         ) and "contract_id" not in getattr(self.request, "GET", {}):
-            return super().qs.filter(b2b_only=False)
+            return base_qs.filter(b2b_only=False)
 
-        return super().qs
+        return base_qs
 
     def filter_by_org_id(self, queryset, _, org_id):
         """Filter according to org_id. If the user is in org_id, return only related programs."""
