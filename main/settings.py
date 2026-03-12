@@ -1536,11 +1536,6 @@ VERIFIABLE_CREDENTIAL_DID = get_string(
     default="",
     description="The Decentralized Identifier (DID) used as the issuer for verifiable credentials.",
 )
-ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING = get_bool(
-    name="ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING",
-    default=False,
-    description="Override posthog flag to enable the provisioning of verifiable credentials in dev.",
-)
 
 MIT_LEARN_ATTACH_URL = get_string(
     name="MIT_LEARN_ATTACH_URL",
