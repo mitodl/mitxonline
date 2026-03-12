@@ -26,7 +26,7 @@ def openedx_private_auth_complete(request):  # noqa: ARG001
 @extend_schema(exclude=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def edx_enrollment_webhook(request):  # noqa: PLR0911
+def edx_enrollment_webhook(request):  # noqa: PLR0911, C901
     """
     Webhook endpoint that receives enrollment notifications from Open edX.
 
