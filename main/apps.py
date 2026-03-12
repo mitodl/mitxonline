@@ -16,7 +16,3 @@ class RootConfig(AppConfig):
 
         envs.validate()
         configure()
-
-        from main.telemetry import configure_opentelemetry  # noqa: PLC0415
-
-        configure_opentelemetry()
