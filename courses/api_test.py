@@ -2513,7 +2513,9 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
     )
     course_run_cert.course_run.course.page.save()
 
-    payload = get_verifiable_credentials_payload(course_run_cert)
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential = "mock_credential_data"
+    payload = get_verifiable_credentials_payload(course_run_cert, mock_certificate_page)
 
     # Assert the expected payload structure
     expected_payload = {
@@ -2619,7 +2621,9 @@ def test_program_certificate_verifiable_credentials_signing_payload(
     program_cert.program.add_requirement(course2)
     program_cert.program.add_requirement(course3)
 
-    payload = get_verifiable_credentials_payload(program_cert)
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential = "mock_credential_data"
+    payload = get_verifiable_credentials_payload(program_cert, mock_certificate_page)
 
     # Build expected narrative from the actual course titles
     narrative = "\n".join(
