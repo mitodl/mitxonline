@@ -317,8 +317,9 @@ class ContractPage(Page, ClusterableModel):
         null=True,
         help_text="The fixed price for enrollment under this contract. (Set to zero or leave blank for free.)",
     )
-    google_sheet_target = models.CharField(
+    google_sheet_target = models.CharField(  # noqa: DJ001
         blank=True,
+        null=True,
         default="",
         help_text="The URL for the Google Sheet to use to send codes and updates.",
     )

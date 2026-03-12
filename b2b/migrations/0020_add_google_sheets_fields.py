@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
             name="google_sheet_target",
             field=models.CharField(
                 blank=True,
+                null=True,
                 default="",
                 help_text="The URL for the Google Sheet to use to send codes and updates.",
             ),
