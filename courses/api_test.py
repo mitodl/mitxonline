@@ -2514,7 +2514,7 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
     course_run_cert.course_run.course.page.save()
 
     mock_certificate_page = Mock()
-    mock_certificate_page.verifiable_credential = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
     payload = get_verifiable_credentials_payload(course_run_cert, mock_certificate_page)
 
     # Assert the expected payload structure
@@ -2554,7 +2554,9 @@ def test_course_run_certificate_verifiable_credentials_signing_payload(
                 "id": "https://learn.mit.edu/courses/course-v1:MITx+6.00.1x",
                 "achievementType": "Course",
                 "type": ["Achievement"],
-                "criteria": {"narrative": "- Learn Python programming fundamentals"},
+                "criteria": {
+                    "narrative": mock_certificate_page.verifiable_credential_criteria
+                },
                 "description": "John Doe has successfully completed all modules and earned a Course Certificate in Introduction to Python.",
                 "name": "Introduction to Python",
                 "image": {
@@ -2622,13 +2624,8 @@ def test_program_certificate_verifiable_credentials_signing_payload(
     program_cert.program.add_requirement(course3)
 
     mock_certificate_page = Mock()
-    mock_certificate_page.verifiable_credential = "mock_credential_data"
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
     payload = get_verifiable_credentials_payload(program_cert, mock_certificate_page)
-
-    # Build expected narrative from the actual course titles
-    narrative = "\n".join(
-        [f"- {course[0].title}" for course in program_cert.program.courses]
-    )
 
     # Assert the expected payload structure
     expected_payload = {
@@ -2667,7 +2664,9 @@ def test_program_certificate_verifiable_credentials_signing_payload(
                 "id": "https://learn.mit.edu/programs/program-v1:MITx+DataScienceMM",
                 "achievementType": "Program",
                 "type": ["Achievement"],
-                "criteria": {"narrative": narrative},
+                "criteria": {
+                    "narrative": mock_certificate_page.verifiable_credential_criteria
+                },
                 "description": "Jane Smith has successfully completed all modules and earned a Program Certificate in Data Science MicroMasters.",
                 "name": "Data Science MicroMasters",
                 "image": {
