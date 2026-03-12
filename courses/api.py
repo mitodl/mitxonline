@@ -90,6 +90,8 @@ if TYPE_CHECKING:
     from django.db.models.query import QuerySet
     from edx_api.course_detail.models import CourseMode
 
+    from cms.models import CertificatePage
+
 
 log = logging.getLogger(__name__)
 UserEnrollments = namedtuple(  # noqa: PYI024
@@ -1422,29 +1424,13 @@ ENV_TO_LEARN_HOSTNAME_MAP = {
 
 def get_verifiable_credentials_payload(
     certificate: CourseRunCertificate | ProgramCertificate,
+    certificate_page: CertificatePage,
 ) -> dict:
     # TODO: We could optimize these queries #noqa: TD002, TD003, FIX002
     # It's not a massive priority though, as we have a total of 20k certs in prod as of 12/25
     learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
         settings.ENVIRONMENT, "learn.mit.edu"
     )
-
-    if not certificate.certificate_page_revision:
-        # Shouldn't realistically hit this as long as we call should_provision_verifiable_credential first
-        log.error(
-            "Error creating verifiable credential - missing certificate page revision for certificate %s",
-            certificate,
-        )
-        raise InvalidCertificateError
-
-    certificate_page = certificate.certificate_page_revision.as_object()
-    if not certificate_page.verifiable_credential_criteria:
-        # If it's empty, we can't generate a valid payload as narrative is required.
-        log.error(
-            "Error creating verifiable credential - missing 'verifiable_credential_criteria' for certificate %s",
-            certificate,
-        )
-        raise InvalidCertificateError
 
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
@@ -1561,15 +1547,11 @@ def request_verifiable_credential(payload) -> dict:
     return resp.json()
 
 
-def should_provision_verifiable_credential(
-    certificate: ProgramCertificate | CourseRunCertificate,
-) -> bool:
-    certificate_page_revision = certificate.certificate_page_revision
-    if certificate_page_revision:
-        certificate_page = certificate_page_revision.as_object()
-        return certificate_page.should_provision_verifiable_credential
+def should_provision_verifiable_credential(certificate_page) -> bool:
+    if not certificate_page:
+        return False
 
-    return False
+    return certificate_page.should_provision_verifiable_credential
 
 
 def create_verifiable_credential(
@@ -1582,10 +1564,25 @@ def create_verifiable_credential(
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
         raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
     """
+    from cms.models import CertificatePage  # noqa: PLC0415
+
     try:
-        if not should_provision_verifiable_credential(certificate):
+        # This line seems clunky, but it might be necessary?
+        # Certificates have a foreign key to a specific revision of the certificate page, but that doesn't help us
+        # use the CMS flag as a toggle for whether or not to create a cert.
+
+        # TODO: Need to confirm the desired functionality #noqa: FIX002, TD002, TD003
+        # - freeze VCs using the state in the CMS page at the time of cert creation OR
+        # - always look at the latest revision of the page to determine whether or not to create a VC?
+        certificate_page = None
+        if certificate.certificate_page_revision:
+            certificate_page = CertificatePage.objects.filter(
+                pk=int(certificate.certificate_page_revision.object_id),
+            ).first()
+
+        if not should_provision_verifiable_credential(certificate_page):
             return
-        payload = get_verifiable_credentials_payload(certificate)
+        payload = get_verifiable_credentials_payload(certificate, certificate_page)
 
         # Call the signing service to create the new credential
         credential = request_verifiable_credential(payload)
