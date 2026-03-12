@@ -180,10 +180,15 @@ def queue_update_all_contract_enrollment_sheets():
     add more contracts.
     """
 
+    from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
     from b2b.models import ContractPage
 
     updateable_contracts = (
-        ContractPage.objects.exclude(google_sheet_target="").only("id").all()
+        ContractPage.objects.exclude(
+            membership_type__in=CONTRACT_MEMBERSHIP_AUTOS, google_sheet_target=""
+        )
+        .only("id")
+        .all()
     )
 
     for contract in updateable_contracts:
