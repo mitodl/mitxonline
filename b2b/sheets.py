@@ -2,6 +2,7 @@
 
 import logging
 
+from django.db.models import Count
 from django.utils.functional import cached_property
 from mitol.google_sheets.api import get_authorized_pygsheets_client
 from mitol.google_sheets.constants import GOOGLE_SHEET_FIRST_ROW
@@ -61,6 +62,7 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
         )
         self.worksheet_name = contract_page.google_sheet_target_tab
         self.start_row = 0  # unimplemented at this point
+        self.last_blank_row = 0
 
     @cached_property
     def worksheet(self):
@@ -83,10 +85,58 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
 
         return self.row_zero + 1
 
+    def _get_sorted_codes(self):
+        """
+        Return the applicable discount codes for the contract.
+
+        Like the b2b_codes command, this limits output to the codes necessary to
+        fill the contract. Unlike the b2b_codes command, we also want to get the
+        codes that have been used, so this adds an annotation so we can sort by
+        contract redemption.
+        """
+
+        return (
+            self.contract_page.discounts_qs.prefetch_related(
+                "contract_redemptions", "contract_redemptions__user"
+            )
+            .annotate(attach_redemption_count=Count("contract_redemptions"))
+            .all()
+            .order_by("-attach_redemption_count")[: self.contract_page.max_learners]
+        )
+
+    def _write_row(self, row: int, columns: list):
+        """
+        Write the row to the current worksheet at the specified location.
+
+        If row is set to a negative, then we will use the first blank line in
+        the sheet that we can find. This will cache the last blank row found, so
+        future calls should start from there rather than having to scan the
+        entire sheet each time.
+        """
+
+        if row < 0:
+            # Now we have to figure out where the next blank column is.
+            found_blank = False
+            search_idx = self.last_blank_row
+            empty_cols = ["" for col in self.default_columns]
+            while not found_blank:
+                cells = self.worksheet.get_row(self.row_one + search_idx)
+
+                if len(cells) == 0 or cells[: len(self.default_columns)] == empty_cols:
+                    found_blank = True
+                    break
+
+                search_idx += 1
+
+            row = search_idx + self.row_one
+            self.last_blank_row = row
+
+        self.worksheet.update_row(row, columns)
+
     def _write_header(self):
         """Write/overwrite the header row."""
 
-        self.worksheet.update_row(self.row_zero, self.default_columns)
+        self._write_row(self.row_zero, self.default_columns)
 
     def _get_discount_cells(self, discount: Discount) -> list:
         """Format the discount for the sheet"""
@@ -137,9 +187,12 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
         """
         Write out all the enrollment codes for the contract.
 
-        As with the b2b_codes command, this will just write out the codes that
-        are necessary to fill out the contract. No provision for getting _all_
-        the codes. Use the command for that if you need it.
+        See notes in _get_sorted_codes - but this will write out all the used
+        and unused codes for the contract, until it has written enough codes to
+        complete the contract (hits max_learners).
+
+        This function is destructive so use "update_codes" if the sheet has been
+        modified.
         """
 
         self.ensure_header()
@@ -147,15 +200,13 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
         row_idx = self.row_one
         codes = []
 
-        for code in self.contract_page.discounts_qs.prefetch_related(
-            "contract_redemptions", "contract_redemptions__user"
-        ).all()[: self.contract_page.max_learners]:
+        for code in self._get_sorted_codes():
             col = self._get_discount_cells(code)
 
             code.b2b_sheet_location = row_idx
             codes.append(code)
 
-            self.worksheet.update_row(row_idx, col)
+            self._write_row(row_idx, col)
 
             row_idx += 1
 
@@ -163,20 +214,18 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
 
         return row_idx - self.row_one
 
-    def check_code(self, enrollment_code: str) -> int:
+    def check_code(self, discount: Discount, *, no_update: bool = False) -> int:
         """Check for the given enrollment code in the sheet."""
-
-        discount = self.contract_page.discounts_qs.filter(
-            discount_code=enrollment_code
-        ).get()
 
         if discount.b2b_sheet_location:
             cached_row = self.worksheet.get_row(
-                discount.b2b_sheet_location, tailing_empty=False, returnas="matrix"
+                int(discount.b2b_sheet_location),
+                include_tailing_empty=False,
+                returnas="matrix",
             )
 
             if cached_row[0] == discount.discount_code:
-                return discount.b2b_sheet_location
+                return int(discount.b2b_sheet_location)
 
         found_cell = self.worksheet.find(
             discount.discount_code,
@@ -186,7 +235,7 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
         )
 
         if len(found_cell) == 0:
-            return False
+            return -1
 
         if len(found_cell) > 1:
             found_locs = ",".join([f"({cell.row},{cell.col})" for cell in found_cell])
@@ -194,26 +243,52 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
 
             raise ValueError(msg)
 
-        discount.b2b_sheet_location = found_cell[0].row
-        discount.b2b_sheet_location.save()
+        if not no_update:
+            discount.b2b_sheet_location = found_cell[0].row
+            discount.save()
 
         return found_cell[0].row
 
-    def update_code(self, enrollment_code: str):
+    def update_code(self, discount: Discount, *, no_update: bool = False) -> int:
         """
         Update the enrollment code in the sheet.
 
         There are some status columns in the worksheet - Invalidated On, Total
         Redemptions, Redeemed By, and Redeemed On. This fills those values for
-        the code.
+        the code if the code is in the sheet already. If it isn't, then it'll
+        be appended.
         """
 
-        discount = self.contract_page.discounts_qs.filter(
-            discount_code=enrollment_code
-        ).get()
-
-        row = self.check_code(enrollment_code)
+        row = self.check_code(discount, no_update=no_update)
 
         update_col = self._get_discount_cells(discount)
 
-        self.worksheet.update_row(row, update_col)
+        self._write_row(row, update_col)
+
+        return row
+
+    def update_sheet(self) -> int:
+        """
+        Update the entire sheet, preserving codes in their locations.
+
+        The write_codes function will destructively write and prepare the sheet.
+        This isn't good if we've given the customer the sheet, because they will
+        probably edit it. So, when we need to refresh the entire sheet, we need
+        to take care to not move the codes around so we don't muck up any of the
+        data the customer's put into the sheet.
+        """
+
+        row_idx = self.row_one
+        codes = []
+
+        for code in self._get_sorted_codes():
+            row = self.update_code(code, no_update=True)
+
+            code.b2b_sheet_location = row
+            codes.append(code)
+
+            row_idx += 1
+
+        Discount.objects.bulk_update(codes, {"b2b_sheet_location"})
+
+        return row_idx - self.row_one
