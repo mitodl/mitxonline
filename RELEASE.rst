@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.141.4
+---------------
+
+- Duplicate programs in api results (#3375)
+
 Version 1.141.3 (Released March 11, 2026)
 ---------------
 
