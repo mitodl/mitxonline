@@ -1553,7 +1553,10 @@ def should_provision_verifiable_credential(
     if not certificate_page:
         return False
 
-    return certificate_page.should_provision_verifiable_credential
+    return (
+        certificate_page.should_provision_verifiable_credential
+        and certificate_page.verifiable_credential_criteria
+    )
 
 
 def get_certificate_page(
