@@ -160,7 +160,7 @@ def queue_contract_sheet_update_post_save(
             # in between. If they did, then we start over.
             # Explicitly set this sort even though the Wagtail model seems to do this anyway.
             rev_count = contract.revisions.order_by("-created_at").count()
-            revs = contract.revisions.all()[rev_count - 2 :]
+            revs = contract.revisions.order_by("-created_at").all()[rev_count - 2 :]
             if (
                 revs[0].as_object().google_sheet_target
                 != revs[1].as_object().google_sheet_target
