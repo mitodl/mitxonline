@@ -1076,7 +1076,7 @@ def test_active_products_for_expired_course_run():
     course_run = CourseRunFactory.create(enrollment_end=now - timedelta(days=10))
     ProductFactory.create(purchasable_object=course_run)
 
-    assert course_run.course.active_products is None
+    assert course_run.course.active_products == []
 
 
 def test_related_programs():

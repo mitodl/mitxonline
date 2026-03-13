@@ -514,10 +514,8 @@ def test_get_current_price_with_queryset_single_product(
     course_run = CourseRunFactory(course=course_page.product)
     product = ProductFactory(purchasable_object=course_run, price=Decimal("99.99"))
 
-    # Mock active_products to return a QuerySet-like object
-    mock_queryset = mocker.MagicMock()
-    mock_queryset.all.return_value = [product]
-    course_page.product.active_products = mock_queryset
+    # Mock active_products to return a list of products
+    course_page.product.active_products = [product]
 
     serializer = CoursePageSerializer()
     result = serializer.get_current_price(course_page)
@@ -537,10 +535,8 @@ def test_get_current_price_with_queryset_multiple_products(
     product2 = ProductFactory(purchasable_object=course_run2, price=Decimal("100.00"))
     product3 = ProductFactory(purchasable_object=course_run3, price=Decimal("75.00"))
 
-    # Mock active_products to return a QuerySet-like object
-    mock_queryset = mocker.MagicMock()
-    mock_queryset.all.return_value = [product1, product2, product3]
-    course_page.product.active_products = mock_queryset
+    # Mock active_products to return a list of products
+    course_page.product.active_products = [product1, product2, product3]
 
     serializer = CoursePageSerializer()
     result = serializer.get_current_price(course_page)
@@ -590,10 +586,8 @@ def test_get_current_price_with_empty_queryset(mocker, fully_configured_wagtail)
     """Test get_current_price with empty QuerySet"""
     course_page = CoursePageFactory()
 
-    # Mock active_products to return empty QuerySet
-    mock_queryset = mocker.MagicMock()
-    mock_queryset.all.return_value = []
-    course_page.product.active_products = mock_queryset
+    # Mock active_products to return empty list
+    course_page.product.active_products = []
 
     serializer = CoursePageSerializer()
     result = serializer.get_current_price(course_page)

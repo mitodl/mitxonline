@@ -1370,7 +1370,7 @@ class CoursePage(ProductPage):
             is_courseware_flexible_price_approved(self.product, request.user)
             and ecommerce_product
         ):
-            ecommerce_product = ecommerce_product.first()
+            ecommerce_product = ecommerce_product[0]
 
             discount = determine_courseware_flexible_price_discount(
                 ecommerce_product, request.user
@@ -1818,8 +1818,8 @@ class FlexiblePricingRequestForm(AbstractForm):
         product_page = self.get_parent_product_page()
         product = product_page.product
         context["product"] = (
-            product.active_products.first()
-            if isinstance(product, Course) and product.active_products is not None
+            product.active_products[0]
+            if isinstance(product, Course) and product.active_products
             else None
         )
         context["product_page"] = product_page.url
