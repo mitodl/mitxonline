@@ -168,7 +168,7 @@ def queue_contract_sheet_update_post_save(
             ):
                 has_revs = False
 
-    if not only_update and has_revs:
+    if not only_update and not has_revs:
         log.info("Setting up Google Sheet for %s", contract)
 
         codes_written = handler.write_codes()
