@@ -4,6 +4,7 @@
 import logging
 
 from django.core.cache import cache
+from django.db.models import Q
 
 from main.celery import app
 
@@ -195,7 +196,7 @@ def queue_update_all_contract_enrollment_sheets():
 
     updateable_contracts = (
         ContractPage.objects.exclude(
-            membership_type__in=CONTRACT_MEMBERSHIP_AUTOS, google_sheet_target=""
+            Q(membership_type__in=CONTRACT_MEMBERSHIP_AUTOS) | Q(google_sheet_target="")
         )
         .only("id")
         .all()
