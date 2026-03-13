@@ -35,6 +35,11 @@ def test_user_enrollments_detail(
     resp = user_drf_client.get(
         reverse("v3:user_enrollments_api-detail", kwargs={"pk": enrollment.id})
     )
+    upgrade_product = (
+        enrollment.run.products.filter(is_active=True).first()
+        if enrollment.run.is_upgradable
+        else None
+    )
     assert resp.status_code == status.HTTP_200_OK
     assert resp.json() == {
         "id": enrollment.id,
@@ -60,6 +65,13 @@ def test_user_enrollments_detail(
             else None,
             "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
             "enrollment_modes": [],
+            "upgrade_product_id": upgrade_product.id if upgrade_product else None,
+            "upgrade_product_price": str(upgrade_product.price)
+            if upgrade_product
+            else None,
+            "upgrade_product_is_active": upgrade_product.is_active
+            if upgrade_product
+            else None,
             "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
             "expiration_date": drf_datetime(enrollment.run.expiration_date),
             "course": {
@@ -121,6 +133,13 @@ def test_user_enrollments_list(
                 else None,
                 "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
                 "enrollment_modes": [],
+                "upgrade_product_id": upgrade_product.id if upgrade_product else None,
+                "upgrade_product_price": str(upgrade_product.price)
+                if upgrade_product
+                else None,
+                "upgrade_product_is_active": upgrade_product.is_active
+                if upgrade_product
+                else None,
                 "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
                 "expiration_date": drf_datetime(enrollment.run.expiration_date),
                 "course": {
@@ -149,6 +168,11 @@ def test_user_enrollments_list(
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
         }
         for enrollment in user_with_enrollments_and_certificates.run_enrollments
+        for upgrade_product in [
+            enrollment.run.products.filter(is_active=True).first()
+            if enrollment.run.is_upgradable
+            else None
+        ]
     ]
 
 
@@ -191,6 +215,15 @@ def test_user_enrollments_list_filter_org_id(
                     else None,
                     "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
                     "enrollment_modes": [],
+                    "upgrade_product_id": upgrade_product.id
+                    if upgrade_product
+                    else None,
+                    "upgrade_product_price": str(upgrade_product.price)
+                    if upgrade_product
+                    else None,
+                    "upgrade_product_is_active": upgrade_product.is_active
+                    if upgrade_product
+                    else None,
                     "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
                     "expiration_date": drf_datetime(enrollment.run.expiration_date),
                     "course": {
@@ -221,6 +254,11 @@ def test_user_enrollments_list_filter_org_id(
                 ),
             }
             for enrollment in user_with_enrollments_and_certificates.run_enrollments
+            for upgrade_product in [
+                enrollment.run.products.filter(is_active=True).first()
+                if enrollment.run.is_upgradable
+                else None
+            ]
             if enrollment.run in b2b_courses.course_runs_by_org_id[org.id]
         ]
 
@@ -266,6 +304,13 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 else None,
                 "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
                 "enrollment_modes": [],
+                "upgrade_product_id": upgrade_product.id if upgrade_product else None,
+                "upgrade_product_price": str(upgrade_product.price)
+                if upgrade_product
+                else None,
+                "upgrade_product_is_active": upgrade_product.is_active
+                if upgrade_product
+                else None,
                 "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
                 "expiration_date": drf_datetime(enrollment.run.expiration_date),
                 "course": {
@@ -292,6 +337,11 @@ def test_user_enrollments_list_filter_exclude_b2b(
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
         }
         for enrollment in user_with_enrollments_and_certificates.run_enrollments
+        for upgrade_product in [
+            enrollment.run.products.filter(is_active=True).first()
+            if enrollment.run.is_upgradable
+            else None
+        ]
         if enrollment.run not in b2b_courses.course_runs
     ]
 
@@ -324,6 +374,13 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 else None,
                 "enrollment_end": drf_datetime(enrollment.run.enrollment_end),
                 "enrollment_modes": [],
+                "upgrade_product_id": upgrade_product.id if upgrade_product else None,
+                "upgrade_product_price": str(upgrade_product.price)
+                if upgrade_product
+                else None,
+                "upgrade_product_is_active": upgrade_product.is_active
+                if upgrade_product
+                else None,
                 "enrollment_start": drf_datetime(enrollment.run.enrollment_start),
                 "expiration_date": drf_datetime(enrollment.run.expiration_date),
                 "course": {
@@ -352,7 +409,23 @@ def test_user_enrollments_list_filter_exclude_b2b(
             "certificate": maybe_serialize_course_cert(enrollment.run, enrollment.user),
         }
         for enrollment in user_with_enrollments_and_certificates.run_enrollments
+        for upgrade_product in [
+            enrollment.run.products.filter(is_active=True).first()
+            if enrollment.run.is_upgradable
+            else None
+        ]
     ]
+
+
+def test_user_enrollments_list_query_count_guard(
+    user_drf_client,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
+    django_assert_max_num_queries,
+):
+    """List endpoint should stay bounded in query count with denormalized upgrade fields."""
+    with django_assert_max_num_queries(20):
+        resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
 
 
 def test_program_enrollments(
