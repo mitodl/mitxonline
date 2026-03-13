@@ -435,6 +435,34 @@ describe("utility functions", () => {
         getStartDateText(course).includes(formatPrettyDate(startDates[0]))
       )
     })
+
+    it("prefers enrollable runs when choosing the start date for a course", () => {
+      const pastDate = moment().subtract(30, "days")
+      const futureDate = moment().add(10, "days")
+
+      const course = {
+        courseruns: [
+          {
+            start_date:    pastDate,
+            is_enrollable: false,
+            is_self_paced: false,
+            is_archived:   false
+          },
+          {
+            start_date:    futureDate,
+            is_enrollable: true,
+            is_self_paced: false,
+            is_archived:   false
+          }
+        ]
+      }
+
+      const text = getStartDateText(course)
+
+      assert.isTrue(text.includes("Starts"))
+      assert.isTrue(text.includes(formatPrettyDate(futureDate)))
+      assert.isFalse(text.includes(formatPrettyDate(pastDate)))
+    })
     it("displays an empty string if it's a course and there's no course runs", () => {
       const course = {
         courseruns: []
