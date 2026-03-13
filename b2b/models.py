@@ -321,11 +321,13 @@ class ContractPage(Page, ClusterableModel):
         blank=True,
         null=True,
         default="",
+        max_length=1024,
         help_text="The URL for the Google Sheet to use to send codes and updates.",
     )
     google_sheet_target_tab = models.CharField(
         blank=True,
         default="Sheet1",
+        max_length=100,
         help_text="The index or title of the worksheet in the Google Sheet to put the codes.",
     )
 

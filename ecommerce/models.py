@@ -271,9 +271,11 @@ class Discount(TimestampedModel):
     )
     # Only for B2B enrollment codes where the contract has a Google Sheet configured.
     # This is just to save time/energy when we want to update the sheet later.
-    b2b_sheet_location = models.CharField(
+    b2b_sheet_location = models.CharField(  # noqa: DJ001
         blank=True,
+        null=True,
         default="",
+        max_length=10,
         help_text="The location of this code in the B2B contract's code sheet.",
     )
 
