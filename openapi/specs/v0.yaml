@@ -5372,6 +5372,11 @@ components:
           nullable: true
           description: Discount is only for creating verified course run enrollments
             for a program.
+        b2b_sheet_location:
+          type: string
+          nullable: true
+          description: The location of this code in the B2B contract's code sheet.
+          maxLength: 10
       required:
       - amount
       - created_on
