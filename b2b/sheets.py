@@ -153,7 +153,7 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
             discount.redemption_type != REDEMPTION_TYPE_UNLIMITED
             and discount.contract_redemptions.count() > 0
         ):
-            redemption_date = str(discount.contract_redemptions.get().created_on)
+            redemption_date = str(discount.contract_redemptions.last().created_on)
 
         if discount.contract_redemptions.exists():
             redeemed_by = discount.contract_redemptions.last().user.email
