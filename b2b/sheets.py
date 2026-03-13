@@ -62,7 +62,6 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
         )
         self.worksheet_name = contract_page.google_sheet_target_tab
         self.start_row = 0  # unimplemented at this point
-        self.last_blank_row = 0
 
     @cached_property
     def worksheet(self):
@@ -119,7 +118,7 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
         if row < 0:
             # Now we have to figure out where the next blank column is.
             found_blank = False
-            search_idx = self.last_blank_row
+            search_idx = 0
             empty_cols = ["" for col in self.default_columns]
             while not found_blank:
                 cells = self.worksheet.get_row(self.row_one + search_idx)
@@ -131,7 +130,6 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
                 search_idx += 1
 
             row = search_idx + self.row_one - 1  # GSheets is 1-indexed
-            self.last_blank_row = search_idx
 
         self.worksheet.update_row(row, columns)
 
