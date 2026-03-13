@@ -271,7 +271,7 @@ def test_write_row(
     handler._write_row(write_idx, test_row)
 
     if write_to_blank_line:
-        handler.worksheet.update_row.assert_called_with(3, test_row)
+        handler.worksheet.update_row.assert_called_with(4, test_row)
     else:
         handler.worksheet.update_row.assert_called_with(write_idx, test_row)
 

@@ -158,7 +158,8 @@ def queue_contract_sheet_update_post_save(
         if has_revs:
             # We have page revisions so check to see if the sheet or the tab changed
             # in between. If they did, then we start over.
-            rev_count = contract.revisions.count()
+            # Explicitly set this sort even though the Wagtail model seems to do this anyway.
+            rev_count = contract.revisions.order_by("-created_at").count()
             revs = contract.revisions.all()[rev_count - 2 :]
             if (
                 revs[0].as_object().google_sheet_target
