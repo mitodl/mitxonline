@@ -80,9 +80,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     def _get_course_specific_form(self, instance):
         """Get financial assistance form specific to the course."""
         return (
-            FlexiblePricingRequestForm.objects.filter(
-                selected_course=instance.product
-            )
+            FlexiblePricingRequestForm.objects.filter(selected_course=instance.product)
             .live()
             .first()
         )
