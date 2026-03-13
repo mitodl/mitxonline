@@ -101,7 +101,9 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
             )
             .annotate(attach_redemption_count=Count("contract_redemptions"))
             .all()
-            .order_by("-attach_redemption_count")[: self.contract_page.max_learners]
+            .order_by("-attach_redemption_count", "id")[
+                : self.contract_page.max_learners
+            ]
         )
 
     def _write_row(self, row: int, columns: list) -> int:
@@ -173,17 +175,14 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
 
         header_row_values = self.worksheet.get_row(self.row_zero)
 
-        if len(header_row_values) == 0:
-            self._write_header()
-            return
+        if len(header_row_values) != 0:
+            log.warning(
+                "ContractEnrollmentCodeSheetHandler.ensure_header: header row for sheet %s in contract %s has data in it that we're now going to overwrite.",
+                self.worksheet_name,
+                self.contract_page,
+            )
 
-        for idx, rowvalue in enumerate(header_row_values):
-            if idx >= len(self.default_columns):
-                break
-
-            if rowvalue != self.default_columns[idx]:
-                self._write_header()
-                return
+        self._write_header()
 
     def write_codes(self) -> int:
         """

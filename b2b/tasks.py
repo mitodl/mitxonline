@@ -139,7 +139,17 @@ def queue_contract_sheet_update_post_save(
     from b2b.sheets import ContractEnrollmentCodesSheetHandler
 
     contract = ContractPage.objects.get(pk=contract_id)
-    handler = ContractEnrollmentCodesSheetHandler(contract)
+
+    try:
+        handler = ContractEnrollmentCodesSheetHandler(contract)
+    except ValueError as exc:
+        if "Google Sheet" in str(exc):
+            log.info(
+                "Contract %s has no linked Google Sheet or tab set, skipping", contract
+            )
+        elif "managed" in str(exc):
+            log.info("Contract %s is managed (no enrollment codes), skipping", contract)
+        return
 
     if not only_update:
         has_revs = contract.revisions.count() > 1
