@@ -119,7 +119,7 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
             # Now we have to figure out where the next blank column is.
             found_blank = False
             search_idx = 0
-            empty_cols = ["" for col in self.default_columns]
+            empty_cols = ["" for _ in self.default_columns]
             while not found_blank:
                 cells = self.worksheet.get_row(self.row_one + search_idx)
 
