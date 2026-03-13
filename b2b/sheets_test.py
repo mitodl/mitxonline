@@ -14,6 +14,7 @@ from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.models import DiscountContractAttachmentRedemption
 from b2b.sheets import ContractEnrollmentCodesSheetHandler
 from courses.factories import CourseRunFactory
+from ecommerce.factories import OneTimeDiscountFactory
 from users.factories import UserFactory
 
 FAKE = faker.Faker()
@@ -68,6 +69,20 @@ def contract_with_sheet_courseruns(contract_with_sheet, mocker):
         contract_with_sheet,
         runs,
     )
+
+
+@pytest.fixture
+def contract_with_sheet_courseruns_handler_mocks(contract_with_sheet_courseruns):
+    """Expand on the contract_with_sheet_courserun and add a handler and mocks."""
+
+    contract_with_sheet, runs = contract_with_sheet_courseruns
+    handler = ContractEnrollmentCodesSheetHandler(contract_with_sheet)
+
+    handler._write_header = MagicMock()
+    handler.worksheet.get_row = MagicMock(return_value=[])
+    handler.worksheet.update_row = MagicMock()
+
+    return (contract_with_sheet, runs, handler)
 
 
 @pytest.mark.parametrize(
@@ -212,17 +227,159 @@ def test_formatted_codes(contract_with_sheet_courseruns):
     ]
 
 
-def test_write_codes(mocker, contract_with_sheet_courseruns):
+@pytest.mark.parametrize(
+    "write_to_blank_line",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "test_with_explicit_blanks",
+    [
+        True,
+        False,
+    ],
+)
+def test_write_row(
+    mocker,
+    contract_with_sheet_courseruns_handler_mocks,
+    write_to_blank_line,
+    test_with_explicit_blanks,
+):
+    """Test that the internal write_row method works."""
+
+    sample_doc = [
+        FAKE.random_letters(6),
+        FAKE.random_letters(15),
+        ["", "", "", "", "", ""] if test_with_explicit_blanks else [],
+    ]
+
+    test_row = FAKE.random_letters(
+        len(ContractEnrollmentCodesSheetHandler.default_columns)
+    )
+
+    _, _, handler = contract_with_sheet_courseruns_handler_mocks
+
+    # Replace the return - each call should be a new row of the sample doc, so
+    # we can make sure this is selecting a row and not just doing the first one.
+    handler.worksheet.get_row.return_value = None
+    handler.worksheet.get_row.side_effect = sample_doc
+
+    write_idx = -1 if write_to_blank_line else 1
+
+    handler._write_row(write_idx, test_row)
+
+    if write_to_blank_line:
+        handler.worksheet.update_row.assert_called_with(3, test_row)
+    else:
+        handler.worksheet.update_row.assert_called_with(write_idx, test_row)
+
+
+def test_write_codes(contract_with_sheet_courseruns_handler_mocks):
     """Test that destructively writing the codes works as expected."""
 
-    contract_with_sheet, _ = contract_with_sheet_courseruns
-    handler = ContractEnrollmentCodesSheetHandler(contract_with_sheet)
-
-    handler._write_header = MagicMock()
-    handler.worksheet.get_row = MagicMock(return_value=[])
-    handler.worksheet.update_row = MagicMock()
+    _, _, handler = contract_with_sheet_courseruns_handler_mocks
 
     handler.write_codes()
 
     test_cells = handler._get_discount_cells(handler._get_sorted_codes()[4])
     handler.worksheet.update_row.assert_any_call(ANY, test_cells)
+
+
+class FakeCell:
+    """A simple fake pygsheets Cell for use in the test below."""
+
+    row = 0
+    col = 0
+
+    def __init__(self, row, col):
+        """Create the cell"""
+
+        self.row = row
+        self.col = col
+
+
+def test_check_codes_expected_loc(contract_with_sheet_courseruns_handler_mocks):
+    """Test that the code check method finds codes as we expect."""
+
+    _, _, handler = contract_with_sheet_courseruns_handler_mocks
+
+    sample_sheet = [
+        ContractEnrollmentCodesSheetHandler.default_columns,
+        *[handler._get_discount_cells(code) for code in handler._get_sorted_codes()],
+    ]
+
+    def _return_row(row_idx, sample_sheet=sample_sheet, **kwargs):
+        """Mock get_row but return from our sample sheet."""
+
+        if row_idx > len(sample_sheet) or row_idx < 0:
+            return []
+
+        return sample_sheet[row_idx]
+
+    handler.worksheet.get_row.side_effect = _return_row
+    handler.worksheet.find = MagicMock()
+
+    # Test when a discount is at the location we expect.
+    discount = handler._get_sorted_codes()[3]
+    discount.b2b_sheet_location = "4"
+    discount.save()
+
+    assert handler.check_code(discount) == 4
+    handler.worksheet.find.assert_not_called()
+
+    # Test when the discount is at a different location.
+    discount.b2b_sheet_location = 1
+    discount.save()
+    handler.worksheet.find.return_value = [FakeCell(4, 1)]
+
+    assert handler.check_code(discount) == 4
+    handler.worksheet.find.assert_called_with(
+        discount.discount_code, matchEntireCell=True, rows=ANY, cols=ANY
+    )
+
+    discount.refresh_from_db()
+    assert discount.b2b_sheet_location == "4"
+
+    # Test when the discount is not in the sheet.
+    random_discount = OneTimeDiscountFactory.create()
+    handler.worksheet.find.return_value = []
+
+    assert handler.check_code(random_discount) == -1
+    handler.worksheet.find.assert_called_with(
+        random_discount.discount_code, matchEntireCell=True, rows=ANY, cols=ANY
+    )
+
+    # Test when too many discounts are found.
+
+    discount.b2b_sheet_location = ""
+    discount.save()
+
+    handler.worksheet.find.return_value = [FakeCell(4, 1), FakeCell(1900, 872)]
+
+    with pytest.raises(ValueError, match="more than once") as exc:
+        handler.check_code(discount)
+
+    assert "1900" in str(exc)
+    handler.worksheet.find.assert_called_with(
+        discount.discount_code, matchEntireCell=True, rows=ANY, cols=ANY
+    )
+
+
+def test_update_sheet(contract_with_sheet_courseruns_handler_mocks):
+    """
+    Test that update_sheet works as expected.
+
+    The internals of this get exercised more in earlier tests, so this is pretty
+    simple.
+    """
+
+    contract, _, handler = contract_with_sheet_courseruns_handler_mocks
+
+    handler.update_code = MagicMock(
+        side_effect=list(range(1, contract.max_learners + 1))
+    )
+
+    handler.update_sheet()
+    assert handler.update_code.call_count == contract.max_learners

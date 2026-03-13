@@ -130,7 +130,7 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
 
                 search_idx += 1
 
-            row = search_idx + self.row_one
+            row = search_idx + self.row_one - 1  # GSheets is 1-indexed
             self.last_blank_row = row
 
         self.worksheet.update_row(row, columns)
