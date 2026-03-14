@@ -189,7 +189,9 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         # Prefetch only products related to Program objects
         program_content_type = ContentType.objects.get_for_model(Program)
-        program_product_queryset = Product.objects.filter(content_type=program_content_type)
+        program_product_queryset = Product.objects.filter(
+            content_type=program_content_type
+        )
         products_prefetch = Prefetch(
             "products",
             queryset=program_product_queryset,
