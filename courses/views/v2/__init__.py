@@ -187,6 +187,16 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     lookup_value_regex = "[^/]+"  # Accept any non-slash character
 
     def get_queryset(self):
+        # Prefetch only products related to Program objects
+        program_content_type = ContentType.objects.get_for_model(Program)
+        program_product_queryset = Product.objects.filter(
+            content_type=program_content_type
+        )
+        products_prefetch = Prefetch(
+            "products",
+            queryset=program_product_queryset,
+            to_attr="prefetched_products",
+        )
         return (
             Program.objects.filter()
             .select_related("page", "page__feature_image")
@@ -223,7 +233,7 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                     "collection_memberships__collection",
                     queryset=ProgramCollection.objects.only("id", "title"),
                 ),
-                "products",
+                products_prefetch,
             )
             .order_by("title")
         )
