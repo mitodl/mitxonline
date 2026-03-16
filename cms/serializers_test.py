@@ -431,9 +431,7 @@ def test_serialize_program_page__form_child_of_course_with_program_fk(
             "feature_image_src": fake_image_src,
             "page_url": program_page.url,
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
-            "description": bleach.clean(
-                program_page.description, tags={}, strip=True
-            ),
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
