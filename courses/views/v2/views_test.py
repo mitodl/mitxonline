@@ -2049,7 +2049,6 @@ def test_program_products_prefetch_query_count(
 
     num_queries_before = len(connection.queries)
     expected_num_queries = num_queries_from_programs(programs, "v2")
-    print(expected_num_queries)
     with django_assert_max_num_queries(expected_num_queries) as context:
         user_drf_client.get(reverse("v2:programs_api-list"))
     duplicate_queries_check(context)
