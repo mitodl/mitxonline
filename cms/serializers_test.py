@@ -375,7 +375,7 @@ def test_get_course_specific_form_returns_only_live_forms(fully_configured_wagta
     )
 
     serializer = CoursePageSerializer()
-    result = serializer._get_course_specific_form(course_page)
+    result = serializer._get_course_specific_form(course_page)  # noqa: SLF001
 
     assert result == live_form
 
