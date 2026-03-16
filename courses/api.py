@@ -1584,9 +1584,9 @@ def create_verifiable_credential(
     """
 
     try:
-        # TODO: Need to confirm the desired functionality #noqa: FIX002, TD002, TD003
-        # - freeze VCs using the state in the CMS page at the time of cert creation OR
-        # - always look at the latest revision of the page to determine whether or not to create a VC?
+        # We always look at the most recent certificate page revision for content and whether or not to provision
+        # You can imagine that if we used the linked revision, if the certificate page was in a bad state
+        # when the certificate was issued, we could never backfill the VC even if we fixed it later.
         certificate_page = get_certificate_page(certificate)
 
         if not should_provision_verifiable_credential(certificate_page):
