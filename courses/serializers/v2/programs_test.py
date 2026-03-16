@@ -128,6 +128,7 @@ def test_serialize_program(
             if not remove_tree
             else [],
             "collections": [program_collection.id],
+            "programs": None,
             "requirements": formatted_reqs,
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root

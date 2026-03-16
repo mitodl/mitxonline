@@ -368,6 +368,50 @@ def test_retrievinng_single_course_by_pk_or_readable_id_includes_programs(
 
 
 @pytest.mark.django_db
+def test_retrieving_single_program_by_pk_or_readable_id_includes_parent_programs(
+    user_drf_client,
+):
+    """Programs retrieved via v2 API should include parent programs when applicable."""
+
+    # Create a child program that will be treated as a course in Learn
+    child_program = ProgramFactory.create(display_mode="course")
+
+    # Create a parent program and add the child as a required program
+    parent_program = ProgramFactory.create()
+    parent_program.add_requirement(child_program)
+    parent_program.refresh_from_db()
+
+    # Request the child program by primary key
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": child_program.id}),
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    program_data = resp.json()
+
+    # Verify that parent programs are included in the response
+    assert "programs" in program_data
+    assert program_data["programs"] is not None
+    assert len(program_data["programs"]) == 1
+    assert program_data["programs"][0]["id"] == parent_program.id
+    assert (
+        program_data["programs"][0]["readable_id"] == parent_program.readable_id
+    )
+    assert program_data["programs"][0]["title"] == parent_program.title
+
+    # Check result is same if retrieving by readable_id or via list filter
+    resp_by_readable = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": child_program.readable_id}),
+    )
+    resp_list = user_drf_client.get(
+        reverse("v2:programs_api-list"), {"readable_id": child_program.readable_id}
+    )
+
+    assert resp_by_readable.json() == program_data
+    assert resp_list.json()["results"][0] == program_data
+
+
+@pytest.mark.django_db
 def test_filter_with_org_id_anonymous():
     org = OrganizationPageFactory(name="Test Org")
 
@@ -1514,6 +1558,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 != "",
                 "topics": [],
                 "display_mode": None,
+                "programs": None,
                 "start_date": ANY_STR,
                 "end_date": None,
                 "enrollment_end": None,
