@@ -2044,7 +2044,7 @@ def test_program_products_prefetch_query_count(
 ):
     """Test that products are prefetched and only one query is made for products in the program API."""
     programs = ProgramFactory.create_batch(5, live=True)
-    for i, program in enumerate(programs):
+    for program in programs:
         ProductFactory(purchasable_object=program)
 
     num_queries_before = len(connection.queries)
