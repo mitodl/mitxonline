@@ -565,8 +565,12 @@ class ProgramDetailSerializer(ProgramSerializer):
         # Use prefetched products if available, otherwise fallback to related manager
         products = getattr(instance, "prefetched_products", None)
         if products is not None:
-            return ProductRelatedField(many=True, read_only=True).to_representation(products)
-        return ProductRelatedField(many=True, read_only=True).to_representation(instance.products.all())
+            return ProductRelatedField(many=True, read_only=True).to_representation(
+                products
+            )
+        return ProductRelatedField(many=True, read_only=True).to_representation(
+            instance.products.all()
+        )
 
 
 class ProgramCertificateSerializer(serializers.ModelSerializer):
