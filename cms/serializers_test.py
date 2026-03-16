@@ -390,6 +390,58 @@ def test_serialize_program_page(
     )
 
 
+def test_serialize_program_page__form_child_of_course_with_program_fk(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
+    """Program page uses course URL when form is child of course page.
+
+    This covers the case where a financial assistance form is created under a
+    course page in Wagtail but is linked to a program via the Selected Program
+    FK. The program page should link to the course-based URL for the form
+    rather than a /programs/ URL.
+    """
+
+    fake_image_src = "http://example.com/my.img"
+    patched_get_wagtail_src = mocker.patch(  # noqa: F841
+        "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
+    )
+
+    program = ProgramFactory(page=None)
+    program_page = ProgramPageFactory(program=program)
+
+    course = CourseFactory(page=None)
+    program.add_requirement(course)
+    course_page = CoursePageFactory(course=course)
+
+    financial_assistance_form = FlexiblePricingFormFactory(
+        selected_program_id=program.id, parent=course_page
+    )
+
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user
+
+    data = ProgramPageSerializer(
+        instance=program_page, context=program_page.get_context(request)
+    ).data
+
+    assert_drf_json_equal(
+        data,
+        {
+            "feature_image_src": fake_image_src,
+            "page_url": program_page.url,
+            "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
+            "description": bleach.clean(
+                program_page.description, tags={}, strip=True
+            ),
+            "live": True,
+            "length": program_page.length,
+            "effort": program_page.effort,
+            "price": None,
+        },
+    )
+
+
 def test_serialize_program_page__with_related_financial_form(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
