@@ -569,7 +569,7 @@ class Command(BaseCommand):
                         )
                         continue
 
-                    already_enrolled = ProgramEnrollment.objects.filter(
+                    already_enrolled = ProgramEnrollment.all_objects.filter(
                         user=user,
                         program=program,
                     ).exists()
