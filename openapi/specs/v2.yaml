@@ -4421,6 +4421,20 @@ components:
           items:
             $ref: '#/components/schemas/EnrollmentMode'
           readOnly: true
+        upgrade_product_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        upgrade_product_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          nullable: true
+          readOnly: true
+        upgrade_product_is_active:
+          type: boolean
+          nullable: true
+          readOnly: true
         course:
           allOf:
           - $ref: '#/components/schemas/CourseV3'
@@ -4437,6 +4451,9 @@ components:
       - is_upgradable
       - run_tag
       - title
+      - upgrade_product_id
+      - upgrade_product_is_active
+      - upgrade_product_price
     CourseRunWithCourseV3Request:
       type: object
       description: CourseRun serializer
