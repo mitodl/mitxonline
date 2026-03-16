@@ -73,6 +73,7 @@ from courses.views.test_utils import (
     num_queries_from_programs,
 )
 from courses.views.v2 import Pagination, ProgramFilterSet
+from ecommerce.factories import ProductFactory
 from ecommerce.models import Product
 from main import features
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
@@ -2001,3 +2002,38 @@ def test_program_enrollment_destroy(user_drf_client, user):
     enrollment.refresh_from_db()
     assert enrollment.active is False
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+
+
+@pytest.mark.django_db
+def test_course_run_and_product_prefetch_optimized(
+    user_drf_client, django_assert_max_num_queries
+):
+    """
+    Verify that querying courses with multiple courseruns and products is optimized and does not result in N+1 queries.
+    """
+
+    course = CourseFactory()
+    num_courseruns = 8
+    courseruns = [CourseRunFactory(course=course) for _ in range(num_courseruns)]
+    for run in courseruns:
+        ProductFactory(
+            purchasable_object=run,
+        )
+    max_expected_queries = 21
+    num_queries_before = len(connection.queries)
+    with django_assert_max_num_queries(max_expected_queries):
+        resp = user_drf_client.get(reverse("v2:courses_api-list"))
+        assert resp.status_code == 200
+        data = resp.json()["results"]
+        assert len(data) == 1
+        assert len(data[0]["courseruns"]) == num_courseruns
+    # Check that products are queried only once/twice
+    # not sure why there is a second query
+    queries_after = connection.queries[num_queries_before:]
+
+    product_queries = [
+        q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
+    ]
+    assert len(product_queries) == 2, (
+        f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
+    )

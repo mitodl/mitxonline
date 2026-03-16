@@ -951,13 +951,15 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Gets active products for the first unexpired courserun for this course
 
         Returns:
-        - ProductsQuerySet
+        - list of active products
         """
         relevant_run = self.first_unexpired_run
-
-        return (
-            relevant_run.products.filter(is_active=True).all() if relevant_run else None
-        )
+        if relevant_run is None:
+            return []
+        # Use prefetched products if available
+        if hasattr(relevant_run, "prefetched_products"):
+            return [p for p in relevant_run.prefetched_products if p.is_active]
+        return list(relevant_run.products.filter(is_active=True).all())
 
     @cached_property
     def first_unexpired_run(self):
@@ -1223,12 +1225,16 @@ class CourseRun(TimestampedModel):
         Checks if the course can be upgraded
         A null value means that the upgrade window is always open
         """
+        if hasattr(self, "prefetched_products"):
+            has_product = bool(self.prefetched_products)
+        else:
+            has_product = self.products.exists()
         return (
             self.live is True
             and (
                 self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
             )
-            and self.products.count() > 0
+            and has_product
         )
 
     @cached_property

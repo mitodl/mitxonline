@@ -206,24 +206,14 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
     def get_current_price(self, instance) -> int | None:
         """Get the current price of the course product."""
-        # Handle both QuerySet and prefetched list cases
         active_products = instance.product.active_products
-        if active_products is None:
+        if not active_products:
             return None
-
         try:
-            # Convert to list and sort by price (descending)
-            products_list = (
-                list(active_products.all())
-                if hasattr(active_products, "all")
-                else list(active_products)
-            )
-            relevant_product = (
-                max(products_list, key=lambda p: p.price) if products_list else None
-            )
-        except (AttributeError, TypeError):
+            # Only call max if there are products
+            relevant_product = max(active_products, key=lambda p: p.price)
+        except (ValueError, AttributeError, TypeError):
             relevant_product = None
-
         return relevant_product.price if relevant_product else None
 
     @extend_schema_field(list)
