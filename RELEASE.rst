@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.142.0
+---------------
+
+- add bare minimum upgrade product info to v3 enrollments endpoint (#3385)
+- Add a test for number of queries in courses api (#3361)
+
 Version 1.141.4 (Released March 12, 2026)
 ---------------
 
