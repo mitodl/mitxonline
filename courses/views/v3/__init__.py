@@ -4,7 +4,7 @@ Course API Views version 3
 
 import django_filters
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -27,6 +27,7 @@ from courses.serializers.v3.programs import (
     ProgramEnrollmentCreateSerializer,
     ProgramEnrollmentSerializer,
 )
+from ecommerce.models import Product
 from main import features
 
 
@@ -91,7 +92,15 @@ class UserEnrollmentsApiViewSet(
             "run",
             "run__b2b_contract",
         )
-        .prefetch_related("run__course", "run__enrollment_modes")
+        .prefetch_related(
+            "run__course",
+            "run__enrollment_modes",
+            Prefetch(
+                "run__products",
+                queryset=Product.objects.only("id", "price", "is_active"),
+                to_attr="prefetched_products",
+            ),
+        )
         .prefetch("certificate", "grades")
         .order_by("id")
     )

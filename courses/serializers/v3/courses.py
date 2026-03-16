@@ -32,10 +32,46 @@ class CourseRunWithCourseSerializer(BaseCourseRunSerializer):
     """CourseRun serializer"""
 
     course = CourseSerializer(read_only=True)
+    upgrade_product_id = serializers.SerializerMethodField()
+    upgrade_product_price = serializers.SerializerMethodField()
+    upgrade_product_is_active = serializers.SerializerMethodField()
+
+    def _get_upgrade_product(self, obj):
+        """Return the active upgrade product only if the run is currently upgradable."""
+        if not obj.is_upgradable:
+            return None
+
+        prefetched_products = getattr(obj, "prefetched_products", None)
+        if prefetched_products is not None:
+            return prefetched_products[0] if prefetched_products else None
+
+        return (
+            obj.products.filter(is_active=True).only("id", "price", "is_active").first()
+        )
+
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_upgrade_product_id(self, obj):
+        product = self._get_upgrade_product(obj)
+        return product.id if product else None
+
+    @extend_schema_field(
+        serializers.DecimalField(max_digits=7, decimal_places=2, allow_null=True)
+    )
+    def get_upgrade_product_price(self, obj):
+        product = self._get_upgrade_product(obj)
+        return str(product.price) if product else None
+
+    @extend_schema_field(serializers.BooleanField(allow_null=True))
+    def get_upgrade_product_is_active(self, obj):
+        product = self._get_upgrade_product(obj)
+        return product.is_active if product else None
 
     class Meta(BaseCourseRunSerializer.Meta):
         fields = [
             *BaseCourseRunSerializer.Meta.fields,
+            "upgrade_product_id",
+            "upgrade_product_price",
+            "upgrade_product_is_active",
             "course",
         ]
 
