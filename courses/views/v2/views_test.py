@@ -181,7 +181,6 @@ def test_get_program(
     )
 
 
-
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_create_program(
@@ -2040,7 +2039,9 @@ def test_course_run_and_product_prefetch_optimized(
     )
 
 
-def test_program_products_prefetch_query_count(user_drf_client, django_assert_max_num_queries):
+def test_program_products_prefetch_query_count(
+    user_drf_client, django_assert_max_num_queries
+):
     """Test that products are prefetched and only one query is made for products in the program API."""
     programs = ProgramFactory.create_batch(5, live=True)
     for i, program in enumerate(programs):
@@ -2057,4 +2058,6 @@ def test_program_products_prefetch_query_count(user_drf_client, django_assert_ma
     product_queries = [
         q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
     ]
-    assert len(product_queries) == 1, f"Expected 1 product query, got {len(product_queries)}"
+    assert len(product_queries) == 1, (
+        f"Expected 1 product query, got {len(product_queries)}"
+    )
