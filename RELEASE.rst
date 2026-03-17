@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.142.1
+Version 1.142.1 (Released March 17, 2026)
 ---------------
 
 - Prefer parent page for financial form URL (#3387)
