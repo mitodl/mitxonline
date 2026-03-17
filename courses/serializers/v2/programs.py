@@ -561,6 +561,7 @@ class ProgramDetailSerializer(ProgramSerializer):
     class Meta(ProgramSerializer.Meta):
         fields = [*ProgramSerializer.Meta.fields, "products"]
 
+    @extend_schema_field(ProductRelatedField(many=True, read_only=True))
     def get_products(self, instance):
         # Use prefetched products if available, otherwise fallback to related manager
         products = getattr(instance, "prefetched_products", None)
