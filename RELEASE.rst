@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.142.0
+Version 1.142.0 (Released March 17, 2026)
 ---------------
 
 - add bare minimum upgrade product info to v3 enrollments endpoint (#3385)
