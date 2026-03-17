@@ -1543,7 +1543,7 @@ def update_edx_course(  # noqa: PLR0913
     )
 
 
-def fix_cloned_run_data(target_course: CourseRun, edx_client) -> CourseRun:
+def fix_cloned_run_data(target_course: CourseRun, *, edx_client=None) -> CourseRun:
     """Fix the title, pacing, and dates for a newly cloned run."""
 
     course_params = [
