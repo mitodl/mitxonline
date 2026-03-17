@@ -1627,14 +1627,8 @@ def process_course_run_clone(target_course: CourseRun, base_course_key: str):
     # We should have the target course in edX now. We need to update it with the
     # data from our course run.
     # Run these after the transaction that this will most likely be
-    transaction.on_commit(
-        partial(fix_cloned_run_data, target_course=target_course, edx_client=edx_client)
-    )
-    transaction.on_commit(
-        partial(
-            push_edx_modes_from_run, course_run=target_course, edx_client=edx_client
-        )
-    )
+    transaction.on_commit(partial(fix_cloned_run_data, target_course=target_course))
+    transaction.on_commit(partial(push_edx_modes_from_run, course_run=target_course))
 
 
 def get_edx_course_modes(
