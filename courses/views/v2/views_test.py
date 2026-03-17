@@ -394,9 +394,7 @@ def test_retrieving_single_program_by_pk_or_readable_id_includes_parent_programs
     assert program_data["programs"] is not None
     assert len(program_data["programs"]) == 1
     assert program_data["programs"][0]["id"] == parent_program.id
-    assert (
-        program_data["programs"][0]["readable_id"] == parent_program.readable_id
-    )
+    assert program_data["programs"][0]["readable_id"] == parent_program.readable_id
     assert program_data["programs"][0]["title"] == parent_program.title
 
     # Check result is same if retrieving by readable_id or via list filter

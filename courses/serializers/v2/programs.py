@@ -183,9 +183,7 @@ class ProgramSerializer(serializers.ModelSerializer):
         else:
             programs_qs = programs_qs.filter(program__b2b_only=False)
 
-        programs = [
-            req.program for req in programs_qs.select_related("program").all()
-        ]
+        programs = [req.program for req in programs_qs.select_related("program").all()]
 
         return BaseProgramSerializer(programs, many=True).data
 
