@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.142.1
+---------------
+
+- Prefer parent page for financial form URL (#3387)
+- Add live filter to finance assistance forms (#3384)
+- Update dependency authlib to v1.6.9 [SECURITY] (#3388)
+
 Version 1.142.0 (Released March 17, 2026)
 ---------------
 
