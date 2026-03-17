@@ -13,7 +13,6 @@ from urllib.parse import urlparse
 
 import requests
 import reversion
-from bs4 import BeautifulSoup
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -25,7 +24,6 @@ from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
 )
-from mitol.olposthog.features import is_enabled
 from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -41,7 +39,6 @@ from courses.constants import (
     PROGRAM_TEXT_ID_PREFIX,
 )
 from courses.models import (
-    BaseCertificate,
     BlockedCountry,
     Course,
     CourseRun,
@@ -92,6 +89,8 @@ from openedx.exceptions import (
 if TYPE_CHECKING:
     from django.db.models.query import QuerySet
     from edx_api.course_detail.models import CourseMode
+
+    from cms.models import CertificatePage
 
 
 log = logging.getLogger(__name__)
@@ -1423,7 +1422,10 @@ ENV_TO_LEARN_HOSTNAME_MAP = {
 }
 
 
-def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
+def get_verifiable_credentials_payload(
+    certificate: CourseRunCertificate | ProgramCertificate,
+    certificate_page: CertificatePage,
+) -> dict:
     # TODO: We could optimize these queries #noqa: TD002, TD003, FIX002
     # It's not a massive priority though, as we have a total of 20k certs in prod as of 12/25
     learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
@@ -1435,14 +1437,6 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         course_run = certificate.course_run
         course = course_run.course
         course_page = course.page
-        if not course_page.what_you_learn:
-            # If it's empty, we can't generate a valid payload as narrative is required.
-            log.error(
-                "Error creating verifiable credential - missing 'what_you_learn' for course page %s for certificate %s",
-                course_page.title,
-                certificate,
-            )
-            raise InvalidCertificateError
 
         course_url_id = course.readable_id
         url = f"https://{learn_hostname}/courses/{course_url_id}"
@@ -1453,10 +1447,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(course_page) if course_page.feature_image else ""
         )
-        soup = BeautifulSoup(course_page.what_you_learn, "html.parser")
-        narrative = "\n".join(
-            [f"- {stripped_string}" for stripped_string in soup.stripped_strings]
-        )
+        narrative = certificate_page.verifiable_credential_criteria
 
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
@@ -1470,9 +1461,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(program_page) if program_page.feature_image else ""
         )
-        narrative = "\n".join(
-            [f"- {program_course[0].title}" for program_course in program.courses]
-        )
+        narrative = certificate_page.verifiable_credential_criteria
     else:
         raise InvalidCertificateError
 
@@ -1558,14 +1547,34 @@ def request_verifiable_credential(payload) -> dict:
     return resp.json()
 
 
-def should_provision_verifiable_credential() -> bool:
+def should_provision_verifiable_credential(
+    certificate_page: CertificatePage | None,
+) -> bool:
+    if not certificate_page:
+        return False
+
     return (
-        is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING, False)  # noqa: FBT003
-        or settings.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING
+        certificate_page.should_provision_verifiable_credential
+        and certificate_page.verifiable_credential_criteria
     )
 
 
-def create_verifiable_credential(certificate: BaseCertificate, *, raise_on_error=False):
+def get_certificate_page(
+    certificate: CourseRunCertificate | ProgramCertificate,
+) -> CertificatePage | None:
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    certificate_page = None
+    if certificate.certificate_page_revision:
+        certificate_page = CertificatePage.objects.filter(
+            pk=int(certificate.certificate_page_revision.object_id),
+        ).first()
+    return certificate_page
+
+
+def create_verifiable_credential(
+    certificate: ProgramCertificate | CourseRunCertificate, *, raise_on_error=False
+):
     """
     Create a verifiable credential for the given course run certificate.
 
@@ -1573,10 +1582,16 @@ def create_verifiable_credential(certificate: BaseCertificate, *, raise_on_error
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
         raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
     """
+
     try:
-        if not should_provision_verifiable_credential():
+        # We always look at the most recent certificate page revision for content and whether or not to provision
+        # You can imagine that if we used the linked revision, if the certificate page was in a bad state
+        # when the certificate was issued, we could never backfill the VC even if we fixed it later.
+        certificate_page = get_certificate_page(certificate)
+
+        if not should_provision_verifiable_credential(certificate_page):
             return
-        payload = get_verifiable_credentials_payload(certificate)
+        payload = get_verifiable_credentials_payload(certificate, certificate_page)
 
         # Call the signing service to create the new credential
         credential = request_verifiable_credential(payload)
