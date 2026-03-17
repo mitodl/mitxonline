@@ -355,6 +355,31 @@ def test_serialized_course_finaid_form_url_publishing_states(
         assert serialized_output["financial_assistance_form_url"] == ""
 
 
+def test_get_course_specific_form_returns_only_live_forms(fully_configured_wagtail):
+    """_get_course_specific_form should ignore non-live forms and return the live one."""
+
+    course_page = CoursePageFactory()
+
+    # Non-live form for this course
+    FlexiblePricingFormFactory(
+        parent=course_page,
+        selected_course=course_page.product,
+        live=False,
+    )
+
+    # Live form for this course
+    live_form = FlexiblePricingFormFactory(
+        parent=course_page,
+        selected_course=course_page.product,
+        live=True,
+    )
+
+    serializer = CoursePageSerializer()
+    result = serializer._get_course_specific_form(course_page)  # noqa: SLF001
+
+    assert result == live_form
+
+
 def test_serialize_program_page(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
