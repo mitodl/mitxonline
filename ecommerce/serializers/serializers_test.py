@@ -7,7 +7,7 @@ from django.urls import reverse
 from mitol.common.utils import now_in_utc
 
 from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
-from courses.models import CourseRun, ProgramRun
+from courses.models import CourseRun, ProgramRun, Program
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -18,7 +18,7 @@ from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
     BasketItemFactory,
     ProductFactory,
-    UnlimitedUseDiscountFactory,
+    UnlimitedUseDiscountFactory, ProgramProductFactory,
 )
 from ecommerce.models import BasketDiscount, Order, OrderStatus
 from ecommerce.serializers import (
@@ -462,13 +462,13 @@ def test_order_receipt_lines_serializer(settings, mocker, user, products, user_c
         elif isinstance(content_object, CourseRun):
             readable_id = content_object.course.readable_id
             content_title = f"{content_object.course_number} {content_object.title}"
-
         line = dict(  # noqa: C408
             quantity=instance.quantity,
             total_paid=str(total_paid),
             discount=str(discount),
             CEUs=None,
             content_title=content_title,
+            content_type=instance.product.content_type,
             readable_id=readable_id,
             price=str(instance.product.price),
             start_date=content_object.start_date,
@@ -478,4 +478,45 @@ def test_order_receipt_lines_serializer(settings, mocker, user, products, user_c
 
     serialized_data = TransactionLineSerializer(instance=order.lines, many=True).data
 
+    assert serialized_data == test_data["lines"]
+
+@pytest.mark.skip_nplusone_check
+def test_program_order_receipt_lines_serializer(settings, mocker, user, user_client):
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    with reversion.create_revision():
+        products = ProgramProductFactory.create_batch(5)
+    (order, test_data) = get_receipt_serializer_test_data(
+        mocker, user, products, user_client
+    )
+
+    for instance in order.lines.all():
+        coupon_redemption = instance.order.discounts.first()
+        discount = 0.0
+
+        if coupon_redemption:
+            discount = instance.product.price - instance.discounted_price
+
+        total_paid = (instance.product.price - Decimal(discount)) * instance.quantity
+
+        content_object = instance.product.purchasable_object
+
+        content_title = content_object.title
+        readable_id = content_object.readable_id
+
+        line = dict(  # noqa: C408
+            quantity=instance.quantity,
+            total_paid=str(total_paid),
+            discount=str(discount),
+            CEUs=None,
+            content_title=content_title,
+            content_type=instance.product.content_type,
+            readable_id=readable_id,
+            price=str(instance.product.price),
+            start_date=content_object.start_date,
+            end_date=content_object.end_date,
+        )
+        test_data["lines"].append(line)
+
+    serialized_data = TransactionLineSerializer(instance=order.lines, many=True).data
     assert serialized_data == test_data["lines"]

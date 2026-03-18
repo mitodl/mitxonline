@@ -830,14 +830,14 @@ class TransactionLineSerializer(serializers.BaseSerializer):
         (content_title, readable_id) = (None, None)
 
         if isinstance(content_object, Program):
-            content_title = content_object.program.title
-            readable_id = content_object.program.readable_id
+            content_title = content_object.title
+            readable_id = content_object.readable_id
         elif isinstance(content_object, CourseRun):
             readable_id = content_object.course.readable_id
             content_title = f"{content_object.course_number} {content_object.title}"
 
         # Add content_type from product's content_type model
-        content_type = instance.product.content_type.model if hasattr(instance.product, "content_type") else None
+        content_type = instance.product.content_type if hasattr(instance.product, "content_type") else None
 
         line = dict(  # noqa: C408
             quantity=instance.quantity,

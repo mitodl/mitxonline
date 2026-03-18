@@ -4,7 +4,7 @@ import faker
 from factory import SubFactory, fuzzy
 from factory.django import DjangoModelFactory
 
-from courses.factories import CourseRunFactory
+from courses.factories import CourseRunFactory, ProgramFactory
 from ecommerce import models
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
@@ -29,6 +29,14 @@ class ProductFactory(DjangoModelFactory):
     class Meta:
         model = models.Product
 
+class ProgramProductFactory(DjangoModelFactory):
+    purchasable_object = SubFactory(ProgramFactory)
+    price = fuzzy.FuzzyDecimal(2, 2000, precision=2)
+    description = FAKE.sentence(nb_words=4)
+    is_active = True
+
+    class Meta:
+        model = models.Product
 
 class DiscountFactory(DjangoModelFactory):
     amount = random.randrange(1, 50, 1)  # noqa: S311
