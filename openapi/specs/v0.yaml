@@ -8157,6 +8157,12 @@ components:
           items:
             type: integer
           readOnly: true
+        programs:
+          type: array
+          items:
+            $ref: '#/components/schemas/BaseProgram'
+          nullable: true
+          readOnly: true
         requirements:
           type: object
           properties:
@@ -8336,6 +8342,7 @@ components:
       - min_weekly_hours
       - min_weeks
       - page
+      - programs
       - readable_id
       - req_tree
       - required_prerequisites
@@ -8441,6 +8448,12 @@ components:
           type: array
           items:
             type: integer
+          readOnly: true
+        programs:
+          type: array
+          items:
+            $ref: '#/components/schemas/BaseProgram'
+          nullable: true
           readOnly: true
         requirements:
           type: object
@@ -8628,6 +8641,7 @@ components:
       - min_weeks
       - page
       - products
+      - programs
       - readable_id
       - req_tree
       - required_prerequisites
