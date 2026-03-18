@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.141.4"
+VERSION = "1.142.1"
 
 log = logging.getLogger()
 
@@ -1535,11 +1535,6 @@ VERIFIABLE_CREDENTIAL_DID = get_string(
     name="VERIFIABLE_CREDENTIAL_DID",
     default="",
     description="The Decentralized Identifier (DID) used as the issuer for verifiable credentials.",
-)
-ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING = get_bool(
-    name="ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING",
-    default=False,
-    description="Override posthog flag to enable the provisioning of verifiable credentials in dev.",
 )
 
 MIT_LEARN_ATTACH_URL = get_string(

@@ -355,6 +355,31 @@ def test_serialized_course_finaid_form_url_publishing_states(
         assert serialized_output["financial_assistance_form_url"] == ""
 
 
+def test_get_course_specific_form_returns_only_live_forms(fully_configured_wagtail):
+    """_get_course_specific_form should ignore non-live forms and return the live one."""
+
+    course_page = CoursePageFactory()
+
+    # Non-live form for this course
+    FlexiblePricingFormFactory(
+        parent=course_page,
+        selected_course=course_page.product,
+        live=False,
+    )
+
+    # Live form for this course
+    live_form = FlexiblePricingFormFactory(
+        parent=course_page,
+        selected_course=course_page.product,
+        live=True,
+    )
+
+    serializer = CoursePageSerializer()
+    result = serializer._get_course_specific_form(course_page)  # noqa: SLF001
+
+    assert result == live_form
+
+
 def test_serialize_program_page(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
@@ -381,6 +406,56 @@ def test_serialize_program_page(
             "feature_image_src": fake_image_src,
             "page_url": program_page.url,
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
+            "description": bleach.clean(program_page.description, tags={}, strip=True),
+            "live": True,
+            "length": program_page.length,
+            "effort": program_page.effort,
+            "price": None,
+        },
+    )
+
+
+def test_serialize_program_page__form_child_of_course_with_program_fk(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
+    """Program page uses course URL when form is child of course page.
+
+    This covers the case where a financial assistance form is created under a
+    course page in Wagtail but is linked to a program via the Selected Program
+    FK. The program page should link to the course-based URL for the form
+    rather than a /programs/ URL.
+    """
+
+    fake_image_src = "http://example.com/my.img"
+    patched_get_wagtail_src = mocker.patch(  # noqa: F841
+        "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
+    )
+
+    program = ProgramFactory(page=None)
+    program_page = ProgramPageFactory(program=program)
+
+    course = CourseFactory(page=None)
+    program.add_requirement(course)
+    course_page = CoursePageFactory(course=course)
+
+    financial_assistance_form = FlexiblePricingFormFactory(
+        selected_program_id=program.id, parent=course_page
+    )
+
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user
+
+    data = ProgramPageSerializer(
+        instance=program_page, context=program_page.get_context(request)
+    ).data
+
+    assert_drf_json_equal(
+        data,
+        {
+            "feature_image_src": fake_image_src,
+            "page_url": program_page.url,
+            "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
             "live": True,
             "length": program_page.length,

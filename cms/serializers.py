@@ -79,9 +79,11 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
     def _get_course_specific_form(self, instance):
         """Get financial assistance form specific to the course."""
-        return FlexiblePricingRequestForm.objects.filter(
-            selected_course=instance.product
-        ).first()
+        return (
+            FlexiblePricingRequestForm.objects.filter(selected_course=instance.product)
+            .live()
+            .first()
+        )
 
     def _get_child_form(self, instance):
         """Get financial assistance form from child pages."""
@@ -307,6 +309,18 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             .live()
             .first()
         )
+
+        # If a form is found via selected_program, prefer its parent page
+        # (e.g., a course or program page) when constructing the URL. This
+        # ensures that forms which are children of course pages but linked to
+        # a program use the correct /courses/ URL instead of the program URL.
+        if financial_assistance_page is not None:
+            parent = financial_assistance_page.get_parent()
+            if parent is not None:
+                parent_page = getattr(parent, "specific", parent)
+                return self._get_financial_assistance_url(
+                    parent_page, financial_assistance_page.slug
+                )
 
         # Check for child form if no direct link found
         if financial_assistance_page is None:

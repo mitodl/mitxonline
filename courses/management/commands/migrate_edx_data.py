@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.db.models import Q
+from reversion.models import Version
 from trino.auth import BasicAuthentication
 from trino.dbapi import connect
 
@@ -13,7 +15,12 @@ from courses.models import (
     CourseRunEnrollment,
     CourseRunGrade,
     Department,
+    Program,
+    ProgramEnrollment,
 )
+from ecommerce.api import fulfill_completed_order
+from ecommerce.constants import ZERO_PAYMENT_DATA
+from ecommerce.models import PendingOrder, Product
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
 
@@ -491,6 +498,110 @@ class Command(BaseCommand):
                     )
                 )
 
+    def _migrate_entitlements(self, conn, options):
+        """
+        Migrate entitlement from edX to MITx Online. Create program Order instances.
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+
+        cur = conn.cursor()
+
+        query = (
+            "SELECT * FROM edxorg_to_mitxonline_program_entitlements "
+            "WHERE order_id IS NULL"
+        )
+
+        if limit is not None:
+            query += f" LIMIT {int(limit)}"
+
+        cur.execute(query)
+        columns = [desc[0] for desc in cur.description]
+
+        created_orders = 0
+
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            batch = [dict(zip(columns, r)) for r in results]
+
+            # Bulk-fetch all objects needed by this batch
+            program_ids = {row["program_id"] for row in batch}
+            user_ids = {row["user_mitxonline_id"] for row in batch}
+            product_version_ids = {row["product_version_id"] for row in batch}
+
+            programs = {p.id: p for p in Program.objects.filter(id__in=program_ids)}
+            users = {u.id: u for u in User.objects.filter(id__in=user_ids)}
+            product_versions = {
+                v.id: v for v in Version.objects.filter(id__in=product_version_ids)
+            }
+
+            for row in batch:
+                try:
+                    program = programs.get(row["program_id"])
+                    user = users.get(row["user_mitxonline_id"])
+                    product_version = product_versions.get(row["product_version_id"])
+                    product = (
+                        Product.all_objects.filter(
+                            id=product_version.field_dict.get("id")
+                        ).first()
+                        if product_version
+                        else None
+                    )
+
+                    if not all([program, user, product_version, product]):
+                        missing = [
+                            name
+                            for name, val in [
+                                ("program", program),
+                                ("user", user),
+                                ("product_version", product_version),
+                                ("product", product),
+                            ]
+                            if not val
+                        ]
+                        self.stdout.write(
+                            self.style.ERROR(
+                                f"Missing objects {missing} for row: {row}"
+                            )
+                        )
+                        continue
+
+                    already_enrolled = ProgramEnrollment.all_objects.filter(
+                        user=user,
+                        program=program,
+                    ).exists()
+                    if already_enrolled:
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"Skipping order creation: user={user.id} is already enrolled "
+                                f"in program={program.id}"
+                            )
+                        )
+                        continue
+
+                    with transaction.atomic():
+                        order = PendingOrder.create_from_product(
+                            product, user, discount=None
+                        )
+                        fulfill_completed_order(
+                            order,
+                            payment_data=ZERO_PAYMENT_DATA,
+                            already_enrolled=True,
+                        )
+                        created_orders += 1
+
+                except Exception as e:  # noqa: BLE001
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Failed to migrate entitlement row: {row} error: {e}"
+                        )
+                    )
+
+        self.stdout.write(self.style.SUCCESS(f"Created {created_orders} Orders"))
+
     def add_arguments(self, parser) -> None:
         parser.add_argument(
             "--use-default-signatory",
@@ -510,7 +621,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--type",
-            choices=["course_runs", "users", "certificates"],
+            choices=["course_runs", "users", "certificates", "entitlements"],
             default="course_runs",
             help="Choose which migration to run: course_runs, users (default: course_runs)",
         )
@@ -539,3 +650,9 @@ class Command(BaseCommand):
                 "Migrating the edX enrollments, grades and certificates ..."
             )
             self._migrate_certificates(conn, options)
+
+        if migrate_type == "entitlements":
+            self.stdout.write(
+                "Migrating the edX entitlements to program orders and enrollments ..."
+            )
+            self._migrate_entitlements(conn, options)

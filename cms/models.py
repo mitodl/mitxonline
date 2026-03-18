@@ -15,7 +15,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.forms import ChoiceField, IntegerField
+from django.forms import ChoiceField, IntegerField, Textarea
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -373,11 +373,25 @@ class CertificatePage(CourseProgramChildPage):
         use_json_field=True,
     )
 
+    verifiable_credential_criteria = models.CharField(  # noqa: DJ001
+        max_length=250,
+        null=True,
+        blank=True,
+        help_text="For verifiable credentials issued for this certificate, this is the criteria narrative field. It should be something descriptive, like a list of completed courses, and may be plaintext or markdown. If it is not supplied, no verifiable credential will be provisioned for those certificates.",
+    )
+
+    should_provision_verifiable_credential = models.BooleanField(
+        default=False,
+        help_text="Whether a verifiable credential should be provisioned for this certificate.",
+    )
+
     content_panels = [
         FieldPanel("product_name"),
         FieldPanel("CEUs"),
         FieldPanel("overrides"),
         FieldPanel("signatories"),
+        FieldPanel("verifiable_credential_criteria", widget=Textarea),
+        FieldPanel("should_provision_verifiable_credential"),
     ]
     api_fields = [
         APIField("product_name"),

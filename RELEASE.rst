@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 1.142.1 (Released March 17, 2026)
+---------------
+
+- Prefer parent page for financial form URL (#3387)
+- Add live filter to finance assistance forms (#3384)
+- Update dependency authlib to v1.6.9 [SECURITY] (#3388)
+
+Version 1.142.0 (Released March 17, 2026)
+---------------
+
+- add bare minimum upgrade product info to v3 enrollments endpoint (#3385)
+- Add a test for number of queries in courses api (#3361)
+
 Version 1.141.4 (Released March 12, 2026)
 ---------------
 

@@ -22,7 +22,7 @@ from courses.serializers.v1.courses import (
     CourseWithCourseRunsSerializer,
 )
 from courses.serializers.v1.programs import ProgramSerializer
-from ecommerce.serializers import BaseProductSerializer
+from ecommerce.serializers.v0 import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
