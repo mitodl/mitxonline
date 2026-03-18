@@ -177,7 +177,9 @@ def test_get_program(
     duplicate_queries_check(context)
     program_data = resp.json()
     assert_drf_json_equal(
-        program_data, ProgramDetailSerializer(program).data, ignore_order=True
+        program_data,
+        ProgramDetailSerializer(program, context={"include_programs": True}).data,
+        ignore_order=True,
     )
 
 
