@@ -838,9 +838,7 @@ class TransactionLineSerializer(serializers.BaseSerializer):
 
         # Add content_type from product's content_type model
         content_type = (
-            instance.product.content_type
-            if hasattr(instance.product, "content_type")
-            else None
+            instance.product.content_type.model if hasattr(instance.product, "content_type") else None
         )
 
         line = dict(  # noqa: C408
