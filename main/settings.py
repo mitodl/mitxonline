@@ -1255,6 +1255,12 @@ EDX_API_CLIENT_TIMEOUT = get_int(
     description="Timeout (in seconds) for requests made via the edX API client",
 )
 
+OPENEDX_WEBHOOK_KEY = get_string(
+    name="OPENEDX_WEBHOOK_KEY",
+    default=None,
+    description="Shared secret token used to authenticate incoming webhook requests from Open edX",
+)
+
 # django debug toolbar only in debug mode
 if DEBUG:
     INSTALLED_APPS += ("debug_toolbar",)
