@@ -257,7 +257,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
 
-    @extend_schema_field(list)
+    @extend_schema_field(BaseProductSerializer(many=True))
     def get_products(self, obj):
         # Use prefetched products if available to avoid N+1 queries
         products = (
