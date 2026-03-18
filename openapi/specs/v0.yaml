@@ -4308,7 +4308,8 @@ components:
           readOnly: true
         products:
           type: array
-          items: {}
+          items:
+            $ref: '#/components/schemas/BaseProduct'
           readOnly: true
         approved_flexible_price_exists:
           type: boolean
@@ -8032,7 +8033,8 @@ components:
           readOnly: true
         products:
           type: array
-          items: {}
+          items:
+            $ref: '#/components/schemas/BaseProduct'
           readOnly: true
         approved_flexible_price_exists:
           type: boolean
