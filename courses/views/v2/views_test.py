@@ -2037,3 +2037,26 @@ def test_course_run_and_product_prefetch_optimized(
     assert len(product_queries) == 2, (
         f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
     )
+
+
+def test_program_products_prefetch_query_count(
+    user_drf_client, django_assert_max_num_queries
+):
+    """Test that products are prefetched and only one query is made for products in the program API."""
+    programs = ProgramFactory.create_batch(5, live=True)
+    for program in programs:
+        ProductFactory(purchasable_object=program)
+
+    num_queries_before = len(connection.queries)
+    expected_num_queries = num_queries_from_programs(programs, "v2")
+    with django_assert_max_num_queries(expected_num_queries) as context:
+        user_drf_client.get(reverse("v2:programs_api-list"))
+    duplicate_queries_check(context)
+    queries_after = connection.queries[num_queries_before:]
+
+    product_queries = [
+        q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
+    ]
+    assert len(product_queries) == 1, (
+        f"Expected 1 product query, got {len(product_queries)}"
+    )

@@ -556,10 +556,22 @@ class ProgramSerializer(serializers.ModelSerializer):
 class ProgramDetailSerializer(ProgramSerializer):
     """Extended Program serializer that includes products. Used by the programs API."""
 
-    products = ProductRelatedField(many=True, read_only=True)
+    products = serializers.SerializerMethodField()
 
     class Meta(ProgramSerializer.Meta):
         fields = [*ProgramSerializer.Meta.fields, "products"]
+
+    @extend_schema_field(ProductRelatedField(many=True, read_only=True))
+    def get_products(self, instance):
+        # Use prefetched products if available, otherwise fallback to related manager
+        products = getattr(instance, "prefetched_products", None)
+        if products is not None:
+            return ProductRelatedField(many=True, read_only=True).to_representation(
+                products
+            )
+        return ProductRelatedField(many=True, read_only=True).to_representation(
+            instance.products.all()
+        )
 
 
 class ProgramCertificateSerializer(serializers.ModelSerializer):
