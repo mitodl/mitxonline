@@ -4,7 +4,7 @@ import faker
 from factory import SubFactory, fuzzy
 from factory.django import DjangoModelFactory
 
-from courses.factories import CourseRunFactory
+from courses.factories import CourseRunFactory, ProgramFactory
 from ecommerce import models
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
@@ -22,6 +22,16 @@ FAKE = faker.Factory.create()
 
 class ProductFactory(DjangoModelFactory):
     purchasable_object = SubFactory(CourseRunFactory)
+    price = fuzzy.FuzzyDecimal(2, 2000, precision=2)
+    description = FAKE.sentence(nb_words=4)
+    is_active = True
+
+    class Meta:
+        model = models.Product
+
+
+class ProgramProductFactory(DjangoModelFactory):
+    purchasable_object = SubFactory(ProgramFactory)
     price = fuzzy.FuzzyDecimal(2, 2000, precision=2)
     description = FAKE.sentence(nb_words=4)
     is_active = True
