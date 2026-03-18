@@ -7,7 +7,7 @@ from django.urls import reverse
 from mitol.common.utils import now_in_utc
 
 from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
-from courses.models import CourseRun, ProgramRun, Program
+from courses.models import CourseRun, ProgramRun
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -18,7 +18,8 @@ from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
     BasketItemFactory,
     ProductFactory,
-    UnlimitedUseDiscountFactory, ProgramProductFactory,
+    ProgramProductFactory,
+    UnlimitedUseDiscountFactory,
 )
 from ecommerce.models import BasketDiscount, Order, OrderStatus
 from ecommerce.serializers import (
@@ -479,6 +480,7 @@ def test_order_receipt_lines_serializer(settings, mocker, user, products, user_c
     serialized_data = TransactionLineSerializer(instance=order.lines, many=True).data
 
     assert serialized_data == test_data["lines"]
+
 
 @pytest.mark.skip_nplusone_check
 def test_program_order_receipt_lines_serializer(settings, mocker, user, user_client):

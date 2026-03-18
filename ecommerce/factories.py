@@ -29,6 +29,7 @@ class ProductFactory(DjangoModelFactory):
     class Meta:
         model = models.Product
 
+
 class ProgramProductFactory(DjangoModelFactory):
     purchasable_object = SubFactory(ProgramFactory)
     price = fuzzy.FuzzyDecimal(2, 2000, precision=2)
@@ -37,6 +38,7 @@ class ProgramProductFactory(DjangoModelFactory):
 
     class Meta:
         model = models.Product
+
 
 class DiscountFactory(DjangoModelFactory):
     amount = random.randrange(1, 50, 1)  # noqa: S311
