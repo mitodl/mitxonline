@@ -702,7 +702,11 @@ class OrderFlow:
 
         # No email is required as this order is generated from management command
         # Skip receipt emails for UAI orders
-        if not already_enrolled and not is_uai_order(self.order) and not is_contract_order(self.order):
+        if (
+            not already_enrolled
+            and not is_uai_order(self.order)
+            and not is_contract_order(self.order)
+        ):
             transaction.on_commit(self.order.send_ecommerce_order_receipt)
 
 

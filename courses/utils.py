@@ -196,6 +196,7 @@ def is_uai_order(order):
                 return True
     return False
 
+
 def is_contract_order(order):
     """
     Check if an order contains any contract products.
