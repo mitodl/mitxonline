@@ -280,7 +280,7 @@ def test_get_dated_courseruns():
 
 def test_is_contract_order_true_for_course_run_with_contract():
     """Test that is_contract_order returns True when a line has a contract course run."""
-    contract_course_run = CourseRun(b2b_contract=object())
+    contract_course_run = CourseRun(b2b_contract_id=1)
     line = SimpleNamespace(
         product=SimpleNamespace(purchasable_object=contract_course_run)
     )

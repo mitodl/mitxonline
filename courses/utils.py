@@ -210,7 +210,7 @@ def is_contract_order(order):
     for line in order.lines.all():
         if hasattr(line.product, "purchasable_object"):
             course_run = line.product.purchasable_object
-            if isinstance(course_run, CourseRun) and course_run.b2b_contract:
+            if isinstance(course_run, CourseRun) and course_run.b2b_contract_id:
                 return True
     return False
 
