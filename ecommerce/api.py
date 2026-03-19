@@ -1099,9 +1099,8 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     basket = establish_basket(request)
 
     if basket.basket_items.count() > 0:
-        # Stuff in the basket - stop here.
-        msg = f"Basket for {request.user} is not empty"
-        raise VerifiedProgramInvalidBasketError(msg)
+        # Stuff in the basket - clear it out first.
+        basket.basket_items.all().delete()
 
     BasketItem.objects.create(basket=basket, product=product, quantity=1)
     BasketDiscount.objects.create(
