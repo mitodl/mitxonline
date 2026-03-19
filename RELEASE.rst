@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.142.2 (Released March 19, 2026)
+---------------
+
+- Restore product type information in OpenAPI Spec (#3396)
+- Add program type to the receipt email template (#3395)
+- Add edX entitlement import to migrate_edx_data management command (#3383)
+- Add auth to cart page (#3392)
+- Add criteria field and course-level feature flag to CMS CertificatePage (#3373)
+
 Version 1.142.1 (Released March 17, 2026)
 ---------------
 
