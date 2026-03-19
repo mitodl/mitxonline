@@ -1101,6 +1101,7 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     if basket.basket_items.count() > 0:
         # Stuff in the basket - clear it out first.
         basket.basket_items.all().delete()
+        basket.discounts.all().delete()
 
     BasketItem.objects.create(basket=basket, product=product, quantity=1)
     BasketDiscount.objects.create(
