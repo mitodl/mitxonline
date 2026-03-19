@@ -21,7 +21,6 @@ from courses.serializers.v1.base import (
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists
 from main import features
-from openedx.api import reconcile_edx_username
 
 
 class CourseSerializer(BaseCourseSerializer):
@@ -175,12 +174,6 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
 
         if run.b2b_contract is not None:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
-
-        if not user.edx_username:
-            # create_run_enrollments below will repair the user so we should
-            # only need to ensure there's a username there for it to try with
-            reconcile_edx_username(user)
-            del user.openedx_user
 
         successful_enrollments, _ = create_run_enrollments(
             user,

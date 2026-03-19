@@ -26,7 +26,6 @@ from ecommerce.serializers.v0 import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
-from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -260,33 +259,3 @@ def test_serialize_course_run_enrollments_with_grades():
         "certificate": None,
         "grades": CourseRunGradeSerializer([grade], many=True).data,
     }
-
-
-def test_course_run_enrollment_serializer_create_edx_user(mocker, mock_context):
-    """Test that the edX username gets created if we're creating an enrollment."""
-
-    user = UserFactory.create(no_openedx_user=True, no_openedx_api_auth=True)
-    run = CourseRunFactory.create(run_tag="fake1234")
-    enrollment = CourseRunEnrollmentFactory(user=user, run=run)
-
-    mocked_reconcile_edx_username = mocker.patch(
-        "courses.serializers.v1.courses.reconcile_edx_username"
-    )
-    mocker.patch(
-        "courses.serializers.v1.courses.create_run_enrollments",
-        return_value=[[enrollment], ""],
-    )
-
-    mock_context["request"].user = user
-    mock_context["user"] = user
-
-    assert user.edx_username is None
-
-    serializer = CourseRunEnrollmentSerializer(
-        data={"run_id": run.id, "edx_emails_subscription": False}, context=mock_context
-    )
-
-    serializer.is_valid()
-    serializer.save()
-
-    assert mocked_reconcile_edx_username.called

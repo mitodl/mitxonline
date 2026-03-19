@@ -1099,14 +1099,6 @@ def enroll_in_edx_course_runs(
     """
     edx_client = get_edx_api_service_client()
 
-    if not user.openedx_users.exists() or not user.edx_username:
-        msg = (
-            f"User {user} has no Open edX user (or no username): '{user.edx_username}'"
-        )
-        raise OpenEdxUserMissingError(msg)
-
-    username = user.edx_username
-
     try:
         repair_faulty_edx_user(user)
     except Exception as exc:
@@ -1117,6 +1109,7 @@ def enroll_in_edx_course_runs(
         msg = f"User {user.edx_username} does not exist in OpenEdX and could not be created"
         raise OpenEdxUserMissingError(msg)
 
+    username = user.edx_username
     results = []
     for course_run in course_runs:
         try:
