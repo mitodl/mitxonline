@@ -196,6 +196,23 @@ def is_uai_order(order):
                 return True
     return False
 
+def is_contract_order(order):
+    """
+    Check if an order contains any contract products.
+
+    Args:
+        order: Order instance
+
+    Returns:
+        bool: True if the order contains contract products, False otherwise
+    """
+    for line in order.lines.all():
+        if hasattr(line.product, "purchasable_object"):
+            course_run = line.product.purchasable_object
+            if isinstance(course_run, CourseRun) and course_run.b2b_contract:
+                return True
+    return False
+
 
 def get_approved_flexible_price_exists(instance, context):
     """
