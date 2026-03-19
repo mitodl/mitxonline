@@ -17,7 +17,11 @@ from courses.serializers.base import (
     get_thumbnail_url,
 )
 from courses.serializers.utils import get_unique_topics_from_courses
-from courses.serializers.v1.base import EnrollmentModeSerializer, ProductRelatedField
+from courses.serializers.v1.base import (
+    BaseProgramSerializer,
+    EnrollmentModeSerializer,
+    ProductRelatedField,
+)
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
 from main.serializers import StrictFieldsSerializer
@@ -132,6 +136,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     courses = serializers.SerializerMethodField()
     collections = serializers.SerializerMethodField()
+    programs = serializers.SerializerMethodField()
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
@@ -149,6 +154,38 @@ class ProgramSerializer(serializers.ModelSerializer):
     max_price = serializers.SerializerMethodField()
     start_date = serializers.SerializerMethodField()
     enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
+
+    @extend_schema_field(BaseProgramSerializer(many=True, allow_null=True))
+    def get_programs(self, instance):
+        """Include parent programs for this program when requested.
+
+        This mirrors the behavior of the CourseSerializer.get_programs method,
+        but uses the ProgramRequirement.required_program reverse relation
+        ("required_by") instead of Course.in_programs.
+        """
+        if not self.context.get("include_programs", False):
+            return None
+
+        programs_qs = instance.required_by
+
+        if self.context.get("org_id"):
+            programs_qs = programs_qs.filter(
+                program__contract_memberships__contract__organization__pk=self.context.get(
+                    "org_id"
+                )
+            )
+        elif self.context.get("contract_id"):
+            programs_qs = programs_qs.filter(
+                program__contract_memberships__contract__pk=self.context.get(
+                    "contract_id"
+                )
+            )
+        else:
+            programs_qs = programs_qs.filter(program__b2b_only=False)
+
+        programs = [req.program for req in programs_qs.select_related("program").all()]
+
+        return BaseProgramSerializer(programs, many=True).data
 
     def get_courses(self, instance) -> list[int]:
         return [course[0].id for course in instance.courses if course[0].live]
@@ -525,6 +562,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "id",
             "courses",
             "collections",
+            "programs",
             "requirements",
             "req_tree",
             "page",

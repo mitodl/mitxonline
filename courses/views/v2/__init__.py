@@ -186,6 +186,26 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
     filterset_class = ProgramFilterSet
     lookup_value_regex = "[^/]+"  # Accept any non-slash character
 
+    def get_serializer_context(self):
+        """Add context flags used by ProgramSerializer.
+
+        - include_programs: include parent programs when retrieving a single
+          program or when filtering by readable_id (parity with CourseViewSet).
+        - org_id / contract_id: used to filter parent programs for B2B.
+        """
+        added_context = {}
+        qp = self.request.query_params
+
+        if self.action == "retrieve" or qp.get("readable_id"):
+            added_context["include_programs"] = True
+
+        if qp.get("org_id"):
+            added_context["org_id"] = qp.get("org_id")
+        if qp.get("contract_id"):
+            added_context["contract_id"] = qp.get("contract_id")
+
+        return {**super().get_serializer_context(), **added_context}
+
     def get_queryset(self):
         # Prefetch only products related to Program objects
         program_content_type = ContentType.objects.get_for_model(Program)
