@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.142.2
+Version 1.142.2 (Released March 19, 2026)
 ---------------
 
 - Restore product type information in OpenAPI Spec (#3396)
