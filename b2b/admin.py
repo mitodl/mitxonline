@@ -7,6 +7,7 @@ from b2b.models import (
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationPage,
+    UserOrganization,
 )
 from courses.models import CourseRun
 
@@ -171,3 +172,14 @@ class OrganizationPageAdmin(ReadOnlyModelAdmin):
         "logo",
         "sso_organization_id",
     ]
+
+
+@admin.register(UserOrganization)
+class UserOrganizationAdmin(admin.ModelAdmin):
+    """Admin for user organization memberships."""
+
+    list_display = ["user", "organization", "is_manager", "keep_until_seen"]
+    list_filter = ["is_manager", "keep_until_seen", "organization"]
+    list_editable = ["is_manager"]
+    search_fields = ["user__email", "user__username", "organization__name"]
+    fields = ["user", "organization", "is_manager", "keep_until_seen"]

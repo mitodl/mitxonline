@@ -9,6 +9,10 @@ from b2b.views.v0 import (
     Enroll,
     OrganizationPageViewSet,
 )
+from b2b.views.v0.manager import (
+    ManagerContractViewSet,
+    ManagerOrganizationViewSet,
+)
 
 app_name = "b2b"
 
@@ -22,6 +26,18 @@ v0_router.register(
     r"contracts",
     ContractPageViewSet,
     basename="b2b-contract",
+)
+
+# Manager dashboard routes
+v0_router.register(
+    r"orgs/(?P<org_id>\d+)/manager/contracts",
+    ManagerContractViewSet,
+    basename="b2b-manager-contract",
+)
+v0_router.register(
+    r"manager/organizations",
+    ManagerOrganizationViewSet,
+    basename="b2b-manager-organization",
 )
 
 urlpatterns = [

@@ -609,6 +609,10 @@ class UserOrganization(models.Model):
         default=False,
         help_text="If True, the user will be kept in the organization until the organization is seen in their SSO data.",
     )
+    is_manager = models.BooleanField(
+        default=False,
+        help_text="If True, the user is a manager of this organization and can access organization dashboard features.",
+    )
 
     class Meta:
         unique_together = ("user", "organization")
@@ -617,3 +621,22 @@ class UserOrganization(models.Model):
         """Return a reasonable representation of the object as a string."""
 
         return f"UserOrganization: {self.user} in {self.organization}"
+
+
+def is_organization_manager(user, org_id):
+    """
+    Check if a user is a manager of the specified organization.
+
+    Args:
+        user: The user to check
+        org_id: The organization ID to check against
+
+    Returns:
+        bool: True if the user is a manager of the organization, False otherwise
+    """
+    if not user or not user.is_authenticated:
+        return False
+
+    return UserOrganization.objects.filter(
+        user=user, organization_id=org_id, is_manager=True
+    ).exists()
