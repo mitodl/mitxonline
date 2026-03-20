@@ -77,6 +77,7 @@ def test_user_enrollments_detail(
             "course": {
                 "id": enrollment.run.course_id,
                 "readable_id": enrollment.run.course.readable_id,
+                "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
                 "title": "Test page",
                 "type": "course",
             },
@@ -145,6 +146,7 @@ def test_user_enrollments_list(
                 "course": {
                     "id": enrollment.run.course_id,
                     "readable_id": enrollment.run.course.readable_id,
+                    "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
                     "title": "Test page",
                     "type": "course",
                 },
@@ -229,6 +231,7 @@ def test_user_enrollments_list_filter_org_id(
                     "course": {
                         "id": enrollment.run.course_id,
                         "readable_id": enrollment.run.course.readable_id,
+                        "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
                         "title": "Test page",
                         "type": "course",
                     },
@@ -316,6 +319,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 "course": {
                     "id": enrollment.run.course_id,
                     "readable_id": enrollment.run.course.readable_id,
+                    "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
                     "title": "Test page",
                     "type": "course",
                 },
@@ -386,6 +390,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 "course": {
                     "id": enrollment.run.course_id,
                     "readable_id": enrollment.run.course.readable_id,
+                    "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
                     "title": "Test page",
                     "type": "course",
                 },

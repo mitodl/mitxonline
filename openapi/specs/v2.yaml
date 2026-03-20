@@ -4543,8 +4543,17 @@ components:
           type: string
           description: Returns the type of object this is serializing.
           readOnly: true
+        include_in_learn_catalog:
+          type: boolean
+          description: |-
+            Return true if the course should be included in the Learn catalog.
+
+            This is controlled in the CoursePage for the course, and will default
+            to False if there isn't one.
+          readOnly: true
       required:
       - id
+      - include_in_learn_catalog
       - readable_id
       - title
       - type
