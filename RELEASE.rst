@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.142.3
+Version 1.142.3 (Released March 20, 2026)
 ---------------
 
 - Update order receipt email template (#3402)
