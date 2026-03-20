@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 1.142.3 (Released March 20, 2026)
+---------------
+
+- Update order receipt email template (#3402)
+- Update dependency pyOpenSSL to v26 [SECURITY] (#3389)
+- Fix incorrect API endpoint usage for course mode creation (#3394)
+- Update dependency deepdiff to v8.6.2 [SECURITY] (#3399)
+- [pre-commit.ci] pre-commit autoupdate (#3325)
+- Update actions/checkout digest to de0fac2 (#3296)
+- adding prefetch for products in programs v2 api (#3386)
+
 Version 1.142.2 (Released March 19, 2026)
 ---------------
 
