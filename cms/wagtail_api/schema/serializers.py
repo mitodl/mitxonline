@@ -246,6 +246,7 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
             "faculty",
             "certificate_page",
             "program_details",
+            "include_in_learn_catalog",
         ]
 
         # NOTE: We use this serializer for schema generation only,
