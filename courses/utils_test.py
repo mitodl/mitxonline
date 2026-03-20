@@ -4,6 +4,7 @@ Tests for utils
 """
 
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 from mitol.common.utils import now_in_utc
@@ -24,6 +25,7 @@ from courses.utils import (
     get_enrollable_courses,
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
+    is_contract_order,
 )
 
 
@@ -274,3 +276,34 @@ def test_get_dated_courseruns():
     assert unenrollable_courserun not in dated_courseruns
     assert self_paced_courserun not in dated_courseruns
     assert instructor_paced_course_run in dated_courseruns
+
+
+def test_is_contract_order_true_for_course_run_with_contract():
+    """Test that is_contract_order returns True when a line has a contract course run."""
+    contract_course_run = CourseRun(b2b_contract_id=1)
+    line = SimpleNamespace(
+        product=SimpleNamespace(purchasable_object=contract_course_run)
+    )
+    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
+
+    assert is_contract_order(order) is True
+
+
+def test_is_contract_order_false_for_course_run_without_contract():
+    """Test that is_contract_order returns False when course runs have no contract."""
+    non_contract_course_run = CourseRun(b2b_contract=None)
+    line = SimpleNamespace(
+        product=SimpleNamespace(purchasable_object=non_contract_course_run)
+    )
+    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
+
+    assert is_contract_order(order) is False
+
+
+def test_is_contract_order_false_for_non_course_run_product():
+    """Test that is_contract_order ignores non-CourseRun purchasable objects."""
+    non_course_run = SimpleNamespace(b2b_contract=object())
+    line = SimpleNamespace(product=SimpleNamespace(purchasable_object=non_course_run))
+    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
+
+    assert is_contract_order(order) is False
