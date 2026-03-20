@@ -26,6 +26,12 @@ log = logging.getLogger(__name__)
 class CourseSerializer(BaseCourseSerializer):
     """Course serializer"""
 
+    class Meta(BaseCourseSerializer.Meta):
+        fields = [
+            *BaseCourseSerializer.Meta.fields,
+            "include_in_learn_catalog",
+        ]
+
 
 @extend_schema_serializer(component_name="CourseRunWithCourseV3")
 class CourseRunWithCourseSerializer(BaseCourseRunSerializer):

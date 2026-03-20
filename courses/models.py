@@ -992,7 +992,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return best_run
 
     @cached_property
-    def include_in_learn_catalog(self):
+    def include_in_learn_catalog(self) -> bool:
         """
         Return true if the course should be included in the Learn catalog.
 
@@ -1003,7 +1003,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return getattr(self.page, "include_in_learn_catalog", False)
 
     @cached_property
-    def ingest_content_files_for_ai(self):
+    def ingest_content_files_for_ai(self) -> bool:
         """
         Return true if the course's content files should be ingested.
 

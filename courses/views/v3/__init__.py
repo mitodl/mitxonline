@@ -94,6 +94,7 @@ class UserEnrollmentsApiViewSet(
         )
         .prefetch_related(
             "run__course",
+            "run__course__page",
             "run__enrollment_modes",
             Prefetch(
                 "run__products",
