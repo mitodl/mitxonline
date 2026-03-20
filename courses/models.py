@@ -919,7 +919,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     )
     live = models.BooleanField(default=False, db_index=True)
     departments = models.ManyToManyField(
-        Department, blank=False, related_name="courses"
+        Department, blank=True, related_name="courses"
     )
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
