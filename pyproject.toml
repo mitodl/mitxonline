@@ -120,7 +120,7 @@ package = false
 default-groups = "all"
 
 [tool.uv.sources]
-django-health-check = { git = "https://github.com/revsys/django-health-check", rev = "53f9bdc3a7acc8a577319987fef0bd3040eef4b4" } # pragma: allowlist secret
+django-health-check = { git = "https://github.com/revsys/django-health-check", rev = "a922d34ef471a05422592d637922e093e09fb647" } # pragma: allowlist secret
 
 [tool.uv.build-backend]
 module-root = ""
