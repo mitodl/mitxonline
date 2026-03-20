@@ -68,7 +68,6 @@ from openedx.exceptions import (
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
-    OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -750,6 +749,14 @@ def test_get_edx_retirement_service_client(mocker, settings):
 @pytest.mark.parametrize("has_edx_username", [True, False])
 def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
     """Tests that enroll_in_edx_course_runs uses the EdxApi client to enroll in course runs"""
+
+    def mock_create_edx_user_request(open_edx_user, *_):
+        """The call to _create_edx_user_request needs to set the synced flag."""
+
+        open_edx_user.has_been_synced = True
+        open_edx_user.save()
+        return True
+
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_client = mocker.MagicMock()
     enroll_return_values = [
@@ -762,20 +769,17 @@ def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
     )
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
-    mocker.patch("openedx.api.repair_faulty_edx_user", return_value=(None, None))
+    if has_edx_username:
+        mocker.patch("openedx.api.repair_faulty_edx_user", return_value=(None, None))
+    mocker.patch(
+        "openedx.api._create_edx_user_request", side_effect=mock_create_edx_user_request
+    )
     course_runs = CourseRunFactory.build_batch(2)
 
     # Test to make sure reconcile_edx_username runs as expected.
     if not has_edx_username:
         user.openedx_users.all().delete()
         user.refresh_from_db()
-
-        with pytest.raises(OpenEdxUserMissingError) as e:
-            enroll_results = enroll_in_edx_course_runs(user, course_runs)
-
-        assert e.type is OpenEdxUserMissingError
-        assert user.openedx_users.count() == 0
-        return
 
     enroll_results = enroll_in_edx_course_runs(user, course_runs)
 
@@ -792,6 +796,9 @@ def test_enroll_in_edx_course_runs(settings, mocker, user, has_edx_username):
         force_enrollment=True,
     )
     assert enroll_results == [enroll_return_values[0], enroll_return_values[2]]
+
+    if not has_edx_username:
+        assert user.openedx_users.exists()
 
 
 def test_enroll_api_fail(mocker, user):
