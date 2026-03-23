@@ -4616,6 +4616,8 @@ components:
           readOnly: true
         certificate_type:
           type: string
+          description: Return the certificate type, if the next enrollable run has
+            a cert.
           readOnly: true
         required_prerequisites:
           type: boolean
@@ -7815,6 +7817,8 @@ components:
           readOnly: true
         certificate_type:
           type: string
+          description: Return the certificate type, if the next enrollable run has
+            a cert.
           readOnly: true
         required_prerequisites:
           type: boolean

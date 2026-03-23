@@ -37,6 +37,7 @@ class CourseSerializer(BaseCourseSerializer):
     programs = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
+    certificate_available = serializers.SerializerMethodField()
     availability = serializers.SerializerMethodField()
     required_prerequisites = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
@@ -153,11 +154,23 @@ class CourseSerializer(BaseCourseSerializer):
 
     @extend_schema_field(str)
     def get_certificate_type(self, instance):
+        """Return the certificate type."""
+
         if instance.programs:
             program = instance.programs[0]
             if "MicroMasters" in program.program_type:
                 return "MicroMasters Credential"
+
         return "Certificate of Completion"
+
+    @extend_schema_field(bool)
+    def get_certificate_available(self, instance) -> bool:
+        """Return if there is a certificate available for the course."""
+
+        return (
+            instance.first_unexpired_run is not None
+            and instance.first_unexpired_run.certificate_available_date is not None
+        )
 
     @extend_schema_field(str)
     def get_availability(self, instance):
@@ -213,6 +226,7 @@ class CourseSerializer(BaseCourseSerializer):
             "programs",
             "topics",
             "certificate_type",
+            "certificate_available",
             "required_prerequisites",
             "duration",
             "min_weeks",
