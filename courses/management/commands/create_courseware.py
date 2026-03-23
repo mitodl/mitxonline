@@ -578,8 +578,9 @@ class Command(BaseCommand):
             )
             exit(-1)  # noqa: PLR1722
 
-        # Validate/create departments for programs and courses (not needed for courseruns)
-        if kwargs["type"] in ["program", "course"]:
+        # Create or get departments if specified.
+        add_depts = None
+        if kwargs.get("depts"):
             add_depts = self._get_or_create_departments(
                 kwargs["depts"], create_if_missing=kwargs["create_depts"]
             )
