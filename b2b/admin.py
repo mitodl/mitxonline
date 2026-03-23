@@ -1,5 +1,7 @@
 """B2B model admin. Only for convenience; you should use the Wagtail interface instead."""
 
+from collections.abc import Sequence
+
 from django.contrib import admin
 
 from b2b.models import (
@@ -12,8 +14,23 @@ from b2b.models import (
 from courses.models import CourseRun
 
 
+class UserOrganizationAdminInline(admin.TabularInline):
+    """Inline that filters to just show organization admins"""
+
+    model = UserOrganization
+    extra = 0
+    verbose_name = "Organization Admin"
+
+    def get_queryset(self, request):
+        """Filter the queryset to just users with Manager access."""
+
+        return super().get_queryset(request).filter(is_manager=True)
+
+
 class ReadOnlyModelAdmin(admin.ModelAdmin):
     """Read-only admin for models."""
+
+    fields: Sequence[str] = []
 
     def __init__(self, *args, **kwargs):
         """Set the readonly_fields to the fields if we can."""
@@ -173,6 +190,10 @@ class OrganizationPageAdmin(ReadOnlyModelAdmin):
         "sso_organization_id",
     ]
 
+    inlines = [
+        UserOrganizationAdminInline,
+    ]
+
 
 @admin.register(UserOrganization)
 class UserOrganizationAdmin(admin.ModelAdmin):
@@ -180,6 +201,5 @@ class UserOrganizationAdmin(admin.ModelAdmin):
 
     list_display = ["user", "organization", "is_manager", "keep_until_seen"]
     list_filter = ["is_manager", "keep_until_seen", "organization"]
-    list_editable = ["is_manager"]
     search_fields = ["user__email", "user__username", "organization__name"]
     fields = ["user", "organization", "is_manager", "keep_until_seen"]

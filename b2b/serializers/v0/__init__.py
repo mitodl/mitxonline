@@ -9,12 +9,43 @@ from main.constants import USER_MSG_TYPE_B2B_CHOICES
 from main.serializers import RichTextSerializer
 
 
-class ContractPageSerializer(serializers.ModelSerializer):
+class BaseContractPageSerializer(serializers.ModelSerializer):
+    """Simplified serializer for the ContractPage model."""
+
+    membership_type = serializers.CharField()
+
+    class Meta:
+        model = ContractPage
+        fields = [
+            "id",
+            "name",
+            "description",
+            "membership_type",
+            "organization",
+            "contract_start",
+            "contract_end",
+            "active",
+            "slug",
+        ]
+        read_only_fields = [
+            "id",
+            "name",
+            "description",
+            "integration_type",
+            "membership_type",
+            "organization",
+            "contract_start",
+            "contract_end",
+            "active",
+            "slug",
+        ]
+
+
+class ContractPageSerializer(BaseContractPageSerializer):
     """
     Serializer for the ContractPage model.
     """
 
-    membership_type = serializers.CharField()
     programs = serializers.SerializerMethodField()
     welcome_message_extra = RichTextSerializer(
         help_text=ContractPage._meta.get_field("welcome_message_extra").help_text,  # noqa: SLF001, not private https://docs.djangoproject.com/en/5.0/ref/models/meta/
@@ -29,35 +60,17 @@ class ContractPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContractPage
         fields = [
-            "id",
-            "name",
-            "description",
+            *BaseContractPageSerializer.Meta.fields,
             "welcome_message",
             "welcome_message_extra",
             "integration_type",
-            "membership_type",
-            "organization",
-            "contract_start",
-            "contract_end",
-            "active",
-            "slug",
-            "organization",
             "programs",
         ]
         read_only_fields = [
-            "id",
-            "name",
-            "description",
+            *BaseContractPageSerializer.Meta.read_only_fields,
             "welcome_message",
             "welcome_message_extra",
             "integration_type",
-            "membership_type",
-            "organization",
-            "contract_start",
-            "contract_end",
-            "active",
-            "slug",
-            "organization",
             "programs",
         ]
 

@@ -1,22 +1,29 @@
 """B2B manager dashboard views."""
 
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
-from rest_framework import serializers, viewsets
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    extend_schema,
+)
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
     ContractPage,
-    DiscountContractAttachmentRedemption,
     OrganizationPage,
-    is_organization_manager,
 )
 from b2b.permissions import IsOrganizationManager
+from b2b.serializers.v0 import (
+    BaseContractPageSerializer,
+    OrganizationPageSerializer,
+)
 from b2b.serializers.v0.manager import (
     ManagerContractDetailSerializer,
-    ManagerContractListSerializer,
     ManagerCourseRunSerializer,
     ManagerEnrollmentCodeSerializer,
     ManagerEnrollmentSerializer,
@@ -24,38 +31,67 @@ from b2b.serializers.v0.manager import (
 from courses.models import CourseRun, CourseRunEnrollment
 
 
-class ManagerContractViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet for organization managers to view their contracts.
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the organization",
+            required=False,
+        ),
+    ]
+)
+class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
+    """List organizations available for the current user."""
 
-    Provides list and detail views for contracts that the authenticated
-    user manages.
-    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrganizationPageSerializer
+
+    def get_queryset(self):
+        """Filter to organizations where the user is a manager."""
+        return OrganizationPage.objects.filter(
+            organization_users__user=self.request.user,
+            organization_users__is_manager=True,
+        ).distinct()
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_organization",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent organization",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the contract",
+            required=True,
+        ),
+    ]
+)
+class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    """List an organization's contracts."""
 
     permission_classes = [IsAuthenticated, IsOrganizationManager]
 
     def get_queryset(self):
-        """Filter contracts to only those in organizations the user manages."""
-        org_id = self.kwargs.get("org_id")
-        if not org_id:
-            return ContractPage.objects.none()
+        """Add useful prefetches to the default queryset."""
 
-        # Verify user is manager of this organization
-        if not is_organization_manager(self.request.user, org_id):
-            return ContractPage.objects.none()
-
-        return ContractPage.objects.filter(
-            organization_id=org_id, active=True
-        ).select_related("organization")
+        return ContractPage.objects.select_related("organization")
 
     def get_serializer_class(self):
         """Use different serializers for list vs detail views."""
         if self.action == "list":
-            return ManagerContractListSerializer
+            return BaseContractPageSerializer
         return ManagerContractDetailSerializer
 
     @action(detail=True, methods=["get"])
-    def course_runs(self, request, org_id=None, pk=None):
+    def course_runs(self, request, **kwargs):  # noqa: ARG002
         """
         List course runs available for a specific contract.
 
@@ -66,22 +102,30 @@ class ManagerContractViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = ManagerCourseRunSerializer(course_runs, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="course_run_id",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="Courseware ID to pull enrollments for.",
+                required=True,
+            ),
+        ],
+    )
     @action(
         detail=True,
         methods=["get"],
-        url_path="course-runs/(?P<course_run_id>[^/.]+)/enrollments",
+        url_path="course_runs/(?P<course_run_id>[^/.]+)/enrollments",
     )
-    def course_run_enrollments(self, request, org_id=None, pk=None, course_run_id=None):
-        """
-        List enrollments for a specific course run within a contract.
-
-        GET /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/course-runs/{course_run_id}/enrollments/
-        """
+    def course_run_enrollments(self, request, **kwargs):  # noqa: ARG002
+        """List enrollments for a specific course run within a contract."""
         contract = self.get_object()
+        course_run_id = kwargs.pop("course_run_id")
 
         # Get the course run and verify it belongs to this contract
         course_run = get_object_or_404(
-            CourseRun, readable_id=course_run_id, b2b_contract=contract
+            CourseRun, courseware_id=course_run_id, b2b_contract=contract
         )
 
         # Get enrollments for this course run
@@ -95,11 +139,9 @@ class ManagerContractViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
-    def codes(self, request, org_id=None, pk=None):
+    def codes(self, request, **kwargs):  # noqa: ARG002
         """
         List enrollment codes for a contract.
-
-        GET /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/
 
         Only shows codes for contracts that require them (non-auto membership types).
         Logic varies based on whether contract has learner limits.
@@ -110,69 +152,39 @@ class ManagerContractViewSet(viewsets.ReadOnlyModelViewSet):
         if contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS:
             return Response([])
 
-        discounts = contract.get_discounts().order_by("id")
+        discounts = contract.get_discounts()
 
         if not contract.max_learners:
-            # No learner limit - show first code only
-            if discounts.exists():
-                discount = discounts.first()
-                serializer = ManagerEnrollmentCodeSerializer(
-                    discount, context={"contract": contract}
+            # No learner limit - show first code only, if there is one
+            return Response(
+                ManagerEnrollmentCodeSerializer(
+                    [discounts.order_by("id").first()],
+                    context={"contract": contract},
+                    many=True,
                 )
-                return Response([serializer.data])
-            else:
-                return Response([])
+            )
+
         else:
             # Has learner limit - show redeemed codes + enough unused codes to fill remaining seats
-            attached_count = contract.get_learners().count()
-            remaining_seats = contract.max_learners - attached_count
+            discounts = discounts.annotate(
+                num_redemptions=Count("contract_redemptions")
+            ).order_by("-num_redemptions", "id")
 
-            # Get redeemed codes (used for attachment to this contract)
-            redeemed_discount_ids = DiscountContractAttachmentRedemption.objects.filter(
-                contract=contract
-            ).values_list("discount_id", flat=True)
+            codes_for_output = discounts.filter(num_redemptions__gt=0).all()
 
-            redeemed_discounts = discounts.filter(id__in=redeemed_discount_ids)
+            # The point of this is to ensure we always get _all_ the redeemed
+            # codes, and then some unredeemed ones if there's space allowed.
+            # I didn't want to just call all() and grab a slice because we might
+            # have _more_ redemptions that we technically allow (if, say, we
+            # adjust the limit down or manually create some redemptions or
+            # something).
 
-            # Get unused codes to fill remaining seats
-            unused_discounts = discounts.exclude(id__in=redeemed_discount_ids)[
-                : max(0, remaining_seats)
-            ]
+            if codes_for_output.count() < contract.max_learners:
+                # We have seats available, so grab some more codes.
+                codes_for_output = discounts.all()[: contract.max_learners]
 
-            # Combine redeemed and unused codes
-            all_discounts = list(redeemed_discounts) + list(unused_discounts)
-
-            serializer = ManagerEnrollmentCodeSerializer(
-                all_discounts, many=True, context={"contract": contract}
+            return Response(
+                ManagerEnrollmentCodeSerializer(
+                    codes_for_output, many=True, context={"contract": contract}
+                ).data
             )
-            return Response(serializer.data)
-
-
-class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet for organization managers to view basic organization info.
-
-    This provides a way to list organizations the user manages and
-    get basic organization details.
-    """
-
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        """Filter to organizations where the user is a manager."""
-        return OrganizationPage.objects.filter(
-            organization_users__user=self.request.user,
-            organization_users__is_manager=True,
-        ).distinct()
-
-    def get_serializer_class(self):
-        """Use a simple serializer for organization info."""
-
-        # We can reuse an existing serializer or create a minimal one
-        # For now, let's create a simple inline serializer
-        class SimpleOrgSerializer(serializers.ModelSerializer):
-            class Meta:
-                model = OrganizationPage
-                fields = ["id", "name", "org_key"]
-
-        return SimpleOrgSerializer

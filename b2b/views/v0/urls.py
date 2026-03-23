@@ -1,7 +1,6 @@
 """URL routing for v0 of the B2B API."""
 
 from django.urls import include, path, re_path
-from rest_framework.routers import SimpleRouter
 
 from b2b.views.v0 import (
     AttachContractApi,
@@ -13,10 +12,11 @@ from b2b.views.v0.manager import (
     ManagerContractViewSet,
     ManagerOrganizationViewSet,
 )
+from main.routers import SimpleRouterWithNesting
 
 app_name = "b2b"
 
-v0_router = SimpleRouter()
+v0_router = SimpleRouterWithNesting()
 v0_router.register(
     r"organizations",
     OrganizationPageViewSet,
@@ -29,15 +29,18 @@ v0_router.register(
 )
 
 # Manager dashboard routes
-v0_router.register(
-    r"orgs/(?P<org_id>\d+)/manager/contracts",
-    ManagerContractViewSet,
-    basename="b2b-manager-contract",
-)
-v0_router.register(
+manager_org = v0_router.register(
     r"manager/organizations",
     ManagerOrganizationViewSet,
     basename="b2b-manager-organization",
+)
+manager_org.register(
+    r"contracts",
+    ManagerContractViewSet,
+    basename="b2b-manager-org-contract",
+    parents_query_lookups=[
+        "organization",
+    ],
 )
 
 urlpatterns = [
