@@ -43,6 +43,7 @@ from courses.factories import (
 from courses.models import (
     Course,
     CourseRunEnrollment,
+    PaidProgram,
     Program,
     ProgramEnrollment,
 )
@@ -73,8 +74,8 @@ from courses.views.test_utils import (
     num_queries_from_programs,
 )
 from courses.views.v2 import Pagination, ProgramFilterSet
-from ecommerce.factories import ProductFactory
-from ecommerce.models import Product
+from ecommerce.factories import OrderFactory, ProductFactory
+from ecommerce.models import OrderStatus, Product
 from main import features
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -2047,6 +2048,26 @@ def test_program_enrollment_destroy(user_drf_client, user):
     enrollment.refresh_from_db()
     assert enrollment.active is False
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+
+
+def test_destroy_program_enrollment_paid_fails(user_drf_client, user):
+    """DELETE a paid program enrollment fails"""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    PaidProgram.objects.create(user=user, program=program, order=order)
+
+    resp = user_drf_client.delete(
+        reverse("v2:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "message": "Cannot unenroll from a purchased program, contact support."
+    }
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True
 
 
 @pytest.mark.django_db

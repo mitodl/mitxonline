@@ -1651,6 +1651,10 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
     def objects_for_audit(cls):
         return cls.all_objects
 
+    @cached_property
+    def can_unenroll(self):
+        return True
+
     def to_dict(self):
         return {
             **serialize_model_object(self),
@@ -1920,6 +1924,10 @@ class ProgramEnrollment(EnrollmentModel):
     @classmethod
     def get_audit_class(cls):
         return ProgramEnrollmentAudit
+
+    @cached_property
+    def can_unenroll(self):
+        return not PaidProgram.fulfilled_paid_program_exists(self.user, self.program)
 
     @cached_property
     def certificate(self):
