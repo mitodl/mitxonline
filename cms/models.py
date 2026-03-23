@@ -1485,9 +1485,13 @@ class ProgramPage(ProductPage):
             ],
         )
     ]
-    content_panels = [  # noqa: RUF005
-        FieldPanel("program"),
-    ] + ProductPage.content_panels + [FieldPanel("include_in_learn_catalog")]
+    content_panels = (
+        [  # noqa: RUF005
+            FieldPanel("program"),
+        ]
+        + ProductPage.content_panels
+        + [FieldPanel("include_in_learn_catalog")]
+    )
     api_fields = [
         *ProductPage.api_fields,
         APIField("program_details"),
