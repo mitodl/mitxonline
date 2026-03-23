@@ -370,6 +370,21 @@ def test_retrievinng_single_course_by_pk_or_readable_id_includes_programs(
 
 
 @pytest.mark.django_db
+def test_retrieving_single_course_by_numeric_readable_id(user_drf_client):
+    """Course detail endpoint should fall back to readable_id when numeric lookup is not a pk."""
+    course = CourseFactory.create(readable_id="99999999")
+    CourseRunFactory.create(course=course)
+
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": course.readable_id}),
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["id"] == course.id
+    assert resp.json()["readable_id"] == course.readable_id
+
+
+@pytest.mark.django_db
 def test_retrieving_single_program_by_pk_or_readable_id_includes_parent_programs(
     user_drf_client,
 ):
@@ -409,6 +424,20 @@ def test_retrieving_single_program_by_pk_or_readable_id_includes_parent_programs
 
     assert resp_by_readable.json() == program_data
     assert resp_list.json()["results"][0] == program_data
+
+
+@pytest.mark.django_db
+def test_retrieving_single_program_by_numeric_readable_id(user_drf_client):
+    """Program detail endpoint should fall back to readable_id when numeric lookup is not a pk."""
+    program = ProgramFactory.create(readable_id="88888888")
+
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": program.readable_id}),
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["id"] == program.id
+    assert resp.json()["readable_id"] == program.readable_id
 
 
 @pytest.mark.django_db

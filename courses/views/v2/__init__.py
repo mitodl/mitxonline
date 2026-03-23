@@ -8,7 +8,7 @@ import django_filters
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Prefetch, Q
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -112,13 +112,15 @@ class ReadableIdLookupMixin:
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
         identifier = self.kwargs[lookup_url_kwarg]
 
-        filter_kwargs = (
-            {"pk": int(identifier)}
-            if identifier.isdigit()
-            else {"readable_id": identifier}
-        )
+        # Numeric identifiers can be either pk or readable_id.
+        if identifier.isdigit():
+            try:
+                obj = get_object_or_404(queryset, pk=int(identifier))
+            except Http404:
+                obj = get_object_or_404(queryset, readable_id=identifier)
+        else:
+            obj = get_object_or_404(queryset, readable_id=identifier)
 
-        obj = get_object_or_404(queryset, **filter_kwargs)
         self.check_object_permissions(self.request, obj)
         return obj
 
