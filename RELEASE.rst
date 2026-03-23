@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 1.143.0 (Released March 23, 2026)
+---------------
+
+- Add include_in_learn_catalog to v3 api (#3409)
+- Fix output formatting for assert_drf_json_equal() (#3408)
+- Don't error out if the user wants a verified program course enrollment and has a non-empty basket (#3404)
+- Skip receipts for contract orders; add util (#3403)
+- Add call to generate edX usernames on course run enroll if none exist (#3398)
+- Include parent programs in ProgramSerializer (#3391)
+
 Version 1.142.3 (Released March 20, 2026)
 ---------------
 

@@ -174,6 +174,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
 
         if run.b2b_contract is not None:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+
         successful_enrollments, _ = create_run_enrollments(
             user,
             [run],

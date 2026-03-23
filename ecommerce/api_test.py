@@ -41,7 +41,6 @@ from ecommerce.constants import (
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.exceptions import (
-    VerifiedProgramInvalidBasketError,
     VerifiedProgramNoEnrollmentError,
 )
 from ecommerce.factories import (
@@ -789,11 +788,14 @@ def test_create_vpcre_no_program(bootstrapped_verified_program, user):
 
 
 def test_create_vpcre_bad_basket(
-    mocker, mock_hubspot_order, bootstrapped_verified_program
+    mocker,
+    mock_hubspot_order,
+    mock_create_run_enrollments,
+    bootstrapped_verified_program,
 ):
     """
-    Test that creating a verified course run enrollment for a program fails if
-    the basket has other stuff in.
+    Test that creating a verified course run enrollment for a program works if
+    the basket has other stuff in. (It should clear the basket.)
     """
 
     with reversion.create_revision():
@@ -813,10 +815,33 @@ def test_create_vpcre_bad_basket(
         basket=user_basket, product=some_other_product, quantity=1
     )
 
-    with pytest.raises(VerifiedProgramInvalidBasketError) as exc:
-        create_verified_program_course_run_enrollment(request, courserun, program)
+    def mock_cre_side_effect(
+        *_, use_user=prog_enrollment.user, use_run=courserun, **kwargs
+    ):
+        """Side effect for mock_create_run_enrollments"""
 
-    assert "not empty" in str(exc.value)
+        return [
+            [
+                CourseRunEnrollmentFactory.create(
+                    user=use_user,
+                    run=use_run,
+                    enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                )
+            ],
+            True,
+        ]
+
+    mock_create_run_enrollments.side_effect = mock_cre_side_effect
+
+    create_verified_program_course_run_enrollment(request, courserun, program)
+
+    mock_create_run_enrollments.side_effect = None
+
+    assert Order.objects.filter(
+        purchaser=prog_enrollment.user,
+        lines__purchased_object_id=courserun.id,
+        state=OrderStatus.FULFILLED,
+    ).exists()
 
 
 @pytest.mark.parametrize(
