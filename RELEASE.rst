@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.143.0
+Version 1.143.0 (Released March 23, 2026)
 ---------------
 
 - Add include_in_learn_catalog to v3 api (#3409)
