@@ -3036,7 +3036,7 @@ paths:
       responses:
         '200':
           description: No response body
-  /api/v2/verified_program_enrollments/{program_id}/{courserun_id}/:
+  /api/v2/verified_program_enrollments/{courserun_id}/:
     post:
       operationId: verified_program_enrollments_create
       description: |-
@@ -3055,16 +3055,26 @@ paths:
         name: courserun_id
         schema:
           type: string
-        description: Readable ID for the course run to enroll in.
-        required: true
-      - in: path
-        name: program_id
-        schema:
-          type: string
-        description: Readable ID for the program.
         required: true
       tags:
       - verified_program_enrollments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+          application/x-www-form-urlencoded:
+            schema:
+              type: array
+              items:
+                type: string
+          multipart/form-data:
+            schema:
+              type: array
+              items:
+                type: string
       responses:
         '201':
           content:
@@ -3073,6 +3083,8 @@ paths:
                 $ref: '#/components/schemas/CourseRunEnrollmentRequestV2'
           description: ''
         '204':
+          description: No response body
+        '400':
           description: No response body
         '404':
           description: No response body

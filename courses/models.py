@@ -727,6 +727,25 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """
         return self._courses_with_requirements_data["elective_courses"]
 
+    @cached_property
+    def program_nodes(self):
+        """
+        Returns the programs that are associated with this program via the
+        requirements tree.
+
+        Returns:
+        - list of Program: programs that are electives
+        """
+        return [
+            req.program
+            for req in ProgramRequirement.objects.filter(
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                required_program=self,
+            )
+            .select_related("program")
+            .all()
+        ]
+
     @property
     def required_programs(self):
         """
