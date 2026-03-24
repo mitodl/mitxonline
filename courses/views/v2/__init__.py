@@ -752,16 +752,16 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
     the upgrade separately.)
     """
 
-    programs = request.data
+    program_ids = request.data
 
     if (
-        not isinstance(programs, list)
-        or len(programs) == 0
-        or len(programs) > VPE_MAX_PROGRAMS
+        not isinstance(program_ids, list)
+        or len(program_ids) == 0
+        or len(program_ids) > VPE_MAX_PROGRAMS
     ):
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
-    programs = Program.objects.filter(readable_id__in=programs).all()
+    programs = Program.objects.filter(readable_id__in=program_ids).all()
 
     program_enrollments = (
         ProgramEnrollment.objects.prefetch_related("program")
@@ -774,7 +774,11 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
 
     # Early short circuiting for some simpler cases.
 
-    if len(program_enrollments) == 0 or len(programs) == 0:
+    if (
+        len(program_enrollments) == 0
+        or len(programs) == 0
+        or len(programs) != len(program_ids)
+    ):
         # Insufficient program enrollments, so abort.
         return Response(status=status.HTTP_404_NOT_FOUND)
     elif len(programs) == 1 and len(program_enrollments) == 1:
