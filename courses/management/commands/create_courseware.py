@@ -372,9 +372,6 @@ class Command(BaseCommand):
             except:  # noqa: E722
                 program = Program.objects.filter(readable_id=kwargs["program"]).first()
 
-            if add_depts:
-                self._add_departments_to_courseware_object(program, add_depts)
-
             if program is not None and kwargs["required"]:
                 new_req = program.add_requirement(new_course)
             elif program is not None and kwargs["elective"]:
