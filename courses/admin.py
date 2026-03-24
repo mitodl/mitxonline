@@ -166,7 +166,13 @@ class ProgramEnrollmentAdmin(AuditableModelAdmin):
         "program__title",
     ]
     list_filter = ["active", "enrollment_mode", "change_status"]
-    list_display = ("id", "get_user_email", "get_program_readable_id", "enrollment_mode", "change_status")
+    list_display = (
+        "id",
+        "get_user_email",
+        "get_program_readable_id",
+        "enrollment_mode",
+        "change_status",
+    )
     raw_id_fields = (
         "user",
         "program",
