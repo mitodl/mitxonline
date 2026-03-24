@@ -737,12 +737,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         - list of Program: programs that are electives
         """
         return [
-            req.program
+            req.required_program
             for req in ProgramRequirement.objects.filter(
                 node_type=ProgramRequirementNodeType.PROGRAM,
-                required_program=self,
+                program=self,
+                required_program__isnull=False,
             )
-            .select_related("program")
+            .select_related("required_program")
             .all()
         ]
 

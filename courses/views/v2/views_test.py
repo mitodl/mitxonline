@@ -1885,6 +1885,9 @@ def test_add_nested_verified_program_course_enrollment(
     if not crogram_unrelated:
         base_program.add_requirement(crogram)
 
+        assert base_program not in crogram.program_nodes
+        assert crogram in base_program.program_nodes
+
     # Get enrollments set up.
 
     if base_program_enrollment_type:
@@ -1928,6 +1931,13 @@ def test_add_nested_verified_program_course_enrollment(
                 user=user, program=crogram
             ).exists()
 
+        return
+
+    if (
+        crogram_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
+        and base_program_enrollment_type != EDX_ENROLLMENT_VERIFIED_MODE
+    ):
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
         return
 
     assert resp.status_code == status.HTTP_201_CREATED

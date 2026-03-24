@@ -754,11 +754,12 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
 
     programs = request.data
 
-    if len(programs) > VPE_MAX_PROGRAMS:
-        # too many programs, abort
-        return Response(
-            "Too many programs specified!", status=status.HTTP_400_BAD_REQUEST
-        )
+    if (
+        not isinstance(programs, list)
+        or len(programs) == 0
+        or len(programs) > VPE_MAX_PROGRAMS
+    ):
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
     programs = Program.objects.filter(readable_id__in=programs).all()
 
@@ -783,13 +784,18 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
         )
 
     # Make sure the programs are related to each other before continuing.
+    # Also check for circular reference, which will break the verified enrollment
+    # checks later.
 
     if (
         programs[0] not in programs[1].program_nodes
         and programs[1] not in programs[0].program_nodes
+    ) or (
+        programs[0] in programs[1].program_nodes
+        and programs[1] in programs[0].program_nodes
     ):
         log.error(
-            "add_verified_program_course_enrollment: user %s enrolling in %s but programs specified (%s) aren't related",
+            "add_verified_program_course_enrollment: user %s enrolling in %s but programs specified (%s) have bad interdependencies",
             request.user,
             courserun_id,
             ",".join(programs.values_list("readable_id", flat=True)),
@@ -803,6 +809,12 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
         )
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
+    # Figure out which is the most upstream program and check enrollments there.
+
+    root_program = (
+        programs[0] if programs[0] not in programs[1].program_nodes else programs[1]
+    )
+
     verified_program_enrollments = [
         enrollment
         for enrollment in program_enrollments
@@ -813,32 +825,44 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
         # No verified enrollments, so it doesn't matter - the user will get an
         # audit one. (But make the audit enrollment to not confuse the course run
         # process later.)
-        program_enrollment = program_enrollments[0]
+        for program in programs:
+            updated_enrollment, _ = ProgramEnrollment.all_objects.update_or_create(
+                user=request.user,
+                program=program,
+            )
+            updated_enrollment.enrollment_mode = EDX_ENROLLMENT_AUDIT_MODE
+            updated_enrollment.active = True
+            updated_enrollment.save()
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program == root_program
+    ):
+        # The verified enrollment that's here is for the root program, so we can
+        # create an enrollment for the other program.
+        for program in programs:
+            updated_enrollment, _ = ProgramEnrollment.all_objects.update_or_create(
+                user=request.user,
+                program=program,
+            )
+            updated_enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
+            updated_enrollment.active = True
+            updated_enrollment.save()
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program != root_program
+    ):
+        # The verified enrollment that's here is _not_ for the root program, so
+        # we should stop.
+        log.error(
+            "add_verified_program_course_enrollment: user %s enrolling in %s has no verified enrollment in %s",
+            request.user,
+            courserun_id,
+            root_program,
+        )
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        ProgramEnrollment.objects.get_or_create(
-            user=request.user,
-            program=programs[0]
-            if program_enrollment.program == programs[1]
-            else programs[1],
-            defaults={"enrollment_mode": program_enrollment.enrollment_mode},
-        )
-    else:
-        # One is verified, so either create a new program enrollment or upgrade
-        # the other one.
-        unverified_program = (
-            programs[0]
-            if verified_program_enrollments[0].program == programs[1]
-            else programs[1]
-        )
-
-        updated_enrollment, _ = ProgramEnrollment.objects.get_or_create(
-            user=request.user,
-            program=unverified_program,
-        )
-        updated_enrollment.enrollment_mode = verified_program_enrollments[
-            0
-        ].enrollment_mode
-        updated_enrollment.save()
+    # If we fell out the bottom, we have all verified enrollments, or we've made
+    # sufficient enrollments to fill the gaps.
 
     # If we have >1 program, we need to pass in the enrollment for the program
     # the course belongs to, or the call to create the course run enrollment will fail.
