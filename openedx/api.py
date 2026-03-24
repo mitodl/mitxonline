@@ -247,9 +247,27 @@ def _handle_username_collision(  # noqa: PLR0913
     if suggestions:
         suggested_usernames = suggestions
 
+    # Filter out any suggestions that are already taken locally in MITx Online.
+    # edX does not know about our local username uniqueness constraint, so its
+    # suggestions may collide with existing OpenEdxUser records here.
+    if suggested_usernames:
+        locally_taken = set(
+            OpenEdxUser.objects.filter(edx_username__in=suggested_usernames)
+            .exclude(user=user)
+            .values_list("edx_username", flat=True)
+        )
+        if locally_taken:
+            log.debug(
+                "Skipping OpenEdX suggestions already taken locally: %s",
+                locally_taken,
+            )
+            suggested_usernames = [
+                u for u in suggested_usernames if u not in locally_taken
+            ]
+
     if not suggested_usernames:
         log.info(
-            "OpenEdX returned empty username suggestions, falling back to local generation"
+            "OpenEdX returned no locally available username suggestions, falling back to local generation"
         )
         base_username = open_edx_user.desired_edx_username
         if not base_username:
