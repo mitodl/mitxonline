@@ -12,10 +12,13 @@ from courses.conftest import B2BCourses, UserWithEnrollmentsAndCerts
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import ProgramEnrollmentFactory, ProgramFactory
 from courses.models import (
+    PaidProgram,
     ProgramEnrollment,
 )
 from courses.serializers.v3.programs import SimpleProgramSerializer
 from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_program_cert
+from ecommerce.factories import OrderFactory
+from ecommerce.models import OrderStatus
 from main.test_utils import drf_datetime
 
 pytestmark = [
@@ -611,3 +614,25 @@ def test_destroy_program_enrollment(user_drf_client, user):
     enrollment.refresh_from_db()
     assert enrollment.active is False
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+
+
+def test_destroy_program_enrollment_paid_fails(user_drf_client, user):
+    """DELETE a paid program enrollment fails"""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    PaidProgram.objects.create(user=user, program=program, order=order)
+
+    resp = user_drf_client.delete(
+        reverse(
+            "v3:user_program_enrollments_api-detail", kwargs={"program_id": program.id}
+        )
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "message": "Cannot unenroll from a purchased program, contact support."
+    }
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True

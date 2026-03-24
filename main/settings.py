@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.143.0"
+VERSION = "1.143.1"
 
 log = logging.getLogger()
 

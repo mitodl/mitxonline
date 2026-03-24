@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.143.1 (Released March 24, 2026)
+---------------
+
+- Add a "certificate available" field so we can tell if the course has a cert available for it (#3415)
+- Don't allow purchased programs to be unenrolled (#3413)
+- feat: replace MITx Online logo with MIT Learn logo in all emails (#3400)
+- [pre-commit.ci] pre-commit autoupdate (#3414)
+- Fix the description field's default when creating or updating a course mode in edX (#3410)
+
 Version 1.143.0 (Released March 23, 2026)
 ---------------
 

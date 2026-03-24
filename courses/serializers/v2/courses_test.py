@@ -32,17 +32,37 @@ pytestmark = [pytest.mark.django_db]
 @pytest.mark.parametrize(
     "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
 )
-def test_serialize_course(
-    mocker, mock_context, is_anonymous, include_programs, certificate_type
+@pytest.mark.parametrize(
+    "cert_available",
+    [
+        True,
+        False,
+    ],
+)
+def test_serialize_course(  # noqa: PLR0913
+    mocker,
+    mock_context,
+    is_anonymous,
+    include_programs,
+    certificate_type,
+    cert_available,
 ):
     """Test Course serialization"""
+
+    if not cert_available:
+        courseRun1 = CourseRunFactory.create(certificate_available_date=None)
+        courseRun2 = CourseRunFactory.create(
+            certificate_available_date=None, course=courseRun1.course
+        )
+    else:
+        courseRun1 = CourseRunFactory.create()
+        courseRun2 = CourseRunFactory.create(course=courseRun1.course)
+
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
     if include_programs:
         mock_context["include_programs"] = True
     user = mock_context["request"].user
-    courseRun1 = CourseRunFactory.create()
-    courseRun2 = CourseRunFactory.create(course=courseRun1.course)
     course = courseRun1.course
     topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
     course.page.topics.set([topics[0], topics[1], topics[2]])
@@ -76,6 +96,7 @@ def test_serialize_course(
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
             "certificate_type": certificate_type,
+            "certificate_available": cert_available,
             "availability": "dated",
             "topics": [{"name": topic.name} for topic in topics],
             "required_prerequisites": True,
@@ -125,6 +146,7 @@ def test_serialize_course_required_prerequisites(
             "departments": [],
             "page": CoursePageSerializer(course.page).data,
             "certificate_type": "Certificate of Completion",
+            "certificate_available": False,
             "topics": [],
             "availability": "anytime",
             "required_prerequisites": expected_required_prerequisites,
