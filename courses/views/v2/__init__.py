@@ -2,7 +2,6 @@
 Course API Views version 2
 """
 
-import json
 import logging
 
 import django_filters
@@ -739,7 +738,7 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
         IsAuthenticated,
     ]
 )
-def add_verified_program_course_enrollment(request, courserun_id: str):  # noqa: PLR0911
+def add_verified_program_course_enrollment(request, courserun_id: str):
     """
     Create a program-related course enrollment for the learner.
 
@@ -757,14 +756,20 @@ def add_verified_program_course_enrollment(request, courserun_id: str):  # noqa:
 
     if len(programs) > VPE_MAX_PROGRAMS:
         # too many programs, abort
-        return Response("Too many programs specified!", status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            "Too many programs specified!", status=status.HTTP_400_BAD_REQUEST
+        )
 
     programs = Program.objects.filter(readable_id__in=programs).all()
 
-    program_enrollments = ProgramEnrollment.objects.prefetch_related("program").filter(
-        program__in=programs,
-        user=request.user,
-    ).all()
+    program_enrollments = (
+        ProgramEnrollment.objects.prefetch_related("program")
+        .filter(
+            program__in=programs,
+            user=request.user,
+        )
+        .all()
+    )
 
     # Early short circuiting for some simpler cases.
 
@@ -773,33 +778,85 @@ def add_verified_program_course_enrollment(request, courserun_id: str):  # noqa:
         return Response(status=status.HTTP_404_NOT_FOUND)
     elif len(programs) == 1 and len(program_enrollments) == 1:
         # Just one program specified, so stop further processing.
-        return _create_course_enrollment_from_program(request, courserun_id, program_enrollments[0])
+        return _create_course_enrollment_from_program(
+            request, courserun_id, program_enrollments[0]
+        )
 
     # Make sure the programs are related to each other before continuing.
 
-    if programs[0] not in programs[1].program_nodes and programs[1] not in programs[0].program_nodes:
-        log.error("add_verified_program_course_enrollment: user %s enrolling in %s but programs specified (%s) aren't related", request.user, courserun_id, ",".join(programs.values_list("readable_id", flat=True)), stack_info=True, extra={"program_1": programs[0], "program_1_nodes": programs[0].program_nodes, "program_2": programs[1], "program_2_nodes": programs[1].program_nodes})
+    if (
+        programs[0] not in programs[1].program_nodes
+        and programs[1] not in programs[0].program_nodes
+    ):
+        log.error(
+            "add_verified_program_course_enrollment: user %s enrolling in %s but programs specified (%s) aren't related",
+            request.user,
+            courserun_id,
+            ",".join(programs.values_list("readable_id", flat=True)),
+            stack_info=True,
+            extra={
+                "program_1": programs[0],
+                "program_1_nodes": programs[0].program_nodes,
+                "program_2": programs[1],
+                "program_2_nodes": programs[1].program_nodes,
+            },
+        )
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
-    verified_program_enrollments = [ enrollment for enrollment in program_enrollments if enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE ]
+    verified_program_enrollments = [
+        enrollment
+        for enrollment in program_enrollments
+        if enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    ]
 
     if len(verified_program_enrollments) == 0:
         # No verified enrollments, so it doesn't matter - the user will get an
-        # audit one.
+        # audit one. (But make the audit enrollment to not confuse the course run
+        # process later.)
         program_enrollment = program_enrollments[0]
+
+        ProgramEnrollment.objects.get_or_create(
+            user=request.user,
+            program=programs[0]
+            if program_enrollment.program == programs[1]
+            else programs[1],
+            defaults={"enrollment_mode": program_enrollment.enrollment_mode},
+        )
     else:
         # One is verified, so either create a new program enrollment or upgrade
         # the other one.
-        unverified_program = programs[0] if verified_program_enrollments[0].program == programs[1] else programs[1]
+        unverified_program = (
+            programs[0]
+            if verified_program_enrollments[0].program == programs[1]
+            else programs[1]
+        )
 
-        program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
+        updated_enrollment, _ = ProgramEnrollment.objects.get_or_create(
             user=request.user,
             program=unverified_program,
         )
-        program_enrollment.enrollment_mode = verified_program_enrollments[0].enrollment_mode
-        program_enrollment.save()
+        updated_enrollment.enrollment_mode = verified_program_enrollments[
+            0
+        ].enrollment_mode
+        updated_enrollment.save()
 
-    return _create_course_enrollment_from_program(request, courserun_id, program_enrollment)
+    # If we have >1 program, we need to pass in the enrollment for the program
+    # the course belongs to, or the call to create the course run enrollment will fail.
+
+    course_program = (
+        programs[0]
+        if programs[0]
+        .courses_qset.filter(courseruns__courseware_id=courserun_id)
+        .exists()
+        else programs[1]
+    )
+    program_enrollment = ProgramEnrollment.objects.get(
+        user=request.user, program=course_program
+    )
+
+    return _create_course_enrollment_from_program(
+        request, courserun_id, program_enrollment
+    )
 
 
 @extend_schema(
