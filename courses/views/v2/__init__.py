@@ -33,6 +33,7 @@ from courses.api import (
     deactivate_run_enrollment,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.exceptions import EnrollmentCreationFailedError
 from courses.models import (
     Course,
     CourseRun,
@@ -715,6 +716,8 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
             mode=EDX_ENROLLMENT_AUDIT_MODE,
             keep_failed_enrollments=True,
         )
+        if len(enrollments) == 0:
+            raise EnrollmentCreationFailedError
         return Response(
             CourseRunEnrollmentSerializer(enrollments[0]).data,
             status=status.HTTP_201_CREATED,
@@ -880,9 +883,12 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
         .exists()
         else programs[1]
     )
-    program_enrollment = ProgramEnrollment.objects.get(
-        user=request.user, program=course_program
-    )
+    try:
+        program_enrollment = ProgramEnrollment.objects.get(
+            user=request.user, program=course_program
+        )
+    except ProgramEnrollment.DoesNotExist as exc:
+        raise EnrollmentCreationFailedError from exc
 
     return _create_course_enrollment_from_program(
         request, courserun_id, program_enrollment
