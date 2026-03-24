@@ -4616,8 +4616,11 @@ components:
           readOnly: true
         certificate_type:
           type: string
-          description: Return the certificate type, if the next enrollable run has
-            a cert.
+          description: Return the certificate type.
+          readOnly: true
+        certificate_available:
+          type: boolean
+          description: Return if there is a certificate available for the course.
           readOnly: true
         required_prerequisites:
           type: boolean
@@ -4685,6 +4688,7 @@ components:
           readOnly: true
       required:
       - availability
+      - certificate_available
       - certificate_type
       - courseruns
       - departments
@@ -7817,8 +7821,11 @@ components:
           readOnly: true
         certificate_type:
           type: string
-          description: Return the certificate type, if the next enrollable run has
-            a cert.
+          description: Return the certificate type.
+          readOnly: true
+        certificate_available:
+          type: boolean
+          description: Return if there is a certificate available for the course.
           readOnly: true
         required_prerequisites:
           type: boolean
@@ -7881,6 +7888,7 @@ components:
           readOnly: true
       required:
       - availability
+      - certificate_available
       - certificate_type
       - departments
       - duration
