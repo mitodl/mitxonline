@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.143.1
+Version 1.143.1 (Released March 24, 2026)
 ---------------
 
 - Add a "certificate available" field so we can tell if the course has a cert available for it (#3415)
