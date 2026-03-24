@@ -1339,15 +1339,17 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
                 title=edx_course_run.name,
                 live=live,
             )
-            dept = None
-            for department in departments:
-                if isinstance(department, str) and create_depts:
-                    dept, _ = Department.objects.get_or_create(name=department)
-                    dept.save()
-                elif isinstance(department, Department):
-                    dept = department
-                if dept:
-                    root_course.departments.add(dept.id)
+
+            if departments:
+                dept = None
+                for department in departments:
+                    if isinstance(department, str) and create_depts:
+                        dept, _ = Department.objects.get_or_create(name=department)
+                        dept.save()
+                    elif isinstance(department, Department):
+                        dept = department
+                    if dept:
+                        root_course.departments.add(dept.id)
 
     new_run = CourseRun.objects.create(
         course=root_course,
