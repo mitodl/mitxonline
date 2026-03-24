@@ -411,6 +411,7 @@ def test_serialize_program_page(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "include_in_learn_catalog": False,
         },
     )
 
@@ -461,6 +462,7 @@ def test_serialize_program_page__form_child_of_course_with_program_fk(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "include_in_learn_catalog": False,
         },
     )
 
@@ -499,6 +501,7 @@ def test_serialize_program_page__with_related_financial_form(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "include_in_learn_catalog": False,
         },
     )
 
@@ -531,6 +534,7 @@ def test_serialize_program_page__no_financial_form(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "include_in_learn_catalog": False,
         },
     )
 
@@ -566,6 +570,7 @@ def test_serialize_program_page__with_related_program_no_financial_form(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "include_in_learn_catalog": False,
         },
     )
 
