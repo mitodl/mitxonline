@@ -851,7 +851,7 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
         and verified_program_enrollments[0].program == root_program
     ):
         # The verified enrollment that's here is for the root program, so we can
-        # create an enrollment for the other program.
+        # create a verified enrollment for the other program.
         for program in programs:
             updated_enrollment, _ = ProgramEnrollment.all_objects.update_or_create(
                 user=request.user,
