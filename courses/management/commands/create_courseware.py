@@ -302,7 +302,8 @@ class Command(BaseCommand):
             live=kwargs["live"],
         )
 
-        self._add_departments_to_courseware_object(new_program, add_depts)
+        if add_depts:
+            self._add_departments_to_courseware_object(new_program, add_depts)
 
         self._successfully_created_courseware_object_message(new_program)
 
@@ -347,8 +348,8 @@ class Command(BaseCommand):
             readable_id=kwargs["courseware_id"],
             live=kwargs["live"],
         )
-
-        self._add_departments_to_courseware_object(new_course, add_depts)
+        if add_depts:
+            self._add_departments_to_courseware_object(new_course, add_depts)
 
         self._successfully_created_courseware_object_message(new_course)
 
@@ -371,7 +372,8 @@ class Command(BaseCommand):
             except:  # noqa: E722
                 program = Program.objects.filter(readable_id=kwargs["program"]).first()
 
-            self._add_departments_to_courseware_object(program, add_depts)
+            if add_depts:
+                self._add_departments_to_courseware_object(program, add_depts)
 
             if program is not None and kwargs["required"]:
                 new_req = program.add_requirement(new_course)
