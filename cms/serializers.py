@@ -372,6 +372,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "financial_assistance_form_url",
             "description",
             "live",
+            "include_in_learn_catalog",
             "length",
             "effort",
             "price",

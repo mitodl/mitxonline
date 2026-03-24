@@ -6510,6 +6510,10 @@ components:
         live:
           type: boolean
           readOnly: true
+        include_in_learn_catalog:
+          type: boolean
+          nullable: true
+          description: If true, Learn should include this in its catalog.
         length:
           type: string
           description: A short description indicating how long it takes to complete
@@ -6639,10 +6643,6 @@ components:
           $ref: '#/components/schemas/CertificatePage'
         program_details:
           $ref: '#/components/schemas/V2Program'
-        include_in_learn_catalog:
-          type: boolean
-          nullable: true
-          description: If true, Learn should include this in its catalog.
       required:
       - about
       - certificate_page
@@ -6653,7 +6653,6 @@ components:
       - faq_url
       - feature_image
       - id
-      - include_in_learn_catalog
       - length
       - max_price
       - max_weekly_hours
