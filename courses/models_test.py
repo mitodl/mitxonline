@@ -1169,9 +1169,10 @@ def test_course_creation_without_department():
     """
     Test that a Course can be created without any departments
     """
-    course = Course.objects.create(title="No Dept Course", readable_id="course-v1:PyT+NoDept+1", live=True)
+    course = Course.objects.create(
+        title="No Dept Course", readable_id="course-v1:PyT+NoDept+1", live=True
+    )
     assert course.departments.count() == 0
     # Should be retrievable and have no departments
     retrieved = Course.objects.get(pk=course.pk)
     assert retrieved.departments.count() == 0
-
