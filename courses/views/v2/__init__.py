@@ -27,7 +27,11 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from courses.api import create_run_enrollments, deactivate_run_enrollment
+from courses.api import (
+    create_program_enrollments,
+    create_run_enrollments,
+    deactivate_run_enrollment,
+)
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     Course,
@@ -837,30 +841,18 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
         # No verified enrollments, so it doesn't matter - the user will get an
         # audit one. (But make the audit enrollment to not confuse the course run
         # process later.)
-        for program in programs:
-            updated_enrollment, _ = ProgramEnrollment.all_objects.update_or_create(
-                user=request.user,
-                program=program,
-            )
-            updated_enrollment.enrollment_mode = EDX_ENROLLMENT_AUDIT_MODE
-            updated_enrollment.active = True
-            updated_enrollment.change_status = ""
-            updated_enrollment.save()
+        create_program_enrollments(
+            request.user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        )
     elif (
         len(verified_program_enrollments) == 1
         and verified_program_enrollments[0].program == root_program
     ):
         # The verified enrollment that's here is for the root program, so we can
         # create a verified enrollment for the other program.
-        for program in programs:
-            updated_enrollment, _ = ProgramEnrollment.all_objects.update_or_create(
-                user=request.user,
-                program=program,
-            )
-            updated_enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
-            updated_enrollment.active = True
-            updated_enrollment.change_status = ""
-            updated_enrollment.save()
+        create_program_enrollments(
+            request.user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
     elif (
         len(verified_program_enrollments) == 1
         and verified_program_enrollments[0].program != root_program
