@@ -4,6 +4,7 @@
 import logging
 
 from django.core.cache import cache
+from django.db.models import Q
 
 from main.celery import app
 
@@ -121,3 +122,85 @@ def create_program_contract_runs(
     finally:
         # Always release the lock when done, even if an exception occurred
         cache.delete(lock_key)
+
+
+@app.task(acks_late=True)
+def queue_contract_sheet_update_post_save(
+    contract_id: int, *, only_update: bool = False
+):
+    """
+    Take an appropriate action on post-save for the contract.
+
+    If the prior revision to the current has a different tab or sheet URL
+    specified, then run write_codes, which will set up the (presumably blank)
+    sheet. Otherwise, use update_sheet, which is non-destructive.
+    """
+
+    from b2b.models import ContractPage
+    from b2b.sheets import ContractEnrollmentCodesSheetHandler
+
+    contract = ContractPage.objects.get(pk=contract_id)
+
+    try:
+        handler = ContractEnrollmentCodesSheetHandler(contract)
+    except ValueError as exc:
+        if "Google Sheet" in str(exc):
+            log.info(
+                "Contract %s has no linked Google Sheet or tab set, skipping", contract
+            )
+        elif "managed" in str(exc):
+            log.info("Contract %s is managed (no enrollment codes), skipping", contract)
+        return
+
+    if not only_update:
+        has_revs = contract.revisions.count() > 1
+
+        if has_revs:
+            # We have page revisions so check to see if the sheet or the tab changed
+            # in between. If they did, then we start over.
+            # Explicitly set this sort even though the Wagtail model seems to do this anyway.
+            revs = contract.revisions.order_by("-created_at").all()[:2]
+            if (
+                revs[0].as_object().google_sheet_target
+                != revs[1].as_object().google_sheet_target
+            ) or (
+                revs[0].as_object().google_sheet_target_tab
+                != revs[1].as_object().google_sheet_target_tab
+            ):
+                has_revs = False
+
+    if not only_update and not has_revs:
+        log.info("Setting up Google Sheet for %s", contract)
+
+        codes_written = handler.write_codes()
+    else:
+        log.info("Updating Google Sheet for %s", contract)
+
+        codes_written = handler.update_sheet()
+
+    log.info("Wrote %s codes for %s", codes_written, contract)
+
+
+@app.task(acks_late=True)
+def queue_update_all_contract_enrollment_sheets():
+    """
+    Update all of the configured enrollment code sheets in the system.
+
+    This fires off a bunch of calls to the above post-save task rather than rolling
+    through the sequentially. May need to revisit this (add batching, etc) as we
+    add more contracts.
+    """
+
+    from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
+    from b2b.models import ContractPage
+
+    updateable_contracts = (
+        ContractPage.objects.exclude(
+            Q(membership_type__in=CONTRACT_MEMBERSHIP_AUTOS) | Q(google_sheet_target="")
+        )
+        .only("id")
+        .all()
+    )
+
+    for contract in updateable_contracts:
+        queue_contract_sheet_update_post_save.delay(contract.id, only_update=True)
