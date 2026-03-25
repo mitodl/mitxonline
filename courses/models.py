@@ -296,7 +296,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         null=True,
     )
     departments = models.ManyToManyField(
-        Department, blank=False, related_name="programs"
+        Department, blank=True, related_name="programs"
     )
     availability = models.CharField(
         choices=AVAILABILITY_CHOICES, default=AVAILABILITY_ANYTIME, max_length=255
