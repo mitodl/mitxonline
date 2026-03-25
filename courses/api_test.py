@@ -236,8 +236,6 @@ def test_create_run_enrollments_upgrade(
     """
     create_run_enrollments should call the edX API to create/update enrollments, and set the enrollment mode properly
     in the event of an upgrade e.g a user moving from Audit to Verified mode
-
-    In addition, tests to make sure there's a ProgramEnrollment for the course.
     """
     test_enrollment = CourseRunEnrollmentFactory.create(
         user=user,
@@ -265,7 +263,7 @@ def test_create_run_enrollments_upgrade(
     assert edx_request_success is True
     test_enrollment.refresh_from_db()
     assert test_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-    assert ProgramEnrollment.objects.filter(
+    assert not ProgramEnrollment.objects.filter(
         user=user, program=program_with_empty_requirements
     ).exists()
 
@@ -278,7 +276,7 @@ def test_create_run_enrollments_multiple_programs(
     """
     create_run_enrollments should enroll the user into any Programs which have the CourseRun's Course defined as a requirement or elective.
 
-    In addition, tests to make sure there's a ProgramEnrollment for the course.
+    In addition, tests to make sure a ProgramEnrollment is created for the course.
     """
     test_enrollment = CourseRunEnrollmentFactory.create(
         user=user,
@@ -312,10 +310,10 @@ def test_create_run_enrollments_multiple_programs(
         user, runs=[test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
 
-    assert ProgramEnrollment.objects.filter(
+    assert not ProgramEnrollment.objects.filter(
         user=user, program=program_with_empty_requirements
     ).exists()
-    assert ProgramEnrollment.objects.filter(user=user, program=program2).exists()
+    assert not ProgramEnrollment.objects.filter(user=user, program=program2).exists()
 
 
 @pytest.mark.parametrize(
@@ -1609,34 +1607,6 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     assert result == (None, False)
     assert len(ProgramCertificate.objects.all()) == 0
 
-
-def test_program_enrollment_unenrollment_re_enrollment(
-    mocker,
-    user,
-    program_with_empty_requirements,  # noqa: F811
-):
-    """
-    create_run_enrollments should always enroll a learner into a program even
-    if the learner has previously unenrolled from the program.
-    """
-
-    # Create a program_enrollment that mocks what exists after a learner unenrolls from
-    # a program.
-    ProgramEnrollmentFactory(
-        user=user,
-        program=program_with_empty_requirements,
-        change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-    )
-    course_run = CourseRunFactory.create()
-    program_with_empty_requirements.add_requirement(course_run.course)
-    mocker.patch("courses.api.enroll_in_edx_course_runs")
-    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
-    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
-
-    create_run_enrollments(user, runs=[course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE)
-    assert ProgramEnrollment.objects.filter(
-        user=user, program=program_with_empty_requirements, change_status=None
-    ).exists()
 
 
 @patch("courses.signals.upsert_custom_properties")
