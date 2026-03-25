@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.143.3
+---------------
+
+- Add send-to-Google-Sheets support for B2B enrollment codes (#3363)
+- Remove department as required field (#3407)
+
 Version 1.143.2 (Released March 25, 2026)
 ---------------
 
