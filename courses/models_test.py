@@ -1176,3 +1176,14 @@ def test_course_creation_without_department():
     # Should be retrievable and have no departments
     retrieved = Course.objects.get(pk=course.pk)
     assert retrieved.departments.count() == 0
+
+
+def test_create_program_without_department():
+    """Test that a Program can be created without any departments."""
+
+    program = Program.objects.create(title="Test Program", readable_id="program-v1:TEST+P1", live=True)
+    assert program.departments.count() == 0
+    # Fetch from DB to ensure no departments are attached
+    program_from_db = Program.objects.get(pk=program.pk)
+    assert program_from_db.departments.count() == 0
+
