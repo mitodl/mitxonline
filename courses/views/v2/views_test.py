@@ -1553,6 +1553,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "collections": [],
                 "availability": "anytime",
                 "certificate_type": "Certificate of Completion",
+                "certificate_available": False,
                 "required_prerequisites": _get_page_prop(
                     program_enrollment, "prerequisites", ""
                 )
