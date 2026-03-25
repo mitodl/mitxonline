@@ -217,6 +217,16 @@ def test_serialize_course_programs_excludes_non_live(
         assert data["programs"] == []
 
 
+def test_serialize_course_with_no_page(mock_context):
+    """Test that a course with no CMS page serializes page as None."""
+    run = CourseRunFactory.create(course__page=None)
+    course = run.course
+
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+
+    assert data["page"] is None
+
+
 class TestCourseRunEnrollmentSerializerV2:
     """Test the v2 CourseRunEnrollmentSerializer."""
 
