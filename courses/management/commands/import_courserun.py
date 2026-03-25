@@ -101,9 +101,10 @@ class Command(BaseCommand):
             "-d",
             "--dept",
             "--department",
-            help="Specify department(s) assigned to the course object.  If program is specified, all courses associated with the program and imported will have the same department.",
+            help="Specify department(s) assigned to the course object. If not specified, the course will be created without departments.",
             action="append",
             dest="depts",
+            required=False,
         )
 
         parser.add_argument(

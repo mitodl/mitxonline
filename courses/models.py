@@ -296,7 +296,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         null=True,
     )
     departments = models.ManyToManyField(
-        Department, blank=False, related_name="programs"
+        Department, blank=True, related_name="programs"
     )
     availability = models.CharField(
         choices=AVAILABILITY_CHOICES, default=AVAILABILITY_ANYTIME, max_length=255
@@ -938,9 +938,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False, db_index=True)
-    departments = models.ManyToManyField(
-        Department, blank=False, related_name="courses"
-    )
+    departments = models.ManyToManyField(Department, blank=True, related_name="courses")
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",

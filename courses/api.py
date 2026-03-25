@@ -1333,24 +1333,23 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         root_course = Course.objects.filter(readable_id=root_course_id).first()
 
         if not root_course:
-            if not departments or len(departments) == 0:
-                msg = f"Course {root_course_id} would be created, so departments are required."
-                raise AttributeError(msg)
-
+            # Allow creating a course without departments
             root_course = Course.objects.create(
                 readable_id=root_course_id,
                 title=edx_course_run.name,
                 live=live,
             )
 
-            for department in departments:
-                if isinstance(department, str) and create_depts:
-                    dept, _ = Department.objects.get_or_create(name=department)
-                    dept.save()
-                elif isinstance(department, Department):
-                    dept = department
-
-                root_course.departments.add(dept.id)
+            if departments:
+                dept = None
+                for department in departments:
+                    if isinstance(department, str) and create_depts:
+                        dept, _ = Department.objects.get_or_create(name=department)
+                        dept.save()
+                    elif isinstance(department, Department):
+                        dept = department
+                    if dept:
+                        root_course.departments.add(dept.id)
 
     new_run = CourseRun.objects.create(
         course=root_course,
