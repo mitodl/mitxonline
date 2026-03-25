@@ -175,25 +175,6 @@ def create_run_enrollments(  # noqa: C901
     def send_enrollment_emails():
         subscribe_edx_course_emails.delay(enrollment.id)
 
-    def _enroll_learner_into_associated_programs():
-        """
-        Enrolls the learner into all programs for which the course they are enrolling into
-        is associated as a requirement or elective.  If a program enrollment already exists
-        then the change_status of that program_enrollment is checked to ensure it equals None.
-        """
-        for program in run.course.programs:
-            if not program.live:
-                continue
-            program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
-                user=user,
-                program=program,
-                defaults=dict(  # noqa: C408
-                    change_status=None,
-                ),
-            )
-            if program_enrollment.change_status is not None:
-                program_enrollment.reactivate_and_save()
-
     edx_request_success = True
     if not runs[0].is_fake_course_run:
         # Make the API call to enroll the user in edX only if the run is not a fake course run
@@ -232,8 +213,6 @@ def create_run_enrollments(  # noqa: C901
                     enrollment_mode=mode,
                 ),
             )
-
-            _enroll_learner_into_associated_programs()
 
             # If the run is associated with a B2B contract, add the contract
             # to the user's contract list and update their org memberships
