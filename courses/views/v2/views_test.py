@@ -1754,9 +1754,11 @@ def test_add_verified_program_course_enrollment(
             "v2:add_verified_program_course_enrollment",
             kwargs={
                 "courserun_id": course_run.courseware_id,
-                "program_id": program.readable_id,
             },
-        )
+        ),
+        data=[
+            program.readable_id,
+        ],
     )
 
     if program_enrollment_type:
@@ -1778,6 +1780,184 @@ def test_add_verified_program_course_enrollment(
         ):
             # We had enough electives so we should have gotten an audit enrollment
             assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+@pytest.mark.parametrize(
+    "crogram_unrelated",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "base_program_enrollment_type",
+    [
+        None,
+        EDX_ENROLLMENT_AUDIT_MODE,
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    ],
+)
+@pytest.mark.parametrize(
+    "crogram_enrollment_type",
+    [
+        None,
+        EDX_ENROLLMENT_AUDIT_MODE,
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    ],
+)
+def test_add_nested_verified_program_course_enrollment(
+    user,
+    user_drf_client,
+    base_program_enrollment_type,
+    crogram_enrollment_type,
+    crogram_unrelated,
+):
+    """
+    Test that the endpoint works as expected when we're enrolling in a nested
+    program.
+
+    This specifically is for testing when the course is part of a "crogram" that
+    is part of a program, and the user has a verified enrollment in the program
+    but no enrollment in the "crogram" (or they don't match). In this case, we
+    should figure out what the upstream enrollment is and make sure the
+    intermediary has the right enrollments too.
+
+    This test doesn't care too much about the resulting course run enrollment
+    since that gets tested in the above test (and elsewhere).
+    """
+
+    expected_enrollment = (
+        EDX_ENROLLMENT_VERIFIED_MODE
+        if EDX_ENROLLMENT_VERIFIED_MODE
+        in [base_program_enrollment_type, crogram_enrollment_type]
+        else EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={
+            "results": [
+                {"mode": expected_enrollment, "is_active": True},
+            ],
+        },
+        status=status.HTTP_200_OK,
+    )
+
+    # Set up base models
+    # We need a "crogram" that has a course as a requirement, and a base program
+    # that has the crogram as a requirement. Then, we need products for all of
+    # these.
+
+    base_program = ProgramFactory.create(display_mode=None)
+    crogram = ProgramFactory.create(display_mode="course")
+    course_run = CourseRunFactory.create()
+
+    course_run_content_type = ContentType.objects.get_for_model(course_run)
+    program_content_type = ContentType.objects.get_for_model(base_program)
+
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=course_run.id,
+            content_type=course_run_content_type,
+        )
+
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=base_program.id,
+            content_type=program_content_type,
+        )
+
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=crogram.id,
+            content_type=program_content_type,
+        )
+
+    crogram.add_requirement(course_run.course)
+    if not crogram_unrelated:
+        base_program.add_requirement(crogram)
+
+        assert base_program not in crogram.program_nodes
+        assert crogram in base_program.program_nodes
+
+    # Get enrollments set up.
+
+    if base_program_enrollment_type:
+        ProgramEnrollmentFactory.create(
+            program=base_program,
+            user=user,
+            enrollment_mode=base_program_enrollment_type,
+        )
+
+    if crogram_enrollment_type:
+        ProgramEnrollmentFactory.create(
+            program=crogram,
+            user=user,
+            enrollment_mode=crogram_enrollment_type,
+        )
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={
+                "courserun_id": course_run.courseware_id,
+            },
+        ),
+        data=[base_program.readable_id, crogram.readable_id],
+    )
+
+    if not base_program_enrollment_type and not crogram_enrollment_type:
+        # If we don't have any program enrollments, then it should bail.
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        assert not ProgramEnrollment.objects.filter(
+            user=user, program__in=[base_program, crogram]
+        ).exists()
+        return
+
+    if crogram_unrelated:
+        # If the two programs specified are unrelated, it should bail.
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+        if not crogram_enrollment_type:
+            assert not ProgramEnrollment.objects.filter(
+                user=user, program=crogram
+            ).exists()
+
+        return
+
+    if (
+        crogram_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
+        and base_program_enrollment_type != EDX_ENROLLMENT_VERIFIED_MODE
+    ):
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        return
+
+    assert resp.status_code == status.HTTP_201_CREATED
+
+    if [base_program_enrollment_type, crogram_enrollment_type] == [
+        EDX_ENROLLMENT_VERIFIED_MODE,
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    ]:
+        # If we were making verified enrollments, then we should have verified
+        # enrollments for both programs too.
+
+        assert (
+            ProgramEnrollment.objects.filter(
+                user=user,
+                program__in=[base_program, crogram],
+                enrollment_mode=expected_enrollment,
+            ).count()
+            == 2
+        )
 
 
 @pytest.mark.skip_nplusone_check
