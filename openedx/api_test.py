@@ -68,6 +68,7 @@ from openedx.exceptions import (
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
+    NoEdxApiAuthError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -1070,6 +1071,36 @@ def test_update_edx_user_name_failure(
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     with pytest.raises(expected_exception):
         update_edx_user_name(user)
+
+
+def test_update_edx_user_name_creates_missing_auth(mocker, user):
+    """
+    Regression test: if the user has no OpenEdxApiAuth record, update_edx_user_name
+    should create one via create_edx_auth_token and then successfully update the name.
+    """
+    mock_client = mocker.MagicMock()
+    update_name_return_value = mocker.Mock(
+        json={"name": user.name, "username": user.edx_username, "email": user.email}
+    )
+    mock_client.user_info.update_user_name = mocker.Mock(
+        return_value=update_name_return_value
+    )
+
+    # First call raises NoEdxApiAuthError; second (after token creation) succeeds.
+    mock_get_edx_api_client = mocker.patch(
+        "openedx.api.get_edx_api_client",
+        side_effect=[NoEdxApiAuthError(str(user)), mock_client],
+    )
+    mock_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
+
+    result = update_edx_user_name(user)
+
+    mock_create_edx_auth_token.assert_called_once_with(user)
+    assert mock_get_edx_api_client.call_count == 2
+    mock_client.user_info.update_user_name.assert_called_once_with(
+        user.edx_username, user.name
+    )
+    assert result == update_name_return_value
 
 
 def test_sync_enrollments_with_edx_active(mocker, user):
