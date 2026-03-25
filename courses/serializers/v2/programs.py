@@ -12,10 +12,7 @@ from courses.models import (
     ProgramCollection,
     ProgramRequirementNodeType,
 )
-from courses.serializers.base import (
-    BaseProgramRequirementTreeSerializer,
-    get_thumbnail_url,
-)
+from courses.serializers.base import BaseProgramRequirementTreeSerializer
 from courses.serializers.utils import get_unique_topics_from_courses
 from courses.serializers.v1.base import (
     BaseProgramSerializer,
@@ -454,12 +451,11 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return ProgramRequirementTreeSerializer(instance=req_root).data
 
-    @extend_schema_field(ProgramPageSerializer)
+    @extend_schema_field(ProgramPageSerializer(allow_null=True))
     def get_page(self, instance):
-        if hasattr(instance, "page"):
+        if hasattr(instance, "page") and instance.page is not None:
             return ProgramPageSerializer(instance.page).data
-        else:
-            return {"feature_image_src": get_thumbnail_url(None)}
+        return None
 
     @extend_schema_field(
         {
