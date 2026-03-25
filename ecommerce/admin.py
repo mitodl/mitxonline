@@ -1,5 +1,6 @@
 """Admin management for Ecommerce module"""
 
+import reversion
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -78,6 +79,12 @@ class ProductAdmin(VersionAdmin):
         Return the all objects for the Product Admin
         """
         return self.model.all_objects.get_queryset()
+
+    def save_model(self, request, obj, form, change):
+        """Ensure Product saves via admin always produce a reversion entry."""
+        with reversion.create_revision():
+            super().save_model(request, obj, form, change)
+            reversion.set_user(request.user)
 
 
 @admin.register(Basket)
