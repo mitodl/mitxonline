@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.143.4
+Version 1.143.4 (Released March 26, 2026)
 ---------------
 
 - add certificate_available field to programs that mirrors courses (#3421)
