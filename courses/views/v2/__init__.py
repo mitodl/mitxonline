@@ -963,6 +963,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                 "program",
                 "program__page",
             )
+            .prefetch_related("program__enrollment_modes")
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .order_by("-id")

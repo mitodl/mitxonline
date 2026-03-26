@@ -143,6 +143,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     departments = DepartmentSerializer(many=True, read_only=True)
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
+    certificate_available = serializers.SerializerMethodField()
     required_prerequisites = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     min_weeks = serializers.SerializerMethodField()
@@ -491,6 +492,10 @@ class ProgramSerializer(serializers.ModelSerializer):
             return "MicroMasters Credential"
         return "Certificate of Completion"
 
+    @extend_schema_field(bool)
+    def get_certificate_available(self, instance) -> bool:
+        return any(mode.requires_payment for mode in instance.enrollment_modes.all())
+
     def get_min_weekly_hours(self, instance) -> str | None:
         """
         Get the min weekly hours of the course from the course page CMS.
@@ -568,6 +573,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "page",
             "program_type",
             "certificate_type",
+            "certificate_available",
             "departments",
             "live",
             "display_mode",

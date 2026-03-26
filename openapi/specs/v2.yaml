@@ -8267,6 +8267,9 @@ components:
         certificate_type:
           type: string
           readOnly: true
+        certificate_available:
+          type: boolean
+          readOnly: true
         departments:
           type: array
           items:
@@ -8366,6 +8369,7 @@ components:
             $ref: '#/components/schemas/EnrollmentMode'
           readOnly: true
       required:
+      - certificate_available
       - certificate_type
       - collections
       - courses
@@ -8559,6 +8563,9 @@ components:
         certificate_type:
           type: string
           readOnly: true
+        certificate_available:
+          type: boolean
+          readOnly: true
         departments:
           type: array
           items:
@@ -8664,6 +8671,7 @@ components:
             - $ref: '#/components/schemas/BaseProduct'
           readOnly: true
       required:
+      - certificate_available
       - certificate_type
       - collections
       - courses
