@@ -269,6 +269,15 @@ class Discount(TimestampedModel):
         default=False,
         help_text="Discount is only for creating verified course run enrollments for a program.",
     )
+    # Only for B2B enrollment codes where the contract has a Google Sheet configured.
+    # This is just to save time/energy when we want to update the sheet later.
+    b2b_sheet_location = models.CharField(  # noqa: DJ001
+        blank=True,
+        null=True,
+        default="",
+        max_length=10,
+        help_text="The location of this code in the B2B contract's code sheet.",
+    )
 
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"

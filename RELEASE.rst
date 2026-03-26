@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.143.2 (Released March 25, 2026)
+---------------
+
+- Update verified program course enrollments API to allow for intermediate programs (#3418)
+
 Version 1.143.1 (Released March 24, 2026)
 ---------------
 

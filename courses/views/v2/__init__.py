@@ -27,8 +27,13 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from courses.api import create_run_enrollments, deactivate_run_enrollment
+from courses.api import (
+    create_program_enrollments,
+    create_run_enrollments,
+    deactivate_run_enrollment,
+)
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.exceptions import EnrollmentCreationFailedError
 from courses.models import (
     Course,
     CourseRun,
@@ -74,6 +79,7 @@ from openedx.api import sync_enrollments_with_edx
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
+VPE_MAX_PROGRAMS = 2
 
 
 class Pagination(PageNumberPagination):
@@ -659,57 +665,8 @@ class UserEnrollmentsApiViewSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@extend_schema(
-    parameters=[
-        OpenApiParameter(
-            "program_id",
-            str,
-            OpenApiParameter.PATH,
-            description="Readable ID for the program.",
-        ),
-        OpenApiParameter(
-            "courserun_id",
-            str,
-            OpenApiParameter.PATH,
-            description="Readable ID for the course run to enroll in.",
-        ),
-    ],
-    request=None,
-    responses={
-        status.HTTP_201_CREATED: CourseRunEnrollmentSerializer,
-        status.HTTP_204_NO_CONTENT: None,
-        status.HTTP_404_NOT_FOUND: None,
-    },
-)
-@api_view(
-    http_method_names=["post"],
-)
-@permission_classes(
-    [
-        IsAuthenticated,
-    ]
-)
-def add_verified_program_course_enrollment(request, program_id: str, courserun_id: str):
-    """
-    Create a program-related course enrollment for the learner.
-
-    Some special handling is needed for program-related course run enrollments
-    when the learner has an enrollment in the program. The learner should get a
-    course run enrollment that matches their program enrollment at no additional
-    charge. However, if the learner is enrolling in a course that's an elective,
-    and they have already enrolled in enough electives to satisfy the program's
-    requirements, they should then get an audit enrollment. (This won't preclude
-    them from getting a certificate for the course itself but they'll have to buy
-    the upgrade separately.)
-    """
-
-    try:
-        program_enrollment = ProgramEnrollment.objects.filter(
-            program__readable_id=program_id, user=request.user
-        ).get()
-    except ProgramEnrollment.DoesNotExist:
-        # Learner isn't in the program so abort.
-        return Response(status=status.HTTP_404_NOT_FOUND)
+def _create_course_enrollment_from_program(request, courserun_id, program_enrollment):
+    """Create the course enrollment based on the specified program enrollment."""
 
     if CourseRunEnrollment.objects.filter(
         run__courseware_id=courserun_id,
@@ -721,7 +678,36 @@ def add_verified_program_course_enrollment(request, program_id: str, courserun_i
 
     run = CourseRun.objects.filter(courseware_id=courserun_id).get()
 
-    if program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE:
+    # Check if:
+    # .. the program enrollment is audit,
+    # .. if the run isn't in the program,
+    # .. if the run is an elective, and if the learner already has enough verified elective enrollments
+    # and create an audit enrollment if any of these are true.
+
+    if (
+        (program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE)
+        or (
+            run.course
+            not in [
+                *program_enrollment.program.required_courses,
+                *program_enrollment.program.elective_courses,
+            ]
+        )
+        or (
+            run.course not in program_enrollment.program.required_courses
+            and (
+                CourseRunEnrollment.objects.filter(
+                    run__course__in=program_enrollment.program.elective_courses,
+                    user=request.user,
+                    active=True,
+                    enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                ).count()
+                >= (
+                    program_enrollment.program.minimum_elective_courses_requirement or 1
+                )
+            )
+        )
+    ):
         # Audit enrollments just get created, regardless of whether or not
         # the course is an elective.
         enrollments, _ = create_run_enrollments(
@@ -730,27 +716,8 @@ def add_verified_program_course_enrollment(request, program_id: str, courserun_i
             mode=EDX_ENROLLMENT_AUDIT_MODE,
             keep_failed_enrollments=True,
         )
-        return Response(
-            CourseRunEnrollmentSerializer(enrollments[0]).data,
-            status=status.HTTP_201_CREATED,
-        )
-
-    if run not in program_enrollment.program.required_courses and (
-        CourseRunEnrollment.objects.filter(
-            run__course__in=program_enrollment.program.elective_courses,
-            user=request.user,
-            active=True,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        ).count()
-        >= (program_enrollment.program.minimum_elective_courses_requirement or 1)
-    ):
-        # Too many verified elective enrollments, so make this as an audit one.
-        enrollments, _ = create_run_enrollments(
-            request.user,
-            [run],
-            mode=EDX_ENROLLMENT_AUDIT_MODE,
-            keep_failed_enrollments=True,
-        )
+        if len(enrollments) == 0:
+            raise EnrollmentCreationFailedError
         return Response(
             CourseRunEnrollmentSerializer(enrollments[0]).data,
             status=status.HTTP_201_CREATED,
@@ -766,6 +733,165 @@ def add_verified_program_course_enrollment(request, program_id: str, courserun_i
     return Response(
         CourseRunEnrollmentSerializer(enrollment).data,
         status=status.HTTP_201_CREATED,
+    )
+
+
+@extend_schema(
+    request=list[str],
+    responses={
+        status.HTTP_201_CREATED: CourseRunEnrollmentSerializer,
+        status.HTTP_204_NO_CONTENT: None,
+        status.HTTP_400_BAD_REQUEST: None,
+        status.HTTP_404_NOT_FOUND: None,
+    },
+)
+@api_view(
+    http_method_names=["post"],
+)
+@permission_classes(
+    [
+        IsAuthenticated,
+    ]
+)
+def add_verified_program_course_enrollment(request, courserun_id: str):
+    """
+    Create a program-related course enrollment for the learner.
+
+    Some special handling is needed for program-related course run enrollments
+    when the learner has an enrollment in the program. The learner should get a
+    course run enrollment that matches their program enrollment at no additional
+    charge. However, if the learner is enrolling in a course that's an elective,
+    and they have already enrolled in enough electives to satisfy the program's
+    requirements, they should then get an audit enrollment. (This won't preclude
+    them from getting a certificate for the course itself but they'll have to buy
+    the upgrade separately.)
+    """
+
+    program_ids = request.data
+
+    if (
+        not isinstance(program_ids, list)
+        or len(program_ids) == 0
+        or len(program_ids) > VPE_MAX_PROGRAMS
+    ):
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
+    programs = Program.objects.filter(readable_id__in=program_ids).all()
+
+    program_enrollments = (
+        ProgramEnrollment.objects.prefetch_related("program")
+        .filter(
+            program__in=programs,
+            user=request.user,
+        )
+        .all()
+    )
+
+    # Early short circuiting for some simpler cases.
+
+    if (
+        len(program_enrollments) == 0
+        or len(programs) == 0
+        or len(programs) != len(program_ids)
+    ):
+        # Insufficient program enrollments, so abort.
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    elif len(programs) == 1 and len(program_enrollments) == 1:
+        # Just one program specified, so stop further processing.
+        return _create_course_enrollment_from_program(
+            request, courserun_id, program_enrollments[0]
+        )
+
+    # Make sure the programs are related to each other before continuing.
+    # Also check for circular reference, which will break the verified enrollment
+    # checks later.
+
+    if (
+        programs[0] not in programs[1].program_nodes
+        and programs[1] not in programs[0].program_nodes
+    ) or (
+        programs[0] in programs[1].program_nodes
+        and programs[1] in programs[0].program_nodes
+    ):
+        log.error(
+            "add_verified_program_course_enrollment: user %s enrolling in %s but programs specified (%s) have bad interdependencies",
+            request.user,
+            courserun_id,
+            ",".join(programs.values_list("readable_id", flat=True)),
+            stack_info=True,
+            extra={
+                "program_1": programs[0],
+                "program_1_nodes": programs[0].program_nodes,
+                "program_2": programs[1],
+                "program_2_nodes": programs[1].program_nodes,
+            },
+        )
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
+    # Figure out which is the most upstream program and check enrollments there.
+
+    root_program = (
+        programs[0] if programs[0] not in programs[1].program_nodes else programs[1]
+    )
+
+    verified_program_enrollments = [
+        enrollment
+        for enrollment in program_enrollments
+        if enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    ]
+
+    if len(verified_program_enrollments) == 0:
+        # No verified enrollments, so it doesn't matter - the user will get an
+        # audit one. (But make the audit enrollment to not confuse the course run
+        # process later.)
+        create_program_enrollments(
+            request.user, programs, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        )
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program == root_program
+    ):
+        # The verified enrollment that's here is for the root program, so we can
+        # create a verified enrollment for the other program.
+        create_program_enrollments(
+            request.user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+    elif (
+        len(verified_program_enrollments) == 1
+        and verified_program_enrollments[0].program != root_program
+    ):
+        # The verified enrollment that's here is _not_ for the root program, so
+        # we should stop.
+        log.error(
+            "add_verified_program_course_enrollment: user %s enrolling in %s has no verified enrollment in %s",
+            request.user,
+            courserun_id,
+            root_program,
+        )
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
+    # If we fell out the bottom, we have all verified enrollments, or we've made
+    # sufficient enrollments to fill the gaps.
+
+    # If we have >1 program, we need to pass in the enrollment for the program
+    # the course belongs to, or the call to create the course run enrollment will fail.
+
+    course_program = (
+        programs[0]
+        if programs[0]
+        .courses_qset.filter(courseruns__courseware_id=courserun_id)
+        .exists()
+        else programs[1]
+    )
+    try:
+        program_enrollment = ProgramEnrollment.objects.get(
+            user=request.user, program=course_program
+        )
+    except ProgramEnrollment.DoesNotExist as exc:
+        raise EnrollmentCreationFailedError from exc
+
+    return _create_course_enrollment_from_program(
+        request, courserun_id, program_enrollment
     )
 
 

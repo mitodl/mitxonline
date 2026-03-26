@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.143.1"
+VERSION = "1.143.2"
 
 log = logging.getLogger()
 
@@ -973,6 +973,18 @@ KEYCLOAK_ORG_SYNC_OFFSET = get_int(
     description="Offset for the Keycloak org sync",
 )
 
+B2B_GSHEETS_UPDATE_FREQUENCY = get_int(
+    name="B2B_GSHEETS_UPDATE_FREQUENCY",
+    default=3600,
+    description="How many seconds to wait between updating the enrollment code Google Sheets for B2B contracts",
+)
+
+B2B_GSHEETS_UPDATE_OFFSET = get_int(
+    name="B2B_GSHEETS_UPDATE_OFFSET",
+    default=int(B2B_GSHEETS_UPDATE_FREQUENCY / 2),
+    description="Offset for the B2B enrollment code sheet updates",
+)
+
 CELERY_BEAT_SCHEDULE = {
     "retry-failed-edx-enrollments": {
         "task": "openedx.tasks.retry_failed_edx_enrollments",
@@ -1030,6 +1042,13 @@ CELERY_BEAT_SCHEDULE = {
     "clear-expired-tokens": {
         "task": "main.tasks.run_clear_tokens",
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week
+    },
+    "update-b2b-enrollment-code-sheets": {
+        "task": "b2b.tasks.queue_update_all_contract_enrollment_sheets",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=B2B_GSHEETS_UPDATE_FREQUENCY),
+            offset=timedelta(seconds=B2B_GSHEETS_UPDATE_OFFSET),
+        ),
     },
 }
 

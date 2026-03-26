@@ -296,7 +296,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         null=True,
     )
     departments = models.ManyToManyField(
-        Department, blank=False, related_name="programs"
+        Department, blank=True, related_name="programs"
     )
     availability = models.CharField(
         choices=AVAILABILITY_CHOICES, default=AVAILABILITY_ANYTIME, max_length=255
@@ -727,6 +727,26 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """
         return self._courses_with_requirements_data["elective_courses"]
 
+    @cached_property
+    def program_nodes(self):
+        """
+        Returns the programs that are associated with this program via the
+        requirements tree.
+
+        Returns:
+        - list of Program: programs that are electives
+        """
+        return [
+            req.required_program
+            for req in ProgramRequirement.objects.filter(
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                program=self,
+                required_program__isnull=False,
+            )
+            .select_related("required_program")
+            .all()
+        ]
+
     @property
     def required_programs(self):
         """
@@ -918,9 +938,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False, db_index=True)
-    departments = models.ManyToManyField(
-        Department, blank=False, related_name="courses"
-    )
+    departments = models.ManyToManyField(Department, blank=True, related_name="courses")
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",
