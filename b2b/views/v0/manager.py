@@ -31,17 +31,6 @@ from b2b.serializers.v0.manager import (
 from courses.models import CourseRun, CourseRunEnrollment
 
 
-@extend_schema(
-    parameters=[
-        OpenApiParameter(
-            name="id",
-            type=int,
-            location=OpenApiParameter.PATH,
-            description="ID of the organization",
-            required=False,
-        ),
-    ]
-)
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
     """List organizations available for the current user."""
 
@@ -50,10 +39,41 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter to organizations where the user is a manager."""
-        return OrganizationPage.objects.filter(
-            organization_users__user=self.request.user,
-            organization_users__is_manager=True,
-        ).distinct()
+        return (
+            OrganizationPage.objects.distinct()
+            if self.request.user and self.request.user.is_superuser
+            else OrganizationPage.objects.filter(
+                organization_users__user=self.request.user,
+                organization_users__is_manager=True,
+            ).distinct()
+        )
+
+    @extend_schema(
+        operation_id="b2b_manager_organizations_list",
+        description="List managed organizations",
+    )
+    def list(self, request, *args, **kwargs):
+        """List the orgs."""
+
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        operation_id="b2b_manager_organizations_detail",
+        description="Retrieve managed organizations",
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="ID of the organization",
+                required=True,
+            ),
+        ],
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve an org."""
+
+        return super().retrieve(request, *args, **kwargs)
 
 
 @extend_schema(

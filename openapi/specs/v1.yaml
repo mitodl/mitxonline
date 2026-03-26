@@ -196,14 +196,7 @@ paths:
   /api/v0/b2b/manager/organizations/:
     get:
       operationId: b2b_manager_organizations_list
-      description: List organizations available for the current user.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: ID of the organization
-        required: true
+      description: List managed organizations
       tags:
       - b2b
       responses:
@@ -362,8 +355,8 @@ paths:
           description: ''
   /api/v0/b2b/manager/organizations/{id}/:
     get:
-      operationId: b2b_manager_organizations_retrieve
-      description: List organizations available for the current user.
+      operationId: b2b_manager_organizations_detail
+      description: Retrieve managed organizations
       parameters:
       - in: path
         name: id
