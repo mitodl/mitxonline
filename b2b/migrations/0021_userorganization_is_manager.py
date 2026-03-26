@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("b2b", "0019_backfill_org_key_prefixes"),
+        ("b2b", "0020_add_google_sheets_fields"),
     ]
 
     operations = [
@@ -14,6 +14,8 @@ class Migration(migrations.Migration):
             name="is_manager",
             field=models.BooleanField(
                 default=False,
+                null=True,
+                blank=True,
                 help_text="If True, the user is a manager of this organization and can access organization dashboard features.",
             ),
         ),

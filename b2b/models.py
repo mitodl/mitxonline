@@ -611,6 +611,8 @@ class UserOrganization(models.Model):
     )
     is_manager = models.BooleanField(
         default=False,
+        null=True,
+        blank=True,
         help_text="If True, the user is a manager of this organization and can access organization dashboard features.",
     )
 
