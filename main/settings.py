@@ -273,6 +273,7 @@ INSTALLED_APPS = (
     "micromasters_import",
     # ol-django apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
+    "mitol.observability.apps.ObservabilityConfig",
     "mitol.google_sheets.apps.GoogleSheetsApp",
     "mitol.google_sheets_refunds.apps.GoogleSheetsRefundsApp",
     "mitol.google_sheets_deferrals.apps.GoogleSheetsDeferralsApp",
@@ -694,49 +695,26 @@ DJANGO_LOG_LEVEL = get_string(
     name="DJANGO_LOG_LEVEL", default="INFO", description="The log level for django"
 )
 
+# mitol-django-observability reads LOG_LEVEL directly from os.environ; bridge the
+# legacy MITX_ONLINE_LOG_LEVEL env var so operators don't silently lose log control.
+os.environ.setdefault("LOG_LEVEL", LOG_LEVEL)
+
 HOSTNAME = platform.node().split(".")[0]
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
-    "formatters": {
-        "verbose": {
-            "format": (
-                "[%(asctime)s] %(levelname)s %(process)d [%(name)s] "
-                "%(filename)s:%(lineno)d - "
-                f"[{HOSTNAME}] - %(message)s"
-            ),
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        }
-    },
-    "handlers": {
-        "console": {
-            "level": "DEBUG",
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "mail_admins": {
-            "level": "ERROR",
-            "filters": ["require_debug_false"],
-            "class": "django.utils.log.AdminEmailHandler",
-        },
-    },
-    "loggers": {
-        "django": {
-            "propagate": True,
-            "level": DJANGO_LOG_LEVEL,
-            "handlers": ["console"],
-        },
-        "django.request": {
-            "handlers": ["mail_admins"],
-            "level": DJANGO_LOG_LEVEL,
-            "propagate": True,
-        },
-        "zeal": {"handlers": ["console"], "level": "ERROR"},
-    },
-    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+# LOGGING is provided by mitol-django-observability (structlog-based, JSON in prod)
+from mitol.observability.settings.logging import LOGGING  # noqa: E402
+
+# Restore the AdminEmailHandler so Django still emails ADMINS on unhandled 500
+# errors in production (i.e. when DEBUG=False). Sentry captures errors too, but
+# this provides an independent email-based safety net.
+LOGGING.setdefault("filters", {})
+LOGGING["filters"]["require_debug_false"] = {"()": "django.utils.log.RequireDebugFalse"}
+LOGGING["handlers"]["mail_admins"] = {
+    "level": "ERROR",
+    "filters": ["require_debug_false"],
+    "class": "django.utils.log.AdminEmailHandler",
 }
+LOGGING["loggers"]["django.request"]["handlers"].append("mail_admins")
 
 # server-status
 STATUS_TOKEN = get_string(
