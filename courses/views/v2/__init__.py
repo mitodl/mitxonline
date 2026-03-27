@@ -739,6 +739,7 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
 
 @extend_schema(
     operation_id="v2_program_enrollments_create_standalone",
+    request=serializers.Serializer(),  # Simple serializer for program_id input
     responses={status.HTTP_201_CREATED: ProgramEnrollmentSerializer},
 )
 @api_view(["POST"])
