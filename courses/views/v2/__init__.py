@@ -935,7 +935,7 @@ def get_program_certificate(request, cert_uuid):
     )
 
 
-class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
+class UserProgramEnrollmentsViewSet(mixins.CreateModelMixin, viewsets.ViewSet):
     """ViewSet for user program enrollments with v2 serializers."""
 
     permission_classes = [IsAuthenticated]
@@ -947,6 +947,14 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         description="Program ID",
         required=True,
     )
+
+    @extend_schema(
+        operation_id="user_program_enrollments_create_v2",
+        description="Create a new user program enrollment - API v2",
+    )
+    def create(self, request, *args, **kwargs):
+        """Create a program enrollment."""
+        return super().create(request, *args, **kwargs)
 
     @extend_schema(
         operation_id="v2_program_enrollments_list",

@@ -22,6 +22,7 @@ import {
   programsQueryKey
 } from "../lib/queries/courseRuns"
 import {
+  programEnrollmentQuery,
   programEnrollmentsQuery,
   programEnrollmentsQueryKey,
   programEnrollmentsSelector
@@ -37,6 +38,7 @@ import users, { currentUserSelector } from "../lib/queries/users"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import ProgramInfoBox from "./ProgramInfoBox"
 import type { ProgramEnrollment, Program } from "../flow/courseTypes"
+import {applyCartMutation} from "../lib/queries/cart";
 
 type Props = {
   programId: ?string,
@@ -48,6 +50,7 @@ type Props = {
   programStatus: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
+  createProgramEnrollment: (programId: number) => Promise<any>,
   currentUser: User,
   updateAddlFields: (currentUser: User) => Promise<any>,
   programEnrollments: ?Array<ProgramEnrollment>,
@@ -130,12 +133,19 @@ export class ProgramProductDetailEnroll extends React.Component<
     }
   }
 
-  toggleUpgradeDialogVisibility = () => {
+  toggleUpgradeDialogVisibility = async () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
+    const { programId, createProgramEnrollment } = this.props
 
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
     })
+    try {
+      await createProgramEnrollment(programId)
+    } catch (error) {
+      console.error("Failed to create program enrollment", error)
+      // Optionally, display an error message to the user.
+    }
   }
 
   setCurrentCourseRun = (runId: string) => {
@@ -470,6 +480,11 @@ const updateAddlFields = (currentUser: User) => {
   return mutateAsync(users.editProfileMutation(updatedUser))
 }
 
+const createProgramEnrollment = (programId: number) => {
+
+  return mutateAsync(programEnrollmentQuery(programId))
+}
+
 const mapStateToProps = createStructuredSelector({
   courseRuns:                courseRunsSelector,
   programs:                  programsSelector,
@@ -495,7 +510,8 @@ const mapPropsToConfig = props => [
 ]
 
 const mapDispatchToProps = {
-  updateAddlFields
+  updateAddlFields,
+  createProgramEnrollment
 }
 
 export default compose(
