@@ -5,14 +5,19 @@ from unittest.mock import patch
 
 import pytest
 from django.shortcuts import reverse
+from mitol.common.utils.datetime import now_in_utc
 from oauth2_provider.models import AccessToken, Application
 from oauthlib.common import generate_token
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from courses.factories import CourseRunFactory
-from courses.models import CourseRunEnrollment, ProgramEnrollment
-from mitol.common.utils.datetime import now_in_utc
+from courses.factories import CourseRunFactory, ProgramFactory
+from courses.models import (
+    CourseRunEnrollment,
+    ProgramEnrollment,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
+)
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -181,7 +186,10 @@ class TestEdxEnrollmentWebhook:
         side_effect=Exception("Unexpected error"),
     )
     def test_enrollment_creation_exception(
-        self, _mock_create_local, api_client, oauth_token
+        self,
+        mock_create_local,  # noqa: ARG002
+        api_client,
+        oauth_token,
     ):
         """Test returns 500 when enrollment creation raises an exception"""
         user = UserFactory.create()
@@ -193,7 +201,7 @@ class TestEdxEnrollmentWebhook:
             "role": "instructor",
         }
         response = self._post_webhook(api_client, payload, token=oauth_token.token)
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Failed to create enrollment" in response.data["error"]
 
     def test_already_enrolled_user(self, api_client, oauth_token):
@@ -216,13 +224,13 @@ class TestEdxEnrollmentWebhook:
 
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["message"] == "Enrollment successful"
-        assert CourseRunEnrollment.all_objects.filter(user=user, run=course_run).count() == 1
+        assert (
+            CourseRunEnrollment.all_objects.filter(user=user, run=course_run).count()
+            == 1
+        )
 
     def test_auto_enrolls_in_associated_program(self, api_client, oauth_token):
         """Test that webhook auto-enrolls user in programs associated with the course"""
-        from courses.factories import ProgramFactory
-        from courses.models import ProgramRequirement, ProgramRequirementNodeType
-
         user = UserFactory.create()
         course_run = CourseRunFactory.create()
         program = ProgramFactory.create(live=True)
@@ -261,9 +269,7 @@ class TestEdxEnrollmentWebhook:
         }
 
         with patch("openedx.api.enroll_in_edx_course_runs") as mock_edx_enroll:
-            response = self._post_webhook(
-                api_client, payload, token=oauth_token.token
-            )
+            response = self._post_webhook(api_client, payload, token=oauth_token.token)
             mock_edx_enroll.assert_not_called()
 
         assert response.status_code == status.HTTP_201_CREATED

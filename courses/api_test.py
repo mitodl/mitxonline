@@ -270,7 +270,8 @@ def test_create_local_enrollment_sets_edx_enrolled(user):
 
 
 def test_create_local_enrollment_enrolls_in_programs(
-    user, program_with_empty_requirements  # noqa: F811
+    user,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     create_local_enrollment should auto-enroll the user in associated programs.
@@ -286,7 +287,8 @@ def test_create_local_enrollment_enrolls_in_programs(
 
 
 def test_enroll_in_associated_programs_creates_enrollment(
-    user, program_with_empty_requirements  # noqa: F811
+    user,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     _enroll_in_associated_programs should create ProgramEnrollments for
@@ -326,7 +328,8 @@ def test_enroll_in_associated_programs_skips_non_live(user):
 
 
 def test_enroll_in_associated_programs_reactivates(
-    user, program_with_empty_requirements  # noqa: F811
+    user,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     _enroll_in_associated_programs should reactivate an existing program enrollment

@@ -70,7 +70,7 @@ def edx_enrollment_webhook(request):
             role,
         )
         return Response(
-            {"error": f"User not found"},
+            {"error": "User not found"},
             status=status.HTTP_404_NOT_FOUND,
         )
 
