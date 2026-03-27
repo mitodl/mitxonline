@@ -192,7 +192,7 @@ export const programEnrollmentQuery = (programId: number) => ({
   url:       `/api/v1/program_enrollments/`,
   body: {
     programId:   `${programId}`,
-    isapi: true
+    isapi:        true
   },
   options: {
     ...getCsrfOptions(),

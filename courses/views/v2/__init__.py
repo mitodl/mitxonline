@@ -935,7 +935,7 @@ def get_program_certificate(request, cert_uuid):
     )
 
 
-class UserProgramEnrollmentsViewSet(mixins.CreateModelMixin, viewsets.ViewSet):
+class UserProgramEnrollmentsViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     """ViewSet for user program enrollments with v2 serializers."""
 
     permission_classes = [IsAuthenticated]

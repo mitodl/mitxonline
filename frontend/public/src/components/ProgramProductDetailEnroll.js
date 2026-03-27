@@ -38,7 +38,6 @@ import users, { currentUserSelector } from "../lib/queries/users"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import ProgramInfoBox from "./ProgramInfoBox"
 import type { ProgramEnrollment, Program } from "../flow/courseTypes"
-import {applyCartMutation} from "../lib/queries/cart";
 
 type Props = {
   programId: ?string,
@@ -480,10 +479,8 @@ const updateAddlFields = (currentUser: User) => {
   return mutateAsync(users.editProfileMutation(updatedUser))
 }
 
-const createProgramEnrollment = (programId: number) => {
-
-  return mutateAsync(programEnrollmentQuery(programId))
-}
+const createProgramEnrollment = (programId: number) =>
+  mutateAsync(programEnrollmentQuery(programId))
 
 const mapStateToProps = createStructuredSelector({
   courseRuns:                courseRunsSelector,
