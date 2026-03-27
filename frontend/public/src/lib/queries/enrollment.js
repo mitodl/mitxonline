@@ -189,10 +189,10 @@ export const enrollmentMutation = (runId: number) => ({
 })
 
 export const programEnrollmentQuery = (programId: number) => ({
-  url:       `/api/v1/program_enrollments/`,
+  url:  `/api/v1/program_enrollments/`,
   body: {
-    programId:   `${programId}`,
-    isapi:        true
+    programId: `${programId}`,
+    isapi:     true
   },
   options: {
     ...getCsrfOptions(),
