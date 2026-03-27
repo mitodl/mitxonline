@@ -6533,6 +6533,10 @@ components:
         live:
           type: boolean
           readOnly: true
+        include_in_learn_catalog:
+          type: boolean
+          nullable: true
+          description: If true, Learn should include this in its catalog.
         length:
           type: string
           description: A short description indicating how long it takes to complete

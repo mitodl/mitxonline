@@ -440,7 +440,7 @@ def create_default_courseware_page(
         "include_in_learn_catalog": include_in_learn_catalog,
         "ingest_content_files_for_ai": ingest_content_files_for_ai,
     }
-    program_only_kwargs = {}
+    program_only_kwargs = {"include_in_learn_catalog": include_in_learn_catalog}
 
     if optional_kwargs is None:
         optional_kwargs = {}

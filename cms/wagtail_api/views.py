@@ -80,7 +80,10 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
 
         if model_type and not self.request.user.is_authenticated:
             if model_type == PageType.PROGRAM.value:
-                queryset = queryset.filter(program__b2b_only=False)
+                queryset = queryset.filter(
+                    program__b2b_only=False,
+                    include_in_learn_catalog=True,
+                )
             elif model_type == PageType.COURSE.value:
                 queryset = queryset.filter(include_in_learn_catalog=True)
 

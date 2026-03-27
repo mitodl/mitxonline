@@ -1470,6 +1470,11 @@ class ProgramPage(ProductPage):
         blank=True,
         null=True,
     )
+    include_in_learn_catalog = models.BooleanField(
+        default=False,
+        null=True,
+        help_text="If true, Learn should include this in its catalog.",
+    )
 
     template = "product_page.html"
     search_fields = Page.search_fields + [  # noqa: RUF005
@@ -1480,12 +1485,17 @@ class ProgramPage(ProductPage):
             ],
         )
     ]
-    content_panels = [  # noqa: RUF005
-        FieldPanel("program"),
-    ] + ProductPage.content_panels
+    content_panels = (
+        [  # noqa: RUF005
+            FieldPanel("program"),
+        ]
+        + ProductPage.content_panels
+        + [FieldPanel("include_in_learn_catalog")]
+    )
     api_fields = [
         *ProductPage.api_fields,
         APIField("program_details"),
+        APIField("include_in_learn_catalog"),
     ]
 
     @property
