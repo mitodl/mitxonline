@@ -1,19 +1,23 @@
 """Test openedx views"""
 
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
 from django.shortcuts import reverse
+from oauth2_provider.models import AccessToken, Application
+from oauthlib.common import generate_token
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
+from courses.factories import CourseRunFactory
+from courses.models import CourseRunEnrollment, ProgramEnrollment
+from mitol.common.utils.datetime import now_in_utc
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
 WEBHOOK_URL = "openedx-enrollment-webhook"
-TEST_WEBHOOK_KEY = "test-webhook-secret-key"
 
 
 @pytest.mark.parametrize(
@@ -38,6 +42,37 @@ class TestEdxEnrollmentWebhook:
         return APIClient()
 
     @pytest.fixture
+    def oauth_application(self):
+        """Create an OAuth2 application"""
+        return Application.objects.create(
+            name="edx-oauth-app",
+            client_type=Application.CLIENT_CONFIDENTIAL,
+            authorization_grant_type=Application.GRANT_CLIENT_CREDENTIALS,
+        )
+
+    @pytest.fixture
+    def oauth_token(self, oauth_application):
+        """Create a valid OAuth2 access token"""
+        user = UserFactory.create(is_staff=True)
+        return AccessToken.objects.create(
+            user=user,
+            application=oauth_application,
+            token=generate_token(),
+            expires=now_in_utc() + timedelta(hours=1),
+        )
+
+    @pytest.fixture
+    def expired_oauth_token(self, oauth_application):
+        """Create an expired OAuth2 access token"""
+        user = UserFactory.create(is_staff=True)
+        return AccessToken.objects.create(
+            user=user,
+            application=oauth_application,
+            token=generate_token(),
+            expires=now_in_utc() - timedelta(hours=1),
+        )
+
+    @pytest.fixture
     def webhook_payload(self):
         """Standard webhook payload"""
         return {
@@ -46,8 +81,8 @@ class TestEdxEnrollmentWebhook:
             "role": "instructor",
         }
 
-    def _post_webhook(self, api_client, payload, token=TEST_WEBHOOK_KEY):
-        """Helper to POST to the webhook with Bearer auth"""
+    def _post_webhook(self, api_client, payload, token=None):
+        """Helper to POST to the webhook with OAuth2 Bearer auth"""
         headers = {}
         if token is not None:
             headers["HTTP_AUTHORIZATION"] = f"Bearer {token}"
@@ -59,36 +94,29 @@ class TestEdxEnrollmentWebhook:
         )
 
     @pytest.mark.parametrize("role", ["instructor", "staff"])
-    @patch("openedx.views.create_run_enrollments")
-    def test_successful_enrollment(
-        self, mock_create_enrollments, api_client, role, settings
-    ):
+    def test_successful_enrollment(self, api_client, oauth_token, role):
         """Test successful enrollment of a user as auditor via webhook"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
         user = UserFactory.create()
         course_run = CourseRunFactory.create()
-        enrollment = CourseRunEnrollmentFactory.create(user=user, run=course_run)
-        mock_create_enrollments.return_value = ([enrollment], True)
 
         payload = {
             "email": user.email,
             "course_id": course_run.courseware_id,
             "role": role,
         }
-        response = self._post_webhook(api_client, payload)
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_201_CREATED
         assert response.data["message"] == "Enrollment successful"
-        assert response.data["enrollment_id"] == enrollment.id
-        mock_create_enrollments.assert_called_once_with(
-            user,
-            [course_run],
-            keep_failed_enrollments=True,
-        )
+        assert response.data["edx_enrolled"] is True
 
-    def test_missing_authorization_header(self, api_client, webhook_payload, settings):
+        enrollment = CourseRunEnrollment.all_objects.get(user=user, run=course_run)
+        assert enrollment.active is True
+        assert enrollment.edx_enrolled is True
+        assert enrollment.enrollment_mode == "audit"
+
+    def test_missing_authorization_header(self, api_client, webhook_payload):
         """Test request without Authorization header returns 401"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
         response = api_client.post(
             reverse(WEBHOOK_URL),
             data=webhook_payload,
@@ -96,128 +124,154 @@ class TestEdxEnrollmentWebhook:
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_invalid_auth_scheme(self, api_client, webhook_payload, settings):
-        """Test request with non-Bearer auth scheme returns 401"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
-        response = api_client.post(
-            reverse(WEBHOOK_URL),
-            data=webhook_payload,
-            format="json",
-            HTTP_AUTHORIZATION="Basic dXNlcjpwYXNz",
+    def test_invalid_token(self, api_client, webhook_payload):
+        """Test request with invalid Bearer token returns 401"""
+        response = self._post_webhook(
+            api_client,
+            webhook_payload,
+            token="invalid-token",  # noqa: S106
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_wrong_token(self, api_client, webhook_payload, settings):
-        """Test request with wrong Bearer token returns 403"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
-        response = self._post_webhook(api_client, webhook_payload, token="wrong-token")  # noqa: S106
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+    def test_expired_token(self, api_client, webhook_payload, expired_oauth_token):
+        """Test request with expired OAuth2 token returns 401"""
+        response = self._post_webhook(
+            api_client, webhook_payload, token=expired_oauth_token.token
+        )
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_webhook_key_not_configured(self, api_client, webhook_payload, settings):
-        """Test returns 500 when OPENEDX_WEBHOOK_KEY is not set"""
-        settings.OPENEDX_WEBHOOK_KEY = None
-        response = self._post_webhook(api_client, webhook_payload)
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert "not configured" in response.data["error"]
-
-    def test_missing_email(self, api_client, settings):
+    def test_missing_email(self, api_client, oauth_token):
         """Test request missing email returns 400"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
         payload = {"course_id": "course-v1:MITx+1.001x+2025_T1", "role": "staff"}
-        response = self._post_webhook(api_client, payload)
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_missing_course_id(self, api_client, settings):
+    def test_missing_course_id(self, api_client, oauth_token):
         """Test request missing course_id returns 400"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
         payload = {"email": "instructor@example.com", "role": "staff"}
-        response = self._post_webhook(api_client, payload)
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_user_not_found(self, api_client, settings):
+    def test_user_not_found(self, api_client, oauth_token):
         """Test returns 404 when the user email doesn't exist"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
         course_run = CourseRunFactory.create()
         payload = {
             "email": "nonexistent@example.com",
             "course_id": course_run.courseware_id,
             "role": "instructor",
         }
-        response = self._post_webhook(api_client, payload)
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.data["error"]
 
-    def test_course_run_not_found(self, api_client, settings):
+    def test_course_run_not_found(self, api_client, oauth_token):
         """Test returns 404 when the course run doesn't exist"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
         user = UserFactory.create()
         payload = {
             "email": user.email,
             "course_id": "course-v1:MITx+NONEXISTENT+2025_T1",
             "role": "instructor",
         }
-        response = self._post_webhook(api_client, payload)
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.data["error"]
 
-    @patch("openedx.views.create_run_enrollments")
+    @patch(
+        "openedx.views.create_local_enrollment",
+        side_effect=Exception("Unexpected error"),
+    )
     def test_enrollment_creation_exception(
-        self, mock_create_enrollments, api_client, settings
+        self, _mock_create_local, api_client, oauth_token
     ):
         """Test returns 500 when enrollment creation raises an exception"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
         user = UserFactory.create()
         course_run = CourseRunFactory.create()
-        mock_create_enrollments.side_effect = Exception("Unexpected error")
 
         payload = {
             "email": user.email,
             "course_id": course_run.courseware_id,
             "role": "instructor",
         }
-        response = self._post_webhook(api_client, payload)
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "Failed to create enrollment" in response.data["error"]
 
-    @patch("openedx.views.create_run_enrollments")
-    def test_enrollment_returns_empty(
-        self, mock_create_enrollments, api_client, settings
-    ):
-        """Test returns 500 when enrollment creation returns empty list"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
-        user = UserFactory.create()
-        course_run = CourseRunFactory.create()
-        mock_create_enrollments.return_value = ([], True)
-
-        payload = {
-            "email": user.email,
-            "course_id": course_run.courseware_id,
-            "role": "instructor",
-        }
-        response = self._post_webhook(api_client, payload)
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
-    @patch("openedx.views.create_run_enrollments")
-    def test_already_enrolled_user(self, mock_create_enrollments, api_client, settings):
+    def test_already_enrolled_user(self, api_client, oauth_token):
         """Test that webhook succeeds for an already-enrolled user (idempotent)"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
         user = UserFactory.create()
         course_run = CourseRunFactory.create()
-        enrollment = CourseRunEnrollmentFactory.create(user=user, run=course_run)
-        mock_create_enrollments.return_value = ([enrollment], True)
+        CourseRunEnrollment.all_objects.create(
+            user=user,
+            run=course_run,
+            edx_enrolled=True,
+            enrollment_mode="audit",
+        )
 
         payload = {
             "email": user.email,
             "course_id": course_run.courseware_id,
             "role": "instructor",
         }
-        response = self._post_webhook(api_client, payload)
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_201_CREATED
         assert response.data["message"] == "Enrollment successful"
+        assert CourseRunEnrollment.all_objects.filter(user=user, run=course_run).count() == 1
 
-    def test_get_method_not_allowed(self, api_client, settings):
+    def test_auto_enrolls_in_associated_program(self, api_client, oauth_token):
+        """Test that webhook auto-enrolls user in programs associated with the course"""
+        from courses.factories import ProgramFactory
+        from courses.models import ProgramRequirement, ProgramRequirementNodeType
+
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+        program = ProgramFactory.create(live=True)
+
+        # Build proper tree structure for program requirements
+        root_node = program.requirements_root
+        operator_node = root_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.ALL_OF,
+            title="Required Courses",
+        )
+        operator_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE,
+            course=course_run.course,
+        )
+
+        payload = {
+            "email": user.email,
+            "course_id": course_run.courseware_id,
+            "role": "instructor",
+        }
+        response = self._post_webhook(api_client, payload, token=oauth_token.token)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert ProgramEnrollment.objects.filter(user=user, program=program).exists()
+
+    def test_no_edx_api_call(self, api_client, oauth_token):
+        """Test that the webhook does NOT call back to edX API"""
+        user = UserFactory.create()
+        course_run = CourseRunFactory.create()
+
+        payload = {
+            "email": user.email,
+            "course_id": course_run.courseware_id,
+            "role": "instructor",
+        }
+
+        with patch("openedx.api.enroll_in_edx_course_runs") as mock_edx_enroll:
+            response = self._post_webhook(
+                api_client, payload, token=oauth_token.token
+            )
+            mock_edx_enroll.assert_not_called()
+
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_get_method_not_allowed(self, api_client, oauth_token):
         """Test that GET requests are rejected"""
-        settings.OPENEDX_WEBHOOK_KEY = TEST_WEBHOOK_KEY
-        response = api_client.get(reverse(WEBHOOK_URL))
+        response = api_client.get(
+            reverse(WEBHOOK_URL),
+            HTTP_AUTHORIZATION=f"Bearer {oauth_token.token}",
+        )
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED

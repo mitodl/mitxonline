@@ -133,6 +133,66 @@ def get_user_relevant_program_course_run_qset(
     return enrollable_run_qset.order_by("enrollment_start")
 
 
+def _enroll_in_associated_programs(user, run):
+    """
+    Enrolls the user into all live programs for which the given course run's
+    course is a requirement or elective.  Reactivates existing program
+    enrollments whose change_status is not None.
+
+    Args:
+        user (User): The user to enroll
+        run (CourseRun): The course run whose course's programs to enroll in
+    """
+    for program in run.course.programs:
+        if not program.live:
+            continue
+        program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
+            user=user,
+            program=program,
+            defaults={"change_status": None},
+        )
+        if program_enrollment.change_status is not None:
+            program_enrollment.reactivate_and_save()
+
+
+def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
+    """
+    Creates a local-only CourseRunEnrollment record without calling the edX API.
+    Reactivates the enrollment if it already exists but is inactive, and ensures
+    edx_enrolled is set to True.  Also auto-enrolls the user in any associated
+    programs.
+
+    This is intended for cases where the user is already enrolled in edX (e.g.
+    via a webhook notification) and we only need to mirror that state locally.
+
+    Args:
+        user (User): The user to enroll
+        run (CourseRun): The course run to enroll in
+        mode (str): The enrollment mode (default: audit)
+
+    Returns:
+        (CourseRunEnrollment, bool): The enrollment object and whether it was newly created
+    """
+    enrollment, created = CourseRunEnrollment.all_objects.get_or_create(
+        user=user,
+        run=run,
+        defaults={
+            "change_status": None,
+            "edx_enrolled": True,
+            "enrollment_mode": mode,
+        },
+    )
+    if not created and not enrollment.active:
+        enrollment.reactivate_and_save()
+    if not enrollment.edx_enrolled:
+        enrollment.edx_enrolled = True
+        enrollment.save_and_log(None)
+
+    _enroll_in_associated_programs(user, run)
+
+    return enrollment, created
+
+
 def create_run_enrollments(  # noqa: C901
     user,
     runs,

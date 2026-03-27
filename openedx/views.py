@@ -2,15 +2,19 @@
 
 import logging
 
-from django.conf import settings
 from django.http import HttpResponse
 from drf_spectacular.utils import extend_schema
+from oauth2_provider.contrib.rest_framework import OAuth2Authentication
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from courses.api import create_run_enrollments
+from courses.api import create_local_enrollment
 from courses.models import CourseRun
 from users.models import User
 
@@ -25,14 +29,17 @@ def openedx_private_auth_complete(request):  # noqa: ARG001
 
 @extend_schema(exclude=True)
 @api_view(["POST"])
-@permission_classes([AllowAny])
-def edx_enrollment_webhook(request):  # noqa: PLR0911, C901
+@authentication_classes([OAuth2Authentication])
+@permission_classes([IsAuthenticated])
+def edx_enrollment_webhook(request):
     """
     Webhook endpoint that receives enrollment notifications from Open edX.
 
     When a user needs to be enrolled in a course (e.g., staff/instructor role added),
     the Open edX plugin POSTs to this endpoint so MITx Online can enroll them as an
     auditor in the corresponding course run.
+
+    Authentication: OAuth2 Bearer token (Django OAuth Toolkit access token).
 
     Expected payload:
         {
@@ -41,29 +48,6 @@ def edx_enrollment_webhook(request):  # noqa: PLR0911, C901
             "role": "instructor"
         }
     """
-    # --- Authenticate via Bearer token ---
-    webhook_key = getattr(settings, "OPENEDX_WEBHOOK_KEY", None)
-    if not webhook_key:
-        log.error("OPENEDX_WEBHOOK_KEY is not configured")
-        return Response(
-            {"error": "Webhook is not configured"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-
-    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
-    if not auth_header.startswith("Bearer "):
-        return Response(
-            {"error": "Missing or invalid Authorization header"},
-            status=status.HTTP_401_UNAUTHORIZED,
-        )
-
-    token = auth_header[len("Bearer ") :]
-    if token != webhook_key:
-        return Response(
-            {"error": "Invalid webhook token"},
-            status=status.HTTP_403_FORBIDDEN,
-        )
-
     # --- Validate payload ---
     email = request.data.get("email")
     course_id = request.data.get("course_id")
@@ -77,7 +61,7 @@ def edx_enrollment_webhook(request):  # noqa: PLR0911, C901
 
     # --- Look up user ---
     try:
-        user = User.objects.get(email=email)
+        user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
         log.warning(
             "Webhook: No user found with email %s for course %s (role: %s)",
@@ -86,19 +70,8 @@ def edx_enrollment_webhook(request):  # noqa: PLR0911, C901
             role,
         )
         return Response(
-            {"error": f"User with email {email} not found"},
+            {"error": f"User not found"},
             status=status.HTTP_404_NOT_FOUND,
-        )
-    except User.MultipleObjectsReturned:
-        log.warning(
-            "Webhook: Multiple users found with email %s for course %s (role: %s)",
-            email,
-            course_id,
-            role,
-        )
-        return Response(
-            {"error": f"Multiple users found with email {email}"},
-            status=status.HTTP_409_CONFLICT,
         )
 
     # --- Look up course run ---
@@ -116,13 +89,9 @@ def edx_enrollment_webhook(request):  # noqa: PLR0911, C901
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    # --- Enroll user as auditor ---
+    # --- Create local enrollment ---
     try:
-        enrollments, edx_request_success = create_run_enrollments(
-            user,
-            [course_run],
-            keep_failed_enrollments=True,
-        )
+        enrollment, created = create_local_enrollment(user, course_run)
     except Exception:
         log.exception(
             "Webhook: Error creating enrollment for user %s in course run %s",
@@ -131,41 +100,22 @@ def edx_enrollment_webhook(request):  # noqa: PLR0911, C901
         )
         return Response(
             {"error": "Failed to create enrollment"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if enrollments:
-        enrollment = enrollments[0]
-        if not edx_request_success:
-            log.warning(
-                "Webhook: Local enrollment created but edX API call failed for user %s in course run %s",
-                email,
-                course_id,
-            )
-        log.info(
-            "Webhook: Successfully enrolled user %s in course run %s as auditor (role: %s, active: %s, edx_synced: %s)",
-            email,
-            course_id,
-            role,
-            enrollment.active,
-            edx_request_success,
-        )
-        return Response(
-            {
-                "message": "Enrollment successful",
-                "enrollment_id": enrollment.id,
-                "active": enrollment.active,
-                "edx_enrolled": enrollment.edx_enrolled,
-            },
-            status=status.HTTP_200_OK,
-        )
-    else:
-        log.error(
-            "Webhook: Enrollment creation returned empty for user %s in course run %s",
-            email,
-            course_id,
-        )
-        return Response(
-            {"error": "Enrollment creation failed"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+    log.info(
+        "Webhook: Successfully enrolled user %s in course run %s as auditor (role: %s, created: %s)",
+        email,
+        course_id,
+        role,
+        created,
+    )
+    return Response(
+        {
+            "message": "Enrollment successful",
+            "enrollment_id": enrollment.id,
+            "active": enrollment.active,
+            "edx_enrolled": enrollment.edx_enrolled,
+        },
+        status=status.HTTP_201_CREATED,
+    )

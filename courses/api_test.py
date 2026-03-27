@@ -33,7 +33,9 @@ from b2b.factories import (
 )
 from cms.factories import CourseIndexPageFactory
 from courses.api import (
+    _enroll_in_associated_programs,
     check_course_modes,
+    create_local_enrollment,
     create_program_enrollments,
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -184,6 +186,193 @@ def _mock_edx_course_detail(coursekey, settings):
         "overview": "<h2>About This Course</h2>\n   <p>Include your long course description here. The long course description should contain 150-400 words.</p>\n",
         "pacing": "self",
     }
+
+
+@pytest.mark.parametrize(
+    "enrollment_mode", [EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
+)
+def test_create_local_enrollment_new(user, enrollment_mode):
+    """
+    create_local_enrollment should create a new CourseRunEnrollment with edx_enrolled=True
+    and the specified mode, without calling the edX API.
+    """
+    run = CourseRunFactory.create()
+
+    enrollment, created = create_local_enrollment(user, run, mode=enrollment_mode)
+
+    assert created is True
+    assert enrollment.user == user
+    assert enrollment.run == run
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
+    assert enrollment.enrollment_mode == enrollment_mode
+    assert enrollment.change_status is None
+
+
+def test_create_local_enrollment_reactivates_inactive(user):
+    """
+    create_local_enrollment should reactivate an existing inactive enrollment.
+    """
+    run = CourseRunFactory.create()
+    existing = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        active=False,
+        edx_enrolled=False,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+    )
+
+    enrollment, created = create_local_enrollment(user, run)
+
+    assert created is False
+    assert enrollment.id == existing.id
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
+
+
+def test_create_local_enrollment_idempotent(user):
+    """
+    create_local_enrollment should be idempotent for already-active enrollments.
+    """
+    run = CourseRunFactory.create()
+    existing = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        active=True,
+        edx_enrolled=True,
+    )
+
+    enrollment, created = create_local_enrollment(user, run)
+
+    assert created is False
+    assert enrollment.id == existing.id
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
+
+
+def test_create_local_enrollment_sets_edx_enrolled(user):
+    """
+    create_local_enrollment should set edx_enrolled=True on an existing enrollment
+    that has edx_enrolled=False.
+    """
+    run = CourseRunFactory.create()
+    CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        active=True,
+        edx_enrolled=False,
+    )
+
+    enrollment, created = create_local_enrollment(user, run)
+
+    assert created is False
+    assert enrollment.edx_enrolled is True
+
+
+def test_create_local_enrollment_enrolls_in_programs(
+    user, program_with_empty_requirements  # noqa: F811
+):
+    """
+    create_local_enrollment should auto-enroll the user in associated programs.
+    """
+    run = CourseRunFactory.create()
+    program_with_empty_requirements.add_requirement(run.course)
+
+    create_local_enrollment(user, run)
+
+    assert ProgramEnrollment.objects.filter(
+        user=user, program=program_with_empty_requirements
+    ).exists()
+
+
+def test_enroll_in_associated_programs_creates_enrollment(
+    user, program_with_empty_requirements  # noqa: F811
+):
+    """
+    _enroll_in_associated_programs should create ProgramEnrollments for
+    all live programs linked to the course run's course.
+    """
+    run = CourseRunFactory.create()
+    program_with_empty_requirements.add_requirement(run.course)
+
+    _enroll_in_associated_programs(user, run)
+
+    program_enrollment = ProgramEnrollment.objects.get(
+        user=user, program=program_with_empty_requirements
+    )
+    assert program_enrollment.change_status is None
+
+
+def test_enroll_in_associated_programs_skips_non_live(user):
+    """
+    _enroll_in_associated_programs should skip programs that are not live.
+    """
+    run = CourseRunFactory.create()
+    program = ProgramFactory.create(live=False)
+    root_node = program.requirements_root
+    operator_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    operator_node.add_child(
+        node_type=ProgramRequirementNodeType.COURSE,
+        course=run.course,
+    )
+
+    _enroll_in_associated_programs(user, run)
+
+    assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
+
+
+def test_enroll_in_associated_programs_reactivates(
+    user, program_with_empty_requirements  # noqa: F811
+):
+    """
+    _enroll_in_associated_programs should reactivate an existing program enrollment
+    whose change_status is not None.
+    """
+    run = CourseRunFactory.create()
+    program_with_empty_requirements.add_requirement(run.course)
+    ProgramEnrollmentFactory.create(
+        user=user,
+        program=program_with_empty_requirements,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        active=True,
+    )
+
+    _enroll_in_associated_programs(user, run)
+
+    program_enrollment = ProgramEnrollment.objects.get(
+        user=user, program=program_with_empty_requirements
+    )
+    assert program_enrollment.change_status is None
+    assert program_enrollment.active is True
+
+
+def test_enroll_in_associated_programs_multiple_programs(user):
+    """
+    _enroll_in_associated_programs should enroll in multiple programs when a course
+    is a requirement in more than one.
+    """
+    run = CourseRunFactory.create()
+    programs = ProgramFactory.create_batch(2, live=True)
+    for program in programs:
+        root_node = program.requirements_root
+        operator_node = root_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.ALL_OF,
+            title="Required Courses",
+        )
+        operator_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE,
+            course=run.course,
+        )
+
+    _enroll_in_associated_programs(user, run)
+
+    for program in programs:
+        assert ProgramEnrollment.objects.filter(user=user, program=program).exists()
 
 
 @pytest.mark.parametrize(
