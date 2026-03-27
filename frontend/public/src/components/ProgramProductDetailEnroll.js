@@ -134,13 +134,15 @@ export class ProgramProductDetailEnroll extends React.Component<
 
   toggleUpgradeDialogVisibility = async () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
-    const { programId, createProgramEnrollment } = this.props
+    const { programs, createProgramEnrollment } = this.props
 
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
     })
     try {
-      await createProgramEnrollment(programId)
+      //find program id
+      const program = programs && programs[0]
+      await createProgramEnrollment(program.id)
     } catch (error) {
       console.error("Failed to create program enrollment", error)
       // Optionally, display an error message to the user.
