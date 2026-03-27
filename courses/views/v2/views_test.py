@@ -1739,7 +1739,7 @@ def test_add_verified_program_course_enrollment(
     if requirement_type == "elective-extra":
         # Add another elective, adjust the requirement to only require one, and
         # give the user a verified enrollment in that course. This should result
-        # in the learner getting an _audit_ enrollment in the course created
+        # in the learner getting a verified enrollment in the course created
         # earlier.
         second_elective = CourseRunFactory.create()
         program.add_elective(second_elective.course)
@@ -1766,21 +1766,11 @@ def test_add_verified_program_course_enrollment(
         assert resp.status_code == status.HTTP_201_CREATED
         assert resp.json()["run"]["id"] == course_run.id
 
-        if (
-            program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
-            and requirement_type != "elective-extra"
-        ):
+        if program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE:
             order = user.orders.last()
             line = order.lines.last()
             assert course_run == line.purchased_object
             assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_VERIFIED_MODE
-
-        if (
-            program_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
-            and requirement_type == "elective-extra"
-        ):
-            # We had enough electives so we should have gotten an audit enrollment
-            assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
 
 
 @pytest.mark.skip_nplusone_check
