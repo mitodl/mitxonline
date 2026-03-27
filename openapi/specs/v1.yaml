@@ -2572,6 +2572,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/CourseWithCourseRunsSerializerV2'
           description: ''
+  /api/v2/create_program_enrollment_view/:
+    post:
+      operationId: v2_program_enrollments_create_standalone
+      description: Create a program enrollment.
+      tags:
+      - create_program_enrollment_view
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2ProgramEnrollment'
+          description: ''
   /api/v2/departments/:
     get:
       operationId: departments_list_v2
@@ -3569,6 +3582,23 @@ components:
           type: boolean
       required:
       - confirmed
+    ChangeStatusEnum:
+      enum:
+      - deferred
+      - transferred
+      - refunded
+      - unenrolled
+      type: string
+      description: |-
+        * `deferred` - deferred
+        * `transferred` - transferred
+        * `refunded` - refunded
+        * `unenrolled` - unenrolled
+      x-enum-descriptions:
+      - deferred
+      - transferred
+      - refunded
+      - unenrolled
     CheckoutPayload:
       type: object
       description: Serializes the payload for the checkout data.
@@ -8696,6 +8726,45 @@ components:
       - time_commitment
       - title
       - topics
+    V2ProgramEnrollment:
+      type: object
+      description: Serializer for ProgramEnrollment
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        created_on:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_on:
+          type: string
+          format: date-time
+          readOnly: true
+        change_status:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/ChangeStatusEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        active:
+          type: boolean
+          description: Indicates whether or not this enrollment should be considered
+            active
+        enrollment_mode:
+          type: string
+          nullable: true
+          maxLength: 20
+        user:
+          type: integer
+        program:
+          type: integer
+      required:
+      - created_on
+      - id
+      - program
+      - updated_on
+      - user
     V2ProgramRequirement:
       type: object
       description: Serializer for a ProgramRequirement

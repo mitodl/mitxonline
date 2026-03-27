@@ -64,7 +64,7 @@ from courses.serializers.v2.departments import (
 from courses.serializers.v2.programs import (
     ProgramCollectionSerializer,
     ProgramDetailSerializer,
-    UserProgramEnrollmentDetailSerializer,
+    UserProgramEnrollmentDetailSerializer, ProgramEnrollmentSerializer,
 )
 from courses.utils import (
     get_enrollable_courses,
@@ -737,6 +737,41 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
 
 
 @extend_schema(
+    operation_id="v2_program_enrollments_create_standalone",
+    responses={status.HTTP_201_CREATED: ProgramEnrollmentSerializer},
+)
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_program_enrollment_view(request):
+    """Create a program enrollment."""
+    program_id = request.data.get("program_id")
+
+    try:
+        program = Program.objects.get(pk=program_id)
+    except Program.DoesNotExist:
+        return Response(
+            {"program_id": ["Program does not exist."]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if ProgramEnrollment.objects.filter(program=program, user=request.user).exists():
+        return Response(status=status.HTTP_200_OK)
+    enrollments, _ = create_program_enrollments(
+        request.user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    if not enrollments:
+        return Response(
+            {"message": "Enrollment creation failed."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    enrollment = enrollments[0]
+
+    return Response(ProgramEnrollmentSerializer(enrollment).data, status=status.HTTP_201_CREATED)
+
+
+
+@extend_schema(
     request=list[str],
     responses={
         status.HTTP_201_CREATED: CourseRunEnrollmentSerializer,
@@ -935,8 +970,8 @@ def get_program_certificate(request, cert_uuid):
     )
 
 
-class UserProgramEnrollmentsViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
-    """ViewSet for user program enrollments with v2 serializers."""
+class UserProgramEnrollmentsViewSet( viewsets.ViewSet):
+    """ViewSet for user program and courserun enrollments with v2 serializers."""
 
     permission_classes = [IsAuthenticated]
 
@@ -947,14 +982,6 @@ class UserProgramEnrollmentsViewSet(mixins.CreateModelMixin, viewsets.GenericVie
         description="Program ID",
         required=True,
     )
-
-    @extend_schema(
-        operation_id="user_program_enrollments_create_v2",
-        description="Create a new user program enrollment - API v2",
-    )
-    def create(self, request, *args, **kwargs):
-        """Create a program enrollment."""
-        return super().create(request, *args, **kwargs)
 
     @extend_schema(
         operation_id="v2_program_enrollments_list",

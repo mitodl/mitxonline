@@ -10,7 +10,7 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramCollection,
-    ProgramRequirementNodeType,
+    ProgramRequirementNodeType, ProgramEnrollment,
 )
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
@@ -617,6 +617,13 @@ class ProgramDetailSerializer(ProgramSerializer):
             instance.products.all()
         )
 
+@extend_schema_serializer(component_name="V2ProgramEnrollmentSerializer")
+class ProgramEnrollmentSerializer(serializers.ModelSerializer):
+    """Serializer for ProgramEnrollment"""
+
+    class Meta:
+        model = ProgramEnrollment
+        fields = "__all__"
 
 class ProgramCertificateSerializer(serializers.ModelSerializer):
     """ProgramCertificate model serializer"""

@@ -27,6 +27,11 @@ router.register(
 urlpatterns = [
     *router.urls,
     path(
+        r"create_program_enrollment_view/",
+        v2.create_program_enrollment_view,
+        name="create_program_enrollment_view",
+    ),
+    path(
         r"verified_program_enrollments/<str:courserun_id>/",
         v2.add_verified_program_course_enrollment,
         name="add_verified_program_course_enrollment",
