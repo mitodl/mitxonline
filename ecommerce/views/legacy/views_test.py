@@ -652,6 +652,45 @@ def test_checkout_result(  # noqa: PLR0913
     assert Basket.objects.filter(id=basket.id).exists() is basket_exists
 
 
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result_redirects_uai_b2c_program_to_learn_dashboard(
+    settings,
+    user,
+    user_client,
+    mocker,
+):
+    """Accepted UAI+B2C program purchases should redirect to the MIT Learn dashboard."""
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    mocker.patch("courses.api.create_program_enrollments")
+
+    program = ProgramFactory.create(readable_id="program-v1:MITx+UAI+B2C+2026")
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=program)
+
+    create_basket_with_product(user, product)
+
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
+
+    payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    assert resp.url == settings.MIT_LEARN_DASHBOARD_URL
+
+
 @pytest.mark.parametrize(
     "cart_exists, cart_empty",  # noqa: PT006
     [(True, False), (True, True), (False, True)],

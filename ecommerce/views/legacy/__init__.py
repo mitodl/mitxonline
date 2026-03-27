@@ -11,7 +11,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -84,6 +84,16 @@ from main.views import RefinePagination
 from users.models import User
 
 log = logging.getLogger(__name__)
+
+
+def _has_uai_b2c_program_purchase(order):
+    """Return True if the order includes a program whose readable_id contains UAI+B2C."""
+    return any(
+        isinstance(line.purchased_object, Program)
+        and line.purchased_object.readable_id
+        and "UAI+B2C" in line.purchased_object.readable_id
+        for line in order.lines.all()
+    )
 
 
 class ProductsPagination(RefinePagination):
@@ -756,6 +766,9 @@ class CheckoutCallbackView(View):
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
             )
         elif order_state == OrderStatus.FULFILLED:
+            if _has_uai_b2c_program_purchase(order):
+                return HttpResponseRedirect(settings.MIT_LEARN_DASHBOARD_URL)
+
             return redirect_with_user_message(
                 reverse("user-dashboard"),
                 {
