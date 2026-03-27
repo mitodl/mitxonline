@@ -117,5 +117,5 @@ def edx_enrollment_webhook(request):
             "active": enrollment.active,
             "edx_enrolled": enrollment.edx_enrolled,
         },
-        status=status.HTTP_201_CREATED,
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
     )

@@ -222,7 +222,7 @@ class TestEdxEnrollmentWebhook:
         }
         response = self._post_webhook(api_client, payload, token=oauth_token.token)
 
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_200_OK
         assert response.data["message"] == "Enrollment successful"
         assert (
             CourseRunEnrollment.all_objects.filter(user=user, run=course_run).count()

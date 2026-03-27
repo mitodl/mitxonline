@@ -133,34 +133,11 @@ def get_user_relevant_program_course_run_qset(
     return enrollable_run_qset.order_by("enrollment_start")
 
 
-def _enroll_in_associated_programs(user, run):
-    """
-    Enrolls the user into all live programs for which the given course run's
-    course is a requirement or elective.  Reactivates existing program
-    enrollments whose change_status is not None.
-
-    Args:
-        user (User): The user to enroll
-        run (CourseRun): The course run whose course's programs to enroll in
-    """
-    for program in run.course.programs:
-        if not program.live:
-            continue
-        program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
-            user=user,
-            program=program,
-            defaults={"change_status": None},
-        )
-        if program_enrollment.change_status is not None:
-            program_enrollment.reactivate_and_save()
-
-
 def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
     """
     Creates a local-only CourseRunEnrollment record without calling the edX API.
     Reactivates the enrollment if it already exists but is inactive, and ensures
-    edx_enrolled is set to True.  Also auto-enrolls the user in any associated
-    programs.
+    edx_enrolled is set to True.
 
     This is intended for cases where the user is already enrolled in edX (e.g.
     via a webhook notification) and we only need to mirror that state locally.
@@ -187,8 +164,6 @@ def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
     if not enrollment.edx_enrolled:
         enrollment.edx_enrolled = True
         enrollment.save_and_log(None)
-
-    _enroll_in_associated_programs(user, run)
 
     return enrollment, created
 
@@ -234,6 +209,25 @@ def create_run_enrollments(  # noqa: C901
 
     def send_enrollment_emails():
         subscribe_edx_course_emails.delay(enrollment.id)
+
+    def _enroll_learner_into_associated_programs():
+        """
+        Enrolls the learner into all programs for which the course they are enrolling into
+        is associated as a requirement or elective.  If a program enrollment already exists
+        then the change_status of that program_enrollment is checked to ensure it equals None.
+        """
+        for program in run.course.programs:
+            if not program.live:
+                continue
+            program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
+                user=user,
+                program=program,
+                defaults=dict(  # noqa: C408
+                    change_status=None,
+                ),
+            )
+            if program_enrollment.change_status is not None:
+                program_enrollment.reactivate_and_save()
 
     edx_request_success = True
     if not runs[0].is_fake_course_run:
