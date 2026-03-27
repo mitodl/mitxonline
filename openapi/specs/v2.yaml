@@ -3045,11 +3045,7 @@ paths:
         Some special handling is needed for program-related course run enrollments
         when the learner has an enrollment in the program. The learner should get a
         course run enrollment that matches their program enrollment at no additional
-        charge. However, if the learner is enrolling in a course that's an elective,
-        and they have already enrolled in enough electives to satisfy the program's
-        requirements, they should then get an audit enrollment. (This won't preclude
-        them from getting a certificate for the course itself but they'll have to buy
-        the upgrade separately.)
+        charge.
       parameters:
       - in: path
         name: courserun_id
