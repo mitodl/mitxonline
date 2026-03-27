@@ -1,6 +1,150 @@
 Release Notes
 =============
 
+Version 1.143.4 (Released March 26, 2026)
+---------------
+
+- add certificate_available field to programs that mirrors courses (#3421)
+- Add send-to-Google-Sheets support for B2B enrollment codes (#3363)
+- Remove department as required field (#3407)
+
+Version 1.143.2 (Released March 25, 2026)
+---------------
+
+- Update verified program course enrollments API to allow for intermediate programs (#3418)
+
+Version 1.143.1 (Released March 24, 2026)
+---------------
+
+- Add a "certificate available" field so we can tell if the course has a cert available for it (#3415)
+- Don't allow purchased programs to be unenrolled (#3413)
+- feat: replace MITx Online logo with MIT Learn logo in all emails (#3400)
+- [pre-commit.ci] pre-commit autoupdate (#3414)
+- Fix the description field's default when creating or updating a course mode in edX (#3410)
+
+Version 1.143.0 (Released March 23, 2026)
+---------------
+
+- Add include_in_learn_catalog to v3 api (#3409)
+- Fix output formatting for assert_drf_json_equal() (#3408)
+- Don't error out if the user wants a verified program course enrollment and has a non-empty basket (#3404)
+- Skip receipts for contract orders; add util (#3403)
+- Add call to generate edX usernames on course run enroll if none exist (#3398)
+- Include parent programs in ProgramSerializer (#3391)
+
+Version 1.142.3 (Released March 20, 2026)
+---------------
+
+- Update order receipt email template (#3402)
+- Update dependency pyOpenSSL to v26 [SECURITY] (#3389)
+- Fix incorrect API endpoint usage for course mode creation (#3394)
+- Update dependency deepdiff to v8.6.2 [SECURITY] (#3399)
+- [pre-commit.ci] pre-commit autoupdate (#3325)
+- Update actions/checkout digest to de0fac2 (#3296)
+- adding prefetch for products in programs v2 api (#3386)
+
+Version 1.142.2 (Released March 19, 2026)
+---------------
+
+- Restore product type information in OpenAPI Spec (#3396)
+- Add program type to the receipt email template (#3395)
+- Add edX entitlement import to migrate_edx_data management command (#3383)
+- Add auth to cart page (#3392)
+- Add criteria field and course-level feature flag to CMS CertificatePage (#3373)
+
+Version 1.142.1 (Released March 17, 2026)
+---------------
+
+- Prefer parent page for financial form URL (#3387)
+- Add live filter to finance assistance forms (#3384)
+- Update dependency authlib to v1.6.9 [SECURITY] (#3388)
+
+Version 1.142.0 (Released March 17, 2026)
+---------------
+
+- add bare minimum upgrade product info to v3 enrollments endpoint (#3385)
+- Add a test for number of queries in courses api (#3361)
+
+Version 1.141.4 (Released March 12, 2026)
+---------------
+
+- Duplicate programs in api results (#3375)
+
+Version 1.141.3 (Released March 11, 2026)
+---------------
+
+- Add filter to context to filter enrollable courseruns (#3377)
+- correct default course / program image behavior (#3351)
+
+Version 0.141.1 (Released March 11, 2026)
+---------------
+
+- Add a /api/v3/enrollments/ API with reduced footprint (#3303)
+
+Version 0.141.0 (Released March 11, 2026)
+---------------
+
+- 10405 add display mode field for mitxonline programs returned in the api (#3358)
+- Add server-side redirect for /dashboard to learn.mit.edu (#3356)
+- update olposthog (#3370)
+- Check for a null start date; emit nothing in that case (#3368)
+- Don't attempt to add users to Keycloak orgs if there's no org to add to (#3359)
+- Fix sometimes flaky program filter test bug (#3364)
+- Add search and filters to enrollment code attachment Django admin (#3362)
+
+Version 0.140.1 (Released March 09, 2026)
+---------------
+
+- Fix unbound query issue with program enrollments (#3366)
+- Fix performance for enrollments API w/ 0 results (#3360)
+- Add command to re-run an existing course run (#3352)
+- Adding prefetch for products in courses api (#3331)
+
+Version 0.139.4 (Released March 05, 2026)
+---------------
+
+- Fix error when a basket converts to an order, and has a product that has versions (#3355)
+- 10316 import courserun should allow the runs course to be set manually (#3347)
+
+Version 0.139.3 (Released March 05, 2026)
+---------------
+
+- Make featured homepage courses cache robust against task failures (#3353)
+
+Version 0.139.2 (Released March 04, 2026)
+---------------
+
+- Update featured courses deafult refresh (#3349)
+- MITx Online needs a management command for removing runs from contracts (#3344)
+- fix(deps): update dependency wagtail to v7.2.3 [security] (#3348)
+- Remove non-functional product_flexible_price from v2/courses apis (#3326)
+- Configurable learn dashboard redirect (#3233)
+
+Version 0.139.1 (Released March 03, 2026)
+---------------
+
+- Revert "Fix create_user and usages to be more robust (#3330)"
+- Fix and enhance flaky test_discount_redemptions_api tests (#3340)
+- Fix create_user and usages to be more robust (#3330)
+- display program enrollment_modes in django admin (#3341)
+- Add enrollment modes to the program APIs (#3339)
+- Fix program enroll / unenroll APIs (#3336)
+- Fix some issues with ensure_enrollment_codes_exist (#3329)
+- Fix 500 error on program checkout completion (#3338)
+- Move calls to create_user to earlier in the ecommerce process (#3337)
+- chore: migrate from poetry/pip to uv for dependency management (#3327)
+
+Version 0.138.7 (Released March 02, 2026)
+---------------
+
+- Add noindex meta tag to learner records and certificate pages (#3328)
+- add a program enrollment endpoint (#3332)
+- Adds enrollment modes to course runs and programs (#3314)
+- Expose programs on product API results, display in UI (#3322)
+- Update ecommerce post-checkout code to handle program purchasing (#3304)
+- Add unit tests for AdminRefundOrder view (#3313)
+- Support Claude Code better (gitignore, CLAUDE.md) (#3323)
+
 Version 0.138.5 (Released February 25, 2026)
 ---------------
 

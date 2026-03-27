@@ -423,6 +423,58 @@ def test_discount_product_calculation(
         ).quantize(Decimal("0.01"))
 
 
+@pytest.mark.parametrize("reuse", [True, False])
+def test_pending_order_with_multiple_product_versions(basket, reuse):
+    """
+    Test that creating a PendingOrder with a basket item for a product with
+    multiple versions works as expected
+    """
+
+    with reversion.create_revision():
+        product = ProductFactory.create(price=500)
+
+    with reversion.create_revision():
+        product.price = 900
+        product.save()
+
+    assert Version.objects.get_for_object(product).count() == 2
+
+    basket_item = BasketItem(product=product, basket=basket, quantity=1)
+    basket_item.save()
+    order = PendingOrder.create_from_basket(basket)
+    order.save()
+
+    assert order.total_price_paid == 900
+
+    if reuse:
+        with reversion.create_revision():
+            product.price = 750
+            product.save()
+
+        order = PendingOrder.create_from_basket(basket)
+        order.save()
+
+        # Unlike the test below, we get a new order because the product changed.
+
+        assert Order.objects.filter(state=OrderStatus.PENDING).count() == 2
+        assert order.total_price_paid == 750
+
+
+def test_pending_order_with_bad_product_versions(basket):
+    """
+    Test that creating a PendingOrder with a basket item for a product with
+    bad (i.e. no) versions works as expected
+    """
+
+    product = ProductFactory.create(price=500)
+    assert Version.objects.get_for_object(product).count() == 0
+
+    basket_item = BasketItem(product=product, basket=basket, quantity=1)
+    basket_item.save()
+    with pytest.raises(ValueError, match=r".*is improperly constructed: no versions"):
+        PendingOrder.create_from_basket(basket)
+
+
 def test_pending_order_is_reused(basket):
     """
     Test that creating a second PendingOrder's with the same associated Product is

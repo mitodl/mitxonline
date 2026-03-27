@@ -9,6 +9,7 @@ from cms.serializers import ProgramPageSerializer
 from courses.factories import (  # noqa: F401
     CourseFactory,
     CourseRunFactory,
+    EnrollmentModeFactory,
     ProgramCollectionFactory,
     ProgramFactory,
     program_with_empty_requirements,
@@ -128,6 +129,7 @@ def test_serialize_program(
             if not remove_tree
             else [],
             "collections": [program_collection.id],
+            "programs": None,
             "requirements": formatted_reqs,
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root
@@ -152,9 +154,38 @@ def test_serialize_program(
             "min_weekly_hours": program_with_empty_requirements.page.min_weekly_hours,
             "min_price": program_with_empty_requirements.page.min_price,
             "max_price": program_with_empty_requirements.page.max_price,
+            "certificate_available": False,
             "enrollment_modes": [],
+            "display_mode": None,
         },
     )
+
+
+@pytest.mark.parametrize(
+    ("has_paid_mode", "expected"),
+    [
+        (True, True),
+        (False, False),
+    ],
+)
+def test_serialize_program_certificate_available(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+    has_paid_mode,
+    expected,
+):
+    """Test that certificate_available reflects whether any enrollment mode requires payment."""
+    mode = EnrollmentModeFactory.create(
+        mode_slug="verified" if has_paid_mode else "audit",
+        requires_payment=has_paid_mode,
+    )
+    program_with_empty_requirements.enrollment_modes.add(mode)
+
+    data = ProgramSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    assert data["certificate_available"] is expected
 
 
 def test_serialize_program_with_products(

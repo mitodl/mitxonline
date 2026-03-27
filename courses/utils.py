@@ -113,15 +113,9 @@ def get_enrollable_courses(queryset, enrollment_end_date=None):
     """
     enrollable_courseruns_qs = CourseRun.objects.enrollable(enrollment_end_date)
 
-    return (
-        queryset.prefetch_related(
-            Prefetch("courseruns", queryset=enrollable_courseruns_qs)
-        )
-        .filter(
-            courseruns__id__in=enrollable_courseruns_qs.values_list("id", flat=True)
-        )
-        .distinct()
-    )
+    return queryset.filter(
+        courseruns__id__in=enrollable_courseruns_qs.values_list("id", flat=True)
+    ).distinct()
 
 
 def get_unenrollable_courses(queryset):
@@ -199,6 +193,24 @@ def is_uai_order(order):
         if hasattr(line.product, "purchasable_object"):
             course_run = line.product.purchasable_object
             if hasattr(course_run, "courseware_id") and is_uai_course_run(course_run):
+                return True
+    return False
+
+
+def is_contract_order(order):
+    """
+    Check if an order contains any contract products.
+
+    Args:
+        order: Order instance
+
+    Returns:
+        bool: True if the order contains contract products, False otherwise
+    """
+    for line in order.lines.all():
+        if hasattr(line.product, "purchasable_object"):
+            course_run = line.product.purchasable_object
+            if isinstance(course_run, CourseRun) and course_run.b2b_contract_id:
                 return True
     return False
 

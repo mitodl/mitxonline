@@ -1,11 +1,14 @@
 """Tests for ecommerce admin views"""
 
 import pytest
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
 from django.urls import reverse
+from reversion.models import Version
 
+from courses.factories import CourseRunFactory
 from ecommerce.factories import OrderFactory
-from ecommerce.models import OrderStatus
+from ecommerce.models import OrderStatus, Product
 
 pytestmark = [pytest.mark.django_db]
 
@@ -194,3 +197,28 @@ def test_admin_refund_order_post_order_not_found(client, admin_user):
         str(messages[0].message)
         == f"Order {missing_order_id} could not be found - is it Fulfilled?"
     )
+
+
+def test_admin_product_create_generates_reversion(client, admin_user):
+    """Creating a Product via admin should create an initial reversion entry."""
+
+    _login_admin(client, admin_user)
+    courserun = CourseRunFactory.create()
+    content_type = ContentType.objects.get_for_model(courserun)
+
+    response = client.post(
+        reverse("admin:ecommerce_product_add"),
+        data={
+            "content_type": content_type.id,
+            "object_id": courserun.id,
+            "price": "123.45",
+            "description": "Admin created versioned product",
+            "is_active": "on",
+            "_save": "Save",
+        },
+    )
+
+    assert response.status_code == 302
+
+    product = Product.all_objects.get(description="Admin created versioned product")
+    assert Version.objects.get_for_object(product).count() == 1

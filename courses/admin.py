@@ -57,8 +57,15 @@ class ProgramAdmin(admin.ModelAdmin):
     model = Program
     form = ProgramAdminForm
     search_fields = ["title", "readable_id", "program_type"]
-    list_display = ("id", "title", "live", "readable_id", "program_type")
-    list_filter = ["live", "program_type", "departments"]
+    list_display = (
+        "id",
+        "title",
+        "live",
+        "readable_id",
+        "program_type",
+        "display_mode",
+    )
+    list_filter = ["live", "program_type", "display_mode", "departments"]
     inlines = [ProgramContractPageInline]
 
 
@@ -158,8 +165,14 @@ class ProgramEnrollmentAdmin(AuditableModelAdmin):
         "program__readable_id",
         "program__title",
     ]
-    list_filter = ["active", "change_status"]
-    list_display = ("id", "get_user_email", "get_program_readable_id", "change_status")
+    list_filter = ["active", "enrollment_mode", "change_status"]
+    list_display = (
+        "id",
+        "get_user_email",
+        "get_program_readable_id",
+        "enrollment_mode",
+        "change_status",
+    )
     raw_id_fields = (
         "user",
         "program",

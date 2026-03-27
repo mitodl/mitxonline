@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 from decimal import Decimal
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import faker
@@ -1000,15 +1001,16 @@ def test_b2b_contract_removal_keeps_enrollments(mocked_b2b_org_attach):
     assert courserun.enrollments.filter(user=user).count() == 1
 
 
-def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach):
+@pytest.mark.parametrize("has_id", [None, uuid4()])
+def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach, has_id):
     """Test that attaching a user to an org calls Keycloak successfully."""
 
-    org = OrganizationPageFactory.create()
+    org = OrganizationPageFactory.create(sso_organization_id=has_id)
     user = UserFactory.create()
 
     process_add_org_membership(user, org)
 
-    mocked_b2b_org_attach.assert_called()
+    mocked_b2b_org_attach.assert_called() if has_id else mocked_b2b_org_attach.assert_not_called()
 
 
 @pytest.mark.parametrize(

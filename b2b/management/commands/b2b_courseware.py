@@ -7,14 +7,18 @@ Allows you to
 import logging
 from argparse import RawTextHelpFormatter
 
+from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand, CommandError
+from mitol.common.utils.datetime import now_in_utc
 from opaque_keys import InvalidKeyError
 
 from b2b.api import create_contract_run, import_and_create_contract_run
 from b2b.models import ContractPage, ContractProgramItem
 from courses.api import resolve_courseware_object_from_id
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
-from courses.models import CourseRun
+from courses.models import CourseRun, CourseRunEnrollment
+from ecommerce.models import Discount, DiscountProduct, Product
+from openedx.api import update_edx_course
 
 log = logging.getLogger(__name__)
 
@@ -302,7 +306,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         return True
 
-    def handle_remove(self, contract, coursewares, **kwargs):
+    def handle_remove(self, contract, coursewares, **kwargs):  # noqa: C901
         """Handle removing courseware from a contract."""
 
         remove_runs = kwargs.pop("remove_program_runs")
@@ -355,14 +359,104 @@ Specifying a program will only unlink the program from the contract, unless "--r
             else:
                 # We're actually at a course run now.
 
-                courseware.b2b_contract = None
+                has_enrollments = CourseRunEnrollment.objects.filter(
+                    run=courseware
+                ).exists()
+
+                # Deactivate the run for future enrollments
+                now = now_in_utc()
+                if (
+                    courseware.live
+                    or courseware.enrollment_end is None
+                    or courseware.enrollment_end > now
+                ):
+                    courseware.live = False
+                    courseware.enrollment_end = now
+
+                # If there are no enrollments, detach the run from the contract
+                if not has_enrollments and courseware.b2b_contract == contract:
+                    courseware.b2b_contract = None
+
                 courseware.save()
 
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Unlinked {courseware.courseware_id} from {contract}."
-                    )
+                # Deactivate products for this run
+                # Use all_objects so we can find products regardless of
+                # their current is_active state, and evaluate to a list so
+                # subsequent updates don't affect the collection we use
+                # below when removing discount associations.
+                content_type = ContentType.objects.get_for_model(CourseRun)
+                run_products = list(
+                    Product.all_objects.filter(
+                        content_type=content_type,
+                        object_id=courseware.id,
+                    ).all()
                 )
+
+                for product in run_products:
+                    if product.is_active:
+                        product.is_active = False
+                        product.save(update_fields=("is_active",))
+
+                # Invalidate/delete any enrollment codes (Discounts) associated with this run's products
+                discounts = Discount.objects.filter(
+                    products__product__in=run_products
+                ).distinct()
+
+                for discount in discounts:
+                    # Remove only associations for these products
+                    DiscountProduct.objects.filter(
+                        discount=discount,
+                        product__in=run_products,
+                    ).delete()
+                    discount.refresh_from_db()
+
+                    # If the discount no longer applies to any products, remove it
+                    if discount.products.count() == 0 and not (
+                        discount.order_redemptions.exists()
+                        or discount.contract_redemptions.exists()
+                    ):
+                        discount.delete()
+
+                # Attempt to push the new enrollment_end to edX so it isn't
+                # overwritten by the next sync from edX.
+                try:
+                    pacing_type = (
+                        "self_paced" if courseware.is_self_paced else "instructor_paced"
+                    )
+
+                    course_params = [
+                        courseware.courseware_id,
+                        courseware.title,
+                        pacing_type,
+                    ]
+
+                    if courseware.start_date and courseware.end_date:
+                        course_params.append(courseware.start_date)
+                        course_params.append(courseware.end_date)
+
+                        if courseware.enrollment_start and courseware.enrollment_end:
+                            course_params.append(courseware.enrollment_start)
+                            course_params.append(courseware.enrollment_end)
+
+                    update_edx_course(*course_params)
+                except Exception:
+                    log.exception(
+                        "Failed to update enrollment end date on edX for %s",
+                        courseware.courseware_id,
+                    )
+
+                if not has_enrollments:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Deactivated and unlinked {courseware.courseware_id} from {contract} (no enrollments)."
+                        )
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Deactivated {courseware.courseware_id} but kept it linked to {contract} (has enrollments)."
+                        )
+                    )
 
         return True
 

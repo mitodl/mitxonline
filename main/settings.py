@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "0.138.5"
+VERSION = "1.143.4"
 
 log = logging.getLogger()
 
@@ -917,7 +917,7 @@ REPAIR_OPENEDX_USERS_OFFSET = int(REPAIR_OPENEDX_USERS_FREQUENCY / 2)
 
 REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ = get_int(
     name="REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ",
-    default=86400,
+    default=180,
     description="How many seconds between refreshing featured items for the homepage cache",
 )
 
@@ -933,6 +933,18 @@ KEYCLOAK_ORG_SYNC_OFFSET = get_int(
     name="KEYCLOAK_ORG_SYNC_OFFSET",
     default=int(KEYCLOAK_ORG_SYNC_FREQUENCY / 2),
     description="Offset for the Keycloak org sync",
+)
+
+B2B_GSHEETS_UPDATE_FREQUENCY = get_int(
+    name="B2B_GSHEETS_UPDATE_FREQUENCY",
+    default=3600,
+    description="How many seconds to wait between updating the enrollment code Google Sheets for B2B contracts",
+)
+
+B2B_GSHEETS_UPDATE_OFFSET = get_int(
+    name="B2B_GSHEETS_UPDATE_OFFSET",
+    default=int(B2B_GSHEETS_UPDATE_FREQUENCY / 2),
+    description="Offset for the B2B enrollment code sheet updates",
 )
 
 CELERY_BEAT_SCHEDULE = {
@@ -992,6 +1004,13 @@ CELERY_BEAT_SCHEDULE = {
     "clear-expired-tokens": {
         "task": "main.tasks.run_clear_tokens",
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # every week
+    },
+    "update-b2b-enrollment-code-sheets": {
+        "task": "b2b.tasks.queue_update_all_contract_enrollment_sheets",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=B2B_GSHEETS_UPDATE_FREQUENCY),
+            offset=timedelta(seconds=B2B_GSHEETS_UPDATE_OFFSET),
+        ),
     },
 }
 
@@ -1085,6 +1104,7 @@ PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"  # noqa: S1
 import_settings_modules(
     "mitol.authentication.settings.djoser_settings",
     "mitol.payment_gateway.settings.cybersource",
+    "mitol.olposthog.settings.olposthog",
 )
 
 # mitol-django-common
@@ -1312,36 +1332,6 @@ HUBSPOT_TASK_DELAY = get_int(
     description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
 
-# PostHog related settings
-POSTHOG_PROJECT_API_KEY = get_string(
-    name="POSTHOG_PROJECT_API_KEY",
-    default="",
-    description="API token to communicate with PostHog",
-)
-
-POSTHOG_API_HOST = get_string(
-    name="POSTHOG_API_HOST",
-    default="",
-    description="API host for PostHog",
-)
-POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS = get_int(
-    name="POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS",
-    default=3000,
-    description="Timeout(MS) for PostHog feature flag requests.",
-)
-
-POSTHOG_MAX_RETRIES = get_int(
-    name="POSTHOG_MAX_RETRIES",
-    default=3,
-    description="Number of times that requests to PostHog should be retried after failing.",
-)
-
-POSTHOG_ENABLED = get_bool(
-    name="POSTHOG_ENABLED",
-    default=False,
-    description="Whether PostHog is enabled",
-)
-
 # HomePage Hubspot Form Settings
 HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
     name="HUBSPOT_HOME_PAGE_FORM_GUID",
@@ -1526,11 +1516,6 @@ VERIFIABLE_CREDENTIAL_DID = get_string(
     name="VERIFIABLE_CREDENTIAL_DID",
     default="",
     description="The Decentralized Identifier (DID) used as the issuer for verifiable credentials.",
-)
-ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING = get_bool(
-    name="ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING",
-    default=False,
-    description="Override posthog flag to enable the provisioning of verifiable credentials in dev.",
 )
 
 MIT_LEARN_ATTACH_URL = get_string(

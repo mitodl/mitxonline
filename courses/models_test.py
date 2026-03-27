@@ -1076,7 +1076,7 @@ def test_active_products_for_expired_course_run():
     course_run = CourseRunFactory.create(enrollment_end=now - timedelta(days=10))
     ProductFactory.create(purchasable_object=course_run)
 
-    assert course_run.course.active_products is None
+    assert course_run.course.active_products == []
 
 
 def test_related_programs():
@@ -1163,3 +1163,28 @@ def test_courserun_qs_b2b_flags():
 def test_program_requirements_root_node_collation():
     """Ensure we can create a bunch of programs ()"""
     ProgramFactory.create_batch(100)
+
+
+def test_course_creation_without_department():
+    """
+    Test that a Course can be created without any departments
+    """
+    course = Course.objects.create(
+        title="No Dept Course", readable_id="course-v1:PyT+NoDept+1", live=True
+    )
+    assert course.departments.count() == 0
+    # Should be retrievable and have no departments
+    retrieved = Course.objects.get(pk=course.pk)
+    assert retrieved.departments.count() == 0
+
+
+def test_create_program_without_department():
+    """Test that a Program can be created without any departments."""
+
+    program = Program.objects.create(
+        title="Test Program", readable_id="program-v1:TEST+P1", live=True
+    )
+    assert program.departments.count() == 0
+    # Fetch from DB to ensure no departments are attached
+    program_from_db = Program.objects.get(pk=program.pk)
+    assert program_from_db.departments.count() == 0

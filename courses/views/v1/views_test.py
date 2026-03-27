@@ -36,6 +36,7 @@ from courses.models import (
     Course,
     CourseRun,
     CourseRunEnrollment,
+    PaidProgram,
     Program,
     ProgramEnrollment,
 )
@@ -784,7 +785,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
     Tests the program enrollments API, which should show the user's enrollment
     in programs with the course runs that apply.
     """
-    user = user_with_enrollments_and_certificates
+    user = user_with_enrollments_and_certificates.user
 
     program_enrollments = (
         ProgramEnrollment.objects.filter(user=user)
@@ -1091,7 +1092,7 @@ class TestUserEnrollmentsApiViewSetSync:
 def test_program_enrollment_destroy_program_not_found(user_drf_client):
     """Test that destroying a program enrollment for a nonexistent program returns 404."""
     resp = user_drf_client.delete(
-        reverse("v2:user_program_enrollments_api-detail", kwargs={"pk": 999999})
+        reverse("v1:user_program_enrollments_api-detail", kwargs={"pk": 999999})
     )
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
@@ -1102,7 +1103,7 @@ def test_program_enrollment_destroy_no_enrollment_is_idempotent(user_drf_client)
     program = ProgramFactory.create()
 
     resp = user_drf_client.delete(
-        reverse("v2:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+        reverse("v1:user_program_enrollments_api-detail", kwargs={"pk": program.id})
     )
     assert resp.status_code == status.HTTP_200_OK
     assert resp.json() == []
@@ -1115,10 +1116,30 @@ def test_program_enrollment_destroy(user_drf_client, user):
     program = enrollment.program
 
     resp = user_drf_client.delete(
-        reverse("v2:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+        reverse("v1:user_program_enrollments_api-detail", kwargs={"pk": program.id})
     )
     assert resp.status_code == status.HTTP_200_OK
 
     enrollment.refresh_from_db()
     assert enrollment.active is False
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+
+
+def test_destroy_program_enrollment_paid_fails(user_drf_client, user):
+    """DELETE a paid program enrollment fails"""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    PaidProgram.objects.create(user=user, program=program, order=order)
+
+    resp = user_drf_client.delete(
+        reverse("v1:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "message": "Cannot unenroll from a purchased program, contact support."
+    }
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True

@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import bleach
-from django.templatetags.static import static
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cms import models
 from cms.api import get_wagtail_img_src
 from cms.models import FlexiblePricingRequestForm, ProgramPage
-from courses.constants import DEFAULT_COURSE_IMG_PATH
 
 
 class BaseCoursePageSerializer(serializers.ModelSerializer):
@@ -22,14 +20,12 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
     effort = serializers.SerializerMethodField()
     length = serializers.SerializerMethodField()
 
-    @extend_schema_field(str)
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_feature_image_src(self, instance):
-        """Serializes the source of the feature_image"""
-        feature_img_src = None
+        """Serializes the source of the feature_image, or None if not set."""
         if hasattr(instance, "feature_image"):
-            feature_img_src = get_wagtail_img_src(instance.feature_image)
-
-        return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
+            return get_wagtail_img_src(instance.feature_image) or None
+        return None
 
     @extend_schema_field(serializers.URLField)
     def get_page_url(self, instance):
@@ -83,9 +79,11 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
     def _get_course_specific_form(self, instance):
         """Get financial assistance form specific to the course."""
-        return FlexiblePricingRequestForm.objects.filter(
-            selected_course=instance.product
-        ).first()
+        return (
+            FlexiblePricingRequestForm.objects.filter(selected_course=instance.product)
+            .live()
+            .first()
+        )
 
     def _get_child_form(self, instance):
         """Get financial assistance form from child pages."""
@@ -208,24 +206,14 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
     def get_current_price(self, instance) -> int | None:
         """Get the current price of the course product."""
-        # Handle both QuerySet and prefetched list cases
         active_products = instance.product.active_products
-        if active_products is None:
+        if not active_products:
             return None
-
         try:
-            # Convert to list and sort by price (descending)
-            products_list = (
-                list(active_products.all())
-                if hasattr(active_products, "all")
-                else list(active_products)
-            )
-            relevant_product = (
-                max(products_list, key=lambda p: p.price) if products_list else None
-            )
-        except (AttributeError, TypeError):
+            # Only call max if there are products
+            relevant_product = max(active_products, key=lambda p: p.price)
+        except (ValueError, AttributeError, TypeError):
             relevant_product = None
-
         return relevant_product.price if relevant_product else None
 
     @extend_schema_field(list)
@@ -280,14 +268,12 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         """Helper method to construct financial assistance URL"""
         return f"{page.get_url()}{slug}/" if page and slug else ""
 
-    @extend_schema_field(str)
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_feature_image_src(self, instance):
-        """Serializes the source of the feature_image"""
-        feature_img_src = None
+        """Serializes the source of the feature_image, or None if not set."""
         if hasattr(instance, "feature_image"):
-            feature_img_src = get_wagtail_img_src(instance.feature_image)
-
-        return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
+            return get_wagtail_img_src(instance.feature_image) or None
+        return None
 
     @extend_schema_field(serializers.URLField)
     def get_page_url(self, instance):
@@ -323,6 +309,18 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             .live()
             .first()
         )
+
+        # If a form is found via selected_program, prefer its parent page
+        # (e.g., a course or program page) when constructing the URL. This
+        # ensures that forms which are children of course pages but linked to
+        # a program use the correct /courses/ URL instead of the program URL.
+        if financial_assistance_page is not None:
+            parent = financial_assistance_page.get_parent()
+            if parent is not None:
+                parent_page = getattr(parent, "specific", parent)
+                return self._get_financial_assistance_url(
+                    parent_page, financial_assistance_page.slug
+                )
 
         # Check for child form if no direct link found
         if financial_assistance_page is None:
@@ -374,6 +372,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "financial_assistance_form_url",
             "description",
             "live",
+            "include_in_learn_catalog",
             "length",
             "effort",
             "price",
@@ -385,14 +384,12 @@ class InstructorPageSerializer(serializers.ModelSerializer):
 
     feature_image_src = serializers.SerializerMethodField()
 
-    @extend_schema_field(str)
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_feature_image_src(self, instance):
-        """Serializes the source of the feature_image"""
-        feature_img_src = None
+        """Serializes the source of the feature_image, or None if not set."""
         if hasattr(instance, "feature_image"):
-            feature_img_src = get_wagtail_img_src(instance.feature_image)
-
-        return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
+            return get_wagtail_img_src(instance.feature_image) or None
+        return None
 
     class Meta:
         model = models.InstructorPage

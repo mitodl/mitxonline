@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import namedtuple
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from traceback import format_exc
 from typing import TYPE_CHECKING
@@ -13,7 +13,6 @@ from urllib.parse import urlparse
 
 import requests
 import reversion
-from bs4 import BeautifulSoup
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -25,7 +24,6 @@ from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
 )
-from mitol.olposthog.features import is_enabled
 from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -41,7 +39,6 @@ from courses.constants import (
     PROGRAM_TEXT_ID_PREFIX,
 )
 from courses.models import (
-    BaseCertificate,
     BlockedCountry,
     Course,
     CourseRun,
@@ -74,6 +71,7 @@ from openedx.api import (
     get_edx_api_course_list_client,
     get_edx_course_modes,
     get_edx_grades_with_users,
+    process_course_run_clone,
     unenroll_edx_course_run,
 )
 from openedx.constants import (
@@ -91,6 +89,8 @@ from openedx.exceptions import (
 if TYPE_CHECKING:
     from django.db.models.query import QuerySet
     from edx_api.course_detail.models import CourseMode
+
+    from cms.models import CertificatePage
 
 
 log = logging.getLogger(__name__)
@@ -1333,24 +1333,23 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         root_course = Course.objects.filter(readable_id=root_course_id).first()
 
         if not root_course:
-            if not departments or len(departments) == 0:
-                msg = f"Course {root_course_id} would be created, so departments are required."
-                raise AttributeError(msg)
-
+            # Allow creating a course without departments
             root_course = Course.objects.create(
                 readable_id=root_course_id,
                 title=edx_course_run.name,
                 live=live,
             )
 
-            for department in departments:
-                if isinstance(department, str) and create_depts:
-                    dept, _ = Department.objects.get_or_create(name=department)
-                    dept.save()
-                elif isinstance(department, Department):
-                    dept = department
-
-                root_course.departments.add(dept.id)
+            if departments:
+                dept = None
+                for department in departments:
+                    if isinstance(department, str) and create_depts:
+                        dept, _ = Department.objects.get_or_create(name=department)
+                        dept.save()
+                    elif isinstance(department, Department):
+                        dept = department
+                    if dept:
+                        root_course.departments.add(dept.id)
 
     new_run = CourseRun.objects.create(
         course=root_course,
@@ -1422,7 +1421,10 @@ ENV_TO_LEARN_HOSTNAME_MAP = {
 }
 
 
-def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
+def get_verifiable_credentials_payload(
+    certificate: CourseRunCertificate | ProgramCertificate,
+    certificate_page: CertificatePage,
+) -> dict:
     # TODO: We could optimize these queries #noqa: TD002, TD003, FIX002
     # It's not a massive priority though, as we have a total of 20k certs in prod as of 12/25
     learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
@@ -1434,14 +1436,6 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         course_run = certificate.course_run
         course = course_run.course
         course_page = course.page
-        if not course_page.what_you_learn:
-            # If it's empty, we can't generate a valid payload as narrative is required.
-            log.error(
-                "Error creating verifiable credential - missing 'what_you_learn' for course page %s for certificate %s",
-                course_page.title,
-                certificate,
-            )
-            raise InvalidCertificateError
 
         course_url_id = course.readable_id
         url = f"https://{learn_hostname}/courses/{course_url_id}"
@@ -1452,10 +1446,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(course_page) if course_page.feature_image else ""
         )
-        soup = BeautifulSoup(course_page.what_you_learn, "html.parser")
-        narrative = "\n".join(
-            [f"- {stripped_string}" for stripped_string in soup.stripped_strings]
-        )
+        narrative = certificate_page.verifiable_credential_criteria
 
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
@@ -1469,9 +1460,7 @@ def get_verifiable_credentials_payload(certificate: BaseCertificate) -> dict:
         achievement_image_url = (
             get_thumbnail_url(program_page) if program_page.feature_image else ""
         )
-        narrative = "\n".join(
-            [f"- {program_course[0].title}" for program_course in program.courses]
-        )
+        narrative = certificate_page.verifiable_credential_criteria
     else:
         raise InvalidCertificateError
 
@@ -1557,14 +1546,34 @@ def request_verifiable_credential(payload) -> dict:
     return resp.json()
 
 
-def should_provision_verifiable_credential() -> bool:
+def should_provision_verifiable_credential(
+    certificate_page: CertificatePage | None,
+) -> bool:
+    if not certificate_page:
+        return False
+
     return (
-        is_enabled(features.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING, False)  # noqa: FBT003
-        or settings.ENABLE_VERIFIABLE_CREDENTIALS_PROVISIONING
+        certificate_page.should_provision_verifiable_credential
+        and certificate_page.verifiable_credential_criteria
     )
 
 
-def create_verifiable_credential(certificate: BaseCertificate, *, raise_on_error=False):
+def get_certificate_page(
+    certificate: CourseRunCertificate | ProgramCertificate,
+) -> CertificatePage | None:
+    from cms.models import CertificatePage  # noqa: PLC0415
+
+    certificate_page = None
+    if certificate.certificate_page_revision:
+        certificate_page = CertificatePage.objects.filter(
+            pk=int(certificate.certificate_page_revision.object_id),
+        ).first()
+    return certificate_page
+
+
+def create_verifiable_credential(
+    certificate: ProgramCertificate | CourseRunCertificate, *, raise_on_error=False
+):
     """
     Create a verifiable credential for the given course run certificate.
 
@@ -1572,10 +1581,16 @@ def create_verifiable_credential(certificate: BaseCertificate, *, raise_on_error
         certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
         raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
     """
+
     try:
-        if not should_provision_verifiable_credential():
+        # We always look at the most recent certificate page revision for content and whether or not to provision
+        # You can imagine that if we used the linked revision, if the certificate page was in a bad state
+        # when the certificate was issued, we could never backfill the VC even if we fixed it later.
+        certificate_page = get_certificate_page(certificate)
+
+        if not should_provision_verifiable_credential(certificate_page):
             return
-        payload = get_verifiable_credentials_payload(certificate)
+        payload = get_verifiable_credentials_payload(certificate, certificate_page)
 
         # Call the signing service to create the new credential
         credential = request_verifiable_credential(payload)
@@ -1594,3 +1609,96 @@ def create_verifiable_credential(certificate: BaseCertificate, *, raise_on_error
         )
         if raise_on_error:
             raise
+
+
+def rerun_course_run(  # noqa: PLR0913
+    base_run: CourseRun,
+    run_tag: str,
+    *,
+    courseware_id: str | None = None,
+    organization: str | None = None,
+    title: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    enrollment_start: datetime | None = None,
+    enrollment_end: datetime | None = None,
+    is_self_paced: bool | None = None,
+    live: bool | None = None,
+    enrollment_modes: list[EnrollmentMode] | None = None,
+) -> CourseRun:
+    """
+    Re-run an existing course run.
+
+    Takes the specified base run and re-runs it in edX with the specified run tag.
+    The resulting run must not exist in edX.
+
+    By default, the created run will share all the same parameters as the base
+    run, other than the run tag.
+
+    When specifying start and end dates, be aware that course start and end must
+    be set to set enrollment start and end, and the enrollment start and end dates
+    must be before or equal to the course start and end dates respectively.
+
+    The organization option has nothing to do with B2B organizations. This is the
+    first part of the courseware ID after the `course-v1:` part.
+
+    Specifying a custom courseware ID will override the run tag and organization
+    settings passed in.
+
+    Args:
+    - base_run (CourseRun): the course to re-run
+    - run_tag (str): the new run tag to use
+    Keyword Args:
+    - courseware_id (str): new courseware/readable ID to use
+    - organization (str): new organization to use
+    - title (str): new course title
+    - start_date (DateTime): course start date
+    - end_date (DateTime): course end date
+    - enrollment_start (DateTime): enrollment start date
+    - enrollment_end (DateTime): enrollment end date
+    - is_self_paced (bool): course is self-paced
+    - live (bool): course is live (in MITx Online)
+    - enrollment_modes (list[EnrollmentMode]): modes to add to the new run
+    Returns:
+    - CourseRun, the created run
+    """
+
+    if courseware_id:
+        target_run_id = courseware_id
+    else:
+        base_key = CourseKey.from_string(base_run.courseware_id)
+
+        base_key = base_key.replace(run=run_tag)
+        if organization:
+            base_key = base_key.replace(org=organization)
+
+        target_run_id = str(base_key)
+
+    with transaction.atomic():
+        new_run = CourseRun.objects.create(
+            course=base_run.course,
+            title=title if title else base_run.title,
+            courseware_id=target_run_id,
+            run_tag=run_tag,
+            start_date=start_date if start_date else base_run.start_date,
+            end_date=end_date if end_date else base_run.end_date,
+            enrollment_start=enrollment_start
+            if enrollment_start
+            else base_run.enrollment_start,
+            enrollment_end=enrollment_end
+            if enrollment_end
+            else base_run.enrollment_end,
+            is_self_paced=is_self_paced
+            if is_self_paced is not None
+            else base_run.is_self_paced,
+            live=live if live is not None else base_run.live,
+        )
+
+        for mode in (
+            enrollment_modes if enrollment_modes else base_run.enrollment_modes.all()
+        ):
+            new_run.enrollment_modes.add(mode)
+
+        process_course_run_clone(new_run, base_run.courseware_id)
+
+    return new_run

@@ -25,6 +25,7 @@ from courses.factories import (
 from courses.models import ProgramEnrollment
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import (
+    DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -640,16 +641,26 @@ def test_discount_rest_api(admin_drf_client, user_drf_client):
     assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
 
 
+@pytest.mark.parametrize(
+    "zerovalue",
+    [
+        True,
+        False,
+    ],
+)
 @pytest.mark.skip_nplusone_check
 def test_discount_redemptions_api(
-    user, products, discounts, admin_drf_client, user_drf_client
+    user, products, admin_drf_client, user_drf_client, zerovalue
 ):
     """
     Tests pulling redemeptions from a discount after submitting an order with
     one in it.
     """
 
-    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+        amount=0 if zerovalue else 1,
+    )
 
     # permissions testing
     resp = user_drf_client.get(
@@ -674,8 +685,14 @@ def test_discount_redemptions_api(
 
     resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
 
-    # 100% discount will redirect to user dashboard
     assert resp.status_code == 200
+
+    # If the order is zero-value, the response changes somewhat, so check for that.
+    if zerovalue:
+        assert "no_checkout" in resp.json()
+        assert resp.json()["no_checkout"]
+    else:
+        assert len(resp.json()["payload"].keys()) > 0
 
     resp = admin_drf_client.get(
         reverse("v0:discounts_api-redemptions-list", args=[discount.id]),

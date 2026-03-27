@@ -23,7 +23,7 @@ from viewflow import this
 from viewflow.fsm import State
 
 from courses.models import CourseRun, PaidCourseRun, Program
-from courses.utils import is_uai_order
+from courses.utils import is_contract_order, is_uai_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -268,6 +268,15 @@ class Discount(TimestampedModel):
         blank=True,
         default=False,
         help_text="Discount is only for creating verified course run enrollments for a program.",
+    )
+    # Only for B2B enrollment codes where the contract has a Google Sheet configured.
+    # This is just to save time/energy when we want to update the sheet later.
+    b2b_sheet_location = models.CharField(  # noqa: DJ001
+        blank=True,
+        null=True,
+        default="",
+        max_length=10,
+        help_text="The location of this code in the B2B contract's code sheet.",
     )
 
     def __str__(self):
@@ -702,7 +711,11 @@ class OrderFlow:
 
         # No email is required as this order is generated from management command
         # Skip receipt emails for UAI orders
-        if not already_enrolled and not is_uai_order(self.order):
+        if (
+            not already_enrolled
+            and not is_uai_order(self.order)
+            and not is_contract_order(self.order)
+        ):
             transaction.on_commit(self.order.send_ecommerce_order_receipt)
 
 
@@ -804,7 +817,14 @@ class PendingOrder(Order):
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
         for product in products:
-            product_versions.append(Version.objects.get_for_object(product).get())
+            # Per docs, this should sort most recent first.
+            product_version = Version.objects.get_for_object(product).first()
+
+            if not product_version:
+                msg = f"Product {product} is improperly constructed: no versions"
+                raise ValueError(msg)
+
+            product_versions.append(product_version)
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 

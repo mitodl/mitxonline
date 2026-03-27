@@ -23,6 +23,7 @@ def test_serialize_program_enrollment(user, with_certificate):
         data,
         {
             "program": {
+                "display_mode": None,
                 "id": enrollment.program.id,
                 "readable_id": enrollment.program.readable_id,
                 "title": enrollment.program.title,

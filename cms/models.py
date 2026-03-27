@@ -15,7 +15,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.forms import ChoiceField, IntegerField
+from django.forms import ChoiceField, IntegerField, Textarea
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -373,11 +373,25 @@ class CertificatePage(CourseProgramChildPage):
         use_json_field=True,
     )
 
+    verifiable_credential_criteria = models.CharField(  # noqa: DJ001
+        max_length=250,
+        null=True,
+        blank=True,
+        help_text="For verifiable credentials issued for this certificate, this is the criteria narrative field. It should be something descriptive, like a list of completed courses, and may be plaintext or markdown. If it is not supplied, no verifiable credential will be provisioned for those certificates.",
+    )
+
+    should_provision_verifiable_credential = models.BooleanField(
+        default=False,
+        help_text="Whether a verifiable credential should be provisioned for this certificate.",
+    )
+
     content_panels = [
         FieldPanel("product_name"),
         FieldPanel("CEUs"),
         FieldPanel("overrides"),
         FieldPanel("signatories"),
+        FieldPanel("verifiable_credential_criteria", widget=Textarea),
+        FieldPanel("should_provision_verifiable_credential"),
     ]
     api_fields = [
         APIField("product_name"),
@@ -1370,7 +1384,7 @@ class CoursePage(ProductPage):
             is_courseware_flexible_price_approved(self.product, request.user)
             and ecommerce_product
         ):
-            ecommerce_product = ecommerce_product.first()
+            ecommerce_product = ecommerce_product[0]
 
             discount = determine_courseware_flexible_price_discount(
                 ecommerce_product, request.user
@@ -1456,6 +1470,11 @@ class ProgramPage(ProductPage):
         blank=True,
         null=True,
     )
+    include_in_learn_catalog = models.BooleanField(
+        default=False,
+        null=True,
+        help_text="If true, Learn should include this in its catalog.",
+    )
 
     template = "product_page.html"
     search_fields = Page.search_fields + [  # noqa: RUF005
@@ -1466,12 +1485,17 @@ class ProgramPage(ProductPage):
             ],
         )
     ]
-    content_panels = [  # noqa: RUF005
-        FieldPanel("program"),
-    ] + ProductPage.content_panels
+    content_panels = (
+        [  # noqa: RUF005
+            FieldPanel("program"),
+        ]
+        + ProductPage.content_panels
+        + [FieldPanel("include_in_learn_catalog")]
+    )
     api_fields = [
         *ProductPage.api_fields,
         APIField("program_details"),
+        APIField("include_in_learn_catalog"),
     ]
 
     @property
@@ -1818,8 +1842,8 @@ class FlexiblePricingRequestForm(AbstractForm):
         product_page = self.get_parent_product_page()
         product = product_page.product
         context["product"] = (
-            product.active_products.first()
-            if isinstance(product, Course) and product.active_products is not None
+            product.active_products[0]
+            if isinstance(product, Course) and product.active_products
             else None
         )
         context["product_page"] = product_page.url

@@ -39,9 +39,29 @@ class DiscountContractAttachmentRedemptionAdmin(ReadOnlyModelAdmin):
     """Admin for discount attachments."""
 
     list_display = ["user", "contract", "discount", "created_on"]
+    list_filter = [
+        (
+            "user",
+            admin.RelatedOnlyFieldListFilter,
+        ),
+        (
+            "contract",
+            admin.RelatedOnlyFieldListFilter,
+        ),
+        (
+            "user__user_organizations__organization",
+            admin.RelatedOnlyFieldListFilter,
+        ),
+    ]
     date_hierarchy = "created_on"
     fields = ["user", "contract", "discount", "created_on"]
     readonly_fields = ["user", "contract", "discount", "created_on"]
+    search_fields = [
+        "user__email",
+        "user__global_id",
+        "contract__slug",
+        "discount__discount_code",
+    ]
 
 
 class ContractPageProgramInline(admin.TabularInline):

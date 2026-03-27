@@ -33,6 +33,7 @@ from courses.constants import (
     AVAILABILITY_CHOICES,
     ENROLL_CHANGE_STATUS_CHOICES,
     ENROLLABLE_ITEM_ID_SEPARATOR,
+    PROGRAM_DISPLAY_MODE_CHOICES,
     SYNCED_COURSE_RUN_FIELD_MSG,
 )
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
@@ -295,7 +296,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         null=True,
     )
     departments = models.ManyToManyField(
-        Department, blank=False, related_name="programs"
+        Department, blank=True, related_name="programs"
     )
     availability = models.CharField(
         choices=AVAILABILITY_CHOICES, default=AVAILABILITY_ANYTIME, max_length=255
@@ -304,6 +305,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     enrollment_end = models.DateTimeField(null=True, blank=True, db_index=True)
     enrollment_modes = models.ManyToManyField(
         EnrollmentMode, blank=True, related_name="+"
+    )
+    display_mode = models.CharField(  # noqa: DJ001
+        max_length=32,
+        choices=PROGRAM_DISPLAY_MODE_CHOICES,
+        blank=True,
+        null=True,
+        help_text="Set to 'course' to treat this program as a course in APIs.",
     )
     start_date = models.DateTimeField(null=True, blank=True, db_index=True)
     end_date = models.DateTimeField(null=True, blank=True, db_index=True)
@@ -719,6 +727,26 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """
         return self._courses_with_requirements_data["elective_courses"]
 
+    @cached_property
+    def program_nodes(self):
+        """
+        Returns the programs that are associated with this program via the
+        requirements tree.
+
+        Returns:
+        - list of Program: programs that are electives
+        """
+        return [
+            req.required_program
+            for req in ProgramRequirement.objects.filter(
+                node_type=ProgramRequirementNodeType.PROGRAM,
+                program=self,
+                required_program__isnull=False,
+            )
+            .select_related("required_program")
+            .all()
+        ]
+
     @property
     def required_programs(self):
         """
@@ -910,9 +938,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False, db_index=True)
-    departments = models.ManyToManyField(
-        Department, blank=False, related_name="courses"
-    )
+    departments = models.ManyToManyField(Department, blank=True, related_name="courses")
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",
@@ -943,13 +969,15 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Gets active products for the first unexpired courserun for this course
 
         Returns:
-        - ProductsQuerySet
+        - list of active products
         """
         relevant_run = self.first_unexpired_run
-
-        return (
-            relevant_run.products.filter(is_active=True).all() if relevant_run else None
-        )
+        if relevant_run is None:
+            return []
+        # Use prefetched products if available
+        if hasattr(relevant_run, "prefetched_products"):
+            return [p for p in relevant_run.prefetched_products if p.is_active]
+        return list(relevant_run.products.filter(is_active=True).all())
 
     @cached_property
     def first_unexpired_run(self):
@@ -982,7 +1010,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return best_run
 
     @cached_property
-    def include_in_learn_catalog(self):
+    def include_in_learn_catalog(self) -> bool:
         """
         Return true if the course should be included in the Learn catalog.
 
@@ -993,7 +1021,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return getattr(self.page, "include_in_learn_catalog", False)
 
     @cached_property
-    def ingest_content_files_for_ai(self):
+    def ingest_content_files_for_ai(self) -> bool:
         """
         Return true if the course's content files should be ingested.
 
@@ -1215,12 +1243,16 @@ class CourseRun(TimestampedModel):
         Checks if the course can be upgraded
         A null value means that the upgrade window is always open
         """
+        if hasattr(self, "prefetched_products"):
+            has_product = bool(self.prefetched_products)
+        else:
+            has_product = self.products.exists()
         return (
             self.live is True
             and (
                 self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
             )
-            and self.products.count() > 0
+            and has_product
         )
 
     @cached_property
@@ -1296,6 +1328,13 @@ class CourseRun(TimestampedModel):
     def is_run(self):
         """Flag to indicate if this is a run"""
         return True
+
+    @cached_property
+    def edx_modes(self):
+        """Get the edX course modes for this course."""
+        from openedx.api import get_edx_course_modes  # noqa: PLC0415
+
+        return get_edx_course_modes(self.courseware_id)
 
     def __str__(self):
         title = f"{self.courseware_id} | {self.title}"
@@ -1630,6 +1669,10 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
     def objects_for_audit(cls):
         return cls.all_objects
 
+    @cached_property
+    def can_unenroll(self):
+        return True
+
     def to_dict(self):
         return {
             **serialize_model_object(self),
@@ -1666,6 +1709,9 @@ class CourseRunEnrollmentCertificatePrefetcher(Prefetcher):
 
     @staticmethod
     def filter(course_run_and_user_ids):
+        if not course_run_and_user_ids:
+            return CourseRunCertificate.objects.none()
+
         id_filters = Q()
 
         # django 5.1 supports this via
@@ -1694,6 +1740,9 @@ class CourseRunEnrollmentGradesPrefetcher(Prefetcher):
 
     @staticmethod
     def filter(course_run_and_user_ids):
+        if not course_run_and_user_ids:
+            return CourseRunGrade.objects.none()
+
         id_filters = Q()
 
         # django 5.1 supports this via
@@ -1837,6 +1886,9 @@ class ProgramEnrollmentCertificatePrefetcher(Prefetcher):
 
     @staticmethod
     def filter(program_and_user_ids):
+        if not program_and_user_ids:
+            return ProgramCertificate.objects.none()
+
         id_filters = Q()
 
         # django 5.1 supports this via
@@ -1890,6 +1942,10 @@ class ProgramEnrollment(EnrollmentModel):
     @classmethod
     def get_audit_class(cls):
         return ProgramEnrollmentAudit
+
+    @cached_property
+    def can_unenroll(self):
+        return not PaidProgram.fulfilled_paid_program_exists(self.user, self.program)
 
     @cached_property
     def certificate(self):

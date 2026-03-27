@@ -14,16 +14,15 @@ from courses import models
 from courses.api import create_run_enrollments
 from courses.serializers.utils import get_topics_from_page
 from courses.serializers.v1.base import (
-    BaseCourseRunEnrollmentSerializer,
+    BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
-    ProductFlexiblePriceRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
+from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +37,7 @@ class CourseSerializer(BaseCourseSerializer):
     programs = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
+    certificate_available = serializers.SerializerMethodField()
     availability = serializers.SerializerMethodField()
     required_prerequisites = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
@@ -154,11 +154,23 @@ class CourseSerializer(BaseCourseSerializer):
 
     @extend_schema_field(str)
     def get_certificate_type(self, instance):
+        """Return the certificate type."""
+
         if instance.programs:
             program = instance.programs[0]
             if "MicroMasters" in program.program_type:
                 return "MicroMasters Credential"
+
         return "Certificate of Completion"
+
+    @extend_schema_field(bool)
+    def get_certificate_available(self, instance) -> bool:
+        """Return if there is a certificate available for the course."""
+
+        return (
+            instance.first_unexpired_run is not None
+            and instance.first_unexpired_run.certificate_available_date is not None
+        )
 
     @extend_schema_field(str)
     def get_availability(self, instance):
@@ -214,6 +226,7 @@ class CourseSerializer(BaseCourseSerializer):
             "programs",
             "topics",
             "certificate_type",
+            "certificate_available",
             "required_prerequisites",
             "duration",
             "min_weeks",
@@ -233,7 +246,7 @@ class CourseSerializer(BaseCourseSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductFlexiblePriceRelatedField(many=True, read_only=True)
+    products = serializers.SerializerMethodField(method_name="get_products")
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
@@ -258,6 +271,17 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
 
+    @extend_schema_field(BaseProductSerializer(many=True))
+    def get_products(self, obj):
+        # Use prefetched products if available to avoid N+1 queries
+        products = (
+            obj.prefetched_products
+            if hasattr(obj, "prefetched_products")
+            else obj.products.all()
+        )
+
+        return BaseProductSerializer(products, many=True, context=self.context).data
+
 
 @extend_schema_serializer(component_name="CourseWithCourseRunsSerializerV2")
 class CourseWithCourseRunsSerializer(CourseSerializer):
@@ -267,22 +291,37 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
 
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
-        """Get the course runs for the given instance."""
-        courseruns = instance.courseruns.prefetch_related("enrollment_modes").order_by(
-            "id"
-        )
-
+        # Use prefetched course runs to preserve prefetched products
+        courseruns = instance.courseruns.all()
+        if hasattr(instance, "prefetched_courseruns"):
+            courseruns = instance.prefetched_courseruns
+        # Filter by enrollable status if context parameter is present
+        if "courserun_is_enrollable" in self.context:
+            courseruns = [
+                run
+                for run in courseruns
+                if getattr(run, "is_enrollable", False)
+                == bool(self.context["courserun_is_enrollable"])
+            ]
         if "org_id" in self.context:
-            courseruns = courseruns.filter(
-                b2b_contract__organization_id=self.context["org_id"]
-            )
+            courseruns = [
+                run
+                for run in courseruns
+                if getattr(run.b2b_contract, "organization_id", None)
+                == int(self.context["org_id"])
+            ]
         if "contract_id" in self.context:
-            courseruns = courseruns.filter(b2b_contract_id=self.context["contract_id"])
-
+            courseruns = [
+                run
+                for run in courseruns
+                if getattr(run.b2b_contract, "id", None)
+                == int(self.context["contract_id"])
+            ]
         if "org_id" not in self.context and "contract_id" not in self.context:
-            courseruns = courseruns.filter(b2b_contract_id=None)
-
-        return CourseRunSerializer(courseruns, many=True, read_only=True).data
+            courseruns = [run for run in courseruns if run.b2b_contract_id is None]
+        return CourseRunSerializer(
+            courseruns, many=True, read_only=True, context=self.context
+        ).data
 
     class Meta:
         model = models.Course
@@ -305,15 +344,11 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
 
 
 @extend_schema_serializer(component_name="CourseRunEnrollmentRequestV2")
-class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
+class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSerializer):
     """CourseRunEnrollment model serializer"""
 
     run = CourseRunWithCourseSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
-    enrollment_mode = serializers.ChoiceField(
-        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
-    )
-    approved_flexible_price_exists = serializers.SerializerMethodField()
     b2b_organization_id = serializers.SerializerMethodField()
     b2b_contract_id = serializers.SerializerMethodField()
 
@@ -351,8 +386,10 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
             return enrollment.run.b2b_contract.id
         return None
 
-    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
-        fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [  # noqa: RUF005
+    class Meta(BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta):
+        fields = [
+            *BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta.fields,
+            "run",
             "run_id",
             "b2b_organization_id",
             "b2b_contract_id",

@@ -302,7 +302,8 @@ class Command(BaseCommand):
             live=kwargs["live"],
         )
 
-        self._add_departments_to_courseware_object(new_program, add_depts)
+        if add_depts:
+            self._add_departments_to_courseware_object(new_program, add_depts)
 
         self._successfully_created_courseware_object_message(new_program)
 
@@ -347,8 +348,8 @@ class Command(BaseCommand):
             readable_id=kwargs["courseware_id"],
             live=kwargs["live"],
         )
-
-        self._add_departments_to_courseware_object(new_course, add_depts)
+        if add_depts:
+            self._add_departments_to_courseware_object(new_course, add_depts)
 
         self._successfully_created_courseware_object_message(new_course)
 
@@ -370,8 +371,6 @@ class Command(BaseCommand):
                 program = Program.objects.filter(pk=kwargs["program"]).first()
             except:  # noqa: E722
                 program = Program.objects.filter(readable_id=kwargs["program"]).first()
-
-            self._add_departments_to_courseware_object(program, add_depts)
 
             if program is not None and kwargs["required"]:
                 new_req = program.add_requirement(new_course)
@@ -578,8 +577,9 @@ class Command(BaseCommand):
             )
             exit(-1)  # noqa: PLR1722
 
-        # Validate/create departments for programs and courses (not needed for courseruns)
-        if kwargs["type"] in ["program", "course"]:
+        # Create or get departments if specified.
+        add_depts = None
+        if kwargs.get("depts"):
             add_depts = self._get_or_create_departments(
                 kwargs["depts"], create_if_missing=kwargs["create_depts"]
             )

@@ -7,7 +7,8 @@ from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from courses.utils import get_approved_flexible_price_exists
-from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
+from ecommerce.serializers import ProductFlexibilePriceSerializer
+from ecommerce.serializers.v0 import BaseProductSerializer
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
@@ -122,6 +123,7 @@ class BaseProgramSerializer(serializers.ModelSerializer):
             "readable_id",
             "id",
             "type",
+            "display_mode",
         ]
 
 
@@ -150,23 +152,33 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     enrollment_mode = serializers.ChoiceField(
         (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
     )
-    approved_flexible_price_exists = serializers.SerializerMethodField()
     grades = CourseRunGradeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = models.CourseRunEnrollment
+        fields = [
+            "id",
+            "edx_emails_subscription",
+            "certificate",
+            "enrollment_mode",
+            "grades",
+        ]
+
+
+class BaseCourseRunEnrollmentWithFlexiblePriceSerializer(
+    BaseCourseRunEnrollmentSerializer
+):
+    approved_flexible_price_exists = serializers.SerializerMethodField()
 
     @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         return get_approved_flexible_price_exists(instance, self.context)
 
-    class Meta:
+    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
         model = models.CourseRunEnrollment
         fields = [
-            "run",
-            "id",
-            "edx_emails_subscription",
-            "certificate",
-            "enrollment_mode",
+            *BaseCourseRunEnrollmentSerializer.Meta.fields,
             "approved_flexible_price_exists",
-            "grades",
         ]
 
 

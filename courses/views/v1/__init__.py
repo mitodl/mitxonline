@@ -191,7 +191,9 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 Course.objects.filter()
                 .select_related("page")
                 .prefetch_related(
-                    "courseruns", "departments", "courseruns__enrollment_modes"
+                    "courseruns",
+                    "departments",
+                    "courseruns__enrollment_modes",
                 )
                 .all()
             )
@@ -587,6 +589,13 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             user=request.user, program=program
         ).first()
         if enrollment:
+            if not enrollment.can_unenroll:
+                return Response(
+                    {
+                        "message": "Cannot unenroll from a purchased program, contact support."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_UNENROLLED)
 
         return self.list(request)

@@ -43,6 +43,7 @@ from courses.factories import (
 from courses.models import (
     Course,
     CourseRunEnrollment,
+    PaidProgram,
     Program,
     ProgramEnrollment,
 )
@@ -73,7 +74,8 @@ from courses.views.test_utils import (
     num_queries_from_programs,
 )
 from courses.views.v2 import Pagination, ProgramFilterSet
-from ecommerce.models import Product
+from ecommerce.factories import OrderFactory, ProductFactory
+from ecommerce.models import OrderStatus, Product
 from main import features
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -176,7 +178,9 @@ def test_get_program(
     duplicate_queries_check(context)
     program_data = resp.json()
     assert_drf_json_equal(
-        program_data, ProgramDetailSerializer(program).data, ignore_order=True
+        program_data,
+        ProgramDetailSerializer(program, context={"include_programs": True}).data,
+        ignore_order=True,
     )
 
 
@@ -248,7 +252,6 @@ def test_get_courses(
     params = {"page_size": 100}
 
     courses = Course.objects.order_by("title").prefetch_related("departments")
-
     if include_finaid is not None:
         mock_context["include_approved_financial_aid"] = include_finaid
         params["include_approved_financial_aid"] = include_finaid
@@ -365,6 +368,48 @@ def test_retrievinng_single_course_by_pk_or_readable_id_includes_programs(
 
     assert resp1.json() == resp.json()
     assert resp2.json()["results"][0] == resp.json()
+
+
+@pytest.mark.django_db
+def test_retrieving_single_program_by_pk_or_readable_id_includes_parent_programs(
+    user_drf_client,
+):
+    """Programs retrieved via v2 API should include parent programs when applicable."""
+
+    # Create a child program that will be treated as a course in Learn
+    child_program = ProgramFactory.create(display_mode="course")
+
+    # Create a parent program and add the child as a required program
+    parent_program = ProgramFactory.create()
+    parent_program.add_requirement(child_program)
+    parent_program.refresh_from_db()
+
+    # Request the child program by primary key
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": child_program.id}),
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    program_data = resp.json()
+
+    # Verify that parent programs are included in the response
+    assert "programs" in program_data
+    assert program_data["programs"] is not None
+    assert len(program_data["programs"]) == 1
+    assert program_data["programs"][0]["id"] == parent_program.id
+    assert program_data["programs"][0]["readable_id"] == parent_program.readable_id
+    assert program_data["programs"][0]["title"] == parent_program.title
+
+    # Check result is same if retrieving by readable_id or via list filter
+    resp_by_readable = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": child_program.readable_id}),
+    )
+    resp_list = user_drf_client.get(
+        reverse("v2:programs_api-list"), {"readable_id": child_program.readable_id}
+    )
+
+    assert resp_by_readable.json() == program_data
+    assert resp_list.json()["results"][0] == program_data
 
 
 @pytest.mark.django_db
@@ -1312,6 +1357,52 @@ def test_filter_by_contract_id_unauthenticated_user(
 
 
 @pytest.mark.django_db
+def test_filter_programs_by_org_and_contract_no_duplicates(
+    contract_ready_course, mock_course_run_clone
+):
+    """Filtering by both org_id and contract_id should not return duplicate programs."""
+
+    org = OrganizationPageFactory()
+    user = UserFactory()
+    user.b2b_organizations.add(org)
+
+    # Two active contracts for the same organization
+    contract_primary = ContractPageFactory(active=True, organization=org)
+    contract_other = ContractPageFactory(active=True, organization=org)
+
+    # User only has access to the primary contract
+    user.b2b_contracts.add(contract_primary)
+
+    # Program shared by both contracts
+    program = ProgramFactory()
+    (course, _) = contract_ready_course
+    program.add_requirement(course)
+    program.refresh_from_db()
+
+    contract_primary.add_program_courses(program)
+    contract_other.add_program_courses(program)
+
+    request = Request(
+        RequestFactory().get(
+            "v2:programs_api-list",
+            {"org_id": org.id, "contract_id": contract_primary.id},
+        )
+    )
+    request.user = user
+
+    filterset = ProgramFilterSet(
+        data={"org_id": org.id, "contract_id": contract_primary.id},
+        queryset=Program.objects.all(),
+        request=request,
+    )
+
+    filtered = list(filterset.qs)
+    # The shared program should only appear once
+    assert program in filtered
+    assert len(filtered) == 1
+
+
+@pytest.mark.django_db
 def test_filter_courses_with_contract_id_authenticated_user(
     mocker, contract_ready_course, mock_course_run_clone
 ):
@@ -1407,7 +1498,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
     Tests the program enrollments API, which should show the user's enrollment
     in programs with the course runs that apply.
     """
-    user = user_with_enrollments_and_certificates
+    user = user_with_enrollments_and_certificates.user
 
     program_enrollments = (
         ProgramEnrollment.objects.filter(user=user)
@@ -1462,11 +1553,14 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "collections": [],
                 "availability": "anytime",
                 "certificate_type": "Certificate of Completion",
+                "certificate_available": False,
                 "required_prerequisites": _get_page_prop(
                     program_enrollment, "prerequisites", ""
                 )
                 != "",
                 "topics": [],
+                "display_mode": None,
+                "programs": None,
                 "start_date": ANY_STR,
                 "end_date": None,
                 "enrollment_end": None,
@@ -1661,9 +1755,11 @@ def test_add_verified_program_course_enrollment(
             "v2:add_verified_program_course_enrollment",
             kwargs={
                 "courserun_id": course_run.courseware_id,
-                "program_id": program.readable_id,
             },
-        )
+        ),
+        data=[
+            program.readable_id,
+        ],
     )
 
     if program_enrollment_type:
@@ -1685,6 +1781,184 @@ def test_add_verified_program_course_enrollment(
         ):
             # We had enough electives so we should have gotten an audit enrollment
             assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
+@pytest.mark.parametrize(
+    "crogram_unrelated",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "base_program_enrollment_type",
+    [
+        None,
+        EDX_ENROLLMENT_AUDIT_MODE,
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    ],
+)
+@pytest.mark.parametrize(
+    "crogram_enrollment_type",
+    [
+        None,
+        EDX_ENROLLMENT_AUDIT_MODE,
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    ],
+)
+def test_add_nested_verified_program_course_enrollment(
+    user,
+    user_drf_client,
+    base_program_enrollment_type,
+    crogram_enrollment_type,
+    crogram_unrelated,
+):
+    """
+    Test that the endpoint works as expected when we're enrolling in a nested
+    program.
+
+    This specifically is for testing when the course is part of a "crogram" that
+    is part of a program, and the user has a verified enrollment in the program
+    but no enrollment in the "crogram" (or they don't match). In this case, we
+    should figure out what the upstream enrollment is and make sure the
+    intermediary has the right enrollments too.
+
+    This test doesn't care too much about the resulting course run enrollment
+    since that gets tested in the above test (and elsewhere).
+    """
+
+    expected_enrollment = (
+        EDX_ENROLLMENT_VERIFIED_MODE
+        if EDX_ENROLLMENT_VERIFIED_MODE
+        in [base_program_enrollment_type, crogram_enrollment_type]
+        else EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={
+            "results": [
+                {"mode": expected_enrollment, "is_active": True},
+            ],
+        },
+        status=status.HTTP_200_OK,
+    )
+
+    # Set up base models
+    # We need a "crogram" that has a course as a requirement, and a base program
+    # that has the crogram as a requirement. Then, we need products for all of
+    # these.
+
+    base_program = ProgramFactory.create(display_mode=None)
+    crogram = ProgramFactory.create(display_mode="course")
+    course_run = CourseRunFactory.create()
+
+    course_run_content_type = ContentType.objects.get_for_model(course_run)
+    program_content_type = ContentType.objects.get_for_model(base_program)
+
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=course_run.id,
+            content_type=course_run_content_type,
+        )
+
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=base_program.id,
+            content_type=program_content_type,
+        )
+
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=crogram.id,
+            content_type=program_content_type,
+        )
+
+    crogram.add_requirement(course_run.course)
+    if not crogram_unrelated:
+        base_program.add_requirement(crogram)
+
+        assert base_program not in crogram.program_nodes
+        assert crogram in base_program.program_nodes
+
+    # Get enrollments set up.
+
+    if base_program_enrollment_type:
+        ProgramEnrollmentFactory.create(
+            program=base_program,
+            user=user,
+            enrollment_mode=base_program_enrollment_type,
+        )
+
+    if crogram_enrollment_type:
+        ProgramEnrollmentFactory.create(
+            program=crogram,
+            user=user,
+            enrollment_mode=crogram_enrollment_type,
+        )
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={
+                "courserun_id": course_run.courseware_id,
+            },
+        ),
+        data=[base_program.readable_id, crogram.readable_id],
+    )
+
+    if not base_program_enrollment_type and not crogram_enrollment_type:
+        # If we don't have any program enrollments, then it should bail.
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        assert not ProgramEnrollment.objects.filter(
+            user=user, program__in=[base_program, crogram]
+        ).exists()
+        return
+
+    if crogram_unrelated:
+        # If the two programs specified are unrelated, it should bail.
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+        if not crogram_enrollment_type:
+            assert not ProgramEnrollment.objects.filter(
+                user=user, program=crogram
+            ).exists()
+
+        return
+
+    if (
+        crogram_enrollment_type == EDX_ENROLLMENT_VERIFIED_MODE
+        and base_program_enrollment_type != EDX_ENROLLMENT_VERIFIED_MODE
+    ):
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        return
+
+    assert resp.status_code == status.HTTP_201_CREATED
+
+    if [base_program_enrollment_type, crogram_enrollment_type] == [
+        EDX_ENROLLMENT_VERIFIED_MODE,
+        EDX_ENROLLMENT_VERIFIED_MODE,
+    ]:
+        # If we were making verified enrollments, then we should have verified
+        # enrollments for both programs too.
+
+        assert (
+            ProgramEnrollment.objects.filter(
+                user=user,
+                program__in=[base_program, crogram],
+                enrollment_mode=expected_enrollment,
+            ).count()
+            == 2
+        )
 
 
 @pytest.mark.skip_nplusone_check
@@ -1955,3 +2229,81 @@ def test_program_enrollment_destroy(user_drf_client, user):
     enrollment.refresh_from_db()
     assert enrollment.active is False
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+
+
+def test_destroy_program_enrollment_paid_fails(user_drf_client, user):
+    """DELETE a paid program enrollment fails"""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    program = enrollment.program
+
+    order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    PaidProgram.objects.create(user=user, program=program, order=order)
+
+    resp = user_drf_client.delete(
+        reverse("v2:user_program_enrollments_api-detail", kwargs={"pk": program.id})
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "message": "Cannot unenroll from a purchased program, contact support."
+    }
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is True
+
+
+@pytest.mark.django_db
+def test_course_run_and_product_prefetch_optimized(
+    user_drf_client, django_assert_max_num_queries
+):
+    """
+    Verify that querying courses with multiple courseruns and products is optimized and does not result in N+1 queries.
+    """
+
+    course = CourseFactory()
+    num_courseruns = 8
+    courseruns = [CourseRunFactory(course=course) for _ in range(num_courseruns)]
+    for run in courseruns:
+        ProductFactory(
+            purchasable_object=run,
+        )
+    max_expected_queries = 21
+    num_queries_before = len(connection.queries)
+    with django_assert_max_num_queries(max_expected_queries):
+        resp = user_drf_client.get(reverse("v2:courses_api-list"))
+        assert resp.status_code == 200
+        data = resp.json()["results"]
+        assert len(data) == 1
+        assert len(data[0]["courseruns"]) == num_courseruns
+    # Check that products are queried only once/twice
+    # not sure why there is a second query
+    queries_after = connection.queries[num_queries_before:]
+
+    product_queries = [
+        q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
+    ]
+    assert len(product_queries) == 2, (
+        f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
+    )
+
+
+def test_program_products_prefetch_query_count(
+    user_drf_client, django_assert_max_num_queries
+):
+    """Test that products are prefetched and only one query is made for products in the program API."""
+    programs = ProgramFactory.create_batch(5, live=True)
+    for program in programs:
+        ProductFactory(purchasable_object=program)
+
+    num_queries_before = len(connection.queries)
+    expected_num_queries = num_queries_from_programs(programs, "v2")
+    with django_assert_max_num_queries(expected_num_queries) as context:
+        user_drf_client.get(reverse("v2:programs_api-list"))
+    duplicate_queries_check(context)
+    queries_after = connection.queries[num_queries_before:]
+
+    product_queries = [
+        q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
+    ]
+    assert len(product_queries) == 1, (
+        f"Expected 1 product query, got {len(product_queries)}"
+    )

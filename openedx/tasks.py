@@ -104,7 +104,11 @@ def update_edx_user_profile(user_id):
 
 
 @app.task
-def clone_courserun(target_id: int, *, base_id: int | str | None = None):
+def clone_courserun(target_id: int, base_key: str):
     """Queue call to clone an existing course run."""
 
-    api.process_course_run_clone(target_id, base_id=base_id)
+    from courses.models import CourseRun  # noqa: PLC0415
+
+    target_course = CourseRun.objects.get(pk=target_id)
+
+    api.process_course_run_clone(target_course, base_key)

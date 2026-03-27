@@ -17,7 +17,11 @@ from courses.serializers.base import (
     get_thumbnail_url,
 )
 from courses.serializers.utils import get_unique_topics_from_courses
-from courses.serializers.v1.base import EnrollmentModeSerializer, ProductRelatedField
+from courses.serializers.v1.base import (
+    BaseProgramSerializer,
+    EnrollmentModeSerializer,
+    ProductRelatedField,
+)
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.courses import CourseRunEnrollmentSerializer
 from main.serializers import StrictFieldsSerializer
@@ -132,12 +136,14 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     courses = serializers.SerializerMethodField()
     collections = serializers.SerializerMethodField()
+    programs = serializers.SerializerMethodField()
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
     departments = DepartmentSerializer(many=True, read_only=True)
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
+    certificate_available = serializers.SerializerMethodField()
     required_prerequisites = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     min_weeks = serializers.SerializerMethodField()
@@ -149,6 +155,38 @@ class ProgramSerializer(serializers.ModelSerializer):
     max_price = serializers.SerializerMethodField()
     start_date = serializers.SerializerMethodField()
     enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
+
+    @extend_schema_field(BaseProgramSerializer(many=True, allow_null=True))
+    def get_programs(self, instance):
+        """Include parent programs for this program when requested.
+
+        This mirrors the behavior of the CourseSerializer.get_programs method,
+        but uses the ProgramRequirement.required_program reverse relation
+        ("required_by") instead of Course.in_programs.
+        """
+        if not self.context.get("include_programs", False):
+            return None
+
+        programs_qs = instance.required_by
+
+        if self.context.get("org_id"):
+            programs_qs = programs_qs.filter(
+                program__contract_memberships__contract__organization__pk=self.context.get(
+                    "org_id"
+                )
+            )
+        elif self.context.get("contract_id"):
+            programs_qs = programs_qs.filter(
+                program__contract_memberships__contract__pk=self.context.get(
+                    "contract_id"
+                )
+            )
+        else:
+            programs_qs = programs_qs.filter(program__b2b_only=False)
+
+        programs = [req.program for req in programs_qs.select_related("program").all()]
+
+        return BaseProgramSerializer(programs, many=True).data
 
     def get_courses(self, instance) -> list[int]:
         return [course[0].id for course in instance.courses if course[0].live]
@@ -454,6 +492,10 @@ class ProgramSerializer(serializers.ModelSerializer):
             return "MicroMasters Credential"
         return "Certificate of Completion"
 
+    @extend_schema_field(bool)
+    def get_certificate_available(self, instance) -> bool:
+        return any(mode.requires_payment for mode in instance.enrollment_modes.all())
+
     def get_min_weekly_hours(self, instance) -> str | None:
         """
         Get the min weekly hours of the course from the course page CMS.
@@ -525,13 +567,16 @@ class ProgramSerializer(serializers.ModelSerializer):
             "id",
             "courses",
             "collections",
+            "programs",
             "requirements",
             "req_tree",
             "page",
             "program_type",
             "certificate_type",
+            "certificate_available",
             "departments",
             "live",
+            "display_mode",
             "topics",
             "availability",
             "start_date",
@@ -555,10 +600,22 @@ class ProgramSerializer(serializers.ModelSerializer):
 class ProgramDetailSerializer(ProgramSerializer):
     """Extended Program serializer that includes products. Used by the programs API."""
 
-    products = ProductRelatedField(many=True, read_only=True)
+    products = serializers.SerializerMethodField()
 
     class Meta(ProgramSerializer.Meta):
         fields = [*ProgramSerializer.Meta.fields, "products"]
+
+    @extend_schema_field(ProductRelatedField(many=True, read_only=True))
+    def get_products(self, instance):
+        # Use prefetched products if available, otherwise fallback to related manager
+        products = getattr(instance, "prefetched_products", None)
+        if products is not None:
+            return ProductRelatedField(many=True, read_only=True).to_representation(
+                products
+            )
+        return ProductRelatedField(many=True, read_only=True).to_representation(
+            instance.products.all()
+        )
 
 
 class ProgramCertificateSerializer(serializers.ModelSerializer):
