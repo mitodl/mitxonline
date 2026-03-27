@@ -1797,6 +1797,25 @@ wheels = [
 ]
 
 [[package]]
+name = "mitol-django-observability"
+version = "2026.3.11"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "mitol-django-common" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/3b/8c07a0a0feda332656213a8af4f055fa83fb9e0d6d483d77f12d8e63b47e/mitol_django_observability-2026.3.11.tar.gz", hash = "sha256:4539eff6b7da18e500fb0f23c0abf6bdba67eb65e35e890b08c338318494a1e6", size = 10093, upload-time = "2026-03-13T20:21:41.271Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cf/76/3f730dec3ff4ff6c5ab044d7b1e027b6f3214cedb66a2532301b6eb4b285/mitol_django_observability-2026.3.11-py3-none-any.whl", hash = "sha256:7523782802c09cad3003cacecdb62cc055efdbd8a80a9ea27a12cb5aaf3f59bc", size = 16052, upload-time = "2026-03-13T20:21:40.216Z" },
+]
+
+[[package]]
 name = "mitol-django-olposthog"
 version = "2025.8.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1909,18 +1928,16 @@ dependencies = [
     { name = "mitol-django-google-sheets-refunds" },
     { name = "mitol-django-hubspot-api" },
     { name = "mitol-django-mail" },
+    { name = "mitol-django-observability" },
     { name = "mitol-django-olposthog" },
     { name = "mitol-django-openedx" },
     { name = "mitol-django-payment-gateway" },
     { name = "mitol-django-scim" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-instrumentation-celery" },
     { name = "opentelemetry-instrumentation-django" },
     { name = "opentelemetry-instrumentation-psycopg" },
     { name = "opentelemetry-instrumentation-redis" },
     { name = "opentelemetry-instrumentation-requests" },
-    { name = "opentelemetry-sdk" },
     { name = "psycopg" },
     { name = "psycopg2" },
     { name = "pycountry" },
@@ -2019,18 +2036,16 @@ requires-dist = [
     { name = "mitol-django-google-sheets-refunds", specifier = ">=2025.6.13,<2026" },
     { name = "mitol-django-hubspot-api", specifier = "==2025.12.18" },
     { name = "mitol-django-mail", specifier = "==2023.12.19" },
+    { name = "mitol-django-observability", specifier = ">=2026.1.0" },
     { name = "mitol-django-olposthog", specifier = ">=2025.8.1,<2026" },
     { name = "mitol-django-openedx", specifier = "==2023.12.19" },
     { name = "mitol-django-payment-gateway", specifier = "==2023.12.19" },
     { name = "mitol-django-scim", specifier = ">=2025.5.23" },
-    { name = "opentelemetry-api", specifier = ">=1.31.0" },
-    { name = "opentelemetry-exporter-otlp", specifier = ">=1.31.0" },
     { name = "opentelemetry-instrumentation-celery", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-django", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-psycopg", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-redis", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-requests", specifier = ">=0.52b0" },
-    { name = "opentelemetry-sdk", specifier = ">=1.31.0" },
     { name = "psycopg", specifier = ">=3.2.4,<4" },
     { name = "psycopg2", specifier = ">=2.9.5,<3" },
     { name = "pycountry", specifier = ">=24.6.1,<25" },
@@ -2144,19 +2159,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/97/b9/3161be15bb8e3ad01be8be5a968a9237c3027c5be504362ff800fca3e442/opentelemetry_api-1.39.1.tar.gz", hash = "sha256:fbde8c80e1b937a2c61f20347e91c0c18a1940cecf012d62e65a7caf08967c9c", size = 65767, upload-time = "2025-12-11T13:32:39.182Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cf/df/d3f1ddf4bb4cb50ed9b1139cc7b1c54c34a1e7ce8fd1b9a37c0d1551a6bd/opentelemetry_api-1.39.1-py3-none-any.whl", hash = "sha256:2edd8463432a7f8443edce90972169b195e7d6a05500cd29e6d13898187c9950", size = 66356, upload-time = "2025-12-11T13:32:17.304Z" },
-]
-
-[[package]]
-name = "opentelemetry-exporter-otlp"
-version = "1.39.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "opentelemetry-exporter-otlp-proto-grpc" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/30/9c/3ab1db90f32da200dba332658f2bbe602369e3d19f6aba394031a42635be/opentelemetry_exporter_otlp-1.39.1.tar.gz", hash = "sha256:7cf7470e9fd0060c8a38a23e4f695ac686c06a48ad97f8d4867bc9b420180b9c", size = 6147, upload-time = "2025-12-11T13:32:40.309Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/6c/bdc82a066e6fb1dcf9e8cc8d4e026358fe0f8690700cc6369a6bf9bd17a7/opentelemetry_exporter_otlp-1.39.1-py3-none-any.whl", hash = "sha256:68ae69775291f04f000eb4b698ff16ff685fdebe5cb52871bc4e87938a7b00fe", size = 7019, upload-time = "2025-12-11T13:32:19.387Z" },
 ]
 
 [[package]]
@@ -3347,6 +3349,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/85/ad/430fb60d90e1d112a62ff57bdd1f286ec73a2a0331272febfddd21f330e1/StrEnum-0.4.15.tar.gz", hash = "sha256:878fb5ab705442070e4dd1929bb5e2249511c0bcf2b0eeacf3bcd80875c82eff", size = 23384, upload-time = "2023-06-29T22:02:58.399Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/69/297302c5f5f59c862faa31e6cb9a4cd74721cd1e052b38e464c5b402df8b/StrEnum-0.4.15-py3-none-any.whl", hash = "sha256:a30cda4af7cc6b5bf52c8055bc4bf4b2b6b14a93b574626da33df53cf7740659", size = 8851, upload-time = "2023-06-29T22:02:56.947Z" },
+]
+
+[[package]]
+name = "structlog"
+version = "25.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/52/9ba0f43b686e7f3ddfeaa78ac3af750292662284b3661e91ad5494f21dbc/structlog-25.5.0.tar.gz", hash = "sha256:098522a3bebed9153d4570c6d0288abf80a031dfdb2048d59a49e9dc2190fc98", size = 1460830, upload-time = "2025-10-27T08:28:23.028Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/45/a132b9074aa18e799b891b91ad72133c98d8042c70f6240e4c5f9dabee2f/structlog-25.5.0-py3-none-any.whl", hash = "sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f", size = 72510, upload-time = "2025-10-27T08:28:21.535Z" },
 ]
 
 [[package]]
