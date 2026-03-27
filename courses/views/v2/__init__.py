@@ -680,33 +680,14 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
 
     # Check if:
     # .. the program enrollment is audit,
-    # .. if the run isn't in the program,
-    # .. if the run is an elective, and if the learner already has enough verified elective enrollments
-    # and create an audit enrollment if any of these are true.
+    # .. if the run isn't in the program
 
-    if (
-        (program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE)
-        or (
-            run.course
-            not in [
-                *program_enrollment.program.required_courses,
-                *program_enrollment.program.elective_courses,
-            ]
-        )
-        or (
-            run.course not in program_enrollment.program.required_courses
-            and (
-                CourseRunEnrollment.objects.filter(
-                    run__course__in=program_enrollment.program.elective_courses,
-                    user=request.user,
-                    active=True,
-                    enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-                ).count()
-                >= (
-                    program_enrollment.program.minimum_elective_courses_requirement or 1
-                )
-            )
-        )
+    if (program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE) or (
+        run.course
+        not in [
+            *program_enrollment.program.required_courses,
+            *program_enrollment.program.elective_courses,
+        ]
     ):
         # Audit enrollments just get created, regardless of whether or not
         # the course is an elective.
@@ -760,11 +741,7 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
     Some special handling is needed for program-related course run enrollments
     when the learner has an enrollment in the program. The learner should get a
     course run enrollment that matches their program enrollment at no additional
-    charge. However, if the learner is enrolling in a course that's an elective,
-    and they have already enrolled in enough electives to satisfy the program's
-    requirements, they should then get an audit enrollment. (This won't preclude
-    them from getting a certificate for the course itself but they'll have to buy
-    the upgrade separately.)
+    charge.
     """
 
     program_ids = request.data
