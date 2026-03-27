@@ -619,15 +619,6 @@ class ProgramDetailSerializer(ProgramSerializer):
         )
 
 
-@extend_schema_serializer(component_name="V2ProgramEnrollmentSerializer")
-class ProgramEnrollmentSerializer(serializers.ModelSerializer):
-    """Serializer for ProgramEnrollment"""
-
-    class Meta:
-        model = ProgramEnrollment
-        fields = "__all__"
-
-
 class ProgramCertificateSerializer(serializers.ModelSerializer):
     """ProgramCertificate model serializer"""
 

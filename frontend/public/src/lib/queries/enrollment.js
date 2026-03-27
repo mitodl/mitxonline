@@ -189,7 +189,7 @@ export const enrollmentMutation = (runId: number) => ({
 })
 
 export const programEnrollmentQuery = (programId: number) => ({
-  url:  `/api/v2/create_program_enrollment_view/`,
+  url:  `/api/v3/program_enrollments/`,
   body: {
     program_id: `${programId}`,
     isapi:      true

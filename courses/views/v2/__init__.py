@@ -64,7 +64,6 @@ from courses.serializers.v2.departments import (
 from courses.serializers.v2.programs import (
     ProgramCollectionSerializer,
     ProgramDetailSerializer,
-    ProgramEnrollmentSerializer,
     UserProgramEnrollmentDetailSerializer,
 )
 from courses.utils import (
@@ -734,43 +733,6 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     return Response(
         CourseRunEnrollmentSerializer(enrollment).data,
         status=status.HTTP_201_CREATED,
-    )
-
-
-@extend_schema(
-    operation_id="v2_program_enrollments_create_standalone",
-    request=serializers.Serializer(),  # Simple serializer for program_id input
-    responses={status.HTTP_201_CREATED: ProgramEnrollmentSerializer},
-)
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def create_program_enrollment_view(request):
-    """Create a program enrollment."""
-    program_id = request.data.get("program_id")
-
-    try:
-        program = Program.objects.get(pk=program_id)
-    except Program.DoesNotExist:
-        return Response(
-            {"program_id": ["Program does not exist."]},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    if ProgramEnrollment.objects.filter(program=program, user=request.user).exists():
-        return Response(status=status.HTTP_200_OK)
-    enrollments, _ = create_program_enrollments(
-        request.user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-    )
-
-    if not enrollments:
-        return Response(
-            {"message": "Enrollment creation failed."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    enrollment = enrollments[0]
-
-    return Response(
-        ProgramEnrollmentSerializer(enrollment).data, status=status.HTTP_201_CREATED
     )
 
 
