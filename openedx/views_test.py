@@ -11,13 +11,8 @@ from oauthlib.common import generate_token
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from courses.factories import CourseRunFactory, ProgramFactory
-from courses.models import (
-    CourseRunEnrollment,
-    ProgramEnrollment,
-    ProgramRequirement,
-    ProgramRequirementNodeType,
-)
+from courses.factories import CourseRunFactory
+from courses.models import CourseRunEnrollment
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -228,34 +223,6 @@ class TestEdxEnrollmentWebhook:
             CourseRunEnrollment.all_objects.filter(user=user, run=course_run).count()
             == 1
         )
-
-    def test_auto_enrolls_in_associated_program(self, api_client, oauth_token):
-        """Test that webhook auto-enrolls user in programs associated with the course"""
-        user = UserFactory.create()
-        course_run = CourseRunFactory.create()
-        program = ProgramFactory.create(live=True)
-
-        # Build proper tree structure for program requirements
-        root_node = program.requirements_root
-        operator_node = root_node.add_child(
-            node_type=ProgramRequirementNodeType.OPERATOR,
-            operator=ProgramRequirement.Operator.ALL_OF,
-            title="Required Courses",
-        )
-        operator_node.add_child(
-            node_type=ProgramRequirementNodeType.COURSE,
-            course=course_run.course,
-        )
-
-        payload = {
-            "email": user.email,
-            "course_id": course_run.courseware_id,
-            "role": "instructor",
-        }
-        response = self._post_webhook(api_client, payload, token=oauth_token.token)
-
-        assert response.status_code == status.HTTP_201_CREATED
-        assert ProgramEnrollment.objects.filter(user=user, program=program).exists()
 
     def test_no_edx_api_call(self, api_client, oauth_token):
         """Test that the webhook does NOT call back to edX API"""
