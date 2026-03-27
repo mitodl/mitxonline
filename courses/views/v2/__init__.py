@@ -913,7 +913,7 @@ def get_program_certificate(request, cert_uuid):
 
 
 class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
-    """ViewSet for user program enrollments with v2 serializers."""
+    """ViewSet for user program and courserun enrollments with v2 serializers."""
 
     permission_classes = [IsAuthenticated]
 
