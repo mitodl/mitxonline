@@ -142,7 +142,9 @@ export class ProgramProductDetailEnroll extends React.Component<
     try {
       //find program id
       const program = programs && programs[0]
-      await createProgramEnrollment(program.id)
+      if (program) {
+        await createProgramEnrollment(program.id)
+      }
     } catch (error) {
       console.error("Failed to create program enrollment", error)
       // Optionally, display an error message to the user.
