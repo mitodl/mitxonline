@@ -1608,7 +1608,6 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-
 @patch("courses.signals.upsert_custom_properties")
 def test_generate_program_certificate_with_subprogram_requirement(
     mock_upsert_custom_properties, user, mocker
