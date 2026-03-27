@@ -10,7 +10,6 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramCollection,
-    ProgramEnrollment,
     ProgramRequirementNodeType,
 )
 from courses.serializers.base import (
