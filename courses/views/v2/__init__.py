@@ -64,7 +64,8 @@ from courses.serializers.v2.departments import (
 from courses.serializers.v2.programs import (
     ProgramCollectionSerializer,
     ProgramDetailSerializer,
-    UserProgramEnrollmentDetailSerializer, ProgramEnrollmentSerializer,
+    ProgramEnrollmentSerializer,
+    UserProgramEnrollmentDetailSerializer,
 )
 from courses.utils import (
     get_enrollable_courses,
@@ -767,8 +768,9 @@ def create_program_enrollment_view(request):
 
     enrollment = enrollments[0]
 
-    return Response(ProgramEnrollmentSerializer(enrollment).data, status=status.HTTP_201_CREATED)
-
+    return Response(
+        ProgramEnrollmentSerializer(enrollment).data, status=status.HTTP_201_CREATED
+    )
 
 
 @extend_schema(
@@ -970,7 +972,7 @@ def get_program_certificate(request, cert_uuid):
     )
 
 
-class UserProgramEnrollmentsViewSet( viewsets.ViewSet):
+class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
     """ViewSet for user program and courserun enrollments with v2 serializers."""
 
     permission_classes = [IsAuthenticated]
