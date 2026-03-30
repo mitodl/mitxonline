@@ -478,6 +478,59 @@ def test_create_edx_user_conflict(  # noqa: PLR0913
     )
 
 
+@responses.activate
+@pytest.mark.usefixtures("application")
+def test_create_edx_user_conflict_suggested_username_taken_locally(settings):
+    """
+    When edX suggests a username that is already taken locally
+    in MITx Online (e.g., jeff_8 exists in OpenEdxUser), the app must not blindly
+    use it (which would cause a UniqueViolation). Instead it should skip that
+    suggestion and fall back to generating a locally unique username.
+    """
+    user = UserFactory.create(
+        openedx_user__has_been_synced=False,
+        openedx_user__desired_edx_username="jeff",
+    )
+    # Simulate jeff_8 already existing locally in MITx Online
+    UserFactory.create(openedx_user__edx_username="jeff_8")
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/mobile/v0.5/my_user_info",
+        json={},
+        status=status.HTTP_200_OK,
+    )
+    # edX returns a 409 with its only suggestion being jeff_8, which is already taken locally
+    responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
+        json={
+            "error_code": "duplicate-username",
+            "username_suggestions": ["jeff_8"],
+        },
+        status=status.HTTP_409_CONFLICT,
+    )
+    # Second registration attempt with the locally-generated username succeeds
+    responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
+        json=dict(success=True),  # noqa: C408
+        status=status.HTTP_200_OK,
+    )
+    edx_username_validation_response_mock(False, settings)  # noqa: FBT003
+
+    create_edx_user(user)
+
+    user.refresh_from_db()
+    edx_user = user.openedx_users.first()
+
+    assert edx_user.has_been_synced is True
+    # Must not have used the locally-conflicting suggestion
+    assert edx_user.edx_username != "jeff_8"
+    # Should have generated a username based on the base username
+    assert edx_user.edx_username.startswith("jeff_")
+
+
 @pytest.mark.parametrize(
     ("base_username", "expected_prefix"),
     [
