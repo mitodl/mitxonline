@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.144.0
+Version 1.144.0 (Released March 30, 2026)
 ---------------
 
 - fix: typo fixed in enrollment_failure template (#3433)
