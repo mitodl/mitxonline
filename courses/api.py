@@ -1042,11 +1042,16 @@ def _has_earned_program_cert(user, program):
     """
     program_course_ids = [course[0].id for course in program.courses]
 
-    passed_courses = Course.objects.filter(
+    cert_courses = Course.objects.filter(
         id__in=program_course_ids,
         courseruns__courseruncertificates__user=user,
         courseruns__courseruncertificates__is_revoked=False,
     )
+    grade_courses = Course.objects.filter(
+        id__in=program_course_ids,
+        courseruns__grades__user=user,
+        courseruns__grades__passed=True,
+    ).exclude(courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
     root = ProgramRequirement.get_root_nodes().get(program=program)
 
     def _has_earned(node):
@@ -1059,8 +1064,8 @@ def _has_earned_program_cert(user, program):
                 node.operator_value
             )
         elif node.is_course:
-            # has passed the reference course
-            return node.course in passed_courses
+            # has passed the referenced course
+            return node.course in [*cert_courses, *grade_courses]
         elif node.is_program:
             # has earned certificate for the required sub-program
             return ProgramCertificate.objects.filter(
@@ -1073,9 +1078,8 @@ def _has_earned_program_cert(user, program):
 
 def generate_program_certificate(user, program, force_create=False):  # noqa: FBT002
     """
-    Create a program certificate if the user has a course certificate
-    for each course in the program. Also, It will create the
-    program enrollment if it does not exist for the user.
+    Create a program certificate if the user has a verified enrollment in the
+    program and certificates or passing grades in the program's required courses.
 
     Args:
         user (User): a Django user.
@@ -1090,13 +1094,26 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
     """
     from hubspot_sync.task_helpers import sync_hubspot_user  # noqa: PLC0415
 
+    if (
+        not force_create
+        and not program.enrollments.filter(
+            user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        ).exists()
+    ):
+        log.warning(
+            "Skipping program enrollment generation for %s in %s: no verified enrollment",
+            user,
+            program,
+        )
+        return (
+            None,
+            False,
+        )
+
     existing_cert_queryset = ProgramCertificate.all_objects.filter(
         user=user, program=program
     )
     if existing_cert_queryset.exists():
-        ProgramEnrollment.objects.get_or_create(
-            program=program, user=user, defaults={"active": True, "change_status": None}
-        )
         return existing_cert_queryset.first(), False
 
     if not force_create and not _has_earned_program_cert(user, program):
@@ -1112,17 +1129,6 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
         sync_hubspot_user(user)
         if not program_cert.verifiable_credential_id:
             create_verifiable_credential(program_cert)
-
-        _, created = ProgramEnrollment.objects.get_or_create(
-            program=program, user=user, defaults={"active": True, "change_status": None}
-        )
-
-        if created:
-            log.info(
-                "Program enrollment for [%s] in program [%s] is created.",
-                user.edx_username,
-                program.title,
-            )
 
     return program_cert, True
 
