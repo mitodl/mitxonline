@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.144.1
+---------------
+
+- Filter non-live parent programs from v2/courses, v2/programs, similar to v1 (#3436)
+
 Version 1.144.0 (Released March 30, 2026)
 ---------------
 
