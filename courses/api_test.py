@@ -1694,7 +1694,7 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     ProgramEnrollment.objects.create(
         user=user,
         program=program,
-        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
     )
     root_node = program.requirements_root
 

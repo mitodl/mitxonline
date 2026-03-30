@@ -9,6 +9,7 @@ from courses.factories import (
     CourseRunCertificateFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
+    EnrollmentModeFactory,
     ProgramCertificateFactory,
     ProgramFactory,
     ProgramRequirementFactory,  # noqa: F401
@@ -16,7 +17,11 @@ from courses.factories import (
     program_with_requirements,  # noqa: F401
 )
 from courses.management.commands import manage_program_certificates
-from courses.models import ProgramCertificate
+from courses.models import ProgramCertificate, ProgramEnrollment
+from openedx.constants import (
+    EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+)
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -129,6 +134,17 @@ def test_program_certificate_management_create(
     Test that create operation for program certificate management command
     creates the program certificate for a user
     """
+    modes = [
+        EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE),
+        EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE),
+    ]
+
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program_with_empty_requirements,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
@@ -136,6 +152,9 @@ def test_program_certificate_management_create(
     program_with_empty_requirements.add_requirement(courses[0])
     program_with_empty_requirements.add_elective(courses[1])
     course_runs = CourseRunFactory.create_batch(2, course=factory.Iterator(courses))
+    for run in course_runs:
+        run.enrollment_modes.set(modes)
+        run.save()
     CourseRunCertificateFactory.create_batch(
         2, user=user, course_run=factory.Iterator(course_runs)
     )
