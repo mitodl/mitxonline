@@ -162,6 +162,39 @@ def test_serialize_program(
 
 
 @pytest.mark.parametrize(
+    ("parent_program_live", "parent_page_live", "expected_in_programs"),
+    [
+        (True, True, True),
+        (False, True, False),
+        (True, False, False),
+        (False, False, False),
+    ],
+)
+def test_serialize_program_programs_excludes_non_live(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+    parent_program_live,
+    parent_page_live,
+    expected_in_programs,
+):
+    """Test that get_programs excludes parent programs where live=False or page.live=False"""
+    mock_context["include_programs"] = True
+    parent_program = ProgramFactory.create(live=parent_program_live)
+    parent_program.page.live = parent_page_live
+    parent_program.page.save()
+    parent_program.add_requirement(program_with_empty_requirements)
+
+    data = ProgramSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    if expected_in_programs:
+        assert len(data["programs"]) == 1
+    else:
+        assert data["programs"] == []
+
+
+@pytest.mark.parametrize(
     ("has_paid_mode", "expected"),
     [
         (True, True),

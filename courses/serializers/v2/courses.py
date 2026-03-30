@@ -137,6 +137,10 @@ class CourseSerializer(BaseCourseSerializer):
             else:
                 programs_qs = programs_qs.filter(program__b2b_only=False)
 
+            programs_qs = programs_qs.filter(
+                program__live=True, program__page__live=True
+            )
+
             programs = [
                 req.program for req in programs_qs.prefetch_related("program").all()
             ]

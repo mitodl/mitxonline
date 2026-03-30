@@ -163,6 +163,37 @@ def test_serialize_course_required_prerequisites(
     )
 
 
+@pytest.mark.parametrize(
+    ("program_live", "page_live", "expected_in_programs"),
+    [
+        (True, True, True),
+        (False, True, False),
+        (True, False, False),
+        (False, False, False),
+    ],
+)
+def test_serialize_course_programs_excludes_non_live(
+    mock_context,
+    program_live,
+    page_live,
+    expected_in_programs,
+):
+    """Test that get_programs excludes programs where live=False or page.live=False"""
+    mock_context["include_programs"] = True
+    course = CourseFactory.create()
+    program = ProgramFactory.create(live=program_live)
+    program.page.live = page_live
+    program.page.save()
+    program.add_requirement(course)
+
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+
+    if expected_in_programs:
+        assert len(data["programs"]) == 1
+    else:
+        assert data["programs"] == []
+
+
 class TestCourseRunEnrollmentSerializerV2:
     """Test the v2 CourseRunEnrollmentSerializer."""
 
