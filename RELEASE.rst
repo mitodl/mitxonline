@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 1.143.5
+---------------
+
+- fix: typo fixed in enrollment_failure template (#3433)
+- fix: remove locally taken usernames from suggestions (#3416)
+- Remove automatic program enrollment (#3425)
+- Stop checking elective enrollments when creating a verified course enrollment for a program (#3430)
+- feat: migrate to mitol-django-observability plugin (#3346)
+- Redirect UAI+B2C purchases to Learn dashboard (#3429)
+- Add "include in learn catalog" setting for programs to mitxonline cms (#3412)
+- Ensure Product admin creates reversion entries (#3423)
+- chore(deps): update dependency requests to v2.33.0 [security] (#3427)
+
 Version 1.143.4 (Released March 26, 2026)
 ---------------
 
