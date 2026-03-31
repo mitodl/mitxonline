@@ -23,7 +23,7 @@ def sync_courseruns_data():
     """
     Task to sync titles and dates for course runs from edX.
     """
-    from courses.api import sync_course_mode, sync_course_runs
+    from courses.api import sync_course_runs
 
     now = now_in_utc()
     runs = (
@@ -33,7 +33,6 @@ def sync_courseruns_data():
     )
 
     # `sync_course_runs` logs internally so no need to capture/output the returned values
-    sync_course_mode(runs)
     sync_course_runs(runs)
 
 
