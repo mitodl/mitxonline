@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.144.3
+---------------
+
+- Update get_certificate_available to use the enrollment modes for determination (#3446)
+- fix: don't send receipts for modules of a program (#3442)
+- Don't sync edX course modes back from edX (#3443)
+
 Version 1.144.2 (Released March 31, 2026)
 ---------------
 
