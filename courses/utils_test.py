@@ -26,6 +26,7 @@ from courses.utils import (
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
     is_contract_order,
+    is_uai_course_run,
 )
 
 
@@ -307,3 +308,18 @@ def test_is_contract_order_false_for_non_course_run_product():
     order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
 
     assert is_contract_order(order) is False
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("courseware_id", "expected"),
+    [
+        ("course-v1:UAI_MIT+1.001x+2025_C12", True),
+        ("UAI_MIT+1.001x+2025_C12", True),
+        ("course-v1:MITx+6.00.1x+1T2026", False),
+    ],
+)
+def test_is_uai_course_run(courseware_id, expected):
+    """UAI detection should match expected value across supported key formats."""
+    course_run = CourseRunFactory.create(courseware_id=courseware_id)
+    assert is_uai_course_run(course_run) is expected
