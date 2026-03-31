@@ -176,7 +176,11 @@ def is_uai_course_run(course_run):
     if not course_run or not course_run.courseware_id:
         return False
 
-    return course_run.courseware_id.startswith(UAI_COURSEWARE_ID_PREFIX)
+    courseware_id = course_run.courseware_id
+    # Support both historical keys ("course-v1:UAI_*") and org-prefix-only values ("UAI_*").
+    return courseware_id.startswith(
+        (UAI_COURSEWARE_ID_PREFIX, f"course-v1:{UAI_COURSEWARE_ID_PREFIX}")
+    )
 
 
 def is_uai_order(order):
