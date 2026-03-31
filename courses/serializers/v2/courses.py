@@ -23,6 +23,7 @@ from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
 from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
@@ -173,7 +174,10 @@ class CourseSerializer(BaseCourseSerializer):
 
         return (
             instance.first_unexpired_run is not None
-            and instance.first_unexpired_run.certificate_available_date is not None
+            and instance.first_unexpired_run.enrollment_modes.filter(
+                mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+            ).count()
+            > 0
         )
 
     @extend_schema_field(str)

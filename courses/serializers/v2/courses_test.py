@@ -12,6 +12,7 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    EnrollmentModeFactory,
     ProgramFactory,
 )
 from courses.models import CourseRunEnrollment, CoursesTopic, Department
@@ -23,6 +24,7 @@ from courses.serializers.v2.courses import (
 )
 from courses.views.v2 import UserEnrollmentFilterSet
 from main.test_utils import assert_drf_json_equal
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -56,7 +58,13 @@ def test_serialize_course(  # noqa: PLR0913
         )
     else:
         courseRun1 = CourseRunFactory.create()
+        courseRun1.enrollment_modes.add(
+            EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+        )
         courseRun2 = CourseRunFactory.create(course=courseRun1.course)
+        courseRun2.enrollment_modes.add(
+            EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+        )
 
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()

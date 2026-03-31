@@ -155,6 +155,10 @@ class CourseRunFactory(DjangoModelFactory):
     b2b_contract = None
     is_source_run = False
 
+    enrollment_modes = factory.RelatedFactoryList(
+        EnrollmentModeFactory, size=1, mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
     class Meta:
         model = CourseRun
 
