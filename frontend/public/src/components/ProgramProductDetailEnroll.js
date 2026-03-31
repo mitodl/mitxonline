@@ -139,7 +139,8 @@ export class ProgramProductDetailEnroll extends React.Component<
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
     })
-    if (!upgradeEnrollmentDialogVisibility) { //if opening dialog
+    if (!upgradeEnrollmentDialogVisibility) {
+      //if opening dialog
       try {
         //find program id
         const program = programs && programs[0]
