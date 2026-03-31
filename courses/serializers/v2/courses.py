@@ -173,7 +173,8 @@ class CourseSerializer(BaseCourseSerializer):
 
         return (
             instance.first_unexpired_run is not None
-            and instance.first_unexpired_run.certificate_available_date is not None
+            and hasattr(instance, "verified_courserun_count")
+            and instance.verified_courserun_count > 0
         )
 
     @extend_schema_field(str)
