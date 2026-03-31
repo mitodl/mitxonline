@@ -237,25 +237,6 @@ def test_create_local_enrollment_existing_enrollment(
     assert enrollment.edx_enrolled is True
 
 
-def test_create_local_enrollment_sets_edx_enrolled(user):
-    """
-    create_local_enrollment should set edx_enrolled=True on an existing enrollment
-    that has edx_enrolled=False.
-    """
-    run = CourseRunFactory.create()
-    CourseRunEnrollmentFactory.create(
-        user=user,
-        run=run,
-        active=True,
-        edx_enrolled=False,
-    )
-
-    enrollment, created = create_local_enrollment(user, run)
-
-    assert created is False
-    assert enrollment.edx_enrolled is True
-
-
 @pytest.mark.parametrize(
     "enrollment_mode", [EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
 )
