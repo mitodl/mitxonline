@@ -86,6 +86,13 @@ def test_serialize_course(  # noqa: PLR0913
         run=courseRun1, **({} if is_anonymous else {"user": user})
     )
 
+    # Fake out a "has_verified_mode" attribute - this is an annotation that the
+    # viewset adds, but won't be here because we're just passing it in a straight
+    # Course object.
+    course.has_verified_mode = course.courseruns.filter(
+        enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+    ).count()
+
     data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 
     assert_drf_json_equal(

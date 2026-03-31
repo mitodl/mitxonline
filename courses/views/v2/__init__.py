@@ -413,6 +413,13 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
             count_b2b_courseruns=Count("courseruns__b2b_contract__id")
         )
         queryset = queryset.annotate(count_courseruns=Count("courseruns"))
+        queryset = queryset.annotate(
+            has_verified_mode=Count("courseruns__enrollment_modes"),
+            filter=Q(
+                courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+            ),
+        )
+
         return queryset.order_by("title").distinct()
 
     def get_serializer_context(self):
