@@ -702,7 +702,7 @@ class OrderFlow:
         source=OrderStatus.PENDING,
         target=OrderStatus.FULFILLED,
     )
-    def fulfill(self, payment_data, already_enrolled=False):  # noqa: FBT002
+    def fulfill(self, payment_data, already_enrolled=False, skip_receipt=False):  # noqa: FBT002
         # record the transaction
         self.create_transaction(payment_data)
 
@@ -710,9 +710,10 @@ class OrderFlow:
         self.create_enrollments()
 
         # No email is required as this order is generated from management command
-        # Skip receipt emails for UAI orders
+        # Skip receipt emails for UAI orders and program-derived course run orders
         if (
             not already_enrolled
+            and not skip_receipt
             and not is_uai_order(self.order)
             and not is_contract_order(self.order)
         ):
