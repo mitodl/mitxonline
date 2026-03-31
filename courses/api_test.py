@@ -209,7 +209,7 @@ def test_create_local_enrollment_new(user, enrollment_mode):
 
 
 @pytest.mark.parametrize(
-    "existing_active,existing_edx_enrolled",
+    ("existing_active", "existing_edx_enrolled"),
     [
         (False, False),
         (True, True),
