@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.144.2 (Released March 31, 2026)
+---------------
+
+- feat: order receipt page updates (#3440)
+- fix: support both formats of course id for UAI course (#3441)
+- fix: create auth if does not exists (#3419)
+
 Version 1.144.1 (Released March 31, 2026)
 ---------------
 
