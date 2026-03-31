@@ -852,8 +852,14 @@ def test_process_transaction_line_hooks(mocker, user, user_drf_client):
 
 
 @pytest.mark.skip_nplusone_check
-def test_fulfill_with_skip_receipt(mocker, django_capture_on_commit_callbacks):
-    """Test that fulfill with skip_receipt=True does not send receipt email."""
+@pytest.mark.parametrize(
+    ("skip_receipt", "email_sent"),
+    [(True, False), (False, True)],
+)
+def test_fulfill_skip_receipt(
+    mocker, django_capture_on_commit_callbacks, skip_receipt, email_sent
+):
+    """Test that fulfill respects the skip_receipt flag for sending receipt email."""
     mocker.patch("courses.api.create_run_enrollments", autospec=True)
     mock_send_receipt = mocker.patch(
         "ecommerce.tasks.send_ecommerce_order_receipt.delay"
@@ -865,26 +871,10 @@ def test_fulfill_with_skip_receipt(mocker, django_capture_on_commit_callbacks):
     with django_capture_on_commit_callbacks(execute=True):
         order_flow.fulfill(
             {"amount": 0, "data": {"reason": "No payment required"}},
-            skip_receipt=True,
+            skip_receipt=skip_receipt,
         )
 
-    mock_send_receipt.assert_not_called()
-
-
-@pytest.mark.skip_nplusone_check
-def test_fulfill_without_skip_receipt(mocker, django_capture_on_commit_callbacks):
-    """Test that fulfill without skip_receipt sends receipt email."""
-    mocker.patch("courses.api.create_run_enrollments", autospec=True)
-    mock_send_receipt = mocker.patch(
-        "ecommerce.tasks.send_ecommerce_order_receipt.delay"
-    )
-
-    pending_order = OrderFactory.create(state=OrderStatus.PENDING)
-    order_flow = pending_order.get_object_flow()
-
-    with django_capture_on_commit_callbacks(execute=True):
-        order_flow.fulfill(
-            {"amount": 0, "data": {"reason": "No payment required"}},
-        )
-
-    mock_send_receipt.assert_called_once_with(pending_order.id)
+    if email_sent:
+        mock_send_receipt.assert_called_once_with(pending_order.id)
+    else:
+        mock_send_receipt.assert_not_called()
