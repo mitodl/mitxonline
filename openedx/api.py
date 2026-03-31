@@ -852,6 +852,11 @@ def get_edx_api_client(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS)
     Returns:
          EdxApi: edx api client instance
     """
+    # create_edx_auth_token is called here as a safety net to ensure the user always
+    # has an OpenEdxApiAuth record before we try to read it. It is idempotent: internally
+    # it uses get_or_create, so calling it on every request is safe and causes no side
+    # effects when the record already exists.
+    create_edx_auth_token(user)
     try:
         auth = get_valid_edx_api_auth(user, ttl_in_seconds=ttl_in_seconds)
     except OpenEdxApiAuth.DoesNotExist:
@@ -1237,7 +1242,6 @@ def update_edx_user_name(user):
     Raises:
         UserNameUpdateFailedException: Raised if underlying edX API request fails due to any reason
     """
-
     edx_client = get_edx_api_client(user)
     try:
         return edx_client.user_info.update_user_name(user.edx_username, user.name)

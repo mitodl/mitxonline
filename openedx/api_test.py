@@ -1125,6 +1125,35 @@ def test_update_edx_user_name_failure(
         update_edx_user_name(user)
 
 
+def test_update_edx_user_name_creates_missing_auth(mocker, user):
+    """
+    Regression test: update_edx_user_name should succeed even when the user had no
+    OpenEdxApiAuth record beforehand.  The auth is now created transparently inside
+    get_edx_api_client (which calls create_edx_auth_token as a safety net), so
+    update_edx_user_name itself no longer needs to handle NoEdxApiAuthError.
+    """
+    mock_client = mocker.MagicMock()
+    update_name_return_value = mocker.Mock(
+        json={"name": user.name, "username": user.edx_username, "email": user.email}
+    )
+    mock_client.user_info.update_user_name = mocker.Mock(
+        return_value=update_name_return_value
+    )
+
+    mock_get_edx_api_client = mocker.patch(
+        "openedx.api.get_edx_api_client",
+        return_value=mock_client,
+    )
+
+    result = update_edx_user_name(user)
+
+    mock_get_edx_api_client.assert_called_once_with(user)
+    mock_client.user_info.update_user_name.assert_called_once_with(
+        user.edx_username, user.name
+    )
+    assert result == update_name_return_value
+
+
 def test_sync_enrollments_with_edx_active(mocker, user):
     """sync_enrollments_with_edx should update the 'active' property of existing enrollment records"""
     courseware_ids = [
