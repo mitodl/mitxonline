@@ -208,37 +208,25 @@ def test_create_local_enrollment_new(user, enrollment_mode):
     assert enrollment.change_status is None
 
 
-def test_create_local_enrollment_reactivates_inactive(user):
-    """
-    create_local_enrollment should reactivate an existing inactive enrollment.
-    """
+@pytest.mark.parametrize(
+    "existing_active,existing_edx_enrolled",
+    [
+        (False, False),
+        (True, True),
+    ],
+)
+def test_create_local_enrollment_existing_enrollment(
+    user,
+    existing_active,
+    existing_edx_enrolled,
+):
+    """create_local_enrollment should be idempotent and reactivate when needed."""
     run = CourseRunFactory.create()
     existing = CourseRunEnrollmentFactory.create(
         user=user,
         run=run,
-        active=False,
-        edx_enrolled=False,
-        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
-    )
-
-    enrollment, created = create_local_enrollment(user, run)
-
-    assert created is False
-    assert enrollment.id == existing.id
-    assert enrollment.active is True
-    assert enrollment.edx_enrolled is True
-
-
-def test_create_local_enrollment_idempotent(user):
-    """
-    create_local_enrollment should be idempotent for already-active enrollments.
-    """
-    run = CourseRunFactory.create()
-    existing = CourseRunEnrollmentFactory.create(
-        user=user,
-        run=run,
-        active=True,
-        edx_enrolled=True,
+        active=existing_active,
+        edx_enrolled=existing_edx_enrolled,
     )
 
     enrollment, created = create_local_enrollment(user, run)
