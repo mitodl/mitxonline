@@ -60,14 +60,6 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                 <a href={`mailto:${SETTINGS.support_email}`}>
                   {SETTINGS.support_email}
                 </a>
-                <br />
-                <a
-                  target="_blank"
-                  href="https://mitxonline.mit.edu/"
-                  rel="noreferrer"
-                >
-                  mitxonline.mit.edu
-                </a>
               </p>
             </div>
           </div>
