@@ -414,10 +414,12 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
         )
         queryset = queryset.annotate(count_courseruns=Count("courseruns"))
         queryset = queryset.annotate(
-            has_verified_mode=Count("courseruns__enrollment_modes"),
-            filter=Q(
-                courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
-            ),
+            has_verified_mode=Count(
+                "courseruns__enrollment_modes",
+                filter=Q(
+                    courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+                ),
+            )
         )
 
         return queryset.order_by("title").distinct()
