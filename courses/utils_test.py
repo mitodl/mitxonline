@@ -311,23 +311,15 @@ def test_is_contract_order_false_for_non_course_run_product():
 
 
 @pytest.mark.django_db
-def test_is_uai_course_run_with_legacy_courseware_id():
-    """UAI detection should work for legacy course-v1 prefixed keys."""
-    course_run = CourseRunFactory.create(
-        courseware_id="course-v1:UAI_MIT+1.001x+2025_C12"
-    )
-    assert is_uai_course_run(course_run) is True
-
-
-@pytest.mark.django_db
-def test_is_uai_course_run_with_org_prefix_only():
-    """UAI detection should work for org-prefix-only keys."""
-    course_run = CourseRunFactory.create(courseware_id="UAI_MIT+1.001x+2025_C12")
-    assert is_uai_course_run(course_run) is True
-
-
-@pytest.mark.django_db
-def test_is_uai_course_run_with_non_uai_courseware_id():
-    """UAI detection should return False for non-UAI keys."""
-    course_run = CourseRunFactory.create(courseware_id="course-v1:MITx+6.00.1x+1T2026")
-    assert is_uai_course_run(course_run) is False
+@pytest.mark.parametrize(
+    ("courseware_id", "expected"),
+    [
+        ("course-v1:UAI_MIT+1.001x+2025_C12", True),
+        ("UAI_MIT+1.001x+2025_C12", True),
+        ("course-v1:MITx+6.00.1x+1T2026", False),
+    ],
+)
+def test_is_uai_course_run(courseware_id, expected):
+    """UAI detection should match expected value across supported key formats."""
+    course_run = CourseRunFactory.create(courseware_id=courseware_id)
+    assert is_uai_course_run(course_run) is expected
