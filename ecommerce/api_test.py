@@ -735,11 +735,19 @@ def test_create_verified_program_discount():
 
 
 def test_create_verified_program_course_run_enrollment(
-    mock_create_run_enrollments, mock_hubspot_order, bootstrapped_verified_program, user
+    mocker,
+    mock_create_run_enrollments,
+    mock_hubspot_order,
+    bootstrapped_verified_program,
+    user,
 ):
-    """Test that creating a verified course run enrollment for a program works."""
+    """Test that creating a verified course run enrollment for a program works
+    and does not send a receipt email."""
 
     mock_cre_side_effect = mock_create_run_enrollments.side_effect
+    mock_send_receipt = mocker.patch(
+        "ecommerce.tasks.send_ecommerce_order_receipt.delay"
+    )
 
     (program, _, _, courserun, _) = bootstrapped_verified_program
 
@@ -766,6 +774,7 @@ def test_create_verified_program_course_run_enrollment(
     )
 
     assert cr_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    mock_send_receipt.assert_not_called()
 
     mock_create_run_enrollments.side_effect = mock_cre_side_effect
 

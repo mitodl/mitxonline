@@ -78,7 +78,7 @@ from openedx.tasks import create_user_from_id
 log = logging.getLogger(__name__)
 
 
-def generate_checkout_payload(request, *, skip_discount_check=False):  # noqa: PLR0911
+def generate_checkout_payload(request, *, skip_discount_check=False, skip_receipt=False):  # noqa: PLR0911
     """
     Generate the checkout payload for the current basket.
 
@@ -90,6 +90,7 @@ def generate_checkout_payload(request, *, skip_discount_check=False):  # noqa: P
     - request: the incoming http request
     Kwargs:
     - skip_discount_check: skip checking discounts for validity (default False)
+    - skip_receipt: skip sending order receipt email (default False)
     """
 
     from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
@@ -200,7 +201,7 @@ def generate_checkout_payload(request, *, skip_discount_check=False):  # noqa: P
     if total_price == 0:
         with transaction.atomic():
             fulfill_completed_order(
-                order, payment_data=ZERO_PAYMENT_DATA, basket=basket
+                order, payment_data=ZERO_PAYMENT_DATA, basket=basket, skip_receipt=skip_receipt
             )
 
         order.refresh_from_db()
@@ -329,9 +330,9 @@ def apply_user_discounts(request):
     return
 
 
-def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):  # noqa: FBT002
+def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False, skip_receipt=False):  # noqa: FBT002
     order_flow = order.get_object_flow()
-    order_flow.fulfill(payment_data, already_enrolled=already_enrolled)
+    order_flow.fulfill(payment_data, already_enrolled=already_enrolled, skip_receipt=skip_receipt)
     sync_hubspot_deal(order)
 
     if basket and basket.compare_to_order(order):
@@ -1118,7 +1119,7 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         msg = f"Basket for {request.user} is not zero-value"
         raise VerifiedProgramInvalidBasketError(msg)
 
-    processed_order = generate_checkout_payload(request, skip_discount_check=True)
+    processed_order = generate_checkout_payload(request, skip_discount_check=True, skip_receipt=True)
 
     if "no_checkout" not in processed_order:
         # It didn't just clear the order so something went wrong
