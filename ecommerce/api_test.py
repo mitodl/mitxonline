@@ -742,7 +742,8 @@ def test_create_verified_program_course_run_enrollment(
     user,
 ):
     """Test that creating a verified course run enrollment for a program works
-    and does not send a receipt email."""
+    and does not send a receipt email.
+    """
 
     mock_cre_side_effect = mock_create_run_enrollments.side_effect
     mock_send_receipt = mocker.patch(

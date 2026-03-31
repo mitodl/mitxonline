@@ -852,9 +852,7 @@ def test_process_transaction_line_hooks(mocker, user, user_drf_client):
 
 
 @pytest.mark.skip_nplusone_check
-def test_fulfill_with_skip_receipt(
-    mocker, django_capture_on_commit_callbacks
-):
+def test_fulfill_with_skip_receipt(mocker, django_capture_on_commit_callbacks):
     """Test that fulfill with skip_receipt=True does not send receipt email."""
     mocker.patch("courses.api.create_run_enrollments", autospec=True)
     mock_send_receipt = mocker.patch(
@@ -874,9 +872,7 @@ def test_fulfill_with_skip_receipt(
 
 
 @pytest.mark.skip_nplusone_check
-def test_fulfill_without_skip_receipt(
-    mocker, django_capture_on_commit_callbacks
-):
+def test_fulfill_without_skip_receipt(mocker, django_capture_on_commit_callbacks):
     """Test that fulfill without skip_receipt sends receipt email."""
     mocker.patch("courses.api.create_run_enrollments", autospec=True)
     mock_send_receipt = mocker.patch(
