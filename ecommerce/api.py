@@ -78,7 +78,7 @@ from openedx.tasks import create_user_from_id
 log = logging.getLogger(__name__)
 
 
-def generate_checkout_payload(
+def generate_checkout_payload(  # noqa: PLR0911
     request, *, skip_discount_check=False, skip_receipt=False
 ):
     """
@@ -336,7 +336,11 @@ def apply_user_discounts(request):
 
 
 def fulfill_completed_order(
-    order, payment_data, basket=None, already_enrolled=False, skip_receipt=False
+    order,
+    payment_data,
+    basket=None,
+    already_enrolled=False,  # noqa: FBT002
+    skip_receipt=False,  # noqa: FBT002
 ):
     order_flow = order.get_object_flow()
     order_flow.fulfill(
