@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.144.2
+Version 1.144.2 (Released March 31, 2026)
 ---------------
 
 - feat: order receipt page updates (#3440)
