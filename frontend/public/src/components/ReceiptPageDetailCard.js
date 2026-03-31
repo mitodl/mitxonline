@@ -46,7 +46,7 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
         <div className="receipt-row p-b-80">
           <div className="receipt-col">
             <div className="receipt-logo">
-              <img src="static/images/mitx-online-logo.png" alt="" />
+              <img src="static/images/mit-learn.png" alt="" />
             </div>
             <div className="receipt-mit-info">
               <p>
@@ -59,14 +59,6 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                 Support:{" "}
                 <a href={`mailto:${SETTINGS.support_email}`}>
                   {SETTINGS.support_email}
-                </a>
-                <br />
-                <a
-                  target="_blank"
-                  href="https://mitxonline.mit.edu/"
-                  rel="noreferrer"
-                >
-                  mitxonline.mit.edu
                 </a>
               </p>
             </div>

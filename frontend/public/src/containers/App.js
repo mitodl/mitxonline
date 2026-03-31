@@ -2,7 +2,7 @@
 import React from "react"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { Switch, Route } from "react-router"
+import { Switch, Route, matchPath } from "react-router"
 import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
 import urljoin from "url-join"
@@ -73,6 +73,14 @@ export class App extends React.Component<Props, void> {
     return searchParams.has("ecom-service")
   }
 
+  isOrderReceiptPage() {
+    const { match, location } = this.props
+    return !!matchPath(location.pathname, {
+      path:  urljoin(match.url, String(routes.orderReceipt)),
+      exact: true
+    })
+  }
+
   render() {
     const { match, currentUser, cartItemsCount, location } = this.props
     if (!currentUser) {
@@ -82,7 +90,7 @@ export class App extends React.Component<Props, void> {
 
     return (
       <div className="app" aria-flowto="notifications-container">
-        {!this.isEcomServiceMode() && (
+        {!this.isEcomServiceMode() && !this.isOrderReceiptPage() && (
           <Header
             currentUser={currentUser}
             cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
