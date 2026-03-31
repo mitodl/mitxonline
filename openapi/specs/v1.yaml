@@ -4559,7 +4559,12 @@ components:
             This is controlled in the CoursePage for the course, and will default
             to False if there isn't one.
           readOnly: true
+        certificate_available:
+          type: boolean
+          description: Return if there is a certificate available for the course.
+          readOnly: true
       required:
+      - certificate_available
       - id
       - include_in_learn_catalog
       - readable_id

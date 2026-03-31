@@ -58,6 +58,7 @@ class TestCourseRunEnrollmentSerializerV3:
         }
 
         assert set(serialized_data.keys()) == expected_fields
+        assert "certificate_available" in serialized_data["run"]["course"]
 
     def test_serializer_includes_upgrade_fields_for_upgradable_run(self):
         """Test serialization includes denormalized upgrade fields when product is eligible."""
@@ -69,6 +70,7 @@ class TestCourseRunEnrollmentSerializerV3:
         assert serialized_data["run"]["upgrade_product_id"] == product.id
         assert serialized_data["run"]["upgrade_product_price"] == str(product.price)
         assert serialized_data["run"]["upgrade_product_is_active"] is True
+        assert "certificate_available" in serialized_data["run"]["course"]
 
     def test_serializer_upgrade_fields_null_when_not_eligible(self):
         """Test upgrade fields are null if run has no eligible upgrade product."""

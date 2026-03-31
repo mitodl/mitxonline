@@ -20,6 +20,7 @@ from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_prog
 from ecommerce.factories import OrderFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import drf_datetime
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [
     pytest.mark.django_db,
@@ -81,6 +82,12 @@ def test_user_enrollments_detail(
                 "id": enrollment.run.course_id,
                 "readable_id": enrollment.run.course.readable_id,
                 "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                "certificate_available": enrollment.run.course.first_unexpired_run
+                is not None
+                and enrollment.run.course.courseruns.filter(
+                    b2b_contract__isnull=True,
+                    enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+                ).exists(),
                 "title": "Test page",
                 "type": "course",
             },
@@ -150,6 +157,12 @@ def test_user_enrollments_list(
                     "id": enrollment.run.course_id,
                     "readable_id": enrollment.run.course.readable_id,
                     "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                    "certificate_available": enrollment.run.course.first_unexpired_run
+                    is not None
+                    and enrollment.run.course.courseruns.filter(
+                        b2b_contract__isnull=True,
+                        enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+                    ).exists(),
                     "title": "Test page",
                     "type": "course",
                 },
@@ -235,6 +248,12 @@ def test_user_enrollments_list_filter_org_id(
                         "id": enrollment.run.course_id,
                         "readable_id": enrollment.run.course.readable_id,
                         "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                        "certificate_available": enrollment.run.course.first_unexpired_run
+                        is not None
+                        and enrollment.run.course.courseruns.filter(
+                            b2b_contract__isnull=True,
+                            enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+                        ).exists(),
                         "title": "Test page",
                         "type": "course",
                     },
@@ -323,6 +342,12 @@ def test_user_enrollments_list_filter_exclude_b2b(
                     "id": enrollment.run.course_id,
                     "readable_id": enrollment.run.course.readable_id,
                     "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                    "certificate_available": enrollment.run.course.first_unexpired_run
+                    is not None
+                    and enrollment.run.course.courseruns.filter(
+                        b2b_contract__isnull=True,
+                        enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+                    ).exists(),
                     "title": "Test page",
                     "type": "course",
                 },
@@ -394,6 +419,12 @@ def test_user_enrollments_list_filter_exclude_b2b(
                     "id": enrollment.run.course_id,
                     "readable_id": enrollment.run.course.readable_id,
                     "include_in_learn_catalog": enrollment.run.course.include_in_learn_catalog,
+                    "certificate_available": enrollment.run.course.first_unexpired_run
+                    is not None
+                    and enrollment.run.course.courseruns.filter(
+                        b2b_contract__isnull=True,
+                        enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+                    ).exists(),
                     "title": "Test page",
                     "type": "course",
                 },

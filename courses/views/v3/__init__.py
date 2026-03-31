@@ -4,7 +4,7 @@ Course API Views version 3
 
 import django_filters
 from django.conf import settings
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -18,6 +18,8 @@ from rest_framework.response import Response
 from courses.api import create_program_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
+    Course,
+    CourseRun,
     CourseRunEnrollment,
     Program,
     ProgramEnrollment,
@@ -29,6 +31,7 @@ from courses.serializers.v3.programs import (
 )
 from ecommerce.models import Product
 from main import features
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
@@ -93,8 +96,25 @@ class UserEnrollmentsApiViewSet(
             "run__b2b_contract",
         )
         .prefetch_related(
-            "run__course",
-            "run__course__page",
+            Prefetch(
+                "run__course",
+                queryset=Course.objects.select_related("page").annotate(
+                    has_enrollable_courserun=Exists(
+                        CourseRun.objects.enrollable().filter(
+                            course_id=OuterRef("pk"),
+                            b2b_contract__isnull=True,
+                        )
+                    ),
+                    verified_courserun_count=Count(
+                        "courseruns",
+                        filter=Q(
+                            courseruns__b2b_contract__isnull=True,
+                            courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+                        ),
+                        distinct=True,
+                    ),
+                ),
+            ),
             "run__enrollment_modes",
             Prefetch(
                 "run__products",

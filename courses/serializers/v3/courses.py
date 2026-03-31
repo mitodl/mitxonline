@@ -18,6 +18,7 @@ from courses.serializers.v1.base import (
 )
 from courses.serializers.v3.certificates import CourseRunCertificateSerializer
 from main import features
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
@@ -26,10 +27,32 @@ log = logging.getLogger(__name__)
 class CourseSerializer(BaseCourseSerializer):
     """Course serializer"""
 
+    certificate_available = serializers.SerializerMethodField()
+
+    @extend_schema_field(bool)
+    def get_certificate_available(self, instance) -> bool:
+        """Return if there is a certificate available for the course."""
+        if hasattr(instance, "has_enrollable_courserun") and hasattr(
+            instance, "verified_courserun_count"
+        ):
+            return (
+                bool(instance.has_enrollable_courserun)
+                and instance.verified_courserun_count > 0
+            )
+
+        return (
+            instance.courseruns.filter(b2b_contract__isnull=True).enrollable().exists()
+            and instance.courseruns.filter(
+                b2b_contract__isnull=True,
+                enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            ).exists()
+        )
+
     class Meta(BaseCourseSerializer.Meta):
         fields = [
             *BaseCourseSerializer.Meta.fields,
             "include_in_learn_catalog",
+            "certificate_available",
         ]
 
 
