@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.144.4
+---------------
+
+- feat: consider verified mode when checking is_upgradable (#3450)
+
 Version 1.144.3 (Released April 01, 2026)
 ---------------
 
