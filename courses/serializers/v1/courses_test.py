@@ -129,7 +129,7 @@ def test_serialize_course_with_page_fields(
 
 def test_serialize_course_run():
     """Test CourseRun serialization"""
-    course_run = CourseRunFactory.create(course__page=None)
+    course_run = CourseRunFactory.create(course__page=None, enrollment_modes=[])
     course_run.refresh_from_db()
 
     data = CourseRunSerializer(course_run).data
@@ -165,7 +165,7 @@ def test_serialize_course_run():
 
 def test_serialize_course_run_with_course():
     """Test CoursePageDepartmentsSerializer serialization"""
-    course_run = CourseRunFactory.create(course__page=None)
+    course_run = CourseRunFactory.create(course__page=None, enrollment_modes=[])
     data = CourseRunWithCourseSerializer(course_run).data
 
     assert data == {

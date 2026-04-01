@@ -12,6 +12,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
+    EnrollmentModeFactory,
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
@@ -40,10 +41,16 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         course__page=None,
         start_date=now() + timedelta(hours=1),
     )
+    run1.enrollment_modes.add(
+        EnrollmentModeFactory.create(mode=EDX_ENROLLMENT_VERIFIED_MODE)
+    )
     course1 = run1.course
     run2 = CourseRunFactory.create(
         course__page=None,
         start_date=now() + timedelta(hours=2),
+    )
+    run2.enrollment_modes.add(
+        EnrollmentModeFactory.create(mode=EDX_ENROLLMENT_VERIFIED_MODE)
     )
     course2 = run2.course
     runs = (  # noqa: F841

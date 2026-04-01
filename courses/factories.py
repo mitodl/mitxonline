@@ -155,9 +155,25 @@ class CourseRunFactory(DjangoModelFactory):
     b2b_contract = None
     is_source_run = False
 
-    enrollment_modes = factory.RelatedFactoryList(
-        EnrollmentModeFactory, size=1, mode_slug=EDX_ENROLLMENT_AUDIT_MODE
-    )
+    @factory.post_generation
+    def enrollment_modes(self, create, extracted, **kwargs):  # noqa: ARG002
+        """
+        Post-generation method to add enrollment modes to the course run.
+        By default, adds the verified mode if no modes are provided.
+
+        Args:
+            create: Whether the instance is being created (as opposed to just built).
+            extracted: The enrollment modes to add, if any were provided when the factory was called.
+            **kwargs: Additional keyword arguments (not used here).
+        """
+        if not create:
+            return
+        if extracted is not None:
+            self.enrollment_modes.set(extracted)
+        else:
+            self.enrollment_modes.add(
+                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+            )
 
     class Meta:
         model = CourseRun

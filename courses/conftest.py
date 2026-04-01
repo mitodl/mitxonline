@@ -101,9 +101,15 @@ def course_catalog_data(
 
 def _create_course(idx):
     test_course = CourseFactory.create(title=f"Test Course {idx}")
-    cr1 = CourseRunFactory.create(course=test_course, past_start=True)
-    cr2 = CourseRunFactory.create(course=test_course, in_progress=True)
-    cr3 = CourseRunFactory.create(course=test_course, in_future=True)
+    cr1 = CourseRunFactory.create(
+        course=test_course, past_start=True, enrollment_modes=[]
+    )
+    cr2 = CourseRunFactory.create(
+        course=test_course, in_progress=True, enrollment_modes=[]
+    )
+    cr3 = CourseRunFactory.create(
+        course=test_course, in_future=True, enrollment_modes=[]
+    )
     return test_course, [cr1, cr2, cr3]
 
 

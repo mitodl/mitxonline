@@ -20,7 +20,6 @@ from courses.factories import (
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    EnrollmentModeFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -40,7 +39,6 @@ from courses.models import (
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import format_as_iso8601
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -181,10 +179,8 @@ def test_course_run_upgradeable(
     course_run = CourseRunFactory.create(upgrade_deadline=upgrade_deadline)
     if has_product:
         ProductFactory.create(purchasable_object=course_run)
-    if has_verified_mode:
-        course_run.enrollment_modes.add(
-            EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
-        )
+    if not has_verified_mode:
+        course_run.enrollment_modes.clear()
 
     assert course_run.is_upgradable is expected
 
