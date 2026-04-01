@@ -139,15 +139,18 @@ export class ProgramProductDetailEnroll extends React.Component<
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
     })
-    try {
-      //find program id
-      const program = programs && programs[0]
-      if (program) {
-        await createProgramEnrollment(program.id)
+    if (!upgradeEnrollmentDialogVisibility) {
+      //if opening dialog
+      try {
+        //find program id
+        const program = programs && programs[0]
+        if (program) {
+          await createProgramEnrollment(program.id)
+        }
+      } catch (error) {
+        console.error("Failed to create program enrollment", error)
+        // Optionally, display an error message to the user.
       }
-    } catch (error) {
-      console.error("Failed to create program enrollment", error)
-      // Optionally, display an error message to the user.
     }
   }
 
@@ -360,7 +363,7 @@ export class ProgramProductDetailEnroll extends React.Component<
 
     return (
       <Modal
-        id={`upgrade-enrollment-dialog`}
+        id="addl-profile-fields-dialog"
         className="upgrade-enrollment-modal"
         isOpen={showAddlProfileFieldsModal}
         toggle={() => this.toggleAddlProfileFieldsModal()}
