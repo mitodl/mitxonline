@@ -37,6 +37,15 @@ pytestmark = [pytest.mark.django_db]
 )
 def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):  # noqa: F811
     """Test Program serialization"""
+
+    def sort_course_runs(course):
+        """
+        Sort course runs and enrollment modes in place to ensure consistent ordering for test assertions
+        """
+        course["courseruns"].sort(key=lambda cr: cr["id"])
+        for course_run in course["courseruns"]:
+            course_run["enrollment_modes"].sort(key=lambda em: em["mode_slug"])
+
     run1 = CourseRunFactory.create(
         course__page=None,
         start_date=now() + timedelta(hours=1),
@@ -100,11 +109,13 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         if not remove_tree
         else []
     )
+
+    # Sort course runs and enrollment modes in expected data and actual data to ensure consistent ordering for assertions
     for course in expected_courses:
-        course["courseruns"].sort(key=lambda cr: cr["id"])
+        sort_course_runs(course)
 
     for course in data["courses"]:
-        course["courseruns"].sort(key=lambda cr: cr["id"])
+        sort_course_runs(course)
 
     assert_drf_json_equal(
         data,
