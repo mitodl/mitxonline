@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -193,7 +193,10 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 .prefetch_related(
                     "courseruns",
                     "departments",
-                    "courseruns__enrollment_modes",
+                    Prefetch(
+                        "courseruns__enrollment_modes",
+                        to_attr="prefetched_enrollment_modes",
+                    ),
                 )
                 .all()
             )
@@ -261,7 +264,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
                 .prefetch_related(
                     "course__departments",
                     "course__page",
-                    "enrollment_modes",
+                    Prefetch("enrollment_modes", to_attr="prefetched_enrollment_modes"),
                 )
                 .filter(live=True)
             )

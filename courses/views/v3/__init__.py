@@ -95,7 +95,10 @@ class UserEnrollmentsApiViewSet(
         .prefetch_related(
             "run__course",
             "run__course__page",
-            "run__enrollment_modes",
+            Prefetch(
+                "run__enrollment_modes",
+                to_attr="prefetched_enrollment_modes",
+            ),
             Prefetch(
                 "run__products",
                 queryset=Product.objects.only("id", "price", "is_active"),
