@@ -612,6 +612,7 @@ class UserEnrollmentsApiViewSet(
         .prefetch_related(
             "run__b2b_contract__organization",
             "run__course__page",
+            Prefetch("run__enrollment_modes", to_attr="prefetched_enrollment_modes"),
         )
         .prefetch("certificate", "grades")
     )

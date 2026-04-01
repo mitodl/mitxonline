@@ -60,7 +60,14 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     is_enrollable = serializers.SerializerMethodField()
     course_number = serializers.SerializerMethodField()
     courseware_url = serializers.SerializerMethodField()
-    enrollment_modes = EnrollmentModeSerializer(many=True, read_only=True)
+    enrollment_modes = serializers.SerializerMethodField()
+
+    def get_enrollment_modes(self, instance) -> list[dict]:
+        """Get the enrollment modes for the course run"""
+        modes = getattr(instance, "prefetched_enrollment_modes", None)
+        if modes is None:
+            modes = instance.enrollment_modes.all()
+        return EnrollmentModeSerializer(modes, many=True).data
 
     def get_courseware_url(self, instance) -> str | None:
         """Get the courseware URL"""
