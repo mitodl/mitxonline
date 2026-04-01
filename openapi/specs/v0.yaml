@@ -4312,7 +4312,9 @@ components:
         enrollment_modes:
           type: array
           items:
-            $ref: '#/components/schemas/EnrollmentMode'
+            type: object
+            additionalProperties: {}
+          description: Get the enrollment modes for the course run
           readOnly: true
         products:
           type: array
@@ -4428,7 +4430,9 @@ components:
         enrollment_modes:
           type: array
           items:
-            $ref: '#/components/schemas/EnrollmentMode'
+            type: object
+            additionalProperties: {}
+          description: Get the enrollment modes for the course run
           readOnly: true
         upgrade_product_id:
           type: integer
@@ -5000,18 +5004,6 @@ components:
       x-enum-descriptions:
       - audit
       - verified
-    EnrollmentModeRequest:
-      type: object
-      description: Enrollment mode serializer.
-      properties:
-        mode_slug:
-          type: string
-          maxLength: 255
-        mode_display_name:
-          type: string
-          maxLength: 255
-        requires_payment:
-          type: boolean
     ErrorEnum:
       enum:
       - enroll-blocked
@@ -7402,7 +7394,9 @@ components:
         enrollment_modes:
           type: array
           items:
-            $ref: '#/components/schemas/EnrollmentMode'
+            type: object
+            additionalProperties: {}
+          description: Get the enrollment modes for the course run
           readOnly: true
         products:
           type: array
@@ -7516,7 +7510,9 @@ components:
         enrollment_modes:
           type: array
           items:
-            $ref: '#/components/schemas/EnrollmentMode'
+            type: object
+            additionalProperties: {}
+          description: Get the enrollment modes for the course run
           readOnly: true
         products:
           type: array
@@ -8067,7 +8063,9 @@ components:
         enrollment_modes:
           type: array
           items:
-            $ref: '#/components/schemas/EnrollmentMode'
+            type: object
+            additionalProperties: {}
+          description: Get the enrollment modes for the course run
           readOnly: true
         products:
           type: array
