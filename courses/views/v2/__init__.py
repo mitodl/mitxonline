@@ -668,27 +668,38 @@ class UserEnrollmentsApiViewSet(
 def _create_course_enrollment_from_program(request, courserun_id, program_enrollment):
     """Create the course enrollment based on the specified program enrollment."""
 
+    run = CourseRun.objects.filter(courseware_id=courserun_id).get()
+
+    in_program = run.course in [
+        *program_enrollment.program.required_courses,
+        *program_enrollment.program.elective_courses,
+    ]
+
+    should_create_audit_enrollment = (
+        program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        or not in_program
+        or not run.is_upgradable
+    )
+
+    effective_enrollment_mode = (
+        EDX_ENROLLMENT_AUDIT_MODE
+        if should_create_audit_enrollment
+        else program_enrollment.enrollment_mode
+    )
+
     if CourseRunEnrollment.objects.filter(
         run__courseware_id=courserun_id,
         user=request.user,
-        enrollment_mode=program_enrollment.enrollment_mode,
+        enrollment_mode=effective_enrollment_mode,
     ).exists():
         # Learner already has a matching enrollment, so nothing to do.
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    run = CourseRun.objects.filter(courseware_id=courserun_id).get()
 
     # Check if:
     # .. the program enrollment is audit,
     # .. if the run isn't in the program
 
-    if (program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE) or (
-        run.course
-        not in [
-            *program_enrollment.program.required_courses,
-            *program_enrollment.program.elective_courses,
-        ]
-    ):
+    if should_create_audit_enrollment:
         # Audit enrollments just get created, regardless of whether or not
         # the course is an elective.
         enrollments, _ = create_run_enrollments(
