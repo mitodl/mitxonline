@@ -1775,6 +1775,64 @@ def test_add_verified_program_course_enrollment(
 
 @pytest.mark.skip_nplusone_check
 @responses.activate
+def test_add_verified_program_course_enrollment_audit_only_run_falls_back_to_audit(
+    user, user_drf_client
+):
+    """Verify we fall back to audit when a program is verified but the run isn't upgradable."""
+
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={
+            "results": [
+                {"mode": EDX_ENROLLMENT_VERIFIED_MODE, "is_active": True},
+            ],
+        },
+        status=status.HTTP_200_OK,
+    )
+
+    prog_enrollment = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    program = prog_enrollment.program
+
+    # Match existing verified setup: programs generally have a product.
+    program_content_type = ContentType.objects.get_for_model(program)
+    with reversion.create_revision():
+        Product.objects.create(
+            price=10,
+            is_active=True,
+            object_id=program.id,
+            content_type=program_content_type,
+        )
+
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+
+    # Intentionally do NOT create a Product for the course run. This makes the run
+    # not upgradable (audit-only), and the endpoint should create an audit enrollment
+    # instead of erroring while trying to generate a verified order.
+
+    initial_order_count = user.orders.count()
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={
+                "courserun_id": course_run.courseware_id,
+            },
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_201_CREATED
+    assert resp.json()["run"]["id"] == course_run.id
+    assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_AUDIT_MODE
+    assert user.orders.count() == initial_order_count
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
 @pytest.mark.parametrize(
     "crogram_unrelated",
     [
