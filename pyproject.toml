@@ -111,6 +111,7 @@ dev = [
     "semantic-version>=2.10.0,<3",
     "wagtail-factories>=4.2,<4.3",
     "pytest-xdist[psutil]>=3.6.1,<4",
+    "mitol-drf-lint>=2025.3.27",
 ]
 
 [tool.uv]
