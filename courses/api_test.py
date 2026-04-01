@@ -65,6 +65,7 @@ from courses.factories import (
     CourseRunFactory,
     CourseRunGradeFactory,
     DepartmentFactory,
+    EnrollmentModeFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -141,6 +142,16 @@ def passed_grade_with_enrollment(user):
 def courses_api_logs(mocker):
     """Logger fixture for tasks"""
     return mocker.patch("courses.api.log")
+
+
+@pytest.fixture
+def default_mode_records():
+    """Returns the default modes we expect."""
+
+    return [
+        EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_AUDIT_MODE),
+        EnrollmentModeFactory.create(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE),
+    ]
 
 
 def _mock_edx_course_detail(coursekey, settings):
@@ -1301,16 +1312,56 @@ def test_create_run_enrollments_upgrade_edx_request_failure(mocker, user):
     assert successful_enrollments[0].edx_enrolled == False  # noqa: E712
 
 
+@pytest.mark.parametrize(
+    "has_enrollment",
+    [
+        True,
+        False,
+    ],
+)
+def test_generate_program_certificate_not_verified(
+    user,
+    program_with_requirements,  # noqa: F811
+    has_enrollment,
+    caplog,
+):
+    """Test that certificate generation fails if the user doesn't have a verified enrollment."""
+
+    # This should fail early - before the check for course enrollments.
+
+    assert not program_with_requirements.program.enrollments.filter(user=user).exists()
+
+    if has_enrollment:
+        ProgramEnrollment.objects.create(
+            program=program_with_requirements.program,
+            user=user,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        )
+
+    result = generate_program_certificate(
+        user=user,
+        program=program_with_requirements.program,
+    )
+
+    assert result == (None, False)
+    assert "Skipping program enrollment certificate" not in caplog.messages
+
+
 def test_generate_program_certificate_failure_missing_certificates(
     user,
     program_with_requirements,  # noqa: F811
+    default_mode_records,
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
     if there is not any course_run certificate for the given course.
     """
     course = CourseFactory.create()
-    CourseRunFactory.create_batch(3, course=course)
+    courseruns = CourseRunFactory.create_batch(3, course=course)
+    for run in courseruns:
+        run.enrollment_modes.set(default_mode_records)
+        run.save()
+
     program_with_requirements.program.add_requirement(course)
 
     result = generate_program_certificate(
@@ -1321,11 +1372,13 @@ def test_generate_program_certificate_failure_missing_certificates(
 
 
 @patch("courses.signals.upsert_custom_properties")
-def test_generate_program_certificate_failure_not_all_passed(
+def test_generate_program_certificate_failure_not_all_passed(  # noqa: PLR0913
     mock_upsert_custom_properties,
+    caplog,
     user,
     program_with_requirements,  # noqa: F811
     mocker,
+    default_mode_records,
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
@@ -1334,8 +1387,17 @@ def test_generate_program_certificate_failure_not_all_passed(
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program_with_requirements.program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    for run in course_runs:
+        run.enrollment_modes.set(default_mode_records)
+        run.save()
+
     CourseRunCertificateFactory.create_batch(
         2, user=user, course_run=factory.Iterator(course_runs)
     )
@@ -1347,11 +1409,12 @@ def test_generate_program_certificate_failure_not_all_passed(
     result = generate_program_certificate(user=user, program=program)
     assert result == (None, False)
     assert len(ProgramCertificate.objects.all()) == 0
+    assert "Skipping program enrollment certificate" not in caplog.messages
 
 
 @patch("courses.signals.upsert_custom_properties")
 def test_generate_program_certificate_success_single_requirement_course(
-    mock_upsert_custom_properties, user, mocker
+    mock_upsert_custom_properties, user, mocker, default_mode_records
 ):
     """
     Test that generate_program_certificate generates a program certificate for a Program with a single required Course.
@@ -1364,6 +1427,11 @@ def test_generate_program_certificate_success_single_requirement_course(
     )
     course = CourseFactory.create()
     program = ProgramFactory.create()
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1373,6 +1441,8 @@ def test_generate_program_certificate_success_single_requirement_course(
     )
     program.add_requirement(course)
     course_run = CourseRunFactory.create(course=course)
+    course_run.enrollment_modes.set(default_mode_records)
+    course_run.save()
     CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
 
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
@@ -1386,7 +1456,7 @@ def test_generate_program_certificate_success_single_requirement_course(
 
 @patch("courses.signals.upsert_custom_properties")
 def test_generate_program_certificate_success_multiple_required_courses(
-    mock_upsert_custom_properties, user, mocker
+    mock_upsert_custom_properties, user, mocker, default_mode_records
 ):
     """
     Test that generate_program_certificate generate a program certificate
@@ -1399,6 +1469,11 @@ def test_generate_program_certificate_success_multiple_required_courses(
     )
     courses = CourseFactory.create_batch(3)
     program = ProgramFactory.create()
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1409,6 +1484,10 @@ def test_generate_program_certificate_success_multiple_required_courses(
     for course in courses:
         program.add_requirement(course)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    for run in course_runs:
+        run.enrollment_modes.set(default_mode_records)
+        run.save()
+
     CourseRunCertificateFactory.create_batch(
         3, user=user, course_run=factory.Iterator(course_runs)
     )
@@ -1422,7 +1501,7 @@ def test_generate_program_certificate_success_multiple_required_courses(
 
 @patch("courses.signals.upsert_custom_properties")
 def test_generate_program_certificate_success_minimum_electives_not_met(
-    mock_upsert_custom_properties, user, mocker
+    mock_upsert_custom_properties, user, mocker, default_mode_records
 ):
     """
     Test that generate_program_certificate does not generate a program certificate if minimum electives have not been met.
@@ -1434,6 +1513,11 @@ def test_generate_program_certificate_success_minimum_electives_not_met(
 
     # Create Program with 2 minimum elective courses.
     program = ProgramFactory.create()
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1456,7 +1540,14 @@ def test_generate_program_certificate_success_minimum_electives_not_met(
 
     required_course1_course_run = CourseRunFactory.create(course=required_course1)
     elective_course1_course_run = CourseRunFactory.create(course=elective_course1)
-    elective_course2_course_run = CourseRunFactory.create(course=elective_course2)  # noqa: F841
+    elective_course2_course_run = CourseRunFactory.create(course=elective_course2)
+
+    required_course1_course_run.enrollment_modes.set(default_mode_records)
+    required_course1_course_run.save()
+    elective_course1_course_run.enrollment_modes.set(default_mode_records)
+    elective_course1_course_run.save()
+    elective_course2_course_run.enrollment_modes.set(default_mode_records)
+    elective_course2_course_run.save()
 
     # User has a certificate for required_course1 and elective_course1 only. No certificate for elective_course2.
     CourseRunCertificateFactory.create(
@@ -1471,12 +1562,21 @@ def test_generate_program_certificate_success_minimum_electives_not_met(
     assert len(ProgramCertificate.objects.all()) == 0
 
 
+@pytest.mark.parametrize(
+    "has_program_enrollment",
+    [
+        True,
+        False,
+    ],
+)
 @patch("courses.signals.upsert_custom_properties")
-def test_force_generate_program_certificate_success(
+def test_force_generate_program_certificate_success(  # noqa: PLR0913
     mock_upsert_custom_properties,
     user,
     program_with_requirements,  # noqa: F811
     mocker,
+    has_program_enrollment,
+    caplog,
 ):
     """
     Test that force creating a program certificate with generate_program_certificate generates
@@ -1488,6 +1588,14 @@ def test_force_generate_program_certificate_success(
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
+
+    if has_program_enrollment:
+        ProgramEnrollment.objects.create(
+            user=user,
+            program=program_with_requirements.program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunCertificateFactory.create_batch(
@@ -1506,6 +1614,9 @@ def test_force_generate_program_certificate_success(
     assert len(ProgramCertificate.objects.all()) == 1
     patched_sync_hubspot_user.assert_called_once_with(user)
 
+    if not has_program_enrollment:
+        assert "Skipping program enrollment certificate" not in caplog.messages
+
 
 def test_generate_program_certificate_already_exist(
     user,
@@ -1515,6 +1626,11 @@ def test_generate_program_certificate_already_exist(
     Test that generate_program_certificate return (None, False) and not create program certificate
     if program certificate already exist.
     """
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program_with_empty_requirements,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     program_certificate = ProgramCertificateFactory.create(
         program=program_with_empty_requirements, user=user
     )
@@ -1528,6 +1644,11 @@ def test_generate_program_certificate_already_exist(
 def test_program_certificates_access():
     """Tests that the revoke and unrevoke for a program certificates sets the states properly"""
     test_certificate = ProgramCertificateFactory.create(is_revoked=False)
+    ProgramEnrollment.objects.create(
+        user=test_certificate.user,
+        program=test_certificate.program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
 
     # Revoke a program certificate
     manage_program_certificate_access(
@@ -1554,6 +1675,7 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     mock_upsert_custom_properties,
     user,
     mocker,
+    default_mode_records,
 ):
     """
     Test that generate_program_certificate returns (None, False) and does not create a program certificate
@@ -1561,11 +1683,19 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     """
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    for run in course_runs:
+        run.enrollment_modes.set(default_mode_records)
+        run.save()
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
     # Create Program
     program = ProgramFactory.create()
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     root_node = program.requirements_root
 
     root_node.add_child(
@@ -1608,9 +1738,26 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     assert len(ProgramCertificate.objects.all()) == 0
 
 
+@pytest.mark.parametrize(
+    ("has_main_enroll", "has_sub_enroll"),
+    [
+        (
+            True,
+            True,
+        ),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
 @patch("courses.signals.upsert_custom_properties")
-def test_generate_program_certificate_with_subprogram_requirement(
-    mock_upsert_custom_properties, user, mocker
+def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0913
+    mock_upsert_custom_properties,
+    user,
+    mocker,
+    default_mode_records,
+    has_main_enroll,
+    has_sub_enroll,
 ):
     """
     Test that generate_program_certificate considers sub-program (nested program) requirements
@@ -1628,64 +1775,61 @@ def test_generate_program_certificate_with_subprogram_requirement(
     sub_course = CourseFactory.create()
     sub_program.add_requirement(sub_course)
 
+    if has_sub_enroll:
+        ProgramEnrollment.objects.create(
+            user=user,
+            program=sub_program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
     # Create the main program that requires the sub-program
     main_program = ProgramFactory.create()
     main_program.add_program_requirement(sub_program)
 
+    if has_main_enroll:
+        ProgramEnrollment.objects.create(
+            user=user,
+            program=main_program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
     # User completes the sub-program course and gets a certificate
     sub_course_run = CourseRunFactory.create(course=sub_course)
+    sub_course_run.enrollment_modes.set(default_mode_records)
+    sub_course_run.save()
     CourseRunGradeFactory.create(
         course_run=sub_course_run, user=user, passed=True, grade=1
     )
     CourseRunCertificateFactory.create(user=user, course_run=sub_course_run)
 
-    # Generate sub-program certificate (user has completed sub-program requirements)
+    # Test sub-program certificate (user has completed sub-program requirements)
     sub_certificate, sub_created = generate_program_certificate(
         user=user, program=sub_program
     )
-    assert sub_created is True
-    assert isinstance(sub_certificate, ProgramCertificate)
+    if has_sub_enroll:
+        assert sub_created is True
+        assert isinstance(sub_certificate, ProgramCertificate)
 
     # Now try to generate main program certificate
-    # It should succeed because the user has a certificate for the required sub-program
+    # It should succeed if the user has a certificate for the required sub-program
     main_certificate, main_created = generate_program_certificate(
         user=user, program=main_program
     )
-    assert main_created is True
-    assert isinstance(main_certificate, ProgramCertificate)
-    assert len(ProgramCertificate.objects.all()) == 2
-    patched_sync_hubspot_user.assert_called()
+    if has_main_enroll and has_sub_enroll:
+        # Should only get a certificate if we had a cert in the sub
+        # So, we'd have to have been enrolled there, too
+        assert main_created is True
+        assert isinstance(main_certificate, ProgramCertificate)
+        assert len(ProgramCertificate.objects.all()) == 2
+        patched_sync_hubspot_user.assert_called()
 
-
-def test_generate_program_certificate_with_subprogram_requirement_missing_certificate(
-    user, mocker
-):
-    """
-    Test that generate_program_certificate does NOT generate a certificate when the required
-    sub-program certificate is missing.
-    """
-    mocker.patch(
-        "hubspot_sync.api.upsert_custom_properties",
-    )
-
-    # Create a sub-program
-    sub_program = ProgramFactory.create()
-    sub_course = CourseFactory.create()
-    sub_program.add_requirement(sub_course)
-
-    # Create the main program that requires the sub-program
-    main_program = ProgramFactory.create()
-    main_program.add_program_requirement(sub_program)
-
-    # User does NOT complete the sub-program course (no certificate)
-    # Try to generate main program certificate
-    # It should fail because the user does not have a certificate for the required sub-program
-    main_certificate, main_created = generate_program_certificate(
-        user=user, program=main_program
-    )
-    assert main_created is False
-    assert main_certificate is None
-    assert len(ProgramCertificate.objects.all()) == 0
+    if not has_main_enroll or not has_sub_enroll:
+        assert (
+            ProgramCertificate.objects.filter(
+                program__in=[main_program, sub_program], user=user
+            ).count()
+            < 2
+        )
 
 
 @patch("courses.signals.upsert_custom_properties")
@@ -1705,9 +1849,21 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(
     sub_course = CourseFactory.create()
     sub_program.add_requirement(sub_course)
 
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=sub_program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
     # Create the main program that requires the sub-program
     main_program = ProgramFactory.create()
     main_program.add_program_requirement(sub_program)
+
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=main_program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
 
     # User completes the sub-program and gets a certificate, but it gets revoked
     sub_course_run = CourseRunFactory.create(course=sub_course)
@@ -1721,6 +1877,7 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(
         user=user, program=sub_program
     )
     assert sub_created is True
+    assert isinstance(sub_certificate, ProgramCertificate)
     sub_certificate.is_revoked = True
     sub_certificate.save()
 
@@ -1734,6 +1891,100 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(
     # Only the revoked sub-program certificate should exist
     assert len(ProgramCertificate.objects.filter(is_revoked=False)) == 0
     assert len(ProgramCertificate.all_objects.all()) == 1
+
+
+def test_generate_program_certificate_audit_courses(user, default_mode_records):
+    """
+    Test that the certificates generate OK if the program has courses that are
+    audit-only.
+
+    Worth noting: simply having a passing grade in a course that you're auditing,
+    when the course has a verified mode in it, should not grant you a certificate.
+    """
+
+    program = ProgramFactory.create()
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+
+    cert_course = CourseFactory.create()
+    cert_course_run = CourseRunFactory.create(course=cert_course)
+    cert_course_run.enrollment_modes.set(default_mode_records)
+    cert_course.save()
+
+    audit_course = CourseFactory.create()
+    audit_course_run = CourseRunFactory.create(course=audit_course)
+    # Potential flakiness: if the fixture is changed and these aren't in the right
+    # order, this will be wrong.
+    audit_course_run.enrollment_modes.add(default_mode_records[0])
+    audit_course.save()
+
+    program.add_requirement(cert_course)
+    program.add_requirement(audit_course)
+
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+    CourseRunEnrollment.objects.create(
+        user=user,
+        run=cert_course_run,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+    CourseRunEnrollment.objects.create(
+        user=user,
+        run=audit_course_run,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    CourseRunGradeFactory.create(
+        course_run=cert_course_run,
+        user=user,
+        passed=True,
+    )
+    audit_grade = CourseRunGradeFactory.create(
+        course_run=audit_course_run,
+        user=user,
+        passed=False,
+    )
+
+    # This should fail - you have neither a cert in the cert run, nor a passing
+    # grade in the audit course, so you don't meet the requirements.
+    result = generate_program_certificate(user, program)
+    assert result == (None, False)
+
+    audit_grade.passed = True
+    audit_grade.save()
+
+    # This should also fail - you don't have a cert in the cert run, but a passing
+    # grade in the audit course. You need both, so you don't meet the requirements.
+    result = generate_program_certificate(user, program)
+    assert result == (None, False)
+
+    audit_grade.passed = False
+    audit_grade.save()
+
+    CourseRunCertificateFactory.create(
+        user=user,
+        course_run=cert_course_run,
+    )
+
+    # This should also fail - you have a cert in the cert run, but no passing
+    # grade in the audit course, so you still don't meet the requirements.
+    result = generate_program_certificate(user, program)
+    assert result == (None, False)
+
+    audit_grade.passed = True
+    audit_grade.save()
+
+    # This should succeed - you have a cert in the cert run, and a passing grade
+    # in the audit run, so you're good now.
+    cert, created = generate_program_certificate(user, program)
+    assert created
+    assert isinstance(cert, ProgramCertificate)
 
 
 @pytest.mark.parametrize(
