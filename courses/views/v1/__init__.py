@@ -256,19 +256,20 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         if relevant_to:
             course = Course.objects.filter(readable_id=relevant_to).first()
             if course:
-                return get_relevant_course_run_qset(course)
+                runs_qset = get_relevant_course_run_qset(course)
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
-                return (
-                    get_user_relevant_program_course_run_qset(program).prefetch_related(
-                        Prefetch(
-                            "enrollment_modes",
-                            to_attr="prefetched_enrollment_modes",
-                        )
-                    )
+                runs_qset = (
+                    get_user_relevant_program_course_run_qset(program)
                     if program
                     else Program.objects.none()
                 )
+            return runs_qset.prefetch_related(
+                Prefetch(
+                    "enrollment_modes",
+                    to_attr="prefetched_enrollment_modes",
+                )
+            )
         else:
             return (
                 CourseRun.objects.select_related("course")
