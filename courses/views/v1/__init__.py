@@ -262,7 +262,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
                 runs_qset = (
                     get_user_relevant_program_course_run_qset(program)
                     if program
-                    else Program.objects.none()
+                    else CourseRun.objects.none()
                 )
             return runs_qset.prefetch_related(
                 Prefetch(
