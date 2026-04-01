@@ -183,7 +183,13 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = (
                 Course.objects.filter()
                 .select_related("page")
-                .prefetch_related("departments")
+                .prefetch_related(
+                    "departments",
+                    Prefetch(
+                        "courseruns__enrollment_modes",
+                        to_attr="prefetched_enrollment_modes",
+                    ),
+                )
                 .all()
             )
         else:
@@ -436,6 +442,12 @@ class UserEnrollmentsApiViewSet(
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
             .select_related("run__course__page", "user", "run")
+            .prefetch_related(
+                Prefetch(
+                    "run__enrollment_modes",
+                    to_attr="prefetched_enrollment_modes",
+                )
+            )
             .prefetch("certificate", "grades")
         )
 
