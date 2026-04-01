@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -183,7 +183,13 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = (
                 Course.objects.filter()
                 .select_related("page")
-                .prefetch_related("departments")
+                .prefetch_related(
+                    "departments",
+                    Prefetch(
+                        "courseruns__enrollment_modes",
+                        to_attr="prefetched_enrollment_modes",
+                    ),
+                )
                 .all()
             )
         else:
@@ -193,7 +199,10 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
                 .prefetch_related(
                     "courseruns",
                     "departments",
-                    "courseruns__enrollment_modes",
+                    Prefetch(
+                        "courseruns__enrollment_modes",
+                        to_attr="prefetched_enrollment_modes",
+                    ),
                 )
                 .all()
             )
@@ -247,21 +256,27 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         if relevant_to:
             course = Course.objects.filter(readable_id=relevant_to).first()
             if course:
-                return get_relevant_course_run_qset(course)
+                runs_qset = get_relevant_course_run_qset(course)
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
-                return (
+                runs_qset = (
                     get_user_relevant_program_course_run_qset(program)
                     if program
-                    else Program.objects.none()
+                    else CourseRun.objects.none()
                 )
+            return runs_qset.prefetch_related(
+                Prefetch(
+                    "enrollment_modes",
+                    to_attr="prefetched_enrollment_modes",
+                )
+            )
         else:
             return (
                 CourseRun.objects.select_related("course")
                 .prefetch_related(
                     "course__departments",
                     "course__page",
-                    "enrollment_modes",
+                    Prefetch("enrollment_modes", to_attr="prefetched_enrollment_modes"),
                 )
                 .filter(live=True)
             )
@@ -433,6 +448,12 @@ class UserEnrollmentsApiViewSet(
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
             .select_related("run__course__page", "user", "run")
+            .prefetch_related(
+                Prefetch(
+                    "run__enrollment_modes",
+                    to_attr="prefetched_enrollment_modes",
+                )
+            )
             .prefetch("certificate", "grades")
         )
 

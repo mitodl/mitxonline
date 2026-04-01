@@ -38,7 +38,11 @@ from courses.constants import (
 )
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
+from openedx.constants import (
+    EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+    EDX_ENROLLMENTS_PAID_MODES,
+)
 
 User = get_user_model()
 
@@ -1240,19 +1244,33 @@ class CourseRun(TimestampedModel):
     @property
     def is_upgradable(self):
         """
-        Checks if the course can be upgraded
-        A null value means that the upgrade window is always open
+        Checks if the course can be upgraded.
+        Requires the run to be live, the upgrade deadline to not have passed,
+        a product to exist, and a verified enrollment mode to be available.
+        A null upgrade_deadline means that the upgrade window is always open.
         """
         if hasattr(self, "prefetched_products"):
             has_product = bool(self.prefetched_products)
         else:
             has_product = self.products.exists()
+
+        if hasattr(self, "prefetched_enrollment_modes"):
+            has_verified_mode = any(
+                mode.mode_slug == EDX_ENROLLMENT_VERIFIED_MODE
+                for mode in self.prefetched_enrollment_modes
+            )
+        else:
+            has_verified_mode = self.enrollment_modes.filter(
+                mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+            ).exists()
+
         return (
             self.live is True
             and (
                 self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
             )
             and has_product
+            and has_verified_mode
         )
 
     @cached_property

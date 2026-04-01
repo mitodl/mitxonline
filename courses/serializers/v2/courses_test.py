@@ -56,6 +56,8 @@ def test_serialize_course(  # noqa: PLR0913
         courseRun2 = CourseRunFactory.create(
             certificate_available_date=None, course=courseRun1.course
         )
+        courseRun1.enrollment_modes.clear()
+        courseRun2.enrollment_modes.clear()
     else:
         courseRun1 = CourseRunFactory.create()
         courseRun1.enrollment_modes.add(

@@ -152,16 +152,21 @@ def test_course_run_past(end_days, expected):
 
 
 @pytest.mark.parametrize(
-    "upgrade_deadline_days,has_product, expected",  # noqa: PT006
+    "upgrade_deadline_days,has_product,has_verified_mode,expected",  # noqa: PT006
     [
-        [-1, True, False],  # noqa: PT007
-        [1, True, True],  # noqa: PT007
-        [None, True, True],  # noqa: PT007
-        [None, False, False],  # noqa: PT007
-        [1, False, False],  # noqa: PT007
+        [-1, True, True, False],  # noqa: PT007
+        [1, True, True, True],  # noqa: PT007
+        [None, True, True, True],  # noqa: PT007
+        [None, False, True, False],  # noqa: PT007
+        [1, False, True, False],  # noqa: PT007
+        [1, True, False, False],  # noqa: PT007
+        [None, True, False, False],  # noqa: PT007
+        [None, False, False, False],  # noqa: PT007
     ],
 )
-def test_course_run_upgradeable(upgrade_deadline_days, has_product, expected):
+def test_course_run_upgradeable(
+    upgrade_deadline_days, has_product, has_verified_mode, expected
+):
     """
     Test that CourseRun.is_upgradable returns the expected boolean value
     """
@@ -174,6 +179,8 @@ def test_course_run_upgradeable(upgrade_deadline_days, has_product, expected):
     course_run = CourseRunFactory.create(upgrade_deadline=upgrade_deadline)
     if has_product:
         ProductFactory.create(purchasable_object=course_run)
+    if not has_verified_mode:
+        course_run.enrollment_modes.clear()
 
     assert course_run.is_upgradable is expected
 

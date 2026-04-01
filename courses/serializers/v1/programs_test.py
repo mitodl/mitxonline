@@ -12,6 +12,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
+    EnrollmentModeFactory,
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
@@ -36,14 +37,29 @@ pytestmark = [pytest.mark.django_db]
 )
 def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):  # noqa: F811
     """Test Program serialization"""
+
+    def sort_course_runs(course):
+        """
+        Sort course runs and enrollment modes in place to ensure consistent ordering for test assertions
+        """
+        course["courseruns"].sort(key=lambda cr: cr["id"])
+        for course_run in course["courseruns"]:
+            course_run["enrollment_modes"].sort(key=lambda em: em["mode_slug"])
+
     run1 = CourseRunFactory.create(
         course__page=None,
         start_date=now() + timedelta(hours=1),
+    )
+    run1.enrollment_modes.add(
+        EnrollmentModeFactory.create(mode=EDX_ENROLLMENT_VERIFIED_MODE)
     )
     course1 = run1.course
     run2 = CourseRunFactory.create(
         course__page=None,
         start_date=now() + timedelta(hours=2),
+    )
+    run2.enrollment_modes.add(
+        EnrollmentModeFactory.create(mode=EDX_ENROLLMENT_VERIFIED_MODE)
     )
     course2 = run2.course
     runs = (  # noqa: F841
@@ -83,20 +99,31 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         instance=program_with_empty_requirements, context=mock_context
     ).data
 
+    expected_courses = (
+        [
+            CourseWithCourseRunsSerializer(
+                instance=course, context={**mock_context}
+            ).data
+            for course in [course1, course2]
+        ]
+        if not remove_tree
+        else []
+    )
+
+    # Sort course runs and enrollment modes in expected data and actual data to ensure consistent ordering for assertions
+    for course in expected_courses:
+        sort_course_runs(course)
+
+    for course in data["courses"]:
+        sort_course_runs(course)
+
     assert_drf_json_equal(
         data,
         {
             "title": program_with_empty_requirements.title,
             "readable_id": program_with_empty_requirements.readable_id,
             "id": program_with_empty_requirements.id,
-            "courses": [
-                CourseWithCourseRunsSerializer(
-                    instance=course, context={**mock_context}
-                ).data
-                for course in [course1, course2]
-            ]
-            if not remove_tree
-            else [],
+            "courses": expected_courses,
             "requirements": formatted_reqs,
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root
