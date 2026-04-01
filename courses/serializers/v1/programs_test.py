@@ -123,14 +123,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             "title": program_with_empty_requirements.title,
             "readable_id": program_with_empty_requirements.readable_id,
             "id": program_with_empty_requirements.id,
-            "courses": [
-                CourseWithCourseRunsSerializer(
-                    instance=course, context={**mock_context}
-                ).data
-                for course in [course1, course2]
-            ]
-            if not remove_tree
-            else [],
+            "courses": expected_courses,
             "requirements": formatted_reqs,
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root
