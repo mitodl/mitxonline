@@ -90,6 +90,22 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         instance=program_with_empty_requirements, context=mock_context
     ).data
 
+    expected_courses = (
+        [
+            CourseWithCourseRunsSerializer(
+                instance=course, context={**mock_context}
+            ).data
+            for course in [course1, course2]
+        ]
+        if not remove_tree
+        else []
+    )
+    for course in expected_courses:
+        course["courseruns"].sort(key=lambda cr: cr["id"])
+
+    for course in data["courses"]:
+        course["courseruns"].sort(key=lambda cr: cr["id"])
+
     assert_drf_json_equal(
         data,
         {
