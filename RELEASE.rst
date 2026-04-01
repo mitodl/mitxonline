@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.144.3
+Version 1.144.3 (Released April 01, 2026)
 ---------------
 
 - Update get_certificate_available to use the enrollment modes for determination (#3446)
