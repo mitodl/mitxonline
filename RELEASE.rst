@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 1.144.5
+---------------
+
+- Add management command to check/repair B2B program enrollments (#3449)
+- chore: add drf-lint pre-commit hook with baseline (#3453)
+- [pre-commit.ci] pre-commit autoupdate (#3438)
+- Add test to the program enrollment dialog (#3445)
+- fix: fall back to audit enrollment for non-upgradable runs in verified program enrollment API (#3451)
+- Refactor program cert generation to support new cert requirements (#3439)
+
 Version 1.144.4 (Released April 02, 2026)
 ---------------
 
