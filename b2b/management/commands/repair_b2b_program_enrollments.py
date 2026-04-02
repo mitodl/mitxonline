@@ -3,11 +3,11 @@
 import logging
 
 from django.core.management import BaseCommand
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Q
 
+from b2b.models import ContractProgramItem
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
-from courses.models import ProgramEnrollment
-from users.models import User
+from courses.models import Program, ProgramEnrollment
 
 log = logging.getLogger(__name__)
 
@@ -35,10 +35,6 @@ Unenroll users from B2B programs that belong to contracts that the user doesn't 
     def handle(self, *args, **kwargs):  # noqa: ARG002
         """Perform check and repair operation."""
 
-        b2b_program_enrollment_qset = ProgramEnrollment.objects.annotate(
-            b2b_program_count=Count("program__contract_memberships")
-        ).filter(b2b_program_count__gt=0)
-
         specific_user = kwargs.pop("user", None)
         commit = kwargs.pop("commit", False)
 
@@ -47,30 +43,39 @@ Unenroll users from B2B programs that belong to contracts that the user doesn't 
                 self.style.WARNING("Commit flag not set - no changes will be made.")
             )
 
-        users = User.objects.prefetch_related(
-            Prefetch("programenrollment_set", queryset=b2b_program_enrollment_qset)
-        )
+        b2b_programs = Program.objects.filter(
+            b2b_only=True,
+            contract_memberships__isnull=False,
+        ).distinct()
 
-        if specific_user:
-            users = users.filter(Q(email=specific_user) | Q(username=specific_user))
+        for program in b2b_programs:
+            program_contract_ids = ContractProgramItem.objects.filter(
+                program=program
+            ).values_list("contract_id", flat=True)
 
-        for user in users.all():
-            extraneous_enrollments = user.programenrollment_set.exclude(
-                Q(program__b2b_only=False)
-                | Q(
-                    program__contract_memberships__contract__in=user.b2b_contracts.all()
+            extraneous_enrollments = (
+                ProgramEnrollment.objects.filter(program=program)
+                .exclude(user__b2b_contracts__in=program_contract_ids)
+                .select_related("user", "program")
+                .distinct()
+            )
+
+            if specific_user:
+                extraneous_enrollments = extraneous_enrollments.filter(
+                    Q(user__email=specific_user) | Q(user__username=specific_user)
                 )
-            ).all()
 
-            if extraneous_enrollments.count() > 0:
+            count = extraneous_enrollments.count()
+            if count > 0:
                 self.stdout.write(
-                    f"Unenrolling user {user.email} from {extraneous_enrollments.count()} program enrollments:"
+                    f"Program {program.readable_id}: unenrolling {count} user(s):"
                 )
 
                 for enrollment in extraneous_enrollments:
-                    enrollment.deactivate_and_save(
-                        ENROLL_CHANGE_STATUS_UNENROLLED, no_user=True
-                    ) if commit else None
-                    self.stdout.write(f"\t{enrollment.program.readable_id} ")
+                    self.stdout.write(f"\t{enrollment.user.email}")
+                    if commit:
+                        enrollment.deactivate_and_save(
+                            ENROLL_CHANGE_STATUS_UNENROLLED, no_user=True
+                        )
 
                 self.stdout.write("\n")
