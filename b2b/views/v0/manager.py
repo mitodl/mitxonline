@@ -98,11 +98,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """List an organization's contracts."""
 
     permission_classes = [IsAuthenticated, IsOrganizationManager]
-
-    def get_queryset(self):
-        """Add useful prefetches to the default queryset."""
-
-        return ContractPage.objects.select_related("organization")
+    queryset = ContractPage.objects.select_related("organization")
 
     def get_serializer_class(self):
         """Use different serializers for list vs detail views."""

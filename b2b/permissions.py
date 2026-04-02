@@ -25,7 +25,7 @@ class IsOrganizationManager(permissions.BasePermission):
             return True
 
         # Get org_id from URL kwargs
-        org_id = view.kwargs.get("org_id")
+        org_id = view.kwargs.get("parent_lookup_organization")
         if not org_id:
             return False
 
@@ -38,7 +38,7 @@ class IsOrganizationManager(permissions.BasePermission):
         For contract-related objects, ensure the contract belongs to
         an organization that the user manages. Superusers are always allowed.
         """
-        org_id = view.kwargs.get("org_id")
+        org_id = view.kwargs.get("parent_lookup_organization")
 
         if request.user and request.user.is_superuser:
             return True

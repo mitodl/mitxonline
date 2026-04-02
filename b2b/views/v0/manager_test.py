@@ -10,8 +10,12 @@ from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory
 from b2b.models import UserOrganization
+from b2b.serializers.v0 import (
+    BaseContractPageSerializer,
+)
 from courses.factories import CourseRunFactory
 from ecommerce.factories import ProductFactory
+from main.test_utils import assert_drf_json_equal
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -190,7 +194,7 @@ def test_org_contract_lists(org_setup, manager_drf_client):
 
     _, orgs, contract_1, contract_2, contract_3 = org_setup
 
-    manager_org_list = reverse("b2b:b2b-manager-organization")
+    manager_org_list = reverse("b2b:b2b-manager-organization-list")
 
     resp = manager_drf_client.get(manager_org_list)
 
@@ -208,11 +212,44 @@ def test_org_contract_lists(org_setup, manager_drf_client):
     assert resp.status_code == status.HTTP_200_OK
     resp_json = resp.json()
 
-    assert len(resp_json["contracts"]) == 2
+    assert len(resp_json) == 2
+    assert_drf_json_equal(
+        resp_json,
+        BaseContractPageSerializer([contract_1[0], contract_2[0]], many=True).data,
+        ignore_order=True,
+    )
+    assert contract_3[0].id not in [contract["id"] for contract in resp_json]
 
     manager_contract_list = reverse(
         "b2b:b2b-manager-org-contract-list",
         kwargs={"parent_lookup_organization": orgs[1].id},
     )
 
+    resp = manager_drf_client.get(manager_contract_list)
+
     assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_org_contract_run_list(org_setup, manager_drf_client):
+    """Test that we can get the course runs out of the contract as expected."""
+
+    # Extracting just the stuff we want.
+    _, _, contract_1, _, _ = org_setup
+    contract, *runs = contract_1
+    runs = [run[0] for run in runs]
+
+    manager_contract_run_list = reverse(
+        "b2b:b2b-manager-org-contract-course-runs",
+        kwargs={
+            "parent_lookup_organization": contract.organization.id,
+            "pk": contract.id,
+        },
+    )
+
+    resp = manager_drf_client.get(manager_contract_run_list)
+    assert resp.status_code == status.HTTP_200_OK
+
+    assert len(resp.json()) == 2
+    assert sorted([run.readable_id for run in runs]) == sorted(
+        [run["readable_id"] for run in resp.json()]
+    )
