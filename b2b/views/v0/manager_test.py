@@ -13,12 +13,22 @@ from b2b.models import UserOrganization
 from b2b.serializers.v0 import (
     BaseContractPageSerializer,
 )
+from b2b.serializers.v0.manager import ManagerEnrollmentSerializer
 from courses.factories import CourseRunFactory
+from courses.models import CourseRunEnrollment
 from ecommerce.factories import ProductFactory
 from main.test_utils import assert_drf_json_equal
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
+
+
+@pytest.fixture(autouse=True)
+def mock_hubspot(mocker):
+    """Mock out some hubspot stuff"""
+
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+    mocker.patch("hubspot_sync.tasks.sync_contact_with_hubspot.delay")
 
 
 @pytest.fixture(autouse=True)
@@ -234,7 +244,7 @@ def test_org_contract_run_list(org_setup, manager_drf_client):
     """Test that we can get the course runs out of the contract as expected."""
 
     # Extracting just the stuff we want.
-    _, _, contract_1, _, _ = org_setup
+    _, _, contract_1, _, contract_3 = org_setup
     contract, *runs = contract_1
     runs = [run[0] for run in runs]
 
@@ -253,3 +263,81 @@ def test_org_contract_run_list(org_setup, manager_drf_client):
     assert sorted([run.readable_id for run in runs]) == sorted(
         [run["readable_id"] for run in resp.json()]
     )
+
+    contract, *_ = contract_3
+
+    manager_contract_run_list = reverse(
+        "b2b:b2b-manager-org-contract-course-runs",
+        kwargs={
+            "parent_lookup_organization": contract.organization.id,
+            "pk": contract.id,
+        },
+    )
+
+    resp = manager_drf_client.get(manager_contract_run_list)
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_org_contract_run_enrollments(org_setup, manager_drf_client):
+    """Test that we can get enrollments in a contract run."""
+
+    # Extracting just the stuff we want.
+    _, _, contract_1, _, contract_3 = org_setup
+    contract, *runs = contract_1
+    runs = [run[0] for run in runs]
+
+    users_to_enroll = UserFactory.create_batch(3)
+
+    run_enrollments = [
+        [
+            CourseRunEnrollment.objects.create(
+                user=users_to_enroll[0],
+                run=runs[0],
+            ),
+            CourseRunEnrollment.objects.create(
+                user=users_to_enroll[1],
+                run=runs[0],
+            ),
+        ],
+        [
+            CourseRunEnrollment.objects.create(
+                user=users_to_enroll[2],
+                run=runs[1],
+            )
+        ],
+    ]
+
+    for idx, run in enumerate(runs):
+        manager_contract_enrol_list = reverse(
+            "b2b:b2b-manager-org-contract-course-run-enrollments",
+            kwargs={
+                "parent_lookup_organization": contract.organization.id,
+                "pk": contract.id,
+                "course_run_id": run.courseware_id,
+            },
+        )
+
+        resp = manager_drf_client.get(manager_contract_enrol_list)
+        assert resp.status_code == status.HTTP_200_OK
+
+        assert len(resp.json()) == len(run_enrollments[idx])
+        assert_drf_json_equal(
+            resp.json(),
+            ManagerEnrollmentSerializer(run_enrollments[idx], many=True).data,
+            ignore_order=True,
+        )
+
+    contract, *runs = contract_3
+    run = runs[0][0]
+
+    manager_contract_enrol_list = reverse(
+        "b2b:b2b-manager-org-contract-course-run-enrollments",
+        kwargs={
+            "parent_lookup_organization": contract.organization.id,
+            "pk": contract.id,
+            "course_run_id": run.courseware_id,
+        },
+    )
+
+    resp = manager_drf_client.get(manager_contract_enrol_list)
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
