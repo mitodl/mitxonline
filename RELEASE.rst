@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.144.5
+Version 1.144.5 (Released April 02, 2026)
 ---------------
 
 - Add management command to check/repair B2B program enrollments (#3449)
