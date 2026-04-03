@@ -61,11 +61,12 @@ class ProgramAdmin(admin.ModelAdmin):
         "id",
         "title",
         "live",
+        "b2b_only"
         "readable_id",
         "program_type",
         "display_mode",
     )
-    list_filter = ["live", "program_type", "display_mode", "departments"]
+    list_filter = ["live", "b2b_only", "program_type", "display_mode", "departments"]
     inlines = [ProgramContractPageInline]
 
 
