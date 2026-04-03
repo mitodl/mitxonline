@@ -61,7 +61,7 @@ class ProgramAdmin(admin.ModelAdmin):
         "id",
         "title",
         "live",
-        "b2b_only"
+        "b2b_only",
         "readable_id",
         "program_type",
         "display_mode",
