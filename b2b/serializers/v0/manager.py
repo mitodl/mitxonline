@@ -1,5 +1,7 @@
 """B2B manager dashboard serializers."""
 
+from datetime import datetime
+
 from rest_framework import serializers
 
 from b2b.models import ContractPage
@@ -35,16 +37,16 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
         if not obj.max_learners:
             return None
 
-        attached_count = obj.get_learners().count()
+        attached_count = obj.users.count()
         return round((attached_count / obj.max_learners) * 100, 2)
 
     def get_total_enrollments(self, obj) -> int:
         """Get total number of enrollments across all contract course runs."""
-        return CourseRunEnrollment.objects.filter(run__b2b_contract=obj).count()
+        return obj.enrollment_count
 
     def get_total_codes(self, obj) -> int:
         """Get total number of discount codes for this contract."""
-        return obj.get_discounts().count()
+        return obj.discount_count
 
 
 class ManagerCourseRunSerializer(serializers.ModelSerializer):
@@ -103,7 +105,7 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         if not contract:
             return False
 
-        return obj.contract_redemptions.exists()
+        return obj.is_redeemed
 
     def get_redeemed_by(self, obj) -> str | None:
         """Return the user that redeemed the code (last)."""
@@ -112,17 +114,17 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         if not contract:
             return None
 
-        last_redemption = obj.contract_redemptions.last()
+        return (
+            obj.last_redemption_email if hasattr(obj, "last_redemption_email") else None
+        )
 
-        return last_redemption.user.email if last_redemption else None
-
-    def get_redeemed_on(self, obj) -> str | None:
+    def get_redeemed_on(self, obj) -> datetime | None:
         """Return the date that the code was redeemed on last."""
 
         contract = self.context.get("contract")
         if not contract:
             return None
 
-        last_redemption = obj.contract_redemptions.last()
-
-        return str(last_redemption.created_on) if last_redemption else None
+        return (
+            obj.last_redemption_date if hasattr(obj, "last_redemption_date") else None
+        )

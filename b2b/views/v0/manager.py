@@ -1,6 +1,7 @@
 """B2B manager dashboard views."""
 
-from django.db.models import Count
+from django.contrib.contenttypes.models import ContentType
+from django.db.models import Count, Exists, OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -15,6 +16,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
     ContractPage,
+    DiscountContractAttachmentRedemption,
     OrganizationPage,
 )
 from b2b.permissions import IsOrganizationManager
@@ -29,6 +31,9 @@ from b2b.serializers.v0.manager import (
     ManagerEnrollmentSerializer,
 )
 from courses.models import CourseRun, CourseRunEnrollment
+from ecommerce.models import Discount
+
+courserun_content_type = ContentType.objects.get_for_model(CourseRun)
 
 
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -98,7 +103,39 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """List an organization's contracts."""
 
     permission_classes = [IsAuthenticated, IsOrganizationManager]
-    queryset = ContractPage.objects.select_related("organization")
+
+    def get_queryset(self):
+        """Get the queryset; add some annotations/etc for computed fields"""
+        return (
+            ContractPage.objects.select_related("organization")
+            .prefetch_related("users")
+            .annotate(
+                discount_count=Count(
+                    Subquery(
+                        Discount.objects.filter(
+                            products__product__is_active=True,
+                            products__product__content_type=courserun_content_type,
+                            products__product__object_id__in=CourseRun.objects.filter(
+                                b2b_contract=OuterRef("pk")
+                            ).all(),
+                        ).values("id")
+                    )
+                )
+            )
+            .annotate(
+                enrollment_count=Count(
+                    Subquery(
+                        CourseRunEnrollment.objects.filter(
+                            run__b2b_contract=OuterRef("pk")
+                        ).values("id")
+                    )
+                )
+            )
+            .filter(
+                organization__organization_users__user=self.request.user,
+                organization__organization_users__is_manager=True,
+            )
+        )
 
     def get_serializer_class(self):
         """Use different serializers for list vs detail views."""
@@ -168,7 +205,32 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         if contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS:
             return Response([])
 
-        discounts = contract.get_discounts()
+        discounts = (
+            contract.get_discounts()
+            .annotate(
+                is_redeemed=Exists(
+                    DiscountContractAttachmentRedemption.objects.filter(
+                        discount=OuterRef("pk")
+                    )
+                )
+            )
+            .annotate(
+                last_redemption_email=Subquery(
+                    DiscountContractAttachmentRedemption.objects.select_related("user")
+                    .filter(discount=OuterRef("pk"))
+                    .order_by("-created_on")
+                    .values("user__email")[:1]
+                )
+            )
+            .annotate(
+                last_redemption_date=Subquery(
+                    DiscountContractAttachmentRedemption.objects.select_related("user")
+                    .filter(discount=OuterRef("pk"))
+                    .order_by("-created_on")
+                    .values("created_on")[:1]
+                )
+            )
+        )
 
         if not contract.max_learners:
             # No learner limit - show first code only, if there is one
@@ -177,7 +239,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     [discounts.order_by("id").first()],
                     context={"contract": contract},
                     many=True,
-                )
+                ).data
             )
 
         else:
