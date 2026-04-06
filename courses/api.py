@@ -930,34 +930,70 @@ def get_certificate_grade_eligible_runs(now):
     return course_runs  # noqa: RET504
 
 
-def generate_course_run_certificates():
+def generate_course_run_certificates(  # noqa: C901
+    user=None,
+    course_run=None,
+    is_webhook=False,  # noqa: FBT002
+):
     """
-    Hits the edX grades API for eligible course runs and generates the certificates and grades for users for course runs
+    Hits the edX grades API and generates the certificates and grades for users for course runs.
+
+    When called without arguments (periodic task path), it fetches all eligible course runs and
+    processes grades/certificates for all users in each run.
+
+    When called with user, course_run, and is_webhook=True (webhook path), it processes a single
+    user's grade and certificate for a specific course run, bypassing certificate_available_date
+    and course run eligibility checks since edX has already determined the certificate is ready.
+
+    Args:
+        user (User or None): If provided, process only this user's grade/certificate.
+        course_run (CourseRun or None): If provided, process only this course run.
+        is_webhook (bool): If True, bypass eligibility checks.
+
+    Returns:
+        str or None: The certificate status - "created", "exists", or None.
     """
     now = now_in_utc()
-    course_runs = get_certificate_grade_eligible_runs(now)
 
-    if course_runs is None or course_runs.count() == 0:
-        log.info("No course runs matched the certificates generation criteria")
-        return
+    certificate_status = None
+
+    # Webhook path: use the provided course run directly, no eligibility filtering
+    if is_webhook and user and course_run:
+        course_runs = [course_run]
+    else:
+        # Periodic task path: fetch all eligible runs
+        course_runs = get_certificate_grade_eligible_runs(now)
+
+        if course_runs is None or course_runs.count() == 0:
+            log.info("No course runs matched the certificates generation criteria")
+            return certificate_status
 
     for run in course_runs:
-        edx_grade_user_iter = exception_logging_generator(
-            get_edx_grades_with_users(run)
-        )
+        if is_webhook:
+            # Webhook: fetch grade for the specific user only
+            edx_grade_user_iter = get_edx_grades_with_users(run, user=user)
+        else:
+            edx_grade_user_iter = exception_logging_generator(
+                get_edx_grades_with_users(run)
+            )
         created_grades_count, updated_grades_count, generated_certificates_count = (
             0,
             0,
             0,
         )
-        for edx_grade, user in edx_grade_user_iter:
+        for edx_grade, run_user in edx_grade_user_iter:
             try:
                 course_run_grade, created, updated = ensure_course_run_grade(
-                    user=user, course_run=run, edx_grade=edx_grade, should_update=True
+                    user=run_user,
+                    course_run=run,
+                    edx_grade=edx_grade,
+                    should_update=True,
                 )
             except ValidationError:
-                msg = f"Can't save grade {edx_grade} for {user} in {run}, skipping certificate generation"
+                msg = f"Can't save grade {edx_grade} for {run_user} in {run}, skipping certificate generation"
                 log.exception(msg)
+                if is_webhook:
+                    return certificate_status
                 continue
 
             if created:
@@ -966,29 +1002,57 @@ def generate_course_run_certificates():
                 updated_grades_count += 1
 
             # Check certificate generation eligibility
+            # For webhooks: bypass checks since edX has already determined the certificate is ready
+            # For periodic task:
             #   1. For self_paced course runs we generate certificates right away irrespective
-            #   of certificate_available_date
-            #   2. For others course runs we generate the certificates if the certificate_available_date of course run
-            #   has passed
-            if run.is_self_paced or (
-                run.certificate_available_date and run.certificate_available_date <= now
+            #      of certificate_available_date
+            #   2. For other course runs we generate certificates if the certificate_available_date
+            #      has passed
+            if (
+                is_webhook
+                or run.is_self_paced
+                or (
+                    run.certificate_available_date
+                    and run.certificate_available_date <= now
+                )
             ):
-                _, created, deleted = process_course_run_grade_certificate(
+                certificate, created, deleted = process_course_run_grade_certificate(
                     course_run_grade=course_run_grade
                 )
 
                 if deleted:
                     log.warning(
-                        "Certificate deleted for user %s and course_run %s", user, run
+                        "Certificate deleted for user %s and course_run %s",
+                        run_user,
+                        run,
                     )
                 elif created:
                     log.warning(
-                        "Certificate created for user %s and course_run %s", user, run
+                        "Certificate created for user %s and course_run %s",
+                        run_user,
+                        run,
                     )
                     generated_certificates_count += 1
+
+                if created:
+                    certificate_status = "created"
+                elif certificate:
+                    certificate_status = "exists"
+                elif is_webhook:
+                    log.info(
+                        "Certificate not created for user %s and course_run %s: "
+                        "user is not certificate eligible (passed=%s, has_paid_enrollment=%s)",
+                        run_user,
+                        run,
+                        course_run_grade.passed,
+                        course_run_grade.is_certificate_eligible,
+                    )
+
         log.info(
             f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"  # noqa: G004
         )
+
+    return certificate_status
 
 
 def manage_course_run_certificate_access(user, courseware_id, revoke_state):
