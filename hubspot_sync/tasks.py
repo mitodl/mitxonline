@@ -226,6 +226,36 @@ def sync_line_with_hubspot(line_id: int) -> str:
 
 @app.task(
     acks_late=True,
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429
+@single_task(10, key=task_obj_lock)
+def sync_cart_add_event_with_hubspot(
+    user_id: int, product_id: int, is_uai_course: bool
+) -> bool:
+    """
+    Track a cart add event in HubSpot for a user/product pair.
+
+    Args:
+        user_id (int): The User ID.
+        product_id (int): The Product ID.
+        is_uai_course (bool): Whether the product's course run is UAI.
+
+    Returns:
+        bool: True if the event was submitted, False otherwise.
+    """
+    return api.track_cart_add_with_hubspot(
+        User.objects.get(id=user_id),
+        Product.objects.get(id=product_id),
+        is_uai_course=is_uai_course,
+    )
+
+
+@app.task(
+    acks_late=True,
     autoretry_for=(TooManyRequestsException,),
     max_retries=3,
     retry_backoff=60,

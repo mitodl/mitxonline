@@ -13,6 +13,7 @@ from reversion.models import Version
 
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from courses.factories import (
+    CourseRunFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     ProgramCertificateFactory,
@@ -538,3 +539,26 @@ def test_get_hubspot_id_raises(mocker, user):
         get_hubspot_id_for_object(user, raise_error=True)
     mock_log.assert_called_once()
     assert f"Hubspot id could not be found for user for id {user.id}" == str(exc.value)
+
+
+def test_track_cart_add_with_hubspot_uses_uai_account(settings, mocker, user):
+    """UAI course adds should route using UAI HubSpot token when available."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "mitx-token"  # noqa: S105
+    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
+
+    course_run = CourseRunFactory.create(courseware_id="course-v1:UAI_MIT+1.001x+2026")
+    product = ProductFactory.create(purchasable_object=course_run)
+
+    mock_sync_deal = mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+
+    assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
+    mock_sync_deal.assert_called_once()
+
+
+def test_track_cart_add_with_hubspot_returns_false_when_unconfigured(settings, user):
+    """Tracking should be skipped when no HubSpot token is configured."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = ""
+    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = ""
+
+    product = ProductFactory.create()
+    assert api.track_cart_add_with_hubspot(user, product, is_uai_course=False) is False

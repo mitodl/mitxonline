@@ -38,6 +38,7 @@ from rest_framework.viewsets import (
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from courses.models import Course, CourseRun, Program, ProgramRun
+from courses.utils import is_uai_course_run
 from ecommerce import api
 from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.discounts import DiscountType
@@ -69,6 +70,7 @@ from ecommerce.serializers import (
     UserDiscountSerializer,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
+from hubspot_sync.task_helpers import sync_hubspot_cart_add
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from main import features
@@ -691,6 +693,15 @@ class CheckoutApiViewSet(ViewSet):
                 # Legacy behavior: add single item
                 BasketItem.objects.create(basket=basket, product=product)
                 message = "Product added to cart"
+
+            if message == "Product added to cart" and isinstance(
+                product.purchasable_object, CourseRun
+            ):
+                sync_hubspot_cart_add(
+                    request.user,
+                    product,
+                    is_uai_course=is_uai_course_run(product.purchasable_object),
+                )
 
         return Response(
             {

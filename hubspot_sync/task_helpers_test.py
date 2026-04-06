@@ -4,6 +4,7 @@ import pytest
 
 from ecommerce.factories import ProductFactory
 from hubspot_sync.task_helpers import (
+    sync_hubspot_cart_add,
     sync_hubspot_deal,
     sync_hubspot_product,
     sync_hubspot_user,
@@ -66,6 +67,26 @@ def test_sync_hubspot_product(mocker, mock_exception_log, raise_exc):
     if raise_exc:
         mock_exception_log.assert_called_once_with(
             "Exception calling sync_product_with_hubspot for product %d", product.id
+        )
+    else:
+        mock_exception_log.assert_not_called()
+
+
+@pytest.mark.parametrize("raise_exc", [True, False])
+def test_sync_hubspot_cart_add(mocker, mock_exception_log, user, raise_exc):
+    """sync_hubspot_cart_add should call sync_cart_add_event_with_hubspot.apply_async and log any exception"""
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_cart_add_event_with_hubspot.apply_async",
+        side_effect=(ConnectionError if raise_exc else None),
+    )
+    product = ProductFactory.build()
+    sync_hubspot_cart_add(user, product, is_uai_course=True)
+    mock_sync.assert_called_once_with(args=(user.id, product.id, True), countdown=5)
+    if raise_exc:
+        mock_exception_log.assert_called_once_with(
+            "Exception calling sync_cart_add_event_with_hubspot for user %s and product %d",
+            user.edx_username,
+            product.id,
         )
     else:
         mock_exception_log.assert_not_called()

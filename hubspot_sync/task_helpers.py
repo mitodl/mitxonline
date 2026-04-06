@@ -78,3 +78,29 @@ def sync_hubspot_product(product: Product):
             log.exception(
                 "Exception calling sync_product_with_hubspot for product %d", product.id
             )
+
+
+def sync_hubspot_cart_add(user: User, product: Product, *, is_uai_course: bool):
+    """
+    Trigger celery task to track a cart add event in HubSpot.
+
+    Args:
+        user (User): The user adding the product to cart
+        product (Product): The product being added
+        is_uai_course (bool): Whether the added course is a UAI course
+    """
+    if (
+        settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
+        or getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+    ):
+        try:
+            tasks.sync_cart_add_event_with_hubspot.apply_async(
+                args=(user.id, product.id, is_uai_course),
+                countdown=5,
+            )
+        except:  # noqa: E722
+            log.exception(
+                "Exception calling sync_cart_add_event_with_hubspot for user %s and product %d",
+                user.edx_username,
+                product.id,
+            )

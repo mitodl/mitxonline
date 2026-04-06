@@ -31,6 +31,7 @@ from hubspot_sync.api import (
 from hubspot_sync.tasks import (
     batch_upsert_associations,
     batch_upsert_associations_chunked,
+    sync_cart_add_event_with_hubspot,
     sync_contact_with_hubspot,
     sync_deal_with_hubspot,
     sync_product_with_hubspot,
@@ -85,6 +86,18 @@ def test_task_sync_deal_with_hubspot(mocker):
 
     assert sync_deal_with_hubspot(mock_object.id) == mock_result.id
     mock_api_call.assert_called_once_with(mock_object)
+
+
+def test_task_sync_cart_add_event_with_hubspot(mocker):
+    """sync_cart_add_event_with_hubspot should call API tracker and return success state."""
+    user = UserFactory.create()
+    product = ProductFactory.create()
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.track_cart_add_with_hubspot", return_value=True
+    )
+
+    assert sync_cart_add_event_with_hubspot(user.id, product.id, True) is True
+    mock_api_call.assert_called_once_with(user, product, is_uai_course=True)
 
 
 @pytest.mark.parametrize("task_func", SYNC_FUNCTIONS)

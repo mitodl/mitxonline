@@ -5,7 +5,9 @@ import re
 from decimal import Decimal
 from typing import List  # noqa: UP035
 
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Q
 from hubspot.crm.objects import (
     SimplePublicObject,
@@ -30,6 +32,7 @@ from mitol.hubspot_api.api import (
     upsert_object_request,
 )
 from mitol.hubspot_api.models import HubspotObject
+from reversion.models import Version
 
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from courses.models import CourseRun, Program
@@ -1376,6 +1379,75 @@ def sync_contact_with_hubspot(user: User):
     user.save(update_fields=["hubspot_sync_datetime"])
 
     return result
+
+
+def _get_cart_add_token(is_uai_course: bool) -> str:
+    """Resolve HubSpot token for cart-add deal tracking."""
+    if is_uai_course:
+        return (
+            getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
+            or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
+        )
+    return getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
+
+
+def track_cart_add_with_hubspot(
+    user: User, product: Product, *, is_uai_course: bool
+) -> bool:
+    """
+    Create and sync a dedicated deal that represents a cart-add occurrence.
+
+    This mirrors the existing deal sync path used by ecommerce orders but creates
+    a standalone pending order/line so each cart add is a distinct deal.
+
+    Args:
+        user (User): The user adding to cart
+        product (Product): Product being added
+        is_uai_course (bool): Whether this is a UAI/Learn course add
+
+    Returns:
+        bool: True if synced successfully, False otherwise.
+    """
+    token = _get_cart_add_token(is_uai_course)
+    if not token:
+        return False
+
+    original_token = getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
+    try:
+        settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = token
+        product_version = Version.objects.get_for_object(product).first()
+        if not product_version:
+            return False
+
+        with transaction.atomic():
+            order = Order.objects.create(
+                state=models.OrderStatus.PENDING,
+                purchaser=user,
+                total_price_paid=0,
+            )
+            line = Line.objects.create(
+                order=order,
+                purchased_object_id=product.object_id,
+                purchased_content_type_id=product.content_type_id,
+                product_version=product_version,
+                quantity=1,
+            )
+            order.total_price_paid = line.discounted_price
+            order.save(update_fields=["total_price_paid"])
+
+        sync_deal_with_hubspot(order)
+    except Exception:  # pylint: disable=broad-except
+        log.exception(
+            "Failed to sync HubSpot cart-add deal for user %s product %s (is_uai=%s)",
+            user.id,
+            product.id,
+            is_uai_course,
+        )
+        return False
+    finally:
+        settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = original_token
+
+    return True
 
 
 MODEL_CREATE_FUNCTION_MAPPING = {

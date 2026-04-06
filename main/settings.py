@@ -1361,6 +1361,12 @@ HUBSPOT_PORTAL_ID = get_string(
     description="Hubspot Portal ID",
 )
 
+UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = get_string(
+    name="UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN",
+    default=None,
+    description="Hubspot private token for UAI/Learn account",
+)
+
 # Unified Ecommerce integration
 
 UNIFIED_ECOMMERCE_URL = get_string(

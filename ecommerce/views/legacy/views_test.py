@@ -842,6 +842,50 @@ def test_add_to_cart_api_with_feature_flag(
         assert basket.basket_items.first().product == product2
 
 
+def test_add_to_cart_triggers_hubspot_cart_add_for_uai_course(
+    user_drf_client, user, settings, mocker
+):
+    """Adding a UAI course run product should trigger UAI-routed HubSpot cart-add tracking."""
+    settings.ENABLE_MULTIPLE_CART_ITEMS = True
+    mock_sync = mocker.patch("ecommerce.views.legacy.sync_hubspot_cart_add")
+
+    course_run = CourseRunFactory.create(courseware_id="course-v1:UAI_MIT+1.001x+2026")
+    product = ProductFactory.create(purchasable_object=course_run)
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    mock_sync.assert_called_once_with(
+        user,
+        product,
+        is_uai_course=True,
+    )
+
+
+def test_add_to_cart_does_not_trigger_hubspot_for_duplicate_product(
+    user_drf_client, user, settings, mocker
+):
+    """When multiple cart items are enabled, duplicate adds should not emit a second tracking event."""
+    settings.ENABLE_MULTIPLE_CART_ITEMS = True
+    mock_sync = mocker.patch("ecommerce.views.legacy.sync_hubspot_cart_add")
+
+    product = ProductFactory.create()
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product)
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": product.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["message"] == "Product already in cart"
+    mock_sync.assert_not_called()
+
+
 def test_discount_rest_api(admin_drf_client, user_drf_client):
     """
     Checks that the admin REST API is only accessible by an admin
