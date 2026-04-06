@@ -174,6 +174,9 @@ class CourseRunFactory(DjangoModelFactory):
             self.enrollment_modes.add(
                 EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)
             )
+            self.enrollment_modes.add(
+                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+            )
 
     class Meta:
         model = CourseRun
