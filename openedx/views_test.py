@@ -301,14 +301,16 @@ class TestCertificateWebhookView:
             assert expected_error_field in response.data["error"]
 
     @pytest.mark.parametrize(
-        "user_email, courseware_id",
+        ("user_email", "courseware_id"),
         [
             ("nonexistent@example.com", None),
             (None, "course-v1:NonExistent+0+2099"),
         ],
         ids=["user_not_found", "course_run_not_found"],
     )
-    def test_not_found_returns_404(self, user_drf_client, user, user_email, courseware_id):
+    def test_not_found_returns_404(
+        self, user_drf_client, user, user_email, courseware_id
+    ):
         """Test that a non-existent user or course run returns 404"""
         if courseware_id is None:
             courseware_id = CourseRunFactory.create().courseware_id
@@ -324,14 +326,59 @@ class TestCertificateWebhookView:
         assert "not found" in response.data["error"]
 
     @pytest.mark.parametrize(
-        "enrollment_mode, grade, passed, is_self_paced, expected_status_code, expected_cert_status, cert_should_exist",  # noqa: E501
+        (
+            "enrollment_mode",
+            "grade",
+            "passed",
+            "is_self_paced",
+            "expected_status_code",
+            "expected_cert_status",
+            "cert_should_exist",
+        ),
         [
-            (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, True, status.HTTP_201_CREATED, "created", True),
-            (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, False, status.HTTP_201_CREATED, "created", True),
-            (EDX_ENROLLMENT_VERIFIED_MODE, 0.30, False, True, status.HTTP_200_OK, None, False),
-            (EDX_ENROLLMENT_AUDIT_MODE, 0.80, True, True, status.HTTP_200_OK, None, False),
+            (
+                EDX_ENROLLMENT_VERIFIED_MODE,
+                0.80,
+                True,
+                True,
+                status.HTTP_201_CREATED,
+                "created",
+                True,
+            ),
+            (
+                EDX_ENROLLMENT_VERIFIED_MODE,
+                0.80,
+                True,
+                False,
+                status.HTTP_201_CREATED,
+                "created",
+                True,
+            ),
+            (
+                EDX_ENROLLMENT_VERIFIED_MODE,
+                0.30,
+                False,
+                True,
+                status.HTTP_200_OK,
+                None,
+                False,
+            ),
+            (
+                EDX_ENROLLMENT_AUDIT_MODE,
+                0.80,
+                True,
+                True,
+                status.HTTP_200_OK,
+                None,
+                False,
+            ),
         ],
-        ids=["verified_passed_self_paced", "verified_passed_instructor_paced", "verified_not_passed", "audit_passed"],
+        ids=[
+            "verified_passed_self_paced",
+            "verified_passed_instructor_paced",
+            "verified_not_passed",
+            "audit_passed",
+        ],
     )
     def test_certificate_status(  # noqa: PLR0913
         self,
@@ -375,7 +422,9 @@ class TestCertificateWebhookView:
         assert response.status_code == expected_status_code
         assert response.data["certificate_status"] == expected_cert_status
         assert (
-            CourseRunCertificate.objects.filter(user=user, course_run=course_run).exists()
+            CourseRunCertificate.objects.filter(
+                user=user, course_run=course_run
+            ).exists()
             == cert_should_exist
         )
 

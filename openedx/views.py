@@ -133,7 +133,7 @@ class CertificateWebhookView(APIView):
     authentication_classes = [OAuth2Authentication]
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):  # noqa: D102
+    def post(self, request):
         user_email = request.data.get("user_id")
         course_run_id = request.data.get("course_id")
 
