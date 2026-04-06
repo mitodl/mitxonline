@@ -1915,7 +1915,7 @@ def test_generate_program_certificate_audit_courses(user, default_mode_records):
     cert_course.save()
 
     audit_course = CourseFactory.create()
-    audit_course_run = CourseRunFactory.create(course=audit_course)
+    audit_course_run = CourseRunFactory.create(course=audit_course, enrollment_modes=[])
     # Potential flakiness: if the fixture is changed and these aren't in the right
     # order, this will be wrong.
     audit_course_run.enrollment_modes.add(default_mode_records[0])

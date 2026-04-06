@@ -159,7 +159,7 @@ class CourseRunFactory(DjangoModelFactory):
     def enrollment_modes(self, create, extracted, **kwargs):  # noqa: ARG002
         """
         Post-generation method to add enrollment modes to the course run.
-        By default, adds the verified mode if no modes are provided.
+        By default, adds the audit mode if no modes are provided.
 
         Args:
             create: Whether the instance is being created (as opposed to just built).
@@ -172,7 +172,7 @@ class CourseRunFactory(DjangoModelFactory):
             self.enrollment_modes.set(extracted)
         else:
             self.enrollment_modes.add(
-                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+                EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)
             )
 
     class Meta:
