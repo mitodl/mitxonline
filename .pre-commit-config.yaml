@@ -73,7 +73,7 @@ repos:
         entry: drf-lint
         args: [--baseline, drf_lint_baseline.json]
         language: python
-        files: 'serializers\.py$'
+        files: '(serializers\.py$|serializers/.*\.py$)'
         additional_dependencies:
           - mitol-drf-lint
           - "setuptools<82"
