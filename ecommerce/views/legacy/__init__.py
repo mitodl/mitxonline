@@ -113,14 +113,14 @@ def _has_uai_purchase(order):
     )
 
 
-def _should_redirect_to_learn(request, order):
+def _should_redirect_to_learn(order):
     """
     Return True if the user should be redirected to the Learn dashboard
     after a successful checkout.
     """
     if _has_uai_purchase(order):
         return True
-    global_id = request.user.global_id
+    global_id = order.purchaser.global_id
     return bool(
         global_id
         and is_posthog_enabled(
@@ -788,7 +788,7 @@ class CheckoutCallbackView(View):
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
             )
         elif order_state == OrderStatus.FULFILLED:
-            if _should_redirect_to_learn(request, order):
+            if _should_redirect_to_learn(order):
                 return _learn_dashboard_redirect(order)
 
             return redirect_with_user_message(
@@ -990,7 +990,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             )
         if "no_checkout" in checkout_payload:
             order = checkout_payload["order"]
-            if _should_redirect_to_learn(request, order):
+            if _should_redirect_to_learn(order):
                 return _learn_dashboard_redirect(order)
             return redirect_with_user_message(
                 reverse("user-dashboard"),
