@@ -1,7 +1,7 @@
 """B2B manager dashboard views."""
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Exists, OuterRef, Subquery
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Subquery
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -33,8 +33,6 @@ from b2b.serializers.v0.manager import (
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
 
-courserun_content_type = ContentType.objects.get_for_model(CourseRun)
-
 
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
     """List organizations available for the current user."""
@@ -44,10 +42,20 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter to organizations where the user is a manager."""
+
+        org_qset = OrganizationPage.objects.prefetch_related(
+            Prefetch(
+                "contracts",
+                queryset=ContractPage.objects.prefetch_related(
+                    "contract_programs", "contract_programs__program"
+                ).filter(active=True),
+                to_attr="active_contracts",
+            ),
+        )
         return (
-            OrganizationPage.objects.distinct()
+            org_qset.distinct()
             if self.request.user and self.request.user.is_superuser
-            else OrganizationPage.objects.filter(
+            else org_qset.filter(
                 organization_users__user=self.request.user,
                 organization_users__is_manager=True,
             ).distinct()
@@ -106,6 +114,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Get the queryset; add some annotations/etc for computed fields"""
+        courserun_content_type = ContentType.objects.get_for_model(CourseRun)
         return (
             ContractPage.objects.select_related("organization")
             .prefetch_related("users")
@@ -124,11 +133,8 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
             .annotate(
                 enrollment_count=Count(
-                    Subquery(
-                        CourseRunEnrollment.objects.filter(
-                            run__b2b_contract=OuterRef("pk")
-                        ).values("id")
-                    )
+                    "course_runs__enrollments",
+                    filter=Q(course_runs__enrollments__active=True),
                 )
             )
             .filter(

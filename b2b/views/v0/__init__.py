@@ -1,7 +1,7 @@
 """Views for the B2B API (v0)."""
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from mitol.common.utils.datetime import now_in_utc
@@ -14,6 +14,7 @@ from rest_framework_api_key.permissions import HasAPIKey
 from b2b.api import create_b2b_enrollment, process_add_org_membership
 from b2b.models import (
     ContractPage,
+    ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationPage,
 )
@@ -35,7 +36,13 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
     Viewset for the OrganizationPage model.
     """
 
-    queryset = OrganizationPage.objects.all()
+    queryset = OrganizationPage.objects.prefetch_related(
+        Prefetch(
+            "contracts",
+            queryset=ContractPage.objects.filter(active=True),
+            to_attr="active_contracts",
+        )
+    ).all()
     serializer_class = OrganizationPageSerializer
     permission_classes = [IsAdminOrReadOnly | HasAPIKey]
     lookup_field = "slug"
@@ -54,7 +61,13 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter to only return active contracts by default."""
-        return ContractPage.objects.filter(active=True)
+        return ContractPage.objects.filter(active=True).prefetch_related(
+            Prefetch(
+                "contract_programs",
+                queryset=ContractProgramItem.objects.order_by("sort_order"),
+            ),
+            "contract_programs__program",
+        )
 
 
 class Enroll(APIView):

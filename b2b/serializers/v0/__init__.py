@@ -46,16 +46,15 @@ class ContractPageSerializer(BaseContractPageSerializer):
     Serializer for the ContractPage model.
     """
 
-    programs = serializers.SerializerMethodField()
+    programs = serializers.ListField(
+        child=serializers.IntegerField(),
+        source="contract_programs.program.id",
+        read_only=True,
+    )
     welcome_message_extra = RichTextSerializer(
         help_text=ContractPage._meta.get_field("welcome_message_extra").help_text,  # noqa: SLF001, not private https://docs.djangoproject.com/en/5.0/ref/models/meta/
         read_only=True,
     )
-
-    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
-    def get_programs(self, instance):
-        """Get the ordered list of program IDs for this contract"""
-        return list(instance.programs.values_list("id", flat=True))
 
     class Meta:
         model = ContractPage
@@ -85,8 +84,11 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
     @extend_schema_field(ContractPageSerializer(many=True))
     def get_contracts(self, instance):
         """Get only active contracts for the organization"""
-        active_contracts = instance.contracts.filter(active=True)
-        return ContractPageSerializer(active_contracts, many=True).data
+        return (
+            ContractPageSerializer(instance.active_contracts, many=True).data
+            if hasattr(instance, "active_contracts")
+            else []
+        )
 
     class Meta:
         model = OrganizationPage
@@ -173,15 +175,7 @@ class UserOrganizationSerializer(serializers.ModelSerializer):
     @extend_schema_field(ContractPageSerializer(many=True))
     def get_contracts(self, instance):
         """Get the contracts for the organization for the user"""
-        contracts = (
-            self.context["user"]
-            .b2b_contracts.filter(
-                organization=instance.organization,
-                active=True,
-            )
-            .all()
-        )
-        return ContractPageSerializer(contracts, many=True).data
+        return ContractPageSerializer(instance.user.b2b_contracts, many=True).data
 
     @extend_schema_field(str)
     def get_logo(self, instance):
