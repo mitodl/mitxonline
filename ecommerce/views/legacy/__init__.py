@@ -73,6 +73,11 @@ from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from main import features
 from main.constants import (
+    USER_MSG_TYPE_BASKET_EMPTY,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_DISCOUNT_INVALID,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
@@ -571,26 +576,6 @@ class CheckoutApiViewSet(ViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
 
-    @action(
-        detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
-    )
-    def start_checkout(self, request):
-        """
-        API call to start the checkout process. This assembles the basket items
-        into an Order with Lines for each item, applies the attached basket
-        discounts, and then calls the payment gateway to prepare for payment.
-        Returns:
-            - JSON payload from the ol-django payment gateway app. The payment
-              gateway returns data necessary to construct a form that will
-              ultimately POST to the actual payment processor.
-        """
-        try:
-            payload = api.generate_checkout_payload(request)
-        except ObjectDoesNotExist:
-            return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
-
-        return Response(payload)
-
     @extend_schema(
         request=RedeemDiscountRequestSerializer,
         responses={200: RedeemDiscountResponseSerializer},
@@ -993,13 +978,16 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             )
         return ga_purchase_payload
 
-    def get(self, request):  # noqa: PLR0911
+    def get(self, request):  # noqa: PLR0911, C901
         try:
             checkout_payload = api.generate_checkout_payload(request)
         except ObjectDoesNotExist:
             return HttpResponse("No basket")
         if "country_blocked" in checkout_payload:
-            return checkout_payload["response"]
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
         if "no_checkout" in checkout_payload:
             order = checkout_payload["order"]
             if _should_redirect_to_learn(request, order):
@@ -1012,11 +1000,25 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 },
             )
         if "purchased_same_courserun" in checkout_payload:
-            return checkout_payload["response"]
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
+            )
         if "purchased_non_upgradeable_courserun" in checkout_payload:
-            return checkout_payload["response"]
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE},
+            )
         if "invalid_discounts" in checkout_payload:
-            return checkout_payload["response"]
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
+            )
+        if "basket_empty" in checkout_payload:
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_BASKET_EMPTY},
+            )
 
         context = {
             "checkout_payload": checkout_payload,
