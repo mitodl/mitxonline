@@ -140,6 +140,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 enrollment_count=Count(
                     "course_runs__enrollments",
                     filter=Q(course_runs__enrollments__active=True),
+                    distinct=True,
                 )
             )
             .filter(
