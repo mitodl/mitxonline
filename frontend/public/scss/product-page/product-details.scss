@@ -356,7 +356,9 @@ body.new-design {
             width: min-content;
             text-align: right;
           }
-
+          .enrollment-info-text.enrollment-requirement {
+              max-width: 340px;
+            }
           .enrollment-info-text {
             width: auto;
             flex-grow: 1;
