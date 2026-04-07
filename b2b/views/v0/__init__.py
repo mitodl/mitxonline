@@ -39,10 +39,16 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = OrganizationPage.objects.prefetch_related(
         Prefetch(
             "contracts",
-            queryset=ContractPage.objects.filter(active=True),
-            to_attr="active_contracts",
+            queryset=ContractPage.objects.prefetch_related(
+                Prefetch(
+                    "contract_programs",
+                    queryset=ContractProgramItem.objects.order_by("sort_order"),
+                    to_attr="contract_program_ids",
+                )
+            ).filter(active=True),
+            to_attr="_active_contracts",
         )
-    ).all()
+    )
     serializer_class = OrganizationPageSerializer
     permission_classes = [IsAdminOrReadOnly | HasAPIKey]
     lookup_field = "slug"
@@ -65,8 +71,8 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
             Prefetch(
                 "contract_programs",
                 queryset=ContractProgramItem.objects.order_by("sort_order"),
-            ),
-            "contract_programs__program",
+                to_attr="_contract_program_ids",
+            )
         )
 
 

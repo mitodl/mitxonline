@@ -46,15 +46,16 @@ class ContractPageSerializer(BaseContractPageSerializer):
     Serializer for the ContractPage model.
     """
 
-    programs = serializers.ListField(
-        child=serializers.IntegerField(),
-        source="contract_programs.program.id",
-        read_only=True,
-    )
+    programs = serializers.SerializerMethodField()
     welcome_message_extra = RichTextSerializer(
         help_text=ContractPage._meta.get_field("welcome_message_extra").help_text,  # noqa: SLF001, not private https://docs.djangoproject.com/en/5.0/ref/models/meta/
         read_only=True,
     )
+
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
+    def get_programs(self, instance):
+        """Get the ordered list of program IDs for this contract"""
+        return [program.id for program in instance.contract_program_ids]
 
     class Meta:
         model = ContractPage
@@ -84,11 +85,7 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
     @extend_schema_field(ContractPageSerializer(many=True))
     def get_contracts(self, instance):
         """Get only active contracts for the organization"""
-        return (
-            ContractPageSerializer(instance.active_contracts, many=True).data
-            if hasattr(instance, "active_contracts")
-            else []
-        )
+        return ContractPageSerializer(instance.active_contracts, many=True).data
 
     class Meta:
         model = OrganizationPage

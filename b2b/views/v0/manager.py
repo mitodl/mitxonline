@@ -16,6 +16,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
     ContractPage,
+    ContractProgramItem,
     DiscountContractAttachmentRedemption,
     OrganizationPage,
 )
@@ -47,9 +48,13 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
             Prefetch(
                 "contracts",
                 queryset=ContractPage.objects.prefetch_related(
-                    "contract_programs", "contract_programs__program"
+                    Prefetch(
+                        "contract_programs",
+                        queryset=ContractProgramItem.objects.order_by("sort_order"),
+                        to_attr="contract_program_ids",
+                    )
                 ).filter(active=True),
-                to_attr="active_contracts",
+                to_attr="_active_contracts",
             ),
         )
         return (
