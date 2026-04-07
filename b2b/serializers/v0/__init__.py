@@ -54,7 +54,7 @@ class ContractPageSerializer(BaseContractPageSerializer):
     @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_programs(self, instance):
         """Get the ordered list of program IDs for this contract"""
-        return [program.id for program in instance.contract_program_ids]
+        return [program.program_id for program in instance.contract_program_ids]
 
     class Meta:
         model = ContractPage
