@@ -88,10 +88,19 @@ log = logging.getLogger(__name__)
 
 def _has_uai_b2c_program_purchase(order):
     """Return True if the order includes a program whose readable_id contains UAI+B2C."""
+    UAI_READABLE_ID_PREFIXES = [
+        "program-v1:UAI+B2C",
+        "course-v1:UAI_SOURCE+UAI.",
+    ]
+
+    def _has_uai_prefix(readable_id):
+        return any(
+            readable_id.startswith(prefix) for prefix in UAI_READABLE_ID_PREFIXES
+        )
+
     return any(
-        isinstance(line.purchased_object, Program)
-        and line.purchased_object.readable_id
-        and "UAI+B2C" in line.purchased_object.readable_id
+        line.purchased_object.readable_id
+        and _has_uai_prefix(line.purchased_object.readable_id)
         for line in order.lines.all()
     )
 
