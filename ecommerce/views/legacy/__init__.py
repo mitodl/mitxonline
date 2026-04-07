@@ -86,7 +86,7 @@ from users.models import User
 log = logging.getLogger(__name__)
 
 
-def _has_uai_b2c_program_purchase(order):
+def _has_uai_purchase(order):
     """Return True if the order includes a program whose readable_id contains UAI+B2C."""
     UAI_READABLE_ID_PREFIXES = [
         "program-v1:UAI+B2C",
@@ -775,7 +775,7 @@ class CheckoutCallbackView(View):
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
             )
         elif order_state == OrderStatus.FULFILLED:
-            if _has_uai_b2c_program_purchase(order):
+            if _has_uai_purchase(order):
                 return HttpResponseRedirect(settings.MIT_LEARN_DASHBOARD_URL)
 
             return redirect_with_user_message(
