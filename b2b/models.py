@@ -359,7 +359,7 @@ class ContractPage(Page, ClusterableModel):
         return (
             self._contract_program_ids
             if hasattr(self, "_contract_program_ids")
-            else self.contract_programs.all()
+            else self.contract_programs.order_by("sort_order").all()
         )
 
     content_panels = [
