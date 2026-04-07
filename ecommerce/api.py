@@ -66,7 +66,6 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_REQUIRED_ENROLLMENT_CODE_EMPTY,
 )
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
@@ -213,13 +212,7 @@ def generate_checkout_payload(  # noqa: PLR0911
 
         return {
             "no_checkout": True,
-            "response": redirect_with_user_message(
-                reverse("user-dashboard"),
-                {
-                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-                    "run": order.lines.first().courseware,
-                },
-            ),
+            "order": order,
             "order_id": order.id,
         }
 

@@ -74,6 +74,7 @@ from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from main import features
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
@@ -104,6 +105,31 @@ def _has_uai_purchase(order):
         line.purchased_object.readable_id
         and _has_uai_prefix(line.purchased_object.readable_id)
         for line in order.lines.all()
+    )
+
+
+def _should_redirect_to_learn(request, order):
+    """
+    Return True if the user should be redirected to the Learn dashboard
+    after a successful checkout.
+    """
+    if _has_uai_purchase(order):
+        return True
+    global_id = request.user.global_id
+    return bool(
+        global_id
+        and is_posthog_enabled(
+            features.REDIRECT_LEARN_DASHBOARD,
+            default=False,
+            opt_unique_id=global_id,
+        )
+    )
+
+
+def _learn_dashboard_redirect(order):
+    """Build an HttpResponseRedirect to the Learn dashboard with order info."""
+    return HttpResponseRedirect(
+        f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
     )
 
 
@@ -777,8 +803,8 @@ class CheckoutCallbackView(View):
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
             )
         elif order_state == OrderStatus.FULFILLED:
-            if _has_uai_purchase(order):
-                return HttpResponseRedirect(settings.MIT_LEARN_DASHBOARD_URL)
+            if _should_redirect_to_learn(request, order):
+                return _learn_dashboard_redirect(order)
 
             return redirect_with_user_message(
                 reverse("user-dashboard"),
@@ -975,7 +1001,16 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         if "country_blocked" in checkout_payload:
             return checkout_payload["response"]
         if "no_checkout" in checkout_payload:
-            return checkout_payload["response"]
+            order = checkout_payload["order"]
+            if _should_redirect_to_learn(request, order):
+                return _learn_dashboard_redirect(order)
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {
+                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+                    "run": order.lines.first().courseware,
+                },
+            )
         if "purchased_same_courserun" in checkout_payload:
             return checkout_payload["response"]
         if "purchased_non_upgradeable_courserun" in checkout_payload:

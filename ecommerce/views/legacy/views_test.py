@@ -688,7 +688,96 @@ def test_checkout_result_redirects_uai_b2c_program_to_learn_dashboard(
 
     resp = user_client.post(reverse("checkout-result-callback"), payload)
     assert resp.status_code == 302
-    assert resp.url == settings.MIT_LEARN_DASHBOARD_URL
+    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result_redirects_to_learn_when_flag_enabled(
+    settings,
+    user,
+    user_client,
+    products,
+    mocker,
+):
+    """Fulfilled purchases redirect to Learn dashboard when feature flag is enabled."""
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    mocker.patch(
+        "ecommerce.views.legacy.is_posthog_enabled",
+        return_value=True,
+    )
+
+    create_basket(user, products)
+
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
+
+    payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result_no_learn_redirect_without_global_id(
+    settings,
+    user_client,
+    products,
+    mocker,
+):
+    """Fulfilled purchases fall back to legacy dashboard when user has no global_id."""
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    user_no_global_id = UserFactory.create(global_id=None)
+    user_client.force_login(user_no_global_id)
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    mock_is_enabled = mocker.patch(
+        "ecommerce.views.legacy.is_posthog_enabled",
+    )
+
+    create_basket(user_no_global_id, products)
+
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
+
+    payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    mock_is_enabled.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -963,7 +1052,7 @@ def test_discount_redemptions_api(
         with pytest.raises(TypeError) as exc:
             resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
 
-        assert "HttpResponseRedirect" in str(exc)
+        assert "not JSON serializable" in str(exc)
     else:
         resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
         assert resp.status_code == 200
@@ -1281,6 +1370,37 @@ def test_start_checkout_with_zero_value(settings, user, user_client, products):
 
 
 @pytest.mark.skip_nplusone_check
+def test_start_checkout_with_zero_value_redirects_to_learn(
+    settings, user, user_client, products, mocker
+):
+    """
+    Check that a zero-value checkout redirects to Learn dashboard when flag is enabled.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+
+    mocker.patch(
+        "ecommerce.views.legacy.is_posthog_enabled",
+        return_value=True,
+    )
+
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
+    )
+    test_redeem_discount(user, user_client, products, [discount], False, False)  # noqa: FBT003
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    order = Order.objects.filter(purchaser=user).get()
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+    assert USER_MSG_COOKIE_NAME not in resp.cookies
+
+
+@pytest.mark.skip_nplusone_check
 def test_start_checkout_and_ensure_edx_username_created(mocker, settings, products):
     """
     Check that checking out with a user that doesn't have an edx username
@@ -1394,7 +1514,7 @@ def test_program_product_purchasing(user, user_drf_client):
     with pytest.raises(TypeError) as exc:
         user_drf_client.post(reverse("checkout_api-start_checkout"))
 
-    assert "HttpResponseRedirect" in str(exc)
+    assert "not JSON serializable" in str(exc)
 
     assert ProgramEnrollment.objects.filter(
         user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
