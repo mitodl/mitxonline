@@ -1731,6 +1731,5 @@ def upgrade_program_enrollment_if_eligible(program_enrollment):
     if nim_elective_num is not None and verified_elective_count < nim_elective_num:
         return program_enrollment, False
 
-    program_enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
-    program_enrollment.save_and_log()
+    program_enrollment.update_mode_and_save(EDX_ENROLLMENT_VERIFIED_MODE)
     return program_enrollment, True
