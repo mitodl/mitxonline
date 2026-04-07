@@ -3,8 +3,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from b2b.models import ContractPage, OrganizationPage, UserOrganization
-from cms.api import get_wagtail_img_src
+from b2b.models import ContractPage, OrganizationPage
 from main.constants import USER_MSG_TYPE_B2B_CHOICES
 from main.serializers import RichTextSerializer
 
@@ -55,7 +54,7 @@ class ContractPageSerializer(BaseContractPageSerializer):
     @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_programs(self, instance):
         """Get the ordered list of program IDs for this contract"""
-        return list(instance.programs.values_list("id", flat=True))
+        return [program.program_id for program in instance.contract_program_ids]
 
     class Meta:
         model = ContractPage
@@ -85,8 +84,7 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
     @extend_schema_field(ContractPageSerializer(many=True))
     def get_contracts(self, instance):
         """Get only active contracts for the organization"""
-        active_contracts = instance.contracts.filter(active=True)
-        return ContractPageSerializer(active_contracts, many=True).data
+        return ContractPageSerializer(instance.active_contracts, many=True).data
 
     class Meta:
         model = OrganizationPage
@@ -151,67 +149,3 @@ class CreateB2BEnrollmentSerializer(serializers.Serializer):
         max_digits=None, decimal_places=2, read_only=True, required=False
     )
     checkout_result = GenerateCheckoutPayloadSerializer(required=False)
-
-
-class UserOrganizationSerializer(serializers.ModelSerializer):
-    """
-    Serializer for user organization data.
-
-    Return the user's organizations in a manner that makes them look like
-    OrganizationPage objects. (Previously, the user organizations were a queryset
-    of OrganizationPages that related to the user, but now we have a through
-    table.)
-    """
-
-    contracts = serializers.SerializerMethodField()
-    id = serializers.IntegerField(source="organization.id")
-    name = serializers.CharField(source="organization.name")
-    description = serializers.CharField(source="organization.description")
-    logo = serializers.SerializerMethodField()
-    slug = serializers.CharField(source="organization.slug")
-
-    @extend_schema_field(ContractPageSerializer(many=True))
-    def get_contracts(self, instance):
-        """Get the contracts for the organization for the user"""
-        contracts = (
-            self.context["user"]
-            .b2b_contracts.filter(
-                organization=instance.organization,
-                active=True,
-            )
-            .all()
-        )
-        return ContractPageSerializer(contracts, many=True).data
-
-    @extend_schema_field(str)
-    def get_logo(self, instance):
-        """Get logo"""
-
-        if hasattr(instance.organization, "logo"):
-            try:
-                return get_wagtail_img_src(instance.organization.logo)
-            except AttributeError:
-                pass
-
-        return None
-
-    class Meta:
-        """Meta opts for the serializer."""
-
-        model = UserOrganization
-        fields = [
-            "id",
-            "name",
-            "description",
-            "logo",
-            "slug",
-            "contracts",
-        ]
-        read_only_fields = [
-            "id",
-            "name",
-            "description",
-            "logo",
-            "slug",
-            "contracts",
-        ]
