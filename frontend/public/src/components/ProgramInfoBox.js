@@ -8,9 +8,6 @@ import type {
   CourseDetailWithRuns
 } from "../flow/courseTypes"
 
-const DEDP_PUBLIC_POLICY_PROGRAM_READABLE_ID =
-  "program-v1:MITx+DEDP-Public-Policy"
-
 type ProgramInfoBoxProps = {
   programs: Array<Program>
 }
@@ -101,10 +98,6 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
       }
     }
 
-    let extraCondition = ""
-    if (program.readable_id === DEDP_PUBLIC_POLICY_PROGRAM_READABLE_ID) {
-      extraCondition = " (one must be advanced)"
-    }
     return (
       <>
         <div className="enrollment-info-box">
@@ -123,7 +116,6 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
                   {electiveCount} {this.getElectiveTitle()}: Complete{" "}
                   {electiveCountPrefix}
                   {electiveCount}
-                  {extraCondition}
                 </>
               ) : null}
             </div>
