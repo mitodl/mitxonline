@@ -43,7 +43,7 @@ class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
                 Prefetch(
                     "contract_programs",
                     queryset=ContractProgramItem.objects.order_by("sort_order"),
-                    to_attr="contract_program_ids",
+                    to_attr="_contract_program_ids",
                 )
             ).filter(active=True),
             to_attr="_active_contracts",
