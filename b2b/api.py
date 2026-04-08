@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
@@ -27,6 +27,7 @@ from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
 from b2b.models import (
     ContractPage,
+    ContractProgramItem,
     OrganizationIndexPage,
     OrganizationPage,
     UserOrganization,
@@ -55,6 +56,36 @@ from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED
 from openedx.tasks import clone_courserun
 
 log = logging.getLogger(__name__)
+
+
+def get_user_b2b_organizations(user):
+    """
+    Get B2B organizations for a user with their active enrolled contracts prefetched.
+
+    This uses Prefetch to load only contracts that are both active and that
+    the user is enrolled in, avoiding N+1 queries in serializers.
+
+    Args:
+        user: The user to get organizations for.
+    Returns:
+        QuerySet of OrganizationPage with _user_active_contracts prefetched.
+    """
+
+    return OrganizationPage.objects.filter(
+        organization_users__user=user
+    ).prefetch_related(
+        Prefetch(
+            "contracts",
+            queryset=ContractPage.objects.prefetch_related(
+                Prefetch(
+                    "contract_programs",
+                    queryset=ContractProgramItem.objects.order_by("sort_order"),
+                    to_attr="_contract_program_ids",
+                )
+            ).filter(active=True, users=user),
+            to_attr="_user_active_contracts",
+        )
+    )
 
 
 def ensure_b2b_organization_index() -> OrganizationIndexPage:
