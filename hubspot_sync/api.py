@@ -9,12 +9,14 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
+from hubspot.crm.objects.models import Filter, FilterGroup, PublicObjectSearchRequest
 from hubspot.crm.objects import (
     SimplePublicObject,
     SimplePublicObjectInput,
 )
 from mitol.common.utils.datetime import now_in_utc
 from mitol.hubspot_api.api import (
+    HubspotApi,
     HubspotAssociationType,
     HubspotObjectType,
     associate_objects_request,
@@ -1391,6 +1393,89 @@ def _get_cart_add_token(is_uai_course: bool) -> str:
     return getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
 
 
+def _find_hubspot_contact_id_by_email(
+    hubspot_client: HubspotApi, email: str
+) -> str | None:
+    """Find a contact id by email in the target HubSpot account."""
+    wait_for_hubspot_rate_limit()
+    response = hubspot_client.crm.objects.search_api.do_search(
+        object_type=HubspotObjectType.CONTACTS.value,
+        public_object_search_request=PublicObjectSearchRequest(
+            filter_groups=[
+                FilterGroup(
+                    filters=[Filter(property_name="email", operator="EQ", value=email)]
+                )
+            ],
+            properties=["email"],
+            limit=1,
+        ),
+    )
+    if response.results:
+        return response.results[0].id
+    return None
+
+
+def _ensure_hubspot_contact_for_user(
+    user: User, hubspot_client: HubspotApi
+) -> str | None:
+    """Return target-account contact id, creating a contact when missing."""
+    contact_id = _find_hubspot_contact_id_by_email(hubspot_client, user.email)
+    if contact_id:
+        log.info(
+            "Found existing HubSpot contact in target account for user_id=%s email=%s",
+            user.id,
+            user.email,
+        )
+        return contact_id
+
+    wait_for_hubspot_rate_limit()
+    contact = hubspot_client.crm.objects.basic_api.create(
+        object_type=HubspotObjectType.CONTACTS.value,
+        simple_public_object_input_for_create=make_contact_sync_message_from_user(user),
+    )
+    user.hubspot_sync_datetime = now_in_utc()
+    user.save(update_fields=["hubspot_sync_datetime"])
+    return contact.id
+
+
+def _sync_cart_add_deal_with_hubspot(
+    order: Order, contact_id: str, hubspot_client: HubspotApi
+) -> SimplePublicObject:
+    """Create cart-add deal and line-item objects and associate them in target account."""
+    wait_for_hubspot_rate_limit()
+    deal = hubspot_client.crm.objects.basic_api.create(
+        object_type=HubspotObjectType.DEALS.value,
+        simple_public_object_input_for_create=make_deal_sync_message_from_order(order),
+    )
+
+    wait_for_hubspot_rate_limit()
+    hubspot_client.crm.associations.v4.basic_api.create_default(
+        from_object_type=HubspotObjectType.DEALS.value,
+        from_object_id=deal.id,
+        to_object_type=HubspotObjectType.CONTACTS.value,
+        to_object_id=contact_id,
+    )
+
+    for line in order.lines.all():
+        wait_for_hubspot_rate_limit()
+        line_item = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.LINES.value,
+            simple_public_object_input_for_create=make_line_item_sync_message_from_line(
+                line
+            ),
+        )
+
+        wait_for_hubspot_rate_limit()
+        hubspot_client.crm.associations.v4.basic_api.create_default(
+            from_object_type=HubspotObjectType.LINES.value,
+            from_object_id=line_item.id,
+            to_object_type=HubspotObjectType.DEALS.value,
+            to_object_id=deal.id,
+        )
+
+    return deal
+
+
 def track_cart_add_with_hubspot(
     user: User, product: Product, *, is_uai_course: bool
 ) -> bool:
@@ -1412,11 +1497,20 @@ def track_cart_add_with_hubspot(
     if not token:
         return False
 
-    original_token = getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
     try:
-        settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = token
+        hubspot_client = HubspotApi(access_token=token)
+
+        # UAI deals must have a contact in the same HubSpot account.
+        contact_id = _ensure_hubspot_contact_for_user(user, hubspot_client)
+        if not contact_id:
+            return False
+
         product_version = Version.objects.get_for_object(product).first()
         if not product_version:
+            log.info(
+                "No version found for product_id=%s; cannot sync cart-add deal",
+                product.id,
+            )
             return False
 
         with transaction.atomic():
@@ -1435,7 +1529,14 @@ def track_cart_add_with_hubspot(
             order.total_price_paid = line.discounted_price
             order.save(update_fields=["total_price_paid"])
 
-        sync_deal_with_hubspot(order)
+        deal = _sync_cart_add_deal_with_hubspot(order, contact_id, hubspot_client)
+        log.info(
+            "Synced cart-add deal with HubSpot for user_id=%s product_id=%s deal_id=%s is_uai=%s",
+            user.id,
+            product.id,
+            deal.id,
+            is_uai_course,
+        )
     except Exception:  # pylint: disable=broad-except
         log.exception(
             "Failed to sync HubSpot cart-add deal for user %s product %s (is_uai=%s)",
@@ -1444,8 +1545,6 @@ def track_cart_add_with_hubspot(
             is_uai_course,
         )
         return False
-    finally:
-        settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = original_token
 
     return True
 

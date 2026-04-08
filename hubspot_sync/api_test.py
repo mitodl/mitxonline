@@ -549,10 +549,52 @@ def test_track_cart_add_with_hubspot_uses_uai_account(settings, mocker, user):
     course_run = CourseRunFactory.create(courseware_id="course-v1:UAI_MIT+1.001x+2026")
     product = ProductFactory.create(purchasable_object=course_run)
 
-    mock_sync_deal = mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+    mock_client = mocker.patch("hubspot_sync.api.HubspotApi")
+    mocker.patch(
+        "hubspot_sync.api._ensure_hubspot_contact_for_user", return_value="contact-id"
+    )
+    mock_sync_deal = mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
 
     assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
+    mock_client.assert_called_once_with(access_token="uai-token")
     mock_sync_deal.assert_called_once()
+
+
+def test_track_cart_add_with_hubspot_syncs_missing_contact(settings, mocker, user):
+    """Missing contacts should be synced before creating a cart-add deal."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "mitx-token"  # noqa: S105
+    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
+
+    product = ProductFactory.create()
+
+    mock_client = mocker.patch("hubspot_sync.api.HubspotApi")
+    mock_ensure_contact = mocker.patch(
+        "hubspot_sync.api._ensure_hubspot_contact_for_user", return_value="contact-id"
+    )
+    mock_sync_deal = mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
+
+    assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
+    mock_ensure_contact.assert_called_once_with(user, mock_client.return_value)
+    mock_sync_deal.assert_called_once()
+
+
+def test_track_cart_add_with_hubspot_returns_false_when_contact_sync_fails(
+    settings, mocker, user
+):
+    """Deal sync should be skipped when contact sync in target account fails."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "mitx-token"  # noqa: S105
+    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
+
+    product = ProductFactory.create()
+
+    mock_sync_deal = mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
+    mocker.patch(
+        "hubspot_sync.api._ensure_hubspot_contact_for_user",
+        return_value=None,
+    )
+
+    assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is False
+    mock_sync_deal.assert_not_called()
 
 
 def test_track_cart_add_with_hubspot_returns_false_when_unconfigured(settings, user):
