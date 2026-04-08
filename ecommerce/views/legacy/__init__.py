@@ -86,12 +86,14 @@ from users.models import User
 log = logging.getLogger(__name__)
 
 
+UAI_READABLE_ID_PREFIXES = [
+    "program-v1:UAI+B2C",
+    "course-v1:UAI_SOURCE+UAI.",
+]
+
+
 def _has_uai_purchase(order):
-    """Return True if the order includes a program whose readable_id contains UAI+B2C."""
-    UAI_READABLE_ID_PREFIXES = [
-        "program-v1:UAI+B2C",
-        "course-v1:UAI_SOURCE+UAI.",
-    ]
+    """Return True if the order includes a program or course run with a UAI prefix."""
 
     def _has_uai_prefix(readable_id):
         return any(
