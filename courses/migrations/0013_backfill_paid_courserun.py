@@ -13,11 +13,16 @@ def backfill_paidcourserun(apps, schema_editor):
     for order in Order.objects.filter(state__in=["fulfilled", "review"]):
         # couldn't use order.purchased_runs here from app defined model
         content_type = ContentType.objects.get_for_model(CourseRun)
-        for run_obj in order.lines.filter(purchased_content_type=content_type):
-            course_run = CourseRun.objects.get(pk=run_obj.purchased_object_id)
-            PaidCourseRun.objects.get_or_create(
-                order=order, course_run=course_run, user=order.purchaser
-            )
+        run_objects = order.lines.filter(purchased_content_type=content_type)
+        course_run_ids = [run_obj.purchased_object_id for run_obj in run_objects]
+        course_runs_by_id = CourseRun.objects.in_bulk(course_run_ids)
+        
+        for run_obj in run_objects:
+            course_run = course_runs_by_id.get(run_obj.purchased_object_id)
+            if course_run:
+                PaidCourseRun.objects.get_or_create(
+                    order=order, course_run=course_run, user=order.purchaser
+                )
 
 
 class Migration(migrations.Migration):

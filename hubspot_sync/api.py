@@ -770,16 +770,17 @@ def make_contact_update_message_list_from_user_ids(
         List[dict]: List of dictionaries containing User properties.
     """
     chunk_dictionary = dict(chunk)
-    users = User.objects.filter(id__in=chunk_dictionary.keys())
+    users_by_id = User.objects.in_bulk(chunk_dictionary.keys())
     request_input = []
     for user_id, hubspot_id in chunk_dictionary.items():
-        user = users.filter(id=user_id).first()
-        request_input.append(
-            {
-                "id": hubspot_id,
-                "properties": make_contact_sync_message_from_user(user).properties,
-            }
-        )
+        user = users_by_id.get(user_id)
+        if user:
+            request_input.append(
+                {
+                    "id": hubspot_id,
+                    "properties": make_contact_sync_message_from_user(user).properties,
+                }
+            )
     return request_input
 
 
@@ -856,16 +857,17 @@ def make_deal_update_message_list_from_order_ids(
         List[dict]: List of dictionaries containing Order properties.
     """
     chunk_dictionary = dict(chunk)
-    orders = Order.objects.filter(id__in=chunk_dictionary.keys())
+    orders_by_id = Order.objects.in_bulk(chunk_dictionary.keys())
     request_input = []
     for order_id, hubspot_id in chunk_dictionary.items():
-        order = orders.filter(id=order_id).first()
-        request_input.append(
-            {
-                "id": hubspot_id,
-                "properties": make_deal_sync_message_from_order(order).properties,
-            }
-        )
+        order = orders_by_id.get(order_id)
+        if order:
+            request_input.append(
+                {
+                    "id": hubspot_id,
+                    "properties": make_deal_sync_message_from_order(order).properties,
+                }
+            )
     return request_input
 
 
@@ -917,16 +919,17 @@ def make_line_item_update_message_list_from_line_ids(
         List[dict]: List of dictionaries containing Line properties.
     """
     chunk_dictionary = dict(chunk)
-    lines = Line.objects.filter(id__in=chunk_dictionary.keys())
+    lines_by_id = Line.objects.in_bulk(chunk_dictionary.keys())
     request_input = []
     for line_id, hubspot_id in chunk_dictionary.items():
-        line = lines.filter(id=line_id).first()
-        request_input.append(
-            {
-                "id": hubspot_id,
-                "properties": make_line_item_sync_message_from_line(line).properties,
-            }
-        )
+        line = lines_by_id.get(line_id)
+        if line:
+            request_input.append(
+                {
+                    "id": hubspot_id,
+                    "properties": make_line_item_sync_message_from_line(line).properties,
+                }
+            )
     return request_input
 
 
@@ -978,18 +981,19 @@ def make_product_update_message_list_from_product_ids(
         List[dict]: List of dictionaries containing Product properties.
     """
     chunk_dictionary = dict(chunk)
-    products = Product.objects.filter(id__in=chunk_dictionary.keys())
+    products_by_id = Product.objects.in_bulk(chunk_dictionary.keys())
     request_input = []
     for product_id, hubspot_id in chunk_dictionary.items():
-        product = products.filter(id=product_id).first()
-        request_input.append(
-            {
-                "id": hubspot_id,
-                "properties": make_product_sync_message_from_product(
-                    product
-                ).properties,
-            }
-        )
+        product = products_by_id.get(product_id)
+        if product:
+            request_input.append(
+                {
+                    "id": hubspot_id,
+                    "properties": make_product_sync_message_from_product(
+                        product
+                    ).properties,
+                }
+            )
     return request_input
 
 

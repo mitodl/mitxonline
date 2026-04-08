@@ -55,8 +55,12 @@ def test_multiple_success(mocker):
 
     COMMAND.handle("retire_users", users=test_usernames)
 
+    users_by_username = User.objects.in_bulk(
+        test_usernames, field_name="openedx_users__edx_username"
+    )
     for user_name in test_usernames:
-        user = User.objects.get(openedx_users__edx_username=user_name)
+        user = users_by_username.get(user_name)
+        assert user is not None
         assert user.is_active is False
         assert "retired_email" in user.email
     mock_bulk_retire_edx_users.assert_called()
@@ -129,8 +133,12 @@ def test_multiple_success_blocking_user(mocker):
 
     COMMAND.handle("retire_users", users=test_usernames, block_users=True)
 
+    users_by_username = User.objects.in_bulk(
+        test_usernames, field_name="openedx_users__edx_username"
+    )
     for user_name in test_usernames:
-        user = User.objects.get(openedx_users__edx_username=user_name)
+        user = users_by_username.get(user_name)
+        assert user is not None
         assert user.is_active is False
         assert "retired_email" in user.email
 

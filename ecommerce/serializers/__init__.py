@@ -567,17 +567,20 @@ class OrderHistorySerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.ListField)
     def get_titles(self, instance):
         titles = []
+        lines = instance.lines.all()
+        product_ids = [line.product_version.field_dict["id"] for line in lines]
+        products_by_id = models.Product.all_objects.in_bulk(product_ids)
 
-        for line in instance.lines.all():
-            product = models.Product.all_objects.get(
-                pk=line.product_version.field_dict["id"]
-            )
-            if product.content_type.model == "courserun":
-                titles.append(product.purchasable_object.course.title)
-            elif product.content_type.model == "programrun":
-                titles.append(product.description)
-            else:
-                titles.append(f"No Title - {product.id}")
+        for line in lines:
+            product_id = line.product_version.field_dict["id"]
+            product = products_by_id.get(product_id)
+            if product:
+                if product.content_type.model == "courserun":
+                    titles.append(product.purchasable_object.course.title)
+                elif product.content_type.model == "programrun":
+                    titles.append(product.description)
+                else:
+                    titles.append(f"No Title - {product.id}")
 
         return titles
 
