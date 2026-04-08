@@ -84,10 +84,10 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
     @extend_schema_field(ContractPageSerializer(many=True))
     def get_contracts(self, instance):
         """Get only active contracts for the organization"""
-        active_contracts = instance.contracts.filter(active=True)
-        user = self.context.get("user")
-        if user is not None:
-            active_contracts = active_contracts.filter(users=user)
+        if hasattr(instance, "_user_active_contracts"):
+            active_contracts = instance._user_active_contracts  # noqa: SLF001
+        else:
+            active_contracts = instance.active_contracts
         return ContractPageSerializer(active_contracts, many=True).data
 
     class Meta:

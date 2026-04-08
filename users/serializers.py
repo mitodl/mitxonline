@@ -10,6 +10,7 @@ from requests import HTTPError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
 
+from b2b.api import get_user_b2b_organizations
 from b2b.serializers.v0 import OrganizationPageSerializer
 from hubspot_sync.task_helpers import sync_hubspot_user
 
@@ -228,9 +229,7 @@ class UserSerializer(serializers.ModelSerializer):
             return []
 
         return OrganizationPageSerializer(
-            instance.b2b_organizations,
-            many=True,
-            context={"user": instance},
+            get_user_b2b_organizations(instance), many=True
         ).data
 
     def validate(self, data):
