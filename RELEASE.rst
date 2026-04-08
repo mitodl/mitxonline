@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.145.2
+Version 1.145.2 (Released April 08, 2026)
 ---------------
 
 - Indicate order status on redirect via query params for MIT Learn (#3464)
