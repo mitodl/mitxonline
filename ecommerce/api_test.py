@@ -868,7 +868,8 @@ def test_create_vpcre_bad_basket(
         False,
     ],
 )
-def test_apply_discount_to_basket(user, better_discount, is_valid):
+@pytest.mark.parametrize("_count", range(100))
+def test_apply_discount_to_basket(user, better_discount, is_valid, _count):
     """
     Test that applying a discount to a basket works as expected.
 
@@ -884,7 +885,7 @@ def test_apply_discount_to_basket(user, better_discount, is_valid):
     BasketItem.objects.create(basket=basket, product=product, quantity=1)
 
     existing_discount = UnlimitedUseDiscountFactory.create(
-        amount=100, discount_type="fixed-price"
+        amount=50, discount_type="percent-off"
     )
     BasketDiscount.objects.create(
         redeemed_by=user,
@@ -894,7 +895,7 @@ def test_apply_discount_to_basket(user, better_discount, is_valid):
     )
 
     new_discount = UnlimitedUseDiscountFactory.create(
-        amount=(50 if better_discount else 150), discount_type="fixed-price"
+        amount=(60 if better_discount else 10), discount_type="percent-off"
     )
 
     if not is_valid:
