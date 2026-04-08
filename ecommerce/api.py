@@ -998,7 +998,7 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
 
                 for item in basket.basket_items.all():
                     test_price = discount.discount_product(item.product, basket.user)
-                    if test_price and item.discounted_price >= test_price:
+                    if test_price and item.discounted_price > test_price:
                         found_better = True
                         break
 

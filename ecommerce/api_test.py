@@ -910,6 +910,37 @@ def test_apply_discount_to_basket(user, better_discount, is_valid, _count):
         assert basket.discounts.filter(redeemed_discount=existing_discount).exists()
 
 
+def test_apply_equal_discount_to_basket_does_not_replace(user):
+    """
+    Test that a discount with the same effective price does not replace
+    an existing discount.
+    """
+    run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    basket, _ = Basket.objects.get_or_create(user=user)
+
+    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+
+    existing_discount = UnlimitedUseDiscountFactory.create(
+        amount=50, discount_type="percent-off"
+    )
+    BasketDiscount.objects.create(
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+        redeemed_discount=existing_discount,
+        redeemed_basket=basket,
+    )
+
+    new_discount = UnlimitedUseDiscountFactory.create(
+        amount=50, discount_type="percent-off"
+    )
+
+    apply_discount_to_basket(basket, new_discount)
+
+    assert basket.discounts.filter(redeemed_discount=existing_discount).exists()
+    assert not basket.discounts.filter(redeemed_discount=new_discount).exists()
+
+
 @pytest.mark.parametrize(
     "is_better",
     [
