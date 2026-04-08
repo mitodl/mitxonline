@@ -14,6 +14,7 @@ from hubspot.crm.objects import (
     SimplePublicObject,
     SimplePublicObjectInput,
 )
+from hubspot.crm.properties.exceptions import ApiException as PropertiesApiException
 from mitol.common.utils.datetime import now_in_utc
 from mitol.hubspot_api.api import (
     HubspotApi,
@@ -39,6 +40,7 @@ from reversion.models import Version
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from courses.models import CourseRun, Program
 from ecommerce import models
+from ecommerce.discounts import resolve_product_version
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -1415,6 +1417,337 @@ def _find_hubspot_contact_id_by_email(
     return None
 
 
+def _get_target_property_options(
+    hubspot_client: HubspotApi, object_type: str, property_name: str
+) -> list[str]:
+    """Return allowed option values for a HubSpot property in the target account."""
+    wait_for_hubspot_rate_limit()
+    property_definition = hubspot_client.crm.properties.core_api.get_by_name(
+        object_type,
+        property_name,
+    )
+    return [
+        str(option.value)
+        for option in getattr(property_definition, "options", [])
+        if getattr(option, "value", None) is not None
+    ]
+
+
+def _pick_preferred_option(
+    allowed_options: list[str], preferred_options: list[str]
+) -> str | None:
+    """Return the first preferred option present in allowed options."""
+    for preferred_option in preferred_options:
+        if preferred_option in allowed_options:
+            return preferred_option
+    if allowed_options:
+        return allowed_options[0]
+    return None
+
+
+def _normalize_status_for_target(
+    current_status: str | None, allowed_statuses: list[str]
+) -> str | None:
+    """Map MITx statuses to target-account options and return a valid status."""
+    status_map = {
+        models.OrderStatus.PENDING: "created",
+        models.OrderStatus.FULFILLED: "fulfilled",
+        models.OrderStatus.CANCELED: "failed",
+        models.OrderStatus.DECLINED: "failed",
+        models.OrderStatus.ERRORED: "failed",
+        models.OrderStatus.REFUNDED: "refunded",
+        models.OrderStatus.PARTIALLY_REFUNDED: "refunded",
+        models.OrderStatus.REVIEW: "created",
+    }
+    mapped_status = status_map.get(current_status or "", current_status)
+    if mapped_status in allowed_statuses:
+        return mapped_status
+    return _pick_preferred_option(
+        allowed_statuses,
+        ["created", "checkout_pending", "fulfilled", "failed", "refunded"],
+    )
+
+
+def _get_target_pipeline_stage_map(hubspot_client: HubspotApi) -> dict[str, list[str]]:
+    """Return mapping of deal pipeline id to valid stage ids in target account."""
+    wait_for_hubspot_rate_limit()
+    pipelines_response = hubspot_client.crm.pipelines.pipelines_api.get_all(
+        object_type=HubspotObjectType.DEALS.value
+    )
+    pipeline_stage_map = {}
+    for pipeline in getattr(pipelines_response, "results", []):
+        pipeline_id = str(getattr(pipeline, "id", "") or "")
+        if not pipeline_id:
+            continue
+        stages = [
+            str(getattr(stage, "id", ""))
+            for stage in getattr(pipeline, "stages", [])
+            if getattr(stage, "id", None) is not None
+        ]
+        if stages:
+            pipeline_stage_map[pipeline_id] = stages
+    return pipeline_stage_map
+
+
+def _normalize_deal_properties_for_target_account(
+    hubspot_client: HubspotApi, deal_input: SimplePublicObjectInput
+) -> None:
+    """Normalize dealstage and status so they are valid in the target HubSpot account."""
+    deal_properties = deal_input.properties
+
+    legacy_stage_map = {
+        "48288379": "checkout_abandoned",
+        "48288388": "checkout_pending",
+        "48288389": "checkout_completed",
+        "48288390": "processed",
+    }
+
+    current_pipeline = str(deal_properties.get("pipeline") or "")
+    try:
+        pipeline_stage_map = _get_target_pipeline_stage_map(hubspot_client)
+    except Exception:  # noqa: BLE001
+        pipeline_stage_map = {}
+
+    if pipeline_stage_map:
+        if current_pipeline not in pipeline_stage_map:
+            resolved_pipeline = _pick_preferred_option(
+                list(pipeline_stage_map.keys()),
+                [str(getattr(settings, "HUBSPOT_PIPELINE_ID", "")), "default"],
+            )
+            if resolved_pipeline:
+                deal_properties["pipeline"] = resolved_pipeline
+                current_pipeline = resolved_pipeline
+
+        allowed_stages = pipeline_stage_map.get(current_pipeline, [])
+    else:
+        try:
+            allowed_stages = _get_target_property_options(
+                hubspot_client, HubspotObjectType.DEALS.value, "dealstage"
+            )
+        except PropertiesApiException:
+            allowed_stages = []
+
+    current_stage = deal_properties.get("dealstage")
+    mapped_legacy_stage = legacy_stage_map.get(str(current_stage))
+    if mapped_legacy_stage:
+        deal_properties["dealstage"] = mapped_legacy_stage
+        current_stage = mapped_legacy_stage
+
+    if allowed_stages and current_stage not in allowed_stages:
+        resolved_stage = _pick_preferred_option(
+            allowed_stages,
+            [
+                "checkout_pending",
+                "created",
+                "appointmentscheduled",
+                "qualifiedtobuy",
+            ],
+        )
+        if resolved_stage:
+            deal_properties["dealstage"] = resolved_stage
+            log.info(
+                "Normalized dealstage for target account from %s to %s",
+                current_stage,
+                resolved_stage,
+            )
+
+    try:
+        allowed_statuses = _get_target_property_options(
+            hubspot_client, HubspotObjectType.DEALS.value, "status"
+        )
+    except PropertiesApiException:
+        allowed_statuses = []
+
+    if allowed_statuses:
+        resolved_status = _normalize_status_for_target(
+            deal_properties.get("status"),
+            allowed_statuses,
+        )
+        if resolved_status:
+            deal_properties["status"] = resolved_status
+
+
+def _normalize_line_item_properties_for_target_account(
+    hubspot_client: HubspotApi, line_item_input: SimplePublicObjectInput
+) -> None:
+    """Normalize line-item status so it is valid in the target HubSpot account."""
+    line_item_properties = line_item_input.properties
+
+    try:
+        allowed_statuses = _get_target_property_options(
+            hubspot_client, HubspotObjectType.LINES.value, "status"
+        )
+    except PropertiesApiException:
+        allowed_statuses = []
+
+    if allowed_statuses:
+        resolved_status = _normalize_status_for_target(
+            line_item_properties.get("status"),
+            allowed_statuses,
+        )
+        if resolved_status:
+            line_item_properties["status"] = resolved_status
+
+
+def _ensure_target_hubspot_custom_properties(hubspot_client: HubspotApi) -> None:
+    """Ensure custom MITx e-commerce properties and groups exist in the target account."""
+    object_configs = {
+        object_type: {
+            "groups": list(config["groups"]),
+            "properties": list(config["properties"]),
+        }
+        for object_type, config in CUSTOM_ECOMMERCE_PROPERTIES.items()
+    }
+    object_configs[HubspotObjectType.CONTACTS.value]["properties"].extend(
+        [
+            _get_course_run_certificate_hubspot_property(),
+            _get_program_certificate_hubspot_property(),
+        ]
+    )
+
+    for object_type, config in object_configs.items():
+        wait_for_hubspot_rate_limit()
+        existing_groups = hubspot_client.crm.properties.groups_api.get_all(object_type)
+        existing_group_names = {
+            group.name for group in getattr(existing_groups, "results", [])
+        }
+
+        for group in config["groups"]:
+            wait_for_hubspot_rate_limit()
+            try:
+                if group["name"] in existing_group_names:
+                    hubspot_client.crm.properties.groups_api.update(
+                        object_type, group["name"], group
+                    )
+                else:
+                    hubspot_client.crm.properties.groups_api.create(object_type, group)
+            except PropertiesApiException:
+                log.exception(
+                    "Failed syncing HubSpot property group %s for %s in target account",
+                    group["name"],
+                    object_type,
+                )
+                raise
+
+        wait_for_hubspot_rate_limit()
+        existing_properties = hubspot_client.crm.properties.core_api.get_all(object_type)
+        existing_property_names = {
+            prop.name for prop in getattr(existing_properties, "results", [])
+        }
+
+        for prop in config["properties"]:
+            wait_for_hubspot_rate_limit()
+            try:
+                if prop["name"] in existing_property_names:
+                    # HubSpot-managed unique_app_id definitions are read-only in some accounts.
+                    if prop["name"] == "unique_app_id":
+                        continue
+                    hubspot_client.crm.properties.core_api.update(
+                        object_type,
+                        prop["name"],
+                        prop,
+                    )
+                else:
+                    hubspot_client.crm.properties.core_api.create(object_type, prop)
+            except PropertiesApiException:
+                log.exception(
+                    "Failed syncing HubSpot property %s for %s in target account",
+                    prop["name"],
+                    object_type,
+                )
+                raise
+
+
+def _build_target_deal_message(
+    order: Order, hubspot_client: HubspotApi
+) -> SimplePublicObjectInput:
+    """Create a deal message normalized for target-account property options."""
+    deal_input = make_deal_sync_message_from_order(order)
+    _normalize_deal_properties_for_target_account(hubspot_client, deal_input)
+    return deal_input
+
+
+def _build_target_line_item_message(
+    line: Line, hubspot_client: HubspotApi
+) -> SimplePublicObjectInput:
+    """Create a line-item message normalized for target-account property options."""
+    line_item_input = make_line_item_sync_message_from_line(line)
+    target_product_id = _ensure_target_hubspot_product_for_line(line, hubspot_client)
+    if target_product_id:
+        line_item_input.properties["hs_product_id"] = target_product_id
+    _normalize_line_item_properties_for_target_account(hubspot_client, line_item_input)
+    return line_item_input
+
+
+def _get_product_from_line(line: Line) -> Product | None:
+    """Resolve the line's product similarly to serializer logic used for HubSpot payloads."""
+    if not line.product_version:
+        return None
+    version = line.product_version
+    product = Product.all_objects.filter(id=version.object_id).first()
+    if product:
+        return resolve_product_version(product, product_version=version)
+    return version.object
+
+
+def _find_target_product_id_by_unique_app_id(
+    hubspot_client: HubspotApi, unique_app_id: str
+) -> str | None:
+    """Find product id in target account by unique_app_id."""
+    wait_for_hubspot_rate_limit()
+    response = hubspot_client.crm.objects.search_api.do_search(
+        object_type=HubspotObjectType.PRODUCTS.value,
+        public_object_search_request=PublicObjectSearchRequest(
+            filter_groups=[
+                FilterGroup(
+                    filters=[
+                        Filter(
+                            property_name="unique_app_id",
+                            operator="EQ",
+                            value=unique_app_id,
+                        )
+                    ]
+                )
+            ],
+            properties=["unique_app_id"],
+            limit=1,
+        ),
+    )
+    if response.results:
+        return response.results[0].id
+    return None
+
+
+def _ensure_target_hubspot_product_for_line(
+    line: Line, hubspot_client: HubspotApi
+) -> str | None:
+    """Return a target-account product id for a line item's hs_product_id."""
+    product = _get_product_from_line(line)
+    if not product:
+        return None
+
+    product_input = make_product_sync_message_from_product(product)
+    unique_app_id = str(product_input.properties.get("unique_app_id") or "")
+    if unique_app_id:
+        existing_product_id = _find_target_product_id_by_unique_app_id(
+            hubspot_client, unique_app_id
+        )
+        if existing_product_id:
+            return existing_product_id
+
+    wait_for_hubspot_rate_limit()
+    created_product = hubspot_client.crm.objects.basic_api.create(
+        object_type=HubspotObjectType.PRODUCTS.value,
+        simple_public_object_input_for_create=product_input,
+    )
+    return created_product.id
+
+
+def _ensure_target_hubspot_contact_properties(hubspot_client: HubspotApi) -> None:
+    """Backward-compatible wrapper retained for tests/callers."""
+    _ensure_target_hubspot_custom_properties(hubspot_client)
+
+
 def _ensure_hubspot_contact_for_user(
     user: User, hubspot_client: HubspotApi
 ) -> str | None:
@@ -1442,10 +1775,12 @@ def _sync_cart_add_deal_with_hubspot(
     order: Order, contact_id: str, hubspot_client: HubspotApi
 ) -> SimplePublicObject:
     """Create cart-add deal and line-item objects and associate them in target account."""
+    deal_input = _build_target_deal_message(order, hubspot_client)
+
     wait_for_hubspot_rate_limit()
     deal = hubspot_client.crm.objects.basic_api.create(
         object_type=HubspotObjectType.DEALS.value,
-        simple_public_object_input_for_create=make_deal_sync_message_from_order(order),
+        simple_public_object_input_for_create=deal_input,
     )
 
     wait_for_hubspot_rate_limit()
@@ -1457,12 +1792,12 @@ def _sync_cart_add_deal_with_hubspot(
     )
 
     for line in order.lines.all():
+        line_item_input = _build_target_line_item_message(line, hubspot_client)
+
         wait_for_hubspot_rate_limit()
         line_item = hubspot_client.crm.objects.basic_api.create(
             object_type=HubspotObjectType.LINES.value,
-            simple_public_object_input_for_create=make_line_item_sync_message_from_line(
-                line
-            ),
+            simple_public_object_input_for_create=line_item_input,
         )
 
         wait_for_hubspot_rate_limit()
@@ -1499,6 +1834,7 @@ def track_cart_add_with_hubspot(
 
     try:
         hubspot_client = HubspotApi(access_token=token)
+        _ensure_target_hubspot_contact_properties(hubspot_client)
 
         # UAI deals must have a contact in the same HubSpot account.
         contact_id = _ensure_hubspot_contact_for_user(user, hubspot_client)
