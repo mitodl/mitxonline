@@ -107,7 +107,8 @@ def _has_uai_purchase(order):
         )
 
     return any(
-        line.purchased_object.readable_id
+        line.purchased_object
+        and line.purchased_object.readable_id
         and _has_uai_prefix(line.purchased_object.readable_id)
         for line in order.lines.all()
     )
