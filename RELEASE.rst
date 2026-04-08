@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.145.2
+---------------
+
+- Indicate order status on redirect via query params for MIT Learn (#3464)
+- Fix flakey discount-related tests (#3472)
+- Fix Cart -> Learn dashboard for UAI industry verticals (#3466)
+
 Version 1.145.1 (Released April 08, 2026)
 ---------------
 
