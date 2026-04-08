@@ -500,8 +500,11 @@ def batch_upsert_associations_chunked(order_ids: List[int]):  # noqa: UP006
     line_associations_batch = []
     hubspot_client = HubspotApi()
     deal_count = len(order_ids)
+    deals_by_id = Order.objects.in_bulk(order_ids)
     for idx, order_id in enumerate(order_ids):
-        deal = Order.objects.get(id=order_id)
+        deal = deals_by_id.get(order_id)
+        if not deal:
+            continue
         contact_id = get_hubspot_id_for_object(deal.purchaser)
         deal_id = get_hubspot_id_for_object(deal)
         for line in deal.lines.iterator():

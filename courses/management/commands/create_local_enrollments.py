@@ -33,16 +33,21 @@ class Command(BaseCommand):
         courseware_ids = options["runs"]
 
         edx_client = get_edx_api_service_client()
+        
+        runs_by_courseware_id = CourseRun.objects.in_bulk(
+            courseware_ids, field_name="courseware_id"
+        )
 
         created_count = {}
         for courseware_id in courseware_ids:
-            run = CourseRun.objects.filter(courseware_id=courseware_id).first()
+            run = runs_by_courseware_id.get(courseware_id)
             if run is None:
                 self.stderr.write(
                     self.style.ERROR(
                         f"Could not find course run with courseware_id={courseware_id}"
                     )
                 )
+                continue
 
             edx_enrollments = edx_client.enrollments.get_enrollments(
                 course_id=courseware_id
