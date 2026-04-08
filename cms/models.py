@@ -1290,7 +1290,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         of the Course/Program instead (e.g.: "/courses/course-v1:edX+DemoX+Demo_Course")
         """
         url_parts = super().get_url_parts(request=request)
-        if not url_parts:
+        if not url_parts or not self.product:
             return None
         return (
             url_parts[0],
@@ -1505,7 +1505,7 @@ class ProgramPage(ProductPage):
 
     def get_admin_display_title(self):
         """Gets the title of the course in the specified format"""
-        return f"{self.program.readable_id} | {self.title}"
+        return f"{self.program.readable_id if self.program else 'No Program???'} | {self.title}"
 
     def get_context(self, request, *args, **kwargs):
         relevant_run = None
