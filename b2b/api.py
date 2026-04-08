@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, Q, Prefetch
+from django.db.models import Count, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
@@ -75,7 +75,9 @@ def get_user_b2b_organizations(user):
     ).prefetch_related(
         Prefetch(
             "contracts",
-            queryset=ContractPage.objects.filter(active=True, users=user),
+            queryset=ContractPage.objects.filter(
+                active=True, users=user
+            ).prefetch_related("contract_programs"),
             to_attr="_user_active_contracts",
         )
     )
