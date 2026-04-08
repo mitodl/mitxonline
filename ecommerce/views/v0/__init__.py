@@ -7,7 +7,7 @@ import logging
 import django_filters
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Count, Q
+from django.db.models import Count, FilteredRelation, Q
 from django.shortcuts import redirect
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import (
@@ -512,51 +512,47 @@ class ProductViewSet(ReadOnlyModelViewSet):
 
         now = now_in_utc()
 
-        unenrollable_courserun_ids = CourseRun.objects.filter(
-            enrollment_end__lt=now
-        ).values_list("id", flat=True)
-
-        unenrollable_course_ids = (
-            Course.objects.annotate(
-                num_runs=Count(
-                    "courseruns", filter=~Q(courseruns__in=unenrollable_courserun_ids)
-                )
-            )
-            .filter(num_runs=0)
-            .values_list("id", flat=True)
-        )
-
-        unenrollable_program_ids = (
-            Program.objects.annotate(
-                valid_runs=Count(
-                    "programruns",
-                    filter=Q(programruns__end_date__gt=now)
-                    | Q(programruns__end_date=None),
+        # Use FilteredRelation to optimize complex filtering for unenrollable products
+        return (
+            Product.objects.annotate(
+                # Filter for enrollable course runs
+                enrollable_courserun=FilteredRelation(
+                    'purchasable_object',
+                    condition=Q(
+                        content_type__model="courserun",
+                        courserun__enrollment_end__gte=now
+                    ) | Q(
+                        content_type__model="courserun",
+                        courserun__enrollment_end__isnull=True
+                    )
+                ),
+                # Filter for programs with valid runs
+                valid_program=FilteredRelation(
+                    'purchasable_object',
+                    condition=Q(
+                        content_type__model="program",
+                        program__programruns__end_date__gt=now
+                    ) | Q(
+                        content_type__model="program", 
+                        program__programruns__end_date__isnull=True
+                    )
+                ),
+                # Filter for valid program runs
+                valid_programrun=FilteredRelation(
+                    'purchasable_object',
+                    condition=Q(
+                        content_type__model="programrun",
+                        programrun__end_date__gt=now
+                    ) | Q(
+                        content_type__model="programrun",
+                        programrun__end_date__isnull=True
+                    )
                 )
             )
             .filter(
-                Q(programruns__isnull=True)
-                | Q(valid_runs=0)
-                | Q(all_requirements__course__in=unenrollable_course_ids)
-            )
-            .values_list("id", flat=True)
-            .distinct()
-        )
-
-        unenrollable_programrun_ids = ProgramRun.objects.filter(
-            Q(program__in=unenrollable_program_ids) | Q(end_date__lt=now)
-        )
-
-        return (
-            Product.objects.exclude(
-                (
-                    Q(object_id__in=unenrollable_courserun_ids)
-                    & Q(content_type__model="courserun")
-                )
-                | (
-                    Q(object_id__in=unenrollable_programrun_ids)
-                    & Q(content_type__model="programrun")
-                )
+                Q(enrollable_courserun__isnull=False) |
+                Q(valid_program__isnull=False) |
+                Q(valid_programrun__isnull=False)
             )
             .select_related("content_type")
             .prefetch_related("purchasable_object")
@@ -596,13 +592,20 @@ class DiscountFilterSet(django_filters.FilterSet):
 
     def redeemed_filter(self, qs, name, value):  # noqa: ARG002
         """Filter by discount redemption status."""
-
-        qs = qs.annotate(num_redemptions=Count("order_redemptions"))
-
         if value == "yes":
-            qs = qs.filter(num_redemptions__gt=0)
+            return qs.annotate(
+                active_redemptions=FilteredRelation(
+                    'order_redemptions',
+                    condition=Q(order_redemptions__isnull=False)
+                )
+            ).filter(active_redemptions__isnull=False)
         elif value == "no":
-            qs = qs.filter(num_redemptions=0)
+            return qs.annotate(
+                active_redemptions=FilteredRelation(
+                    'order_redemptions',
+                    condition=Q(order_redemptions__isnull=False)
+                )
+            ).filter(active_redemptions__isnull=True)
 
         return qs
 

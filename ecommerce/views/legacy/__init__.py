@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, FilteredRelation, Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
@@ -318,12 +318,21 @@ class DiscountFilterSet(django_filters.FilterSet):
     )
 
     def redeemed_filter(self, qs, name, value):  # noqa: ARG002
-        qs = qs.annotate(num_redemptions=Count("order_redemptions"))
-
+        """Filter by discount redemption status."""
         if value == "yes":
-            qs = qs.filter(num_redemptions__gt=0)
+            return qs.annotate(
+                active_redemptions=FilteredRelation(
+                    'order_redemptions',
+                    condition=Q(order_redemptions__isnull=False)
+                )
+            ).filter(active_redemptions__isnull=False)
         elif value == "no":
-            qs = qs.filter(num_redemptions=0)
+            return qs.annotate(
+                active_redemptions=FilteredRelation(
+                    'order_redemptions',
+                    condition=Q(order_redemptions__isnull=False)
+                )
+            ).filter(active_redemptions__isnull=True)
 
         return qs
 

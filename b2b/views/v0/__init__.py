@@ -1,7 +1,7 @@
 """Views for the B2B API (v0)."""
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, FilteredRelation, Prefetch, Q
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from mitol.common.utils.datetime import now_in_utc
@@ -202,19 +202,31 @@ class AttachContractApi(APIView):
 
     def _get_active_user_contracts(self, user, now):
         """Return active contracts for a user at the given time."""
-        return user.b2b_contracts.filter(active=True).exclude(
-            Q(contract_start__gt=now) | Q(contract_end__lt=now)
-        )
+        return user.b2b_contracts.annotate(
+            active_contracts=FilteredRelation(
+                'contractpage_ptr',
+                condition=Q(
+                    active=True,
+                    contract_start__lte=now,
+                    contract_end__gte=now
+                )
+            )
+        ).filter(active_contracts__isnull=False)
 
     def _get_valid_discount(self, enrollment_code, now):
         """Return a valid discount for the given enrollment code and time."""
         return (
-            Discount.objects.annotate(Count("contract_redemptions"))
+            Discount.objects.annotate(
+                contract_redemptions_count=FilteredRelation(
+                    'contract_redemptions',
+                    condition=Q(contract_redemptions__isnull=False)
+                )
+            )
             .filter(Q(activation_date__isnull=True) | Q(activation_date__lte=now))
             .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
             .filter(
                 Q(redemption_type=REDEMPTION_TYPE_UNLIMITED)
-                | Q(contract_redemptions__count__lt=1)
+                | Q(contract_redemptions_count__isnull=True)
             )
             .get(discount_code=enrollment_code)
         )
@@ -222,11 +234,21 @@ class AttachContractApi(APIView):
     def _get_eligible_contracts(self, user, code, now):
         """Return contracts associated with the code that the user can join."""
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
+        user_contract_ids = user.b2b_contracts.values_list("id", flat=True)
+        
         return (
             ContractPage.objects.filter(pk__in=contract_ids)
-            .exclude(pk__in=user.b2b_contracts.all())
-            .exclude(Q(contract_end__lt=now) | Q(contract_start__gt=now))
-            .all()
+            .exclude(pk__in=user_contract_ids)
+            .annotate(
+                active_contract=FilteredRelation(
+                    'contractpage_ptr',
+                    condition=Q(
+                        contract_start__lte=now,
+                        contract_end__gte=now
+                    )
+                )
+            )
+            .filter(active_contract__isnull=False)
         )
 
     def _attach_user_to_contracts(self, user, contracts, code):

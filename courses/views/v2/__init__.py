@@ -7,7 +7,7 @@ import logging
 import django_filters
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, FilteredRelation, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -163,9 +163,12 @@ class ProgramFilterSet(django_filters.FilterSet):
     def filter_by_org_id(self, queryset, _, org_id):
         """Filter according to org_id. If the user is in org_id, return only related programs."""
         if self.request and user_has_org_access(self.request.user, org_id):
-            return queryset.filter(
-                contract_memberships__contract__organization__id=org_id
-            )
+            return queryset.annotate(
+                org_contract_memberships=FilteredRelation(
+                    'contract_memberships',
+                    condition=Q(contract_memberships__contract__organization__id=org_id)
+                )
+            ).filter(org_contract_memberships__isnull=False)
         else:
             return queryset.filter(b2b_only=False)
 
@@ -178,7 +181,12 @@ class ProgramFilterSet(django_filters.FilterSet):
             and contract_id
             and user.b2b_contracts.filter(id=contract_id).exists()
         ):
-            return queryset.filter(contract_memberships__contract__id=contract_id)
+            return queryset.annotate(
+                target_contract_memberships=FilteredRelation(
+                    'contract_memberships',
+                    condition=Q(contract_memberships__contract__id=contract_id)
+                )
+            ).filter(target_contract_memberships__isnull=False)
         return queryset.filter(b2b_only=False)
 
 
@@ -330,10 +338,15 @@ class CourseFilterSet(django_filters.FilterSet):
         user = self.request.user
 
         if user_has_org_access(user, value):
-            return queryset.filter(
-                courseruns__b2b_contract__organization_id=value,
-                courseruns__b2b_contract__active=True,
-            )
+            return queryset.annotate(
+                b2b_org_courseruns=FilteredRelation(
+                    'courseruns',
+                    condition=Q(
+                        courseruns__b2b_contract__organization_id=value,
+                        courseruns__b2b_contract__active=True
+                    )
+                )
+            ).filter(b2b_org_courseruns__isnull=False)
         return Course.objects.none()
 
     def filter_contract_id(self, queryset, _, value):
@@ -349,10 +362,15 @@ class CourseFilterSet(django_filters.FilterSet):
             and value
             and user.b2b_contracts.filter(id=value).exists()
         ):
-            return queryset.filter(
-                courseruns__b2b_contract__id=value,
-                courseruns__b2b_contract__active=True,
-            )
+            return queryset.annotate(
+                contract_courseruns=FilteredRelation(
+                    'courseruns',
+                    condition=Q(
+                        courseruns__b2b_contract__id=value,
+                        courseruns__b2b_contract__active=True
+                    )
+                )
+            ).filter(contract_courseruns__isnull=False)
         return Course.objects.none()
 
     def filter_include_approved_financial_aid(self, queryset, *_):
@@ -586,7 +604,12 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
     def filter_org_id(self, queryset, name, value):  # noqa: ARG002
         """Filter enrollments by B2B organization ID."""
         if value:
-            return queryset.filter(run__b2b_contract__organization_id=value)
+            return queryset.annotate(
+                b2b_org_runs=FilteredRelation(
+                    'run',
+                    condition=Q(run__b2b_contract__organization_id=value)
+                )
+            ).filter(b2b_org_runs__isnull=False)
         return queryset
 
 
