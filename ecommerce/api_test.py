@@ -30,6 +30,7 @@ from ecommerce.api import (
     create_verified_program_course_run_enrollment,
     create_verified_program_discount,
     establish_basket,
+    generate_checkout_payload,
     get_auto_apply_discounts_for_basket,
     process_cybersource_payment_response,
     refund_order,
@@ -215,6 +216,18 @@ def create_basket(user, products):
     basket_item.save()
 
     return basket
+
+
+def create_pending_order(user):
+    """
+    Call generate_checkout_payload to create a PendingOrder with a realistic
+    CyberSource payload.
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = user
+    request.session = {}
+    return generate_checkout_payload(request)
 
 
 @pytest.mark.parametrize(
@@ -489,9 +502,7 @@ def test_unenrollment_unenrolls_learner(mocker, user):
 
 
 @pytest.mark.skip_nplusone_check
-def test_process_cybersource_payment_response(  # noqa: PLR0913
-    settings, rf, mocker, user_client, user, products
-):
+def test_process_cybersource_payment_response(settings, rf, mocker, user, products):
     """Test that ensures the response from Cybersource for an ACCEPTed payment updates the orders state"""
 
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
@@ -501,9 +512,9 @@ def test_process_cybersource_payment_response(  # noqa: PLR0913
     )
     create_basket(user, products)
 
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
+    checkout_payload = create_pending_order(user)
 
-    payload = resp.json()["payload"]
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": "ACCEPT",
@@ -527,8 +538,8 @@ def test_process_cybersource_payment_response(  # noqa: PLR0913
 
 @pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize("include_discount", [True, False])
-def test_process_cybersource_payment_decline_response(  # noqa: PLR0913
-    rf, mocker, user_client, user, products, include_discount
+def test_process_cybersource_payment_decline_response(
+    rf, mocker, user, products, include_discount
 ):
     """Test that ensures the response from Cybersource for an DECLINEd payment updates the orders state"""
 
@@ -538,9 +549,9 @@ def test_process_cybersource_payment_decline_response(  # noqa: PLR0913
     )
     create_basket(user, products)
 
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
+    checkout_payload = create_pending_order(user)
 
-    payload = resp.json()["payload"]
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": "DECLINE",
