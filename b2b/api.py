@@ -27,6 +27,7 @@ from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
 from b2b.models import (
     ContractPage,
+    ContractProgramItem,
     OrganizationIndexPage,
     OrganizationPage,
     UserOrganization,
@@ -75,9 +76,13 @@ def get_user_b2b_organizations(user):
     ).prefetch_related(
         Prefetch(
             "contracts",
-            queryset=ContractPage.objects.filter(
-                active=True, users=user
-            ).prefetch_related("contract_programs"),
+            queryset=ContractPage.objects.prefetch_related(
+                Prefetch(
+                    "contract_programs",
+                    queryset=ContractProgramItem.objects.order_by("sort_order"),
+                    to_attr="_contract_program_ids",
+                )
+            ).filter(active=True, users=user),
             to_attr="_user_active_contracts",
         )
     )
