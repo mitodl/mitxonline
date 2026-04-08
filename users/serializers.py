@@ -230,6 +230,7 @@ class UserSerializer(serializers.ModelSerializer):
         return OrganizationPageSerializer(
             instance.b2b_organizations,
             many=True,
+            context={"user": instance},
         ).data
 
     def validate(self, data):
