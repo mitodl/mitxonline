@@ -1,7 +1,4 @@
 [
-  "b2b/serializers/v0/__init__.py:164:12:ORM002",
-  "b2b/serializers/v0/__init__.py:27:20:ORM002",
-  "b2b/serializers/v0/__init__.py:75:27:ORM002",
   "cms/serializers.py:114:16:ORM001",
   "cms/serializers.py:153:41:ORM001",
   "cms/serializers.py:306:12:ORM001",
@@ -88,7 +85,7 @@
   "hubspot_sync/serializers.py:309:36:ORM001",
   "hubspot_sync/serializers.py:57:22:ORM002",
   "hubspot_sync/serializers.py:68:27:ORM002",
-  "users/serializers.py:208:16:ORM001",
+  "users/serializers.py:209:16:ORM001",
   "users/serializers.py:254:20:ORM001",
   "users/serializers.py:301:19:ORM001",
   "users/serializers.py:431:13:ORM001",
