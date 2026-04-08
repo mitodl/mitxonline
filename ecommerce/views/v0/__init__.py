@@ -512,7 +512,6 @@ class ProductViewSet(ReadOnlyModelViewSet):
 
         now = now_in_utc()
 
-        # Use FilteredRelation to optimize complex filtering for unenrollable products
         return (
             Product.objects.annotate(
                 # Filter for enrollable course runs
