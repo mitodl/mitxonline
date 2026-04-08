@@ -400,7 +400,12 @@ def test_create_basket_with_products(
     ],
 )
 def test_create_basket_with_product(  # noqa: PLR0913
-    user, user_client, existing_basket, add_discount, bad_discount, existing_discount
+    user,
+    user_client,
+    existing_basket,
+    add_discount,
+    bad_discount,
+    existing_discount,
 ):
     """Test creating a basket with a single product, and/or a discount."""
 
@@ -419,8 +424,8 @@ def test_create_basket_with_product(  # noqa: PLR0913
             # the one that'll be "supplied" below.
 
             ex_discount = DiscountFactory(
-                discount_type="fixed-price",
-                amount=150 if existing_discount == "worse" else 50,
+                discount_type="percent-off",
+                amount=10 if existing_discount == "worse" else 60,
             )
             BasketDiscount.objects.create(
                 redeemed_basket=basket,
@@ -431,7 +436,7 @@ def test_create_basket_with_product(  # noqa: PLR0913
 
         if bad_discount:
             discount = DiscountFactory(
-                discount_type="fixed-price", amount=100, max_redemptions=1
+                discount_type="percent-off", amount=50, max_redemptions=1
             )
             order = OrderFactory.create()
             DiscountRedemption.objects.create(
@@ -441,7 +446,7 @@ def test_create_basket_with_product(  # noqa: PLR0913
                 redeemed_order=order,
             )
         else:
-            discount = DiscountFactory(discount_type="fixed-price", amount=100)
+            discount = DiscountFactory(discount_type="percent-off", amount=50)
 
         url = reverse(
             "v0:baskets_api-create_from_product_with_discount",
