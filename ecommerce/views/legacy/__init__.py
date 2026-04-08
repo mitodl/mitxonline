@@ -70,9 +70,9 @@ from ecommerce.serializers import (
     UserDiscountSerializer,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
-from hubspot_sync.task_helpers import sync_hubspot_cart_add
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
+from hubspot_sync.task_helpers import sync_hubspot_cart_add
 from main import features
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,

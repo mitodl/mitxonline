@@ -9,11 +9,11 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
-from hubspot.crm.objects.models import Filter, FilterGroup, PublicObjectSearchRequest
 from hubspot.crm.objects import (
     SimplePublicObject,
     SimplePublicObjectInput,
 )
+from hubspot.crm.objects.models import Filter, FilterGroup, PublicObjectSearchRequest
 from hubspot.crm.properties.exceptions import ApiException as PropertiesApiException
 from mitol.common.utils.datetime import now_in_utc
 from mitol.hubspot_api.api import (
@@ -40,12 +40,12 @@ from reversion.models import Version
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from courses.models import CourseRun, Program
 from ecommerce import models
-from ecommerce.discounts import resolve_product_version
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
 )
+from ecommerce.discounts import resolve_product_version
 from ecommerce.models import Line, Order, Product
 from hubspot_sync.rate_limiter import wait_for_hubspot_rate_limit
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -1388,9 +1388,8 @@ def sync_contact_with_hubspot(user: User):
 def _get_cart_add_token(is_uai_course: bool) -> str:
     """Resolve HubSpot token for cart-add deal tracking."""
     if is_uai_course:
-        return (
-            getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
-            or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
+        return getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", "") or getattr(
+            settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", ""
         )
     return getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
 
@@ -1630,7 +1629,9 @@ def _ensure_target_hubspot_custom_properties(hubspot_client: HubspotApi) -> None
                 raise
 
         wait_for_hubspot_rate_limit()
-        existing_properties = hubspot_client.crm.properties.core_api.get_all(object_type)
+        existing_properties = hubspot_client.crm.properties.core_api.get_all(
+            object_type
+        )
         existing_property_names = {
             prop.name for prop in getattr(existing_properties, "results", [])
         }

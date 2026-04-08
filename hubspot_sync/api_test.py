@@ -14,9 +14,9 @@ from reversion.models import Version
 
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from courses.factories import (
-    CourseRunFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
+    CourseRunFactory,
     ProgramCertificateFactory,
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
@@ -294,7 +294,9 @@ def test_sync_product_with_hubspot(mock_hubspot_api):
 def test_ensure_target_hubspot_custom_properties_skips_unique_app_id_update(mocker):
     """Existing unique_app_id properties should not be updated because they can be read-only."""
     mock_client = mocker.Mock()
-    mock_client.crm.properties.groups_api.get_all.return_value = SimpleNamespace(results=[])
+    mock_client.crm.properties.groups_api.get_all.return_value = SimpleNamespace(
+        results=[]
+    )
     mock_client.crm.properties.core_api.get_all.return_value = SimpleNamespace(
         results=[
             SimpleNamespace(name="status"),
@@ -305,7 +307,8 @@ def test_ensure_target_hubspot_custom_properties_skips_unique_app_id_update(mock
     api._ensure_target_hubspot_custom_properties(mock_client)
 
     updated_property_names = {
-        call.args[1] for call in mock_client.crm.properties.core_api.update.call_args_list
+        call.args[1]
+        for call in mock_client.crm.properties.core_api.update.call_args_list
     }
     assert "status" in updated_property_names
     assert "unique_app_id" not in updated_property_names
