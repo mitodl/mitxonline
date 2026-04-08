@@ -120,6 +120,13 @@ def _should_redirect_to_learn(order):
     """
     if _has_uai_purchase(order):
         return True
+
+    # NOTE: Retrieve global_id from purchaser rather than request user
+    # because this is used in contexts where the request is anonymous.
+    #
+    # One example is the callback view that processes the payment response from
+    # cybersource. This view is hit via a POST request from a different domain,
+    # which means no samesite (lax, strict) authentication cookies are sent.
     global_id = order.purchaser.global_id
     return bool(
         global_id
