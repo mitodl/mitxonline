@@ -80,7 +80,7 @@ class ProgramAdmin(admin.ModelAdmin):
         # If a cert already has a cred, leave it alone for now.
         certificates = list(
             ProgramCertificate.objects.filter(
-                id__in=program_ids, verifiable_credential__isnull=True
+                program_id__in=program_ids, verifiable_credential__isnull=True
             )
         )
         populate_verifiable_credentials_for_certificate(self, request, certificates)
@@ -746,6 +746,6 @@ def populate_verifiable_credentials_for_certificate(admin, request, certificates
     if failed_certificates:
         # We indicate IDs, but errors should also be logged to sentry from within create_verifiable_credential
         level = messages.WARNING
-        message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates, but failed to create credentials for {len(failed_certificates)} certificates with IDs: {[cert.id for cert in failed_certificates]}"
+        message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates, but encountered errors for certificates with IDs: {[cert.id for cert in failed_certificates]}"
 
     admin.message_user(request, message, level=level)
