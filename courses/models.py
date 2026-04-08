@@ -12,7 +12,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
-from django.db.models import Exists, FilteredRelation, OuterRef, Prefetch, Q
+from django.db.models import FilteredRelation, Prefetch, Q
 from django.db.models.constraints import CheckConstraint, UniqueConstraint
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -214,7 +214,7 @@ class DepartmentQuerySet(TimestampedModelQuerySet):
 
     def for_serialization(self):
         from mitol.common.utils.datetime import now_in_utc
-        
+
         now = now_in_utc()
         enrollable_filter = (
             # Check if enrollment has not ended
@@ -230,14 +230,13 @@ class DepartmentQuerySet(TimestampedModelQuerySet):
             # Course run must have started
             & Q(courseruns__start_date__isnull=False)
         )
-        
+
         return self.prefetch_related(
             Prefetch(
                 "courses",
                 queryset=Course.objects.annotate(
                     enrollable_runs=FilteredRelation(
-                        'courseruns',
-                        condition=enrollable_filter
+                        "courseruns", condition=enrollable_filter
                     )
                 )
                 .filter(
