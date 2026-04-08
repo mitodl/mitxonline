@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.145.1
+Version 1.145.1 (Released April 08, 2026)
 ---------------
 
 - Fix github actions django env vars (#3463)
