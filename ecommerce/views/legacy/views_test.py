@@ -670,7 +670,7 @@ def test_checkout_result_redirects_uai_b2c_program_to_learn_dashboard(
     )
     mocker.patch("courses.api.create_program_enrollments")
 
-    program = ProgramFactory.create(readable_id="program-v1:MITx+UAI+B2C+2026")
+    program = ProgramFactory.create(readable_id="program-v1:UAI+B2C.3+2026")
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=program)
 
