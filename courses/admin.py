@@ -34,6 +34,7 @@ from courses.models import (
     ProgramEnrollmentAudit,
     ProgramRun,
     RelatedProgram,
+    VerifiableCredential,
 )
 from main.admin import AuditableModelAdmin, ModelAdminRunActionsForAllMixin
 from main.utils import get_field_names
@@ -73,7 +74,7 @@ class ProgramAdmin(admin.ModelAdmin):
     @admin.action(
         description="Backfill verifiable credentials for program certificates"
     )
-    def populate_verifiable_credentials_for_courserun(self, request, queryset):
+    def populate_verifiable_credentials_for_program(self, request, queryset):
         """Admin action to regenerate verifiable credentials for a program"""
         program_ids = queryset.values_list("id", flat=True)
         # If a cert already has a cred, leave it alone for now.
@@ -666,6 +667,18 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         return self.model.all_objects.get_queryset().select_related("user", "program")
 
 
+@admin.register(VerifiableCredential)
+class VerifiableCredentialAdmin(TimestampedModelAdmin):
+    """Admin for VerifiableCredential"""
+
+    model = VerifiableCredential
+    include_timestamps_in_list = True
+    list_display = ["uuid", "programcertificate", "courseruncertificate"]
+
+    def has_add_permission(self, request, obj=None):  # noqa: ARG002
+        return False
+
+
 @admin.register(PartnerSchool)
 class PartnerSchoolAdmin(TimestampedModelAdmin):
     """Admin for PartnerSchool"""
@@ -731,6 +744,7 @@ def populate_verifiable_credentials_for_certificate(admin, request, certificates
     message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates."
     level = messages.INFO
     if failed_certificates:
+        # We indicate IDs, but errors should also be logged to sentry from within create_verifiable_credential
         level = messages.WARNING
         message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates, but failed to create credentials for {len(failed_certificates)} certificates with IDs: {[cert.id for cert in failed_certificates]}"
 
