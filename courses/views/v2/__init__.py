@@ -165,8 +165,10 @@ class ProgramFilterSet(django_filters.FilterSet):
         if self.request and user_has_org_access(self.request.user, org_id):
             return queryset.annotate(
                 org_contract_memberships=FilteredRelation(
-                    'contract_memberships',
-                    condition=Q(contract_memberships__contract__organization__id=org_id)
+                    "contract_memberships",
+                    condition=Q(
+                        contract_memberships__contract__organization__id=org_id
+                    ),
                 )
             ).filter(org_contract_memberships__isnull=False)
         else:
@@ -183,8 +185,8 @@ class ProgramFilterSet(django_filters.FilterSet):
         ):
             return queryset.annotate(
                 target_contract_memberships=FilteredRelation(
-                    'contract_memberships',
-                    condition=Q(contract_memberships__contract__id=contract_id)
+                    "contract_memberships",
+                    condition=Q(contract_memberships__contract__id=contract_id),
                 )
             ).filter(target_contract_memberships__isnull=False)
         return queryset.filter(b2b_only=False)
@@ -340,11 +342,11 @@ class CourseFilterSet(django_filters.FilterSet):
         if user_has_org_access(user, value):
             return queryset.annotate(
                 b2b_org_courseruns=FilteredRelation(
-                    'courseruns',
+                    "courseruns",
                     condition=Q(
                         courseruns__b2b_contract__organization_id=value,
-                        courseruns__b2b_contract__active=True
-                    )
+                        courseruns__b2b_contract__active=True,
+                    ),
                 )
             ).filter(b2b_org_courseruns__isnull=False)
         return Course.objects.none()
@@ -364,11 +366,11 @@ class CourseFilterSet(django_filters.FilterSet):
         ):
             return queryset.annotate(
                 contract_courseruns=FilteredRelation(
-                    'courseruns',
+                    "courseruns",
                     condition=Q(
                         courseruns__b2b_contract__id=value,
-                        courseruns__b2b_contract__active=True
-                    )
+                        courseruns__b2b_contract__active=True,
+                    ),
                 )
             ).filter(contract_courseruns__isnull=False)
         return Course.objects.none()
@@ -606,8 +608,7 @@ class UserEnrollmentFilterSet(django_filters.FilterSet):
         if value:
             return queryset.annotate(
                 b2b_org_runs=FilteredRelation(
-                    'run',
-                    condition=Q(run__b2b_contract__organization_id=value)
+                    "run", condition=Q(run__b2b_contract__organization_id=value)
                 )
             ).filter(b2b_org_runs__isnull=False)
         return queryset

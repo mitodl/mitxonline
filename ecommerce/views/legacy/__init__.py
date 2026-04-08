@@ -322,15 +322,13 @@ class DiscountFilterSet(django_filters.FilterSet):
         if value == "yes":
             return qs.annotate(
                 active_redemptions=FilteredRelation(
-                    'order_redemptions',
-                    condition=Q(order_redemptions__isnull=False)
+                    "order_redemptions", condition=Q(order_redemptions__isnull=False)
                 )
             ).filter(active_redemptions__isnull=False)
         elif value == "no":
             return qs.annotate(
                 active_redemptions=FilteredRelation(
-                    'order_redemptions',
-                    condition=Q(order_redemptions__isnull=False)
+                    "order_redemptions", condition=Q(order_redemptions__isnull=False)
                 )
             ).filter(active_redemptions__isnull=True)
 

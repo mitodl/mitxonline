@@ -5,7 +5,7 @@ import re
 from urllib.parse import urljoin
 
 from django.conf import settings
-from django.db.models import FilteredRelation, Prefetch, Q
+from django.db.models import FilteredRelation, Q
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
@@ -112,11 +112,11 @@ def get_enrollable_courses(queryset, enrollment_end_date=None):
         enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
     """
     from mitol.common.utils.datetime import now_in_utc
-    
+
     now = now_in_utc()
     if enrollment_end_date is None:
         enrollment_end_date = now
-    
+
     enrollable_filter = (
         # Check if enrollment has not ended
         (
@@ -131,13 +131,16 @@ def get_enrollable_courses(queryset, enrollment_end_date=None):
         # Course run must have started
         & Q(courseruns__start_date__isnull=False)
     )
-    
-    return queryset.annotate(
-        enrollable_courseruns=FilteredRelation(
-            'courseruns',
-            condition=enrollable_filter
+
+    return (
+        queryset.annotate(
+            enrollable_courseruns=FilteredRelation(
+                "courseruns", condition=enrollable_filter
+            )
         )
-    ).filter(enrollable_courseruns__isnull=False).distinct()
+        .filter(enrollable_courseruns__isnull=False)
+        .distinct()
+    )
 
 
 def get_unenrollable_courses(queryset):
@@ -148,20 +151,26 @@ def get_unenrollable_courses(queryset):
         queryset: Queryset of Course objects
     """
     from mitol.common.utils.datetime import now_in_utc
-    
+
     now = now_in_utc()
     unenrollable_filter = (
         Q(courseruns__live=False)
         | Q(courseruns__start_date__isnull=True)
-        | (Q(courseruns__enrollment_end__lte=now) | Q(courseruns__enrollment_start__gt=now))
-    )
-    
-    return queryset.annotate(
-        unenrollable_courseruns=FilteredRelation(
-            'courseruns',
-            condition=unenrollable_filter
+        | (
+            Q(courseruns__enrollment_end__lte=now)
+            | Q(courseruns__enrollment_start__gt=now)
         )
-    ).filter(unenrollable_courseruns__isnull=False).distinct()
+    )
+
+    return (
+        queryset.annotate(
+            unenrollable_courseruns=FilteredRelation(
+                "courseruns", condition=unenrollable_filter
+            )
+        )
+        .filter(unenrollable_courseruns__isnull=False)
+        .distinct()
+    )
 
 
 def get_archived_courseruns(queryset):

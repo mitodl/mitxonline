@@ -517,42 +517,44 @@ class ProductViewSet(ReadOnlyModelViewSet):
             Product.objects.annotate(
                 # Filter for enrollable course runs
                 enrollable_courserun=FilteredRelation(
-                    'purchasable_object',
+                    "purchasable_object",
                     condition=Q(
                         content_type__model="courserun",
-                        courserun__enrollment_end__gte=now
-                    ) | Q(
-                        content_type__model="courserun",
-                        courserun__enrollment_end__isnull=True
+                        courserun__enrollment_end__gte=now,
                     )
+                    | Q(
+                        content_type__model="courserun",
+                        courserun__enrollment_end__isnull=True,
+                    ),
                 ),
                 # Filter for programs with valid runs
                 valid_program=FilteredRelation(
-                    'purchasable_object',
+                    "purchasable_object",
                     condition=Q(
                         content_type__model="program",
-                        program__programruns__end_date__gt=now
-                    ) | Q(
-                        content_type__model="program", 
-                        program__programruns__end_date__isnull=True
+                        program__programruns__end_date__gt=now,
                     )
+                    | Q(
+                        content_type__model="program",
+                        program__programruns__end_date__isnull=True,
+                    ),
                 ),
                 # Filter for valid program runs
                 valid_programrun=FilteredRelation(
-                    'purchasable_object',
+                    "purchasable_object",
                     condition=Q(
-                        content_type__model="programrun",
-                        programrun__end_date__gt=now
-                    ) | Q(
-                        content_type__model="programrun",
-                        programrun__end_date__isnull=True
+                        content_type__model="programrun", programrun__end_date__gt=now
                     )
-                )
+                    | Q(
+                        content_type__model="programrun",
+                        programrun__end_date__isnull=True,
+                    ),
+                ),
             )
             .filter(
-                Q(enrollable_courserun__isnull=False) |
-                Q(valid_program__isnull=False) |
-                Q(valid_programrun__isnull=False)
+                Q(enrollable_courserun__isnull=False)
+                | Q(valid_program__isnull=False)
+                | Q(valid_programrun__isnull=False)
             )
             .select_related("content_type")
             .prefetch_related("purchasable_object")
@@ -595,15 +597,13 @@ class DiscountFilterSet(django_filters.FilterSet):
         if value == "yes":
             return qs.annotate(
                 active_redemptions=FilteredRelation(
-                    'order_redemptions',
-                    condition=Q(order_redemptions__isnull=False)
+                    "order_redemptions", condition=Q(order_redemptions__isnull=False)
                 )
             ).filter(active_redemptions__isnull=False)
         elif value == "no":
             return qs.annotate(
                 active_redemptions=FilteredRelation(
-                    'order_redemptions',
-                    condition=Q(order_redemptions__isnull=False)
+                    "order_redemptions", condition=Q(order_redemptions__isnull=False)
                 )
             ).filter(active_redemptions__isnull=True)
 

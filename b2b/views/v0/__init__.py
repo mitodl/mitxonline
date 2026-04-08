@@ -204,12 +204,10 @@ class AttachContractApi(APIView):
         """Return active contracts for a user at the given time."""
         return user.b2b_contracts.annotate(
             active_contracts=FilteredRelation(
-                'contractpage_ptr',
+                "contractpage_ptr",
                 condition=Q(
-                    active=True,
-                    contract_start__lte=now,
-                    contract_end__gte=now
-                )
+                    active=True, contract_start__lte=now, contract_end__gte=now
+                ),
             )
         ).filter(active_contracts__isnull=False)
 
@@ -218,8 +216,8 @@ class AttachContractApi(APIView):
         return (
             Discount.objects.annotate(
                 contract_redemptions_count=FilteredRelation(
-                    'contract_redemptions',
-                    condition=Q(contract_redemptions__isnull=False)
+                    "contract_redemptions",
+                    condition=Q(contract_redemptions__isnull=False),
                 )
             )
             .filter(Q(activation_date__isnull=True) | Q(activation_date__lte=now))
@@ -235,17 +233,14 @@ class AttachContractApi(APIView):
         """Return contracts associated with the code that the user can join."""
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
         user_contract_ids = user.b2b_contracts.values_list("id", flat=True)
-        
+
         return (
             ContractPage.objects.filter(pk__in=contract_ids)
             .exclude(pk__in=user_contract_ids)
             .annotate(
                 active_contract=FilteredRelation(
-                    'contractpage_ptr',
-                    condition=Q(
-                        contract_start__lte=now,
-                        contract_end__gte=now
-                    )
+                    "contractpage_ptr",
+                    condition=Q(contract_start__lte=now, contract_end__gte=now),
                 )
             )
             .filter(active_contract__isnull=False)
