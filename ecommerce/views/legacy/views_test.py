@@ -623,6 +623,48 @@ def test_checkout_result(  # noqa: PLR0913
 
 @pytest.mark.skip_nplusone_check
 @pytest.mark.dont_mock_enrollments
+def test_checkout_result_redirects_uai_b2c_courserun_to_learn_dashboard(
+    settings,
+    user,
+    user_client,
+    mocker,
+):
+    """Accepted UAI+B2C course run purchases should redirect to the MIT Learn dashboard."""
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+
+    run = CourseRunFactory.create(courseware_id="course-v1:UAI_B2C+TEST+2026")
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+
+    create_basket_with_product(user, product)
+
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
 def test_checkout_result_redirects_uai_b2c_program_to_learn_dashboard(
     settings,
     user,
