@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.146.0
+---------------
+
+- Include program titles in v0 TransactionLineSerializer (#3469)
+- Add management command to upgrade eligible program enrollments (#3455)
+- fix: filter b2b contracts in users/me API to only show contracts the user is enrolled in (#3470)
+- Exit Python Tests step after first failure (#3382)
+
 Version 1.145.2 (Released April 08, 2026)
 ---------------
 
