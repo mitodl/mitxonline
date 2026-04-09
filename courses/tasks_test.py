@@ -80,5 +80,3 @@ def test_upgrade_eligible_program_enrollments_selects_related_program_and_user(
         upgrade_eligible_program_enrollments()
 
     assert upgrade_program_enrollment_if_eligible.call_count == len(audit_enrollments)
-
-
