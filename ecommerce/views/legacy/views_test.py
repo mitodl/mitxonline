@@ -7,7 +7,7 @@ import freezegun
 import pytest
 import reversion
 from django.forms.models import model_to_dict
-from django.test.client import Client
+from django.test.client import Client, RequestFactory
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
@@ -15,6 +15,7 @@ from rest_framework import status
 from b2b.factories import ContractPageFactory
 from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
 from courses.models import CourseRunEnrollment, PaidCourseRun, ProgramEnrollment
+from ecommerce import api
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
@@ -215,6 +216,18 @@ def create_basket_with_product(user, product):
     basket_item.save()
 
     return basket
+
+
+def create_pending_order(user):
+    """
+    Call generate_checkout_payload to create a PendingOrder with a realistic
+    CyberSource payload. Returns the payload dict from the payment gateway.
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = user
+    request.session = {}
+    return api.generate_checkout_payload(request)
 
 
 @pytest.mark.parametrize(
@@ -442,42 +455,6 @@ def test_redeem_time_limited_discount(  # noqa: PLR0913
         assert "not found" in resp_json
 
 
-@pytest.mark.skip_nplusone_check
-def test_start_checkout(user, user_drf_client, products):
-    """
-    Hits the start checkout view, which should create an Order record
-    and its associated line items.
-    """
-    basket = create_basket(user, products)  # noqa: F841
-
-    resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
-
-    # if there's not a payload in here, something went wrong
-    assert "payload" in resp.json()
-
-    order = Order.objects.filter(purchaser=user).get()
-
-    assert order.state == OrderStatus.PENDING
-
-
-@pytest.mark.skip_nplusone_check
-def test_start_checkout_with_discounts(user, user_drf_client, products, discounts):
-    """
-    Applies a discount, then hits the start checkout view, which should create
-    an Order record and its associated line items.
-    """
-    test_redeem_discount(user, user_drf_client, products, discounts, False, False)  # noqa: FBT003
-
-    resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
-
-    # if there's not a payload in here, something went wrong
-    assert "payload" in resp.json()
-
-    order = Order.objects.filter(purchaser=user).get()
-
-    assert order.state == OrderStatus.PENDING
-
-
 def test_start_checkout_with_invalid_discounts(user, user_client, products, discounts):
     """
     Applies a discount, invalidates all the discounts, then hits the start
@@ -581,8 +558,7 @@ def test_checkout_result(  # noqa: PLR0913
     basket_exists,
 ):
     """
-    Generates an order (using the API endpoint) and then cancels it using the endpoint.
-    There shouldn't be any PendingOrders after that happens.
+    Generates an order and then processes the checkout callback.
     """
     mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
@@ -592,9 +568,9 @@ def test_checkout_result(  # noqa: PLR0913
     )
     basket = create_basket(user, products)
 
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
+    checkout_payload = create_pending_order(user)
 
-    payload = resp.json()["payload"]
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": decision,
@@ -602,16 +578,9 @@ def test_checkout_result(  # noqa: PLR0913
         "transaction_id": "12345",
     }
 
-    # Load the pending order from the DB(factory) - should match the ref# in
-    # the payload we get back
-
     order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
 
     assert order.reference_number == payload["req_reference_number"]
-
-    # This is kind of cheating - CyberSource will send back a payload that is
-    # signed, but here we're just passing the payload as we got it back from
-    # the start checkout call.
 
     resp = user_client.post(reverse("checkout-result-callback"), payload)
     assert resp.status_code == 302
@@ -670,15 +639,15 @@ def test_checkout_result_redirects_uai_b2c_program_to_learn_dashboard(
     )
     mocker.patch("courses.api.create_program_enrollments")
 
-    program = ProgramFactory.create(readable_id="program-v1:MITx+UAI+B2C+2026")
+    program = ProgramFactory.create(readable_id="program-v1:UAI+B2C.3+2026")
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=program)
 
     create_basket_with_product(user, product)
 
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
+    checkout_payload = create_pending_order(user)
 
-    payload = resp.json()["payload"]
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": "ACCEPT",
@@ -688,7 +657,96 @@ def test_checkout_result_redirects_uai_b2c_program_to_learn_dashboard(
 
     resp = user_client.post(reverse("checkout-result-callback"), payload)
     assert resp.status_code == 302
-    assert resp.url == settings.MIT_LEARN_DASHBOARD_URL
+    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result_redirects_to_learn_when_flag_enabled(
+    settings,
+    user,
+    user_client,
+    products,
+    mocker,
+):
+    """Fulfilled purchases redirect to Learn dashboard when feature flag is enabled."""
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    mocker.patch(
+        "ecommerce.views.legacy.is_posthog_enabled",
+        return_value=True,
+    )
+
+    create_basket(user, products)
+
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+
+
+@pytest.mark.skip_nplusone_check
+@pytest.mark.dont_mock_enrollments
+def test_checkout_result_no_learn_redirect_without_global_id(
+    settings,
+    user_client,
+    products,
+    mocker,
+):
+    """Fulfilled purchases fall back to legacy dashboard when user has no global_id."""
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    user_no_global_id = UserFactory.create(global_id=None)
+    user_client.force_login(user_no_global_id)
+
+    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    mock_is_enabled = mocker.patch(
+        "ecommerce.views.legacy.is_posthog_enabled",
+    )
+
+    create_basket(user_no_global_id, products)
+
+    checkout_payload = create_pending_order(user_no_global_id)
+
+    payload = checkout_payload["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    mock_is_enabled.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -1003,16 +1061,12 @@ def test_discount_redemptions_api(
 
     assert resp.status_code == 200
 
+    checkout_payload = create_pending_order(user)
+
     if zerovalue:
-        with pytest.raises(TypeError) as exc:
-            resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
-
-        assert "HttpResponseRedirect" in str(exc)
+        assert "no_checkout" in checkout_payload
     else:
-        resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
-        assert resp.status_code == 200
-
-    # 100% discount will redirect to user dashboard
+        assert "payload" in checkout_payload
 
     resp = admin_drf_client.get(f"/api/discounts/{discount.id}/redemptions/")
     assert resp.status_code == 200
@@ -1133,9 +1187,9 @@ def test_checkout_api_result(  # noqa: PLR0913
     )
     basket = create_basket(user, products)
 
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
+    checkout_payload = create_pending_order(user)
 
-    payload = resp.json()["payload"]
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": decision,
@@ -1143,16 +1197,9 @@ def test_checkout_api_result(  # noqa: PLR0913
         "transaction_id": "12345",
     }
 
-    # Load the pending order from the DB(factory) - should match the ref# in
-    # the payload we get back
-
     order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
 
     assert order.reference_number == payload["req_reference_number"]
-
-    # This is kind of cheating - CyberSource will send back a payload that is
-    # signed, but here we're just passing the payload as we got it back from
-    # the start checkout call.
 
     resp = api_client.post(reverse("checkout_result_api"), payload)
 
@@ -1199,9 +1246,10 @@ def test_checkout_api_result_verification_failure(
     )
 
     create_basket(user, products)
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
 
-    payload = resp.json()["payload"]
+    checkout_payload = create_pending_order(user)
+
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": OrderStatus.PENDING,
@@ -1238,10 +1286,9 @@ def test_checkout_api_result_program_accept(
 
     basket = create_basket_with_product(user, product)
 
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
-    assert resp.status_code == 200
+    checkout_payload = create_pending_order(user)
 
-    payload = resp.json()["payload"]
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": "ACCEPT",
@@ -1322,6 +1369,37 @@ def test_start_checkout_with_zero_value(settings, user, user_client, products):
             "run": order.lines.first().purchased_object.course.title,
         }
     )
+
+
+@pytest.mark.skip_nplusone_check
+def test_start_checkout_with_zero_value_redirects_to_learn(
+    settings, user, user_client, products, mocker
+):
+    """
+    Check that a zero-value checkout redirects to Learn dashboard when flag is enabled.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+
+    mocker.patch(
+        "ecommerce.views.legacy.is_posthog_enabled",
+        return_value=True,
+    )
+
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
+    )
+    test_redeem_discount(user, user_client, products, [discount], False, False)  # noqa: FBT003
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    order = Order.objects.filter(purchaser=user).get()
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+    assert USER_MSG_COOKIE_NAME not in resp.cookies
 
 
 @pytest.mark.skip_nplusone_check
@@ -1435,10 +1513,8 @@ def test_program_product_purchasing(user, user_drf_client):
     basket = BasketFactory.create(user=user)
     BasketItem.objects.create(basket=basket, product=product)
 
-    with pytest.raises(TypeError) as exc:
-        user_drf_client.post(reverse("checkout_api-start_checkout"))
-
-    assert "HttpResponseRedirect" in str(exc)
+    checkout_payload = create_pending_order(user)
+    assert "no_checkout" in checkout_payload
 
     assert ProgramEnrollment.objects.filter(
         user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE

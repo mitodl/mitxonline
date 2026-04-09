@@ -4,10 +4,12 @@ a course run).
 """
 
 from datetime import timedelta
+from decimal import Decimal
 from typing import List, Union  # noqa: UP035
 
+import reversion
 from django.core.management import BaseCommand
-from django.db import models
+from django.db import models, transaction
 
 from cms.api import (
     create_default_certificate_page,
@@ -15,8 +17,10 @@ from cms.api import (
     create_default_signatory_page,
     get_optional_placeholder_values_for_courseware_type,
 )
-from courses.models import Course, CourseRun, Department, Program
+from courses.models import Course, CourseRun, Department, EnrollmentMode, Program
+from ecommerce.models import Product
 from main.utils import now_datetime_with_tz, parse_supplied_date
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
 class Command(BaseCommand):
@@ -286,9 +290,71 @@ class Command(BaseCommand):
             is_source_run=kwargs.get("create_run_as_sourcerun", False),
         )
 
+        if kwargs["price"]:
+            self._create_product(course_run, kwargs["price"])
+
+        if kwargs["mode_audit"]:
+            self._add_enrollment_mode(course_run, EDX_ENROLLMENT_AUDIT_MODE)
+
+        if kwargs["mode_verified"]:
+            self._add_enrollment_mode(course_run, EDX_ENROLLMENT_VERIFIED_MODE)
+
         self.stdout.write(
             self.style.SUCCESS(f"Created course run {course_run.id}: {course_run}")
         )
+
+    def _create_product(self, courserun_or_program, price):
+        """Create a product for the specified course run or program."""
+
+        if not isinstance(courserun_or_program, CourseRun) and not isinstance(
+            courserun_or_program, Program
+        ):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Price specified for {courserun_or_program} but it's not a course run or program, so skipping product creation."
+                )
+            )
+            return
+
+        with reversion.create_revision():
+            new_product = Product.objects.create(
+                purchasable_object=courserun_or_program,
+                price=price,
+                description=str(courserun_or_program),
+                is_active=True,
+            )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Created product {new_product} for {courserun_or_program}"
+            )
+        )
+
+    def _add_enrollment_mode(self, courserun_or_program, mode_slug):
+        """Add the specified mode to the course run or program."""
+
+        if not isinstance(courserun_or_program, CourseRun) and not isinstance(
+            courserun_or_program, Program
+        ):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Enrollment mode {mode_slug} specified for {courserun_or_program} but it's not a course run or program, so skipping modes."
+                )
+            )
+            return
+
+        mode = EnrollmentMode.objects.filter(mode_slug=mode_slug).first()
+
+        if not mode:
+            self.stdout.write(
+                self.style.ERROR(
+                    f"Enrollment mode {mode_slug} not found - this probably means things aren't configured correctly."
+                )
+            )
+            return
+
+        courserun_or_program.enrollment_modes.add(mode)
+        courserun_or_program.save()
 
     def _handle_program(self, add_depts: models.QuerySet, **kwargs):
         """Handle creation of a program."""
@@ -300,6 +366,8 @@ class Command(BaseCommand):
             readable_id=kwargs["courseware_id"],
             title=kwargs["title"],
             live=kwargs["live"],
+            b2b_only=kwargs.pop("b2b_only", False),
+            display_mode=kwargs.pop("program_course", None),
         )
 
         if add_depts:
@@ -336,6 +404,15 @@ class Command(BaseCommand):
             create_certificate_page=kwargs["create_certificate_page"],
             create_signatory=kwargs["create_signatory"],
         )
+
+        if kwargs["price"]:
+            self._create_product(new_program, kwargs["price"])
+
+        if kwargs["mode_audit"]:
+            self._add_enrollment_mode(new_program, EDX_ENROLLMENT_AUDIT_MODE)
+
+        if kwargs["mode_verified"]:
+            self._add_enrollment_mode(new_program, EDX_ENROLLMENT_VERIFIED_MODE)
 
     def _handle_course(self, add_depts: models.QuerySet, **kwargs):
         """Handle creation of a course."""
@@ -564,6 +641,35 @@ class Command(BaseCommand):
             action="store_true",
         )
 
+        parser.add_argument(
+            "--price",
+            help="If set, create a product for the item. (Must be a course run or a program.)",
+            type=Decimal,
+        )
+
+        parser.add_argument(
+            "--mode-audit",
+            help="Add the audit mode to the courseware. (Must be a course run or program.)",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--mode-verified",
+            help="Add the verified mode to the courseware. (Must be a course run or program.)",
+            action="store_true",
+        )
+
+        parser.add_argument(
+            "--b2b-only",
+            help="Make the program B2B-only.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--program-course",
+            help="Make the program a program-course (displays like a course).",
+            action="store_const",
+            const="course",
+        )
+
     def handle(self, *_args, **kwargs):
         if not (
             kwargs["force"]
@@ -578,17 +684,20 @@ class Command(BaseCommand):
             exit(-1)  # noqa: PLR1722
 
         # Create or get departments if specified.
-        add_depts = None
-        if kwargs.get("depts"):
-            add_depts = self._get_or_create_departments(
-                kwargs["depts"], create_if_missing=kwargs["create_depts"]
-            )
+        with transaction.atomic():
+            add_depts = None
+            if kwargs.get("depts"):
+                add_depts = self._get_or_create_departments(
+                    kwargs["depts"], create_if_missing=kwargs["create_depts"]
+                )
 
-        if kwargs["type"] == "program":
-            self._handle_program(add_depts, **kwargs)
-        elif kwargs["type"] == "course":
-            self._handle_course(add_depts, **kwargs)
-        elif kwargs["type"] == "courserun":
-            self._handle_courserun(**kwargs)
-        else:
-            self.stderr.write(self.style.ERROR(f"Not sure what {kwargs['type']} is."))
+            if kwargs["type"] == "program":
+                self._handle_program(add_depts, **kwargs)
+            elif kwargs["type"] == "course":
+                self._handle_course(add_depts, **kwargs)
+            elif kwargs["type"] == "courserun":
+                self._handle_courserun(**kwargs)
+            else:
+                self.stderr.write(
+                    self.style.ERROR(f"Not sure what {kwargs['type']} is.")
+                )

@@ -1687,3 +1687,50 @@ def rerun_course_run(  # noqa: PLR0913
         process_course_run_clone(new_run, base_run.courseware_id)
 
     return new_run
+
+
+def upgrade_program_enrollment_if_eligible(program_enrollment):
+    """
+    For a given program enrollment checks if learner is qualified for an upgrade
+
+    Returns:
+        (ProgramEnrollment, bool): A tuple containing a
+        ProgramEnrollment paired
+        with a boolean indicating whether the enrollment was upgraded.
+    """
+    program = program_enrollment.program
+    user = program_enrollment.user
+
+    if ProgramCertificate.objects.filter(
+        user=program_enrollment.user, program=program
+    ).exists():
+        return program_enrollment, False
+
+    program_course_ids = [course[0].id for course in program.courses]
+
+    verified_courses = Course.objects.filter(
+        id__in=program_course_ids,
+        courseruns__enrollments__user=user,
+        courseruns__enrollments__enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        courseruns__enrollments__active=True,
+    ).distinct()
+
+    verified_course_ids = set(verified_courses.values_list("id", flat=True))
+
+    # make sure all core courses are verified
+    required_courses = program.required_courses
+    if not all(course.id in verified_course_ids for course in required_courses):
+        return program_enrollment, False
+
+    nim_elective_num = program.minimum_elective_courses_requirement
+    elective_course_ids = [course.id for course in program.elective_courses]
+    verified_elective_count = verified_courses.filter(
+        id__in=elective_course_ids
+    ).count()
+
+    if nim_elective_num is not None and verified_elective_count < nim_elective_num:
+        return program_enrollment, False
+
+    program_enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
+    program_enrollment.save_and_log(None)
+    return program_enrollment, True

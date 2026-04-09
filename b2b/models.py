@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.http import Http404
+from django.utils.functional import cached_property
 from django.utils.text import slugify
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
@@ -195,6 +196,16 @@ class OrganizationPage(Page):
 
         return f"{self.name} <{self.org_key}>"
 
+    @cached_property
+    def active_contracts(self):
+        """Returns the active contracts for the organization."""
+
+        return (
+            self._active_contracts
+            if hasattr(self, "_active_contracts")
+            else self.contracts.filter(active=True).all()
+        )
+
     class Meta:
         """Meta options for the OrganizationPage."""
 
@@ -339,6 +350,16 @@ class ContractPage(Page, ClusterableModel):
         """
         return Program.objects.filter(contract_memberships__contract=self).order_by(
             "contract_memberships__sort_order"
+        )
+
+    @cached_property
+    def contract_program_ids(self):
+        """Return the contract's programs in the proper order."""
+
+        return (
+            self._contract_program_ids
+            if hasattr(self, "_contract_program_ids")
+            else self.contract_programs.order_by("sort_order").all()
         )
 
     content_panels = [
@@ -609,6 +630,12 @@ class UserOrganization(models.Model):
         default=False,
         help_text="If True, the user will be kept in the organization until the organization is seen in their SSO data.",
     )
+    is_manager = models.BooleanField(
+        default=False,
+        null=True,
+        blank=True,
+        help_text="If True, the user is a manager of this organization and can access organization dashboard features.",
+    )
 
     class Meta:
         unique_together = ("user", "organization")
@@ -617,3 +644,22 @@ class UserOrganization(models.Model):
         """Return a reasonable representation of the object as a string."""
 
         return f"UserOrganization: {self.user} in {self.organization}"
+
+
+def is_organization_manager(user, org_id):
+    """
+    Check if a user is a manager of the specified organization.
+
+    Args:
+        user: The user to check
+        org_id: The organization ID to check against
+
+    Returns:
+        bool: True if the user is a manager of the organization, False otherwise
+    """
+    if not user or not user.is_authenticated:
+        return False
+
+    return UserOrganization.objects.filter(
+        user=user, organization_id=org_id, is_manager=True
+    ).exists()

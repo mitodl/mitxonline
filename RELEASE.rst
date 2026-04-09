@@ -1,6 +1,24 @@
 Release Notes
 =============
 
+Version 1.145.2 (Released April 08, 2026)
+---------------
+
+- Indicate order status on redirect via query params for MIT Learn (#3464)
+- Fix flakey discount-related tests (#3472)
+- Fix Cart -> Learn dashboard for UAI industry verticals (#3466)
+
+Version 1.145.1 (Released April 08, 2026)
+---------------
+
+- Fix github actions django env vars (#3463)
+- Move call for a content type back into the viewset; fix some n+1 errors (#3465)
+- Update program requirement box for Public Policy (#3457)
+- Update the DRF linter config to look at serialiers in a serializer folder (#3458)
+- Add API support for a B2B contract management dashboard (#3424)
+- Fix issues with the program certificate audit courses test (#3460)
+- feat: list filter b2b programs (#3456)
+
 Version 1.144.5 (Released April 02, 2026)
 ---------------
 

@@ -93,7 +93,6 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
 
     if (electiveCount > 0) {
       const electives = this.getReqNode(false)
-
       if (electives.data.operator !== "all_of") {
         electiveCountPrefix = `${electives.data.operator_value} of `
       }
@@ -109,7 +108,7 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
                 alt="Program Requirements"
               />
             </div>
-            <div className="enrollment-info-text">
+            <div className="enrollment-info-text enrollment-requirement">
               {reqCount} {this.getRequiredTitle()}: Complete All
               {electiveCount > 0 ? (
                 <>

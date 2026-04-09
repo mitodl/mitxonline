@@ -75,7 +75,13 @@ from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from hubspot_sync.task_helpers import sync_hubspot_cart_add
 from main import features
 from main.constants import (
+    USER_MSG_TYPE_BASKET_EMPTY,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_DISCOUNT_INVALID,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
@@ -88,13 +94,57 @@ from users.models import User
 log = logging.getLogger(__name__)
 
 
-def _has_uai_b2c_program_purchase(order):
-    """Return True if the order includes a program whose readable_id contains UAI+B2C."""
+UAI_READABLE_ID_PREFIXES = [
+    "program-v1:UAI+B2C",
+    "course-v1:UAI_SOURCE+UAI.",
+]
+
+
+def _has_uai_purchase(order):
+    """Return True if the order includes a program or course run with a UAI prefix."""
+
+    def _has_uai_prefix(readable_id):
+        return any(
+            readable_id.startswith(prefix) for prefix in UAI_READABLE_ID_PREFIXES
+        )
+
     return any(
-        isinstance(line.purchased_object, Program)
+        line.purchased_object
         and line.purchased_object.readable_id
-        and "UAI+B2C" in line.purchased_object.readable_id
+        and _has_uai_prefix(line.purchased_object.readable_id)
         for line in order.lines.all()
+    )
+
+
+def _should_redirect_to_learn(order):
+    """
+    Return True if the user should be redirected to the Learn dashboard
+    after a successful checkout.
+    """
+    if _has_uai_purchase(order):
+        return True
+
+    # NOTE: Retrieve global_id from purchaser rather than request user
+    # because this is used in contexts where the request is anonymous.
+    #
+    # One example is the callback view that processes the payment response from
+    # cybersource. This view is hit via a POST request from a different domain,
+    # which means no samesite (lax, strict) authentication cookies are sent.
+    global_id = order.purchaser.global_id
+    return bool(
+        global_id
+        and is_posthog_enabled(
+            features.REDIRECT_LEARN_DASHBOARD,
+            default=False,
+            opt_unique_id=global_id,
+        )
+    )
+
+
+def _learn_dashboard_redirect(order):
+    """Build an HttpResponseRedirect to the Learn dashboard with order info."""
+    return HttpResponseRedirect(
+        f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
     )
 
 
@@ -536,26 +586,6 @@ class CheckoutApiViewSet(ViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
 
-    @action(
-        detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
-    )
-    def start_checkout(self, request):
-        """
-        API call to start the checkout process. This assembles the basket items
-        into an Order with Lines for each item, applies the attached basket
-        discounts, and then calls the payment gateway to prepare for payment.
-        Returns:
-            - JSON payload from the ol-django payment gateway app. The payment
-              gateway returns data necessary to construct a form that will
-              ultimately POST to the actual payment processor.
-        """
-        try:
-            payload = api.generate_checkout_payload(request)
-        except ObjectDoesNotExist:
-            return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
-
-        return Response(payload)
-
     @extend_schema(
         request=RedeemDiscountRequestSerializer,
         responses={200: RedeemDiscountResponseSerializer},
@@ -777,8 +807,8 @@ class CheckoutCallbackView(View):
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
             )
         elif order_state == OrderStatus.FULFILLED:
-            if _has_uai_b2c_program_purchase(order):
-                return HttpResponseRedirect(settings.MIT_LEARN_DASHBOARD_URL)
+            if _should_redirect_to_learn(order):
+                return _learn_dashboard_redirect(order)
 
             return redirect_with_user_message(
                 reverse("user-dashboard"),
@@ -967,21 +997,47 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             )
         return ga_purchase_payload
 
-    def get(self, request):  # noqa: PLR0911
+    def get(self, request):  # noqa: PLR0911, C901
         try:
             checkout_payload = api.generate_checkout_payload(request)
         except ObjectDoesNotExist:
             return HttpResponse("No basket")
         if "country_blocked" in checkout_payload:
-            return checkout_payload["response"]
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
         if "no_checkout" in checkout_payload:
-            return checkout_payload["response"]
+            order = checkout_payload["order"]
+            if _should_redirect_to_learn(order):
+                return _learn_dashboard_redirect(order)
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {
+                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+                    "run": order.lines.first().courseware,
+                },
+            )
         if "purchased_same_courserun" in checkout_payload:
-            return checkout_payload["response"]
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
+            )
         if "purchased_non_upgradeable_courserun" in checkout_payload:
-            return checkout_payload["response"]
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE},
+            )
         if "invalid_discounts" in checkout_payload:
-            return checkout_payload["response"]
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
+            )
+        if "basket_empty" in checkout_payload:
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_BASKET_EMPTY},
+            )
 
         context = {
             "checkout_payload": checkout_payload,
