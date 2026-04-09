@@ -94,7 +94,7 @@ log = logging.getLogger(__name__)
 
 UAI_READABLE_ID_PREFIXES = [
     "program-v1:UAI+B2C",
-    "course-v1:UAI_SOURCE+UAI.",
+    "course-v1:UAI_B2C",
 ]
 
 
