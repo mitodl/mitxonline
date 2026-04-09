@@ -8,6 +8,7 @@ import logging
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 
+from courses.api import upgrade_program_enrollment_if_eligible
 from courses.models import (
     CourseRun,
     CourseRunEnrollment,
@@ -79,7 +80,6 @@ def send_partner_school_email(record_uuid):
 @app.task
 def upgrade_eligible_program_enrollments():
     """Upgrade eligible learners for all audit-mode program enrollments."""
-    from courses.api import upgrade_program_enrollment_if_eligible
 
     enrollments = ProgramEnrollment.objects.filter(
         enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
