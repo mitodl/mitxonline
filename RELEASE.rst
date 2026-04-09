@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.146.0
+Version 1.146.0 (Released April 09, 2026)
 ---------------
 
 - Include program titles in v0 TransactionLineSerializer (#3469)
