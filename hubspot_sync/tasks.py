@@ -234,7 +234,7 @@ def sync_line_with_hubspot(line_id: int) -> str:
 @raise_429
 @single_task(10, key=task_obj_lock)
 def sync_cart_add_event_with_hubspot(
-    user_id: int, product_id: int, is_uai_course: bool
+    user_id: int, product_id: int, *, is_uai_course: bool
 ) -> bool:
     """
     Track a cart add event in HubSpot for a user/product pair.

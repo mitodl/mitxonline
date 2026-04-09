@@ -81,7 +81,11 @@ def test_sync_hubspot_cart_add(mocker, mock_exception_log, user, raise_exc):
     )
     product = ProductFactory.build()
     sync_hubspot_cart_add(user, product, is_uai_course=True)
-    mock_sync.assert_called_once_with(args=(user.id, product.id, True), countdown=5)
+    mock_sync.assert_called_once_with(
+        args=(user.id, product.id),
+        kwargs={"is_uai_course": True},
+        countdown=5,
+    )
     if raise_exc:
         mock_exception_log.assert_called_once_with(
             "Exception calling sync_cart_add_event_with_hubspot for user %s and product %d",

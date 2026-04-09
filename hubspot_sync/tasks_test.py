@@ -96,7 +96,12 @@ def test_task_sync_cart_add_event_with_hubspot(mocker):
         "hubspot_sync.tasks.api.track_cart_add_with_hubspot", return_value=True
     )
 
-    assert sync_cart_add_event_with_hubspot(user.id, product.id, True) is True
+    assert (
+        sync_cart_add_event_with_hubspot(
+            user.id, product.id, is_uai_course=True
+        )
+        is True
+    )
     mock_api_call.assert_called_once_with(user, product, is_uai_course=True)
 
 

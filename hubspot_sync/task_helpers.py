@@ -94,7 +94,8 @@ def sync_hubspot_cart_add(user: User, product: Product, *, is_uai_course: bool):
     ):
         try:
             tasks.sync_cart_add_event_with_hubspot.apply_async(
-                args=(user.id, product.id, is_uai_course),
+                args=(user.id, product.id),
+                kwargs={"is_uai_course": is_uai_course},
                 countdown=5,
             )
         except:  # noqa: E722

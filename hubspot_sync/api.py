@@ -1385,7 +1385,7 @@ def sync_contact_with_hubspot(user: User):
     return result
 
 
-def _get_cart_add_token(is_uai_course: bool) -> str:
+def _get_cart_add_token(*, is_uai_course: bool) -> str:
     """Resolve HubSpot token for cart-add deal tracking."""
     if is_uai_course:
         return getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", "") or getattr(
@@ -1488,7 +1488,7 @@ def _get_target_pipeline_stage_map(hubspot_client: HubspotApi) -> dict[str, list
     return pipeline_stage_map
 
 
-def _normalize_deal_properties_for_target_account(
+def _normalize_deal_properties_for_target_account(  # noqa: C901
     hubspot_client: HubspotApi, deal_input: SimplePublicObjectInput
 ) -> None:
     """Normalize dealstage and status so they are valid in the target HubSpot account."""
@@ -1829,7 +1829,7 @@ def track_cart_add_with_hubspot(
     Returns:
         bool: True if synced successfully, False otherwise.
     """
-    token = _get_cart_add_token(is_uai_course)
+    token = _get_cart_add_token(is_uai_course=is_uai_course)
     if not token:
         return False
 

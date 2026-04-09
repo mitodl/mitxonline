@@ -304,7 +304,7 @@ def test_ensure_target_hubspot_custom_properties_skips_unique_app_id_update(mock
         ]
     )
 
-    api._ensure_target_hubspot_custom_properties(mock_client)
+    api._ensure_target_hubspot_custom_properties(mock_client)  # noqa: SLF001
 
     updated_property_names = {
         call.args[1]
@@ -585,7 +585,7 @@ def test_track_cart_add_with_hubspot_uses_uai_account(settings, mocker, user):
     mock_sync_deal = mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
 
     assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
-    mock_client.assert_called_once_with(access_token="uai-token")
+    mock_client.assert_called_once_with(access_token="uai-token")  # noqa: S106
     mock_sync_deal.assert_called_once()
 
 
@@ -669,7 +669,7 @@ def test_normalize_deal_properties_for_target_account_pipeline_stage_mismatch(mo
         }
     )
 
-    api._normalize_deal_properties_for_target_account(mock_client, deal_input)
+    api._normalize_deal_properties_for_target_account(mock_client, deal_input)  # noqa: SLF001
 
     assert deal_input.properties["pipeline"] == "19817792"
     assert deal_input.properties["dealstage"] == "created"
@@ -690,7 +690,7 @@ def test_build_target_line_item_message_uses_target_product_id_from_search(
         "hubspot_sync.api._normalize_line_item_properties_for_target_account",
     )
 
-    message = api._build_target_line_item_message(line, mock_client)
+    message = api._build_target_line_item_message(line, mock_client)  # noqa: SLF001
 
     assert message.properties["hs_product_id"] == "target-product-123"
 
@@ -709,7 +709,7 @@ def test_ensure_target_hubspot_product_for_line_creates_when_missing(
         "hubspot_sync.api._find_target_product_id_by_unique_app_id", return_value=None
     )
 
-    result = api._ensure_target_hubspot_product_for_line(line, mock_client)
+    result = api._ensure_target_hubspot_product_for_line(line, mock_client)  # noqa: SLF001
 
     assert result == "created-product-999"
     mock_client.crm.objects.basic_api.create.assert_called_once()
