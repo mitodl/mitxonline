@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.146.1
+Version 1.146.1 (Released April 09, 2026)
 ---------------
 
 - Use correct run-level prefix when redirecting UAI industry-specific verticals (#3479)
