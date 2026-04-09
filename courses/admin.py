@@ -51,12 +51,12 @@ class VerifiableCredentialBackfillAdminMixin:
             except Exception:  # noqa: PERF203, BLE001
                 failed_certificates.append(certificate)
 
-        message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates."
+        message = f"Successfully requested verifiable credential backfill for {len(certificates)} {self.model._meta.model_name} certificates."  # noqa: SLF001
         level = messages.INFO
         if failed_certificates:
             # We indicate IDs, but errors should also be logged to sentry from within create_verifiable_credential
             level = messages.WARNING
-            message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates, but encountered errors for certificates with IDs: {[cert.id for cert in failed_certificates]}"
+            message = f"Successfully requested verifiable credential backfill for {len(certificates)} {self.model._meta.model_name} certificates, but encountered errors for certificates with IDs: {[cert.id for cert in failed_certificates]}"  # noqa: SLF001
 
         self.message_user(request, message, level=level)
 
