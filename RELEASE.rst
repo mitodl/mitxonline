@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.146.1
+---------------
+
+- Use correct run-level prefix when redirecting UAI industry-specific verticals (#3479)
+- Add some options to the create_courseware admin command (#3467)
+
 Version 1.146.0 (Released April 09, 2026)
 ---------------
 
