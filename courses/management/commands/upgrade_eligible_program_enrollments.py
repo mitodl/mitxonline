@@ -16,9 +16,11 @@ class Command(BaseCommand):
         processed_count = 0
         upgraded_count = 0
 
-        for program_enrollment in ProgramEnrollment.objects.filter(
+        enrollments = ProgramEnrollment.objects.filter(
             enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-        ):
+        ).select_related("program", "user")
+
+        for program_enrollment in enrollments.iterator():
             _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
 
             if upgraded:

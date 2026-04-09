@@ -83,6 +83,6 @@ def upgrade_eligible_program_enrollments():
 
     enrollments = ProgramEnrollment.objects.filter(
         enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-    )
+    ).select_related("program", "user")
     for enrollment in enrollments.iterator():
         upgrade_program_enrollment_if_eligible(enrollment)
