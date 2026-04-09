@@ -41,6 +41,26 @@ from main.utils import get_field_names
 from openedx.tasks import retry_failed_edx_enrollments
 
 
+class VerifiableCredentialBackfillAdminMixin:
+    def populate_verifiable_credentials_for_certificate(self, request, certificates):
+        """Helper method to create and associate a verifiable credential for a given certificate"""
+        failed_certificates = []
+        for certificate in certificates:
+            try:
+                create_verifiable_credential(certificate, raise_on_error=True)
+            except Exception:  # noqa: PERF203, BLE001
+                failed_certificates.append(certificate)
+
+        message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates."
+        level = messages.INFO
+        if failed_certificates:
+            # We indicate IDs, but errors should also be logged to sentry from within create_verifiable_credential
+            level = messages.WARNING
+            message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates, but encountered errors for certificates with IDs: {[cert.id for cert in failed_certificates]}"
+
+        self.message_user(request, message, level=level)
+
+
 class ProgramContractPageInline(admin.TabularInline):
     """Inline for contract pages"""
 
@@ -52,7 +72,7 @@ class ProgramContractPageInline(admin.TabularInline):
 
 
 @admin.register(Program)
-class ProgramAdmin(admin.ModelAdmin):
+class ProgramAdmin(VerifiableCredentialBackfillAdminMixin, admin.ModelAdmin):
     """Admin for Program"""
 
     model = Program
@@ -83,7 +103,7 @@ class ProgramAdmin(admin.ModelAdmin):
                 program_id__in=program_ids, verifiable_credential__isnull=True
             )
         )
-        populate_verifiable_credentials_for_certificate(self, request, certificates)
+        self.populate_verifiable_credentials_for_certificate(request, certificates)
 
 
 @admin.register(ProgramRun)
@@ -142,7 +162,7 @@ class CourseAdmin(admin.ModelAdmin):
 
 
 @admin.register(CourseRun)
-class CourseRunAdmin(TimestampedModelAdmin):
+class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdmin):
     """Admin for CourseRun"""
 
     model = CourseRun
@@ -184,7 +204,7 @@ class CourseRunAdmin(TimestampedModelAdmin):
                 course_run_id__in=course_run_ids, verifiable_credential__isnull=True
             )
         )
-        populate_verifiable_credentials_for_certificate(self, request, certificates)
+        self.populate_verifiable_credentials_for_certificate(request, certificates)
 
 
 @admin.register(ProgramEnrollment)
@@ -730,22 +750,3 @@ class EnrollmentModeAdmin(admin.ModelAdmin):
     list_filter = [
         "requires_payment",
     ]
-
-
-def populate_verifiable_credentials_for_certificate(admin, request, certificates):
-    """Helper method to create and associate a verifiable credential for a given certificate"""
-    failed_certificates = []
-    for certificate in certificates:
-        try:
-            create_verifiable_credential(certificate, raise_on_error=True)
-        except Exception:  # noqa: PERF203, BLE001
-            failed_certificates.append(certificate)
-
-    message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates."
-    level = messages.INFO
-    if failed_certificates:
-        # We indicate IDs, but errors should also be logged to sentry from within create_verifiable_credential
-        level = messages.WARNING
-        message = f"Successfully requested verifiable credential backfill for {len(certificates)} course run certificates, but encountered errors for certificates with IDs: {[cert.id for cert in failed_certificates]}"
-
-    admin.message_user(request, message, level=level)
