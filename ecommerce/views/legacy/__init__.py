@@ -724,15 +724,6 @@ class CheckoutApiViewSet(ViewSet):
                 BasketItem.objects.create(basket=basket, product=product)
                 message = "Product added to cart"
 
-            if message == "Product added to cart" and isinstance(
-                product.purchasable_object, CourseRun
-            ):
-                sync_hubspot_cart_add(
-                    request.user,
-                    product,
-                    is_uai_course=is_uai_course_run(product.purchasable_object),
-                )
-
         return Response(
             {
                 "message": message,

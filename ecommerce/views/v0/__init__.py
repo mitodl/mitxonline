@@ -30,6 +30,7 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from courses.models import Course, CourseRun, Program, ProgramRun
+from courses.utils import is_uai_course_run
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
@@ -68,6 +69,7 @@ from ecommerce.serializers.v0 import (
 )
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
+from hubspot_sync.task_helpers import sync_hubspot_cart_add
 
 log = logging.getLogger(__name__)
 User = get_user_model()
@@ -369,6 +371,13 @@ def create_basket_with_products(request):
             BasketItem.objects.update_or_create(
                 basket=basket, product=product, defaults={"quantity": quantity}
             )
+            # Sync with HubSpot for CourseRun products
+            if isinstance(product.purchasable_object, CourseRun):
+                sync_hubspot_cart_add(
+                    request.user,
+                    product,
+                    is_uai_course=is_uai_course_run(product.purchasable_object),
+                )
     except ProductBlockedError:
         return Response(
             {"error": "Product blocked from purchasing.", "product": product},

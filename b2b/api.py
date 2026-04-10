@@ -54,6 +54,8 @@ from main import constants as main_constants
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.tasks import clone_courserun
+from courses.utils import is_uai_course_run
+from hubspot_sync.task_helpers import sync_hubspot_cart_add
 
 log = logging.getLogger(__name__)
 
@@ -1013,6 +1015,14 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
 
     item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
     item.save()
+
+    # Sync with HubSpot for CourseRun products
+    if isinstance(product.purchasable_object, CourseRun):
+        sync_hubspot_cart_add(
+            request.user,
+            product,
+            is_uai_course=is_uai_course_run(product.purchasable_object),
+        )
 
     return basket
 
