@@ -705,7 +705,7 @@ class TransactionDataSerializer(serializers.BaseSerializer):
         if not isinstance(instance, Order):
             raise AttributeError  # noqa: TRY004
 
-        # Use prefetched transactions data  
+        # Use prefetched transactions data
         transactions = [t for t in instance.transactions.all()]
         transaction = (
             max(transactions, key=lambda t: t.created_on) if transactions else None
