@@ -42,6 +42,7 @@ from courses.factories import (
 )
 from courses.models import (
     Course,
+    CourseRun,
     CourseRunEnrollment,
     PaidProgram,
     Program,
