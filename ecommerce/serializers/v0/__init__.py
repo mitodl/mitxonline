@@ -661,7 +661,10 @@ class OrderHistorySerializer(serializers.ModelSerializer):
             product_id = line.product_version.field_dict["id"]
             product = products_by_id.get(product_id)
             if product:
-                if product.content_type.model == "courserun" and product.purchasable_object:
+                if (
+                    product.content_type.model == "courserun"
+                    and product.purchasable_object
+                ):
                     titles.append(product.purchasable_object.course.title)
                 elif product.content_type.model == "programrun":
                     titles.append(product.description)
