@@ -2,7 +2,7 @@
 Admin site bindings for profiles
 """
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.db import models
 from django.forms import TextInput
@@ -10,7 +10,7 @@ from django.urls import reverse
 from mitol.common.admin import TimestampedModelAdmin
 
 import cms.admin  # noqa: F401
-from courses.api import downgrade_learner
+from courses.api import create_verifiable_credential, downgrade_learner
 from courses.forms import ProgramAdminForm
 from courses.models import (
     BlockedCountry,
@@ -34,10 +34,31 @@ from courses.models import (
     ProgramEnrollmentAudit,
     ProgramRun,
     RelatedProgram,
+    VerifiableCredential,
 )
 from main.admin import AuditableModelAdmin, ModelAdminRunActionsForAllMixin
 from main.utils import get_field_names
 from openedx.tasks import retry_failed_edx_enrollments
+
+
+class VerifiableCredentialBackfillAdminMixin:
+    def populate_verifiable_credentials_for_certificate(self, request, certificates):
+        """Helper method to create and associate a verifiable credential for a given certificate"""
+        failed_certificates = []
+        for certificate in certificates:
+            try:
+                create_verifiable_credential(certificate, raise_on_error=True)
+            except Exception:  # noqa: PERF203, BLE001
+                failed_certificates.append(certificate)
+
+        message = f"Successfully requested verifiable credential backfill for {len(certificates)} {self.model._meta.model_name} certificates."  # noqa: SLF001
+        level = messages.INFO
+        if failed_certificates:
+            # We indicate IDs, but errors should also be logged to sentry from within create_verifiable_credential
+            level = messages.WARNING
+            message = f"Successfully requested verifiable credential backfill for {len(certificates)} {self.model._meta.model_name} certificates, but encountered errors for certificates with IDs: {[cert.id for cert in failed_certificates]}"  # noqa: SLF001
+
+        self.message_user(request, message, level=level)
 
 
 class ProgramContractPageInline(admin.TabularInline):
@@ -51,7 +72,7 @@ class ProgramContractPageInline(admin.TabularInline):
 
 
 @admin.register(Program)
-class ProgramAdmin(admin.ModelAdmin):
+class ProgramAdmin(VerifiableCredentialBackfillAdminMixin, admin.ModelAdmin):
     """Admin for Program"""
 
     model = Program
@@ -68,6 +89,21 @@ class ProgramAdmin(admin.ModelAdmin):
     )
     list_filter = ["live", "b2b_only", "program_type", "display_mode", "departments"]
     inlines = [ProgramContractPageInline]
+    actions = ["populate_verifiable_credentials_for_program"]
+
+    @admin.action(
+        description="Backfill verifiable credentials for program certificates"
+    )
+    def populate_verifiable_credentials_for_program(self, request, queryset):
+        """Admin action to regenerate verifiable credentials for a program"""
+        program_ids = queryset.values_list("id", flat=True)
+        # If a cert already has a cred, leave it alone for now.
+        certificates = list(
+            ProgramCertificate.objects.filter(
+                program_id__in=program_ids, verifiable_credential__isnull=True
+            )
+        )
+        self.populate_verifiable_credentials_for_certificate(request, certificates)
 
 
 @admin.register(ProgramRun)
@@ -126,7 +162,7 @@ class CourseAdmin(admin.ModelAdmin):
 
 
 @admin.register(CourseRun)
-class CourseRunAdmin(TimestampedModelAdmin):
+class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdmin):
     """Admin for CourseRun"""
 
     model = CourseRun
@@ -153,6 +189,22 @@ class CourseRunAdmin(TimestampedModelAdmin):
         models.CharField: {"widget": TextInput(attrs={"size": "80"})},
         models.TextField: {"widget": TextInput(attrs={"size": "100"})},
     }
+
+    actions = ["populate_verifiable_credentials_for_courserun"]
+
+    @admin.action(
+        description="Backfill verifiable credentials for course run certificates"
+    )
+    def populate_verifiable_credentials_for_courserun(self, request, queryset):
+        """Admin action to regenerate verifiable credentials for a course run"""
+        course_run_ids = queryset.values_list("id", flat=True)
+        # If a cert already has a cred, leave it alone for now.
+        certificates = list(
+            CourseRunCertificate.objects.filter(
+                course_run_id__in=course_run_ids, verifiable_credential__isnull=True
+            )
+        )
+        self.populate_verifiable_credentials_for_certificate(request, certificates)
 
 
 @admin.register(ProgramEnrollment)
@@ -633,6 +685,22 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
 
     def get_queryset(self, request):  # noqa: ARG002
         return self.model.all_objects.get_queryset().select_related("user", "program")
+
+
+@admin.register(VerifiableCredential)
+class VerifiableCredentialAdmin(TimestampedModelAdmin):
+    """Admin for VerifiableCredential"""
+
+    model = VerifiableCredential
+    include_timestamps_in_list = True
+    list_display = ["uuid", "programcertificate", "courseruncertificate"]
+
+    def has_add_permission(self, request, obj=None):  # noqa: ARG002
+        return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("programcertificate", "courseruncertificate")
 
 
 @admin.register(PartnerSchool)

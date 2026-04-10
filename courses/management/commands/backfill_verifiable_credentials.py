@@ -114,7 +114,7 @@ class Command(BaseCommand):
             program_ids = Program.objects.filter(readable_id__in=ids).values_list(
                 "id", flat=True
             )
-            certificates = ProgramCertificate.objects.filter(id__in=program_ids)
+            certificates = ProgramCertificate.objects.filter(program_id__in=program_ids)
         elif courseware_type == "course":
             course_run_ids = CourseRun.objects.filter(
                 courseware_id__in=ids
