@@ -5,16 +5,23 @@ from uuid import uuid4
 import faker
 import wagtail_factories
 from factory import Factory, LazyAttribute, LazyFunction, SubFactory
+from factory.django import DjangoModelFactory
 
 from b2b.constants import CONTRACT_MEMBERSHIP_NONSSO, CONTRACT_MEMBERSHIP_SSO
 from b2b.keycloak_admin_dataclasses import (
     OrganizationRepresentation,
     RealmRepresentation,
 )
-from b2b.models import ContractPage, OrganizationIndexPage, OrganizationPage
+from b2b.models import (
+    ContractPage,
+    OrganizationIndexPage,
+    OrganizationPage,
+    UserOrganization,
+)
 from cms.factories import HomePageFactory
 from cms.models import HomePage
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
+from users.factories import UserFactory
 
 FAKE = faker.Faker()
 
@@ -94,3 +101,19 @@ class OrganizationRepresentationFactory(Factory):
     alias = LazyAttribute(lambda _: FAKE.unique.word())
     description = LazyAttribute(lambda _: FAKE.text())
     enabled = True
+
+
+class UserOrganizationFactory(DjangoModelFactory):
+    """Factory for UserOrganizations"""
+
+    class Meta:
+        model = UserOrganization
+        django_get_or_create = (
+            "user",
+            "organization",
+        )
+
+    user = SubFactory(UserFactory)
+    organization = SubFactory(OrganizationPageFactory)
+    keep_until_seen = True
+    is_manager = False

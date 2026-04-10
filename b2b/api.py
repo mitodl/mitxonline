@@ -1020,16 +1020,18 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
 def _apply_available_discount(request, product: Product, basket: Basket) -> None:
     """Apply available discount to the basket if one exists."""
 
-    # TODO: this and the validate don't consider programs...
-
     # Changed to only check redemption count if the discount isn't unlimited -
     # which it will be if the contract has unlimited seats - and order by ID
     # so it matches what we send out to people.
-    applicable_discounts_qs = product.discounts.annotate(
-        redemptions=Count("discount__order_redemptions")
-    ).filter(discount__is_bulk=True, discount__products__product=product).filter(
-        Q(redemptions_gt=0) | Q(redemption_type=REDEMPTION_TYPE_UNLIMITED)
-    ).order_by("id")
+    applicable_discounts_qs = (
+        product.discounts.annotate(redemptions=Count("discount__order_redemptions"))
+        .filter(discount__is_bulk=True, discount__products__product=product)
+        .filter(
+            Q(redemptions__gt=0)
+            | Q(discount__redemption_type=REDEMPTION_TYPE_UNLIMITED)
+        )
+        .order_by("id")
+    )
 
     if applicable_discounts_qs.exists():
         # We have unused codes for this product, so we should apply one.
@@ -1044,9 +1046,15 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
             raise ValueError(msg)
 
         discount_amount = product.purchasable_object.b2b_contract.enrollment_fixed_price
-        redemption_type = REDEMPTION_TYPE_ONE_TIME if product.purchasable_object.b2b_contract.max_learners > 0 else REDEMPTION_TYPE_UNLIMITED
+        redemption_type = (
+            REDEMPTION_TYPE_ONE_TIME
+            if product.purchasable_object.b2b_contract.max_learners > 0
+            else REDEMPTION_TYPE_UNLIMITED
+        )
 
-        discount = _create_discount_with_product(product, discount_amount if discount_amount else Decimal(0), redemption_type)
+        discount = _create_discount_with_product(
+            product, discount_amount if discount_amount else Decimal(0), redemption_type
+        )
 
     basket_discount = BasketDiscount.objects.create(
         redemption_date=now_in_utc(),

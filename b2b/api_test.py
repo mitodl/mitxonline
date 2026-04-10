@@ -17,6 +17,7 @@ from opaque_keys.edx.keys import CourseKey
 
 from b2b import factories
 from b2b.api import (
+    _apply_available_discount,
     _handle_extra_enrollment_codes,
     create_b2b_enrollment,
     create_contract_run,
@@ -58,10 +59,17 @@ from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     OneTimeDiscountFactory,
+    OrderFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
 )
-from ecommerce.models import Basket, BasketDiscount, DiscountProduct
+from ecommerce.models import (
+    Basket,
+    BasketDiscount,
+    DiscountProduct,
+    DiscountRedemption,
+    OrderStatus,
+)
 from main.constants import (
     USER_MSG_TYPE_B2B_DISALLOWED,
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
@@ -1464,3 +1472,64 @@ def test_ensure_enrollment_codes_courseware_changes(
         contract.get_discounts().filter(products__product=product_2).count()
         == max_learners
     )
+
+
+def test_apply_available_discount_seat_limit():
+    """
+    Test that the internal _apply_available_discount function works as expected.
+
+    This should find an applicable discount to apply to the order. For a
+    seat-limited contract, this should be an unused discount linked to the
+    product in the cart. For an unlimited seat contract, this is the discount
+    linked to the product (ignoring use). If there's not a discount, then we
+    should make one if there's sufficient seats available.
+    """
+
+    contract = factories.ContractPageFactory.create(
+        max_learners=2,
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+    )
+    CourseRunFactory.create_batch(2, b2b_contract=contract)
+    user_orgs = factories.UserOrganizationFactory.create_batch(
+        3, organization=contract.organization
+    )
+
+    products = ensure_contract_run_products(contract)
+    ensure_enrollment_codes_exist(contract)
+
+    assert contract.get_discounts().count() == 4
+
+    # For this we care about redemptions for enrollment, so we need to create
+    # some orders and throw some discounts on them.
+
+    for uo in user_orgs[:2]:
+        user = uo.user
+
+        for product in products:
+            order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+            discount = (
+                contract.get_unused_discounts()
+                .filter(products__product=product)
+                .first()
+            )
+            DiscountRedemption.objects.create(
+                redemption_date=now_in_utc(),
+                redeemed_by=user,
+                redeemed_discount=discount,
+                redeemed_order=order,
+            )
+
+    assert contract.get_unused_discounts().count() == 0
+
+    # The _apply_available_discount function doesn't check for seats - space is
+    # expected to be checked before this gets called. So we should have just one
+    # new discount.
+
+    basket = Basket.objects.create(user=user_orgs[2].user)
+    request = RequestFactory()
+    request.user = user_orgs[2].user
+
+    _apply_available_discount(request, products[0], basket)
+
+    assert contract.get_discounts().count() == 5
