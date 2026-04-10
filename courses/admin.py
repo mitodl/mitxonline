@@ -698,6 +698,10 @@ class VerifiableCredentialAdmin(TimestampedModelAdmin):
     def has_add_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("programcertificate", "courseruncertificate")
+
 
 @admin.register(PartnerSchool)
 class PartnerSchoolAdmin(TimestampedModelAdmin):
