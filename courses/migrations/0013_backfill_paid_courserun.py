@@ -16,7 +16,7 @@ def backfill_paidcourserun(apps, schema_editor):
         run_objects = order.lines.filter(purchased_content_type=content_type)
         course_run_ids = [run_obj.purchased_object_id for run_obj in run_objects]
         course_runs_by_id = CourseRun.objects.in_bulk(course_run_ids)
-
+        
         for run_obj in run_objects:
             course_run = course_runs_by_id.get(run_obj.purchased_object_id)
             if course_run:

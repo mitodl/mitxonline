@@ -33,7 +33,7 @@ class Command(BaseCommand):
         courseware_ids = options["runs"]
 
         edx_client = get_edx_api_service_client()
-
+        
         runs_by_courseware_id = CourseRun.objects.in_bulk(
             courseware_ids, field_name="courseware_id"
         )

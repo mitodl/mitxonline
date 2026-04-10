@@ -1065,12 +1065,6 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
             Order.objects.filter(purchaser=self.request.user)
             .filter(state__in=[OrderStatus.FULFILLED, OrderStatus.REFUNDED])
             .order_by("-created_on")
-            .prefetch_related(
-                "lines__product__purchasable_object__course",
-                "lines__product__content_type",
-                "transactions",
-                "discounts__discount",
-            )
             .all()
         )
 
