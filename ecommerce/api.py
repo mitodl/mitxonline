@@ -11,7 +11,6 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, Validat
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.urls import reverse
-from courses.models import CourseRun
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
@@ -24,6 +23,7 @@ from b2b.api import (
 )
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+from courses.models import CourseRun
 from courses.utils import is_uai_course_run
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
