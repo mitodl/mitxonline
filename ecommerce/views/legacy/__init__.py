@@ -719,7 +719,7 @@ class CheckoutApiViewSet(ViewSet):
                     # Add new item to basket
                     BasketItem.objects.create(basket=basket, product=product)
                     message = "Product added to cart"
-                    
+
                     # Sync with HubSpot for CourseRun products
                     if isinstance(product.purchasable_object, CourseRun):
                         sync_hubspot_cart_add(
@@ -731,7 +731,7 @@ class CheckoutApiViewSet(ViewSet):
                 # Legacy behavior: add single item
                 BasketItem.objects.create(basket=basket, product=product)
                 message = "Product added to cart"
-                
+
                 # Sync with HubSpot for CourseRun products
                 if isinstance(product.purchasable_object, CourseRun):
                     sync_hubspot_cart_add(
