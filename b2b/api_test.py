@@ -19,6 +19,7 @@ from b2b import factories
 from b2b.api import (
     _apply_available_discount,
     _handle_extra_enrollment_codes,
+    _validate_b2b_enrollment_prerequisites,
     create_b2b_enrollment,
     create_contract_run,
     create_contract_run_key,
@@ -75,6 +76,7 @@ from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
+    USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
 from main.utils import date_to_datetime
@@ -1519,6 +1521,9 @@ def test_apply_available_discount_seat_limit():
                 redeemed_discount=discount,
                 redeemed_order=order,
             )
+            CourseRunEnrollment.objects.create(
+                run=product.purchasable_object, active=True, user=user
+            )
 
     assert contract.get_unused_discounts().count() == 0
 
@@ -1530,6 +1535,95 @@ def test_apply_available_discount_seat_limit():
     request = RequestFactory()
     request.user = user_orgs[2].user
 
+    # Test the validate step - this gets called before the apply call and should
+    # fail. (So, in real life, trying to add this third user should not work.)
+
+    user_orgs[2].user.b2b_contracts.add(contract)
+    user_orgs[2].user.save()
+
+    result = _validate_b2b_enrollment_prerequisites(user_orgs[2].user, products[0])
+
+    assert result == {"result": USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
+
+    # Calling this directly should result in a new discount being created.
+
     _apply_available_discount(request, products[0], basket)
 
     assert contract.get_discounts().count() == 5
+
+
+@pytest.mark.parametrize(
+    "existing_discounts",
+    [
+        True,
+        False,
+    ],
+)
+def test_apply_available_discount_unlimited_seats(existing_discounts):
+    """
+    Test that the internal _apply_available_discount function works as expected.
+
+    The other half of the above test - this checks for proper operation when the
+    contract has unlimited seats.
+    """
+
+    contract = factories.ContractPageFactory.create(
+        max_learners=0,
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+    )
+    CourseRunFactory.create_batch(2, b2b_contract=contract)
+    user_orgs = factories.UserOrganizationFactory.create_batch(
+        3, organization=contract.organization
+    )
+
+    products = ensure_contract_run_products(contract)
+    if existing_discounts:
+        # Testing for existing discounts means we should create some orders where
+        # the discount is used, to make sure we don't end up with extras.
+
+        ensure_enrollment_codes_exist(contract)
+
+        assert contract.get_discounts().count() == 2
+
+        for uo in user_orgs[:2]:
+            user = uo.user
+
+            for product in products:
+                order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+                discount = (
+                    contract.get_discounts().filter(products__product=product).first()
+                )
+                DiscountRedemption.objects.create(
+                    redemption_date=now_in_utc(),
+                    redeemed_by=user,
+                    redeemed_discount=discount,
+                    redeemed_order=order,
+                )
+                CourseRunEnrollment.objects.create(
+                    run=product.purchasable_object, active=True, user=user
+                )
+
+    assert contract.get_unused_discounts().count() == 0
+
+    # The _apply_available_discount function doesn't check for seats - space is
+    # expected to be checked before this gets called. So we should have just one
+    # new discount.
+
+    basket = Basket.objects.create(user=user_orgs[2].user)
+    request = RequestFactory()
+    request.user = user_orgs[2].user
+
+    # Test the validate step - this gets called before the apply call and should
+    # fail. (So, in real life, trying to add this third user should not work.)
+
+    user_orgs[2].user.b2b_contracts.add(contract)
+    user_orgs[2].user.save()
+
+    result = _validate_b2b_enrollment_prerequisites(user_orgs[2].user, products[0])
+
+    assert not result
+
+    _apply_available_discount(request, products[0], basket)
+
+    assert contract.get_discounts().count() == (2 if existing_discounts else 1)

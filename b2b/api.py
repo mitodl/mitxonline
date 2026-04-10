@@ -1027,8 +1027,7 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
         product.discounts.annotate(redemptions=Count("discount__order_redemptions"))
         .filter(discount__is_bulk=True, discount__products__product=product)
         .filter(
-            Q(redemptions__gt=0)
-            | Q(discount__redemption_type=REDEMPTION_TYPE_UNLIMITED)
+            Q(redemptions=0) | Q(discount__redemption_type=REDEMPTION_TYPE_UNLIMITED)
         )
         .order_by("id")
     )
@@ -1041,7 +1040,10 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
         # an appropriate discount, and we couldn't find one, so now we need to
         # make one for the learner (or for the contract).
 
-        if not product.purchasable_object or product.purchasable_object.b2b_contract:
+        if (
+            not product.purchasable_object
+            or not product.purchasable_object.b2b_contract
+        ):
             msg = f"Product {product} has no purchasable object or the purchasable object has no B2B contract"
             raise ValueError(msg)
 

@@ -1294,9 +1294,17 @@ class CourseRun(TimestampedModel):
         if not self.b2b_contract:
             return False
 
-        contract_enrollments = self.enrollments.filter(is_active=True, change_status=None).count()
+        if self.b2b_contract.max_learners == 0:
+            return True
 
-        return self.b2b_contract.max_learners > 0 and self.b2b_contract.max_learners > contract_enrollments
+        contract_enrollments = self.enrollments.filter(
+            active=True, change_status=None
+        ).count()
+
+        return (
+            self.b2b_contract.max_learners > 0
+            and self.b2b_contract.max_learners > contract_enrollments
+        )
 
     @property
     def is_fake_course_run(self):
