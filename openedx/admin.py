@@ -14,7 +14,13 @@ class OpenEdxUserAdmin(ModelAdminRunActionsForAllMixin, admin.ModelAdmin):
     """Admin for OpenEdxUser"""
 
     model = OpenEdxUser
-    search_fields = ["user__username", "user__email", "user__name", "platform"]
+    search_fields = [
+        "user__username",
+        "user__email",
+        "user__name",
+        "edx_username",
+        "platform",
+    ]
     list_display = ["id", "user", "has_been_synced", "platform"]
     list_filter = ["has_been_synced", "platform"]
     raw_id_fields = ["user"]
