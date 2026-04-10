@@ -1294,7 +1294,7 @@ class CourseRun(TimestampedModel):
         if not self.b2b_contract:
             return False
 
-        if self.b2b_contract.max_learners == 0:
+        if not self.b2b_contract.max_learners:
             return True
 
         contract_enrollments = self.enrollments.filter(
