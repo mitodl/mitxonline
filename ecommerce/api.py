@@ -11,6 +11,7 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, Validat
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.urls import reverse
+from courses.models import CourseRun
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
