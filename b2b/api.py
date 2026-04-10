@@ -1050,7 +1050,8 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
         discount_amount = product.purchasable_object.b2b_contract.enrollment_fixed_price
         redemption_type = (
             REDEMPTION_TYPE_ONE_TIME
-            if product.purchasable_object.b2b_contract.max_learners > 0
+            if product.purchasable_object.b2b_contract.max_learners
+            and product.purchasable_object.b2b_contract.max_learners > 0
             else REDEMPTION_TYPE_UNLIMITED
         )
 

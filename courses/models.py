@@ -1295,7 +1295,7 @@ class CourseRun(TimestampedModel):
             return False
 
         if not self.b2b_contract.max_learners:
-            return True
+            return self.is_enrollable
 
         contract_enrollments = self.enrollments.filter(
             active=True, change_status=None
@@ -1304,6 +1304,7 @@ class CourseRun(TimestampedModel):
         return (
             self.b2b_contract.max_learners > 0
             and self.b2b_contract.max_learners > contract_enrollments
+            and self.is_enrollable
         )
 
     @property
