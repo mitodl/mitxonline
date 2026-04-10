@@ -23,7 +23,6 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
-from courses.models import CourseRun
 from ecommerce.api import (
     apply_discount_to_basket,
     check_and_process_pending_orders_for_resolution,
