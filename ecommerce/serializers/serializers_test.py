@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 import reversion
 from dateutil.parser import parse
+from django.test import RequestFactory
 from django.urls import reverse
 from mitol.common.utils import now_in_utc
 
@@ -310,15 +311,21 @@ def create_order_receipt(mocker, user, products, user_client):
     """
     Sets up an order for use with the receipt serializer tests.
     """
+    from ecommerce.api import generate_checkout_payload  # noqa: PLC0415
+
     mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
         return_value=True,
     )
-    basket = create_basket(user, products)  # noqa: F841
+    create_basket(user, products)
 
-    resp = user_client.post(reverse("checkout_api-start_checkout"))
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = user
+    request.session = {}
+    checkout_payload = generate_checkout_payload(request)
 
-    payload = resp.json()["payload"]
+    payload = checkout_payload["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": "ACCEPT",
@@ -328,7 +335,7 @@ def create_order_receipt(mocker, user, products, user_client):
 
     order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
 
-    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    user_client.post(reverse("checkout-result-callback"), payload)
 
     order.refresh_from_db()
     return order

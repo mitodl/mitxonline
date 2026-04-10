@@ -7208,6 +7208,8 @@ components:
           type: string
         content_title:
           type: string
+        content_type:
+          type: string
         readable_id:
           type: string
         start_date:
@@ -7225,6 +7227,7 @@ components:
       required:
       - CEUs
       - content_title
+      - content_type
       - discount
       - end_date
       - price

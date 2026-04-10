@@ -187,6 +187,40 @@ def test_get_user_by_me_excludes_inactive_contracts(client, user):
     assert inactive_contract.id not in contract_ids
 
 
+@pytest.mark.django_db
+def test_get_user_by_me_excludes_unenrolled_contracts(client, user):
+    """Test that /api/v0/users/me only returns contracts the user is enrolled in"""
+    client.force_login(user)
+
+    # Create two active contracts in the same organization
+    enrolled_contract = ContractPageFactory.create(active=True)
+    unenrolled_contract = ContractPageFactory.create(
+        active=True, organization=enrolled_contract.organization
+    )
+
+    # Add user to the organization
+    user.b2b_organizations.add(enrolled_contract.organization)
+    # Add user to only one contract
+    user.b2b_contracts.add(enrolled_contract)
+    user.save()
+
+    resp = client.get(reverse("users_api-me"))
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    response_data = resp.json()
+    assert len(response_data["b2b_organizations"]) == 1
+
+    org_data = response_data["b2b_organizations"][0]
+    # Should only include the enrolled contract
+    assert len(org_data["contracts"]) == 1
+    assert org_data["contracts"][0]["id"] == enrolled_contract.id
+
+    # Should not include the unenrolled contract
+    contract_ids = [contract["id"] for contract in org_data["contracts"]]
+    assert unenrolled_contract.id not in contract_ids
+
+
 @pytest.mark.parametrize(
     ("is_anonymous", "has_openedx_user", "has_edx_username"),
     [

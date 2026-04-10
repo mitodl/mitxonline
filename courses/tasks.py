@@ -12,8 +12,10 @@ from courses.models import (
     CourseRun,
     CourseRunEnrollment,
     LearnerProgramRecordShare,
+    ProgramEnrollment,
 )
 from main.celery import app
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 
 log = logging.getLogger(__name__)
 
@@ -72,3 +74,15 @@ def send_partner_school_email(record_uuid):
     record = LearnerProgramRecordShare.objects.get(share_uuid=record_uuid)
 
     send_partner_school_sharing_message(record)
+
+
+@app.task
+def upgrade_eligible_program_enrollments():
+    """Upgrade eligible learners for all audit-mode program enrollments."""
+    from courses.api import upgrade_program_enrollment_if_eligible
+
+    enrollments = ProgramEnrollment.objects.filter(
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    for enrollment in enrollments.iterator():
+        upgrade_program_enrollment_if_eligible(enrollment)

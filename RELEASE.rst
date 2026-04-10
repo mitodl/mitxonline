@@ -1,6 +1,27 @@
 Release Notes
 =============
 
+Version 1.146.1 (Released April 09, 2026)
+---------------
+
+- Use correct run-level prefix when redirecting UAI industry-specific verticals (#3479)
+- Add some options to the create_courseware admin command (#3467)
+
+Version 1.146.0 (Released April 09, 2026)
+---------------
+
+- Include program titles in v0 TransactionLineSerializer (#3469)
+- Add management command to upgrade eligible program enrollments (#3455)
+- fix: filter b2b contracts in users/me API to only show contracts the user is enrolled in (#3470)
+- Exit Python Tests step after first failure (#3382)
+
+Version 1.145.2 (Released April 08, 2026)
+---------------
+
+- Indicate order status on redirect via query params for MIT Learn (#3464)
+- Fix flakey discount-related tests (#3472)
+- Fix Cart -> Learn dashboard for UAI industry verticals (#3466)
+
 Version 1.145.1 (Released April 08, 2026)
 ---------------
 
