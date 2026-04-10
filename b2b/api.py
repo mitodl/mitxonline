@@ -36,6 +36,7 @@ from b2b.tasks import queue_contract_sheet_update_post_save
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun, Department, EnrollmentMode
+from courses.utils import is_uai_course_run
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     PAYMENT_TYPE_SALES,
@@ -50,12 +51,11 @@ from ecommerce.models import (
     DiscountProduct,
     Product,
 )
+from hubspot_sync.task_helpers import sync_hubspot_cart_add
 from main import constants as main_constants
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.tasks import clone_courserun
-from courses.utils import is_uai_course_run
-from hubspot_sync.task_helpers import sync_hubspot_cart_add
 
 log = logging.getLogger(__name__)
 
