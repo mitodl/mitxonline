@@ -24,7 +24,6 @@ from b2b.api import (
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.utils import is_uai_course_run
-from hubspot_sync.task_helpers import sync_hubspot_cart_add
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
@@ -59,7 +58,7 @@ from ecommerce.models import (
 )
 from ecommerce.tasks import perform_downgrade_from_order
 from flexiblepricing.api import determine_courseware_flexible_price_discount
-from hubspot_sync.task_helpers import sync_hubspot_deal
+from hubspot_sync.task_helpers import sync_hubspot_cart_add, sync_hubspot_deal
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
