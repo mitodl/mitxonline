@@ -653,7 +653,8 @@ class OrderHistorySerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.ListField)
     def get_titles(self, instance):
         titles = []
-        lines = instance.lines.all()
+        # Use prefetched lines data
+        lines = [line for line in instance.lines.all()]
         product_ids = [line.product_version.field_dict["id"] for line in lines]
         products_by_id = models.Product.all_objects.in_bulk(product_ids)
 
@@ -661,7 +662,10 @@ class OrderHistorySerializer(serializers.ModelSerializer):
             product_id = line.product_version.field_dict["id"]
             product = products_by_id.get(product_id)
             if product:
-                if product.content_type.model == "courserun" and product.purchasable_object:
+                if (
+                    product.content_type.model == "courserun"
+                    and product.purchasable_object
+                ):
                     titles.append(product.purchasable_object.course.title)
                 elif product.content_type.model == "programrun":
                     titles.append(product.description)
@@ -807,7 +811,11 @@ class TransactionDataSerializer(serializers.BaseSerializer):
         if not isinstance(instance, Order):
             raise AttributeError  # noqa: TRY004
 
-        transaction = instance.transactions.order_by("-created_on").first()
+        # Use prefetched transactions data
+        transactions = [t for t in instance.transactions.all()]
+        transaction = (
+            max(transactions, key=lambda t: t.created_on) if transactions else None
+        )
 
         return transaction  # noqa: RET504
 
@@ -951,7 +959,9 @@ class OrderReceiptSerializer(serializers.ModelSerializer):
 
     def get_coupon(self, instance):
         """Get discount code from the discount redemption if available"""
-        coupon_redemption = instance.discounts.first()
+        # Use prefetched discounts data
+        discounts = [d for d in instance.discounts.all()]
+        coupon_redemption = discounts[0] if discounts else None
         if not coupon_redemption:
             return None
         return DiscountRedemptionSerializer(coupon_redemption).data

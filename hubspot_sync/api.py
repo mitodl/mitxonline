@@ -927,7 +927,9 @@ def make_line_item_update_message_list_from_line_ids(
             request_input.append(
                 {
                     "id": hubspot_id,
-                    "properties": make_line_item_sync_message_from_line(line).properties,
+                    "properties": make_line_item_sync_message_from_line(
+                        line
+                    ).properties,
                 }
             )
     return request_input
