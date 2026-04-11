@@ -1074,4 +1074,13 @@ class OrderReceiptView(RetrieveAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Order.objects.filter(purchaser=self.request.user).all()
+        return (
+            Order.objects.filter(purchaser=self.request.user)
+            .prefetch_related(
+                "lines__product__purchasable_object__course",
+                "lines__product__content_type",
+                "transactions",
+                "discounts__discount",
+            )
+            .all()
+        )

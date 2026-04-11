@@ -653,7 +653,11 @@ class OrderHistorySerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.ListField)
     def get_titles(self, instance):
         titles = []
-        lines = instance.lines.all()
+        # Access prefetched lines data
+        lines = (
+            getattr(instance, "_prefetched_objects_cache", {}).get("lines")
+            or instance.lines.all()
+        )
         product_ids = [line.product_version.field_dict["id"] for line in lines]
         products_by_id = models.Product.all_objects.in_bulk(product_ids)
 
@@ -661,7 +665,10 @@ class OrderHistorySerializer(serializers.ModelSerializer):
             product_id = line.product_version.field_dict["id"]
             product = products_by_id.get(product_id)
             if product:
-                if product.content_type.model == "courserun" and product.purchasable_object:
+                if (
+                    product.content_type.model == "courserun"
+                    and product.purchasable_object
+                ):
                     titles.append(product.purchasable_object.course.title)
                 elif product.content_type.model == "programrun":
                     titles.append(product.description)
@@ -807,9 +814,18 @@ class TransactionDataSerializer(serializers.BaseSerializer):
         if not isinstance(instance, Order):
             raise AttributeError  # noqa: TRY004
 
-        transaction = instance.transactions.order_by("-created_on").first()
+        # Access prefetched transactions
+        transactions = getattr(instance, "_prefetched_objects_cache", {}).get(
+            "transactions"
+        )
+        if transactions:
+            transaction = (
+                max(transactions, key=lambda t: t.created_on) if transactions else None
+            )
+        else:
+            transaction = instance.transactions.order_by("-created_on").first()
 
-        return transaction  # noqa: RET504
+        return transaction
 
 
 class TransactionPurchaseSerializer(TransactionDataSerializer):
@@ -951,7 +967,9 @@ class OrderReceiptSerializer(serializers.ModelSerializer):
 
     def get_coupon(self, instance):
         """Get discount code from the discount redemption if available"""
-        coupon_redemption = instance.discounts.first()
+        # Access prefetched discounts
+        discounts = getattr(instance, "_prefetched_objects_cache", {}).get("discounts")
+        coupon_redemption = discounts[0] if discounts else instance.discounts.first()
         if not coupon_redemption:
             return None
         return DiscountRedemptionSerializer(coupon_redemption).data
