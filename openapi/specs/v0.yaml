@@ -6442,6 +6442,8 @@ components:
           maxLength: 255
         email:
           type: string
+        is_active:
+          type: boolean
       required:
       - created_on
       - email
@@ -6458,6 +6460,8 @@ components:
         email:
           type: string
           minLength: 1
+        is_active:
+          type: boolean
       required:
       - email
       - name
