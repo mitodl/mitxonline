@@ -1287,6 +1287,26 @@ class CourseRun(TimestampedModel):
             and self.start_date is not None
         )
 
+    @cached_property
+    def is_enrollable_for_b2b(self):
+        """Determine if the run is enrollable for B2B purchases."""
+
+        if not self.b2b_contract:
+            return False
+
+        if not self.b2b_contract.max_learners:
+            return self.is_enrollable
+
+        contract_enrollments = self.enrollments.filter(
+            active=True, change_status=None
+        ).count()
+
+        return (
+            self.b2b_contract.max_learners > 0
+            and self.b2b_contract.max_learners > contract_enrollments
+            and self.is_enrollable
+        )
+
     @property
     def is_fake_course_run(self):
         """
