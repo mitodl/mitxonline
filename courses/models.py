@@ -2408,6 +2408,12 @@ class PartnerSchool(TimestampedModel):
     def __str__(self):
         return self.name
 
+    def delete(self):
+        """Soft-delete the record."""
+
+        self.is_active = False
+        self.save(update_fields=("is_active",))
+
 
 class LearnerProgramRecordShare(TimestampedModel):
     """

@@ -726,6 +726,11 @@ class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
         "program",
     ]
 
+    def get_queryset(self, request):  # noqa: ARG002
+        """Use the all_objects manager so we can see everything."""
+
+        return self.model.all_objects.get_queryset()
+
 
 @admin.register(RelatedProgram)
 class RelatedProgramAdmin(admin.ModelAdmin):
