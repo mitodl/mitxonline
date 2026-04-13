@@ -716,6 +716,17 @@ class PartnerSchoolAdmin(TimestampedModelAdmin):
 
         return self.model.all_objects.get_queryset()
 
+    def delete_model(self, request, obj):  # noqa: ARG002
+        """Soft-delete the model."""
+
+        obj.is_active = False
+        obj.save()
+
+    def delete_queryset(self, request, queryset):  # noqa: ARG002
+        """Soft-delete using the queryset."""
+
+        queryset.update(is_active=False)
+
 
 @admin.register(LearnerProgramRecordShare)
 class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
