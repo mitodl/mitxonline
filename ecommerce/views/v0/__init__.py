@@ -231,6 +231,14 @@ def _create_basket_from_product(
         basket=basket, product=product, defaults={"quantity": quantity}
     )
 
+    # Sync with HubSpot for CourseRun products
+    if isinstance(product.purchasable_object, CourseRun):
+        sync_hubspot_cart_add(
+            request.user,
+            product,
+            is_uai_course=is_uai_course_run(product.purchasable_object),
+        )
+
     existing_basket_discounts = [bd.redeemed_discount for bd in basket.discounts.all()]
     discounts_to_apply = [
         *existing_basket_discounts,
