@@ -2381,7 +2381,7 @@ class PartnerSchoolActiveUndeleteManager(models.Manager):
     # This can be used generally, for the models that have `is_active` field
     def get_queryset(self):
         """Getting the active queryset for manager"""
-        return self.model.get_queryset().filter(is_active=True)
+        return super().get_queryset().filter(is_active=True)
 
 
 class PartnerSchool(TimestampedModel):
