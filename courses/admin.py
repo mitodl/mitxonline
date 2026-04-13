@@ -719,6 +719,12 @@ class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
     model = LearnerProgramRecordShare
     list_display = ["share_uuid", "user", "partner_school", "is_active"]
     search_fields = ["share_uuid"]
+    readonly_fields = [
+        "share_uuid",
+        "user",
+        "partner_school",
+        "program",
+    ]
 
 
 @admin.register(RelatedProgram)

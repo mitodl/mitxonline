@@ -2375,6 +2375,24 @@ class ProgramRequirement(MP_Node):
         ]
 
 
+class PartnerSchoolQuerySet(models.QuerySet):
+    """Queryset to block delete and instead mark the items in_active"""
+
+    def delete(self):
+        """Delete by setting the is_active flag to False."""
+
+        self.update(is_active=False)
+
+
+class PartnerSchoolActiveUndeleteManager(models.Manager):
+    """Query manager for active objects"""
+
+    # This can be used generally, for the models that have `is_active` field
+    def get_queryset(self):
+        """Getting the active queryset for manager"""
+        return PartnerSchoolQuerySet(self.model, using=self._db).filter(is_active=True)
+
+
 class PartnerSchool(TimestampedModel):
     """
     Model for partner school to send records to (copied from MicroMasters)
@@ -2382,6 +2400,10 @@ class PartnerSchool(TimestampedModel):
 
     name = models.CharField(max_length=255)
     email = models.TextField(null=False)
+    is_active = models.BooleanField(default=True, blank=True)
+
+    objects = PartnerSchoolActiveUndeleteManager()
+    all_objects = models.Manager()
 
     def __str__(self):
         return self.name
