@@ -711,6 +711,11 @@ class PartnerSchoolAdmin(TimestampedModelAdmin):
     list_display = ["name", "email"]
     search_fields = ["name", "email"]
 
+    def get_queryset(self, request):  # noqa: ARG002
+        """Use the all_objects manager so we can see everything."""
+
+        return self.model.all_objects.get_queryset()
+
 
 @admin.register(LearnerProgramRecordShare)
 class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
@@ -725,11 +730,6 @@ class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
         "partner_school",
         "program",
     ]
-
-    def get_queryset(self, request):  # noqa: ARG002
-        """Use the all_objects manager so we can see everything."""
-
-        return self.model.all_objects.get_queryset()
 
 
 @admin.register(RelatedProgram)
