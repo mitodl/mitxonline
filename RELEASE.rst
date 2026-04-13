@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.146.2
+Version 1.146.2 (Released April 13, 2026)
 ---------------
 
 - Add admin search by edx_username (#3482)
