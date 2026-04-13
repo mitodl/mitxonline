@@ -2399,7 +2399,7 @@ class PartnerSchool(TimestampedModel):
     def __str__(self):
         return self.name
 
-    def delete(self):
+    def delete(self, *, using=None, keep_parents=False):  # noqa: ARG002
         """Soft-delete the record."""
 
         self.is_active = False
