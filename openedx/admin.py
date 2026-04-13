@@ -21,7 +21,7 @@ class OpenEdxUserAdmin(ModelAdminRunActionsForAllMixin, admin.ModelAdmin):
         "edx_username",
         "platform",
     ]
-    list_display = ["id", "user", "has_been_synced", "platform"]
+    list_display = ["id", "user", "edx_username", "has_been_synced", "platform"]
     list_filter = ["has_been_synced", "platform"]
     raw_id_fields = ["user"]
     actions = ["repair_all_faulty_openedx_users"]
