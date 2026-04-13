@@ -2404,6 +2404,7 @@ class PartnerSchool(TimestampedModel):
 
         self.is_active = False
         self.save(update_fields=("is_active",))
+        return (1, {"courses.PartnerSchool": 1})
 
 
 class LearnerProgramRecordShare(TimestampedModel):
