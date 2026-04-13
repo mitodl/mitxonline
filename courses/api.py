@@ -52,6 +52,7 @@ from courses.models import (
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
+    ProgramRequirementNodeType,
     VerifiableCredential,
 )
 from courses.serializers.base import get_thumbnail_url
@@ -1724,6 +1725,40 @@ def rerun_course_run(  # noqa: PLR0913
     return new_run
 
 
+def _get_program_requirements_data(program: Program) -> dict:
+    """Return requirement data for a program, using prefetched requirements when available."""
+    prefetched_requirements = getattr(program, "_prefetched_objects_cache", {}).get(
+        "all_requirements"
+    )
+    if prefetched_requirements is None:
+        return program._courses_with_requirements_data
+
+    main_ops = [req for req in prefetched_requirements if req.depth == 2]
+    if not main_ops:
+        return {
+            "courses": [],
+            "required_courses": [],
+            "elective_courses": [],
+            "required_title": "Required Courses",
+            "elective_title": "Elective Courses",
+            "minimum_elective_requirement": None,
+        }
+
+    path_to_operator = {op.path: op for op in main_ops}
+    course_requirements = [
+        req
+        for req in prefetched_requirements
+        if req.node_type == ProgramRequirementNodeType.COURSE
+        and any(req.path.startswith(op.path) for op in main_ops)
+    ]
+
+    requirements_data = program._process_course_requirements(
+        course_requirements, path_to_operator
+    )
+    program._courses_with_requirements_data = requirements_data
+    return requirements_data
+
+
 def upgrade_program_enrollment_if_eligible(program_enrollment):
     """
     For a given program enrollment checks if learner is qualified for an upgrade
@@ -1736,29 +1771,28 @@ def upgrade_program_enrollment_if_eligible(program_enrollment):
     program = program_enrollment.program
     user = program_enrollment.user
 
-    if ProgramCertificate.objects.filter(
-        user=program_enrollment.user, program=program
-    ).exists():
+    if program_enrollment.certificate is not None:
         return program_enrollment, False
 
-    program_course_ids = [course[0].id for course in program.courses]
-
+    requirements_data = _get_program_requirements_data(program)
+    program_course_ids = [course.id for course, _ in requirements_data["courses"]]
     verified_courses = Course.objects.filter(
         id__in=program_course_ids,
         courseruns__enrollments__user=user,
         courseruns__enrollments__enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         courseruns__enrollments__active=True,
     ).distinct()
-
     verified_course_ids = set(verified_courses.values_list("id", flat=True))
 
     # make sure all core courses are verified
-    required_courses = program.required_courses
+    required_courses = requirements_data["required_courses"]
     if not all(course.id in verified_course_ids for course in required_courses):
         return program_enrollment, False
 
-    nim_elective_num = program.minimum_elective_courses_requirement
-    elective_course_ids = [course.id for course in program.elective_courses]
+    nim_elective_num = requirements_data["minimum_elective_requirement"]
+    elective_course_ids = [
+        course.id for course in requirements_data["elective_courses"]
+    ]
     verified_elective_count = verified_courses.filter(
         id__in=elective_course_ids
     ).count()

@@ -5,7 +5,7 @@ Tasks for the courses app
 
 import logging
 
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from mitol.common.utils.datetime import now_in_utc
 
 from courses.models import (
@@ -13,6 +13,7 @@ from courses.models import (
     CourseRunEnrollment,
     LearnerProgramRecordShare,
     ProgramEnrollment,
+    ProgramRequirement,
 )
 from main.celery import app
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
@@ -83,6 +84,11 @@ def upgrade_eligible_program_enrollments():
 
     enrollments = ProgramEnrollment.objects.filter(
         enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-    ).select_related("program", "user")
+    ).select_related("program", "user").prefetch("certificate").prefetch_related(
+        Prefetch(
+            "program__all_requirements",
+            queryset=ProgramRequirement.objects.select_related("course"),
+        )
+    )
     for enrollment in enrollments.iterator():
         upgrade_program_enrollment_if_eligible(enrollment)
