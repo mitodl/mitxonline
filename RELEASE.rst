@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.146.2
+---------------
+
+- Add admin search by edx_username (#3482)
+- Update discount code redemption to create codes if necessary (#3483)
+- Adds action to populate empty verifiable creds by courserun or program (#3473)
+- chore(deps): update actions/cache digest to 6682284 (#3432)
+- [pre-commit.ci] pre-commit autoupdate (#3461)
+
 Version 1.146.1 (Released April 09, 2026)
 ---------------
 
