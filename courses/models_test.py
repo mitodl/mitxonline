@@ -4,6 +4,9 @@ from datetime import timedelta
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.db.models import Prefetch
+from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 
@@ -686,6 +689,45 @@ def test_courses_in_program(program_with_requirements):  # noqa: F811
         + program_with_requirements.elective_courses
         + program_with_requirements.mut_exclusive_courses
     )
+
+
+def test_program_requirement_properties_use_prefetched_all_requirements(
+    program_with_requirements,  # noqa: F811
+):
+    """Requirement properties should reuse prefetched requirement data."""
+    program = Program.objects.prefetch_related(
+        Prefetch(
+            "all_requirements",
+            queryset=ProgramRequirement.objects.select_related("course"),
+        )
+    ).get(pk=program_with_requirements.program.pk)
+
+    with CaptureQueriesContext(connection) as context:
+        course_pairs = program.courses
+        required_course_list = program.required_courses
+        elective_course_list = program.elective_courses
+        minimum_elective_requirement = program.minimum_elective_courses_requirement
+
+    assert len(context) == 0
+    assert [course.id for course, _ in course_pairs] == [
+        course.id
+        for course in (
+            program_with_requirements.required_courses
+            + program_with_requirements.elective_courses
+            + program_with_requirements.mut_exclusive_courses
+        )
+    ]
+    assert [course.id for course in required_course_list] == [
+        course.id for course in program_with_requirements.required_courses
+    ]
+    assert [course.id for course in elective_course_list] == [
+        course.id
+        for course in (
+            program_with_requirements.elective_courses
+            + program_with_requirements.mut_exclusive_courses
+        )
+    ]
+    assert minimum_elective_requirement == 2
 
 
 def test_program_requirements_is_operator():
