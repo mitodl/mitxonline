@@ -1722,6 +1722,8 @@ def rerun_course_run(  # noqa: PLR0913
         process_course_run_clone(new_run, base_run.courseware_id)
 
     return new_run
+
+
 def upgrade_program_enrollment_if_eligible(program_enrollment):
     """
     For a given program enrollment checks if learner is qualified for an upgrade
@@ -1756,7 +1758,9 @@ def upgrade_program_enrollment_if_eligible(program_enrollment):
     elective_course_ids = [
         course.id for course in requirements_data["elective_courses"]
     ]
-    verified_elective_count = verified_courses.filter(id__in=elective_course_ids).count()
+    verified_elective_count = verified_courses.filter(
+        id__in=elective_course_ids
+    ).count()
 
     if nim_elective_num is not None and verified_elective_count < nim_elective_num:
         return program_enrollment, False
