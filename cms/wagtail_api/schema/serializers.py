@@ -189,6 +189,12 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
             "topic_list",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
+            "hyl_choice_realworld_learning",
+            "hyl_choice_learn_by_doing",
+            "hyl_choice_learn_from_others",
+            "hyl_choice_learn_on_demand",
+            "hyl_choice_ai_enabled_support",
+            "hyl_choice_stackable_credentials",
         ]
 
         # NOTE: We use this serializer for schema generation only,
@@ -246,6 +252,12 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
             "faculty",
             "certificate_page",
             "program_details",
+            "hyl_choice_realworld_learning",
+            "hyl_choice_learn_by_doing",
+            "hyl_choice_learn_from_others",
+            "hyl_choice_learn_on_demand",
+            "hyl_choice_ai_enabled_support",
+            "hyl_choice_stackable_credentials",
         ]
 
         # NOTE: We use this serializer for schema generation only,

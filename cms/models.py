@@ -15,7 +15,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.forms import ChoiceField, IntegerField, Textarea
+from django.forms import CheckboxInput, ChoiceField, IntegerField, Textarea
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -27,6 +27,7 @@ from modelcluster.fields import ParentalKey, ParentalManyToManyField
 from wagtail.admin.panels import (
     FieldPanel,
     InlinePanel,
+    MultiFieldPanel,
     PageChooserPanel,
 )
 from wagtail.api import APIField
@@ -1159,6 +1160,46 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         help_text="*Required for Verifiable Credential generation. What you will learn from this course.",
     )
 
+    # How You'll Learn choice fields - these toggle on or off components on the
+    # Learn product pages.
+    hyl_choice_realworld_learning = models.BooleanField(
+        help_text="Learn from faculty experts who emphasize practical application over theory.",
+        null=True,
+        blank=True,
+        default=False,
+    )
+    hyl_choice_learn_by_doing = models.BooleanField(
+        help_text="Practice core competencies through case studies, simulations, and hands-on tools.",
+        null=True,
+        blank=True,
+        default=False,
+    )
+    hyl_choice_learn_from_others = models.BooleanField(
+        help_text="Connect with an international community of professionals working on real-world projects.",
+        null=True,
+        blank=True,
+        default=False,
+    )
+    hyl_choice_learn_on_demand = models.BooleanField(
+        help_text="Access all course content online with complete flexibility to study at your own pace.",
+        null=True,
+        blank=True,
+        default=False,
+    )
+    hyl_choice_ai_enabled_support = models.BooleanField(
+        help_text="Get personalized help on assignments from AskTIM, powered by advanced AI.",
+        null=True,
+        blank=True,
+        default=False,
+    )
+    hyl_choice_stackable_credentials = models.BooleanField(
+        help_text="Earn certificates at key milestones—module, course, and program—building a portfolio of expertise.",
+        null=True,
+        blank=True,
+        default=False,
+    )
+    # end How You'll Learn choice fields
+
     feature_image = models.ForeignKey(
         Image,
         null=True,
@@ -1191,6 +1232,41 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         FieldPanel("faq_url"),
         FieldPanel("about"),
         FieldPanel("what_you_learn"),
+        MultiFieldPanel(
+            children=(
+                FieldPanel(
+                    "hyl_choice_realworld_learning",
+                    widget=CheckboxInput,
+                    heading="Real-world Learning",
+                ),
+                FieldPanel(
+                    "hyl_choice_learn_by_doing",
+                    widget=CheckboxInput,
+                    heading="Learn By Doing",
+                ),
+                FieldPanel(
+                    "hyl_choice_learn_from_others",
+                    widget=CheckboxInput,
+                    heading="Learn From Others",
+                ),
+                FieldPanel(
+                    "hyl_choice_learn_on_demand",
+                    widget=CheckboxInput,
+                    heading="Learn On Demand",
+                ),
+                FieldPanel(
+                    "hyl_choice_ai_enabled_support",
+                    widget=CheckboxInput,
+                    heading="AI-Enabled Support",
+                ),
+                FieldPanel(
+                    "hyl_choice_stackable_credentials",
+                    widget=CheckboxInput,
+                    heading="Stackable Credentials",
+                ),
+            ),
+            heading="How You'll Learn",
+        ),
         FieldPanel("feature_image"),
         FieldPanel("video_url"),
         FieldPanel("faculty_section_title"),
@@ -1219,6 +1295,12 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         APIField("faculty_section_title"),
         APIField("faculty"),
         APIField("certificate_page", serializer=ProductChildPageSerializer()),
+        APIField("hyl_choice_realworld_learning"),
+        APIField("hyl_choice_learn_by_doing"),
+        APIField("hyl_choice_learn_from_others"),
+        APIField("hyl_choice_learn_on_demand"),
+        APIField("hyl_choice_ai_enabled_support"),
+        APIField("hyl_choice_stackable_credentials"),
     ]
 
     subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
