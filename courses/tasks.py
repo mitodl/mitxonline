@@ -82,12 +82,15 @@ def upgrade_eligible_program_enrollments():
     """Upgrade eligible learners for all audit-mode program enrollments."""
     from courses.api import upgrade_program_enrollment_if_eligible
 
-    enrollments = ProgramEnrollment.objects.filter(
-        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-    ).select_related("program", "user").prefetch("certificate").prefetch_related(
-        Prefetch(
-            "program__all_requirements",
-            queryset=ProgramRequirement.objects.select_related("course"),
+    enrollments = (
+        ProgramEnrollment.objects.filter(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
+        .select_related("program", "user")
+        .prefetch("certificate")
+        .prefetch_related(
+            Prefetch(
+                "program__all_requirements",
+                queryset=ProgramRequirement.objects.select_related("course"),
+            )
         )
     )
     for enrollment in enrollments:

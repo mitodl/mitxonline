@@ -86,7 +86,7 @@ from courses.models import (
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
-    ProgramRequirementNodeType, CourseRun,
+    ProgramRequirementNodeType,
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Basket, OrderStatus

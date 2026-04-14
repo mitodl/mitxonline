@@ -1,7 +1,7 @@
 """Upgrade program enrollments that are eligible for verified mode."""
 
-from django.db.models import Prefetch
 from django.core.management.base import BaseCommand
+from django.db.models import Prefetch
 
 from courses.api import upgrade_program_enrollment_if_eligible
 from courses.models import ProgramEnrollment, ProgramRequirement
@@ -17,12 +17,15 @@ class Command(BaseCommand):
         processed_count = 0
         upgraded_count = 0
 
-        enrollments = ProgramEnrollment.objects.filter(
-            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
-        ).select_related("program", "user").prefetch("certificate").prefetch_related(
-            Prefetch(
-                "program__all_requirements",
-                queryset=ProgramRequirement.objects.select_related("course"),
+        enrollments = (
+            ProgramEnrollment.objects.filter(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
+            .select_related("program", "user")
+            .prefetch("certificate")
+            .prefetch_related(
+                Prefetch(
+                    "program__all_requirements",
+                    queryset=ProgramRequirement.objects.select_related("course"),
+                )
             )
         )
 
