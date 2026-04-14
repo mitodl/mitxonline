@@ -90,5 +90,5 @@ def upgrade_eligible_program_enrollments():
             queryset=ProgramRequirement.objects.select_related("course"),
         )
     )
-    for enrollment in enrollments.iterator():
+    for enrollment in enrollments:
         upgrade_program_enrollment_if_eligible(enrollment)
