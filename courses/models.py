@@ -2375,6 +2375,15 @@ class ProgramRequirement(MP_Node):
         ]
 
 
+class PartnerSchoolActiveUndeleteManager(models.Manager):
+    """Query manager for active objects"""
+
+    # This can be used generally, for the models that have `is_active` field
+    def get_queryset(self):
+        """Getting the active queryset for manager"""
+        return super().get_queryset().filter(is_active=True)
+
+
 class PartnerSchool(TimestampedModel):
     """
     Model for partner school to send records to (copied from MicroMasters)
@@ -2382,9 +2391,20 @@ class PartnerSchool(TimestampedModel):
 
     name = models.CharField(max_length=255)
     email = models.TextField(null=False)
+    is_active = models.BooleanField(default=True, blank=True)
+
+    objects = PartnerSchoolActiveUndeleteManager()
+    all_objects = models.Manager()
 
     def __str__(self):
         return self.name
+
+    def delete(self, *, using=None, keep_parents=False):  # noqa: ARG002
+        """Soft-delete the record."""
+
+        self.is_active = False
+        self.save(update_fields=("is_active",))
+        return (1, {"courses.PartnerSchool": 1})
 
 
 class LearnerProgramRecordShare(TimestampedModel):

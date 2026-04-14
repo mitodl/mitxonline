@@ -711,6 +711,22 @@ class PartnerSchoolAdmin(TimestampedModelAdmin):
     list_display = ["name", "email"]
     search_fields = ["name", "email"]
 
+    def get_queryset(self, request):  # noqa: ARG002
+        """Use the all_objects manager so we can see everything."""
+
+        return self.model.all_objects.get_queryset()
+
+    def delete_model(self, request, obj):  # noqa: ARG002
+        """Soft-delete the model."""
+
+        obj.is_active = False
+        obj.save()
+
+    def delete_queryset(self, request, queryset):  # noqa: ARG002
+        """Soft-delete using the queryset."""
+
+        queryset.update(is_active=False)
+
 
 @admin.register(LearnerProgramRecordShare)
 class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
@@ -719,6 +735,12 @@ class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
     model = LearnerProgramRecordShare
     list_display = ["share_uuid", "user", "partner_school", "is_active"]
     search_fields = ["share_uuid"]
+    readonly_fields = [
+        "share_uuid",
+        "user",
+        "partner_school",
+        "program",
+    ]
 
 
 @admin.register(RelatedProgram)
