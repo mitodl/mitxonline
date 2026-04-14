@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.146.3
+---------------
+
+- Add soft delete to the partner school model (#3485)
+- 10745 learn   hubspot should be updated when user adds item to cart (#3474)
+
 Version 1.146.2 (Released April 13, 2026)
 ---------------
 
