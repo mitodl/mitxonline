@@ -1692,8 +1692,8 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
         default=True,
         help_text="Indicates whether or not this enrollment should be considered active",
     )
-    enrollment_mode = models.CharField(  # noqa: DJ001
-        default=EDX_DEFAULT_ENROLLMENT_MODE, max_length=20, null=True, blank=True
+    enrollment_mode = models.CharField(
+        default=EDX_DEFAULT_ENROLLMENT_MODE, max_length=20
     )
 
     objects = ActiveEnrollmentManager()
