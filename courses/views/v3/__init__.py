@@ -8,8 +8,14 @@ from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
-from rest_framework import mixins, status, viewsets
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    extend_schema,
+    extend_schema_view,
+    inline_serializer,
+)
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import (
     IsAuthenticated,
@@ -251,6 +257,65 @@ class UserProgramEnrollmentsViewSet(
 @extend_schema(
     operation_id="course_outline_retrieve_v3",
     description="Fetch course outline data for the given course key from Open edX.",
+    parameters=[
+        OpenApiParameter(
+            name="course_id",
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            required=True,
+            description="Open edX course key (URL-encoded recommended), e.g. course-v1%3AOpenedX%2BDemoX%2BDemoCourse",
+        )
+    ],
+    responses={
+        200: inline_serializer(
+            name="CourseOutlineResponse",
+            fields={
+                "course_id": serializers.CharField(),
+                "generated_at": serializers.CharField(),
+                "modules": serializers.ListField(child=serializers.DictField()),
+            },
+        ),
+        403: inline_serializer(
+            name="CourseOutlineAuthErrorResponse",
+            fields={"detail": serializers.CharField()},
+        ),
+        500: inline_serializer(
+            name="CourseOutlineUpstreamErrorResponse",
+            fields={"detail": serializers.CharField()},
+        ),
+    },
+    examples=[
+        OpenApiExample(
+            "CourseOutlineSuccess",
+            value={
+                "course_id": "course-v1:OpenedX+DemoX+DemoCourse",
+                "generated_at": "2026-04-10T07:17:20Z",
+                "modules": [
+                    {
+                        "id": "block-v1:OpenedX+DemoX+DemoCourse+type@chapter+block@abc123",
+                        "title": "Module 1",
+                        "effort_time": 0,
+                        "effort_activities": 0,
+                        "counts": {
+                            "videos": 2,
+                            "readings": 1,
+                            "problems": 1,
+                            "assignments": 0,
+                            "app_items": 0,
+                        },
+                    }
+                ],
+            },
+            response_only=True,
+            status_codes=["200"],
+        ),
+        OpenApiExample(
+            "AuthError",
+            value={"detail": "Authentication credentials were not provided."},
+            response_only=True,
+            status_codes=["403"],
+        ),
+    ],
 )
 @api_view(["GET"])
 @permission_classes([IsAuthenticated | HasAPIKey])
