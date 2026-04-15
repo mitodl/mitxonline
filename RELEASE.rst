@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.146.3
+Version 1.146.3 (Released April 15, 2026)
 ---------------
 
 - Add soft delete to the partner school model (#3485)
