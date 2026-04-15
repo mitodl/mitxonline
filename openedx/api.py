@@ -39,6 +39,7 @@ from openedx.constants import (
     PLATFORM_EDX,
 )
 from openedx.exceptions import (
+    EdxApiCourseOutlineError,
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
@@ -904,25 +905,36 @@ def get_edx_course_outline(course_id: str) -> dict:
         course_id=encoded_course_id
     )
     outline_url = edx_url(outline_path)
-    response = requests.get(
-        outline_url,
-        headers={
-            "Authorization": f"Bearer {settings.OPENEDX_SERVICE_WORKER_API_TOKEN}"
-        },
-        timeout=settings.EDX_API_CLIENT_TIMEOUT,
-    )
-
     try:
+        response = requests.get(
+            outline_url,
+            headers={
+                "Authorization": f"Bearer {settings.OPENEDX_SERVICE_WORKER_API_TOKEN}"
+            },
+            timeout=settings.EDX_API_CLIENT_TIMEOUT,
+        )
         response.raise_for_status()
-    except HTTPError:
+    except requests.exceptions.RequestException as exc:
         log.exception(
             "Failed to fetch Open edX course outline for course_id=%s url=%s",
             course_id,
             outline_url,
         )
-        raise
+        raise EdxApiCourseOutlineError(
+            "Open edX course outline request failed"
+        ) from exc
 
-    return response.json()
+    try:
+        return response.json()
+    except (ValueError, requests.exceptions.JSONDecodeError) as exc:
+        log.exception(
+            "Open edX course outline response was not valid JSON for course_id=%s url=%s",
+            course_id,
+            outline_url,
+        )
+        raise EdxApiCourseOutlineError(
+            "Open edX course outline response was invalid"
+        ) from exc
 
 
 def get_edx_api_jwt_client(

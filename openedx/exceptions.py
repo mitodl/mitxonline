@@ -128,3 +128,7 @@ class EdxApiRegistrationValidationException(Exception):  # noqa: N818
 
 class OpenEdxUserMissingError(Exception):
     """We tried to do something that requires an Open edX user, and there isn't one."""
+
+
+class EdxApiCourseOutlineError(Exception):  # noqa: N818
+    """Base exception for Open edX course outline fetch errors."""

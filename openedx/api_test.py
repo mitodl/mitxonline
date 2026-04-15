@@ -66,6 +66,7 @@ from openedx.constants import (
     PLATFORM_EDX,
 )
 from openedx.exceptions import (
+    EdxApiCourseOutlineError,
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
@@ -816,7 +817,7 @@ def test_get_edx_course_outline(settings):
 
 @responses.activate
 def test_get_edx_course_outline_http_error(settings):
-    """Tests that get_edx_course_outline raises HTTPError on failure response."""
+    """Tests that get_edx_course_outline raises upstream error on failure response."""
     settings.OPENEDX_API_BASE_URL = "http://example.com"
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "outline_token"  # noqa: S105
     settings.OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE = (
@@ -832,7 +833,30 @@ def test_get_edx_course_outline_http_error(settings):
         status=status.HTTP_404_NOT_FOUND,
     )
 
-    with pytest.raises(HTTPError):
+    with pytest.raises(EdxApiCourseOutlineError):
+        get_edx_course_outline(course_id)
+
+
+@responses.activate
+def test_get_edx_course_outline_invalid_json(settings):
+    """Tests that get_edx_course_outline raises invalid response for bad JSON."""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "outline_token"  # noqa: S105
+    settings.OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE = (
+        "/api/ol-course-outline/v0/{course_id}/"
+    )
+
+    course_id = "course-v1:OpenedX+DemoX+DemoCourse"
+    encoded_course_id = "course-v1%3AOpenedX%2BDemoX%2BDemoCourse"
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/ol-course-outline/v0/{encoded_course_id}/",
+        body="not-json",
+        content_type="text/plain",
+        status=status.HTTP_200_OK,
+    )
+
+    with pytest.raises(EdxApiCourseOutlineError):
         get_edx_course_outline(course_id)
 
 
