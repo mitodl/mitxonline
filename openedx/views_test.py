@@ -62,6 +62,17 @@ class TestEdxEnrollmentWebhook:
         )
 
     @pytest.fixture
+    def non_staff_oauth_token(self, oauth_application):
+        """Create a valid OAuth2 access token for a non-staff user"""
+        user = UserFactory.create(is_staff=False)
+        return AccessToken.objects.create(
+            user=user,
+            application=oauth_application,
+            token=generate_token(),
+            expires=now_in_utc() + timedelta(hours=1),
+        )
+
+    @pytest.fixture
     def expired_oauth_token(self, oauth_application):
         """Create an expired OAuth2 access token"""
         user = UserFactory.create(is_staff=True)
@@ -139,6 +150,15 @@ class TestEdxEnrollmentWebhook:
             api_client, webhook_payload, token=expired_oauth_token.token
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_non_staff_token_forbidden(
+        self, api_client, webhook_payload, non_staff_oauth_token
+    ):
+        """Test request with valid token but non-staff user returns 403"""
+        response = self._post_webhook(
+            api_client, webhook_payload, token=non_staff_oauth_token.token
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_missing_email(self, api_client, oauth_token):
         """Test request missing email returns 400"""

@@ -11,7 +11,7 @@ from rest_framework.decorators import (
     authentication_classes,
     permission_classes,
 )
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
 from courses.api import create_local_enrollment
@@ -30,7 +30,7 @@ def openedx_private_auth_complete(request):  # noqa: ARG001
 @extend_schema(exclude=True)
 @api_view(["POST"])
 @authentication_classes([OAuth2Authentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def edx_enrollment_webhook(request):
     """
     Webhook endpoint that receives enrollment notifications from Open edX.
