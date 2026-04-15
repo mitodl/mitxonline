@@ -94,7 +94,10 @@ class ProductAdmin(VersionAdmin):
         """Soft-delete using the queryset."""
 
         with reversion.create_revision():
-            queryset.update(is_active=False)
+            for item in queryset:
+                item.is_active = False
+                item.save()
+
             reversion.set_user(request.user)
 
 
