@@ -1,5 +1,6 @@
 """Course API v3 URL configuration."""
 
+from django.urls import path
 from rest_framework import routers
 
 from courses.views import v3
@@ -19,3 +20,10 @@ router.register(
 )
 
 urlpatterns = router.urls
+urlpatterns += [
+    path(
+        "courses/<str:course_id>/outline/",
+        v3.get_course_outline,
+        name="course_outline",
+    ),
+]

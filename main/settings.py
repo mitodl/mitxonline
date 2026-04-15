@@ -1203,6 +1203,11 @@ OPENEDX_COURSE_BASE_URL_SUFFIX = get_string(
     default="/home",
     description="The suffix (with leading slash) to append to a course URL.",
 )
+OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE = get_string(
+    name="OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE",
+    default="/api/ol-course-outline/v0/{course_id}/",
+    description="Path template for Open edX course outline plugin endpoint.",
+)
 
 OPENEDX_BASE_REDIRECT_URL = get_string(
     name="OPENEDX_BASE_REDIRECT_URL",

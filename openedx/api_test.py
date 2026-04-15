@@ -10,6 +10,7 @@ import factory
 import pytest
 import responses
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
@@ -37,6 +38,7 @@ from openedx.api import (
     existing_edx_enrollment,
     generate_unique_username,
     get_edx_api_client,
+    get_edx_course_outline,
     get_edx_retirement_service_client,
     get_valid_edx_api_auth,
     process_course_run_clone,
@@ -777,6 +779,69 @@ def test_get_edx_api_client(mocker, settings, user):
     mock_refresh.assert_called_with(
         user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS
     )
+
+
+@responses.activate
+def test_get_edx_course_outline(settings):
+    """Tests that get_edx_course_outline fetches and returns outline JSON."""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "outline_token"  # noqa: S105
+    settings.OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE = (
+        "/api/ol-course-outline/v0/{course_id}/"
+    )
+    settings.EDX_API_CLIENT_TIMEOUT = 30
+
+    course_id = "course-v1:OpenedX+DemoX+DemoCourse"
+    encoded_course_id = "course-v1%3AOpenedX%2BDemoX%2BDemoCourse"
+    expected_payload = {
+        "course_id": course_id,
+        "blocks": [{"id": "block-v1:demo+type@chapter+block@week1"}],
+    }
+    resp = responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/ol-course-outline/v0/{encoded_course_id}/",
+        json=expected_payload,
+        status=status.HTTP_200_OK,
+    )
+
+    result = get_edx_course_outline(course_id)
+
+    assert result == expected_payload
+    assert resp.call_count == 1
+    assert (
+        resp.calls[0].request.headers["Authorization"]
+        == f"Bearer {settings.OPENEDX_SERVICE_WORKER_API_TOKEN}"
+    )
+
+
+@responses.activate
+def test_get_edx_course_outline_http_error(settings):
+    """Tests that get_edx_course_outline raises HTTPError on failure response."""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "outline_token"  # noqa: S105
+    settings.OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE = (
+        "/api/ol-course-outline/v0/{course_id}/"
+    )
+
+    course_id = "course-v1:OpenedX+DemoX+DemoCourse"
+    encoded_course_id = "course-v1%3AOpenedX%2BDemoX%2BDemoCourse"
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/ol-course-outline/v0/{encoded_course_id}/",
+        json={"detail": "Not found"},
+        status=status.HTTP_404_NOT_FOUND,
+    )
+
+    with pytest.raises(HTTPError):
+        get_edx_course_outline(course_id)
+
+
+def test_get_edx_course_outline_missing_service_token(settings):
+    """Tests that get_edx_course_outline requires OPENEDX_SERVICE_WORKER_API_TOKEN."""
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = None
+
+    with pytest.raises(ImproperlyConfigured):
+        get_edx_course_outline("course-v1:OpenedX+DemoX+DemoCourse")
 
 
 def test_get_edx_retirement_service_client(mocker, settings):

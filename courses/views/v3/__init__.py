@@ -10,10 +10,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import (
     IsAuthenticated,
 )
 from rest_framework.response import Response
+from rest_framework_api_key.permissions import HasAPIKey
 
 from courses.api import create_program_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
@@ -29,6 +31,7 @@ from courses.serializers.v3.programs import (
 )
 from ecommerce.models import Product
 from main import features
+from openedx.api import get_edx_course_outline
 
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
@@ -243,3 +246,17 @@ class UserProgramEnrollmentsViewSet(
             enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_UNENROLLED)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(
+    operation_id="course_outline_retrieve_v3",
+    description="Fetch course outline data for the given course key from Open edX.",
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated | HasAPIKey])
+def get_course_outline(request, course_id):  # noqa: ARG001
+    """
+    Return course outline data from Open edX for the specified course key.
+    """
+    outline_data = get_edx_course_outline(course_id)
+    return Response(outline_data, status=status.HTTP_200_OK)

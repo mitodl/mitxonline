@@ -4,7 +4,7 @@ import logging
 import random
 from datetime import datetime, timedelta
 from functools import partial
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, quote, urljoin, urlparse
 
 import requests
 from django.conf import settings
@@ -885,6 +885,44 @@ def get_edx_api_service_client():
     )
 
     return edx_client  # noqa: RET504
+
+
+def get_edx_course_outline(course_id: str) -> dict:
+    """
+    Fetch course outline data from the Open edX course outline plugin endpoint.
+
+    Args:
+        course_id (str): edX course key (e.g., course-v1:MITx+1.00x+1T2026)
+    Returns:
+        dict: Parsed JSON response from the outline API
+    """
+    if settings.OPENEDX_SERVICE_WORKER_API_TOKEN is None:
+        raise ImproperlyConfigured("OPENEDX_SERVICE_WORKER_API_TOKEN is not set")  # noqa: EM101
+
+    encoded_course_id = quote(course_id, safe="")
+    outline_path = settings.OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE.format(
+        course_id=encoded_course_id
+    )
+    outline_url = edx_url(outline_path)
+    response = requests.get(
+        outline_url,
+        headers={
+            "Authorization": f"Bearer {settings.OPENEDX_SERVICE_WORKER_API_TOKEN}"
+        },
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    )
+
+    try:
+        response.raise_for_status()
+    except HTTPError:
+        log.exception(
+            "Failed to fetch Open edX course outline for course_id=%s url=%s",
+            course_id,
+            outline_url,
+        )
+        raise
+
+    return response.json()
 
 
 def get_edx_api_jwt_client(

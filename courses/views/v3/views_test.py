@@ -636,3 +636,40 @@ def test_destroy_program_enrollment_paid_fails(user_drf_client, user):
 
     enrollment.refresh_from_db()
     assert enrollment.active is True
+
+
+def test_course_outline_v3_requires_auth():
+    """GET course outline endpoint without auth should be unauthorized/forbidden."""
+    client = APIClient()
+    resp = client.get(
+        reverse(
+            "v3:course_outline",
+            kwargs={"course_id": "course-v1:OpenedX+DemoX+DemoCourse"},
+        )
+    )
+    assert resp.status_code in (
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN,
+    )
+
+
+def test_course_outline_v3_authenticated_success(user_drf_client, mocker):
+    """Authenticated request should return proxied Open edX outline data."""
+    expected_outline = {
+        "course_id": "course-v1:OpenedX+DemoX+DemoCourse",
+        "blocks": [],
+    }
+    mocked_get_outline = mocker.patch(
+        "courses.views.v3.get_edx_course_outline", return_value=expected_outline
+    )
+
+    resp = user_drf_client.get(
+        reverse(
+            "v3:course_outline",
+            kwargs={"course_id": "course-v1:OpenedX+DemoX+DemoCourse"},
+        )
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == expected_outline
+    mocked_get_outline.assert_called_once_with("course-v1:OpenedX+DemoX+DemoCourse")
