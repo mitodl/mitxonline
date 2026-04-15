@@ -82,16 +82,20 @@ class ProductAdmin(VersionAdmin):
             super().save_model(request, obj, form, change)
             reversion.set_user(request.user)
 
-    def delete_model(self, request, obj):  # noqa: ARG002
+    def delete_model(self, request, obj):
         """Soft-delete the model."""
 
-        obj.is_active = False
-        obj.save()
+        with reversion.create_revision():
+            obj.is_active = False
+            obj.save()
+            reversion.set_user(request.user)
 
-    def delete_queryset(self, request, queryset):  # noqa: ARG002
+    def delete_queryset(self, request, queryset):
         """Soft-delete using the queryset."""
 
-        queryset.update(is_active=False)
+        with reversion.create_revision():
+            queryset.update(is_active=False)
+            reversion.set_user(request.user)
 
 
 @admin.register(Basket)
