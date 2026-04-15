@@ -60,7 +60,7 @@ class ProductAdmin(VersionAdmin):
     list_filter = ("content_type", "is_active")
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
-        product = Product.objects.get(id=object_id)
+        product = Product.all_objects.get(id=object_id)
         extra_context = {"subtitle": self.content_object(product)}
         return super(ProductAdmin, self).change_view(  # noqa: UP008
             request, object_id, form_url, extra_context
@@ -69,10 +69,6 @@ class ProductAdmin(VersionAdmin):
     def content_object(self, obj):
         """Return the content object details"""
         return str(obj.purchasable_object)
-
-    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
-        """Disable the delete permission for Product models"""
-        return False
 
     def get_queryset(self, request):  # noqa: ARG002
         """
@@ -85,6 +81,17 @@ class ProductAdmin(VersionAdmin):
         with reversion.create_revision():
             super().save_model(request, obj, form, change)
             reversion.set_user(request.user)
+
+    def delete_model(self, request, obj):  # noqa: ARG002
+        """Soft-delete the model."""
+
+        obj.is_active = False
+        obj.save()
+
+    def delete_queryset(self, request, queryset):  # noqa: ARG002
+        """Soft-delete using the queryset."""
+
+        queryset.update(is_active=False)
 
 
 @admin.register(Basket)
