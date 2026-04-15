@@ -3264,6 +3264,58 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v3/courses/{course_id}/outline/:
+    get:
+      operationId: course_outline_retrieve_v3
+      description: Fetch course outline data for the given course key from Open edX.
+      parameters:
+      - in: path
+        name: course_id
+        schema:
+          type: string
+        description: Open edX course key (URL-encoded recommended), e.g. course-v1%3AOpenedX%2BDemoX%2BDemoCourse
+        required: true
+      tags:
+      - courses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseOutlineResponse'
+              examples:
+                CourseOutlineSuccess:
+                  value:
+                    course_id: course-v1:OpenedX+DemoX+DemoCourse
+                    generated_at: '2026-04-10T07:17:20Z'
+                    modules:
+                    - id: block-v1:OpenedX+DemoX+DemoCourse+type@chapter+block@abc123
+                      title: Module 1
+                      effort_time: 0
+                      effort_activities: 0
+                      counts:
+                        videos: 2
+                        readings: 1
+                        problems: 1
+                        assignments: 0
+                        app_items: 0
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseOutlineAuthErrorResponse'
+              examples:
+                AuthError:
+                  value:
+                    detail: Authentication credentials were not provided.
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseOutlineUpstreamErrorResponse'
+          description: ''
   /api/v3/enrollments/:
     get:
       operationId: user_enrollments_list_v3
@@ -4019,6 +4071,36 @@ components:
       - programs
       - readable_id
       - title
+    CourseOutlineAuthErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    CourseOutlineResponse:
+      type: object
+      properties:
+        course_id:
+          type: string
+        generated_at:
+          type: string
+        modules:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - course_id
+      - generated_at
+      - modules
+    CourseOutlineUpstreamErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     CoursePage:
       type: object
       description: Course page model serializer
