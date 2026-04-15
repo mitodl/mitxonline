@@ -1332,6 +1332,66 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     return result
 
 
+def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObject:
+    """
+    Sync an Order with a hubspot deal using a specific HubSpot token.
+    This enables routing deals to different HubSpot accounts (e.g., UAI vs MITx Online account).
+
+    Args:
+        order (Order): The Order object.
+        token (str): The HubSpot API token to use.
+
+    Returns:
+        SimplePublicObject: The hubspot deal object
+    """
+    hubspot_client = HubspotApi(access_token=token)
+    
+    deal_input = _build_target_deal_message(order, hubspot_client)
+    contact_id = _ensure_hubspot_contact_for_user(order.purchaser, hubspot_client)
+    if not contact_id:
+        contact_body = make_contact_sync_message_from_user(order.purchaser)
+        wait_for_hubspot_rate_limit()
+        contact_result = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.CONTACTS.value,
+            simple_public_object_input_for_create=contact_body,
+        )
+        contact_id = contact_result.id
+
+    wait_for_hubspot_rate_limit()
+    result = hubspot_client.crm.objects.basic_api.create(
+        object_type=HubspotObjectType.DEALS.value,
+        simple_public_object_input_for_create=deal_input,
+    )
+
+    wait_for_hubspot_rate_limit()
+    hubspot_client.crm.associations.v4.basic_api.create_default(
+        from_object_type=HubspotObjectType.DEALS.value,
+        from_object_id=result.id,
+        to_object_type=HubspotObjectType.CONTACTS.value,
+        to_object_id=contact_id,
+    )
+
+    for line in order.lines.all():
+        line_item_input = _build_target_line_item_message(line, hubspot_client)
+        
+        wait_for_hubspot_rate_limit()
+        line_item_result = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.LINES.value,
+            simple_public_object_input_for_create=line_item_input,
+        )
+        
+
+        wait_for_hubspot_rate_limit()
+        hubspot_client.crm.associations.v4.basic_api.create_default(
+            from_object_type=HubspotObjectType.LINES.value,
+            from_object_id=line_item_result.id,
+            to_object_type=HubspotObjectType.DEALS.value,
+            to_object_id=result.id,
+        )
+
+    return result
+
+
 def sync_product_with_hubspot(product: Product) -> SimplePublicObject:
     """
     Sync a Product with a hubspot product
