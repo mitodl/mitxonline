@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0058_programpage_include_in_learn_catalog"),
+        ("cms", "0059_alter_certificatepage_verifiable_credential_criteria"),
     ]
 
     operations = [
