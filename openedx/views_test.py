@@ -126,72 +126,63 @@ class TestEdxEnrollmentWebhook:
         assert enrollment.edx_enrolled is True
         assert enrollment.enrollment_mode == "audit"
 
-    def test_missing_authorization_header(self, api_client, webhook_payload):
-        """Test request without Authorization header returns 401"""
-        response = api_client.post(
-            reverse(WEBHOOK_URL),
-            data=webhook_payload,
-            format="json",
-        )
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
-
-    def test_invalid_token(self, api_client, webhook_payload):
-        """Test request with invalid Bearer token returns 401"""
-        response = self._post_webhook(
-            api_client,
-            webhook_payload,
-            token="invalid-token",  # noqa: S106
-        )
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
-
-    def test_expired_token(self, api_client, webhook_payload, expired_oauth_token):
-        """Test request with expired OAuth2 token returns 401"""
-        response = self._post_webhook(
-            api_client, webhook_payload, token=expired_oauth_token.token
-        )
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
-
-    def test_non_staff_token_forbidden(
-        self, api_client, webhook_payload, non_staff_oauth_token
+    @pytest.mark.parametrize(
+        ("token_type", "expected_status"),
+        [
+            ("none", status.HTTP_401_UNAUTHORIZED),
+            ("invalid", status.HTTP_401_UNAUTHORIZED),
+            ("expired", status.HTTP_401_UNAUTHORIZED),
+            ("non_staff", status.HTTP_403_FORBIDDEN),
+        ],
+    )
+    def test_authentication_and_permission_failures(
+        self, request, api_client, webhook_payload, token_type, expected_status
     ):
-        """Test request with valid token but non-staff user returns 403"""
-        response = self._post_webhook(
-            api_client, webhook_payload, token=non_staff_oauth_token.token
-        )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        """Test that invalid/missing/expired tokens return 401 and non-staff returns 403"""
+        if token_type == "none":
+            token = None
+        elif token_type == "invalid":
+            token = "invalid-token"  # noqa: S106
+        elif token_type == "expired":
+            token = request.getfixturevalue("expired_oauth_token").token
+        else:
+            token = request.getfixturevalue("non_staff_oauth_token").token
 
-    def test_missing_email(self, api_client, oauth_token):
-        """Test request missing email returns 400"""
-        payload = {"course_id": "course-v1:MITx+1.001x+2025_T1", "role": "staff"}
+        response = self._post_webhook(api_client, webhook_payload, token=token)
+        assert response.status_code == expected_status
+
+    @pytest.mark.parametrize("missing_field", ["email", "course_id"])
+    def test_missing_required_field(self, api_client, oauth_token, missing_field):
+        """Test request missing a required field returns 400"""
+        payload = {
+            "email": "instructor@example.com",
+            "course_id": "course-v1:MITx+1.001x+2025_T1",
+            "role": "staff",
+        }
+        del payload[missing_field]
         response = self._post_webhook(api_client, payload, token=oauth_token.token)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_missing_course_id(self, api_client, oauth_token):
-        """Test request missing course_id returns 400"""
-        payload = {"email": "instructor@example.com", "role": "staff"}
-        response = self._post_webhook(api_client, payload, token=oauth_token.token)
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+    @pytest.mark.parametrize(
+        ("create_user", "create_course_run"),
+        [(False, True), (True, False)],
+        ids=["user_not_found", "course_run_not_found"],
+    )
+    def test_resource_not_found(
+        self, api_client, oauth_token, create_user, create_course_run
+    ):
+        """Test returns 404 when user or course run doesn't exist"""
+        email = "nonexistent@example.com"
+        course_id = "course-v1:MITx+NONEXISTENT+2025_T1"
 
-    def test_user_not_found(self, api_client, oauth_token):
-        """Test returns 404 when the user email doesn't exist"""
-        course_run = CourseRunFactory.create()
-        payload = {
-            "email": "nonexistent@example.com",
-            "course_id": course_run.courseware_id,
-            "role": "instructor",
-        }
-        response = self._post_webhook(api_client, payload, token=oauth_token.token)
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-        assert "not found" in response.data["error"]
+        if create_user:
+            user = UserFactory.create()
+            email = user.email
+        if create_course_run:
+            course_run = CourseRunFactory.create()
+            course_id = course_run.courseware_id
 
-    def test_course_run_not_found(self, api_client, oauth_token):
-        """Test returns 404 when the course run doesn't exist"""
-        user = UserFactory.create()
-        payload = {
-            "email": user.email,
-            "course_id": "course-v1:MITx+NONEXISTENT+2025_T1",
-            "role": "instructor",
-        }
+        payload = {"email": email, "course_id": course_id, "role": "instructor"}
         response = self._post_webhook(api_client, payload, token=oauth_token.token)
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.data["error"]
