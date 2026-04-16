@@ -15,4 +15,9 @@ urlpatterns = (
         views.openedx_private_auth_complete,
         name="openedx-private-oauth-complete-no-apisix",
     ),
+    path(
+        "api/openedx_webhook/enrollment/",
+        views.edx_enrollment_webhook,
+        name="openedx-enrollment-webhook",
+    ),
 )
