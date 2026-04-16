@@ -86,6 +86,15 @@ class OverrideSerializer(serializers.Serializer):
     id = serializers.CharField()
 
 
+class HowYoullLearnSerializer(serializers.Serializer):
+    """Serializer for the How You'll Learn generated property"""
+
+    key = serializers.CharField()
+    icon = serializers.CharField()
+    title = serializers.CharField()
+    text = serializers.CharField()
+
+
 class PageMetaSerializer(serializers.Serializer):
     """
     Serializer for page metadata used in various Wagtail pages.
@@ -189,6 +198,7 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
             "topic_list",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
+            "how_youll_learn",
         ]
 
         # NOTE: We use this serializer for schema generation only,
@@ -202,6 +212,7 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
     certificate_page = CertificatePageSerializer(allow_null=True)
     course_details = CourseSerializer()
     topic_list = TopicSerializer(many=True)
+    how_youll_learn = HowYoullLearnSerializer(many=True)
 
 
 class CoursePageListSerializer(serializers.Serializer):
@@ -246,6 +257,7 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
             "faculty",
             "certificate_page",
             "program_details",
+            "how_youll_learn",
         ]
 
         # NOTE: We use this serializer for schema generation only,
@@ -265,6 +277,7 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
     faculty = FacultySerializer(many=True)
     certificate_page = CertificatePageSerializer()
     program_details = ProgramSerializer()
+    how_youll_learn = HowYoullLearnSerializer(many=True)
 
 
 class ProgramPageListSerializer(serializers.Serializer):

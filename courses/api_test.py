@@ -34,6 +34,7 @@ from b2b.factories import (
 from cms.factories import CourseIndexPageFactory
 from courses.api import (
     check_course_modes,
+    create_local_enrollment,
     create_program_enrollments,
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -184,6 +185,56 @@ def _mock_edx_course_detail(coursekey, settings):
         "overview": "<h2>About This Course</h2>\n   <p>Include your long course description here. The long course description should contain 150-400 words.</p>\n",
         "pacing": "self",
     }
+
+
+@pytest.mark.parametrize(
+    "enrollment_mode", [EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
+)
+def test_create_local_enrollment_new(user, enrollment_mode):
+    """
+    create_local_enrollment should create a new CourseRunEnrollment with edx_enrolled=True
+    and the specified mode, without calling the edX API.
+    """
+    run = CourseRunFactory.create()
+
+    enrollment, created = create_local_enrollment(user, run, mode=enrollment_mode)
+
+    assert created is True
+    assert enrollment.user == user
+    assert enrollment.run == run
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
+    assert enrollment.enrollment_mode == enrollment_mode
+    assert enrollment.change_status is None
+
+
+@pytest.mark.parametrize(
+    ("existing_active", "existing_edx_enrolled"),
+    [
+        (False, False),
+        (True, True),
+    ],
+)
+def test_create_local_enrollment_existing_enrollment(
+    user,
+    existing_active,
+    existing_edx_enrolled,
+):
+    """create_local_enrollment should be idempotent and reactivate when needed."""
+    run = CourseRunFactory.create()
+    existing = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        active=existing_active,
+        edx_enrolled=existing_edx_enrolled,
+    )
+
+    enrollment, created = create_local_enrollment(user, run)
+
+    assert created is False
+    assert enrollment.id == existing.id
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
 
 
 @pytest.mark.parametrize(
