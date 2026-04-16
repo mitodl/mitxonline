@@ -44,12 +44,12 @@ def sync_hubspot_deal(order: Order):
         is_uai = is_uai_order(order)
 
         if is_uai:
-            token = getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None) or getattr(
-                settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
-            )
+            token = getattr(
+                settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
+            ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
         else:
             token = getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
-        
+
         if token:
             try:
                 tasks.sync_deal_with_hubspot_targeted.apply_async(
@@ -57,7 +57,8 @@ def sync_hubspot_deal(order: Order):
                 )
             except:  # noqa: E722
                 log.exception(
-                    "Exception calling sync_deal_with_hubspot_targeted for order %d", order.id
+                    "Exception calling sync_deal_with_hubspot_targeted for order %d",
+                    order.id,
                 )
 
 

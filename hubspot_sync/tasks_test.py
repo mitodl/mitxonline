@@ -111,7 +111,8 @@ def test_task_sync_deal_with_hubspot_targeted(mocker):
     test_token = "test-token-123"  # noqa: S105
 
     mock_api_call = mocker.patch(
-        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted", return_value=mock_result
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted",
+        return_value=mock_result,
     )
 
     assert sync_deal_with_hubspot_targeted(mock_object.id, test_token) == mock_result.id
@@ -141,7 +142,7 @@ def test_task_sync_deal_with_hubspot_targeted_api_error(mocker, status, expected
 
     mocker.patch(
         "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted",
-        side_effect=expected_error(status=status)
+        side_effect=expected_error(status=status),
     )
 
     with pytest.raises(expected_error):
