@@ -3277,6 +3277,8 @@ paths:
         required: true
       tags:
       - courses
+      security:
+      - {}
       responses:
         '200':
           content:
@@ -3300,21 +3302,32 @@ paths:
                         assignments: 0
                         app_items: 0
           description: ''
-        '403':
+        '400':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseOutlineAuthErrorResponse'
+                $ref: '#/components/schemas/CourseOutlineBadRequestResponse'
               examples:
-                AuthError:
+                InvalidCourseId:
                   value:
-                    detail: Authentication credentials were not provided.
+                    detail: Invalid course_id format. Expected an Open edX course
+                      key.
+          description: ''
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseOutlineUpstreamErrorResponse'
+              examples:
+                UpstreamError:
+                  value:
+                    detail: Unable to fetch course outline from Open edX.
           description: ''
         '500':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseOutlineUpstreamErrorResponse'
+                $ref: '#/components/schemas/CourseOutlineServerErrorResponse'
           description: ''
   /api/v3/enrollments/:
     get:
@@ -4071,7 +4084,7 @@ components:
       - programs
       - readable_id
       - title
-    CourseOutlineAuthErrorResponse:
+    CourseOutlineBadRequestResponse:
       type: object
       properties:
         detail:
@@ -4094,6 +4107,13 @@ components:
       - course_id
       - generated_at
       - modules
+    CourseOutlineServerErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     CourseOutlineUpstreamErrorResponse:
       type: object
       properties:
