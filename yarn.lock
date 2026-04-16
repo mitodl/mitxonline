@@ -3195,12 +3195,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@json-editor/json-editor@npm:2.15.2":
-  version: 2.15.2
-  resolution: "@json-editor/json-editor@npm:2.15.2"
+"@json-editor/json-editor@npm:2.16.0":
+  version: 2.16.0
+  resolution: "@json-editor/json-editor@npm:2.16.0"
   dependencies:
     core-js: ^3.27.2
-  checksum: d548be511b5e07e765e4e1f4df3df6f6ce8edd7d0fd61166c6a416cec6a95a539407e31f6b4c89bfac5858c11cb26680a1503e07dddf5ed3237ce5f0ad61bafe
+  checksum: 5ccf6cbfbbd975c4057da1a5212e81638abf255377b4050e1c5b8019df922e13ed3e4ffe60054b14e35f76445af0c506a4f328f76f9e7bd2ad4d65b887bd9063
   languageName: node
   linkType: hard
 
@@ -15820,7 +15820,7 @@ __metadata:
     "@babel/preset-react": 7.28.5
     "@babel/register": 7.28.3
     "@fancyapps/fancybox": 3.5.7
-    "@json-editor/json-editor": 2.15.2
+    "@json-editor/json-editor": 2.16.0
     "@material/layout-grid": 0.41.0
     "@material/top-app-bar": 1.1.1
     "@sentry/browser": 10.38.0
