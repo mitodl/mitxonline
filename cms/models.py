@@ -58,6 +58,7 @@ from cms.blocks import (
 from cms.constants import (
     CERTIFICATE_INDEX_SLUG,
     COURSE_INDEX_SLUG,
+    HYL_CHOICES,
     INSTRUCTOR_INDEX_SLUG,
     PROGRAM_COLLECTION_INDEX_SLUG,
     PROGRAM_INDEX_SLUG,
@@ -1295,12 +1296,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         APIField("faculty_section_title"),
         APIField("faculty"),
         APIField("certificate_page", serializer=ProductChildPageSerializer()),
-        APIField("hyl_choice_realworld_learning"),
-        APIField("hyl_choice_learn_by_doing"),
-        APIField("hyl_choice_learn_from_others"),
-        APIField("hyl_choice_learn_on_demand"),
-        APIField("hyl_choice_ai_enabled_support"),
-        APIField("hyl_choice_stackable_credentials"),
+        APIField("how_youll_learn"),
     ]
 
     subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
@@ -1360,6 +1356,16 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     def product(self):
         """Returns the courseware object (Course, Program) associated with this page"""
         raise NotImplementedError
+
+    @property
+    def how_youll_learn(self):
+        """Returns the selected choices for the How You'll Learn section."""
+
+        return [
+            {"key": key, **HYL_CHOICES[key]}
+            for key in HYL_CHOICES
+            if getattr(self, f"hyl_choice_{key}", False)
+        ]
 
     def get_url_parts(self, request=None):
         """

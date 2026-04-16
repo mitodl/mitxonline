@@ -4192,36 +4192,10 @@ components:
           nullable: true
           description: If true, allow the AI chatbots to ingest the course's content
             files.
-        hyl_choice_realworld_learning:
-          type: boolean
-          nullable: true
-          description: Learn from faculty experts who emphasize practical application
-            over theory.
-        hyl_choice_learn_by_doing:
-          type: boolean
-          nullable: true
-          description: Practice core competencies through case studies, simulations,
-            and hands-on tools.
-        hyl_choice_learn_from_others:
-          type: boolean
-          nullable: true
-          description: Connect with an international community of professionals working
-            on real-world projects.
-        hyl_choice_learn_on_demand:
-          type: boolean
-          nullable: true
-          description: Access all course content online with complete flexibility
-            to study at your own pace.
-        hyl_choice_ai_enabled_support:
-          type: boolean
-          nullable: true
-          description: Get personalized help on assignments from AskTIM, powered by
-            advanced AI.
-        hyl_choice_stackable_credentials:
-          type: boolean
-          nullable: true
-          description: Earn certificates at key milestones—module, course, and program—building
-            a portfolio of expertise.
+        how_youll_learn:
+          type: array
+          items:
+            $ref: '#/components/schemas/HowYoullLearn'
       required:
       - about
       - certificate_page
@@ -4232,12 +4206,7 @@ components:
       - faculty_section_title
       - faq_url
       - feature_image
-      - hyl_choice_ai_enabled_support
-      - hyl_choice_learn_by_doing
-      - hyl_choice_learn_from_others
-      - hyl_choice_learn_on_demand
-      - hyl_choice_realworld_learning
-      - hyl_choice_stackable_credentials
+      - how_youll_learn
       - id
       - include_in_learn_catalog
       - ingest_content_files_for_ai
@@ -5477,6 +5446,23 @@ components:
       - Elementary/primary school
       - No formal education
       - Other education
+    HowYoullLearn:
+      type: object
+      description: Serializer for the How You'll Learn generated property
+      properties:
+        key:
+          type: string
+        icon:
+          type: string
+        title:
+          type: string
+        text:
+          type: string
+      required:
+      - icon
+      - key
+      - text
+      - title
     IntegrationTypeEnum:
       enum:
       - sso
@@ -7025,36 +7011,10 @@ components:
           $ref: '#/components/schemas/CertificatePage'
         program_details:
           $ref: '#/components/schemas/V2Program'
-        hyl_choice_realworld_learning:
-          type: boolean
-          nullable: true
-          description: Learn from faculty experts who emphasize practical application
-            over theory.
-        hyl_choice_learn_by_doing:
-          type: boolean
-          nullable: true
-          description: Practice core competencies through case studies, simulations,
-            and hands-on tools.
-        hyl_choice_learn_from_others:
-          type: boolean
-          nullable: true
-          description: Connect with an international community of professionals working
-            on real-world projects.
-        hyl_choice_learn_on_demand:
-          type: boolean
-          nullable: true
-          description: Access all course content online with complete flexibility
-            to study at your own pace.
-        hyl_choice_ai_enabled_support:
-          type: boolean
-          nullable: true
-          description: Get personalized help on assignments from AskTIM, powered by
-            advanced AI.
-        hyl_choice_stackable_credentials:
-          type: boolean
-          nullable: true
-          description: Earn certificates at key milestones—module, course, and program—building
-            a portfolio of expertise.
+        how_youll_learn:
+          type: array
+          items:
+            $ref: '#/components/schemas/HowYoullLearn'
       required:
       - about
       - certificate_page
@@ -7064,12 +7024,7 @@ components:
       - faculty_section_title
       - faq_url
       - feature_image
-      - hyl_choice_ai_enabled_support
-      - hyl_choice_learn_by_doing
-      - hyl_choice_learn_from_others
-      - hyl_choice_learn_on_demand
-      - hyl_choice_realworld_learning
-      - hyl_choice_stackable_credentials
+      - how_youll_learn
       - id
       - length
       - max_price
