@@ -4192,6 +4192,10 @@ components:
           nullable: true
           description: If true, allow the AI chatbots to ingest the course's content
             files.
+        how_youll_learn:
+          type: array
+          items:
+            $ref: '#/components/schemas/HowYoullLearn'
       required:
       - about
       - certificate_page
@@ -4202,6 +4206,7 @@ components:
       - faculty_section_title
       - faq_url
       - feature_image
+      - how_youll_learn
       - id
       - include_in_learn_catalog
       - ingest_content_files_for_ai
@@ -5441,6 +5446,23 @@ components:
       - Elementary/primary school
       - No formal education
       - Other education
+    HowYoullLearn:
+      type: object
+      description: Serializer for the How You'll Learn generated property
+      properties:
+        key:
+          type: string
+        icon:
+          type: string
+        title:
+          type: string
+        text:
+          type: string
+      required:
+      - icon
+      - key
+      - text
+      - title
     IntegrationTypeEnum:
       enum:
       - sso
@@ -6989,6 +7011,10 @@ components:
           $ref: '#/components/schemas/CertificatePage'
         program_details:
           $ref: '#/components/schemas/V2Program'
+        how_youll_learn:
+          type: array
+          items:
+            $ref: '#/components/schemas/HowYoullLearn'
       required:
       - about
       - certificate_page
@@ -6998,6 +7024,7 @@ components:
       - faculty_section_title
       - faq_url
       - feature_image
+      - how_youll_learn
       - id
       - length
       - max_price
