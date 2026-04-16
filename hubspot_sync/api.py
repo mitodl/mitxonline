@@ -1345,7 +1345,7 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
         SimplePublicObject: The hubspot deal object
     """
     hubspot_client = HubspotApi(access_token=token)
-    
+
     deal_input = _build_target_deal_message(order, hubspot_client)
     contact_id = _ensure_hubspot_contact_for_user(order.purchaser, hubspot_client)
     if not contact_id:
@@ -1373,13 +1373,12 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
 
     for line in order.lines.all():
         line_item_input = _build_target_line_item_message(line, hubspot_client)
-        
+
         wait_for_hubspot_rate_limit()
         line_item_result = hubspot_client.crm.objects.basic_api.create(
             object_type=HubspotObjectType.LINES.value,
             simple_public_object_input_for_create=line_item_input,
         )
-        
 
         wait_for_hubspot_rate_limit()
         hubspot_client.crm.associations.v4.basic_api.create_default(
