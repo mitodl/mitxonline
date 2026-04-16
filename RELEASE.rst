@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.146.4
+Version 1.146.4 (Released April 16, 2026)
 ---------------
 
 - Change field to match what you learn (#3491)
