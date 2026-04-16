@@ -127,7 +127,7 @@ class TestEdxEnrollmentWebhook:
         assert enrollment.enrollment_mode == "audit"
 
     @pytest.mark.parametrize(
-        ("token_type", "expected_status"),
+        ("auth_scenario", "expected_status"),
         [
             ("none", status.HTTP_401_UNAUTHORIZED),
             ("invalid", status.HTTP_401_UNAUTHORIZED),
@@ -136,19 +136,18 @@ class TestEdxEnrollmentWebhook:
         ],
     )
     def test_authentication_and_permission_failures(
-        self, request, api_client, webhook_payload, token_type, expected_status
+        self, request, api_client, webhook_payload, auth_scenario, expected_status
     ):
         """Test that invalid/missing/expired tokens return 401 and non-staff returns 403"""
-        if token_type == "none":
-            token = None
-        elif token_type == "invalid":
-            token = "invalid-token"  # noqa: S106
-        elif token_type == "expired":
-            token = request.getfixturevalue("expired_oauth_token").token
-        else:
-            token = request.getfixturevalue("non_staff_oauth_token").token
-
-        response = self._post_webhook(api_client, webhook_payload, token=token)
+        token_map = {
+            "none": None,
+            "invalid": "invalid-token",
+            "expired": request.getfixturevalue("expired_oauth_token").token,
+            "non_staff": request.getfixturevalue("non_staff_oauth_token").token,
+        }
+        response = self._post_webhook(
+            api_client, webhook_payload, token=token_map[auth_scenario]
+        )
         assert response.status_code == expected_status
 
     @pytest.mark.parametrize("missing_field", ["email", "course_id"])
