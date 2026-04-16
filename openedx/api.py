@@ -915,26 +915,24 @@ def get_edx_course_outline(course_id: str) -> dict:
         )
         response.raise_for_status()
     except requests.exceptions.RequestException as exc:
+        message = "Open edX course outline request failed"
         log.exception(
             "Failed to fetch Open edX course outline for course_id=%s url=%s",
             course_id,
             outline_url,
         )
-        raise EdxApiCourseOutlineError(
-            "Open edX course outline request failed"
-        ) from exc
+        raise EdxApiCourseOutlineError(message) from exc
 
     try:
         return response.json()
     except (ValueError, requests.exceptions.JSONDecodeError) as exc:
+        message = "Open edX course outline response was invalid"
         log.exception(
             "Open edX course outline response was not valid JSON for course_id=%s url=%s",
             course_id,
             outline_url,
         )
-        raise EdxApiCourseOutlineError(
-            "Open edX course outline response was invalid"
-        ) from exc
+        raise EdxApiCourseOutlineError(message) from exc
 
 
 def get_edx_api_jwt_client(

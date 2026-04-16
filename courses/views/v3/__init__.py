@@ -7,7 +7,7 @@ import re
 
 import django_filters
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -342,10 +342,7 @@ def get_course_outline(request, course_id):  # noqa: ARG001
     """
     Return course outline data from Open edX for the specified course key.
     """
-    try:
-        if not re.fullmatch(COURSE_KEY_PATTERN, course_id):
-            raise ValidationError("Invalid course_id")
-    except ValidationError:
+    if not re.fullmatch(COURSE_KEY_PATTERN, course_id):
         return Response(
             {"detail": "Invalid course_id format. Expected an Open edX course key."},
             status=status.HTTP_400_BAD_REQUEST,

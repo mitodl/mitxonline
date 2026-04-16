@@ -695,7 +695,7 @@ def test_course_outline_v3_invalid_course_id():
 
 
 @pytest.mark.parametrize(
-    "exception_instance,expected_detail",
+    ("exception_instance", "expected_detail"),
     [
         (
             EdxApiCourseOutlineError("boom"),
