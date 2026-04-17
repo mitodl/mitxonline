@@ -717,29 +717,31 @@ def test_ensure_target_hubspot_product_for_line_creates_when_missing(
 
 def test_get_course_run_certificate_hubspot_property_removes_semicolons():
     """Test that _get_course_run_certificate_hubspot_property removes semicolons from course run names."""
-    from courses.factories import ProgramFactory
-    
+
     # Create course runs with semicolons in their titles
     course_run_with_semicolon = CourseRunFactory.create(
         title="Information and Entropy; Energy and Exergy",
-        courseware_id="course-v1:MITxT+8.014x+2T2025"
+        courseware_id="course-v1:MITxT+8.014x+2T2025",
     )
     course_run_normal = CourseRunFactory.create(
-        title="Normal Course Title",
-        courseware_id="course-v1:MIT+6.00x+2026"
+        title="Normal Course Title", courseware_id="course-v1:MIT+6.00x+2026"
     )
-    
+
     property_dict = api._get_course_run_certificate_hubspot_property()
-    
+
     # Check that the property structure is correct
     assert property_dict["name"] == "course_run_certificates"
     assert property_dict["type"] == "enumeration"
     assert property_dict["fieldType"] == "checkbox"
-    
+
     # Check that semicolons are removed from options
     options = property_dict["options"]
-    course_run_options = [opt for opt in options if course_run_with_semicolon.courseware_id in opt["value"]]
-    
+    course_run_options = [
+        opt
+        for opt in options
+        if course_run_with_semicolon.courseware_id in opt["value"]
+    ]
+
     assert len(course_run_options) == 1
     option = course_run_options[0]
     assert ";" not in option["value"]
@@ -750,28 +752,28 @@ def test_get_course_run_certificate_hubspot_property_removes_semicolons():
 def test_get_program_certificate_hubspot_property_removes_semicolons():
     """Test that _get_program_certificate_hubspot_property removes semicolons from program names."""
     from courses.factories import ProgramFactory
-    
+
     # Create programs with semicolons in their titles
     program_with_semicolon = ProgramFactory.create(
-        title="Test Program; With Semicolon",
-        readable_id="test-program-with-semicolon"
+        title="Test Program; With Semicolon", readable_id="test-program-with-semicolon"
     )
     program_normal = ProgramFactory.create(
-        title="Normal Program Title",
-        readable_id="normal-program"
+        title="Normal Program Title", readable_id="normal-program"
     )
-    
+
     property_dict = api._get_program_certificate_hubspot_property()
-    
+
     # Check that the property structure is correct
     assert property_dict["name"] == "program_certificates"
     assert property_dict["type"] == "enumeration"
     assert property_dict["fieldType"] == "checkbox"
-    
+
     # Check that semicolons are removed from options
     options = property_dict["options"]
-    program_options = [opt for opt in options if program_with_semicolon.readable_id in opt["value"]]
-    
+    program_options = [
+        opt for opt in options if program_with_semicolon.readable_id in opt["value"]
+    ]
+
     assert len(program_options) == 1
     option = program_options[0]
     assert ";" not in option["value"]
