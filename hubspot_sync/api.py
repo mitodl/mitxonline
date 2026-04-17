@@ -679,8 +679,8 @@ def _get_course_run_certificate_hubspot_property():
     course_runs = CourseRun.objects.all()
     options_array = [
         {
-            "value": str(course_run),
-            "label": str(course_run),
+            "value": str(course_run).replace(";", ""),
+            "label": str(course_run).replace(";", ""),
             "hidden": False,
         }
         for course_run in course_runs
@@ -708,8 +708,8 @@ def _get_program_certificate_hubspot_property():
     programs = Program.objects.all()
     options_array = [
         {
-            "value": str(program),
-            "label": str(program),
+            "value": str(program).replace(";", ""),
+            "label": str(program).replace(";", ""),
             "hidden": False,
         }
         for program in programs
