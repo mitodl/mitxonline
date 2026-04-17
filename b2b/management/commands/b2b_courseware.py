@@ -14,6 +14,7 @@ from opaque_keys import InvalidKeyError
 
 from b2b.api import create_contract_run, import_and_create_contract_run
 from b2b.models import ContractPage, ContractProgramItem
+from b2b.tasks import queue_enrollment_code_check
 from courses.api import resolve_courseware_object_from_id
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import CourseRun, CourseRunEnrollment
@@ -33,7 +34,7 @@ Courseware objects can be course runs, courses, or programs. specified by their 
 Specifying courseware: You must specify one courseware item (of any type). You can specify more than one by adding "--also <courseware id>" to the end of the command. You can repeat this as many times as necessary.
 
 To add courseware:
-   b2b_courseware add [--import <departments>] [--no-create-runs] [--force] [--prefix <prefix>] <contract> <courseware> [--also <courseware>] [--also <courseware>...]
+   b2b_courseware add [--import <departments>] [--no-create-runs] [--force] [--prefix <prefix>] [--make-codes] <contract> <courseware> [--also <courseware>] [--also <courseware>...]
 
 Example: b2b_courseware add contract-100-101 program-v1:UAI+Fundamentals --also course-v1:UAI_C100+14.314x+2025_C101
 
@@ -153,6 +154,11 @@ Specifying a program will only unlink the program from the contract, unless "--r
             help=f"Organization prefix for the resulting course run. (Defaults to the org setting, or {UAI_COURSEWARE_ID_PREFIX}.)",
             type=str,
         )
+        add_subparser.add_argument(
+            "--make-codes",
+            action="store_true",
+            help="Create enrollment codes after adding course(s) to the contract. (Skips this by default; run b2b_codes validate afterward if the contract requires codes.)",
+        )
 
         remove_subparser = subparsers.add_parser(
             "remove",
@@ -174,6 +180,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
         force_associate = kwargs.pop("force")
         can_import = kwargs.pop("can_import")
         org_prefix = kwargs.pop("prefix")
+        make_codes = kwargs.pop("make_codes", False)
 
         managed = skipped = 0
 
@@ -296,7 +303,9 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 )
                 skipped += 1
 
-        contract.save()
+        if managed > 0 and make_codes:
+            self.stdout.write("Queueing enrollment code check for {contract}")
+            queue_enrollment_code_check.delay(contract.id)
 
         self.stdout.write(
             self.style.SUCCESS(

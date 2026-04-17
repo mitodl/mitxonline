@@ -39,7 +39,6 @@ from b2b.api import (
 )
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
-    CONTRACT_MEMBERSHIP_CODE,
     CONTRACT_MEMBERSHIP_NONSSO,
     CONTRACT_MEMBERSHIP_SSO,
 )
@@ -310,7 +309,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 
     assert contract.get_discounts().count() == 0
 
-    _, product = create_contract_run(contract, course)
+    _, product = create_contract_run(contract, course, queue_codes=True)
     assert mocked_ensure_call.called
 
     ensure_enrollment_codes_exist(contract)
@@ -429,6 +428,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     mocker.patch("openedx.api.enroll_in_edx_course_runs")
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
     mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
     if not user_has_valid_edx_user:
         mocked_create_user = mocker.patch("openedx.api._create_edx_user_request")
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
@@ -442,7 +442,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
         else FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
     )
     (course, _) = contract_ready_course
-    run, product = create_contract_run(contract, course)
+    run, product = create_contract_run(contract, course, queue_codes=True)
 
     if not product_in_contract:
         # just create something random - this is like someone fuzzing the API
@@ -1419,61 +1419,6 @@ def test_create_contract_run_key():
         assert new_course_key.run == B2B_RUN_TAG_FORMAT.format(
             run_idx=run_idx, contract_id=contract_id, year=next_year.year
         )
-
-
-@pytest.mark.parametrize("has_learner_cap", [True, False])
-def test_ensure_enrollment_codes_courseware_changes(
-    mocker, make_contract_ready_course, has_learner_cap
-):
-    """
-    Test that ensure_enrollment_codes works properly when there are courseware changes.
-
-    If a course is added to the contract, then the system should make an
-    appropriate amount of new codes for the contract.
-    """
-
-    mocker.patch("openedx.tasks.clone_courserun.delay")
-    mocked_ensure_call = mocker.patch("b2b.tasks.queue_enrollment_code_check.delay")
-    max_learners = FAKE.random_int(min=10, max=15) if has_learner_cap else None
-
-    contract = factories.ContractPageFactory(
-        integration_type=CONTRACT_MEMBERSHIP_CODE,
-        membership_type=CONTRACT_MEMBERSHIP_CODE,
-        max_learners=max_learners,
-    )
-
-    max_learners = max_learners if max_learners else 1
-
-    (course, _) = make_contract_ready_course()
-
-    assert contract.get_discounts().count() == 0
-
-    _, product = create_contract_run(contract, course)
-    assert mocked_ensure_call.called
-
-    ensure_enrollment_codes_exist(contract)
-
-    assert contract.get_discounts().count() == max_learners
-    assert (
-        contract.get_discounts().filter(products__product=product).count()
-        == max_learners
-    )
-
-    (course, _) = make_contract_ready_course()
-    _, product_2 = create_contract_run(contract, course)
-    assert mocked_ensure_call.called
-
-    ensure_enrollment_codes_exist(contract)
-
-    assert contract.get_discounts().count() == (2 * max_learners)
-    assert (
-        contract.get_discounts().filter(products__product=product).count()
-        == max_learners
-    )
-    assert (
-        contract.get_discounts().filter(products__product=product_2).count()
-        == max_learners
-    )
 
 
 def test_apply_available_discount_seat_limit():

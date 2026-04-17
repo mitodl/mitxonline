@@ -32,7 +32,7 @@ from b2b.models import (
     OrganizationPage,
     UserOrganization,
 )
-from b2b.tasks import queue_contract_sheet_update_post_save
+from b2b.tasks import queue_contract_sheet_update_post_save, queue_enrollment_code_check
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun, Department, EnrollmentMode
@@ -286,6 +286,7 @@ def create_contract_run(  # noqa: PLR0913
     require_designated_source_run=True,
     org_prefix: str | None = UAI_COURSEWARE_ID_PREFIX,
     no_reruns: bool = False,
+    queue_codes: bool = False,
 ) -> tuple[CourseRun, Product]:
     """
     Create a run for the specified contract.
@@ -435,9 +436,8 @@ def create_contract_run(  # noqa: PLR0913
             contract,
         )
 
-    # Saving the contract here triggers any shoring up of related data that we
-    # need to do, like generating enrollment codes.
-    contract.save()
+    if queue_codes:
+        queue_enrollment_code_check.delay(contract.id)
 
     return course_run, course_run_product
 

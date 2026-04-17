@@ -337,6 +337,7 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
 def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrollable):
     """Make sure that hitting the enroll endpoint actually results in enrollments"""
 
+    mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
     mocked_create_from_id = mocker.patch("openedx.tasks.create_user_from_id")
     mocker.patch("openedx.tasks.clone_courserun.delay")
     mocked_create_user_request = mocker.patch("openedx.api._create_edx_user_request")
@@ -349,7 +350,9 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrol
     )
     source_courserun = CourseRunFactory.create(is_source_run=True)
 
-    courserun, _ = create_contract_run(contract, source_courserun.course)
+    courserun, _ = create_contract_run(
+        contract, source_courserun.course, queue_codes=True
+    )
 
     if not run_is_enrollable:
         courserun.live = False

@@ -26,7 +26,6 @@ from b2b.constants import (
     ORG_INDEX_SLUG,
 )
 from b2b.exceptions import TargetCourseRunExistsError
-from b2b.tasks import queue_enrollment_code_check
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
 
@@ -430,7 +429,6 @@ class ContractPage(Page, ClusterableModel):
         self.membership_type = self.integration_type
 
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
-        queue_enrollment_code_check.delay(self.id)
 
     def get_learners(self):
         """Get the learners associated with this organization."""
