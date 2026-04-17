@@ -1098,9 +1098,12 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
             request.user,
             product,
             is_uai=(
-                is_product_courserun(product) and is_uai_course_run(product.purchasable_object)
-            ) or (
-                is_product_program(product) and is_uai_program(product.purchasable_object)
+                is_product_courserun(product)
+                and is_uai_course_run(product.purchasable_object)
+            )
+            or (
+                is_product_program(product)
+                and is_uai_program(product.purchasable_object)
             ),
         )
 

@@ -721,7 +721,7 @@ def test_get_course_run_certificate_hubspot_property_removes_semicolons():
     # Create course runs with semicolons in their titles
     course_run_with_semicolon = CourseRunFactory.create(
         title="Information and Entropy; Energy and Exergy",
-        courseware_id="course-v1:MITxT+8.014x+2T2025"
+        courseware_id="course-v1:MITxT+8.014x+2T2025",
     )
 
     property_dict = api._get_course_run_certificate_hubspot_property()
@@ -746,8 +746,7 @@ def test_get_program_certificate_hubspot_property_removes_semicolons():
     """Test that _get_program_certificate_hubspot_property removes semicolons from program names."""
     # Create programs with semicolons in their titles
     program_with_semicolon = ProgramFactory.create(
-        title="Test Program; With Semicolon",
-        readable_id="test-program-with-semicolon"
+        title="Test Program; With Semicolon", readable_id="test-program-with-semicolon"
     )
 
     property_dict = api._get_program_certificate_hubspot_property()
