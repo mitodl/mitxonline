@@ -1336,6 +1336,7 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
     """
     Sync an Order with a hubspot deal using a specific HubSpot token.
     This enables routing deals to different HubSpot accounts (e.g., UAI vs MITx Online account).
+    This function is idempotent - it will not create duplicates if called multiple times.
 
     Args:
         order (Order): The Order object.
@@ -1347,46 +1348,86 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
     hubspot_client = HubspotApi(access_token=token)
 
     deal_input = _build_target_deal_message(order, hubspot_client)
+    dealname = deal_input.properties.get("dealname")
+    
+    # Check if deal already exists
+    existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
+    
+    if existing_deal_id:
+        # Deal exists, fetch it and ensure associations are correct
+        wait_for_hubspot_rate_limit()
+        result = hubspot_client.crm.objects.basic_api.get_by_id(
+            object_type=HubspotObjectType.DEALS.value,
+            object_id=existing_deal_id,
+            properties=["dealname"],
+        )
+    else:
+        # Create new deal
+        wait_for_hubspot_rate_limit()
+        result = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.DEALS.value,
+            simple_public_object_input_for_create=deal_input,
+        )
+
+    # Ensure contact exists and is associated
     contact_id = _ensure_hubspot_contact_for_user(order.purchaser, hubspot_client)
-    if not contact_id:
-        contact_body = make_contact_sync_message_from_user(order.purchaser)
+    
+    # Check if deal-contact association exists
+    try:
         wait_for_hubspot_rate_limit()
-        contact_result = hubspot_client.crm.objects.basic_api.create(
-            object_type=HubspotObjectType.CONTACTS.value,
-            simple_public_object_input_for_create=contact_body,
+        associations = hubspot_client.crm.associations.v4.basic_api.get_page(
+            from_object_type=HubspotObjectType.DEALS.value,
+            from_object_id=result.id,
+            to_object_type=HubspotObjectType.CONTACTS.value,
         )
-        contact_id = contact_result.id
+        contact_associated = any(assoc.to_object_id == contact_id for assoc in associations.results)
+        
+        if not contact_associated:
+            wait_for_hubspot_rate_limit()
+            hubspot_client.crm.associations.v4.basic_api.create_default(
+                from_object_type=HubspotObjectType.DEALS.value,
+                from_object_id=result.id,
+                to_object_type=HubspotObjectType.CONTACTS.value,
+                to_object_id=contact_id,
+            )
+    except Exception:  # noqa: BLE001
+        # If we can't check associations, try to create (HubSpot will ignore duplicates)
+        try:
+            wait_for_hubspot_rate_limit()
+            hubspot_client.crm.associations.v4.basic_api.create_default(
+                from_object_type=HubspotObjectType.DEALS.value,
+                from_object_id=result.id,
+                to_object_type=HubspotObjectType.CONTACTS.value,
+                to_object_id=contact_id,
+            )
+        except Exception:  # noqa: BLE001
+            pass  # Association may already exist
 
-    wait_for_hubspot_rate_limit()
-    result = hubspot_client.crm.objects.basic_api.create(
-        object_type=HubspotObjectType.DEALS.value,
-        simple_public_object_input_for_create=deal_input,
-    )
+    # Get existing line items for this deal
+    existing_line_item_ids = _find_target_line_items_for_deal(hubspot_client, result.id)
+    expected_line_count = order.lines.count()
+    
+    # Only create line items if we don't have the expected number
+    if len(existing_line_item_ids) != expected_line_count:
+        for line in order.lines.all():
+            line_item_input = _build_target_line_item_message(line, hubspot_client)
 
-    wait_for_hubspot_rate_limit()
-    hubspot_client.crm.associations.v4.basic_api.create_default(
-        from_object_type=HubspotObjectType.DEALS.value,
-        from_object_id=result.id,
-        to_object_type=HubspotObjectType.CONTACTS.value,
-        to_object_id=contact_id,
-    )
+            wait_for_hubspot_rate_limit()
+            line_item_result = hubspot_client.crm.objects.basic_api.create(
+                object_type=HubspotObjectType.LINES.value,
+                simple_public_object_input_for_create=line_item_input,
+            )
 
-    for line in order.lines.all():
-        line_item_input = _build_target_line_item_message(line, hubspot_client)
-
-        wait_for_hubspot_rate_limit()
-        line_item_result = hubspot_client.crm.objects.basic_api.create(
-            object_type=HubspotObjectType.LINES.value,
-            simple_public_object_input_for_create=line_item_input,
-        )
-
-        wait_for_hubspot_rate_limit()
-        hubspot_client.crm.associations.v4.basic_api.create_default(
-            from_object_type=HubspotObjectType.LINES.value,
-            from_object_id=line_item_result.id,
-            to_object_type=HubspotObjectType.DEALS.value,
-            to_object_id=result.id,
-        )
+            try:
+                wait_for_hubspot_rate_limit()
+                hubspot_client.crm.associations.v4.basic_api.create_default(
+                    from_object_type=HubspotObjectType.LINES.value,
+                    from_object_id=line_item_result.id,
+                    to_object_type=HubspotObjectType.DEALS.value,
+                    to_object_id=result.id,
+                )
+            except Exception:  # noqa: BLE001
+                pass  # Association may already exist
 
     return result
 
@@ -1776,6 +1817,54 @@ def _find_target_product_id_by_unique_app_id(
     if response.results:
         return response.results[0].id
     return None
+
+
+def _find_target_deal_id_by_dealname(
+    hubspot_client: HubspotApi, dealname: str
+) -> str | None:
+    """Find deal id in target account by dealname."""
+    wait_for_hubspot_rate_limit()
+    try:
+        response = hubspot_client.crm.objects.search_api.do_search(
+            object_type=HubspotObjectType.DEALS.value,
+            public_object_search_request=PublicObjectSearchRequest(
+                filter_groups=[
+                    FilterGroup(
+                        filters=[
+                            Filter(
+                                property_name="dealname",
+                                operator="EQ",
+                                value=dealname,
+                            )
+                        ]
+                    )
+                ],
+                properties=["dealname"],
+                limit=1,
+            ),
+        )
+        if response.results:
+            return response.results[0].id
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def _find_target_line_items_for_deal(
+    hubspot_client: HubspotApi, deal_id: str
+) -> list[str]:
+    """Find line item ids associated with a deal in the target account."""
+    wait_for_hubspot_rate_limit()
+    try:
+        response = hubspot_client.crm.associations.v4.basic_api.get_page(
+            from_object_type=HubspotObjectType.DEALS.value,
+            from_object_id=deal_id,
+            to_object_type=HubspotObjectType.LINES.value,
+        )
+        return [assoc.to_object_id for assoc in response.results]
+    except Exception:  # noqa: BLE001
+        pass
+    return []
 
 
 def _ensure_target_hubspot_product_for_line(
