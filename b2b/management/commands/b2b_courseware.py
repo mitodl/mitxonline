@@ -303,8 +303,8 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 )
                 skipped += 1
 
-        if managed > 0 and make_codes:
-            self.stdout.write("Queueing enrollment code check for {contract}")
+        if make_codes:
+            self.stdout.write(f"Queueing enrollment code check for {contract}")
             queue_enrollment_code_check.delay(contract.id)
 
         self.stdout.write(
