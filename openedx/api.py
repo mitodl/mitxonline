@@ -407,6 +407,19 @@ def _create_edx_user_request(open_edx_user, user, access_token):  # noqa: C901, 
         lock.release()
 
 
+def _edx_user_exists(user):
+    """
+    Returns True if the user can be verified to exist in edX, False otherwise.
+    """
+    try:
+        client = get_edx_api_client(user)
+        if client is not None:
+            client.user_info.get_user_info()
+    except:  # noqa: E722
+        return False
+    return True
+
+
 def create_edx_user(user, edx_username=None):
     """
     Makes a request to create an equivalent user in Open edX
@@ -442,17 +455,11 @@ def create_edx_user(user, edx_username=None):
         log.warning("create_edx_user: skipping create for %s, no edx_username", user)
         return False
 
-    if open_edx_user.has_been_synced:
-        # Here we should check with edx that the user exists on that end.
-        try:
-            client = get_edx_api_client(user)
-            client.user_info.get_user_info()
-        except:  # noqa: S110, E722
-            pass
-        else:
-            open_edx_user.has_been_synced = True
-            open_edx_user.save()
-            return False
+    if open_edx_user.has_been_synced and _edx_user_exists(user):
+        # User already exists in edX, mark as synced and skip creation
+        open_edx_user.has_been_synced = True
+        open_edx_user.save()
+        return False
 
     try:
         return _create_edx_user_request(open_edx_user, user, access_token)
@@ -857,7 +864,14 @@ def get_edx_api_client(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS)
     # has an OpenEdxApiAuth record before we try to read it. It is idempotent: internally
     # it uses get_or_create, so calling it on every request is safe and causes no side
     # effects when the record already exists.
-    create_edx_auth_token(user)
+    if create_edx_auth_token(user) is None:
+        if settings.FEATURES.get(features.IGNORE_EDX_FAILURES, False):
+            log.warning(
+                "get_edx_api_client: user %s is not yet synced with edX, skipping", user
+            )
+            return None
+        raise NoEdxApiAuthError(f"{user!s} is not yet synced with edX")  # noqa: EM102
+
     try:
         auth = get_valid_edx_api_auth(user, ttl_in_seconds=ttl_in_seconds)
     except OpenEdxApiAuth.DoesNotExist:
@@ -1284,6 +1298,8 @@ def update_edx_user_name(user):
         UserNameUpdateFailedException: Raised if underlying edX API request fails due to any reason
     """
     edx_client = get_edx_api_client(user)
+    if edx_client is None:
+        return None
     try:
         return edx_client.user_info.update_user_name(user.edx_username, user.name)
     except Exception as exc:  # noqa: BLE001
@@ -1298,6 +1314,8 @@ def sync_enrollments_with_edx(
 ) -> SyncResult[courses.models.CourseRunEnrollment]:
     """Syncs enrollment records so that local enrollments match the enrollment data in edX"""
     client = get_edx_api_client(user)
+    if client is None:
+        return SyncResult()
     edx_enrollments = client.enrollments.get_student_enrollments()
     local_enrollments = (
         user.courserunenrollment_set(manager="all_objects")
@@ -1374,6 +1392,8 @@ def subscribe_to_edx_course_emails(user, course_run):
         EdxApiChangeEmailSettingsException: Raised if an unknown error was encountered during the edX API request
     """
     edx_client = get_edx_api_client(user)
+    if edx_client is None:
+        return None
     try:
         result = edx_client.email_settings.subscribe(course_run.courseware_id)
     except HTTPError as exc:
@@ -1400,6 +1420,8 @@ def unsubscribe_from_edx_course_emails(user, course_run):
         EdxApiChangeEmailSettingsException: Raised if an unknown error was encountered during the edX API request
     """
     edx_client = get_edx_api_client(user)
+    if edx_client is None:
+        return None
     try:
         result = edx_client.email_settings.unsubscribe(course_run.courseware_id)
     except HTTPError as exc:
