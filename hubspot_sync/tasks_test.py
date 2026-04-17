@@ -116,7 +116,9 @@ def test_task_sync_deal_with_hubspot_targeted(mocker, settings):
         return_value=mock_result,
     )
 
-    assert sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False) == mock_result.id
+    assert (
+        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False) == mock_result.id
+    )
     mock_api_call.assert_called_once_with(mock_object, test_token)
 
 
@@ -137,7 +139,9 @@ def test_task_sync_deal_with_hubspot_targeted_order_not_found(mocker, settings):
     "status, expected_error",  # noqa: PT006
     [[429, TooManyRequestsException], [500, ApiException]],  # noqa: PT007
 )
-def test_task_sync_deal_with_hubspot_targeted_api_error(mocker, status, expected_error, settings):
+def test_task_sync_deal_with_hubspot_targeted_api_error(
+    mocker, status, expected_error, settings
+):
     """sync_deal_with_hubspot_targeted should propagate API exceptions properly"""
     mock_object = OrderFactory.create()
     test_token = "test-token-123"  # noqa: S105
@@ -164,7 +168,9 @@ def test_task_sync_deal_with_hubspot_targeted_uai_order(mocker, settings):
         return_value=mock_result,
     )
 
-    assert sync_deal_with_hubspot_targeted(mock_object.id, is_uai=True) == mock_result.id
+    assert (
+        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=True) == mock_result.id
+    )
     mock_api_call.assert_called_once_with(mock_object, uai_token)
 
 
@@ -172,8 +178,10 @@ def test_task_sync_deal_with_hubspot_targeted_no_token_error(mocker, settings):
     """sync_deal_with_hubspot_targeted should raise ValueError when no token is available"""
     mock_object = OrderFactory.create()
     # Don't set any tokens in settings
-    
-    with pytest.raises(ValueError, match="No HubSpot token available for standard account"):
+
+    with pytest.raises(
+        ValueError, match="No HubSpot token available for standard account"
+    ):
         sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False)
 
     with pytest.raises(ValueError, match="No HubSpot token available for UAI account"):
