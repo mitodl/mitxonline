@@ -733,7 +733,11 @@ def test_get_course_run_certificate_hubspot_property_removes_semicolons():
 
     # Check that semicolons are removed from options
     options = property_dict["options"]
-    course_run_options = [opt for opt in options if course_run_with_semicolon.courseware_id in opt["value"]]
+    course_run_options = [
+        opt
+        for opt in options
+        if course_run_with_semicolon.courseware_id in opt["value"]
+    ]
 
     assert len(course_run_options) == 1
     option = course_run_options[0]
@@ -758,7 +762,9 @@ def test_get_program_certificate_hubspot_property_removes_semicolons():
 
     # Check that semicolons are removed from options
     options = property_dict["options"]
-    program_options = [opt for opt in options if program_with_semicolon.readable_id in opt["value"]]
+    program_options = [
+        opt for opt in options if program_with_semicolon.readable_id in opt["value"]
+    ]
 
     assert len(program_options) == 1
     option = program_options[0]
