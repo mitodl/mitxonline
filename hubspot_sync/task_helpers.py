@@ -55,7 +55,7 @@ def sync_hubspot_deal(order: Order):
         if token_exists:
             try:
                 tasks.sync_deal_with_hubspot_targeted.apply_async(
-                    args=(order.id, is_uai), countdown=10
+                    args=(order.id,), kwargs={"is_uai": is_uai}, countdown=10
                 )
             except:  # noqa: E722
                 log.exception(

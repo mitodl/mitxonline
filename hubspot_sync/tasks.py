@@ -211,7 +211,7 @@ def sync_deal_with_hubspot(order_id: int) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_deal_with_hubspot_targeted(order_id: int, is_uai: bool) -> str:
+def sync_deal_with_hubspot_targeted(order_id: int, *, is_uai: bool) -> str:
     """
     Sync an Order with a hubspot deal using the appropriate HubSpot token.
     This allows routing UAI orders to the UAI HubSpot account.
@@ -232,7 +232,9 @@ def sync_deal_with_hubspot_targeted(order_id: int, is_uai: bool) -> str:
         token = getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
     
     if not token:
-        raise ValueError(f"No HubSpot token available for {'UAI' if is_uai else 'standard'} account")
+        account_type = \"UAI\" if is_uai else \"standard\"
+        error_message = f\"No HubSpot token available for {account_type} account\"
+        raise ValueError(error_message)
     
     return api.sync_deal_with_hubspot_targeted(Order.objects.get(id=order_id), token).id
 

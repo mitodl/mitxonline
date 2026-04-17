@@ -1401,7 +1401,11 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
                 to_object_id=contact_id,
             )
         except Exception:  # noqa: BLE001
-            pass  # Association may already exist
+            log.exception(
+                "Failed to create deal-contact association for deal %s and contact %s",
+                result.id,
+                contact_id,
+            )
 
     # Get existing line items for this deal
     existing_line_item_ids = _find_target_line_items_for_deal(hubspot_client, result.id)
@@ -1427,7 +1431,11 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
                     to_object_id=result.id,
                 )
             except Exception:  # noqa: BLE001
-                pass  # Association may already exist
+                log.exception(
+                    "Failed to create line-deal association for line %s and deal %s",
+                    line_item_result.id,
+                    result.id,
+                )
 
     return result
 
@@ -1846,7 +1854,7 @@ def _find_target_deal_id_by_dealname(
         if response.results:
             return response.results[0].id
     except Exception:  # noqa: BLE001
-        pass
+        log.exception("Failed to search for deal by dealname: %s", dealname)
     return None
 
 
@@ -1863,7 +1871,7 @@ def _find_target_line_items_for_deal(
         )
         return [assoc.to_object_id for assoc in response.results]
     except Exception:  # noqa: BLE001
-        pass
+        log.exception("Failed to get line items for deal: %s", deal_id)
     return []
 
 
