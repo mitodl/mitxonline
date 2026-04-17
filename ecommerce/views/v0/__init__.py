@@ -31,7 +31,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
 from courses.models import Course, CourseRun, Program, ProgramRun
-from courses.utils import is_uai_course_run
+from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
@@ -237,7 +237,11 @@ def _create_basket_from_product(
         sync_hubspot_cart_add(
             request.user,
             product,
-            is_uai_course=is_uai_course_run(product.purchasable_object),
+            is_uai=(
+                is_product_courserun(product) and is_uai_course_run(product.purchasable_object)
+            ) or (
+                is_product_program(product) and is_uai_program(product.purchasable_object)
+            ),
         )
 
     existing_basket_discounts = [bd.redeemed_discount for bd in basket.discounts.all()]
@@ -385,7 +389,11 @@ def create_basket_with_products(request):
                 sync_hubspot_cart_add(
                     request.user,
                     product,
-                    is_uai_course=is_uai_course_run(product.purchasable_object),
+                    is_uai=(
+                        is_product_courserun(product) and is_uai_course_run(product.purchasable_object)
+                    ) or (
+                        is_product_program(product) and is_uai_program(product.purchasable_object)
+                    ),
                 )
     except ProductBlockedError:
         return Response(

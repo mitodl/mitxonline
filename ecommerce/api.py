@@ -25,7 +25,7 @@ from b2b.api import (
 )
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-from courses.utils import is_uai_course_run
+from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
@@ -1097,7 +1097,11 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         sync_hubspot_cart_add(
             request.user,
             product,
-            is_uai_course=is_uai_course_run(product.purchasable_object),
+            is_uai=(
+                is_product_courserun(product) and is_uai_course_run(product.purchasable_object)
+            ) or (
+                is_product_program(product) and is_uai_program(product.purchasable_object)
+            ),
         )
 
     if Decimal(

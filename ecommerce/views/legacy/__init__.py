@@ -39,7 +39,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
 from courses.models import Course, CourseRun, Program, ProgramRun
-from courses.utils import is_uai_course_run
+from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce import api
 from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.discounts import DiscountType
@@ -726,7 +726,11 @@ class CheckoutApiViewSet(ViewSet):
                         sync_hubspot_cart_add(
                             self.request.user,
                             product,
-                            is_uai_course=is_uai_course_run(product.purchasable_object),
+                            is_uai=(
+                                is_product_courserun(product) and is_uai_course_run(product.purchasable_object)
+                            ) or (
+                                is_product_program(product) and is_uai_program(product.purchasable_object)
+                            ),
                         )
             else:
                 # Legacy behavior: add single item
@@ -738,7 +742,11 @@ class CheckoutApiViewSet(ViewSet):
                     sync_hubspot_cart_add(
                         self.request.user,
                         product,
-                        is_uai_course=is_uai_course_run(product.purchasable_object),
+                        is_uai=(
+                            is_product_courserun(product) and is_uai_course_run(product.purchasable_object)
+                        ) or (
+                            is_product_program(product) and is_uai_program(product.purchasable_object)
+                        ),
                     )
 
         return Response(
