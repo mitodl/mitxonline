@@ -413,8 +413,9 @@ def _edx_user_exists(user):
     """
     try:
         client = get_edx_api_client(user)
-        if client is not None:
-            client.user_info.get_user_info()
+        if client is None:
+            return False
+        client.user_info.get_user_info()
     except:  # noqa: E722
         return False
     return True
