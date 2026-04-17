@@ -230,10 +230,12 @@ def sync_deal_with_hubspot_targeted(order_id: int, is_uai: bool) -> str:
         ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
     else:
         token = getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
-    
+
     if not token:
-        raise ValueError(f"No HubSpot token available for {'UAI' if is_uai else 'standard'} account")
-    
+        raise ValueError(
+            f"No HubSpot token available for {'UAI' if is_uai else 'standard'} account"
+        )
+
     return api.sync_deal_with_hubspot_targeted(Order.objects.get(id=order_id), token).id
 
 
