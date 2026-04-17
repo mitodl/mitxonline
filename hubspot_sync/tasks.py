@@ -230,7 +230,7 @@ def sync_deal_with_hubspot_targeted(order_id: int, *, is_uai: bool) -> str:
         ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
     else:
         token = getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
-    
+
     if not token:
         account_type = \"UAI\" if is_uai else \"standard\"
         error_message = f\"No HubSpot token available for {account_type} account\"

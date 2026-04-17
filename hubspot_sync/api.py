@@ -1349,10 +1349,10 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
 
     deal_input = _build_target_deal_message(order, hubspot_client)
     dealname = deal_input.properties.get("dealname")
-    
+
     # Check if deal already exists
     existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
-    
+
     if existing_deal_id:
         # Deal exists, fetch it and ensure associations are correct
         wait_for_hubspot_rate_limit()
@@ -1371,7 +1371,7 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
 
     # Ensure contact exists and is associated
     contact_id = _ensure_hubspot_contact_for_user(order.purchaser, hubspot_client)
-    
+
     # Check if deal-contact association exists
     try:
         wait_for_hubspot_rate_limit()
@@ -1380,8 +1380,10 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
             from_object_id=result.id,
             to_object_type=HubspotObjectType.CONTACTS.value,
         )
-        contact_associated = any(assoc.to_object_id == contact_id for assoc in associations.results)
-        
+        contact_associated = any(
+            assoc.to_object_id == contact_id for assoc in associations.results
+        )
+
         if not contact_associated:
             wait_for_hubspot_rate_limit()
             hubspot_client.crm.associations.v4.basic_api.create_default(
@@ -1410,7 +1412,7 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
     # Get existing line items for this deal
     existing_line_item_ids = _find_target_line_items_for_deal(hubspot_client, result.id)
     expected_line_count = order.lines.count()
-    
+
     # Only create line items if we don't have the expected number
     if len(existing_line_item_ids) != expected_line_count:
         for line in order.lines.all():

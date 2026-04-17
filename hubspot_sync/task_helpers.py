@@ -50,7 +50,9 @@ def sync_hubspot_deal(order: Order):
                 or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
             )
         else:
-            token_exists = bool(getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None))
+            token_exists = bool(
+                getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+            )
 
         if token_exists:
             try:
