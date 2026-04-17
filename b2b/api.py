@@ -35,7 +35,7 @@ from b2b.models import (
 from b2b.tasks import queue_contract_sheet_update_post_save
 from cms.api import get_home_page
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
-from courses.models import Course, CourseRun, Department, EnrollmentMode
+from courses.models import Course, CourseRun, Department, EnrollmentMode, Program
 from courses.utils import is_uai_course_run
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -454,6 +454,32 @@ def get_free_and_nonfree_contracts(contracts: Iterable) -> tuple[list, list]:
         price = c.enrollment_fixed_price
         (free if not price or price == 0 else nonfree).append(c)
     return free, nonfree
+
+
+def is_product_courserun(product) -> bool:
+    """
+    Check if a product's purchasable object is a CourseRun.
+
+    Args:
+        product: The Product object to check.
+
+    Returns:
+        bool: True if the purchasable object is a CourseRun, False otherwise.
+    """
+    return isinstance(product.purchasable_object, CourseRun)
+
+
+def is_product_program(product) -> bool:
+    """
+    Check if a product's purchasable object is a Program.
+
+    Args:
+        product: The Product object to check.
+
+    Returns:
+        bool: True if the purchasable object is a Program, False otherwise.
+    """
+    return isinstance(product.purchasable_object, Program)
 
 
 def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
@@ -1017,7 +1043,7 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     item.save()
 
     # Sync with HubSpot for CourseRun products
-    if isinstance(product.purchasable_object, CourseRun):
+    if is_product_courserun(product):
         sync_hubspot_cart_add(
             request.user,
             product,

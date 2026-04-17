@@ -17,6 +17,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import RedirectView, TemplateView, View
+from b2b.api import is_product_courserun, is_product_program
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.common.utils import now_in_utc
 from mitol.olposthog.features import is_enabled as is_posthog_enabled
@@ -720,8 +721,8 @@ class CheckoutApiViewSet(ViewSet):
                     BasketItem.objects.create(basket=basket, product=product)
                     message = "Product added to cart"
 
-                    # Sync with HubSpot for CourseRun products
-                    if isinstance(product.purchasable_object, CourseRun):
+                    # Sync with HubSpot for CourseRun and Program products
+                    if is_product_courserun(product) or is_product_program(product):
                         sync_hubspot_cart_add(
                             self.request.user,
                             product,
@@ -732,8 +733,8 @@ class CheckoutApiViewSet(ViewSet):
                 BasketItem.objects.create(basket=basket, product=product)
                 message = "Product added to cart"
 
-                # Sync with HubSpot for CourseRun products
-                if isinstance(product.purchasable_object, CourseRun):
+                # Sync with HubSpot for CourseRun and Program products
+                if is_product_courserun(product) or is_product_program(product):
                     sync_hubspot_cart_add(
                         self.request.user,
                         product,

@@ -20,6 +20,8 @@ from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
 from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
+    is_product_courserun,
+    is_product_program,
 )
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
@@ -1091,8 +1093,8 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         redeemed_basket=basket,
     )
 
-    # Sync with HubSpot for CourseRun products
-    if isinstance(product.purchasable_object, CourseRun):
+    # Sync with HubSpot for CourseRun and Program products
+    if is_product_courserun(product) or is_product_program(product):
         sync_hubspot_cart_add(
             request.user,
             product,

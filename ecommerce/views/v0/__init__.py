@@ -10,6 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, Q
 from django.shortcuts import redirect
 from django_filters import rest_framework as filters
+from b2b.api import is_product_courserun, is_product_program
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -231,8 +232,8 @@ def _create_basket_from_product(
         basket=basket, product=product, defaults={"quantity": quantity}
     )
 
-    # Sync with HubSpot for CourseRun products
-    if isinstance(product.purchasable_object, CourseRun):
+    # Sync with HubSpot for CourseRun and Program products
+    if is_product_courserun(product) or is_product_program(product):
         sync_hubspot_cart_add(
             request.user,
             product,
@@ -379,8 +380,8 @@ def create_basket_with_products(request):
             BasketItem.objects.update_or_create(
                 basket=basket, product=product, defaults={"quantity": quantity}
             )
-            # Sync with HubSpot for CourseRun products
-            if isinstance(product.purchasable_object, CourseRun):
+            # Sync with HubSpot for CourseRun and Program products
+            if is_product_courserun(product) or is_product_program(product):
                 sync_hubspot_cart_add(
                     request.user,
                     product,
