@@ -724,7 +724,7 @@ def test_get_course_run_certificate_hubspot_property_removes_semicolons():
         courseware_id="course-v1:MITxT+8.014x+2T2025",
     )
 
-    property_dict = api._get_course_run_certificate_hubspot_property()
+    property_dict = api._get_course_run_certificate_hubspot_property() # noqa: SLF001
 
     # Check that the property structure is correct
     assert property_dict["name"] == "course_run_certificates"
@@ -749,7 +749,7 @@ def test_get_program_certificate_hubspot_property_removes_semicolons():
         title="Test Program; With Semicolon", readable_id="test-program-with-semicolon"
     )
 
-    property_dict = api._get_program_certificate_hubspot_property()
+    property_dict = api._get_program_certificate_hubspot_property() # noqa: SLF001
 
     # Check that the property structure is correct
     assert property_dict["name"] == "program_certificates"
