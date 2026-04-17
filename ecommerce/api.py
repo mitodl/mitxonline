@@ -25,7 +25,6 @@ from b2b.api import (
 )
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-from courses.models import CourseRun
 from courses.utils import is_uai_course_run
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,

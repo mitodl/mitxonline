@@ -10,7 +10,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, Q
 from django.shortcuts import redirect
 from django_filters import rest_framework as filters
-from b2b.api import is_product_courserun, is_product_program
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -30,6 +29,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
+from b2b.api import is_product_courserun, is_product_program
 from courses.models import Course, CourseRun, Program, ProgramRun
 from courses.utils import is_uai_course_run
 from ecommerce.api import (

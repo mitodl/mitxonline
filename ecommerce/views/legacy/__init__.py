@@ -17,7 +17,6 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import RedirectView, TemplateView, View
-from b2b.api import is_product_courserun, is_product_program
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.common.utils import now_in_utc
 from mitol.olposthog.features import is_enabled as is_posthog_enabled
@@ -38,6 +37,7 @@ from rest_framework.viewsets import (
 )
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
+from b2b.api import is_product_courserun, is_product_program
 from courses.models import Course, CourseRun, Program, ProgramRun
 from courses.utils import is_uai_course_run
 from ecommerce import api
