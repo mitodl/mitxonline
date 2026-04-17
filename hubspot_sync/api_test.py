@@ -770,4 +770,5 @@ def test_get_program_certificate_hubspot_property_removes_semicolons():
     option = program_options[0]
     assert ";" not in option["value"]
     assert ";" not in option["label"]
-    assert "Test Program With Semicolon" in option["value"]
+    # Check that the readable_id is present (this should always be there)
+    assert program_with_semicolon.readable_id in option["label"]

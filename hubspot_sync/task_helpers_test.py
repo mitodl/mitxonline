@@ -80,7 +80,7 @@ def test_sync_hubspot_cart_add(mocker, mock_exception_log, user, raise_exc):
         side_effect=(ConnectionError if raise_exc else None),
     )
     product = ProductFactory.build()
-    sync_hubspot_cart_add(user, product, is_uai_course=True)
+    sync_hubspot_cart_add(user, product, is_uai=True)
     mock_sync.assert_called_once_with(
         args=(user.id, product.id),
         kwargs={"is_uai_course": True},
