@@ -598,6 +598,25 @@ class PaidProgramAdmin(TimestampedModelAdmin):
         return obj.order.state
 
 
+class HasCertificateRevisionFilter(admin.SimpleListFilter):
+    title = "Has Certificate Revision"
+    parameter_name = "has_certificate_revision"
+
+    def lookups(self, request, model_admin):  # noqa: ARG002
+        return (
+            ("yes", "Yes"),
+            ("no", "No"),
+        )
+
+    def queryset(self, request, queryset):  # noqa: ARG002
+        value = self.value()
+        if value == "yes":
+            return queryset.filter(certificate_page_revision__isnull=False)
+        if value == "no":
+            return queryset.filter(certificate_page_revision__isnull=True)
+        return queryset
+
+
 @admin.register(CourseRunCertificate)
 class CourseRunCertificateAdmin(TimestampedModelAdmin):
     """Admin for CourseRunCertificate"""
@@ -619,7 +638,7 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         "user__username",
         "user__email",
     ]
-    list_filter = ["is_revoked", "course_run__course", "get_has_certificate_revision"]
+    list_filter = ["is_revoked", HasCertificateRevisionFilter, "course_run__course"]
     raw_id_fields = ("user", "course_run", "verifiable_credential")
     autocomplete_fields = ("certificate_page_revision",)
 
@@ -684,7 +703,7 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         "user__email",
         "uuid",
     ]
-    list_filter = ["program__title", "is_revoked", "get_has_certificate_revision"]
+    list_filter = ["program__title", HasCertificateRevisionFilter, "is_revoked"]
     raw_id_fields = ("user", "verifiable_credential", "program")
     autocomplete_fields = ("certificate_page_revision",)
 
