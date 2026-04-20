@@ -283,6 +283,15 @@ class TestProcessCertificateWebhookView:
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
+    def test_non_admin_returns_403(self, user_drf_client):
+        """Test that non-admin authenticated users are rejected"""
+        response = user_drf_client.post(
+            self.WEBHOOK_URL,
+            {"user_id": "test@example.com", "course_id": "course-v1:MITx+1+2024"},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
     @pytest.mark.parametrize(
         "payload, expected_error_field",  # noqa: PT006
         [
@@ -292,10 +301,10 @@ class TestProcessCertificateWebhookView:
         ],
     )
     def test_missing_fields_returns_400(
-        self, user_drf_client, payload, expected_error_field
+        self, admin_drf_client, payload, expected_error_field
     ):
         """Test that missing required fields return 400"""
-        response = user_drf_client.post(
+        response = admin_drf_client.post(
             self.WEBHOOK_URL,
             payload,
             format="json",
@@ -313,7 +322,7 @@ class TestProcessCertificateWebhookView:
         ids=["user_not_found", "course_run_not_found"],
     )
     def test_not_found_returns_404(
-        self, user_drf_client, user, user_email, courseware_id
+        self, admin_drf_client, user, user_email, courseware_id
     ):
         """Test that a non-existent user or course run returns 404"""
         if courseware_id is None:
@@ -321,7 +330,7 @@ class TestProcessCertificateWebhookView:
         if user_email is None:
             user_email = user.email
 
-        response = user_drf_client.post(
+        response = admin_drf_client.post(
             self.WEBHOOK_URL,
             {"user_id": user_email, "course_id": courseware_id},
             format="json",
@@ -353,7 +362,7 @@ class TestProcessCertificateWebhookView:
     def test_certificate_status(  # noqa: PLR0913
         self,
         mocker,
-        user_drf_client,
+        admin_drf_client,
         user,
         enrollment_mode,
         grade,
@@ -381,7 +390,7 @@ class TestProcessCertificateWebhookView:
             return_value=(grade_obj, True, False),
         )
 
-        response = user_drf_client.post(
+        response = admin_drf_client.post(
             self.WEBHOOK_URL,
             {"user_id": user.email, "course_id": course_run.courseware_id},
             format="json",
@@ -398,7 +407,7 @@ class TestProcessCertificateWebhookView:
     def test_idempotent_certificate_already_exists(
         self,
         mocker,
-        user_drf_client,
+        admin_drf_client,
         user,
     ):
         """Test that when a certificate already exists the webhook returns 200 without reprocessing"""
@@ -421,7 +430,7 @@ class TestProcessCertificateWebhookView:
             return_value=(passed_grade, True, False),
         )
 
-        response1 = user_drf_client.post(
+        response1 = admin_drf_client.post(
             self.WEBHOOK_URL,
             {"user_id": user.email, "course_id": course_run.courseware_id},
             format="json",
@@ -433,7 +442,7 @@ class TestProcessCertificateWebhookView:
 
         mock_generate = mocker.patch("openedx.views.generate_course_run_certificates")
 
-        response2 = user_drf_client.post(
+        response2 = admin_drf_client.post(
             self.WEBHOOK_URL,
             {"user_id": user.email, "course_id": course_run.courseware_id},
             format="json",

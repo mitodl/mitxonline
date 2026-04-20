@@ -122,6 +122,7 @@ def edx_enrollment_webhook(request):
     )
 
 
+@extend_schema(exclude=True)
 class ProcessCertificateWebhookView(APIView):
     """
     API view for receiving certificate creation events from Open edX.
@@ -133,7 +134,7 @@ class ProcessCertificateWebhookView(APIView):
     """
 
     authentication_classes = [OAuth2Authentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
 
     def post(self, request):
         user_email = request.data.get("user_id")
