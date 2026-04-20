@@ -18,8 +18,10 @@ from courses.factories import (
 )
 from courses.models import (
     CourseRunCertificate,
+    CourseRunEnrollment,
 )
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -264,10 +266,12 @@ class TestEdxEnrollmentWebhook:
             HTTP_AUTHORIZATION=f"Bearer {oauth_token.token}",
         )
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
-class TestCertificateWebhookView:
-    """Tests for the CertificateWebhookView"""
 
-    WEBHOOK_URL = reverse("certificate-webhook")
+
+class TestProcessCertificateWebhookView:
+    """Tests for the ProcessCertificateWebhookView"""
+
+    WEBHOOK_URL = reverse("process-certificate-webhook")
 
     def test_unauthenticated_returns_401(self):
         """Test that unauthenticated requests are rejected"""
@@ -331,47 +335,13 @@ class TestCertificateWebhookView:
             "grade",
             "passed",
             "is_self_paced",
-            "expected_status_code",
-            "expected_cert_status",
             "cert_should_exist",
         ),
         [
-            (
-                EDX_ENROLLMENT_VERIFIED_MODE,
-                0.80,
-                True,
-                True,
-                status.HTTP_201_CREATED,
-                "created",
-                True,
-            ),
-            (
-                EDX_ENROLLMENT_VERIFIED_MODE,
-                0.80,
-                True,
-                False,
-                status.HTTP_201_CREATED,
-                "created",
-                True,
-            ),
-            (
-                EDX_ENROLLMENT_VERIFIED_MODE,
-                0.30,
-                False,
-                True,
-                status.HTTP_200_OK,
-                None,
-                False,
-            ),
-            (
-                EDX_ENROLLMENT_AUDIT_MODE,
-                0.80,
-                True,
-                True,
-                status.HTTP_200_OK,
-                None,
-                False,
-            ),
+            (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, True, True),
+            (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, False, True),
+            (EDX_ENROLLMENT_VERIFIED_MODE, 0.30, False, True, False),
+            (EDX_ENROLLMENT_AUDIT_MODE, 0.80, True, True, False),
         ],
         ids=[
             "verified_passed_self_paced",
@@ -389,8 +359,6 @@ class TestCertificateWebhookView:
         grade,
         passed,
         is_self_paced,
-        expected_status_code,
-        expected_cert_status,
         cert_should_exist,
     ):
         """Test certificate creation based on enrollment mode and grade"""
@@ -419,8 +387,7 @@ class TestCertificateWebhookView:
             format="json",
         )
 
-        assert response.status_code == expected_status_code
-        assert response.data["certificate_status"] == expected_cert_status
+        assert response.status_code == status.HTTP_200_OK
         assert (
             CourseRunCertificate.objects.filter(
                 user=user, course_run=course_run
@@ -434,7 +401,7 @@ class TestCertificateWebhookView:
         user_drf_client,
         user,
     ):
-        """Test that duplicate webhook calls return 200 without creating duplicate certs"""
+        """Test that when a certificate already exists the webhook returns 200 without reprocessing"""
         mocker.patch("courses.signals.upsert_custom_properties")
         enrollment = CourseRunEnrollmentFactory.create(
             user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
@@ -454,33 +421,25 @@ class TestCertificateWebhookView:
             return_value=(passed_grade, True, False),
         )
 
-        # First call
         response1 = user_drf_client.post(
             self.WEBHOOK_URL,
             {"user_id": user.email, "course_id": course_run.courseware_id},
             format="json",
         )
-        assert response1.status_code == status.HTTP_201_CREATED
-        assert response1.data["certificate_status"] == "created"
+        assert response1.status_code == status.HTTP_200_OK
+        assert CourseRunCertificate.objects.filter(
+            user=user, course_run=course_run
+        ).exists()
 
-        # Reset mocks for second call
-        mocker.patch(
-            "courses.api.get_edx_grades_with_users",
-            return_value=iter([(passed_grade, user)]),
-        )
-        mocker.patch(
-            "courses.api.ensure_course_run_grade",
-            return_value=(passed_grade, False, False),
-        )
+        mock_generate = mocker.patch("openedx.views.generate_course_run_certificates")
 
-        # Second call
         response2 = user_drf_client.post(
             self.WEBHOOK_URL,
             {"user_id": user.email, "course_id": course_run.courseware_id},
             format="json",
         )
         assert response2.status_code == status.HTTP_200_OK
-        assert response2.data["certificate_status"] == "exists"
+        mock_generate.assert_not_called()
         assert (
             CourseRunCertificate.objects.filter(
                 user=user, course_run=course_run

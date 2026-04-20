@@ -951,11 +951,9 @@ def generate_course_run_certificates(  # noqa: C901
         is_webhook (bool): If True, bypass eligibility checks.
 
     Returns:
-        str or None: The certificate status - "created", "exists", or None.
+        None
     """
     now = now_in_utc()
-
-    certificate_status = None
 
     # Webhook path: use the provided course run directly, no eligibility filtering
     if is_webhook and user and course_run:
@@ -966,16 +964,12 @@ def generate_course_run_certificates(  # noqa: C901
 
         if course_runs is None or course_runs.count() == 0:
             log.info("No course runs matched the certificates generation criteria")
-            return certificate_status
+            return
 
     for run in course_runs:
-        if is_webhook:
-            # Webhook: fetch grade for the specific user only
-            edx_grade_user_iter = get_edx_grades_with_users(run, user=user)
-        else:
-            edx_grade_user_iter = exception_logging_generator(
-                get_edx_grades_with_users(run)
-            )
+        edx_grade_user_iter = exception_logging_generator(
+            get_edx_grades_with_users(run, user=user)
+        )
         created_grades_count, updated_grades_count, generated_certificates_count = (
             0,
             0,
@@ -993,7 +987,7 @@ def generate_course_run_certificates(  # noqa: C901
                 msg = f"Can't save grade {edx_grade} for {run_user} in {run}, skipping certificate generation"
                 log.exception(msg)
                 if is_webhook:
-                    return certificate_status
+                    return
                 continue
 
             if created:
@@ -1034,11 +1028,7 @@ def generate_course_run_certificates(  # noqa: C901
                     )
                     generated_certificates_count += 1
 
-                if created:
-                    certificate_status = "created"
-                elif certificate:
-                    certificate_status = "exists"
-                elif is_webhook:
+                if is_webhook and not created and not certificate:
                     log.info(
                         "Certificate not created for user %s and course_run %s: "
                         "user is not certificate eligible (passed=%s, has_paid_enrollment=%s)",
@@ -1051,8 +1041,6 @@ def generate_course_run_certificates(  # noqa: C901
         log.info(
             f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"  # noqa: G004
         )
-
-    return certificate_status
 
 
 def manage_course_run_certificate_access(user, courseware_id, revoke_state):

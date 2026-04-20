@@ -80,6 +80,7 @@ from courses.factories import (
 
 # pylint: disable=redefined-outer-name
 from courses.models import (
+    CourseRunCertificate,
     CourseRunEnrollment,
     EnrollmentMode,
     PaidCourseRun,
@@ -1261,11 +1262,11 @@ def test_generate_course_certificates_with_course_end_date(
 
 
 @pytest.mark.parametrize(
-    "enrollment_mode, grade, passed, expected_result",  # noqa: PT006
+    ("enrollment_mode", "grade", "passed", "should_create_cert"),
     [
-        (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, "created"),
-        (EDX_ENROLLMENT_VERIFIED_MODE, 0.30, False, None),
-        (EDX_ENROLLMENT_AUDIT_MODE, 0.80, True, None),
+        (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, True),
+        (EDX_ENROLLMENT_VERIFIED_MODE, 0.30, False, False),
+        (EDX_ENROLLMENT_AUDIT_MODE, 0.80, True, False),
     ],
 )
 @patch("courses.signals.upsert_custom_properties")
@@ -1276,9 +1277,9 @@ def test_webhook_certificate_status(  # noqa: PLR0913
     enrollment_mode,
     grade,
     passed,
-    expected_result,
+    should_create_cert,
 ):
-    """Test that the webhook path returns the correct certificate status based on enrollment and grade"""
+    """Test that the webhook path creates a certificate based on enrollment mode and grade"""
     enrollment = CourseRunEnrollmentFactory.create(
         user=user, enrollment_mode=enrollment_mode
     )
@@ -1297,11 +1298,12 @@ def test_webhook_certificate_status(  # noqa: PLR0913
         return_value=(grade_obj, True, False),
     )
 
-    result = generate_course_run_certificates(
-        user=user, course_run=course_run, is_webhook=True
-    )
+    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
 
-    assert result == expected_result
+    assert (
+        CourseRunCertificate.objects.filter(user=user, course_run=course_run).exists()
+        == should_create_cert
+    )
 
 
 @patch("courses.signals.upsert_custom_properties")
@@ -1327,10 +1329,10 @@ def test_webhook_certificate_already_exists(
     )
 
     # First call creates the certificate
-    result1 = generate_course_run_certificates(
-        user=user, course_run=course_run, is_webhook=True
-    )
-    assert result1 == "created"
+    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
+    assert CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists()
 
     # Mock the grade fetch again for second call
     mocker.patch(
@@ -1338,11 +1340,12 @@ def test_webhook_certificate_already_exists(
         return_value=iter([(passed_grade_with_enrollment, user)]),
     )
 
-    # Second call should find it already exists
-    result2 = generate_course_run_certificates(
-        user=user, course_run=course_run, is_webhook=True
+    # Second call should not create a duplicate certificate
+    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
+    assert (
+        CourseRunCertificate.objects.filter(user=user, course_run=course_run).count()
+        == 1
     )
-    assert result2 == "exists"
 
 
 @patch("courses.signals.upsert_custom_properties")
@@ -1372,11 +1375,11 @@ def test_webhook_certificate_bypasses_certificate_available_date(
         return_value=(passed_grade_with_enrollment, True, False),
     )
 
-    result = generate_course_run_certificates(
-        user=user, course_run=course_run, is_webhook=True
-    )
+    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
 
-    assert result == "created"
+    assert CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists()
 
 
 def test_webhook_no_grade_from_edx(
@@ -1391,11 +1394,11 @@ def test_webhook_no_grade_from_edx(
         return_value=iter([]),
     )
 
-    result = generate_course_run_certificates(
-        user=user, course_run=course_run, is_webhook=True
-    )
+    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
 
-    assert result is None
+    assert not CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists()
 
 
 @patch("courses.signals.upsert_custom_properties")

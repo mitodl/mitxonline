@@ -21,8 +21,8 @@ urlpatterns = (
         name="openedx-enrollment-webhook",
     ),
     path(
-        "api/certificate_webhook/",
-        views.CertificateWebhookView.as_view(),
-        name="certificate-webhook",
-    )
+        "api/process_certificate_webhook/",
+        views.ProcessCertificateWebhookView.as_view(),
+        name="process-certificate-webhook",
+    ),
 )

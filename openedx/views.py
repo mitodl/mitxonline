@@ -12,11 +12,11 @@ from rest_framework.decorators import (
     permission_classes,
 )
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from courses.api import create_local_enrollment, generate_course_run_certificates
-from courses.models import CourseRun
+from courses.models import CourseRun, CourseRunCertificate
 from users.models import User
 
 log = logging.getLogger(__name__)
@@ -120,7 +120,9 @@ def edx_enrollment_webhook(request):
         },
         status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
     )
-class CertificateWebhookView(APIView):
+
+
+class ProcessCertificateWebhookView(APIView):
     """
     API view for receiving certificate creation events from Open edX.
 
@@ -165,18 +167,20 @@ class CertificateWebhookView(APIView):
             course_run_id,
         )
 
-        certificate_status = generate_course_run_certificates(
+        if CourseRunCertificate.objects.filter(
+            user=user, course_run=course_run
+        ).exists():
+            log.info(
+                "Certificate already exists for user %s and course run %s, skipping",
+                user_email,
+                course_run_id,
+            )
+            return Response(status=status.HTTP_200_OK)
+
+        generate_course_run_certificates(
             user=user,
             course_run=course_run,
             is_webhook=True,
         )
 
-        response_status = (
-            status.HTTP_201_CREATED
-            if certificate_status == "created"
-            else status.HTTP_200_OK
-        )
-
-        return Response(
-            {"certificate_status": certificate_status}, status=response_status
-        )
+        return Response(status=status.HTTP_200_OK)
