@@ -1010,7 +1010,7 @@ def generate_course_run_certificates(  # noqa: C901
                     and run.certificate_available_date <= now
                 )
             ):
-                certificate, created, deleted = process_course_run_grade_certificate(
+                _, created, deleted = process_course_run_grade_certificate(
                     course_run_grade=course_run_grade
                 )
 
@@ -1027,16 +1027,6 @@ def generate_course_run_certificates(  # noqa: C901
                         run,
                     )
                     generated_certificates_count += 1
-
-                if is_webhook and not created and not certificate:
-                    log.info(
-                        "Certificate not created for user %s and course_run %s: "
-                        "user is not certificate eligible (passed=%s, has_paid_enrollment=%s)",
-                        run_user,
-                        run,
-                        course_run_grade.passed,
-                        course_run_grade.is_certificate_eligible,
-                    )
 
         log.info(
             f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"  # noqa: G004
