@@ -1699,7 +1699,9 @@ def _normalize_line_item_properties_for_target_account(
             line_item_properties["status"] = resolved_status
 
 
-def _ensure_target_hubspot_custom_properties(hubspot_client: HubspotApi, *, skip_certificates: bool = False) -> None:
+def _ensure_target_hubspot_custom_properties(
+    hubspot_client: HubspotApi, *, skip_certificates: bool = False
+) -> None:
     """Ensure custom MITx e-commerce properties and groups exist in the target account."""
     object_configs = {
         object_type: {
@@ -1980,9 +1982,13 @@ def _ensure_target_hubspot_product_for_line(
     return created_product.id
 
 
-def _ensure_target_hubspot_contact_properties(hubspot_client: HubspotApi, *, skip_certificates: bool = False) -> None:
+def _ensure_target_hubspot_contact_properties(
+    hubspot_client: HubspotApi, *, skip_certificates: bool = False
+) -> None:
     """Backward-compatible wrapper retained for tests/callers."""
-    _ensure_target_hubspot_custom_properties(hubspot_client, skip_certificates=skip_certificates)
+    _ensure_target_hubspot_custom_properties(
+        hubspot_client, skip_certificates=skip_certificates
+    )
 
 
 def _ensure_hubspot_contact_for_user(
@@ -2087,7 +2093,9 @@ def track_cart_add_with_hubspot(
 
     try:
         hubspot_client = HubspotApi(access_token=token)
-        _ensure_target_hubspot_contact_properties(hubspot_client, skip_certificates=is_uai_course)
+        _ensure_target_hubspot_contact_properties(
+            hubspot_client, skip_certificates=is_uai_course
+        )
 
         # UAI deals must have a contact in the same HubSpot account.
         contact_id = _ensure_hubspot_contact_for_user(user, hubspot_client)
