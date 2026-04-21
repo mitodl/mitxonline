@@ -1376,8 +1376,8 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
     try:
         wait_for_hubspot_rate_limit()
         associations = hubspot_client.crm.associations.v4.basic_api.get_page(
-            from_object_type=HubspotObjectType.DEALS.value,
-            from_object_id=result.id,
+            object_type=HubspotObjectType.DEALS.value,
+            object_id=result.id,
             to_object_type=HubspotObjectType.CONTACTS.value,
         )
         contact_associated = any(
@@ -1858,8 +1858,8 @@ def _find_target_line_items_for_deal(
     wait_for_hubspot_rate_limit()
     try:
         response = hubspot_client.crm.associations.v4.basic_api.get_page(
-            from_object_type=HubspotObjectType.DEALS.value,
-            from_object_id=deal_id,
+            object_type=HubspotObjectType.DEALS.value,
+            object_id=deal_id,
             to_object_type=HubspotObjectType.LINES.value,
         )
         return [assoc.to_object_id for assoc in response.results]
