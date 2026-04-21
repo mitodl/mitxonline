@@ -1901,7 +1901,7 @@ def _ensure_target_line_item_for_line(
     """Return a target-account line item id, creating one when missing."""
     line_item_input = _build_target_line_item_message(line, hubspot_client)
     unique_app_id = str(line_item_input.properties.get("unique_app_id") or "")
-    
+
     if unique_app_id:
         existing_line_item_id = _find_target_line_item_id_by_unique_app_id(
             hubspot_client, unique_app_id
