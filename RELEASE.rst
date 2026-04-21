@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.147.2
+Version 1.147.2 (Released April 21, 2026)
 ---------------
 
 - Add helpers and include Program in HubSpot sync (#3500)
