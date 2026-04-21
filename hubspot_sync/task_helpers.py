@@ -4,6 +4,7 @@ import logging
 
 from django.conf import settings
 
+from courses.utils import is_uai_order
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
 from users.models import User
@@ -34,17 +35,35 @@ def sync_hubspot_deal(order: Order):
     """
     Trigger celery task to sync an order to Hubspot if it has lines.
     Use a delay of 10 seconds to make sure state is updated first.
+    For UAI courses, uses the UAI HubSpot account token.
 
     Args:
         order (Order): The order to sync
     """
-    if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN and order.lines.first() is not None:
-        try:
-            tasks.sync_deal_with_hubspot.apply_async(args=(order.id,), countdown=10)
-        except:  # noqa: E722
-            log.exception(
-                "Exception calling sync_deal_with_hubspot for order %d", order.id
+    if order.lines.first() is not None:
+        is_uai = is_uai_order(order)
+
+        # Check if appropriate token exists
+        if is_uai:
+            token_exists = bool(
+                getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+                or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
             )
+        else:
+            token_exists = bool(
+                getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+            )
+
+        if token_exists:
+            try:
+                tasks.sync_deal_with_hubspot_targeted.apply_async(
+                    args=(order.id,), kwargs={"is_uai": is_uai}, countdown=10
+                )
+            except:  # noqa: E722
+                log.exception(
+                    "Exception calling sync_deal_with_hubspot_targeted for order %d",
+                    order.id,
+                )
 
 
 def sync_hubspot_line_by_line_id(line_id: int):

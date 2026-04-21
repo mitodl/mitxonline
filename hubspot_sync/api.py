@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
 from hubspot.crm.objects import (
+    ApiException,
     SimplePublicObject,
     SimplePublicObjectInput,
 )
@@ -34,6 +35,7 @@ from mitol.hubspot_api.api import (
     transform_object_properties,
     upsert_object_request,
 )
+from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
@@ -1332,6 +1334,115 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     return result
 
 
+def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObject:
+    """
+    Sync an Order with a hubspot deal using a specific HubSpot token.
+    This enables routing deals to different HubSpot accounts (e.g., UAI vs MITx Online account).
+    This function is idempotent - it will not create duplicates if called multiple times.
+
+    Args:
+        order (Order): The Order object.
+        token (str): The HubSpot API token to use.
+
+    Returns:
+        SimplePublicObject: The hubspot deal object
+    """
+    hubspot_client = HubspotApi(access_token=token)
+
+    deal_input = _build_target_deal_message(order, hubspot_client)
+    dealname = deal_input.properties.get("dealname")
+
+    # Check if deal already exists
+    existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
+
+    if existing_deal_id:
+        # Deal exists, update it with the latest order data
+        wait_for_hubspot_rate_limit()
+        result = hubspot_client.crm.objects.basic_api.update(
+            object_type=HubspotObjectType.DEALS.value,
+            object_id=existing_deal_id,
+            simple_public_object_input=deal_input,
+        )
+    else:
+        # Create new deal
+        wait_for_hubspot_rate_limit()
+        result = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.DEALS.value,
+            simple_public_object_input_for_create=deal_input,
+        )
+
+    # Ensure contact exists and is associated
+    contact_id = _ensure_hubspot_contact_for_user(order.purchaser, hubspot_client)
+
+    # Check if deal-contact association exists
+    try:
+        wait_for_hubspot_rate_limit()
+        associations = hubspot_client.crm.associations.v4.basic_api.get_page(
+            object_type=HubspotObjectType.DEALS.value,
+            object_id=result.id,
+            to_object_type=HubspotObjectType.CONTACTS.value,
+        )
+        contact_associated = any(
+            assoc.to_object_id == contact_id for assoc in associations.results
+        )
+
+        if not contact_associated:
+            wait_for_hubspot_rate_limit()
+            hubspot_client.crm.associations.v4.basic_api.create_default(
+                from_object_type=HubspotObjectType.DEALS.value,
+                from_object_id=result.id,
+                to_object_type=HubspotObjectType.CONTACTS.value,
+                to_object_id=contact_id,
+            )
+    except Exception:  # noqa: BLE001
+        # If we can't check associations, try to create (HubSpot will ignore duplicates)
+        try:
+            wait_for_hubspot_rate_limit()
+            hubspot_client.crm.associations.v4.basic_api.create_default(
+                from_object_type=HubspotObjectType.DEALS.value,
+                from_object_id=result.id,
+                to_object_type=HubspotObjectType.CONTACTS.value,
+                to_object_id=contact_id,
+            )
+        except Exception:
+            log.exception(
+                "Failed to create deal-contact association for deal %s and contact %s",
+                result.id,
+                contact_id,
+            )
+
+    # Ensure each line item exists by checking unique_app_id to avoid duplicates
+    for line in order.lines.all():
+        line_item_id = _ensure_target_line_item_for_line(line, hubspot_client)
+        if line_item_id:
+            # Ensure the line item is associated with the deal
+            try:
+                wait_for_hubspot_rate_limit()
+                hubspot_client.crm.associations.v4.basic_api.create_default(
+                    from_object_type=HubspotObjectType.LINES.value,
+                    from_object_id=line_item_id,
+                    to_object_type=HubspotObjectType.DEALS.value,
+                    to_object_id=result.id,
+                )
+            except Exception:  # noqa: BLE001
+                # Association might already exist, which is fine
+                log.debug(
+                    "Association may already exist for line %s and deal %s",
+                    line_item_id,
+                    result.id,
+                )
+
+    # Update the local HubspotObject mapping to maintain ID tracking
+    content_type = ContentType.objects.get_for_model(Order)
+    HubspotObject.objects.update_or_create(
+        object_id=order.id,
+        content_type=content_type,
+        defaults={"hubspot_id": result.id},
+    )
+
+    return result
+
+
 def sync_product_with_hubspot(product: Product) -> SimplePublicObject:
     """
     Sync a Product with a hubspot product
@@ -1719,6 +1830,129 @@ def _find_target_product_id_by_unique_app_id(
     return None
 
 
+def _find_target_deal_id_by_dealname(
+    hubspot_client: HubspotApi, dealname: str
+) -> str | None:
+    """Find deal id in target account by dealname."""
+    wait_for_hubspot_rate_limit()
+    try:
+        response = hubspot_client.crm.objects.search_api.do_search(
+            object_type=HubspotObjectType.DEALS.value,
+            public_object_search_request=PublicObjectSearchRequest(
+                filter_groups=[
+                    FilterGroup(
+                        filters=[
+                            Filter(
+                                property_name="dealname",
+                                operator="EQ",
+                                value=dealname,
+                            )
+                        ]
+                    )
+                ],
+                properties=["dealname"],
+                limit=1,
+            ),
+        )
+        if response.results:
+            return response.results[0].id
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        # to avoid creating duplicates when we can't search
+        log.warning("Rate limited searching for deal by dealname: %s", dealname)
+        raise
+    except Exception:
+        log.exception("Failed to search for deal by dealname: %s", dealname)
+    return None
+
+
+def _find_target_line_item_id_by_unique_app_id(
+    hubspot_client: HubspotApi, unique_app_id: str
+) -> str | None:
+    """Find line item id in target account by unique_app_id."""
+    wait_for_hubspot_rate_limit()
+    try:
+        response = hubspot_client.crm.objects.search_api.do_search(
+            object_type=HubspotObjectType.LINES.value,
+            public_object_search_request=PublicObjectSearchRequest(
+                filter_groups=[
+                    FilterGroup(
+                        filters=[
+                            Filter(
+                                property_name="unique_app_id",
+                                operator="EQ",
+                                value=unique_app_id,
+                            )
+                        ]
+                    )
+                ],
+                limit=1,
+            ),
+        )
+        if response.results:
+            return response.results[0].id
+        else:
+            return None
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        # to avoid creating duplicates when we can't search
+        log.warning(
+            "Rate limited searching for line item with unique_app_id %s",
+            unique_app_id,
+        )
+        raise
+    except ApiException:
+        log.exception(
+            "Failed to search for line item with unique_app_id %s",
+            unique_app_id,
+        )
+        return None
+    except Exception:
+        log.exception(
+            "Unexpected error searching for line item with unique_app_id %s",
+            unique_app_id,
+        )
+        return None
+
+
+def _ensure_target_line_item_for_line(
+    line: Line, hubspot_client: HubspotApi
+) -> str | None:
+    """Return a target-account line item id, creating one when missing."""
+    line_item_input = _build_target_line_item_message(line, hubspot_client)
+    unique_app_id = str(line_item_input.properties.get("unique_app_id") or "")
+
+    if unique_app_id:
+        existing_line_item_id = _find_target_line_item_id_by_unique_app_id(
+            hubspot_client, unique_app_id
+        )
+        if existing_line_item_id:
+            # Update the local HubspotObject mapping for existing line item
+            content_type = ContentType.objects.get_for_model(Line)
+            HubspotObject.objects.update_or_create(
+                object_id=line.id,
+                content_type=content_type,
+                defaults={"hubspot_id": existing_line_item_id},
+            )
+            return existing_line_item_id
+
+    wait_for_hubspot_rate_limit()
+    created_line_item = hubspot_client.crm.objects.basic_api.create(
+        object_type=HubspotObjectType.LINES.value,
+        simple_public_object_input_for_create=line_item_input,
+    )
+
+    # Update the local HubspotObject mapping for newly created line item
+    content_type = ContentType.objects.get_for_model(Line)
+    HubspotObject.objects.update_or_create(
+        object_id=line.id,
+        content_type=content_type,
+        defaults={"hubspot_id": created_line_item.id},
+    )
+
+    return created_line_item.id
+
+
 def _ensure_target_hubspot_product_for_line(
     line: Line, hubspot_client: HubspotApi
 ) -> str | None:
@@ -1760,6 +1994,13 @@ def _ensure_hubspot_contact_for_user(
             user.id,
             user.email,
         )
+        # Update the local HubspotObject mapping for existing contact
+        content_type = ContentType.objects.get_for_model(User)
+        HubspotObject.objects.update_or_create(
+            object_id=user.id,
+            content_type=content_type,
+            defaults={"hubspot_id": contact_id},
+        )
         return contact_id
 
     wait_for_hubspot_rate_limit()
@@ -1769,6 +2010,15 @@ def _ensure_hubspot_contact_for_user(
     )
     user.hubspot_sync_datetime = now_in_utc()
     user.save(update_fields=["hubspot_sync_datetime"])
+
+    # Update the local HubspotObject mapping for newly created contact
+    content_type = ContentType.objects.get_for_model(User)
+    HubspotObject.objects.update_or_create(
+        object_id=user.id,
+        content_type=content_type,
+        defaults={"hubspot_id": contact.id},
+    )
+
     return contact.id
 
 
