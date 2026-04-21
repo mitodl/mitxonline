@@ -211,6 +211,43 @@ def sync_deal_with_hubspot(order_id: int) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
+def sync_deal_with_hubspot_targeted(order_id: int, *, is_uai: bool) -> str:
+    """
+    Sync an Order with a hubspot deal using the appropriate HubSpot token.
+    This allows routing UAI orders to the UAI HubSpot account.
+
+    Args:
+        order_id(int): The Order ID.
+        is_uai(bool): Whether this is a UAI order, determines which token to use.
+
+    Returns:
+        str: The hubspot id for the deal
+    """
+    # Resolve token from settings based on is_uai flag
+    if is_uai:
+        token = getattr(
+            settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
+        ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+    else:
+        token = getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+
+    if not token:
+        account_type = "UAI" if is_uai else "standard"
+        error_message = f"No HubSpot token available for {account_type} account"
+        raise ValueError(error_message)
+
+    return api.sync_deal_with_hubspot_targeted(Order.objects.get(id=order_id), token).id
+
+
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429
+@single_task(10, key=task_obj_lock)
 def sync_line_with_hubspot(line_id: int) -> str:
     """
     Sync a Line with a hubspot line

@@ -21,17 +21,56 @@ def mock_exception_log(settings, mocker):
 
 
 @pytest.mark.parametrize("raise_exc", [True, False])
-def test_sync_hubspot_deal(mocker, mock_exception_log, hubspot_order, raise_exc):
-    """sync_hubspot_deal should call tasks.sync_contact_with_hubspot.applY_async and log any exception"""
+def test_sync_hubspot_deal_uai_order_with_uai_token(
+    mocker, mock_exception_log, hubspot_order, raise_exc, settings
+):
+    """sync_hubspot_deal should use UAI token for UAI orders when available"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "regular-token"  # noqa: S105
+    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
+
     mock_sync = mocker.patch(
-        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot.apply_async",
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async",
         side_effect=(ConnectionError if raise_exc else None),
     )
+    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=True)
+
     sync_hubspot_deal(hubspot_order)
-    mock_sync.assert_called_once_with(args=(hubspot_order.id,), countdown=10)
+    mock_sync.assert_called_once_with(
+        args=(hubspot_order.id,), kwargs={"is_uai": True}, countdown=10
+    )
+
     if raise_exc:
         mock_exception_log.assert_called_once_with(
-            "Exception calling sync_deal_with_hubspot for order %d", hubspot_order.id
+            "Exception calling sync_deal_with_hubspot_targeted for order %d",
+            hubspot_order.id,
+        )
+    else:
+        mock_exception_log.assert_not_called()
+
+
+@pytest.mark.parametrize("raise_exc", [True, False])
+def test_sync_hubspot_deal_non_uai_order(
+    mocker, mock_exception_log, hubspot_order, raise_exc, settings
+):
+    """sync_hubspot_deal should use regular token for non-UAI orders"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "regular-token"  # noqa: S105
+    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
+
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async",
+        side_effect=(ConnectionError if raise_exc else None),
+    )
+    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=False)
+
+    sync_hubspot_deal(hubspot_order)
+    mock_sync.assert_called_once_with(
+        args=(hubspot_order.id,), kwargs={"is_uai": False}, countdown=10
+    )
+
+    if raise_exc:
+        mock_exception_log.assert_called_once_with(
+            "Exception calling sync_deal_with_hubspot_targeted for order %d",
+            hubspot_order.id,
         )
     else:
         mock_exception_log.assert_not_called()

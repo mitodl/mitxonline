@@ -1006,19 +1006,35 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         dict with error result if validation fails, None if validation passes.
     """
     if not user.is_authenticated:
+        log.error("B2B enroll: attempted to use %s with no user account", product)
         return {"result": main_constants.USER_MSG_TYPE_B2B_DISALLOWED}
 
     purchasable_object = product.purchasable_object
     if not purchasable_object or not purchasable_object.b2b_contract:
+        log.error(
+            "B2B enroll: attempted to use %s but product has no purchasable object",
+            product,
+        )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT}
 
     if (
         isinstance(purchasable_object, CourseRun)
         and not purchasable_object.is_enrollable_for_b2b
     ):
+        log.error(
+            "B2B enroll: attempted to use %s but %s is not enrollable for B2B",
+            product,
+            purchasable_object,
+        )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
     if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
+        log.error(
+            "B2B enroll: attempted to use %s but %s is not in the contract %s",
+            product,
+            user,
+            purchasable_object.b2b_contract,
+        )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
 
     return None
@@ -1097,6 +1113,8 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
             and product.purchasable_object.b2b_contract.max_learners > 0
             else REDEMPTION_TYPE_UNLIMITED
         )
+
+        log.error("B2B enroll: had to create a discount for %s", product)
 
         discount = _create_discount_with_product(
             product, discount_amount if discount_amount else Decimal(0), redemption_type

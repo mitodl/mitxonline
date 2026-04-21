@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 1.147.0 (Released April 21, 2026)
+---------------
+
+- Fix deleted items issues in ProductAdmin (#3492)
+- Update dependency @json-editor/json-editor to v2.16.0 (#3321)
+- Update dependency serialize-javascript to v7 [SECURITY] (#3342)
+- Update dependency lodash to v4.18.1 [SECURITY] (#3493)
+
+Version 1.146.5 (Released April 21, 2026)
+---------------
+
+- Add fields for configuring the How You'll Learn cards on product pages (#3487)
+- feat: add webhook endpoint for Open edX course enrollment (#3372)
+- Make enrollment_mode field non-nullable (#3494)
+- [pre-commit.ci] pre-commit autoupdate (#3486)
+
 Version 1.146.4 (Released April 16, 2026)
 ---------------
 
