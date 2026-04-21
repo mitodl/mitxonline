@@ -1946,7 +1946,7 @@ def _ensure_target_line_item_for_line(
         object_type=HubspotObjectType.LINES.value,
         simple_public_object_input_for_create=line_item_input,
     )
-    
+
     # Update the local HubspotObject mapping for newly created line item
     content_type = ContentType.objects.get_for_model(Line)
     HubspotObject.objects.update_or_create(
@@ -1954,7 +1954,7 @@ def _ensure_target_line_item_for_line(
         content_type=content_type,
         defaults={"hubspot_id": created_line_item.id},
     )
-    
+
     return created_line_item.id
 
 
@@ -2015,7 +2015,7 @@ def _ensure_hubspot_contact_for_user(
     )
     user.hubspot_sync_datetime = now_in_utc()
     user.save(update_fields=["hubspot_sync_datetime"])
-    
+
     # Update the local HubspotObject mapping for newly created contact
     content_type = ContentType.objects.get_for_model(User)
     HubspotObject.objects.update_or_create(
@@ -2023,7 +2023,7 @@ def _ensure_hubspot_contact_for_user(
         content_type=content_type,
         defaults={"hubspot_id": contact.id},
     )
-    
+
     return contact.id
 
 
