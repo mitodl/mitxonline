@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.146.5
+Version 1.146.5 (Released April 21, 2026)
 ---------------
 
 - Add fields for configuring the How You'll Learn cards on product pages (#3487)
