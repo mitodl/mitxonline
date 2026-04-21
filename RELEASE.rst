@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.147.2
+---------------
+
+- Add helpers and include Program in HubSpot sync (#3500)
+- 3488 mitx online   update xpro hubspot when course purchased is uai (#3497)
+
 Version 1.147.1 (Released April 21, 2026)
 ---------------
 
