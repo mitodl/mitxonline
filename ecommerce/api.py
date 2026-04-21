@@ -1093,19 +1093,13 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     )
 
     # Sync with HubSpot for CourseRun and Program products
-    if is_product_courserun(product) or is_product_program(product):
-        sync_hubspot_cart_add(
-            request.user,
-            product,
-            is_uai=(
-                is_product_courserun(product)
-                and is_uai_course_run(product.purchasable_object)
-            )
-            or (
-                is_product_program(product)
-                and is_uai_program(product.purchasable_object)
-            ),
+    sync_hubspot_cart_add(
+        request.user,
+        product,
+        is_uai=(
+            is_uai_course_run(product.purchasable_object)
         )
+    )
 
     if Decimal(
         sum([basket_item.discounted_price for basket_item in basket.basket_items.all()])

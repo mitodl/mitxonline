@@ -197,10 +197,8 @@ def is_uai_program(program):
         return False
 
     readable_id = program.readable_id
-    # UAI programs use the format "program-v1:UAI+..." or just "UAI+..."
-    return readable_id.startswith(
-        (f"program-v1:{UAI_COURSEWARE_ID_PREFIX}", UAI_COURSEWARE_ID_PREFIX)
-    )
+    # UAI programs use the format "program-v1:UAI+..." 
+    return readable_id.startswith("program-v1:UAI")
 
 
 def is_uai_order(order):

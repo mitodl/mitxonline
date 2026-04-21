@@ -6,7 +6,7 @@ from django.conf import settings
 from mitol.hubspot_api.api import format_app_id
 from rest_framework import serializers
 
-from courses.models import CourseRunCertificate, CourseRunEnrollment, ProgramCertificate
+from courses.models import CourseRun, CourseRunCertificate, CourseRunEnrollment, Program, ProgramCertificate, ProgramEnrollment
 from ecommerce import models
 from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import resolve_product_version
@@ -64,19 +64,26 @@ class LineSerializer(serializers.ModelSerializer):
         return self._product
 
     def _get_enrollment(self, instance):
-        """Returns the CourseRunEnrollment associated with the Order, if one exists, else None"""
-        self._enrollment = CourseRunEnrollment.all_objects.filter(
-            run=instance.purchased_object, user=instance.order.purchaser
-        ).first()
+        """Returns the enrollment associated with the Order, if one exists, else None"""
+        if isinstance(instance.purchased_object, CourseRun):
+            self._enrollment = CourseRunEnrollment.all_objects.filter(
+                run=instance.purchased_object, user=instance.order.purchaser
+            ).first()
+        elif isinstance(instance.purchased_object, Program):
+            self._enrollment = ProgramEnrollment.all_objects.filter(
+                program=instance.purchased_object, user=instance.order.purchaser
+            ).first()
+        else:
+            self._enrollment = None
         return self._enrollment
 
     def get_enrollment_mode(self, instance):
-        """Returns the CourseRunEnrollment's mode associated with the Order, if a CourseRunEnrollment exists, else None"""
+        """Returns the enrollment's mode associated with the Order, if an enrollment exists, else None"""
         enrollment = self._get_enrollment(instance)
         return enrollment.enrollment_mode if enrollment is not None else None
 
     def get_change_status(self, instance):
-        """Returns the CourseRunEnrollment's change_status associated with the Order, if a CourseRunEnrollment exists, else None"""
+        """Returns the enrollment's change_status associated with the Order, if an enrollment exists, else None"""
         enrollment = self._get_enrollment(instance)
         return enrollment.change_status if enrollment is not None else None
 
