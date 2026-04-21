@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
 from hubspot.crm.objects import (
+    ApiException,
     SimplePublicObject,
     SimplePublicObjectInput,
 )
@@ -34,6 +35,7 @@ from mitol.hubspot_api.api import (
     transform_object_properties,
     upsert_object_request,
 )
+from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
@@ -1873,26 +1875,41 @@ def _find_target_line_item_id_by_unique_app_id(
 ) -> str | None:
     """Find line item id in target account by unique_app_id."""
     wait_for_hubspot_rate_limit()
-    response = hubspot_client.crm.objects.search_api.do_search(
-        object_type=HubspotObjectType.LINES.value,
-        public_object_search_request=PublicObjectSearchRequest(
-            filter_groups=[
-                FilterGroup(
-                    filters=[
-                        Filter(
-                            property_name="unique_app_id",
-                            operator="EQ",
-                            value=unique_app_id,
-                        )
-                    ]
-                )
-            ],
-            limit=1,
-        ),
-    )
-    if response.results:
-        return response.results[0].id
-    return None
+    try:
+        response = hubspot_client.crm.objects.search_api.do_search(
+            object_type=HubspotObjectType.LINES.value,
+            public_object_search_request=PublicObjectSearchRequest(
+                filter_groups=[
+                    FilterGroup(
+                        filters=[
+                            Filter(
+                                property_name="unique_app_id",
+                                operator="EQ",
+                                value=unique_app_id,
+                            )
+                        ]
+                    )
+                ],
+                limit=1,
+            ),
+        )
+        if response.results:
+            return response.results[0].id
+        return None
+    except (ApiException, TooManyRequestsException) as exc:
+        log.exception(
+            "Failed to search for line item with unique_app_id %s: %s",
+            unique_app_id,
+            str(exc),
+        )
+        return None
+    except Exception as exc:
+        log.exception(
+            "Unexpected error searching for line item with unique_app_id %s: %s",
+            unique_app_id,
+            str(exc),
+        )
+        return None
 
 
 def _ensure_target_line_item_for_line(
