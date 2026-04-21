@@ -787,7 +787,7 @@ def test_get_edx_course_outline(settings):
     """Tests that get_edx_course_outline fetches and returns outline JSON."""
     settings.OPENEDX_API_BASE_URL = "http://example.com"
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "outline_token"  # noqa: S105
-    settings.OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE = (
+    settings.OL_OPENEDX_COURSE_OUTLINE_URL = (
         "/api/ol-course-outline/v0/{course_id}/"
     )
     settings.EDX_API_CLIENT_TIMEOUT = 30
@@ -820,7 +820,7 @@ def test_get_edx_course_outline_http_error(settings):
     """Tests that get_edx_course_outline raises upstream error on failure response."""
     settings.OPENEDX_API_BASE_URL = "http://example.com"
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "outline_token"  # noqa: S105
-    settings.OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE = (
+    settings.OL_OPENEDX_COURSE_OUTLINE_URL = (
         "/api/ol-course-outline/v0/{course_id}/"
     )
 
@@ -842,7 +842,7 @@ def test_get_edx_course_outline_invalid_json(settings):
     """Tests that get_edx_course_outline raises invalid response for bad JSON."""
     settings.OPENEDX_API_BASE_URL = "http://example.com"
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "outline_token"  # noqa: S105
-    settings.OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE = (
+    settings.OL_OPENEDX_COURSE_OUTLINE_URL = (
         "/api/ol-course-outline/v0/{course_id}/"
     )
 

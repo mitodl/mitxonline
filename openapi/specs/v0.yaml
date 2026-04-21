@@ -3264,7 +3264,7 @@ paths:
           description: No response body
         '404':
           description: No response body
-  /api/v3/courses/{course_id}/outline/:
+  /api/v3/courses/{course_id}/ol_openedx_outline/:
     get:
       operationId: course_outline_retrieve_v3
       description: Fetch course outline data for the given course key from Open edX.

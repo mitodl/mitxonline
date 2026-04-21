@@ -897,22 +897,15 @@ def get_edx_course_outline(course_id: str) -> dict:
     Returns:
         dict: Parsed JSON response from the outline API
     """
-    if settings.OPENEDX_SERVICE_WORKER_API_TOKEN is None:
-        raise ImproperlyConfigured("OPENEDX_SERVICE_WORKER_API_TOKEN is not set")  # noqa: EM101
-
+    edx_client = get_edx_api_service_client()
     encoded_course_id = quote(course_id, safe="")
-    outline_path = settings.OPENEDX_COURSE_OUTLINE_PATH_TEMPLATE.format(
+    outline_path = settings.OL_OPENEDX_COURSE_OUTLINE_URL.format(
         course_id=encoded_course_id
     )
     outline_url = edx_url(outline_path)
+    requester = edx_client.get_requester()
     try:
-        response = requests.get(
-            outline_url,
-            headers={
-                "Authorization": f"Bearer {settings.OPENEDX_SERVICE_WORKER_API_TOKEN}"
-            },
-            timeout=settings.EDX_API_CLIENT_TIMEOUT,
-        )
+        response = requester.get(outline_url)
         response.raise_for_status()
     except requests.exceptions.RequestException as exc:
         message = "Open edX course outline request failed"

@@ -22,7 +22,7 @@ router.register(
 urlpatterns = router.urls
 urlpatterns += [
     path(
-        "courses/<str:course_id>/outline/",
+        "courses/<str:course_id>/ol_openedx_outline/",
         v3.get_course_outline,
         name="course_outline",
     ),
