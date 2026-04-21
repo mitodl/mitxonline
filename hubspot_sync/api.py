@@ -1903,19 +1903,18 @@ def _find_target_line_item_id_by_unique_app_id(
         )
         if response.results:
             return response.results[0].id
-        return None
-    except (ApiException, TooManyRequestsException) as exc:
+        else:
+            return None
+    except (ApiException, TooManyRequestsException):
         log.exception(
-            "Failed to search for line item with unique_app_id %s: %s",
+            "Failed to search for line item with unique_app_id %s",
             unique_app_id,
-            str(exc),
         )
         return None
-    except Exception as exc:
+    except Exception:
         log.exception(
-            "Unexpected error searching for line item with unique_app_id %s: %s",
+            "Unexpected error searching for line item with unique_app_id %s",
             unique_app_id,
-            str(exc),
         )
         return None
 
