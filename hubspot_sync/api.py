@@ -1861,21 +1861,6 @@ def _find_target_deal_id_by_dealname(
     return None
 
 
-def _find_target_line_items_for_deal(
-    hubspot_client: HubspotApi, deal_id: str
-) -> list[str]:
-    """Find line item ids associated with a deal in the target account."""
-    wait_for_hubspot_rate_limit()
-    try:
-        response = hubspot_client.crm.associations.v4.basic_api.get_page(
-            object_type=HubspotObjectType.DEALS.value,
-            object_id=deal_id,
-            to_object_type=HubspotObjectType.LINES.value,
-        )
-        return [assoc.to_object_id for assoc in response.results]
-    except Exception:
-        log.exception("Failed to get line items for deal: %s", deal_id)
-    return []
 
 
 def _find_target_line_item_id_by_unique_app_id(
