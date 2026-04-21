@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.147.1
+Version 1.147.1 (Released April 21, 2026)
 ---------------
 
 - Add more logging for B2B enroll/attach error states (#3505)
