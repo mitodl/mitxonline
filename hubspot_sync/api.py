@@ -1422,7 +1422,7 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
                     to_object_type=HubspotObjectType.DEALS.value,
                     to_object_id=result.id,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # Association might already exist, which is fine
                 log.debug(
                     "Association may already exist for line %s and deal %s",
