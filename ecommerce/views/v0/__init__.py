@@ -239,10 +239,7 @@ def _create_basket_from_product(
             is_product_courserun(product)
             and is_uai_course_run(product.purchasable_object)
         )
-        or (
-            is_product_program(product)
-            and is_uai_program(product.purchasable_object)
-        ),
+        or (is_product_program(product) and is_uai_program(product.purchasable_object)),
     )
 
     existing_basket_discounts = [bd.redeemed_discount for bd in basket.discounts.all()]
