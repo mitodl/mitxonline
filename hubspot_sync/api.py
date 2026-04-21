@@ -1409,33 +1409,24 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
                 contact_id,
             )
 
-    # Get existing line items for this deal
-    existing_line_item_ids = _find_target_line_items_for_deal(hubspot_client, result.id)
-    expected_line_count = order.lines.count()
-
-    # Only create line items if we don't have the expected number
-    if len(existing_line_item_ids) != expected_line_count:
-        for line in order.lines.all():
-            line_item_input = _build_target_line_item_message(line, hubspot_client)
-
-            wait_for_hubspot_rate_limit()
-            line_item_result = hubspot_client.crm.objects.basic_api.create(
-                object_type=HubspotObjectType.LINES.value,
-                simple_public_object_input_for_create=line_item_input,
-            )
-
+    # Ensure each line item exists by checking unique_app_id to avoid duplicates
+    for line in order.lines.all():
+        line_item_id = _ensure_target_line_item_for_line(line, hubspot_client)
+        if line_item_id:
+            # Ensure the line item is associated with the deal
             try:
                 wait_for_hubspot_rate_limit()
                 hubspot_client.crm.associations.v4.basic_api.create_default(
                     from_object_type=HubspotObjectType.LINES.value,
-                    from_object_id=line_item_result.id,
+                    from_object_id=line_item_id,
                     to_object_type=HubspotObjectType.DEALS.value,
                     to_object_id=result.id,
                 )
             except Exception:
-                log.exception(
-                    "Failed to create line-deal association for line %s and deal %s",
-                    line_item_result.id,
+                # Association might already exist, which is fine
+                log.debug(
+                    "Association may already exist for line %s and deal %s",
+                    line_item_id,
                     result.id,
                 )
 
@@ -1875,6 +1866,55 @@ def _find_target_line_items_for_deal(
     except Exception:
         log.exception("Failed to get line items for deal: %s", deal_id)
     return []
+
+
+def _find_target_line_item_id_by_unique_app_id(
+    hubspot_client: HubspotApi, unique_app_id: str
+) -> str | None:
+    """Find line item id in target account by unique_app_id."""
+    wait_for_hubspot_rate_limit()
+    response = hubspot_client.crm.objects.search_api.do_search(
+        object_type=HubspotObjectType.LINES.value,
+        public_object_search_request=PublicObjectSearchRequest(
+            filter_groups=[
+                FilterGroup(
+                    filters=[
+                        Filter(
+                            property_name="unique_app_id",
+                            operator="EQ",
+                            value=unique_app_id,
+                        )
+                    ]
+                )
+            ],
+            limit=1,
+        ),
+    )
+    if response.results:
+        return response.results[0].id
+    return None
+
+
+def _ensure_target_line_item_for_line(
+    line: Line, hubspot_client: HubspotApi
+) -> str | None:
+    """Return a target-account line item id, creating one when missing."""
+    line_item_input = _build_target_line_item_message(line, hubspot_client)
+    unique_app_id = str(line_item_input.properties.get("unique_app_id") or "")
+    
+    if unique_app_id:
+        existing_line_item_id = _find_target_line_item_id_by_unique_app_id(
+            hubspot_client, unique_app_id
+        )
+        if existing_line_item_id:
+            return existing_line_item_id
+
+    wait_for_hubspot_rate_limit()
+    created_line_item = hubspot_client.crm.objects.basic_api.create(
+        object_type=HubspotObjectType.LINES.value,
+        simple_public_object_input_for_create=line_item_input,
+    )
+    return created_line_item.id
 
 
 def _ensure_target_hubspot_product_for_line(
