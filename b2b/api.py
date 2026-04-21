@@ -1058,20 +1058,19 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     item = BasketItem.objects.create(product=product, basket=basket, quantity=1)
     item.save()
 
-    # Sync with HubSpot for CourseRun and Program products
-    if is_product_courserun(product) or is_product_program(product):
-        sync_hubspot_cart_add(
-            request.user,
-            product,
-            is_uai=(
-                is_product_courserun(product)
-                and is_uai_course_run(product.purchasable_object)
-            )
-            or (
-                is_product_program(product)
-                and is_uai_program(product.purchasable_object)
-            ),
+    # Sync with HubSpot for CourseRun
+    sync_hubspot_cart_add(
+        request.user,
+        product,
+        is_uai=(
+            is_product_courserun(product)
+            and is_uai_course_run(product.purchasable_object)
         )
+        or (
+            is_product_program(product)
+            and is_uai_program(product.purchasable_object)
+        ),
+    )
 
     return basket
 
