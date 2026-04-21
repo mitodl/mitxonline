@@ -1856,6 +1856,11 @@ def _find_target_deal_id_by_dealname(
         )
         if response.results:
             return response.results[0].id
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        # to avoid creating duplicates when we can't search
+        log.warning("Rate limited searching for deal by dealname: %s", dealname)
+        raise
     except Exception:
         log.exception("Failed to search for deal by dealname: %s", dealname)
     return None
@@ -1890,7 +1895,15 @@ def _find_target_line_item_id_by_unique_app_id(
             return response.results[0].id
         else:
             return None
-    except (ApiException, TooManyRequestsException):
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        # to avoid creating duplicates when we can't search
+        log.warning(
+            "Rate limited searching for line item with unique_app_id %s",
+            unique_app_id,
+        )
+        raise
+    except ApiException:
         log.exception(
             "Failed to search for line item with unique_app_id %s",
             unique_app_id,
