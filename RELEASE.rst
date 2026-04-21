@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.147.0
+Version 1.147.0 (Released April 21, 2026)
 ---------------
 
 - Fix deleted items issues in ProductAdmin (#3492)
