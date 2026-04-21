@@ -1356,12 +1356,12 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
     existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
 
     if existing_deal_id:
-        # Deal exists, fetch it and ensure associations are correct
+        # Deal exists, update it with the latest order data
         wait_for_hubspot_rate_limit()
-        result = hubspot_client.crm.objects.basic_api.get_by_id(
+        result = hubspot_client.crm.objects.basic_api.update(
             object_type=HubspotObjectType.DEALS.value,
             object_id=existing_deal_id,
-            properties=["dealname"],
+            simple_public_object_input=deal_input,
         )
     else:
         # Create new deal
