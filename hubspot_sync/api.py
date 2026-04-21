@@ -1432,6 +1432,14 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
                     result.id,
                 )
 
+    # Update the local HubspotObject mapping to maintain ID tracking
+    content_type = ContentType.objects.get_for_model(Order)
+    HubspotObject.objects.update_or_create(
+        object_id=order.id,
+        content_type=content_type,
+        defaults={"hubspot_id": result.id},
+    )
+
     return result
 
 
@@ -1924,6 +1932,13 @@ def _ensure_target_line_item_for_line(
             hubspot_client, unique_app_id
         )
         if existing_line_item_id:
+            # Update the local HubspotObject mapping for existing line item
+            content_type = ContentType.objects.get_for_model(Line)
+            HubspotObject.objects.update_or_create(
+                object_id=line.id,
+                content_type=content_type,
+                defaults={"hubspot_id": existing_line_item_id},
+            )
             return existing_line_item_id
 
     wait_for_hubspot_rate_limit()
@@ -1931,6 +1946,15 @@ def _ensure_target_line_item_for_line(
         object_type=HubspotObjectType.LINES.value,
         simple_public_object_input_for_create=line_item_input,
     )
+    
+    # Update the local HubspotObject mapping for newly created line item
+    content_type = ContentType.objects.get_for_model(Line)
+    HubspotObject.objects.update_or_create(
+        object_id=line.id,
+        content_type=content_type,
+        defaults={"hubspot_id": created_line_item.id},
+    )
+    
     return created_line_item.id
 
 
@@ -1975,6 +1999,13 @@ def _ensure_hubspot_contact_for_user(
             user.id,
             user.email,
         )
+        # Update the local HubspotObject mapping for existing contact
+        content_type = ContentType.objects.get_for_model(User)
+        HubspotObject.objects.update_or_create(
+            object_id=user.id,
+            content_type=content_type,
+            defaults={"hubspot_id": contact_id},
+        )
         return contact_id
 
     wait_for_hubspot_rate_limit()
@@ -1984,6 +2015,15 @@ def _ensure_hubspot_contact_for_user(
     )
     user.hubspot_sync_datetime = now_in_utc()
     user.save(update_fields=["hubspot_sync_datetime"])
+    
+    # Update the local HubspotObject mapping for newly created contact
+    content_type = ContentType.objects.get_for_model(User)
+    HubspotObject.objects.update_or_create(
+        object_id=user.id,
+        content_type=content_type,
+        defaults={"hubspot_id": contact.id},
+    )
+    
     return contact.id
 
 
