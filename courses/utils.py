@@ -183,6 +183,24 @@ def is_uai_course_run(course_run):
     )
 
 
+def is_uai_program(program):
+    """
+    Check if a program is a UAI program.
+
+    Args:
+        program: Program instance
+
+    Returns:
+        bool: True if the program is UAI, False otherwise
+    """
+    if not program or not program.readable_id:
+        return False
+
+    readable_id = program.readable_id
+    # UAI programs use the format "program-v1:UAI+..."
+    return readable_id.startswith("program-v1:UAI")
+
+
 def is_uai_order(order):
     """
     Check if an order contains any UAI courses.

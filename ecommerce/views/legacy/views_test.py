@@ -961,7 +961,7 @@ def test_add_to_cart_triggers_hubspot_cart_add_for_uai_course(
     mock_sync.assert_called_once_with(
         user,
         product,
-        is_uai_course=True,
+        is_uai=True,
     )
 
 

@@ -99,14 +99,14 @@ def sync_hubspot_product(product: Product):
             )
 
 
-def sync_hubspot_cart_add(user: User, product: Product, *, is_uai_course: bool):
+def sync_hubspot_cart_add(user: User, product: Product, *, is_uai: bool):
     """
     Trigger celery task to track a cart add event in HubSpot.
 
     Args:
         user (User): The user adding the product to cart
         product (Product): The product being added
-        is_uai_course (bool): Whether the added course is a UAI course
+        is_uai (bool): Whether the added course is a UAI course
     """
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN or getattr(
         settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
@@ -114,7 +114,7 @@ def sync_hubspot_cart_add(user: User, product: Product, *, is_uai_course: bool):
         try:
             tasks.sync_cart_add_event_with_hubspot.apply_async(
                 args=(user.id, product.id),
-                kwargs={"is_uai_course": is_uai_course},
+                kwargs={"is_uai_course": is_uai},
                 countdown=5,
             )
         except:  # noqa: E722
