@@ -609,7 +609,7 @@ def test_track_cart_add_with_hubspot_syncs_missing_contact(settings, mocker, use
     mock_sync_deal = mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
 
     assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
-    mock_ensure_props.assert_called_once_with(mock_client.return_value)
+    mock_ensure_props.assert_called_once_with(mock_client.return_value, skip_certificates=True)
     mock_ensure_contact.assert_called_once_with(user, mock_client.return_value)
     mock_sync_deal.assert_called_once()
 
