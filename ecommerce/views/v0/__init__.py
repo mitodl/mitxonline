@@ -232,20 +232,18 @@ def _create_basket_from_product(
         basket=basket, product=product, defaults={"quantity": quantity}
     )
 
-    # Sync with HubSpot for CourseRun and Program products
-    if is_product_courserun(product) or is_product_program(product):
-        sync_hubspot_cart_add(
-            request.user,
-            product,
-            is_uai=(
-                is_product_courserun(product)
-                and is_uai_course_run(product.purchasable_object)
-            )
-            or (
-                is_product_program(product)
-                and is_uai_program(product.purchasable_object)
-            ),
+    sync_hubspot_cart_add(
+        request.user,
+        product,
+        is_uai=(
+            is_product_courserun(product)
+            and is_uai_course_run(product.purchasable_object)
         )
+        or (
+            is_product_program(product)
+            and is_uai_program(product.purchasable_object)
+        ),
+    )
 
     existing_basket_discounts = [bd.redeemed_discount for bd in basket.discounts.all()]
     discounts_to_apply = [
@@ -387,20 +385,19 @@ def create_basket_with_products(request):
             BasketItem.objects.update_or_create(
                 basket=basket, product=product, defaults={"quantity": quantity}
             )
-            # Sync with HubSpot for CourseRun and Program products
-            if is_product_courserun(product) or is_product_program(product):
-                sync_hubspot_cart_add(
-                    request.user,
-                    product,
-                    is_uai=(
-                        is_product_courserun(product)
-                        and is_uai_course_run(product.purchasable_object)
-                    )
-                    or (
-                        is_product_program(product)
-                        and is_uai_program(product.purchasable_object)
-                    ),
+
+            sync_hubspot_cart_add(
+                request.user,
+                product,
+                is_uai=(
+                    is_product_courserun(product)
+                    and is_uai_course_run(product.purchasable_object)
                 )
+                or (
+                    is_product_program(product)
+                    and is_uai_program(product.purchasable_object)
+                ),
+            )
     except ProductBlockedError:
         return Response(
             {"error": "Product blocked from purchasing.", "product": product},

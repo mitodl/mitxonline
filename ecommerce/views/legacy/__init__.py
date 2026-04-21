@@ -721,27 +721,6 @@ class CheckoutApiViewSet(ViewSet):
                     BasketItem.objects.create(basket=basket, product=product)
                     message = "Product added to cart"
 
-                    # Sync with HubSpot for CourseRun and Program products
-                    if is_product_courserun(product) or is_product_program(product):
-                        sync_hubspot_cart_add(
-                            self.request.user,
-                            product,
-                            is_uai=(
-                                is_product_courserun(product)
-                                and is_uai_course_run(product.purchasable_object)
-                            )
-                            or (
-                                is_product_program(product)
-                                and is_uai_program(product.purchasable_object)
-                            ),
-                        )
-            else:
-                # Legacy behavior: add single item
-                BasketItem.objects.create(basket=basket, product=product)
-                message = "Product added to cart"
-
-                # Sync with HubSpot for CourseRun and Program products
-                if is_product_courserun(product) or is_product_program(product):
                     sync_hubspot_cart_add(
                         self.request.user,
                         product,
@@ -754,6 +733,23 @@ class CheckoutApiViewSet(ViewSet):
                             and is_uai_program(product.purchasable_object)
                         ),
                     )
+            else:
+                # Legacy behavior: add single item
+                BasketItem.objects.create(basket=basket, product=product)
+                message = "Product added to cart"
+
+                sync_hubspot_cart_add(
+                    self.request.user,
+                    product,
+                    is_uai=(
+                        is_product_courserun(product)
+                        and is_uai_course_run(product.purchasable_object)
+                    )
+                    or (
+                        is_product_program(product)
+                        and is_uai_program(product.purchasable_object)
+                    ),
+                )
 
         return Response(
             {
