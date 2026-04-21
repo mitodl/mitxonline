@@ -197,7 +197,7 @@ def is_uai_program(program):
         return False
 
     readable_id = program.readable_id
-    # UAI programs use the format "program-v1:UAI+..." 
+    # UAI programs use the format "program-v1:UAI+..."
     return readable_id.startswith("program-v1:UAI")
 
 

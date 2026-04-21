@@ -6,7 +6,14 @@ from django.conf import settings
 from mitol.hubspot_api.api import format_app_id
 from rest_framework import serializers
 
-from courses.models import CourseRun, CourseRunCertificate, CourseRunEnrollment, Program, ProgramCertificate, ProgramEnrollment
+from courses.models import (
+    CourseRun,
+    CourseRunCertificate,
+    CourseRunEnrollment,
+    Program,
+    ProgramCertificate,
+    ProgramEnrollment,
+)
 from ecommerce import models
 from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import resolve_product_version
