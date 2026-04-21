@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.146.5 (Released April 21, 2026)
+---------------
+
+- Add fields for configuring the How You'll Learn cards on product pages (#3487)
+- feat: add webhook endpoint for Open edX course enrollment (#3372)
+- Make enrollment_mode field non-nullable (#3494)
+- [pre-commit.ci] pre-commit autoupdate (#3486)
+
 Version 1.146.4 (Released April 16, 2026)
 ---------------
 
