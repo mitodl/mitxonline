@@ -179,7 +179,7 @@ class AttachContractApi(APIView):
                         continue
 
                     if contract.is_full():
-                        log.exception(
+                        log.error(  # noqa: TRY400
                             "B2B attach: checked contract %s for code %s but it's full",
                             contract,
                             enrollment_code,
