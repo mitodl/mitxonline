@@ -1699,7 +1699,9 @@ def _normalize_line_item_properties_for_target_account(
             line_item_properties["status"] = resolved_status
 
 
-def _ensure_target_hubspot_custom_properties(hubspot_client: HubspotApi) -> None:
+def _ensure_target_hubspot_custom_properties(
+    hubspot_client: HubspotApi, *, skip_certificates: bool = False
+) -> None:
     """Ensure custom MITx e-commerce properties and groups exist in the target account."""
     object_configs = {
         object_type: {
@@ -1708,12 +1710,14 @@ def _ensure_target_hubspot_custom_properties(hubspot_client: HubspotApi) -> None
         }
         for object_type, config in CUSTOM_ECOMMERCE_PROPERTIES.items()
     }
-    object_configs[HubspotObjectType.CONTACTS.value]["properties"].extend(
-        [
-            _get_course_run_certificate_hubspot_property(),
-            _get_program_certificate_hubspot_property(),
-        ]
-    )
+    # Skip certificate properties for UAI courses since they don't need them
+    if not skip_certificates:
+        object_configs[HubspotObjectType.CONTACTS.value]["properties"].extend(
+            [
+                _get_course_run_certificate_hubspot_property(),
+                _get_program_certificate_hubspot_property(),
+            ]
+        )
 
     for object_type, config in object_configs.items():
         wait_for_hubspot_rate_limit()
@@ -1978,9 +1982,13 @@ def _ensure_target_hubspot_product_for_line(
     return created_product.id
 
 
-def _ensure_target_hubspot_contact_properties(hubspot_client: HubspotApi) -> None:
+def _ensure_target_hubspot_contact_properties(
+    hubspot_client: HubspotApi, *, skip_certificates: bool = False
+) -> None:
     """Backward-compatible wrapper retained for tests/callers."""
-    _ensure_target_hubspot_custom_properties(hubspot_client)
+    _ensure_target_hubspot_custom_properties(
+        hubspot_client, skip_certificates=skip_certificates
+    )
 
 
 def _ensure_hubspot_contact_for_user(
@@ -2085,7 +2093,9 @@ def track_cart_add_with_hubspot(
 
     try:
         hubspot_client = HubspotApi(access_token=token)
-        _ensure_target_hubspot_contact_properties(hubspot_client)
+        _ensure_target_hubspot_contact_properties(
+            hubspot_client, skip_certificates=is_uai_course
+        )
 
         # UAI deals must have a contact in the same HubSpot account.
         contact_id = _ensure_hubspot_contact_for_user(user, hubspot_client)
