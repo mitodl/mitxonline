@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.147.4
+---------------
+
+- fix: links on cart page point to learn (#3514)
+- Add even more logging for B2B enroll/attach error states (#3510)
+- Force explicit calls to generate enrollment codes for B2B contracts (#3501)
+
 Version 1.147.3 (Released April 22, 2026)
 ---------------
 
