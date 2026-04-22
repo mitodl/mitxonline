@@ -173,7 +173,7 @@ export class CartPage extends React.Component<Props, CartState> {
                   <div>{this.renderFinancialAssistanceOffer()}</div>
                   <div className="text-right ms-auto">
                     <a
-                      href="https://mitxonline.zendesk.com/hc/en-us"
+                      href="https://support.learn.mit.edu/"
                       target="_blank"
                       rel="noreferrer"
                     >
