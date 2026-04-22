@@ -250,13 +250,10 @@ export class OrderSummaryCard extends React.Component<Props, State> {
           {(totalPrice > 0 || discounts) && !orderFulfilled ? (
             <div className="cart-text-smaller">
               By placing my order I agree to the{" "}
-              <a href="/terms-of-service/" target="_blank" rel="noreferrer">
-                Terms of Service
+              <a href="https://learn.mit.edu/terms/" target="_blank" rel="noreferrer">
+                MIT Learn Terms of Service
               </a>
-              , and{" "}
-              <a href="/privacy-policy/" target="_blank" rel="noreferrer">
-                Privacy Policy.
-              </a>
+              .
             </div>
           ) : null}
         </div>
