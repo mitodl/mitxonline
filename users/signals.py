@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -12,4 +13,4 @@ def sync_user_to_hubspot_on_create(sender, instance, created, **kwargs):  # noqa
 
     """
     if created:
-        sync_hubspot_user(instance)
+        transaction.on_commit(lambda: sync_hubspot_user(instance))

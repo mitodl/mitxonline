@@ -5,7 +5,7 @@ import pytest
 from users.factories import UserFactory
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_user_creation_triggers_hubspot_sync(mocker):
     """
     Test that creating a user triggers the Hubspot sync.
