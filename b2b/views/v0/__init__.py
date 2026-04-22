@@ -1,5 +1,7 @@
 """Views for the B2B API (v0)."""
 
+import logging
+
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Prefetch, Q
 from django.views.decorators.csrf import csrf_exempt
@@ -29,6 +31,8 @@ from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.permissions import IsAdminOrReadOnly
+
+log = logging.getLogger(__name__)
 
 
 class OrganizationPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -151,6 +155,10 @@ class AttachContractApi(APIView):
             # a contract that is actually full. In that case we want to return
             # 409 (Contract is full) instead of a generic 404.
 
+            log.exception(
+                "B2B attach: redeeming code %s but it is not valid", enrollment_code
+            )
+
             fallback_discounts = (
                 Discount.objects.filter(
                     Q(activation_date__isnull=True) | Q(activation_date__lte=now)
@@ -171,6 +179,11 @@ class AttachContractApi(APIView):
                         continue
 
                     if contract.is_full():
+                        log.error(  # noqa: TRY400
+                            "B2B attach: checked contract %s for code %s but it's full",
+                            contract,
+                            enrollment_code,
+                        )
                         return Response(
                             {"detail": "Contract is full."},
                             status=status.HTTP_409_CONFLICT,
@@ -236,6 +249,11 @@ class AttachContractApi(APIView):
 
         for contract in contracts:
             if contract.is_full():
+                log.error(
+                    "B2B attach to contract: can't add %s to %s: no open seats",
+                    user,
+                    contract,
+                )
                 contract_full = True
                 continue
 
