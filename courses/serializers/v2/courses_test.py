@@ -401,7 +401,7 @@ def test_course_serializer_language_options():
 
 
 def test_course_serializer_titles():
-    """titles field returns one entry per language with the correct title."""
+    """Titles field returns one entry per language with the correct title."""
     course = CourseFactory.create()
     CourseRunFactory.create(
         course=course,

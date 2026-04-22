@@ -301,9 +301,9 @@ def _get_source_runs_for_course(
             language.
     """
     source_runs = list(
-        course.courseruns.filter(
-            Q(is_source_run=True) | Q(run_tag="SOURCE")
-        ).order_by("id")
+        course.courseruns.filter(Q(is_source_run=True) | Q(run_tag="SOURCE")).order_by(
+            "id"
+        )
     )
 
     if not source_runs:
@@ -313,8 +313,7 @@ def _get_source_runs_for_course(
                 msg = f"No course runs available for {course}."
                 raise SourceCourseIncompleteError(msg)
             log.warning(
-                "_get_source_runs_for_course: no source run for %s, "
-                "falling back to %s",
+                "_get_source_runs_for_course: no source run for %s, falling back to %s",
                 course,
                 fallback,
             )

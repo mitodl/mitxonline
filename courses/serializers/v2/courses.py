@@ -265,9 +265,7 @@ class CourseSerializer(BaseCourseSerializer):
                 best_run_by_language[lang] = run
                 continue
             existing = best_run_by_language[lang]
-            run_is_active = (
-                run.start_date and run.start_date <= now and not run.is_past
-            )
+            run_is_active = run.start_date and run.start_date <= now and not run.is_past
             existing_is_active = (
                 existing.start_date
                 and existing.start_date <= now

@@ -18,7 +18,6 @@ from opaque_keys.edx.keys import CourseKey
 from b2b import factories
 from b2b.api import (
     _apply_available_discount,
-    _get_source_runs_for_course,
     _handle_extra_enrollment_codes,
     _validate_b2b_enrollment_prerequisites,
     create_b2b_enrollment,
