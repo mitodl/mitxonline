@@ -214,21 +214,20 @@ def test_basket_with_product_serializer():
     """
     Tests serialization of a basket with the attached products (and any
     discounts applied).
-    
+
     Uses deterministic test values and consistent rounding to prevent
     flaky behavior caused by floating-point precision differences.
     """
 
     # Create product with deterministic price that avoids precision edge cases
     product = ProductFactory.create(price=Decimal("100.00"))
-    
+
     # Create discount with deterministic percentage that results in clean calculation
     # 20% discount on $100.00 = $20.00 discount, final price $80.00
     discount = UnlimitedUseDiscountFactory.create(
-        discount_type=DISCOUNT_TYPE_PERCENT_OFF,
-        amount=20
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=20
     )
-    
+
     basket_item = BasketItemFactory.create(product=product)
     user = UserFactory.create()
 
@@ -251,7 +250,7 @@ def test_basket_with_product_serializer():
     assert serialized_basket["total_price"] == basket_item.product.price
     assert serialized_basket["discounted_price"] == expected_discount_price
     assert len(serialized_basket["discounts"]) == 1
-    
+
     # Additional verification: ensure the discount calculation is correct
     # 20% discount on $100.00 should result in $80.00
     assert expected_discount_price == Decimal("80.00")
