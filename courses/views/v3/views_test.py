@@ -20,6 +20,7 @@ from courses.test_utils import maybe_serialize_course_cert, maybe_serialize_prog
 from ecommerce.factories import OrderFactory
 from ecommerce.models import OrderStatus
 from main.test_utils import drf_datetime
+from openedx.exceptions import EdxApiCourseOutlineError
 
 pytestmark = [
     pytest.mark.django_db,
@@ -636,3 +637,89 @@ def test_destroy_program_enrollment_paid_fails(user_drf_client, user):
 
     enrollment.refresh_from_db()
     assert enrollment.active is True
+
+
+def test_course_outline_v3_public_success(mocker):
+    """GET course outline endpoint should succeed without authentication."""
+    client = APIClient()
+    expected_outline = {
+        "course_id": "course-v1:OpenedX+DemoX+DemoCourse",
+        "blocks": [],
+    }
+    mocked_get_outline = mocker.patch(
+        "courses.views.v3.get_edx_course_outline", return_value=expected_outline
+    )
+    resp = client.get(
+        reverse(
+            "v3:course_outline",
+            kwargs={"course_id": "course-v1:OpenedX+DemoX+DemoCourse"},
+        )
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == expected_outline
+    mocked_get_outline.assert_called_once_with("course-v1:OpenedX+DemoX+DemoCourse")
+
+
+def test_course_outline_v3_authenticated_success(user_drf_client, mocker):
+    """Authenticated request should return proxied Open edX outline data."""
+    expected_outline = {
+        "course_id": "course-v1:OpenedX+DemoX+DemoCourse",
+        "blocks": [],
+    }
+    mocked_get_outline = mocker.patch(
+        "courses.views.v3.get_edx_course_outline", return_value=expected_outline
+    )
+
+    resp = user_drf_client.get(
+        reverse(
+            "v3:course_outline",
+            kwargs={"course_id": "course-v1:OpenedX+DemoX+DemoCourse"},
+        )
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json() == expected_outline
+    mocked_get_outline.assert_called_once_with("course-v1:OpenedX+DemoX+DemoCourse")
+
+
+def test_course_outline_v3_invalid_course_id():
+    """Invalid course IDs should return 400 before upstream call."""
+    client = APIClient()
+    resp = client.get(
+        reverse("v3:course_outline", kwargs={"course_id": "not-a-course-key"})
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {
+        "detail": "Invalid course_id format. Expected an Open edX course key."
+    }
+
+
+@pytest.mark.parametrize(
+    ("exception_instance", "expected_detail"),
+    [
+        (
+            EdxApiCourseOutlineError("boom"),
+            "Unable to fetch course outline from Open edX.",
+        ),
+        (
+            EdxApiCourseOutlineError("bad json"),
+            "Unable to fetch course outline from Open edX.",
+        ),
+    ],
+)
+def test_course_outline_v3_upstream_failures(
+    user_drf_client, mocker, exception_instance, expected_detail
+):
+    """Upstream errors should be mapped to 502 responses with safe messages."""
+    mocker.patch(
+        "courses.views.v3.get_edx_course_outline",
+        side_effect=exception_instance,
+    )
+    resp = user_drf_client.get(
+        reverse(
+            "v3:course_outline",
+            kwargs={"course_id": "course-v1:OpenedX+DemoX+DemoCourse"},
+        )
+    )
+    assert resp.status_code == status.HTTP_502_BAD_GATEWAY
+    assert resp.json() == {"detail": expected_detail}

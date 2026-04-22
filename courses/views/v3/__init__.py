@@ -2,21 +2,33 @@
 Course API Views version 3
 """
 
+import logging
+import re
+
 import django_filters
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
-from rest_framework import mixins, status, viewsets
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    extend_schema,
+    extend_schema_view,
+    inline_serializer,
+)
+from rest_framework import mixins, serializers, status, viewsets
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import (
+    AllowAny,
     IsAuthenticated,
 )
 from rest_framework.response import Response
 
 from courses.api import create_program_enrollments, deactivate_run_enrollment
-from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.constants import COURSE_KEY_PATTERN, ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     CourseRunEnrollment,
     Program,
@@ -29,6 +41,10 @@ from courses.serializers.v3.programs import (
 )
 from ecommerce.models import Product
 from main import features
+from openedx.api import get_edx_course_outline
+from openedx.exceptions import EdxApiCourseOutlineError
+
+log = logging.getLogger(__name__)
 
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
@@ -243,3 +259,107 @@ class UserProgramEnrollmentsViewSet(
             enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_UNENROLLED)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(
+    operation_id="course_outline_retrieve_v3",
+    description="Fetch course outline data for the given course key from Open edX.",
+    parameters=[
+        OpenApiParameter(
+            name="course_id",
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            required=True,
+            description="Open edX course key (URL-encoded recommended), e.g. course-v1%3AOpenedX%2BDemoX%2BDemoCourse",
+        )
+    ],
+    responses={
+        200: inline_serializer(
+            name="CourseOutlineResponse",
+            fields={
+                "course_id": serializers.CharField(),
+                "generated_at": serializers.CharField(),
+                "modules": serializers.ListField(child=serializers.DictField()),
+            },
+        ),
+        400: inline_serializer(
+            name="CourseOutlineBadRequestResponse",
+            fields={"detail": serializers.CharField()},
+        ),
+        502: inline_serializer(
+            name="CourseOutlineUpstreamErrorResponse",
+            fields={"detail": serializers.CharField()},
+        ),
+        500: inline_serializer(
+            name="CourseOutlineServerErrorResponse",
+            fields={"detail": serializers.CharField()},
+        ),
+    },
+    examples=[
+        OpenApiExample(
+            "CourseOutlineSuccess",
+            value={
+                "course_id": "course-v1:OpenedX+DemoX+DemoCourse",
+                "generated_at": "2026-04-10T07:17:20Z",
+                "modules": [
+                    {
+                        "id": "block-v1:OpenedX+DemoX+DemoCourse+type@chapter+block@abc123",
+                        "title": "Module 1",
+                        "effort_time": 0,
+                        "effort_activities": 0,
+                        "counts": {
+                            "videos": 2,
+                            "readings": 1,
+                            "problems": 1,
+                            "assignments": 0,
+                            "app_items": 0,
+                        },
+                    }
+                ],
+            },
+            response_only=True,
+            status_codes=["200"],
+        ),
+        OpenApiExample(
+            "InvalidCourseId",
+            value={
+                "detail": "Invalid course_id format. Expected an Open edX course key."
+            },
+            response_only=True,
+            status_codes=["400"],
+        ),
+        OpenApiExample(
+            "UpstreamError",
+            value={"detail": "Unable to fetch course outline from Open edX."},
+            response_only=True,
+            status_codes=["502"],
+        ),
+    ],
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_course_outline(request, course_id):  # noqa: ARG001
+    """
+    Return course outline data from Open edX for the specified course key.
+    """
+    if not re.fullmatch(COURSE_KEY_PATTERN, course_id):
+        return Response(
+            {"detail": "Invalid course_id format. Expected an Open edX course key."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        outline_data = get_edx_course_outline(course_id)
+    except EdxApiCourseOutlineError:
+        return Response(
+            {"detail": "Unable to fetch course outline from Open edX."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except ImproperlyConfigured:
+        log.exception("Course outline service is not configured")
+        return Response(
+            {"detail": "Course outline service is not configured."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    return Response(outline_data, status=status.HTTP_200_OK)

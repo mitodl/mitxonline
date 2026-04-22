@@ -4,7 +4,7 @@ import logging
 import random
 from datetime import datetime, timedelta
 from functools import partial
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, quote, urljoin, urlparse
 
 import requests
 from django.conf import settings
@@ -39,6 +39,7 @@ from openedx.constants import (
     PLATFORM_EDX,
 )
 from openedx.exceptions import (
+    EdxApiCourseOutlineError,
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
@@ -885,6 +886,46 @@ def get_edx_api_service_client():
     )
 
     return edx_client  # noqa: RET504
+
+
+def get_edx_course_outline(course_id: str) -> dict:
+    """
+    Fetch course outline data from the Open edX course outline plugin endpoint.
+
+    Args:
+        course_id (str): edX course key (e.g., course-v1:MITx+1.00x+1T2026)
+    Returns:
+        dict: Parsed JSON response from the outline API
+    """
+    edx_client = get_edx_api_service_client()
+    encoded_course_id = quote(course_id, safe="")
+    outline_path = settings.OL_OPENEDX_COURSE_OUTLINE_URL.format(
+        course_id=encoded_course_id
+    )
+    outline_url = edx_url(outline_path)
+    requester = edx_client.get_requester()
+    try:
+        response = requester.get(outline_url)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        message = "Open edX course outline request failed"
+        log.exception(
+            "Failed to fetch Open edX course outline for course_id=%s url=%s",
+            course_id,
+            outline_url,
+        )
+        raise EdxApiCourseOutlineError(message) from exc
+
+    try:
+        return response.json()
+    except (ValueError, requests.exceptions.JSONDecodeError) as exc:
+        message = "Open edX course outline response was invalid"
+        log.exception(
+            "Open edX course outline response was not valid JSON for course_id=%s url=%s",
+            course_id,
+            outline_url,
+        )
+        raise EdxApiCourseOutlineError(message) from exc
 
 
 def get_edx_api_jwt_client(
