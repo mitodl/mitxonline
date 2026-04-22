@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.147.4
+Version 1.147.4 (Released April 22, 2026)
 ---------------
 
 - fix: links on cart page point to learn (#3514)
