@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.147.3
+Version 1.147.3 (Released April 22, 2026)
 ---------------
 
 - Add skip_certificates flag to HubSpot property setup (#3511)
