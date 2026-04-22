@@ -4602,6 +4602,37 @@ components:
       - letter_grade
       - passed
       - set_by_admin
+    CourseRunLanguageOption:
+      type: object
+      description: Compact serializer for a single language variant of a course run.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        courseware_id:
+          type: string
+          maxLength: 255
+        language:
+          type: string
+          nullable: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        run_tag:
+          type: string
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+      required:
+      - courseware_id
+      - id
+      - run_tag
+      - title
     CourseRunV2:
       type: object
       description: CourseRun model serializer
@@ -4696,6 +4727,18 @@ components:
             additionalProperties: {}
           description: Get the enrollment modes for the course run
           readOnly: true
+        language:
+          type: string
+          nullable: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
         products:
           type: array
           items:
@@ -4814,6 +4857,18 @@ components:
             additionalProperties: {}
           description: Get the enrollment modes for the course run
           readOnly: true
+        language:
+          type: string
+          nullable: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
         upgrade_product_id:
           type: integer
           nullable: true
@@ -4913,6 +4968,18 @@ components:
           maxLength: 100
         live:
           type: boolean
+        language:
+          type: string
+          nullable: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
       required:
       - courseware_id
       - run_tag
@@ -5073,10 +5140,21 @@ components:
         ingest_content_files_for_ai:
           type: boolean
           readOnly: true
+        titles:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
         courseruns:
           type: array
           items:
             $ref: '#/components/schemas/CourseRunV2'
+          readOnly: true
+        language_options:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseRunLanguageOption'
           readOnly: true
       required:
       - availability
@@ -5088,6 +5166,7 @@ components:
       - id
       - include_in_learn_catalog
       - ingest_content_files_for_ai
+      - language_options
       - max_price
       - max_weekly_hours
       - max_weeks
@@ -5101,6 +5180,7 @@ components:
       - required_prerequisites
       - time_commitment
       - title
+      - titles
       - topics
     CreateB2BEnrollment:
       type: object
@@ -7906,6 +7986,18 @@ components:
             additionalProperties: {}
           description: Get the enrollment modes for the course run
           readOnly: true
+        language:
+          type: string
+          nullable: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
         products:
           type: array
           items:
@@ -8022,6 +8114,18 @@ components:
             additionalProperties: {}
           description: Get the enrollment modes for the course run
           readOnly: true
+        language:
+          type: string
+          nullable: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
         products:
           type: array
           items:
@@ -8116,6 +8220,18 @@ components:
           maxLength: 100
         live:
           type: boolean
+        language:
+          type: string
+          nullable: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
       required:
       - courseware_id
       - run_tag
@@ -8407,6 +8523,12 @@ components:
         ingest_content_files_for_ai:
           type: boolean
           readOnly: true
+        titles:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
       required:
       - availability
       - certificate_available
@@ -8429,6 +8551,7 @@ components:
       - required_prerequisites
       - time_commitment
       - title
+      - titles
       - topics
     V2CourseRequest:
       type: object
@@ -8575,6 +8698,18 @@ components:
             additionalProperties: {}
           description: Get the enrollment modes for the course run
           readOnly: true
+        language:
+          type: string
+          nullable: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
         products:
           type: array
           items:
@@ -8670,6 +8805,18 @@ components:
           maxLength: 100
         live:
           type: boolean
+        language:
+          type: string
+          nullable: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
         b2b_contract:
           type: integer
           nullable: true
