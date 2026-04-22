@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.147.3
+---------------
+
+- Add skip_certificates flag to HubSpot property setup (#3511)
+- feat: mitxonline API to surface course modules metadata (#3490)
+- Update dependency authlib to v1.6.11 [SECURITY] (#3506)
+- Update astral-sh/setup-uv action to v8 (#3512)
+
 Version 1.147.2 (Released April 21, 2026)
 ---------------
 
