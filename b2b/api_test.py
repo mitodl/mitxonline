@@ -18,6 +18,7 @@ from opaque_keys.edx.keys import CourseKey
 from b2b import factories
 from b2b.api import (
     _apply_available_discount,
+    _get_source_runs_for_course,
     _handle_extra_enrollment_codes,
     _validate_b2b_enrollment_prerequisites,
     create_b2b_enrollment,
@@ -123,7 +124,7 @@ def test_create_single_course_run(mocker, contract_ready_course, has_start, has_
         else None,
     )
     (source_course, _) = contract_ready_course
-    run, product = create_contract_run(contract, source_course)
+    [(run, product)] = create_contract_run(contract, source_course)
 
     assert run.course == source_course
     assert run.run_tag == B2B_RUN_TAG_FORMAT.format(
@@ -309,7 +310,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 
     assert contract.get_discounts().count() == 0
 
-    _, product = create_contract_run(contract, course, queue_codes=True)
+    [(_, product)] = create_contract_run(contract, course, queue_codes=True)
     assert mocked_ensure_call.called
 
     ensure_enrollment_codes_exist(contract)
@@ -442,7 +443,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
         else FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
     )
     (course, _) = contract_ready_course
-    run, product = create_contract_run(contract, course, queue_codes=True)
+    [(run, product)] = create_contract_run(contract, course, queue_codes=True)
 
     if not product_in_contract:
         # just create something random - this is like someone fuzzing the API
@@ -574,7 +575,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
             b2b_contract=contract,
         )
 
-        new_run, _ = create_contract_run(contract, course)
+        [(new_run, _)] = create_contract_run(contract, course)
 
         collision_key = CourseKey.from_string(collision_run.courseware_id)
         new_run_key = CourseKey.from_string(new_run.courseware_id)
@@ -586,7 +587,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
 
     assert not course.courseruns.filter(courseware_id=target_course_id).exists()
 
-    created_run, created_product = create_contract_run(contract, course)
+    [(created_run, created_product)] = create_contract_run(contract, course)
 
     assert course.courseruns.filter(courseware_id=target_course_id).exists()
     assert created_run.courseware_id == target_course_id
@@ -1054,7 +1055,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
     mock_course = mocker.Mock()
     mock_run.course = mock_course
     mock_product = mocker.Mock()
-    mock_create_contract_run.return_value = (mock_run, mock_product)
+    mock_create_contract_run.return_value = [(mock_run, mock_product)]
 
     if run_exists:
         # Create a mock existing run
@@ -1154,7 +1155,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
     mock_run = mocker.Mock()
     mock_product = mocker.Mock()
-    mock_create_contract_run.return_value = (mock_run, mock_product)
+    mock_create_contract_run.return_value = [(mock_run, mock_product)]
 
     # Test with all kwargs
     result = import_and_create_contract_run(
@@ -1219,7 +1220,7 @@ def test_import_and_create_contract_run_with_string_departments(mocker):
     mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
     mock_run = mocker.Mock()
     mock_product = mocker.Mock()
-    mock_create_contract_run.return_value = (mock_run, mock_product)
+    mock_create_contract_run.return_value = [(mock_run, mock_product)]
 
     result = import_and_create_contract_run(
         contract=contract,
@@ -1572,3 +1573,99 @@ def test_apply_available_discount_unlimited_seats(existing_discounts):
     _apply_available_discount(request, products[0], basket)
 
     assert contract.get_discounts().count() == (2 if existing_discounts else 1)
+
+
+# ---- Multi-language create_contract_run tests ----
+
+
+@pytest.mark.django_db
+def test_create_contract_run_multi_language(mocker):
+    """create_contract_run produces one run+product per language source run."""
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-zh",
+    )
+    results = create_contract_run(contract, course, require_designated_source_run=True)
+    assert len(results) == 2
+    languages = {run.language for run, _ in results}
+    assert languages == {"en", "zh"}
+    # Each result should have a distinct product
+    products = [product for _, product in results]
+    assert len({p.id for p in products}) == 2
+
+
+@pytest.mark.django_db
+def test_create_contract_run_multi_language_propagates_language(mocker):
+    """The new contract run inherits the language from its source run."""
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_primary_language=True,
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    results = create_contract_run(contract, course)
+    assert len(results) == 1
+    run, _ = results[0]
+    assert run.language == "en"
+    assert run.is_primary_language is True
+
+
+@pytest.mark.django_db
+def test_create_contract_run_duplicate_language_source_raises():
+    """Two source runs with the same language raise SourceCourseIncompleteError."""
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en",
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026-copy",
+        language="en",
+        is_source_run=True,
+        courseware_id=f"{course.readable_id}+1T2026-en-copy",
+    )
+    with pytest.raises(SourceCourseIncompleteError, match="more than one source run"):
+        create_contract_run(contract, course)
+
+
+@pytest.mark.django_db
+def test_create_contract_run_single_language_legacy(mocker):
+    """A course with one source run (no language set) returns a one-element list."""
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    contract = ContractPageFactory.create()
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="SOURCE",
+        language=None,
+        is_source_run=False,
+        courseware_id=f"{course.readable_id}+SOURCE",
+    )
+    results = create_contract_run(contract, course, require_designated_source_run=True)
+    assert len(results) == 1
+    run, product = results[0]
+    assert run.b2b_contract == contract
+    assert product.object_id == run.id

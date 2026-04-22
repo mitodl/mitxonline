@@ -278,6 +278,66 @@ def import_and_create_contract_run(  # noqa: PLR0913
     )
 
 
+def _get_source_runs_for_course(
+    course: Course,
+    *,
+    require_designated: bool = True,
+) -> list[CourseRun]:
+    """
+    Return the set of source runs for a course.
+
+    A source run is one with ``is_source_run=True`` or ``run_tag="SOURCE"``.
+
+    Args:
+        course: The course to inspect.
+        require_designated: If True, raise SourceCourseIncompleteError when no
+            source run exists. If False, fall back to the oldest run.
+    Returns:
+        List of distinct source CourseRun objects, one per language (or one
+        for the "no language" legacy case).
+    Raises:
+        SourceCourseIncompleteError: if require_designated is True and no source
+            run is found, or if more than one source run exists for the same
+            language.
+    """
+    source_runs = list(
+        course.courseruns.filter(
+            Q(is_source_run=True) | Q(run_tag="SOURCE")
+        ).order_by("id")
+    )
+
+    if not source_runs:
+        if not require_designated:
+            fallback = course.courseruns.order_by("id").first()
+            if not fallback:
+                msg = f"No course runs available for {course}."
+                raise SourceCourseIncompleteError(msg)
+            log.warning(
+                "_get_source_runs_for_course: no source run for %s, "
+                "falling back to %s",
+                course,
+                fallback,
+            )
+            return [fallback]
+        msg = f"No source run found for {course}."
+        raise SourceCourseIncompleteError(msg)
+
+    # Validate: at most one source run per language.
+    seen_languages: dict = {}
+    for run in source_runs:
+        lang = run.language  # may be None for legacy runs
+        if lang in seen_languages:
+            msg = (
+                f"Course {course} has more than one source run for "
+                f"language '{lang}': {seen_languages[lang]} and {run}. "
+                "Resolve by unsetting is_source_run on the duplicates."
+            )
+            raise SourceCourseIncompleteError(msg)
+        seen_languages[lang] = run
+
+    return source_runs
+
+
 def create_contract_run(  # noqa: PLR0913
     contract: ContractPage,
     course: Course,
@@ -287,23 +347,27 @@ def create_contract_run(  # noqa: PLR0913
     org_prefix: str | None = UAI_COURSEWARE_ID_PREFIX,
     no_reruns: bool = False,
     queue_codes: bool = False,
-) -> tuple[CourseRun, Product]:
+) -> list[tuple[CourseRun, Product]]:
     """
-    Create a run for the specified contract.
+    Create run(s) for the specified contract.
 
-    This does 3 main things:
+    If the course has multiple language source runs, a contract run and product
+    is created for **each** language. A list of (CourseRun, Product) tuples is
+    returned, one per source language run.
+
+    This does 3 main things per source run:
     - Grab and identify the source course run, and create a new course key for
       the contract course run.
     - Create the contract course run in MITx Online, and queue a clone of the
       source course run in edX.
     - Create a product for the run.
 
-    Source course runs are runs that have the "is_source_run" flag set. If one
+    Source course runs are runs that have the ``is_source_run`` flag set. If one
     cannot be found, this will also check for a run with the run tag "SOURCE".
     If neither of those are found, it will throw an error. However, setting
-    "require_designated_source_run" to False will add a third attempt, which will
-    try to use whatever the first course run is for the specified course. This
-    may not be what you want, so this functionality is disabled by default.
+    ``require_designated_source_run`` to False will add a third attempt, which
+    will try to use whatever the first course run is for the specified course.
+    This may not be what you want, so this functionality is disabled by default.
 
     The MITx Online course run will belong to the source course. They will get a
     course key that is modified to represent the organization they belong to,
@@ -328,46 +392,19 @@ def create_contract_run(  # noqa: PLR0913
         require_designated_source_run (bool): Require a flagged source run.
         org_prefix (str): Organization prefix. For UAI courses, this should be "UAI_".
         no_reruns (bool): Don't rerun the course - raise an exception instead.
+        queue_codes (bool): Queue enrollment code generation after saving.
     Returns:
-        CourseRun: The created CourseRun object.
-        Product: The created Product object.
+        list[tuple[CourseRun, Product]]: One (CourseRun, Product) pair per
+        source language run. Legacy single-language courses produce a one-element
+        list.
     """
-
-    clone_course_run = course.courseruns.filter(
-        Q(is_source_run=True) | Q(run_tag="SOURCE")
-    ).first()
-
-    if not clone_course_run and not require_designated_source_run:
-        try:
-            clone_course_run = course.courseruns.order_by("-id").first()
-            log.warning(
-                "create_contract_run: Couldn't find an appropriate source run for %s, using %s",
-                course,
-                clone_course_run,
-            )
-        except CourseRun.DoesNotExist as exc:
-            msg = f"No course runs available for {course}."
-            raise SourceCourseIncompleteError(msg) from exc
-
-    if not clone_course_run:
-        msg = f"No course runs available for {course}."
-        raise SourceCourseIncompleteError(msg)
-
-    new_course_key = CourseKey.from_string(
-        create_contract_run_key(
-            source_course=clone_course_run, contract=contract, org_prefix=org_prefix
-        )
+    source_runs = _get_source_runs_for_course(
+        course, require_designated=require_designated_source_run
     )
-    new_readable_id = str(new_course_key)
-    new_run_tag = new_course_key.run
 
-    # Check first for an existing run with the same readable ID.
-    if (
-        CourseRun.objects.filter(course=course, b2b_contract=contract).exists()
-        and no_reruns
-    ):
-        msg = f"Can't create a run for {course} and contract {contract}: courseware ID {new_readable_id} already exists."
-        raise TargetCourseRunExistsError(msg)
+    content_type = ContentType.objects.filter(
+        app_label="courses", model="courserun"
+    ).get()
 
     start_date = (
         date_to_datetime(contract.contract_start, settings.TIME_ZONE)
@@ -380,66 +417,99 @@ def create_contract_run(  # noqa: PLR0913
         else None
     )
 
-    course_run = CourseRun(
-        course=course,
-        title=course.title,
-        courseware_id=new_readable_id,
-        run_tag=new_run_tag,
-        start_date=start_date,
-        end_date=end_date,
-        enrollment_start=start_date,
-        enrollment_end=end_date,
-        certificate_available_date=start_date,
-        is_self_paced=True,
-        live=True,
-        b2b_contract=contract,
-    )
-    course_run.save()
+    results = []
 
-    required_modes = EnrollmentMode.objects.filter(
-        mode_slug__in=[EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
-    ).all()
-
-    [course_run.enrollment_modes.add(mode) for mode in required_modes]
-
-    if not skip_edx:
-        clone_courserun.delay(course_run.id, clone_course_run.courseware_id)
-
-    log.debug(
-        "Created run %s for course %s in contract %s from course run %s",
-        course_run,
-        course,
-        contract,
-        clone_course_run,
-    )
-
-    content_type = ContentType.objects.filter(
-        app_label="courses", model="courserun"
-    ).get()
-
-    with reversion.create_revision():
-        course_run_product = Product(
-            price=contract.enrollment_fixed_price
-            if contract.enrollment_fixed_price
-            else Decimal(0),
-            is_active=True,
-            description=f"{contract.organization.name} #{contract.id} - {course.title} {course.readable_id}",
-            object_id=course_run.id,
-            content_type=content_type,
+    for clone_course_run in source_runs:
+        new_course_key = CourseKey.from_string(
+            create_contract_run_key(
+                source_course=clone_course_run,
+                contract=contract,
+                org_prefix=org_prefix,
+            )
         )
-        course_run_product.save()
+        new_readable_id = str(new_course_key)
+        new_run_tag = new_course_key.run
+
+        if (
+            CourseRun.objects.filter(course=course, b2b_contract=contract).exists()
+            and no_reruns
+        ):
+            msg = (
+                f"Can't create a run for {course} and contract {contract}: "
+                f"courseware ID {new_readable_id} already exists."
+            )
+            raise TargetCourseRunExistsError(msg)
+
+        course_run = CourseRun(
+            course=course,
+            title=clone_course_run.title,
+            courseware_id=new_readable_id,
+            run_tag=new_run_tag,
+            start_date=start_date,
+            end_date=end_date,
+            enrollment_start=start_date,
+            enrollment_end=end_date,
+            certificate_available_date=start_date,
+            is_self_paced=True,
+            live=True,
+            b2b_contract=contract,
+            language=clone_course_run.language,
+            is_primary_language=clone_course_run.is_primary_language,
+        )
+        course_run.save()
+
+        required_modes = EnrollmentMode.objects.filter(
+            mode_slug__in=[EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
+        ).all()
+        course_run.enrollment_modes.add(*required_modes)
+
+        if not skip_edx:
+            clone_courserun.delay(course_run.id, clone_course_run.courseware_id)
 
         log.debug(
-            "Created product %s for run %s in contract %s",
-            course_run_product,
+            "Created run %s (language=%s) for course %s in contract %s from %s",
             course_run,
+            course_run.language,
+            course,
             contract,
+            clone_course_run,
         )
+
+        lang_suffix = f" [{course_run.language}]" if course_run.language else ""
+        with reversion.create_revision():
+            course_run_product = Product(
+                price=(
+                    contract.enrollment_fixed_price
+                    if contract.enrollment_fixed_price
+                    else Decimal(0)
+                ),
+                is_active=True,
+                description=(
+                    f"{contract.organization.name} #{contract.id}"
+                    f" - {course.title} {course.readable_id}{lang_suffix}"
+                ),
+                object_id=course_run.id,
+                content_type=content_type,
+            )
+            course_run_product.save()
+
+            log.debug(
+                "Created product %s for run %s in contract %s",
+                course_run_product,
+                course_run,
+                contract,
+            )
+
+        results.append((course_run, course_run_product))
 
     if queue_codes:
         queue_enrollment_code_check.delay(contract.id)
 
-    return course_run, course_run_product
+    # Saving the contract here triggers any shoring up of related data,
+    # like generating enrollment codes.
+    contract.save()
+
+    return results
 
 
 def get_free_and_nonfree_contracts(contracts: Iterable) -> tuple[list, list]:

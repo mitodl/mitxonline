@@ -322,3 +322,111 @@ class TestUserEnrollmentFiltering:
         result = filter_set.qs
         assert result.count() == 1
         assert result.first().id == enrollment2.id
+
+
+# ---- Language / titles serializer tests ----
+
+
+def test_course_serializer_canonical_run_per_tag():
+    """get_courseruns returns one canonical run per tag (the primary-language one)."""
+    course = CourseFactory.create()
+    run_en = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_primary_language=True,
+        courseware_id="course-v1:T+C+1T2026-en",
+        b2b_contract=None,
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        is_primary_language=False,
+        courseware_id="course-v1:T+C+1T2026-zh",
+        b2b_contract=None,
+    )
+    serializer = CourseWithCourseRunsSerializer(course)
+    assert len(serializer.data["courseruns"]) == 1
+    assert serializer.data["courseruns"][0]["courseware_id"] == run_en.courseware_id
+
+
+def test_course_serializer_canonical_run_fallback_to_oldest():
+    """When no run has is_primary_language=True, the oldest run is canonical."""
+    course = CourseFactory.create()
+    run_first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_primary_language=False,
+        courseware_id="course-v1:T+C+1T2026-en",
+        b2b_contract=None,
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        is_primary_language=False,
+        courseware_id="course-v1:T+C+1T2026-zh",
+        b2b_contract=None,
+    )
+    serializer = CourseWithCourseRunsSerializer(course)
+    assert len(serializer.data["courseruns"]) == 1
+    assert serializer.data["courseruns"][0]["courseware_id"] == run_first.courseware_id
+
+
+def test_course_serializer_language_options():
+    """language_options contains all variants for each run tag."""
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        courseware_id="course-v1:T+C+1T2026-en",
+        b2b_contract=None,
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        courseware_id="course-v1:T+C+1T2026-zh",
+        b2b_contract=None,
+    )
+    serializer = CourseWithCourseRunsSerializer(course)
+    languages = {opt["language"] for opt in serializer.data["language_options"]}
+    assert languages == {"en", "zh"}
+    # run_tag should be present in each option
+    for opt in serializer.data["language_options"]:
+        assert opt["run_tag"] == "1T2026"
+
+
+def test_course_serializer_titles():
+    """titles field returns one entry per language with the correct title."""
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        title="Calculus I",
+        courseware_id="course-v1:T+C+1T2026-en",
+        b2b_contract=None,
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        title="微积分 I",
+        courseware_id="course-v1:T+C+1T2026-zh",
+        b2b_contract=None,
+    )
+    serializer = CourseWithCourseRunsSerializer(course)
+    title_map = {t["language"]: t["title"] for t in serializer.data["titles"]}
+    assert title_map["en"] == "Calculus I"
+    assert title_map["zh"] == "微积分 I"
+
+
+def test_course_serializer_language_options_empty_without_runs():
+    """language_options is empty when there are no matching runs."""
+    course = CourseFactory.create()
+    serializer = CourseWithCourseRunsSerializer(course)
+    assert serializer.data["language_options"] == []

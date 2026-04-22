@@ -1242,9 +1242,35 @@ class CourseRun(TimestampedModel):
         default=False,
         help_text='Designate this run as a "source" run for contract re-runs of the course.',
     )
+    language = models.CharField(
+        max_length=8,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text=(
+            "ISO 639-1 language code for this run "
+            "(e.g. 'en', 'zh', 'fr'). Leave blank for unspecified."
+        ),
+    )
+    is_primary_language = models.BooleanField(
+        default=False,
+        help_text=(
+            "Designates this run as the primary-language version for its run-tag "
+            "group. The primary run is used as the canonical run when grouping "
+            "language variants. If no run in a group is marked primary, the oldest "
+            "run by creation date is treated as primary."
+        ),
+    )
 
     class Meta:
         unique_together = ("course", "courseware_id", "run_tag")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["course", "run_tag", "language"],
+                name="unique_courserun_course_runtag_language",
+                condition=models.Q(language__isnull=False),
+            ),
+        ]
 
     @property
     def is_past(self):

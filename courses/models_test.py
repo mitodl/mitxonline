@@ -1237,3 +1237,67 @@ def test_create_program_without_department():
     # Fetch from DB to ensure no departments are attached
     program_from_db = Program.objects.get(pk=program.pk)
     assert program_from_db.departments.count() == 0
+
+
+# ---- Language field tests ----
+
+
+@pytest.mark.django_db
+def test_courserun_language_unique_constraint():
+    """Two runs for the same course+run_tag cannot share a language."""
+    from django.db import IntegrityError
+
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="R1",
+        language="en",
+        courseware_id="course-v1:X+Y+R1-en",
+    )
+    with pytest.raises(IntegrityError):
+        CourseRunFactory.create(
+            course=course,
+            run_tag="R1",
+            language="en",
+            courseware_id="course-v1:X+Y+R1-en2",
+        )
+
+
+@pytest.mark.django_db
+def test_courserun_language_null_not_constrained():
+    """Multiple runs with language=None should not trigger the constraint."""
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="R1",
+        language=None,
+        courseware_id="course-v1:X+Y+R1a",
+    )
+    # Should not raise
+    run2 = CourseRunFactory.create(
+        course=course,
+        run_tag="R1",
+        language=None,
+        courseware_id="course-v1:X+Y+R1b",
+    )
+    assert run2.pk is not None
+
+
+@pytest.mark.django_db
+def test_courserun_different_tags_same_language_allowed():
+    """The same language can appear on runs with different run_tags."""
+    course = CourseFactory.create()
+    run1 = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        courseware_id="course-v1:X+Y+1T2026-en",
+    )
+    run2 = CourseRunFactory.create(
+        course=course,
+        run_tag="2T2026",
+        language="en",
+        courseware_id="course-v1:X+Y+2T2026-en",
+    )
+    assert run1.language == run2.language == "en"
+    assert run1.run_tag != run2.run_tag

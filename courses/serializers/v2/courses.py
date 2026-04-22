@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from mitol.common.utils.datetime import now_in_utc
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -18,6 +20,7 @@ from courses.serializers.v1.base import (
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
+    CourseRunLanguageOptionSerializer,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
@@ -25,6 +28,27 @@ from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
 
 log = logging.getLogger(__name__)
+
+
+def _get_canonical_runs_per_tag(runs):
+    """
+    Given a list of CourseRun objects, return one canonical run per run_tag.
+
+    The canonical run is:
+    1. The run with ``is_primary_language=True`` in that group, or
+    2. The run with the lowest ``id`` (oldest creation order) if none is flagged.
+    """
+    groups = defaultdict(list)
+    for run in runs:
+        groups[run.run_tag].append(run)
+
+    canonical = []
+    for tag_runs in groups.values():
+        primary = next((r for r in tag_runs if r.is_primary_language), None)
+        canonical.append(
+            primary if primary is not None else min(tag_runs, key=lambda r: r.id)
+        )
+    return canonical
 
 
 @extend_schema_serializer(component_name="V2Course")
@@ -50,6 +74,7 @@ class CourseSerializer(BaseCourseSerializer):
     max_price = serializers.SerializerMethodField()
     include_in_learn_catalog = serializers.BooleanField(read_only=True)
     ingest_content_files_for_ai = serializers.BooleanField(read_only=True)
+    titles = serializers.SerializerMethodField()
 
     @extend_schema_field(bool)
     def get_required_prerequisites(self, instance):
@@ -219,6 +244,48 @@ class CourseSerializer(BaseCourseSerializer):
             return instance.page.max_price
         return None
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_titles(self, instance):
+        """
+        Return a list of {language, title} dicts built from active course runs.
+
+        For each language that has at least one run, the title is taken from the
+        run that is either currently enrollable/active or the nearest future run.
+        Runs with no language set are represented under the key None.
+        """
+        now = now_in_utc()
+        runs = instance.courseruns.filter(
+            b2b_contract__isnull=True, live=True
+        ).order_by("start_date")
+
+        best_run_by_language: dict = {}
+        for run in runs:
+            lang = run.language
+            if lang not in best_run_by_language:
+                best_run_by_language[lang] = run
+                continue
+            existing = best_run_by_language[lang]
+            run_is_active = (
+                run.start_date and run.start_date <= now and not run.is_past
+            )
+            existing_is_active = (
+                existing.start_date
+                and existing.start_date <= now
+                and not existing.is_past
+            )
+            if run_is_active and not existing_is_active:
+                best_run_by_language[lang] = run
+            elif not existing_is_active and not run_is_active:
+                if run.start_date and (
+                    not existing.start_date or run.start_date < existing.start_date
+                ):
+                    best_run_by_language[lang] = run
+
+        return [
+            {"language": lang, "title": run.title}
+            for lang, run in best_run_by_language.items()
+        ]
+
     class Meta:
         model = models.Course
         fields = [
@@ -244,6 +311,7 @@ class CourseSerializer(BaseCourseSerializer):
             "max_weekly_hours",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
+            "titles",
         ]
 
 
@@ -293,45 +361,70 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
     courseruns = serializers.SerializerMethodField()
+    language_options = serializers.SerializerMethodField()
 
-    @extend_schema_field(CourseRunSerializer(many=True))
-    def get_courseruns(self, instance):
-        # Use prefetched course runs to preserve prefetched products
-        courseruns = instance.courseruns.all()
-        courseruns = sorted(courseruns, key=lambda run: run.id)
-        if hasattr(instance, "prefetched_courseruns"):
-            courseruns = instance.prefetched_courseruns
-        # Filter by enrollable status if context parameter is present
+    def _get_filtered_runs(self, instance):
+        """Return sorted course runs respecting org/contract/enrollability context."""
+        courseruns = (
+            instance.prefetched_courseruns
+            if hasattr(instance, "prefetched_courseruns")
+            else list(instance.courseruns.all())
+        )
+        courseruns = sorted(courseruns, key=lambda r: r.id)
+
         if "courserun_is_enrollable" in self.context:
             courseruns = [
-                run
-                for run in courseruns
-                if getattr(run, "is_enrollable", False)
+                r
+                for r in courseruns
+                if getattr(r, "is_enrollable", False)
                 == bool(self.context["courserun_is_enrollable"])
             ]
         if "org_id" in self.context:
             courseruns = [
-                run
-                for run in courseruns
-                if getattr(run.b2b_contract, "organization_id", None)
+                r
+                for r in courseruns
+                if getattr(r.b2b_contract, "organization_id", None)
                 == int(self.context["org_id"])
             ]
         if "contract_id" in self.context:
             courseruns = [
-                run
-                for run in courseruns
-                if getattr(run.b2b_contract, "id", None)
+                r
+                for r in courseruns
+                if getattr(r.b2b_contract, "id", None)
                 == int(self.context["contract_id"])
             ]
         if "org_id" not in self.context and "contract_id" not in self.context:
-            courseruns = [run for run in courseruns if run.b2b_contract_id is None]
+            courseruns = [r for r in courseruns if r.b2b_contract_id is None]
+        return courseruns
+
+    @extend_schema_field(CourseRunSerializer(many=True))
+    def get_courseruns(self, instance):
+        """
+        Return one canonical run per run_tag.
+
+        The canonical run for a run_tag group is the one with
+        ``is_primary_language=True``. If no run in the group is so designated,
+        the oldest run (lowest id) in the group is used.
+        """
+        all_runs = self._get_filtered_runs(instance)
+        canonical_runs = _get_canonical_runs_per_tag(all_runs)
         return CourseRunSerializer(
-            courseruns, many=True, read_only=True, context=self.context
+            canonical_runs, many=True, read_only=True, context=self.context
         ).data
+
+    @extend_schema_field(CourseRunLanguageOptionSerializer(many=True))
+    def get_language_options(self, instance):
+        """
+        For every run_tag group return all language variants as a flat list.
+
+        Each entry contains: id, courseware_id, language, title, run_tag.
+        """
+        all_runs = self._get_filtered_runs(instance)
+        return CourseRunLanguageOptionSerializer(all_runs, many=True).data
 
     class Meta:
         model = models.Course
-        fields = [*CourseSerializer.Meta.fields, "courseruns"]
+        fields = [*CourseSerializer.Meta.fields, "courseruns", "language_options"]
 
 
 @extend_schema_serializer(component_name="V2CourseRunWithCourse")

@@ -154,6 +154,8 @@ class CourseRunFactory(DjangoModelFactory):
     live = True
     b2b_contract = None
     is_source_run = False
+    language = None
+    is_primary_language = False
 
     @factory.post_generation
     def enrollment_modes(self, create, extracted, **kwargs):  # noqa: ARG002
