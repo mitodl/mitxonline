@@ -2095,6 +2095,14 @@ def _ensure_hubspot_contact_for_user(
 
         return contact.id
 
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        log.warning(
+            "Rate limited ensuring HubSpot contact for user_id=%s email=%s in target account",
+            user.id,
+            user.email,
+        )
+        raise
     except Exception:
         log.exception(
             "Failed to ensure HubSpot contact for user_id=%s email=%s in target account",
