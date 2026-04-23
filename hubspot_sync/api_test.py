@@ -12,6 +12,7 @@ from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObject
 from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
+from b2b.factories import ContractPageFactory
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from courses.factories import (
     CourseRunCertificateFactory,
@@ -272,6 +273,71 @@ def test_existing_user_sync_contact_with_hubspot_error(mocker, mock_hubspot_api)
         api.sync_contact_with_hubspot(user)
     user.refresh_from_db()
     assert user.hubspot_sync_datetime == current_datetime
+
+
+def test_sync_contact_with_hubspot_skips_b2b_users(mocker, mock_hubspot_api):
+    """Test that B2B users are skipped and not synced to HubSpot"""
+    user = UserFactory.create()
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
+    
+    mock_info_log = mocker.patch("hubspot_sync.api.log.info")
+    
+    result = api.sync_contact_with_hubspot(user)
+    
+    # Should return None for B2B users
+    assert result is None
+    
+    # Should not call HubSpot API
+    mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_not_called()
+    
+    # Should log that user was skipped
+    mock_info_log.assert_called_once_with(
+        "Skipping HubSpot sync for B2B user %s (user_id=%d)",
+        user.edx_username or user.email,
+        user.id,
+    )
+    
+    # Should not update hubspot_sync_datetime
+    user.refresh_from_db()
+    assert user.hubspot_sync_datetime is None
+    
+    # Should not create HubspotObject
+    assert not api.HubspotObject.objects.filter(
+        object_id=user.id, content_type__model="user"
+    ).exists()
+
+
+def test_sync_contact_with_hubspot_syncs_regular_users(mocker, mock_hubspot_api):
+    """Test that regular users (without B2B contracts) are still synced normally"""
+    user = UserFactory.create()
+    
+    mock_info_log = mocker.patch("hubspot_sync.api.log.info")
+    
+    result = api.sync_contact_with_hubspot(user)
+    
+    # Should return the HubSpot object
+    assert result is not None
+    
+    # Should call HubSpot API
+    mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_called_once_with(
+        simple_public_object_input_for_create=api.make_contact_sync_message_from_user(
+            user
+        ),
+        object_type=api.HubspotObjectType.CONTACTS.value,
+    )
+    
+    # Should not log any skip message
+    mock_info_log.assert_not_called()
+    
+    # Should update hubspot_sync_datetime
+    user.refresh_from_db()
+    assert user.hubspot_sync_datetime is not None
+    
+    # Should create HubspotObject
+    assert api.HubspotObject.objects.filter(
+        object_id=user.id, content_type__model="user"
+    ).exists()
 
 
 def test_sync_product_with_hubspot(mock_hubspot_api):

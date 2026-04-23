@@ -1478,6 +1478,15 @@ def sync_contact_with_hubspot(user: User):
         ApiException: Raised if HubSpot upsert request fails.
         TooManyRequestsException: Too many requests against HubSpot's API.
     """
+    # Skip sync for B2B users to avoid errors
+    if user.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot sync for B2B user %s (user_id=%d)",
+            user.edx_username or user.email,
+            user.id,
+        )
+        return None
+        
     content_type = ContentType.objects.get_for_model(User)
     body = make_contact_sync_message_from_user(user)
 

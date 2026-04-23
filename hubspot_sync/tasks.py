@@ -153,9 +153,10 @@ def sync_contact_with_hubspot(user_id: int) -> str:
         user_id(int): The User ID.
 
     Returns:
-        str: The HubSpot ID for the User.
+        str: The HubSpot ID for the User, or None if user was skipped (e.g., B2B user).
     """
-    return api.sync_contact_with_hubspot(User.objects.get(id=user_id)).id
+    result = api.sync_contact_with_hubspot(User.objects.get(id=user_id))
+    return result.id if result else None
 
 
 @app.task(

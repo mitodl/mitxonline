@@ -2,6 +2,7 @@
 
 import pytest
 
+from b2b.factories import ContractPageFactory
 from ecommerce.factories import ProductFactory
 from hubspot_sync.task_helpers import (
     sync_hubspot_cart_add,
@@ -9,6 +10,7 @@ from hubspot_sync.task_helpers import (
     sync_hubspot_product,
     sync_hubspot_user,
 )
+from users.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -91,6 +93,90 @@ def test_sync_hubspot_user(mocker, mock_exception_log, user, raise_exc):
         )
     else:
         mock_exception_log.assert_not_called()
+
+
+def test_sync_hubspot_user_skips_b2b_users(mocker, settings):
+    """sync_hubspot_user should skip B2B users and not call HubSpot sync"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+    
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_contact_with_hubspot.delay"
+    )
+    mock_info_log = mocker.patch("hubspot_sync.task_helpers.log.info")
+    
+    # Mock the global QuerySet.exists to avoid any calls during user creation
+    mock_exists_global = mocker.patch(
+        "django.db.models.query.QuerySet.exists", 
+        return_value=False  # Initially False for user creation
+    )
+    
+    # Create a user (this might trigger some syncs during creation)
+    user = UserFactory.create()
+    
+    # Reset the mocks after user creation to clear any calls that happened during setup
+    mock_sync.reset_mock()
+    mock_info_log.reset_mock()
+    
+    # Now set up the mock to return True for B2B check
+    mock_exists_global.return_value = True
+    
+    # Add some debug logging
+    print(f"Before calling sync_hubspot_user:")
+    print(f"User ID: {user.id}")
+    print(f"Actual user.b2b_contracts.exists(): {user.b2b_contracts.exists()}")
+    
+    # Call the function we're actually testing
+    sync_hubspot_user(user)
+    
+    # Debug after the call
+    print(f"Mock sync called: {mock_sync.called}")
+    print(f"Mock sync call count: {mock_sync.call_count}")
+    print(f"Mock info log called: {mock_info_log.called}")
+    print(f"Mock info log call count: {mock_info_log.call_count}")
+    
+    # Should not call the sync task
+    mock_sync.assert_not_called()
+    
+    # Should log that user was skipped
+    mock_info_log.assert_called_once_with(
+        "Skipping HubSpot sync for B2B user %s (user_id=%d)",
+        user.edx_username,
+        user.id,
+    )
+
+
+def test_sync_hubspot_user_syncs_regular_users(mocker, settings):
+    """sync_hubspot_user should sync regular users (without B2B contracts)"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
+    
+    mock_sync = mocker.patch(
+        "hubspot_sync.task_helpers.tasks.sync_contact_with_hubspot.delay"
+    )
+    mock_info_log = mocker.patch("hubspot_sync.task_helpers.log.info")
+    
+    # Create a regular user without any B2B contracts
+    user = UserFactory.create()
+    
+    # Reset mocks after user creation to ignore any calls during setup
+    mock_sync.reset_mock()
+    mock_info_log.reset_mock()
+    
+    # Debug: Check the user has no contracts 
+    print(f"Regular User ID: {user.id}")
+    print(f"regular user.b2b_contracts.exists(): {user.b2b_contracts.exists()}")
+    print(f"regular user.b2b_contracts.count(): {user.b2b_contracts.count()}")
+    
+    # Call the function we're actually testing
+    sync_hubspot_user(user)
+    
+    # Should call the sync task
+    mock_sync.assert_called_once_with(user.id)
+    
+    # Should not log anything about B2B users
+    mock_info_log.assert_not_called()
+    
+    # Should not log any skip message
+    mock_info_log.assert_not_called()
 
 
 @pytest.mark.parametrize("raise_exc", [True, False])
