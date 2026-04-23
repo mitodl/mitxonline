@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.147.6
+---------------
+
+- Add skip_certificates for UAI HubSpot sync (#3520)
+- Fix transaction race condition with hubspot sync (#3518)
+- [pre-commit.ci] pre-commit autoupdate (#3503)
+- Update actions/cache digest to 27d5ce7 (#3507)
+
 Version 1.147.5 (Released April 23, 2026)
 ---------------
 
