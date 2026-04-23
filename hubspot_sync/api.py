@@ -828,23 +828,25 @@ def make_contact_sync_message_from_user(
         "type_is_educator": "typeiseducator",
         "type_is_other": "typeisother",
     }
-    
+
     # Only include certificate properties if not skipping them
     if not skip_certificates:
-        contact_properties_map.update({
-            "program_certificates": "program_certificates",
-            "course_run_certificates": "course_run_certificates",
-        })
-    
+        contact_properties_map.update(
+            {
+                "program_certificates": "program_certificates",
+                "course_run_certificates": "course_run_certificates",
+            }
+        )
+
     properties = HubspotContactSerializer(user).data
     properties.update(properties.pop("legal_address") or {})
     properties.update(properties.pop("user_profile") or {})
-    
+
     # Remove certificate data if skipping certificates
     if skip_certificates:
         properties.pop("program_certificates", None)
         properties.pop("course_run_certificates", None)
-    
+
     hubspot_props = transform_object_properties(properties, contact_properties_map)
     return make_object_properties_message(hubspot_props)
 
@@ -1389,11 +1391,13 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
 
     # Ensure contact exists and is associated
     # For targeted sync, we need to determine if this is for a UAI course to skip certificates
-    is_uai_account = token == getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
+    is_uai_account = token == getattr(
+        settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", ""
+    )
     contact_id = _ensure_hubspot_contact_for_user(
         order.purchaser, hubspot_client, skip_certificates=is_uai_account
     )
-    
+
     if not contact_id:
         log.error(
             "Failed to create or find contact in target HubSpot account for user %s (email: %s)",
@@ -2068,14 +2072,14 @@ def _ensure_hubspot_contact_for_user(
                 user, skip_certificates=skip_certificates
             ),
         )
-        
+
         log.info(
             "Successfully created HubSpot contact in target account for user_id=%s email=%s contact_id=%s",
             user.id,
             user.email,
             contact.id,
         )
-        
+
         user.hubspot_sync_datetime = now_in_utc()
         user.save(update_fields=["hubspot_sync_datetime"])
 
@@ -2090,7 +2094,7 @@ def _ensure_hubspot_contact_for_user(
             )
 
         return contact.id
-        
+
     except Exception:
         log.exception(
             "Failed to ensure HubSpot contact for user_id=%s email=%s in target account",
