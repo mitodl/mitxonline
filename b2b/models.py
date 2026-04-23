@@ -643,11 +643,6 @@ class UserOrganization(models.Model):
 
         return f"UserOrganization: {self.user} in {self.organization}"
 
-    def user_email(self):
-        """Return the user's email address."""
-
-        return self.user.email
-
 
 def is_organization_manager(user, org_id):
     """

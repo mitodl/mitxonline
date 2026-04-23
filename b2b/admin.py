@@ -20,7 +20,7 @@ class UserOrganizationAdminInline(admin.TabularInline):
     model = UserOrganization
     extra = 0
     verbose_name = "Organization Admin"
-    fields = [
+    list_display = [
         "user_email",
         "keep_until_seen",
         "is_manager",
@@ -55,6 +55,12 @@ class UserOrganizationAdminInline(admin.TabularInline):
         """Determine if the user can add new ones from here (no, they cannot)"""
 
         return False
+
+    @admin.display(description="User Email")
+    def user_email(self, obj):
+        """Return the user's email address."""
+
+        return obj.user.email
 
 
 class ReadOnlyModelAdmin(admin.ModelAdmin):
