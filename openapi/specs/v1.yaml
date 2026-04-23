@@ -4084,6 +4084,30 @@ components:
       - programs
       - readable_id
       - title
+    CourseLocalizedTitle:
+      type: object
+      description: Serializer for localized course title list
+      properties:
+        language:
+          type: string
+        title:
+          type: string
+      required:
+      - language
+      - title
+    CourseLocalizedTitleRequest:
+      type: object
+      description: Serializer for localized course title list
+      properties:
+        language:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          minLength: 1
+      required:
+      - language
+      - title
     CourseOutlineBadRequestResponse:
       type: object
       properties:
@@ -5143,8 +5167,7 @@ components:
         titles:
           type: array
           items:
-            type: object
-            additionalProperties: {}
+            $ref: '#/components/schemas/CourseLocalizedTitle'
           readOnly: true
         courseruns:
           type: array
@@ -8526,8 +8549,7 @@ components:
         titles:
           type: array
           items:
-            type: object
-            additionalProperties: {}
+            $ref: '#/components/schemas/CourseLocalizedTitle'
           readOnly: true
       required:
       - availability
