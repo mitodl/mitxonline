@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.147.5
+---------------
+
+- Make basket serializer test deterministic (#3517)
+
 Version 1.147.4 (Released April 22, 2026)
 ---------------
 
