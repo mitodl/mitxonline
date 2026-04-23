@@ -2093,8 +2093,6 @@ def _ensure_hubspot_contact_for_user(
                 defaults={"hubspot_id": contact.id},
             )
 
-        return contact.id
-
     except TooManyRequestsException:
         # Re-raise rate limit errors so calling code can retry
         log.warning(
@@ -2110,6 +2108,8 @@ def _ensure_hubspot_contact_for_user(
             user.email,
         )
         return None
+    else:
+        return contact.id
 
 
 def _sync_cart_add_deal_with_hubspot(
