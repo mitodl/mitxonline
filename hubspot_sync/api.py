@@ -2043,13 +2043,15 @@ def _ensure_hubspot_contact_for_user(
                 user.email,
                 contact_id,
             )
-            # Update the local HubspotObject mapping for existing contact
-            content_type = ContentType.objects.get_for_model(User)
-            HubspotObject.objects.update_or_create(
-                object_id=user.id,
-                content_type=content_type,
-                defaults={"hubspot_id": contact_id},
-            )
+            # Only update local HubspotObject mapping for primary (MITx Online) account
+            # to avoid overwriting existing mappings when syncing to secondary (UAI) accounts
+            if not skip_certificates:
+                content_type = ContentType.objects.get_for_model(User)
+                HubspotObject.objects.update_or_create(
+                    object_id=user.id,
+                    content_type=content_type,
+                    defaults={"hubspot_id": contact_id},
+                )
             return contact_id
 
         # Create new contact if not found
@@ -2077,13 +2079,15 @@ def _ensure_hubspot_contact_for_user(
         user.hubspot_sync_datetime = now_in_utc()
         user.save(update_fields=["hubspot_sync_datetime"])
 
-        # Update the local HubspotObject mapping for newly created contact
-        content_type = ContentType.objects.get_for_model(User)
-        HubspotObject.objects.update_or_create(
-            object_id=user.id,
-            content_type=content_type,
-            defaults={"hubspot_id": contact.id},
-        )
+        # Only update local HubspotObject mapping for primary (MITx Online) account
+        # to avoid overwriting existing mappings when syncing to secondary (UAI) accounts
+        if not skip_certificates:
+            content_type = ContentType.objects.get_for_model(User)
+            HubspotObject.objects.update_or_create(
+                object_id=user.id,
+                content_type=content_type,
+                defaults={"hubspot_id": contact.id},
+            )
 
         return contact.id
         
