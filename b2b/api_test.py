@@ -554,7 +554,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
         with pytest.raises(SourceCourseIncompleteError) as exc:
             create_contract_run(contract, course)
 
-        assert "No course runs available" in str(exc)
+        assert "No source run found" in str(exc)
         return
 
     source_course_run_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
@@ -1061,7 +1061,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
         existing_run = CourseRunFactory.create(courseware_id=course_run_id)
 
         # Test the case where run exists
-        result = import_and_create_contract_run(
+        [result] = import_and_create_contract_run(
             contract=contract,
             course_run_id=course_run_id,
             departments=departments,
@@ -1087,7 +1087,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
             imported_run.course = imported_course
             mock_import.return_value = (imported_run, None, None)
 
-            result = import_and_create_contract_run(
+            [result] = import_and_create_contract_run(
                 contract=contract,
                 course_run_id=course_run_id,
                 departments=departments,
@@ -1157,7 +1157,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
     mock_create_contract_run.return_value = [(mock_run, mock_product)]
 
     # Test with all kwargs
-    result = import_and_create_contract_run(
+    [result] = import_and_create_contract_run(
         contract=contract,
         course_run_id=course_run_id,
         departments=departments,
@@ -1221,7 +1221,7 @@ def test_import_and_create_contract_run_with_string_departments(mocker):
     mock_product = mocker.Mock()
     mock_create_contract_run.return_value = [(mock_run, mock_product)]
 
-    result = import_and_create_contract_run(
+    [result] = import_and_create_contract_run(
         contract=contract,
         course_run_id=course_run_id,
         departments=departments,

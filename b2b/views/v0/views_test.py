@@ -350,9 +350,9 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrol
     )
     source_courserun = CourseRunFactory.create(is_source_run=True)
 
-    courserun, _ = create_contract_run(
-        contract, source_courserun.course, queue_codes=True
-    )
+    [
+        (courserun, _),
+    ] = create_contract_run(contract, source_courserun.course, queue_codes=True)
 
     if not run_is_enrollable:
         courserun.live = False

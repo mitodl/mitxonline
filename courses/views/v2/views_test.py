@@ -945,7 +945,9 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
 
     # make the B2B run start a day further away from now than the regular run
     # if this weren't a B2B run, then that would give it precedence
-    b2b_run, _ = create_contract_run(contract, b2b_course)
+    [
+        (b2b_run, _),
+    ] = create_contract_run(contract, b2b_course)
     b2b_run.start_date = one_month_prior - timedelta(days=1)
     b2b_run.enrollment_start = one_month_prior - timedelta(days=1)
     b2b_run.save()
@@ -1052,7 +1054,9 @@ def test_next_run_id_with_org_filter(  # noqa: PLR0915
     # finally, make a new contract and don't assign the user to it.
     # we should get a 404, since we're filtering on an org we're not in.
 
-    second_b2b_run, _ = create_contract_run(second_contract, b2b_course)
+    [
+        (second_b2b_run, _),
+    ] = create_contract_run(second_contract, b2b_course)
     second_b2b_run.enrollment_start = one_month_prior
     second_b2b_run.save()
 

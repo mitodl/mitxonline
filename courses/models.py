@@ -1144,6 +1144,18 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             country=user.legal_address.country
         ).exists()
 
+    @cached_property
+    def titles(self) -> list[dict]:
+        """Return the translated titles for the course, based on its runs"""
+
+        # I think we just want the most recent live, non-source run.
+        return (
+            self.courseruns.filter(live=True, is_source_run=False)
+            .order_by("language", "-created_on")
+            .distinct("language")
+            .values("language", "title")
+        )
+
     @property
     def is_program(self):
         """Flag to indicate if this is a program"""
@@ -1242,7 +1254,7 @@ class CourseRun(TimestampedModel):
         default=False,
         help_text='Designate this run as a "source" run for contract re-runs of the course.',
     )
-    language = models.CharField(
+    language = models.CharField(  # noqa: DJ001
         max_length=8,
         blank=True,
         null=True,

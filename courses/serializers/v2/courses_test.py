@@ -19,6 +19,7 @@ from courses.models import CourseRunEnrollment, CoursesTopic, Department
 from courses.serializers.v1.base import BaseProgramSerializer
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
+    CourseRunLanguageOptionSerializer,
     CourseRunSerializer,
     CourseWithCourseRunsSerializer,
 )
@@ -130,7 +131,12 @@ def test_serialize_course(  # noqa: PLR0913
             ),
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
+            "titles": course.titles,
+            "language_options": CourseRunLanguageOptionSerializer(
+                course.courseruns.all(), many=True
+            ).data,
         },
+        ignore_order=True,
     )
 
 
@@ -176,6 +182,8 @@ def test_serialize_course_required_prerequisites(
             "programs": None,
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
+            "titles": course.titles,
+            "language_options": [],
         },
     )
 

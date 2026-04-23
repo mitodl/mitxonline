@@ -7,7 +7,6 @@ from collections import defaultdict
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
-from mitol.common.utils.datetime import now_in_utc
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -51,6 +50,13 @@ def _get_canonical_runs_per_tag(runs):
     return canonical
 
 
+class CourseLocalizedTitleSerializer(serializers.Serializer):
+    """Serializer for localized course title list"""
+
+    language = serializers.CharField()
+    title = serializers.CharField()
+
+
 @extend_schema_serializer(component_name="V2Course")
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer"""
@@ -74,7 +80,7 @@ class CourseSerializer(BaseCourseSerializer):
     max_price = serializers.SerializerMethodField()
     include_in_learn_catalog = serializers.BooleanField(read_only=True)
     ingest_content_files_for_ai = serializers.BooleanField(read_only=True)
-    titles = serializers.SerializerMethodField()
+    titles = CourseLocalizedTitleSerializer(read_only=True, many=True)
 
     @extend_schema_field(bool)
     def get_required_prerequisites(self, instance):
@@ -243,46 +249,6 @@ class CourseSerializer(BaseCourseSerializer):
         if hasattr(instance, "page") and hasattr(instance.page, "max_price"):
             return instance.page.max_price
         return None
-
-    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
-    def get_titles(self, instance):
-        """
-        Return a list of {language, title} dicts built from active course runs.
-
-        For each language that has at least one run, the title is taken from the
-        run that is either currently enrollable/active or the nearest future run.
-        Runs with no language set are represented under the key None.
-        """
-        now = now_in_utc()
-        runs = instance.courseruns.filter(
-            b2b_contract__isnull=True, live=True
-        ).order_by("start_date")
-
-        best_run_by_language: dict = {}
-        for run in runs:
-            lang = run.language
-            if lang not in best_run_by_language:
-                best_run_by_language[lang] = run
-                continue
-            existing = best_run_by_language[lang]
-            run_is_active = run.start_date and run.start_date <= now and not run.is_past
-            existing_is_active = (
-                existing.start_date
-                and existing.start_date <= now
-                and not existing.is_past
-            )
-            if run_is_active and not existing_is_active:
-                best_run_by_language[lang] = run
-            elif not existing_is_active and not run_is_active:
-                if run.start_date and (
-                    not existing.start_date or run.start_date < existing.start_date
-                ):
-                    best_run_by_language[lang] = run
-
-        return [
-            {"language": lang, "title": run.title}
-            for lang, run in best_run_by_language.items()
-        ]
 
     class Meta:
         model = models.Course
