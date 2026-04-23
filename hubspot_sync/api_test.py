@@ -609,10 +609,8 @@ def test_track_cart_add_with_hubspot_syncs_missing_contact(settings, mocker, use
     mock_sync_deal = mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
 
     assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
-    mock_ensure_props.assert_called_once_with(
-        mock_client.return_value, skip_certificates=True
-    )
-    mock_ensure_contact.assert_called_once_with(user, mock_client.return_value)
+    mock_ensure_props.assert_called_once_with(mock_client.return_value, skip_certificates=True)
+    mock_ensure_contact.assert_called_once_with(user, mock_client.return_value, skip_certificates=True)
     mock_sync_deal.assert_called_once()
 
 
@@ -647,6 +645,35 @@ def test_track_cart_add_with_hubspot_returns_false_when_unconfigured(settings, u
 
     product = ProductFactory.create()
     assert api.track_cart_add_with_hubspot(user, product, is_uai_course=False) is False
+
+
+def test_track_cart_add_with_hubspot_uai_fallback_to_primary_account(settings, mocker, user):
+    """UAI course adds should fallback to primary account when UAI token not configured, and skip_certificates should reflect the actual account used."""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "primary-token"  # noqa: S105
+    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = ""  # UAI token not configured
+
+    course_run = CourseRunFactory.create(courseware_id="course-v1:UAI_MIT+1.001x+2026") 
+    product = ProductFactory.create(purchasable_object=course_run)
+    with reversion.create_revision():
+        product.save()
+
+    mock_client = mocker.patch("hubspot_sync.api.HubspotApi")
+    mock_ensure_props = mocker.patch("hubspot_sync.api._ensure_target_hubspot_contact_properties")
+    mock_ensure_contact = mocker.patch(
+        "hubspot_sync.api._ensure_hubspot_contact_for_user", return_value="contact-id"
+    )
+    mock_sync_deal = mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
+
+    assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
+    
+    # Should use primary token since UAI token is not configured
+    mock_client.assert_called_once_with(access_token="primary-token")  # noqa: S106
+    
+    # skip_certificates should be False because we're actually using the primary account
+    # (even though is_uai_course=True)
+    mock_ensure_props.assert_called_once_with(mock_client.return_value, skip_certificates=False)
+    mock_ensure_contact.assert_called_once_with(user, mock_client.return_value, skip_certificates=False)
+    mock_sync_deal.assert_called_once()
 
 
 def test_normalize_deal_properties_for_target_account_pipeline_stage_mismatch(mocker):

@@ -2175,13 +2175,18 @@ def track_cart_add_with_hubspot(
 
     try:
         hubspot_client = HubspotApi(access_token=token)
+        
+        # Determine which account is actually being used for the API call
+        # This ensures skip_certificates reflects the actual HubSpot account, not just course type
+        is_uai_account = token == getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
+        
         _ensure_target_hubspot_contact_properties(
-            hubspot_client, skip_certificates=is_uai_course
+            hubspot_client, skip_certificates=is_uai_account
         )
 
         # UAI deals must have a contact in the same HubSpot account.
         contact_id = _ensure_hubspot_contact_for_user(
-            user, hubspot_client, skip_certificates=is_uai_course
+            user, hubspot_client, skip_certificates=is_uai_account
         )
         if not contact_id:
             return False
