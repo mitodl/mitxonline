@@ -1298,7 +1298,7 @@ def test_webhook_certificate_status(  # noqa: PLR0913
         return_value=(grade_obj, True, False),
     )
 
-    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
 
     assert (
         CourseRunCertificate.objects.filter(user=user, course_run=course_run).exists()
@@ -1329,7 +1329,7 @@ def test_webhook_certificate_already_exists(
     )
 
     # First call creates the certificate
-    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
     assert CourseRunCertificate.objects.filter(
         user=user, course_run=course_run
     ).exists()
@@ -1341,7 +1341,7 @@ def test_webhook_certificate_already_exists(
     )
 
     # Second call should not create a duplicate certificate
-    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
     assert (
         CourseRunCertificate.objects.filter(user=user, course_run=course_run).count()
         == 1
@@ -1375,7 +1375,7 @@ def test_webhook_certificate_bypasses_certificate_available_date(
         return_value=(passed_grade_with_enrollment, True, False),
     )
 
-    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
 
     assert CourseRunCertificate.objects.filter(
         user=user, course_run=course_run
@@ -1394,7 +1394,7 @@ def test_webhook_no_grade_from_edx(
         return_value=iter([]),
     )
 
-    generate_course_run_certificates(user=user, course_run=course_run, is_webhook=True)
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
 
     assert not CourseRunCertificate.objects.filter(
         user=user, course_run=course_run

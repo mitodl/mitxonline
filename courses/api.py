@@ -933,33 +933,32 @@ def get_certificate_grade_eligible_runs(now):
 def generate_course_run_certificates(  # noqa: C901
     user=None,
     course_run=None,
-    is_webhook=False,  # noqa: FBT002
+    force=False,  # noqa: FBT002
 ):
     """
     Hits the edX grades API and generates the certificates and grades for users for course runs.
 
+    Each parameter works independently:
+    - If course_run is provided, only that course run is processed (skipping eligibility filtering).
+    - If user is provided, only that user's grade/certificate is processed.
+    - If force is True, certificate date/eligibility checks are bypassed.
+
     When called without arguments (periodic task path), it fetches all eligible course runs and
     processes grades/certificates for all users in each run.
-
-    When called with user, course_run, and is_webhook=True (webhook path), it processes a single
-    user's grade and certificate for a specific course run, bypassing certificate_available_date
-    and course run eligibility checks since edX has already determined the certificate is ready.
 
     Args:
         user (User or None): If provided, process only this user's grade/certificate.
         course_run (CourseRun or None): If provided, process only this course run.
-        is_webhook (bool): If True, bypass eligibility checks.
+        force (bool): If True, bypass certificate_available_date and eligibility checks.
 
     Returns:
         None
     """
     now = now_in_utc()
 
-    # Webhook path: use the provided course run directly, no eligibility filtering
-    if is_webhook and user and course_run:
+    if course_run:
         course_runs = [course_run]
     else:
-        # Periodic task path: fetch all eligible runs
         course_runs = get_certificate_grade_eligible_runs(now)
 
         if course_runs is None or course_runs.count() == 0:
@@ -986,7 +985,7 @@ def generate_course_run_certificates(  # noqa: C901
             except ValidationError:
                 msg = f"Can't save grade {edx_grade} for {run_user} in {run}, skipping certificate generation"
                 log.exception(msg)
-                if is_webhook:
+                if len(course_runs) == 1:
                     return
                 continue
 
@@ -996,14 +995,15 @@ def generate_course_run_certificates(  # noqa: C901
                 updated_grades_count += 1
 
             # Check certificate generation eligibility
-            # For webhooks: bypass checks since edX has already determined the certificate is ready
-            # For periodic task:
+            # When force is True: bypass checks (e.g. webhook path where edX already
+            #   determined the certificate is ready)
+            # Otherwise:
             #   1. For self_paced course runs we generate certificates right away irrespective
             #      of certificate_available_date
             #   2. For other course runs we generate certificates if the certificate_available_date
             #      has passed
             if (
-                is_webhook
+                force
                 or run.is_self_paced
                 or (
                     run.certificate_available_date

@@ -181,7 +181,7 @@ class ProcessCertificateWebhookView(APIView):
         generate_course_run_certificates(
             user=user,
             course_run=course_run,
-            is_webhook=True,
+            force=True,
         )
 
         return Response(status=status.HTTP_200_OK)
