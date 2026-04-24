@@ -89,7 +89,7 @@ def test_ensure_home_page_and_site():
     ensure_home_page_and_site()
     assert home_page_qset.count() == 1
 
-
+@pytest.mark.django_db
 def test_get_wagtail_img_src(settings):
     """get_wagtail_img_src should return the correct image URL"""
     settings.MEDIA_URL = "/mediatest/"
