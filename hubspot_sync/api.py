@@ -1486,7 +1486,7 @@ def sync_contact_with_hubspot(user: User):
             user.id,
         )
         return None
-        
+
     content_type = ContentType.objects.get_for_model(User)
     body = make_contact_sync_message_from_user(user)
 

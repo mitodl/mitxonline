@@ -29,7 +29,7 @@ def sync_hubspot_user(user: User):
             user.id,
         )
         return
-        
+
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
             tasks.sync_contact_with_hubspot.delay(user.id)
