@@ -1344,7 +1344,9 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
     return result
 
 
-def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObject | None:
+def sync_deal_with_hubspot_targeted(
+    order: Order, token: str
+) -> SimplePublicObject | None:
     """
     Sync an Order with a hubspot deal using a specific HubSpot token.
     This enables routing deals to different HubSpot accounts (e.g., UAI vs MITx Online account).
