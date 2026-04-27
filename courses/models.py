@@ -1284,23 +1284,50 @@ class CourseRun(TimestampedModel):
             models.UniqueConstraint(
                 fields=[
                     "course",
+                    "courseware_id",
                     "run_tag",
                     "language",
-                    "b2b_contract",
                 ],
                 name="unique_courserun_course_runtag_language",
-                condition=models.Q(language__isnull=False),
+                condition=models.Q(language__isnull=False, b2b_contract__isnull=True),
             ),
             models.UniqueConstraint(
                 fields=[
                     "course",
                     "run_tag",
+                    "is_primary_language",
+                ],
+                name="unique_courserun_course_runtag_language_primary",
+                condition=models.Q(
+                    language__isnull=False,
+                    is_primary_language=True,
+                    b2b_contract__isnull=True,
+                ),
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "course",
+                    "courseware_id",
+                    "run_tag",
                     "language",
+                    "b2b_contract",
+                ],
+                name="unique_courserun_course_runtag_language_b2b",
+                condition=models.Q(language__isnull=False, b2b_contract__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "course",
+                    "run_tag",
                     "is_primary_language",
                     "b2b_contract",
                 ],
-                name="unique_courserun_course_runtag_language_primary",
-                condition=models.Q(language__isnull=False, is_primary_language=True),
+                name="unique_courserun_course_runtag_language_primary_b2b",
+                condition=models.Q(
+                    language__isnull=False,
+                    is_primary_language=True,
+                    b2b_contract__isnull=False,
+                ),
             ),
         ]
 

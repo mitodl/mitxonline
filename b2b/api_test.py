@@ -18,6 +18,7 @@ from opaque_keys.edx.keys import CourseKey
 from b2b import factories
 from b2b.api import (
     _apply_available_discount,
+    _get_source_runs_for_course,
     _handle_extra_enrollment_codes,
     _validate_b2b_enrollment_prerequisites,
     create_b2b_enrollment,
@@ -559,7 +560,10 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
 
     source_course_run_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
     source_run = CourseRunFactory.create(
-        course=course, courseware_id=str(source_course_run_key), run_tag="SOURCE"
+        course=course,
+        courseware_id=str(source_course_run_key),
+        run_tag="SOURCE",
+        is_source_run=True,
     )
 
     target_course_id = create_contract_run_key(source_run, contract)
@@ -1577,7 +1581,6 @@ def test_apply_available_discount_unlimited_seats(existing_discounts):
 # ---- Multi-language create_contract_run tests ----
 
 
-@pytest.mark.django_db
 def test_create_contract_run_multi_language(mocker):
     """create_contract_run produces one run+product per language source run."""
     mocker.patch("openedx.tasks.clone_courserun.delay")
@@ -1589,6 +1592,7 @@ def test_create_contract_run_multi_language(mocker):
         language="en",
         is_source_run=True,
         courseware_id=f"{course.readable_id}+1T2026-en",
+        is_primary_language=True,
     )
     CourseRunFactory.create(
         course=course,
@@ -1606,7 +1610,6 @@ def test_create_contract_run_multi_language(mocker):
     assert len({p.id for p in products}) == 2
 
 
-@pytest.mark.django_db
 def test_create_contract_run_multi_language_propagates_language(mocker):
     """The new contract run inherits the language from its source run."""
     mocker.patch("openedx.tasks.clone_courserun.delay")
@@ -1627,8 +1630,7 @@ def test_create_contract_run_multi_language_propagates_language(mocker):
     assert run.is_primary_language is True
 
 
-@pytest.mark.django_db
-def test_create_contract_run_duplicate_language_source_raises():
+def test_create_contract_run_duplicate_language_source_raises(mocker):
     """Two source runs with the same language raise SourceCourseIncompleteError."""
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
@@ -1637,11 +1639,12 @@ def test_create_contract_run_duplicate_language_source_raises():
         run_tag="1T2026",
         language="en",
         is_source_run=True,
+        is_primary_language=True,
         courseware_id=f"{course.readable_id}+1T2026-en",
     )
     CourseRunFactory.create(
         course=course,
-        run_tag="1T2026-copy",
+        run_tag="1T2026",
         language="en",
         is_source_run=True,
         courseware_id=f"{course.readable_id}+1T2026-en-copy",
@@ -1650,7 +1653,6 @@ def test_create_contract_run_duplicate_language_source_raises():
         create_contract_run(contract, course)
 
 
-@pytest.mark.django_db
 def test_create_contract_run_single_language_legacy(mocker):
     """A course with one source run (no language set) returns a one-element list."""
     mocker.patch("openedx.tasks.clone_courserun.delay")
@@ -1658,9 +1660,8 @@ def test_create_contract_run_single_language_legacy(mocker):
     course = CourseFactory.create()
     CourseRunFactory.create(
         course=course,
-        run_tag="SOURCE",
         language=None,
-        is_source_run=False,
+        is_source_run=True,
         courseware_id=f"{course.readable_id}+SOURCE",
     )
     results = create_contract_run(contract, course, require_designated_source_run=True)
@@ -1668,3 +1669,57 @@ def test_create_contract_run_single_language_legacy(mocker):
     run, product = results[0]
     assert run.b2b_contract == contract
     assert product.object_id == run.id
+
+
+def test_get_source_course_runs():
+    """Test that the internal _get_source_runs_for_course returns properly when there's a mix of translated runs."""
+
+    course = CourseFactory.create()
+
+    main_source_course = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        is_source_run=True,
+        language="en",
+        is_primary_language=True,
+    )
+
+    translated_1T_runs = [
+        CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            is_source_run=True,
+            language=lang,
+            is_primary_language=False,
+            start_date=main_source_course.start_date,
+            end_date=main_source_course.end_date,
+            enrollment_start=main_source_course.start_date,
+            enrollment_end=main_source_course.end_date,
+        )
+        for lang in ["fr", "es"]
+    ]
+
+    translated_3T_runs = [
+        CourseRunFactory.create(
+            course=course,
+            run_tag="3T2025",
+            is_source_run=True,
+            language=lang,
+            is_primary_language=False,
+            start_date=main_source_course.start_date,
+            end_date=main_source_course.end_date,
+            enrollment_start=main_source_course.start_date,
+            enrollment_end=main_source_course.end_date,
+        )
+        for lang in ["fr", "es"]
+    ]
+
+    runs = _get_source_runs_for_course(course)
+
+    assert len(runs) == 3
+
+    for run in translated_1T_runs:
+        assert run in runs
+
+    for run in translated_3T_runs:
+        assert run not in runs

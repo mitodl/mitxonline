@@ -248,7 +248,7 @@ def test_get_courses(
 ):
     """Test the view that handles requests for all Courses"""
     courses_from_fixture = []
-    num_queries = 2  # django_site + course count as a minimum
+    num_queries = 3  # django_site + content type + course count as a minimum
     params = {"page_size": 100}
 
     courses = Course.objects.order_by("title").prefetch_related("departments")

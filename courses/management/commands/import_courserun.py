@@ -68,7 +68,7 @@ class Command(BaseCommand):
             "--run-tag",
             type=str,
             nargs="?",
-            help="The run tag (3T2022, etc.) to use. The + will be appended to this when combining it with the course's readable ID. Requires --program. Do not specify with --courserun.",
+            help="The run tag (3T2022, etc.) to use. The + will be appended to this when combining it with the course's readable ID. Requires --program. Do not specify with --courserun unless also specifying a language.",
         )
 
         parser.add_argument(
@@ -251,7 +251,7 @@ class Command(BaseCommand):
                 return False
         elif kwargs.get("program") is not None and kwargs.get("run_tag") is not None:
             try:
-                if kwargs.get("program").isnumeric():
+                if kwargs.get("program", "").isnumeric():
                     program = Program.objects.filter(pk=kwargs.get("program")).get()
                 else:
                     program = Program.objects.filter(
@@ -313,6 +313,16 @@ class Command(BaseCommand):
             if kwargs.get("language", False):
                 run.language = kwargs.pop("language")
                 run.is_primary_language = kwargs.get("primary_lang", False)
+
+                if kwargs.get("run_tag", False):
+                    run.run_tag = kwargs.get("run_tag")
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"WARNING: No specific run tag specified for {run.courseware_id} in language {run.language}, so using the default {run.run_tag}. This is probably not what you want."
+                        )
+                    )
+
                 run.save()
 
             success_count += 1

@@ -131,7 +131,6 @@ def test_serialize_course(  # noqa: PLR0913
             ),
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
-            "titles": course.titles,
             "language_options": CourseRunLanguageOptionSerializer(
                 course.courseruns.all(), many=True
             ).data,
@@ -182,7 +181,6 @@ def test_serialize_course_required_prerequisites(
             "programs": None,
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
-            "titles": course.titles,
             "language_options": [],
         },
     )
@@ -406,35 +404,3 @@ def test_course_serializer_language_options():
     # run_tag should be present in each option
     for opt in serializer.data["language_options"]:
         assert opt["run_tag"] == "1T2026"
-
-
-def test_course_serializer_titles():
-    """Titles field returns one entry per language with the correct title."""
-    course = CourseFactory.create()
-    CourseRunFactory.create(
-        course=course,
-        run_tag="1T2026",
-        language="en",
-        title="Calculus I",
-        courseware_id="course-v1:T+C+1T2026-en",
-        b2b_contract=None,
-    )
-    CourseRunFactory.create(
-        course=course,
-        run_tag="1T2026",
-        language="zh",
-        title="微积分 I",
-        courseware_id="course-v1:T+C+1T2026-zh",
-        b2b_contract=None,
-    )
-    serializer = CourseWithCourseRunsSerializer(course)
-    title_map = {t["language"]: t["title"] for t in serializer.data["titles"]}
-    assert title_map["en"] == "Calculus I"
-    assert title_map["zh"] == "微积分 I"
-
-
-def test_course_serializer_language_options_empty_without_runs():
-    """language_options is empty when there are no matching runs."""
-    course = CourseFactory.create()
-    serializer = CourseWithCourseRunsSerializer(course)
-    assert serializer.data["language_options"] == []

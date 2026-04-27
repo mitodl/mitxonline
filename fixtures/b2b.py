@@ -30,6 +30,7 @@ def make_contract_ready_course():
             end_date=None,
             enrollment_start=None,
             enrollment_end=None,
+            is_source_run=True,
         )
 
         return (course, source_course_run)

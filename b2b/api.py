@@ -142,9 +142,7 @@ def create_contract_run_key(
         f"course-v1:{org_prefix}{contract.organization.org_key}+{source_id.course}"
     )
     mostly_run_tag = B2B_RUN_TAG_FORMAT.format(
-        run_idx="",
-        contract_id=contract.id,
-        year=now_in_utc().year,
+        run_idx="", contract_id=contract.id, year=now_in_utc().year
     )
     run_idx = 1
 
@@ -162,9 +160,7 @@ def create_contract_run_key(
         run_idx = int(run_idx) + 1
 
     new_run_tag = B2B_RUN_TAG_FORMAT.format(
-        year=now_in_utc().year,
-        contract_id=contract.id,
-        run_idx=run_idx,
+        year=now_in_utc().year, contract_id=contract.id, run_idx=run_idx
     )
     # Validate and return
     return str(CourseKey.from_string(f"{new_course_key}+{new_run_tag}"))
@@ -291,7 +287,7 @@ def _get_source_runs_for_course(
     Args:
         course: The course to inspect.
         require_designated: If True, raise SourceCourseIncompleteError when no
-            source run exists. If False, fall back to the oldest run.
+            source run exists. If False, fall back to the newest non-B2B run.
     Returns:
         List of distinct source CourseRun objects, one per language (or one
         for the "no language" legacy case).
@@ -300,14 +296,19 @@ def _get_source_runs_for_course(
             run is found, or if more than one source run exists for the same
             language.
     """
-    source_runs = (
-        course.courseruns.filter(is_source_run=True).filter().distinct("language").all()
+
+    primary_source_run = (
+        course.courseruns.filter(is_source_run=True)
+        .filter(Q(is_primary_language=True) | Q(language__isnull=True))
+        .first()
     )
 
-    if not source_runs:
+    if not primary_source_run:
         if not require_designated:
             fallback = (
-                course.courseruns.filter(is_source_run=True).order_by("id").first()
+                course.courseruns.filter(b2b_contract__isnull=True)
+                .order_by("-id")
+                .first()
             )
             if not fallback:
                 msg = f"No course runs available for {course}."
@@ -321,24 +322,27 @@ def _get_source_runs_for_course(
         msg = f"No source run found for {course}."
         raise SourceCourseIncompleteError(msg)
 
-    # Validate: at most one source run per language.
+    # Pull all the other source runs for the course and run tag combo
+    source_runs = course.courseruns.filter(
+        is_source_run=True, run_tag=primary_source_run.run_tag
+    ).all()
+
     seen_languages: list = []
-    filtered_run_list = []
+    filtered_run_list = {}
     for run in source_runs:
         lang = run.language  # may be None for legacy runs
         if lang in seen_languages:
             msg = (
                 f"Course {course} has more than one source run for "
-                f"language '{lang}': {seen_languages[lang]} and {run}. "
+                f"language '{lang}': {filtered_run_list[lang]} and {run}. "
                 "Resolve by unsetting is_source_run on the duplicates."
             )
-            log.error(msg)
-            continue
+            raise SourceCourseIncompleteError(msg)
 
         seen_languages.append(lang)
-        filtered_run_list.append(run)
+        filtered_run_list[lang] = run
 
-    return filtered_run_list
+    return [filtered_run_list[r] for r in filtered_run_list]
 
 
 def create_contract_run(  # noqa: PLR0913
@@ -362,7 +366,8 @@ def create_contract_run(  # noqa: PLR0913
     - Grab and identify the source course run, and create a new course key for
       the contract course run.
     - Create the contract course run in MITx Online, and queue a clone of the
-      source course run in edX.
+      source course run in edX. This gets done for _all_ languages that the source
+      course run has.
     - Create a product for the run.
 
     Source course runs are runs that have the ``is_source_run`` flag set. If one

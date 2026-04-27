@@ -4869,7 +4869,6 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
-          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
@@ -4981,7 +4980,6 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
-          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
@@ -8121,7 +8119,6 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
-          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
@@ -8228,7 +8225,6 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
-          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
