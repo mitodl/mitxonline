@@ -200,7 +200,7 @@ def test_task_sync_deal_with_hubspot_skips_b2b_users(mocker):
     )
 
     result = sync_deal_with_hubspot(order.id)
-    
+
     assert result is None
     mock_api_call.assert_called_once_with(order)
 
@@ -218,7 +218,7 @@ def test_task_sync_deal_with_hubspot_targeted_skips_b2b_users(mocker, settings):
     )
 
     result = sync_deal_with_hubspot_targeted(order.id, is_uai=False)
-    
+
     assert result is None
     mock_api_call.assert_called_once_with(order, test_token)
 
