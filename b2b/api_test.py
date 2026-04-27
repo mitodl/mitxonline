@@ -575,6 +575,7 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
         collision_run = CourseRunFactory.create(
             course=course,
             courseware_id=target_course_id,
+            run_tag=CourseKey.from_string(target_course_id).run,
             b2b_contract=contract,
         )
 
@@ -1362,7 +1363,7 @@ def test_create_contract_run_key():
     )
 
     courserun = CourseRunFactory.create(
-        course=course, courseware_id=str(new_course_key)
+        course=course, courseware_id=str(new_course_key), run_tag=new_course_key.run
     )
 
     # Test index incrementing - first, naturally
@@ -1387,6 +1388,7 @@ def test_create_contract_run_key():
     out_of_sequence_run_tag = CourseKey.from_string(courserun.courseware_id)
     _, run_tag_remainder = out_of_sequence_run_tag.run.split("T")
     courserun.courseware_id = f"course-v1:{out_of_sequence_run_tag.org}+{out_of_sequence_run_tag.course}+99T{run_tag_remainder}"
+    courserun.run_tag = f"99T{run_tag_remainder}"
 
     courserun.save()
 

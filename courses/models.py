@@ -1284,11 +1284,20 @@ class CourseRun(TimestampedModel):
             models.UniqueConstraint(
                 fields=[
                     "course",
-                    "courseware_id",
                     "run_tag",
                     "language",
                 ],
                 name="unique_courserun_course_runtag_language",
+                condition=models.Q(language__isnull=False, b2b_contract__isnull=True),
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "course",
+                    "courseware_id",
+                    "run_tag",
+                    "language",
+                ],
+                name="unique_courserun_course_coursewareid_runtag_language",
                 condition=models.Q(language__isnull=False, b2b_contract__isnull=True),
             ),
             models.UniqueConstraint(
