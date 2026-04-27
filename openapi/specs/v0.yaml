@@ -2680,6 +2680,10 @@ paths:
           type: boolean
         description: Course Run Is Enrollable
       - in: query
+        name: courseruns__language
+        schema:
+          type: string
+      - in: query
         name: id
         schema:
           type: array
@@ -4084,30 +4088,6 @@ components:
       - programs
       - readable_id
       - title
-    CourseLocalizedTitle:
-      type: object
-      description: Serializer for localized course title list
-      properties:
-        language:
-          type: string
-        title:
-          type: string
-      required:
-      - language
-      - title
-    CourseLocalizedTitleRequest:
-      type: object
-      description: Serializer for localized course title list
-      properties:
-        language:
-          type: string
-          minLength: 1
-        title:
-          type: string
-          minLength: 1
-      required:
-      - language
-      - title
     CourseOutlineBadRequestResponse:
       type: object
       properties:
@@ -4889,6 +4869,7 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
+          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
@@ -5000,6 +4981,7 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
+          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
@@ -5164,11 +5146,6 @@ components:
         ingest_content_files_for_ai:
           type: boolean
           readOnly: true
-        titles:
-          type: array
-          items:
-            $ref: '#/components/schemas/CourseLocalizedTitle'
-          readOnly: true
         courseruns:
           type: array
           items:
@@ -5203,7 +5180,6 @@ components:
       - required_prerequisites
       - time_commitment
       - title
-      - titles
       - topics
     CreateB2BEnrollment:
       type: object
@@ -8145,6 +8121,7 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
+          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
@@ -8251,6 +8228,7 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
+          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
@@ -8546,11 +8524,6 @@ components:
         ingest_content_files_for_ai:
           type: boolean
           readOnly: true
-        titles:
-          type: array
-          items:
-            $ref: '#/components/schemas/CourseLocalizedTitle'
-          readOnly: true
       required:
       - availability
       - certificate_available
@@ -8573,7 +8546,6 @@ components:
       - required_prerequisites
       - time_commitment
       - title
-      - titles
       - topics
     V2CourseRequest:
       type: object
@@ -8728,6 +8700,7 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
+          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
@@ -8835,6 +8808,7 @@ components:
           maxLength: 8
         is_primary_language:
           type: boolean
+          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest

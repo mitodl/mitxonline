@@ -149,6 +149,19 @@ class Command(BaseCommand):
             help="Designate the course run(s) to import as source course runs.",
         )
 
+        parser.add_argument(
+            "--language",
+            "--lang",
+            type="str",
+            help='Set the language for the course run. (Default "en".)',
+            default="en",
+        )
+        parser.add_argument(
+            "--primary-lang",
+            action="store_true",
+            help="Set this course run as the default for the language.",
+        )
+
     def _resolve_contract(self, contract_identifier):
         """
         Resolve a contract by ID or slug.
@@ -296,6 +309,11 @@ class Command(BaseCommand):
                 continue
 
             run, page, product = run_data
+
+            if kwargs.get("language", False):
+                run.language = kwargs.pop("language")
+                run.is_primary_language = kwargs.get("primary_lang", False)
+                run.save()
 
             success_count += 1
             self.stdout.write(

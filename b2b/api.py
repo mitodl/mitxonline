@@ -286,7 +286,7 @@ def _get_source_runs_for_course(
     """
     Return the set of source runs for a course.
 
-    A source run is one with ``is_source_run=True`` or ``run_tag="SOURCE"``.
+    Courses may have
 
     Args:
         course: The course to inspect.
@@ -300,15 +300,15 @@ def _get_source_runs_for_course(
             run is found, or if more than one source run exists for the same
             language.
     """
-    source_runs = list(
-        course.courseruns.filter(Q(is_source_run=True) | Q(run_tag="SOURCE")).order_by(
-            "id"
-        )
+    source_runs = (
+        course.courseruns.filter(is_source_run=True).filter().distinct("language").all()
     )
 
     if not source_runs:
         if not require_designated:
-            fallback = course.courseruns.order_by("id").first()
+            fallback = (
+                course.courseruns.filter(is_source_run=True).order_by("id").first()
+            )
             if not fallback:
                 msg = f"No course runs available for {course}."
                 raise SourceCourseIncompleteError(msg)
@@ -322,7 +322,8 @@ def _get_source_runs_for_course(
         raise SourceCourseIncompleteError(msg)
 
     # Validate: at most one source run per language.
-    seen_languages: dict = {}
+    seen_languages: list = []
+    filtered_run_list = []
     for run in source_runs:
         lang = run.language  # may be None for legacy runs
         if lang in seen_languages:
@@ -331,10 +332,13 @@ def _get_source_runs_for_course(
                 f"language '{lang}': {seen_languages[lang]} and {run}. "
                 "Resolve by unsetting is_source_run on the duplicates."
             )
-            raise SourceCourseIncompleteError(msg)
-        seen_languages[lang] = run
+            log.error(msg)
+            continue
 
-    return source_runs
+        seen_languages.append(lang)
+        filtered_run_list.append(run)
+
+    return filtered_run_list
 
 
 def create_contract_run(  # noqa: PLR0913

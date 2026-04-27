@@ -1034,6 +1034,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__isnull=True)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
+            .filter(Q(language__isnull=True) | Q(is_primary_language=True))
             .order_by("start_date")
             .first()
         )
@@ -1043,6 +1044,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__isnull=True)
                 .enrollable()
+                .filter(Q(language__isnull=True) | Q(is_primary_language=True))
                 .order_by("start_date")
                 .first()
             )
@@ -1090,6 +1092,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__in=user_contracts)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
+            .filter(Q(language__isnull=True) | Q(is_primary_language=True))
             .order_by("start_date")
             .first()
         )
@@ -1099,6 +1102,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__in=user_contracts)
                 .enrollable()
+                .filter(Q(language__isnull=True) | Q(is_primary_language=True))
                 .order_by("start_date")
                 .first()
             )
@@ -1278,9 +1282,25 @@ class CourseRun(TimestampedModel):
         unique_together = ("course", "courseware_id", "run_tag")
         constraints = [
             models.UniqueConstraint(
-                fields=["course", "run_tag", "language"],
+                fields=[
+                    "course",
+                    "run_tag",
+                    "language",
+                    "b2b_contract",
+                ],
                 name="unique_courserun_course_runtag_language",
                 condition=models.Q(language__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "course",
+                    "run_tag",
+                    "language",
+                    "is_primary_language",
+                    "b2b_contract",
+                ],
+                name="unique_courserun_course_runtag_language_primary",
+                condition=models.Q(language__isnull=False, is_primary_language=True),
             ),
         ]
 

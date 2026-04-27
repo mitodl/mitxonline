@@ -80,7 +80,6 @@ class CourseSerializer(BaseCourseSerializer):
     max_price = serializers.SerializerMethodField()
     include_in_learn_catalog = serializers.BooleanField(read_only=True)
     ingest_content_files_for_ai = serializers.BooleanField(read_only=True)
-    titles = CourseLocalizedTitleSerializer(read_only=True, many=True)
 
     @extend_schema_field(bool)
     def get_required_prerequisites(self, instance):
@@ -275,7 +274,6 @@ class CourseSerializer(BaseCourseSerializer):
             "max_weekly_hours",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
-            "titles",
         ]
 
 
