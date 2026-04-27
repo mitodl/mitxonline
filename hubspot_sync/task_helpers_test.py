@@ -119,19 +119,8 @@ def test_sync_hubspot_user_skips_b2b_users(mocker, settings):
     # Now set up the mock to return True for B2B check
     mock_exists_global.return_value = True
 
-    # Add some debug logging
-    print("Before calling sync_hubspot_user:")
-    print(f"User ID: {user.id}")
-    print(f"Actual user.b2b_contracts.exists(): {user.b2b_contracts.exists()}")
-
     # Call the function we're actually testing
     sync_hubspot_user(user)
-
-    # Debug after the call
-    print(f"Mock sync called: {mock_sync.called}")
-    print(f"Mock sync call count: {mock_sync.call_count}")
-    print(f"Mock info log called: {mock_info_log.called}")
-    print(f"Mock info log call count: {mock_info_log.call_count}")
 
     # Should not call the sync task
     mock_sync.assert_not_called()

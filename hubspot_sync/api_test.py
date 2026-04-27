@@ -435,7 +435,7 @@ def test_sync_deal_with_hubspot_targeted_skips_b2b_users(mocker, mock_hubspot_ap
     order = OrderFactory.create()
     contract = ContractPageFactory.create()
     order.purchaser.b2b_contracts.add(contract)
-    token = "test-token"
+    token = "test-token"  # noqa: S105
 
     mock_info_log = mocker.patch("hubspot_sync.api.log.info")
 
