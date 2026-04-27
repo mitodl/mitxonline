@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.147.6
+Version 1.147.6 (Released April 27, 2026)
 ---------------
 
 - Add skip_certificates for UAI HubSpot sync (#3520)
