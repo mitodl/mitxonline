@@ -1369,9 +1369,14 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
 
     deal_input = _build_target_deal_message(order, hubspot_client)
     dealname = deal_input.properties.get("dealname")
+    unique_app_id = deal_input.properties.get("unique_app_id")
 
-    # Check if deal already exists
+    # Check if deal already exists by dealname first
     existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
+    
+    # If not found by dealname, also check by unique_app_id to prevent duplicates
+    if not existing_deal_id and unique_app_id:
+        existing_deal_id = _find_target_deal_id_by_unique_app_id(hubspot_client, unique_app_id)
 
     if existing_deal_id:
         # Deal exists, update it with the latest order data
@@ -1910,6 +1915,42 @@ def _find_target_deal_id_by_dealname(
         raise
     except Exception:
         log.exception("Failed to search for deal by dealname: %s", dealname)
+    return None
+
+
+def _find_target_deal_id_by_unique_app_id(
+    hubspot_client: HubspotApi, unique_app_id: str
+) -> str | None:
+    """Find deal id in target account by unique_app_id."""
+    wait_for_hubspot_rate_limit()
+    try:
+        response = hubspot_client.crm.objects.search_api.do_search(
+            object_type=HubspotObjectType.DEALS.value,
+            public_object_search_request=PublicObjectSearchRequest(
+                filter_groups=[
+                    FilterGroup(
+                        filters=[
+                            Filter(
+                                property_name="unique_app_id",
+                                operator="EQ",
+                                value=unique_app_id,
+                            )
+                        ]
+                    )
+                ],
+                properties=["unique_app_id"],
+                limit=1,
+            ),
+        )
+        if response.results:
+            return response.results[0].id
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        # to avoid creating duplicates when we can't search
+        log.warning("Rate limited searching for deal by unique_app_id: %s", unique_app_id)
+        raise
+    except Exception:
+        log.exception("Failed to search for deal by unique_app_id: %s", unique_app_id)
     return None
 
 
