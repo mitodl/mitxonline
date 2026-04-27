@@ -29,7 +29,7 @@ class Command(BaseCommand):
             )
         )
 
-        for program_enrollment in enrollments.iterator():
+        for program_enrollment in enrollments:
             _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
 
             if upgraded:
