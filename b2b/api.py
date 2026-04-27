@@ -149,7 +149,8 @@ def create_contract_run_key(
     last_run_tag = (
         CourseRun.objects.filter(
             courseware_id__startswith=new_course_key,
-            courseware_id__endswith=mostly_run_tag,
+            run_tag__endswith=mostly_run_tag,
+            language=source_course.language,
         )
         .select_for_update()
         .order_by("-courseware_id")
@@ -436,6 +437,13 @@ def create_contract_run(  # noqa: PLR0913
             )
         )
         new_readable_id = str(new_course_key)
+
+        # If there's a language, we want to change the courseware ID (which is
+        # sent to edX) but not the run tag, because we group translated course
+        # runs by run tag.
+        if clone_course_run.language:
+            new_readable_id = f"{new_readable_id}_{clone_course_run.language}"
+
         new_run_tag = new_course_key.run
 
         if (
