@@ -135,3 +135,34 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
             "b2b_contract_id",
             "certificate",
         ]
+
+
+@extend_schema_serializer(component_name="CourseOutlineModuleCounts")
+class CourseOutlineModuleCountsSerializer(serializers.Serializer):
+    """Activity counts within a course outline module."""
+
+    videos = serializers.IntegerField()
+    readings = serializers.IntegerField()
+    problems = serializers.IntegerField()
+    assignments = serializers.IntegerField()
+    app_items = serializers.IntegerField()
+
+
+@extend_schema_serializer(component_name="CourseOutlineModule")
+class CourseOutlineModuleSerializer(serializers.Serializer):
+    """A single module within a course outline."""
+
+    id = serializers.CharField()
+    title = serializers.CharField()
+    effort_time = serializers.IntegerField()
+    effort_activities = serializers.IntegerField()
+    counts = CourseOutlineModuleCountsSerializer()
+
+
+@extend_schema_serializer(component_name="CourseOutlineResponse")
+class CourseOutlineResponseSerializer(serializers.Serializer):
+    """Course outline data fetched from Open edX."""
+
+    course_id = serializers.CharField()
+    generated_at = serializers.DateTimeField()
+    modules = CourseOutlineModuleSerializer(many=True)
