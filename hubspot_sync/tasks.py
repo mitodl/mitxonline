@@ -190,7 +190,7 @@ def sync_product_with_hubspot(product_id: int) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_deal_with_hubspot(order_id: int) -> str:
+def sync_deal_with_hubspot(order_id: int) -> str | None:
     """
     Sync an Order with a hubspot deal
 
@@ -198,9 +198,10 @@ def sync_deal_with_hubspot(order_id: int) -> str:
         order_id(int): The Order ID.
 
     Returns:
-        str: The hubspot id for the deal
+        str | None: The hubspot id for the deal, or None if skipped for B2B users
     """
-    return api.sync_deal_with_hubspot(Order.objects.get(id=order_id)).id
+    result = api.sync_deal_with_hubspot(Order.objects.get(id=order_id))
+    return result.id if result else None
 
 
 @app.task(
@@ -212,7 +213,7 @@ def sync_deal_with_hubspot(order_id: int) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_deal_with_hubspot_targeted(order_id: int, *, is_uai: bool) -> str:
+def sync_deal_with_hubspot_targeted(order_id: int, *, is_uai: bool) -> str | None:
     """
     Sync an Order with a hubspot deal using the appropriate HubSpot token.
     This allows routing UAI orders to the UAI HubSpot account.
@@ -222,7 +223,7 @@ def sync_deal_with_hubspot_targeted(order_id: int, *, is_uai: bool) -> str:
         is_uai(bool): Whether this is a UAI order, determines which token to use.
 
     Returns:
-        str: The hubspot id for the deal
+        str | None: The hubspot id for the deal, or None if skipped for B2B users
     """
     # Resolve token from settings based on is_uai flag
     if is_uai:
@@ -237,7 +238,8 @@ def sync_deal_with_hubspot_targeted(order_id: int, *, is_uai: bool) -> str:
         error_message = f"No HubSpot token available for {account_type} account"
         raise ValueError(error_message)
 
-    return api.sync_deal_with_hubspot_targeted(Order.objects.get(id=order_id), token).id
+    result = api.sync_deal_with_hubspot_targeted(Order.objects.get(id=order_id), token)
+    return result.id if result else None
 
 
 @app.task(

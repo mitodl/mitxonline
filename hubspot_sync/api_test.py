@@ -405,6 +405,57 @@ def test_sync_deal_with_hubspot(mocker, mock_hubspot_api, hubspot_order):
     )
 
 
+def test_sync_deal_with_hubspot_skips_b2b_users(mocker, mock_hubspot_api):
+    """Test that B2B users are skipped and not synced to HubSpot for deals"""
+    order = OrderFactory.create()
+    contract = ContractPageFactory.create()
+    order.purchaser.b2b_contracts.add(contract)
+
+    mock_info_log = mocker.patch("hubspot_sync.api.log.info")
+
+    result = api.sync_deal_with_hubspot(order)
+
+    # Should return None for B2B users
+    assert result is None
+
+    # Should not call HubSpot API
+    mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_not_called()
+
+    # Should log that user was skipped
+    mock_info_log.assert_called_once_with(
+        "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+        order.purchaser.edx_username or order.purchaser.email,
+        order.purchaser.id,
+        order.id,
+    )
+
+
+def test_sync_deal_with_hubspot_targeted_skips_b2b_users(mocker, mock_hubspot_api):
+    """Test that B2B users are skipped in targeted deal sync"""
+    order = OrderFactory.create()
+    contract = ContractPageFactory.create()
+    order.purchaser.b2b_contracts.add(contract)
+    token = "test-token"
+
+    mock_info_log = mocker.patch("hubspot_sync.api.log.info")
+
+    result = api.sync_deal_with_hubspot_targeted(order, token)
+
+    # Should return None for B2B users
+    assert result is None
+
+    # Should not call HubSpot API
+    mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_not_called()
+
+    # Should log that user was skipped
+    mock_info_log.assert_called_once_with(
+        "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+        order.purchaser.edx_username or order.purchaser.email,
+        order.purchaser.id,
+        order.id,
+    )
+
+
 def test_sync_line_item_with_hubspot(
     mocker, mock_hubspot_api, hubspot_order, hubspot_order_id
 ):
