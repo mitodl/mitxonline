@@ -149,11 +149,6 @@ def test_sync_hubspot_user_syncs_regular_users(mocker, settings):
     mock_sync.reset_mock()
     mock_info_log.reset_mock()
 
-    # Debug: Check the user has no contracts
-    print(f"Regular User ID: {user.id}")
-    print(f"regular user.b2b_contracts.exists(): {user.b2b_contracts.exists()}")
-    print(f"regular user.b2b_contracts.count(): {user.b2b_contracts.count()}")
-
     # Call the function we're actually testing
     sync_hubspot_user(user)
 
