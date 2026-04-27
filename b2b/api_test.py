@@ -11,6 +11,7 @@ import pytest
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
@@ -1632,9 +1633,16 @@ def test_create_contract_run_multi_language_propagates_language(mocker):
     assert run.is_primary_language is True
 
 
-def test_create_contract_run_duplicate_language_source_raises(mocker):
-    """Two source runs with the same language raise SourceCourseIncompleteError."""
-    contract = ContractPageFactory.create()
+@pytest.mark.parametrize("in_contract", ["no", "first", "second", "both"])
+def test_create_contract_run_duplicate_language_source_raises(mocker, in_contract):
+    """
+    Test that you can't create two source runs with the same run tag and language.
+
+    This is enforced as a unique constraint so trying to do this should fail,
+    unless the runs are in different contracts (or one is in a contract and the
+    other isn't).
+    """
+    contract = None if in_contract == "no" else ContractPageFactory.create()
     course = CourseFactory.create()
     CourseRunFactory.create(
         course=course,
@@ -1643,16 +1651,30 @@ def test_create_contract_run_duplicate_language_source_raises(mocker):
         is_source_run=True,
         is_primary_language=True,
         courseware_id=f"{course.readable_id}+1T2026-en",
+        b2b_contract=contract if in_contract in ["first", "both"] else None,
     )
-    CourseRunFactory.create(
-        course=course,
-        run_tag="1T2026",
-        language="en",
-        is_source_run=True,
-        courseware_id=f"{course.readable_id}+1T2026-en-copy",
-    )
-    with pytest.raises(SourceCourseIncompleteError, match="more than one source run"):
-        create_contract_run(contract, course)
+
+    if in_contract in ["no", "both"]:
+        with pytest.raises(
+            IntegrityError, match="unique_courserun_course_runtag_language"
+        ):
+            CourseRunFactory.create(
+                course=course,
+                run_tag="1T2026",
+                language="en",
+                is_source_run=True,
+                courseware_id=f"{course.readable_id}+1T2026-en-copy",
+                b2b_contract=contract,
+            )
+    else:
+        CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            language="en",
+            is_source_run=True,
+            courseware_id=f"{course.readable_id}+1T2026-en-copy",
+            b2b_contract=contract if in_contract == "second" else None,
+        )
 
 
 def test_create_contract_run_single_language_legacy(mocker):

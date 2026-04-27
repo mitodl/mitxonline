@@ -1316,7 +1316,6 @@ class CourseRun(TimestampedModel):
             models.UniqueConstraint(
                 fields=[
                     "course",
-                    "courseware_id",
                     "run_tag",
                     "language",
                     "b2b_contract",
