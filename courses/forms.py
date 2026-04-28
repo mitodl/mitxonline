@@ -141,6 +141,7 @@ def program_requirements_schema():
                                 "format": "number",
                                 "title": "Value",
                                 "default": 1,
+                                "minimum": 1,
                                 "options": {
                                     "dependencies": {
                                         "node_type": ProgramRequirementNodeType.OPERATOR.value,
@@ -269,7 +270,7 @@ class ProgramAdminForm(ModelForm):
         def _validate_elective_value_presence(operator):
             """
             Verifies that a Program's elective operator contains
-            a defined Value field.
+            a defined Value field that is not negative.
 
             Args:
                 operator (dict):
@@ -286,6 +287,7 @@ class ProgramAdminForm(ModelForm):
                 }
             ValidationError: operator_value does not exist.
             ValidationError: operator_value does exist but is empty.
+            ValidationError: operator_value is negative.
             """
             if (
                 operator["data"]["operator"]
@@ -299,6 +301,17 @@ class ProgramAdminForm(ModelForm):
                 if operator["data"]["operator_value"] == "":
                     raise ValidationError(
                         '"Minimum # of" operator must have Value equal to 1 or more.'  # noqa: EM101
+                    )
+                # Ensure the value is not negative
+                try:
+                    value = int(operator["data"]["operator_value"])
+                    if value < 1:
+                        raise ValidationError(
+                            '"Minimum # of" operator must have Value equal to 1 or more.'  # noqa: EM101
+                        )
+                except (ValueError, TypeError):
+                    raise ValidationError(
+                        '"Minimum # of" operator must have a valid numeric Value equal to 1 or more.'  # noqa: EM101
                     )
 
         def _validate_operator_title(operator):
@@ -363,7 +376,7 @@ class ProgramAdminForm(ModelForm):
                         if child["data"]["node_type"] == "operator":
                             _validate_operator_title(child)
                             if (
-                                operator["data"]["operator"]
+                                child["data"]["operator"]
                                 == ProgramRequirement.Operator.MIN_NUMBER_OF.value
                             ):
                                 _validate_elective_value_presence(child)

@@ -2279,6 +2279,28 @@ class ProgramRequirement(MP_Node):
         """True if the node is an operator"""
         return self.node_type == ProgramRequirementNodeType.OPERATOR
 
+    def clean(self):
+        """Validate the program requirement fields"""
+        super().clean()
+        
+        # Validate operator_value for MIN_NUMBER_OF operators
+        if (
+            self.operator == self.Operator.MIN_NUMBER_OF
+            and self.operator_value is not None
+        ):
+            try:
+                value = int(self.operator_value)
+                if value < 1:
+                    from django.core.exceptions import ValidationError
+                    raise ValidationError({
+                        'operator_value': 'Minimum # of value must be 1 or greater.'
+                    })
+            except (ValueError, TypeError):
+                from django.core.exceptions import ValidationError
+                raise ValidationError({
+                    'operator_value': 'Minimum # of value must be a valid number.'
+                })
+
     @property
     def is_course(self):
         """True if the node references a course"""
