@@ -1326,9 +1326,7 @@ def test_receipt_by_run_not_found(user, user_drf_client):
 
 def test_receipt_by_run_unauthenticated(client):
     """Test that unauthenticated users cannot access the receipt by run endpoint."""
-    resp = client.get(
-        reverse("v0:receipt_by_run", kwargs={"run_id": 1})
-    )
+    resp = client.get(reverse("v0:receipt_by_run", kwargs={"run_id": 1}))
 
     assert resp.status_code in (401, 403)
 
@@ -1391,9 +1389,7 @@ def test_receipt_by_program_not_found(user, user_drf_client):
 
 def test_receipt_by_program_unauthenticated(client):
     """Test that unauthenticated users cannot access the receipt by program endpoint."""
-    resp = client.get(
-        reverse("v0:receipt_by_program", kwargs={"program_id": 1})
-    )
+    resp = client.get(reverse("v0:receipt_by_program", kwargs={"program_id": 1}))
 
     assert resp.status_code in (401, 403)
 

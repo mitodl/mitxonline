@@ -32,7 +32,14 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
-from courses.models import Course, CourseRun, PaidCourseRun, PaidProgram, Program, ProgramRun
+from courses.models import (
+    Course,
+    CourseRun,
+    PaidCourseRun,
+    PaidProgram,
+    Program,
+    ProgramRun,
+)
 from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce.api import (
     apply_discount_to_basket,
