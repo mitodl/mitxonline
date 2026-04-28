@@ -57,7 +57,7 @@ def sync_hubspot_deal(order: Order):
             order.purchaser.id,
             order.id,
         )
-        return None
+        return
 
     if order.lines.first() is not None:
         is_uai = is_uai_order(order)
