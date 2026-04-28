@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.149.1
+Version 1.149.1 (Released April 28, 2026)
 ---------------
 
 - Skip HubSpot sync for B2B users (#3524)
