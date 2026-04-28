@@ -939,6 +939,7 @@ class OrderReceiptView(RetrieveAPIView):
         return Order.objects.filter(purchaser=self.request.user).all()
 
 
+@extend_schema(exclude=True)
 class ReceiptByRunView(APIView):
     """Redirects to the receipt page for an order associated with a course run."""
 
@@ -959,6 +960,7 @@ class ReceiptByRunView(APIView):
         return redirect(f"/orders/receipt/{paid_run.order_id}/")
 
 
+@extend_schema(exclude=True)
 class ReceiptByProgramView(APIView):
     """Redirects to the receipt page for an order associated with a program."""
 
