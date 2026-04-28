@@ -4091,18 +4091,59 @@ components:
           type: string
       required:
       - detail
+    CourseOutlineModule:
+      type: object
+      description: A single module within a course outline.
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        effort_time:
+          type: integer
+        effort_activities:
+          type: integer
+        counts:
+          $ref: '#/components/schemas/CourseOutlineModuleCounts'
+      required:
+      - counts
+      - effort_activities
+      - effort_time
+      - id
+      - title
+    CourseOutlineModuleCounts:
+      type: object
+      description: Activity counts within a course outline module.
+      properties:
+        videos:
+          type: integer
+        readings:
+          type: integer
+        problems:
+          type: integer
+        assignments:
+          type: integer
+        app_items:
+          type: integer
+      required:
+      - app_items
+      - assignments
+      - problems
+      - readings
+      - videos
     CourseOutlineResponse:
       type: object
+      description: Course outline data fetched from Open edX.
       properties:
         course_id:
           type: string
         generated_at:
           type: string
+          format: date-time
         modules:
           type: array
           items:
-            type: object
-            additionalProperties: {}
+            $ref: '#/components/schemas/CourseOutlineModule'
       required:
       - course_id
       - generated_at
