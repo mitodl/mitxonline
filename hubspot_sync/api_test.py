@@ -346,61 +346,67 @@ def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "test-token"  # noqa: S105
     test_token = "test-token"  # noqa: S105
     existing_deal_id = "existing-deal-123"
-    
+
     # Mock HubspotApi directly where it's imported in the api module
     mock_hubspot_api = mocker.patch("hubspot_sync.api.HubspotApi")
     mock_client_instance = mock_hubspot_api.return_value
     mock_result = SimplePublicObjectFactory(id=existing_deal_id)
     mock_client_instance.crm.objects.basic_api.update.return_value = mock_result
-    
+
     # Mock association checking to return empty results (no existing associations)
-    mock_client_instance.crm.associations.v4.basic_api.get_page.return_value = mocker.Mock(results=[])
-    
+    mock_client_instance.crm.associations.v4.basic_api.get_page.return_value = (
+        mocker.Mock(results=[])
+    )
+
     # Mock that dealname search returns None (not found)
     mock_find_by_dealname = mocker.patch(
         "hubspot_sync.api._find_target_deal_id_by_dealname", return_value=None
     )
-    
+
     # Mock that unique_app_id search returns an existing deal ID
     mock_find_by_unique_app_id = mocker.patch(
-        "hubspot_sync.api._find_target_deal_id_by_unique_app_id", return_value=existing_deal_id
+        "hubspot_sync.api._find_target_deal_id_by_unique_app_id",
+        return_value=existing_deal_id,
     )
-    
+
     # Mock other dependencies
     mock_ensure_contact = mocker.patch(
         "hubspot_sync.api._ensure_hubspot_contact_for_user", return_value="contact-123"
     )
     mock_ensure_line_item = mocker.patch(
-        "hubspot_sync.api._ensure_target_line_item_for_line", return_value="line-item-123"
+        "hubspot_sync.api._ensure_target_line_item_for_line",
+        return_value="line-item-123",
     )
     mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
     
     # Call the function under test
     result = api.sync_deal_with_hubspot_targeted(hubspot_order, test_token)
-    
+
     # Verify HubspotApi was instantiated with the correct token
     mock_hubspot_api.assert_called_once_with(access_token=test_token)
-    
+
     # Verify both find functions were called correctly
     mock_find_by_dealname.assert_called_once()
     mock_find_by_unique_app_id.assert_called_once()
-    
+
     # Verify that UPDATE was called, not CREATE
     mock_client_instance.crm.objects.basic_api.update.assert_called_once_with(
         object_type=api.HubspotObjectType.DEALS.value,
         object_id=existing_deal_id,
         simple_public_object_input=mocker.ANY,
     )
-    
+
     # Verify that CREATE was NOT called
     mock_client_instance.crm.objects.basic_api.create.assert_not_called()
-    
+
     # Verify other expected calls
     mock_ensure_contact.assert_called_once_with(
         hubspot_order.purchaser, mock_client_instance, skip_certificates=False
     )
-    mock_ensure_line_item.assert_called_once_with(hubspot_order.lines.first(), mock_client_instance)
-    
+    mock_ensure_line_item.assert_called_once_with(
+        hubspot_order.lines.first(), mock_client_instance
+    )
+
     # Verify associations were created (deal-contact and line-deal)
     expected_association_calls = [
         mocker.call(
