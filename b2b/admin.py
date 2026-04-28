@@ -20,11 +20,47 @@ class UserOrganizationAdminInline(admin.TabularInline):
     model = UserOrganization
     extra = 0
     verbose_name = "Organization Admin"
+    list_display = [
+        "user_email",
+        "keep_until_seen",
+        "is_manager",
+    ]
+    readonly_fields = [
+        "user_email",
+        "keep_until_seen",
+        "is_manager",
+    ]
 
     def get_queryset(self, request):
         """Filter the queryset to just users with Manager access."""
 
-        return super().get_queryset(request).filter(is_manager=True)
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("user")
+            .filter(is_manager=True)
+        )
+
+    def has_add_permission(self, request, obj):  # noqa: ARG002
+        """Determine if the user can add new ones from here (no, they cannot)"""
+
+        return False
+
+    def has_change_permission(self, request, obj=None):  # noqa: ARG002
+        """Determine if the user can add new ones from here (no, they cannot)"""
+
+        return False
+
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
+        """Determine if the user can add new ones from here (no, they cannot)"""
+
+        return False
+
+    @admin.display(description="User Email")
+    def user_email(self, obj):
+        """Return the user's email address."""
+
+        return obj.user.email
 
 
 class ReadOnlyModelAdmin(admin.ModelAdmin):

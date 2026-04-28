@@ -34,7 +34,10 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
-from courses.serializers.v3.courses import CourseRunEnrollmentSerializer
+from courses.serializers.v3.courses import (
+    CourseOutlineResponseSerializer,
+    CourseRunEnrollmentSerializer,
+)
 from courses.serializers.v3.programs import (
     ProgramEnrollmentCreateSerializer,
     ProgramEnrollmentSerializer,
@@ -274,14 +277,7 @@ class UserProgramEnrollmentsViewSet(
         )
     ],
     responses={
-        200: inline_serializer(
-            name="CourseOutlineResponse",
-            fields={
-                "course_id": serializers.CharField(),
-                "generated_at": serializers.CharField(),
-                "modules": serializers.ListField(child=serializers.DictField()),
-            },
-        ),
+        200: CourseOutlineResponseSerializer,
         400: inline_serializer(
             name="CourseOutlineBadRequestResponse",
             fields={"detail": serializers.CharField()},

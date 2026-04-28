@@ -792,13 +792,17 @@ def make_contact_update_message_list_from_user_ids(
     return request_input
 
 
-def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
+def make_contact_sync_message_from_user(
+    user: User, *, skip_certificates: bool = False
+) -> SimplePublicObjectInput:
     """
     Create the body of a HubSpot sync message for a contact. This will flatten the contained LegalAddress and Profile
     serialized data into one larger serializable dict
 
     Args:
         user (User): User object.
+        skip_certificates (bool): If True, exclude certificate properties from the contact data.
+                                 Used for UAI HubSpot accounts that don't have certificate properties.
     Returns:
         SimplePublicObjectInput: Input object for upserting User data to Hubspot
     """
@@ -823,12 +827,26 @@ def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
         "type_is_professional": "typeisprofessional",
         "type_is_educator": "typeiseducator",
         "type_is_other": "typeisother",
-        "program_certificates": "program_certificates",
-        "course_run_certificates": "course_run_certificates",
     }
+
+    # Only include certificate properties if not skipping them
+    if not skip_certificates:
+        contact_properties_map.update(
+            {
+                "program_certificates": "program_certificates",
+                "course_run_certificates": "course_run_certificates",
+            }
+        )
+
     properties = HubspotContactSerializer(user).data
     properties.update(properties.pop("legal_address") or {})
     properties.update(properties.pop("user_profile") or {})
+
+    # Remove certificate data if skipping certificates
+    if skip_certificates:
+        properties.pop("program_certificates", None)
+        properties.pop("course_run_certificates", None)
+
     hubspot_props = transform_object_properties(properties, contact_properties_map)
     return make_object_properties_message(hubspot_props)
 
@@ -1384,7 +1402,22 @@ def sync_deal_with_hubspot_targeted(
         )
 
     # Ensure contact exists and is associated
-    contact_id = _ensure_hubspot_contact_for_user(order.purchaser, hubspot_client)
+    # For targeted sync, we need to determine if this is for a UAI course to skip certificates
+    is_uai_account = token == getattr(
+        settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", ""
+    )
+    contact_id = _ensure_hubspot_contact_for_user(
+        order.purchaser, hubspot_client, skip_certificates=is_uai_account
+    )
+
+    if not contact_id:
+        log.error(
+            "Failed to create or find contact in target HubSpot account for user %s (email: %s)",
+            order.purchaser.id,
+            order.purchaser.email,
+        )
+        # Still return the deal result, but log the association failure
+        return result
 
     # Check if deal-contact association exists
     try:
@@ -1406,6 +1439,11 @@ def sync_deal_with_hubspot_targeted(
                 to_object_type=HubspotObjectType.CONTACTS.value,
                 to_object_id=contact_id,
             )
+            log.info(
+                "Created deal-contact association for deal %s and contact %s",
+                result.id,
+                contact_id,
+            )
     except Exception:  # noqa: BLE001
         # If we can't check associations, try to create (HubSpot will ignore duplicates)
         try:
@@ -1415,6 +1453,11 @@ def sync_deal_with_hubspot_targeted(
                 from_object_id=result.id,
                 to_object_type=HubspotObjectType.CONTACTS.value,
                 to_object_id=contact_id,
+            )
+            log.info(
+                "Created deal-contact association for deal %s and contact %s (via fallback)",
+                result.id,
+                contact_id,
             )
         except Exception:
             log.exception(
@@ -2013,42 +2056,81 @@ def _ensure_target_hubspot_contact_properties(
 
 
 def _ensure_hubspot_contact_for_user(
-    user: User, hubspot_client: HubspotApi
+    user: User, hubspot_client: HubspotApi, *, skip_certificates: bool = False
 ) -> str | None:
     """Return target-account contact id, creating a contact when missing."""
-    contact_id = _find_hubspot_contact_id_by_email(hubspot_client, user.email)
-    if contact_id:
+    try:
+        contact_id = _find_hubspot_contact_id_by_email(hubspot_client, user.email)
+        if contact_id:
+            log.info(
+                "Found existing HubSpot contact in target account for user_id=%s email=%s contact_id=%s",
+                user.id,
+                user.email,
+                contact_id,
+            )
+            # Only update local HubspotObject mapping for primary (MITx Online) account
+            # to avoid overwriting existing mappings when syncing to secondary (UAI) accounts
+            if not skip_certificates:
+                content_type = ContentType.objects.get_for_model(User)
+                HubspotObject.objects.update_or_create(
+                    object_id=user.id,
+                    content_type=content_type,
+                    defaults={"hubspot_id": contact_id},
+                )
+            return contact_id
+
+        # Create new contact if not found
         log.info(
-            "Found existing HubSpot contact in target account for user_id=%s email=%s",
+            "Creating new HubSpot contact in target account for user_id=%s email=%s (skip_certificates=%s)",
+            user.id,
+            user.email,
+            skip_certificates,
+        )
+        wait_for_hubspot_rate_limit()
+        contact = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.CONTACTS.value,
+            simple_public_object_input_for_create=make_contact_sync_message_from_user(
+                user, skip_certificates=skip_certificates
+            ),
+        )
+
+        log.info(
+            "Successfully created HubSpot contact in target account for user_id=%s email=%s contact_id=%s",
+            user.id,
+            user.email,
+            contact.id,
+        )
+
+        user.hubspot_sync_datetime = now_in_utc()
+        user.save(update_fields=["hubspot_sync_datetime"])
+
+        # Only update local HubspotObject mapping for primary (MITx Online) account
+        # to avoid overwriting existing mappings when syncing to secondary (UAI) accounts
+        if not skip_certificates:
+            content_type = ContentType.objects.get_for_model(User)
+            HubspotObject.objects.update_or_create(
+                object_id=user.id,
+                content_type=content_type,
+                defaults={"hubspot_id": contact.id},
+            )
+
+    except TooManyRequestsException:
+        # Re-raise rate limit errors so calling code can retry
+        log.warning(
+            "Rate limited ensuring HubSpot contact for user_id=%s email=%s in target account",
             user.id,
             user.email,
         )
-        # Update the local HubspotObject mapping for existing contact
-        content_type = ContentType.objects.get_for_model(User)
-        HubspotObject.objects.update_or_create(
-            object_id=user.id,
-            content_type=content_type,
-            defaults={"hubspot_id": contact_id},
+        raise
+    except Exception:
+        log.exception(
+            "Failed to ensure HubSpot contact for user_id=%s email=%s in target account",
+            user.id,
+            user.email,
         )
-        return contact_id
-
-    wait_for_hubspot_rate_limit()
-    contact = hubspot_client.crm.objects.basic_api.create(
-        object_type=HubspotObjectType.CONTACTS.value,
-        simple_public_object_input_for_create=make_contact_sync_message_from_user(user),
-    )
-    user.hubspot_sync_datetime = now_in_utc()
-    user.save(update_fields=["hubspot_sync_datetime"])
-
-    # Update the local HubspotObject mapping for newly created contact
-    content_type = ContentType.objects.get_for_model(User)
-    HubspotObject.objects.update_or_create(
-        object_id=user.id,
-        content_type=content_type,
-        defaults={"hubspot_id": contact.id},
-    )
-
-    return contact.id
+        return None
+    else:
+        return contact.id
 
 
 def _sync_cart_add_deal_with_hubspot(
@@ -2114,12 +2196,21 @@ def track_cart_add_with_hubspot(
 
     try:
         hubspot_client = HubspotApi(access_token=token)
+
+        # Determine which account is actually being used for the API call
+        # This ensures skip_certificates reflects the actual HubSpot account, not just course type
+        is_uai_account = token == getattr(
+            settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", ""
+        )
+
         _ensure_target_hubspot_contact_properties(
-            hubspot_client, skip_certificates=is_uai_course
+            hubspot_client, skip_certificates=is_uai_account
         )
 
         # UAI deals must have a contact in the same HubSpot account.
-        contact_id = _ensure_hubspot_contact_for_user(user, hubspot_client)
+        contact_id = _ensure_hubspot_contact_for_user(
+            user, hubspot_client, skip_certificates=is_uai_account
+        )
         if not contact_id:
             return False
 

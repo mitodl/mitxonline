@@ -598,6 +598,25 @@ class PaidProgramAdmin(TimestampedModelAdmin):
         return obj.order.state
 
 
+class HasCertificateRevisionFilter(admin.SimpleListFilter):
+    title = "Has Certificate Revision"
+    parameter_name = "has_certificate_revision"
+
+    def lookups(self, request, model_admin):  # noqa: ARG002
+        return (
+            ("yes", "Yes"),
+            ("no", "No"),
+        )
+
+    def queryset(self, request, queryset):  # noqa: ARG002
+        value = self.value()
+        if value == "yes":
+            return queryset.filter(certificate_page_revision__isnull=False)
+        if value == "no":
+            return queryset.filter(certificate_page_revision__isnull=True)
+        return queryset
+
+
 @admin.register(CourseRunCertificate)
 class CourseRunCertificateAdmin(TimestampedModelAdmin):
     """Admin for CourseRunCertificate"""
@@ -610,14 +629,16 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         "course_run",
         "get_certificate_page_title",
         "get_revoked_state",
+        "get_has_certificate_revision",
     ]
     search_fields = [
+        "uuid",
         "course_run__courseware_id",
         "course_run__title",
         "user__username",
         "user__email",
     ]
-    list_filter = ["is_revoked", "course_run__course"]
+    list_filter = ["is_revoked", HasCertificateRevisionFilter, "course_run__course"]
     raw_id_fields = ("user", "course_run", "verifiable_credential")
     autocomplete_fields = ("certificate_page_revision",)
 
@@ -648,6 +669,14 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         """Return the revoked state"""
         return obj.is_revoked is not True
 
+    @admin.display(
+        description="Has Certificate Revision",
+        boolean=True,
+    )
+    def get_has_certificate_revision(self, obj):
+        """Return whether a certificate page revision is associated"""
+        return obj.certificate_page_revision is not None
+
     def get_queryset(self, request):  # noqa: ARG002
         return self.model.all_objects.get_queryset().select_related(
             "user", "course_run"
@@ -665,15 +694,18 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         "user",
         "program",
         "get_revoked_state",
+        "get_has_certificate_revision",
     ]
     search_fields = [
         "program__readable_id",
         "program__title",
         "user__username",
         "user__email",
+        "uuid",
     ]
-    list_filter = ["program__title", "is_revoked"]
-    raw_id_fields = ("user", "verifiable_credential")
+    list_filter = ["program__title", HasCertificateRevisionFilter, "is_revoked"]
+    raw_id_fields = ("user", "verifiable_credential", "program")
+    autocomplete_fields = ("certificate_page_revision",)
 
     @admin.display(
         description="Active",
@@ -682,6 +714,14 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
     def get_revoked_state(self, obj):
         """Return the revoked state"""
         return obj.is_revoked is not True
+
+    @admin.display(
+        description="Has Certificate Revision",
+        boolean=True,
+    )
+    def get_has_certificate_revision(self, obj):
+        """Return whether a certificate page revision is associated"""
+        return obj.certificate_page_revision is not None
 
     def get_queryset(self, request):  # noqa: ARG002
         return self.model.all_objects.get_queryset().select_related("user", "program")
