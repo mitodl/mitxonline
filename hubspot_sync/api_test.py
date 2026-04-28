@@ -339,6 +339,64 @@ def test_sync_deal_with_hubspot(mocker, mock_hubspot_api, hubspot_order):
     )
 
 
+def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
+    mocker, mock_hubspot_api, hubspot_order, settings
+):
+    """Test that when deal is not found by dealname but found by unique_app_id, it updates instead of creating"""
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "test-token"  # noqa: S105
+    test_token = "test-token"  # noqa: S105
+    existing_deal_id = "existing-deal-123"
+    
+    # Mock that dealname search returns None (not found)
+    mock_find_by_dealname = mocker.patch(
+        "hubspot_sync.api._find_target_deal_id_by_dealname", return_value=None
+    )
+    
+    # Mock that unique_app_id search returns an existing deal ID
+    mock_find_by_unique_app_id = mocker.patch(
+        "hubspot_sync.api._find_target_deal_id_by_unique_app_id", return_value=existing_deal_id
+    )
+    
+    # Mock other dependencies
+    mock_sync_line = mocker.patch(
+        "hubspot_sync.api.sync_line_item_with_hubspot", autospec=True
+    )
+    mock_ensure_contact = mocker.patch(
+        "hubspot_sync.api._ensure_hubspot_contact_for_user", return_value="contact-123"
+    )
+    mock_associate_deal = mocker.patch(
+        "hubspot_sync.api._associate_deal_with_contact"
+    )
+    mock_wait_rate_limit = mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+    
+    # Call the function under test
+    result = api.sync_deal_with_hubspot_targeted(hubspot_order, test_token)
+    
+    # Verify both find functions were called correctly
+    mock_find_by_dealname.assert_called_once()
+    mock_find_by_unique_app_id.assert_called_once()
+    
+    # Verify that UPDATE was called, not CREATE
+    mock_hubspot_api.return_value.crm.objects.basic_api.update.assert_called_once_with(
+        object_type=api.HubspotObjectType.DEALS.value,
+        object_id=existing_deal_id,
+        simple_public_object_input=mocker.ANY,
+    )
+    
+    # Verify that CREATE was NOT called
+    mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_not_called()
+    
+    # Verify other expected calls
+    mock_sync_line.assert_called_once_with(hubspot_order.lines.first())
+    mock_ensure_contact.assert_called_once_with(
+        hubspot_order.purchaser, mocker.ANY, skip_certificates=False
+    )
+    mock_associate_deal.assert_called_once()
+    
+    # Verify rate limiting was respected (called twice - once for update, once for association)
+    assert mock_wait_rate_limit.call_count == 2
+
+
 def test_sync_line_item_with_hubspot(
     mocker, mock_hubspot_api, hubspot_order, hubspot_order_id
 ):
