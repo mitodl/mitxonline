@@ -49,6 +49,16 @@ def sync_hubspot_deal(order: Order):
     Args:
         order (Order): The order to sync
     """
+    # Skip sync for B2B users to avoid errors
+    if order.purchaser.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
+            order.id,
+        )
+        return None
+
     if order.lines.first() is not None:
         is_uai = is_uai_order(order)
 
