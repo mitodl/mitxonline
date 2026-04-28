@@ -21,6 +21,7 @@ from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObject
 from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
+from b2b.factories import ContractPageFactory
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
@@ -186,6 +187,40 @@ def test_task_sync_deal_with_hubspot_targeted_no_token_error(mocker, settings):
 
     with pytest.raises(ValueError, match="No HubSpot token available for UAI account"):
         sync_deal_with_hubspot_targeted(mock_object.id, is_uai=True)
+
+
+def test_task_sync_deal_with_hubspot_skips_b2b_users(mocker):
+    """sync_deal_with_hubspot task should return None for B2B users"""
+    order = OrderFactory.create()
+    contract = ContractPageFactory.create()
+    order.purchaser.b2b_contracts.add(contract)
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot", return_value=None
+    )
+
+    result = sync_deal_with_hubspot(order.id)
+
+    assert result is None
+    mock_api_call.assert_called_once_with(order)
+
+
+def test_task_sync_deal_with_hubspot_targeted_skips_b2b_users(mocker, settings):
+    """sync_deal_with_hubspot_targeted task should return None for B2B users"""
+    order = OrderFactory.create()
+    contract = ContractPageFactory.create()
+    order.purchaser.b2b_contracts.add(contract)
+    test_token = "test-token-123"  # noqa: S105
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted", return_value=None
+    )
+
+    result = sync_deal_with_hubspot_targeted(order.id, is_uai=False)
+
+    assert result is None
+    mock_api_call.assert_called_once_with(order, test_token)
 
 
 @pytest.mark.parametrize("task_func", SYNC_FUNCTIONS)

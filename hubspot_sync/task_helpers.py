@@ -21,6 +21,15 @@ def sync_hubspot_user(user: User):
     Args:
         user (User): The user to sync
     """
+    # Skip sync for B2B users to avoid errors
+    if user.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot sync for B2B user %s (user_id=%d)",
+            user.edx_username,
+            user.id,
+        )
+        return
+
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
             tasks.sync_contact_with_hubspot.delay(user.id)
@@ -40,6 +49,16 @@ def sync_hubspot_deal(order: Order):
     Args:
         order (Order): The order to sync
     """
+    # Skip sync for B2B users to avoid errors
+    if order.purchaser.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
+            order.id,
+        )
+        return
+
     if order.lines.first() is not None:
         is_uai = is_uai_order(order)
 

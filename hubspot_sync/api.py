@@ -1315,7 +1315,7 @@ def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
     return result
 
 
-def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
+def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
     """
     Sync an Order with a hubspot deal
 
@@ -1323,8 +1323,18 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
         order (Order): The Order object.
 
     Returns:
-        SimplePublicObject: The hubspot deal object
+        SimplePublicObject | None: The hubspot deal object, or None if skipped for B2B users
     """
+    # Skip sync for B2B users to avoid errors
+    if order.purchaser.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
+            order.id,
+        )
+        return None
+
     body = make_deal_sync_message_from_order(order)
     content_type = ContentType.objects.get_for_model(Order)
 
@@ -1352,7 +1362,9 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     return result
 
 
-def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObject:
+def sync_deal_with_hubspot_targeted(  # noqa: C901
+    order: Order, token: str
+) -> SimplePublicObject | None:
     """
     Sync an Order with a hubspot deal using a specific HubSpot token.
     This enables routing deals to different HubSpot accounts (e.g., UAI vs MITx Online account).
@@ -1363,8 +1375,18 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
         token (str): The HubSpot API token to use.
 
     Returns:
-        SimplePublicObject: The hubspot deal object
+        SimplePublicObject | None: The hubspot deal object, or None if skipped for B2B users
     """
+    # Skip sync for B2B users to avoid errors
+    if order.purchaser.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
+            order.id,
+        )
+        return None
+
     hubspot_client = HubspotApi(access_token=token)
 
     deal_input = _build_target_deal_message(order, hubspot_client)
@@ -1528,6 +1550,15 @@ def sync_contact_with_hubspot(user: User):
         ApiException: Raised if HubSpot upsert request fails.
         TooManyRequestsException: Too many requests against HubSpot's API.
     """
+    # Skip sync for B2B users to avoid errors
+    if user.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot sync for B2B user %s (user_id=%d)",
+            user.edx_username or user.email,
+            user.id,
+        )
+        return None
+
     content_type = ContentType.objects.get_for_model(User)
     body = make_contact_sync_message_from_user(user)
 
