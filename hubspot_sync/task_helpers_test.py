@@ -103,23 +103,14 @@ def test_sync_hubspot_user_skips_b2b_users(mocker, settings):
     )
     mock_info_log = mocker.patch("hubspot_sync.task_helpers.log.info")
 
-    # Mock the global QuerySet.exists to avoid any calls during user creation
-    mock_exists_global = mocker.patch(
-        "django.db.models.query.QuerySet.exists",
-        return_value=False,  # Initially False for user creation
-    )
-
-    # Create a user (this might trigger some syncs during creation)
     user = UserFactory.create()
+    contract = ContractPageFactory.create()
+    user.b2b_contracts.add(contract)
 
-    # Reset the mocks after user creation to clear any calls that happened during setup
+    # Reset mocks after user creation to clear any calls during setup
     mock_sync.reset_mock()
     mock_info_log.reset_mock()
 
-    # Now set up the mock to return True for B2B check
-    mock_exists_global.return_value = True
-
-    # Call the function we're actually testing
     sync_hubspot_user(user)
 
     # Should not call the sync task
