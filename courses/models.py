@@ -2282,7 +2282,7 @@ class ProgramRequirement(MP_Node):
     def clean(self):
         """Validate the program requirement fields"""
         super().clean()
-        
+
         # Validate operator_value for MIN_NUMBER_OF operators
         if (
             self.operator == self.Operator.MIN_NUMBER_OF
@@ -2292,14 +2292,16 @@ class ProgramRequirement(MP_Node):
                 value = int(self.operator_value)
                 if value < 1:
                     from django.core.exceptions import ValidationError
-                    raise ValidationError({
-                        'operator_value': 'Minimum # of value must be 1 or greater.'
-                    })
+
+                    raise ValidationError(
+                        {"operator_value": "Minimum # of value must be 1 or greater."}
+                    )
             except (ValueError, TypeError):
                 from django.core.exceptions import ValidationError
-                raise ValidationError({
-                    'operator_value': 'Minimum # of value must be a valid number.'
-                })
+
+                raise ValidationError(
+                    {"operator_value": "Minimum # of value must be a valid number."}
+                )
 
     @property
     def is_course(self):
