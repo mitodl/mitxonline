@@ -423,12 +423,16 @@ def test_create_basket_with_product(  # noqa: PLR0913
 
     if add_discount:
         if existing_discount in ["better", "worse"]:
-            # Create and apply a discount that is either better or worse than
-            # the one that'll be "supplied" below.
+            # Create and apply a percent-off discount that is either better or
+            # worse than the supplied 50% discount below. "better" = 60% off
+            # (lower final price), "worse" = 10% off (higher final price).
+            # redemption_type is set explicitly to avoid import-time randomness
+            # from DiscountFactory affecting discount validity checks.
 
             ex_discount = DiscountFactory(
-                discount_type="percent-off",
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
                 amount=10 if existing_discount == "worse" else 60,
+                redemption_type="unlimited",
             )
             BasketDiscount.objects.create(
                 redeemed_basket=basket,
@@ -439,7 +443,10 @@ def test_create_basket_with_product(  # noqa: PLR0913
 
         if bad_discount:
             discount = DiscountFactory(
-                discount_type="percent-off", amount=50, max_redemptions=1
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                amount=50,
+                max_redemptions=1,
+                redemption_type="unlimited",
             )
             order = OrderFactory.create()
             DiscountRedemption.objects.create(
@@ -449,7 +456,11 @@ def test_create_basket_with_product(  # noqa: PLR0913
                 redeemed_order=order,
             )
         else:
-            discount = DiscountFactory(discount_type="percent-off", amount=50)
+            discount = DiscountFactory(
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                amount=50,
+                redemption_type="unlimited",
+            )
 
         url = reverse(
             "v0:baskets_api-create_from_product_with_discount",
