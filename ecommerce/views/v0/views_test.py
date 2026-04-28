@@ -409,7 +409,10 @@ def test_create_basket_with_product(  # noqa: PLR0913
 ):
     """Test creating a basket with a single product, and/or a discount."""
 
-    product = ProductFactory.create()
+    # Use a fixed price well above any discount amount so that the discount
+    # comparison logic works correctly regardless of discount type (percent-off,
+    # dollars-off, or fixed-price).
+    product = ProductFactory.create(price=Decimal("1000.00"))
 
     basket = BasketFactory(user=user) if existing_basket else None
 
