@@ -2282,7 +2282,7 @@ class ProgramRequirement(MP_Node):
     def clean(self):
         """Validate the program requirement fields"""
         super().clean()
-        
+
         # Validate operator_value for MIN_NUMBER_OF operators
         if (
             self.operator == self.Operator.MIN_NUMBER_OF
