@@ -1,5 +1,6 @@
 """Tests for hubspot_sync.task_helpers"""
 
+from b2b.factories import ContractPageFactory
 import pytest
 
 from ecommerce.factories import ProductFactory
