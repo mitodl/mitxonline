@@ -373,7 +373,7 @@ def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
     mock_ensure_line_item = mocker.patch(
         "hubspot_sync.api._ensure_target_line_item_for_line", return_value="line-item-123"
     )
-    mock_wait_rate_limit = mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
     
     # Call the function under test
     result = api.sync_deal_with_hubspot_targeted(hubspot_order, test_token)
