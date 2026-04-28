@@ -1325,6 +1325,16 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
     Returns:
         SimplePublicObject | None: The hubspot deal object, or None if skipped for B2B users
     """
+    # Skip sync for B2B users to avoid errors
+    if order.purchaser.b2b_contracts.exists():
+        log.info(
+            "Skipping HubSpot deal sync for B2B user %s (user_id=%d, order_id=%d)",
+            order.purchaser.edx_username or order.purchaser.email,
+            order.purchaser.id,
+            order.id,
+        )
+        return None
+
     body = make_deal_sync_message_from_order(order)
     content_type = ContentType.objects.get_for_model(Order)
 
