@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.149.0
+Version 1.149.0 (Released April 28, 2026)
 ---------------
 
 - Define typed serializers for course outline response (#3525)
