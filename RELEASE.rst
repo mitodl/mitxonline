@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.148.0
+---------------
+
+- feat: enhance certificate admin (#3502)
+- Add pytest.mark.django_db to image test (#3523)
+- Fixes 500 errors when viewing an Organization in the Django Admin (#3519)
+
 Version 1.147.6 (Released April 27, 2026)
 ---------------
 
