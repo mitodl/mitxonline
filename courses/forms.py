@@ -312,7 +312,7 @@ class ProgramAdminForm(ModelForm):
                 except (ValueError, TypeError):
                     raise ValidationError(
                         '"Minimum # of" operator must have a valid numeric Value equal to 1 or more.'  # noqa: EM101
-                    )
+                    ) from None
 
         def _validate_operator_title(operator):
             """Ensure Title is defined for every operator.

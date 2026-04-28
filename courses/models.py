@@ -2291,15 +2291,13 @@ class ProgramRequirement(MP_Node):
             try:
                 value = int(self.operator_value)
                 if value < 1:
-                    from django.core.exceptions import ValidationError
                     raise ValidationError({
                         'operator_value': 'Minimum # of value must be 1 or greater.'
                     })
             except (ValueError, TypeError):
-                from django.core.exceptions import ValidationError
                 raise ValidationError({
                     'operator_value': 'Minimum # of value must be a valid number.'
-                })
+                }) from None
 
     @property
     def is_course(self):
