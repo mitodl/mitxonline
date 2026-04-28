@@ -1373,10 +1373,12 @@ def sync_deal_with_hubspot_targeted(order: Order, token: str) -> SimplePublicObj
 
     # Check if deal already exists by dealname first
     existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
-    
+
     # If not found by dealname, also check by unique_app_id to prevent duplicates
     if not existing_deal_id and unique_app_id:
-        existing_deal_id = _find_target_deal_id_by_unique_app_id(hubspot_client, unique_app_id)
+        existing_deal_id = _find_target_deal_id_by_unique_app_id(
+            hubspot_client, unique_app_id
+        )
 
     if existing_deal_id:
         # Deal exists, update it with the latest order data
@@ -1947,7 +1949,9 @@ def _find_target_deal_id_by_unique_app_id(
     except TooManyRequestsException:
         # Re-raise rate limit errors so calling code can retry
         # to avoid creating duplicates when we can't search
-        log.warning("Rate limited searching for deal by unique_app_id: %s", unique_app_id)
+        log.warning(
+            "Rate limited searching for deal by unique_app_id: %s", unique_app_id
+        )
         raise
     except Exception:
         log.exception("Failed to search for deal by unique_app_id: %s", unique_app_id)
