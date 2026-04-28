@@ -454,7 +454,7 @@ def test_sync_deal_with_hubspot_targeted_skips_b2b_users(mocker, mock_hubspot_ap
         order.purchaser.id,
         order.id,
     )
-    
+
 
 def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
     mocker, hubspot_order, settings
