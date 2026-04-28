@@ -204,7 +204,7 @@ class ProgramAdminForm(ModelForm):
     )
 
     def __init__(self, *args, **kwargs):
-        initial = kwargs.pop("initial", {})
+        initial = kwargs.pop("initial", {}")
         instance = kwargs.get("instance")
 
         if instance is not None and instance.requirements_root is not None:
@@ -212,29 +212,54 @@ class ProgramAdminForm(ModelForm):
                 instance.requirements_root
             )
 
+        # Define default sections
+        default_required_section = {
+            "data": {
+                "node_type": ProgramRequirementNodeType.OPERATOR.value,
+                "title": "Required Courses",
+                "operator_value": None,
+                "operator": ProgramRequirement.Operator.ALL_OF.value,
+                "elective_flag": False,
+            },
+            "children": [],
+        }
+        
+        default_elective_section = {
+            "data": {
+                "node_type": ProgramRequirementNodeType.OPERATOR.value,
+                "title": "Elective Courses",
+                "operator": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
+                "operator_value": 1,
+                "elective_flag": True,
+            },
+            "children": [],
+        }
+
+        # Create initial sections if no requirements exist
         if not initial.get("requirements", None):
-            initial["requirements"] = [
-                {
-                    "data": {
-                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                        "title": "Required Courses",
-                        "operator_value": None,
-                        "operator": ProgramRequirement.Operator.ALL_OF.value,
-                        "elective_flag": False,
-                    },
-                    "children": [],
-                },
-                {
-                    "data": {
-                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
-                        "title": "Elective Courses",
-                        "operator": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
-                        "operator_value": 1,
-                        "elective_flag": True,
-                    },
-                    "children": [],
-                },
-            ]
+            initial["requirements"] = [default_required_section, default_elective_section]
+        else:
+            # Check if required sections exist and add missing ones
+            requirements = initial["requirements"]
+            has_required_section = False
+            has_elective_section = False
+            
+            for section in requirements:
+                section_data = section.get("data", {})
+                if (section_data.get("title") == "Required Courses" and 
+                    section_data.get("operator") == ProgramRequirement.Operator.ALL_OF.value):
+                    has_required_section = True
+                elif (section_data.get("title") == "Elective Courses" and 
+                      section_data.get("operator") == ProgramRequirement.Operator.MIN_NUMBER_OF.value and
+                      section_data.get("elective_flag", False)):
+                    has_elective_section = True
+            
+            # Add missing sections
+            if not has_required_section:
+                requirements.insert(0, default_required_section)
+            
+            if not has_elective_section:
+                requirements.append(default_elective_section)
 
         super().__init__(*args, initial=initial, **kwargs)
 
