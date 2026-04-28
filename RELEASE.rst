@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.149.1
+---------------
+
+- Skip HubSpot sync for B2B users (#3524)
+- Search deals by unique_app_id to avoid duplicates (#3528)
+
 Version 1.149.0 (Released April 28, 2026)
 ---------------
 
