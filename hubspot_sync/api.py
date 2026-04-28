@@ -1362,7 +1362,7 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
     return result
 
 
-def sync_deal_with_hubspot_targeted(
+def sync_deal_with_hubspot_targeted(  # noqa: C901
     order: Order, token: str
 ) -> SimplePublicObject | None:
     """
