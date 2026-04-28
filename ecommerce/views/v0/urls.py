@@ -14,6 +14,8 @@ from ecommerce.views.v0 import (
     OrderHistoryViewSet,
     OrderReceiptView,
     ProductViewSet,
+    ReceiptByProgramView,
+    ReceiptByRunView,
     add_discount_to_basket,
     checkout_basket,
     clear_basket,
@@ -100,6 +102,16 @@ urlpatterns = [
         "orders/receipt/<int:pk>/",
         OrderReceiptView.as_view(),
         name="order_receipt_api",
+    ),
+    path(
+        "orders/receipt/by-run/<int:run_id>/",
+        ReceiptByRunView.as_view(),
+        name="receipt_by_run",
+    ),
+    path(
+        "orders/receipt/by-program/<int:program_id>/",
+        ReceiptByProgramView.as_view(),
+        name="receipt_by_program",
     ),
     re_path(
         r"^",
