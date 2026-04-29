@@ -97,7 +97,9 @@ class LineSerializer(serializers.ModelSerializer):
     def get_unique_app_id(self, instance):
         """Get the app_id for the object based on purchasable content"""
         # instance is a Line object, so access its purchasable content directly
-        if hasattr(instance, 'purchased_content_type') and hasattr(instance, 'purchased_object_id'):
+        if hasattr(instance, "purchased_content_type") and hasattr(
+            instance, "purchased_object_id"
+        ):
             content_type = instance.purchased_content_type
             if content_type:
                 object_id = instance.purchased_object_id
