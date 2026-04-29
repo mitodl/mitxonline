@@ -2,13 +2,12 @@
 Validate that our settings functions work
 """
 
+import re
 import sys
 from types import SimpleNamespace
 
-import re
-import tomllib
-
 import pytest
+import tomllib
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common import envs
@@ -169,5 +168,5 @@ def test_bump_my_version_format(settings):
         pyproject = tomllib.load(f)
     version_pattern = pyproject["tool"]["bumpversion"]["parse"]
     package_version = pyproject["project"]["version"]
-    assert settings.VERSION == package_version
+    assert package_version == settings.VERSION
     assert re.fullmatch(version_pattern, settings.VERSION)
