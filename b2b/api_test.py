@@ -1684,7 +1684,7 @@ def test_create_contract_run_single_language_legacy(mocker):
     course = CourseFactory.create()
     CourseRunFactory.create(
         course=course,
-        language=None,
+        language="",
         is_source_run=True,
         courseware_id=f"{course.readable_id}+SOURCE",
     )

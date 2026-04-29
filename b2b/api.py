@@ -299,8 +299,8 @@ def _get_source_runs_for_course(
     """
 
     primary_source_run = (
-        course.courseruns.filter(is_source_run=True)
-        .filter(Q(is_primary_language=True) | Q(language__isnull=True))
+        course.courseruns.filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
+        .filter(Q(is_primary_language=True) | Q(language=""))
         .first()
     )
 

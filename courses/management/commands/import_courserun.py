@@ -153,13 +153,12 @@ class Command(BaseCommand):
             "--language",
             "--lang",
             type=str,
-            help='Set the language for the course run. (Default "en".)',
-            default="en",
+            help="Set the language for the course run.",
         )
         parser.add_argument(
             "--primary-lang",
             action="store_true",
-            help="Set this course run as the default for the language.",
+            help="Set this course run as the default for the language. Requires a language to be set.",
         )
 
     def _resolve_contract(self, contract_identifier):
@@ -310,8 +309,8 @@ class Command(BaseCommand):
 
             run, page, product = run_data
 
-            if kwargs.get("language", False):
-                run.language = kwargs.pop("language")
+            if not kwargs.get("language", False):
+                run.language = kwargs.get("language")
                 run.is_primary_language = kwargs.get("primary_lang", False)
 
                 if kwargs.get("run_tag", False):

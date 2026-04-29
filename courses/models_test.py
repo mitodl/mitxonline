@@ -1266,19 +1266,19 @@ def test_courserun_language_unique_constraint():
 
 
 def test_courserun_language_null_not_constrained():
-    """Multiple runs with language=None should not trigger the constraint."""
+    """Multiple runs with language="" should not trigger the constraint."""
     course = CourseFactory.create()
     CourseRunFactory.create(
         course=course,
         run_tag="R1",
-        language=None,
+        language="",
         courseware_id="course-v1:X+Y+R1a",
     )
     # Should not raise
     run2 = CourseRunFactory.create(
         course=course,
         run_tag="R1",
-        language=None,
+        language="",
         courseware_id="course-v1:X+Y+R1b",
     )
     assert run2.pk is not None
@@ -1339,7 +1339,7 @@ def test_course_next_run_multiple_languages(primary, include_translations, b2b):
     main_run = CourseRunFactory.create(
         course=course,
         run_tag="1T2026",
-        language="en" if primary else None,
+        language="en" if primary else "",
         courseware_id=f"{course.readable_id}+1T2026_EN",
         is_primary_language=primary,
     )

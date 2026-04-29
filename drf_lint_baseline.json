@@ -1,10 +1,4 @@
 [
-  ".venv/lib/python3.11/site-packages/django/core/serializers/python.py:31:8:ORM001",
-  ".venv/lib/python3.11/site-packages/djoser/serializers.py:178:24:ORM001",
-  ".venv/lib/python3.11/site-packages/djoser/webauthn/serializers.py:30:11:ORM001",
-  ".venv/lib/python3.11/site-packages/djoser/webauthn/serializers.py:59:31:ORM001",
-  ".venv/lib/python3.11/site-packages/rest_framework_simplejwt/serializers.py:116:20:ORM001",
-  ".venv/lib/python3.11/site-packages/rest_framework_simplejwt/serializers.py:177:15:ORM001",
   "cms/serializers.py:114:16:ORM001",
   "cms/serializers.py:153:41:ORM001",
   "cms/serializers.py:306:12:ORM001",

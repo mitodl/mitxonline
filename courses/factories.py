@@ -154,7 +154,7 @@ class CourseRunFactory(DjangoModelFactory):
     live = True
     b2b_contract = None
     is_source_run = False
-    language = None
+    language = ""
     is_primary_language = False
 
     @factory.post_generation

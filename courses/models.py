@@ -1034,7 +1034,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__isnull=True)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(language__isnull=True) | Q(is_primary_language=True))
+            .filter(Q(language="") | Q(is_primary_language=True))
             .order_by("start_date")
             .first()
         )
@@ -1044,7 +1044,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__isnull=True)
                 .enrollable()
-                .filter(Q(language__isnull=True) | Q(is_primary_language=True))
+                .filter(Q(language="") | Q(is_primary_language=True))
                 .order_by("start_date")
                 .first()
             )
@@ -1092,7 +1092,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__in=user_contracts)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(language__isnull=True) | Q(is_primary_language=True))
+            .filter(Q(language="") | Q(is_primary_language=True))
             .order_by("start_date")
             .first()
         )
@@ -1102,7 +1102,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__in=user_contracts)
                 .enrollable()
-                .filter(Q(language__isnull=True) | Q(is_primary_language=True))
+                .filter(Q(language="") | Q(is_primary_language=True))
                 .order_by("start_date")
                 .first()
             )
@@ -1258,10 +1258,10 @@ class CourseRun(TimestampedModel):
         default=False,
         help_text='Designate this run as a "source" run for contract re-runs of the course.',
     )
-    language = models.CharField(  # noqa: DJ001
+    language = models.CharField(
         max_length=8,
         blank=True,
-        null=True,
+        default="",
         db_index=True,
         help_text=(
             "ISO 639-1 language code for this run "
@@ -1288,7 +1288,9 @@ class CourseRun(TimestampedModel):
                     "language",
                 ],
                 name="unique_courserun_course_runtag_language",
-                condition=models.Q(language__isnull=False, b2b_contract__isnull=True),
+                condition=models.Q(
+                    ~models.Q(language="") & models.Q(b2b_contract__isnull=True)
+                ),
             ),
             models.UniqueConstraint(
                 fields=[
@@ -1298,7 +1300,9 @@ class CourseRun(TimestampedModel):
                     "language",
                 ],
                 name="unique_courserun_course_coursewareid_runtag_language",
-                condition=models.Q(language__isnull=False, b2b_contract__isnull=True),
+                condition=models.Q(
+                    ~models.Q(language="") & models.Q(b2b_contract__isnull=True)
+                ),
             ),
             models.UniqueConstraint(
                 fields=[
@@ -1308,9 +1312,9 @@ class CourseRun(TimestampedModel):
                 ],
                 name="unique_courserun_course_runtag_language_primary",
                 condition=models.Q(
-                    language__isnull=False,
-                    is_primary_language=True,
-                    b2b_contract__isnull=True,
+                    ~models.Q(language="")
+                    & models.Q(is_primary_language=True)
+                    & models.Q(b2b_contract__isnull=True)
                 ),
             ),
             models.UniqueConstraint(
@@ -1321,7 +1325,9 @@ class CourseRun(TimestampedModel):
                     "b2b_contract",
                 ],
                 name="unique_courserun_course_runtag_language_b2b",
-                condition=models.Q(language__isnull=False, b2b_contract__isnull=False),
+                condition=models.Q(
+                    ~models.Q(language="") & models.Q(b2b_contract__isnull=False)
+                ),
             ),
             models.UniqueConstraint(
                 fields=[
@@ -1332,9 +1338,9 @@ class CourseRun(TimestampedModel):
                 ],
                 name="unique_courserun_course_runtag_language_primary_b2b",
                 condition=models.Q(
-                    language__isnull=False,
-                    is_primary_language=True,
-                    b2b_contract__isnull=False,
+                    ~models.Q(language="")
+                    & models.Q(is_primary_language=True)
+                    & models.Q(b2b_contract__isnull=False)
                 ),
             ),
         ]

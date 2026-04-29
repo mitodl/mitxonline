@@ -675,7 +675,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--language",
             "--lang",
-            type="str",
+            type=str,
             help='Set the language for the course run. (Default "en".)',
             default="en",
         )
