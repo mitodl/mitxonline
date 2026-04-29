@@ -667,6 +667,43 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 return op
         return None
 
+    @staticmethod
+    def _empty_course_requirements_data() -> dict:
+        """Return the default empty course-requirements payload."""
+        return {
+            "courses": [],
+            "required_courses": [],
+            "elective_courses": [],
+            "required_title": "Required Courses",
+            "elective_title": "Elective Courses",
+            "minimum_elective_requirement": None,
+        }
+
+    def get_courses_with_requirements_data(self, requirements=None) -> dict:
+        """
+        Return processed requirement data for this program.
+
+        If requirements are provided, they are assumed to already be loaded and
+        will be used directly. Otherwise this falls back to the cached-property
+        path, which may query the database.
+        """
+        if requirements is None:
+            return self._courses_with_requirements_data
+
+        main_ops = [req for req in requirements if req.depth == 2]  # noqa: PLR2004
+        if not main_ops:
+            return self._empty_course_requirements_data()
+
+        path_to_operator = {op.path: op for op in main_ops}
+        course_requirements = [
+            req
+            for req in requirements
+            if req.node_type == ProgramRequirementNodeType.COURSE
+            and any(req.path.startswith(op.path) for op in main_ops)
+        ]
+
+        return self._process_course_requirements(course_requirements, path_to_operator)
+
     @cached_property
     def _courses_with_requirements_data(self):
         """
@@ -676,18 +713,17 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         - dict: Contains 'courses', 'required_courses', 'elective_courses',
                 'required_title', 'elective_title', and 'minimum_elective_requirement'
         """
+        prefetched_requirements = getattr(self, "_prefetched_objects_cache", {}).get(
+            "all_requirements"
+        )
+        if prefetched_requirements is not None:
+            return self.get_courses_with_requirements_data(prefetched_requirements)
+
         # Get all operator nodes at depth 2 (direct children of root)
         main_ops = ProgramRequirement.objects.filter(program=self, depth=2).all()
 
         if not main_ops:
-            return {
-                "courses": [],
-                "required_courses": [],
-                "elective_courses": [],
-                "required_title": "Required Courses",
-                "elective_title": "Elective Courses",
-                "minimum_elective_requirement": None,
-            }
+            return self._empty_course_requirements_data()
 
         # Fetch all course requirements efficiently
         course_reqs = self._get_operator_course_requirements(main_ops)

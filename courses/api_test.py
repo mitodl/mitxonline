@@ -16,7 +16,10 @@ import responses
 import reversion
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.db.models import Prefetch
 from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
@@ -3167,6 +3170,58 @@ def test_upgrade_program_enrollment_if_eligible_upgrades_when_requirements_met(
     _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
 
     program_enrollment.refresh_from_db()
+    assert upgraded is True
+    assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+
+def test_upgrade_program_enrollment_if_eligible_query_count(
+    user,
+    program_with_requirements,  # noqa: F811
+):
+    """The upgrade path should use a stable number of queries for an eligible enrollment."""
+    program = program_with_requirements.program
+    program_enrollment = ProgramEnrollmentFactory.create(
+        user=user,
+        program=program,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+
+    for course in program.required_courses:
+        run = CourseRunFactory.create(course=course)
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+
+    min_electives = program.minimum_elective_courses_requirement or 0
+    for course in program.elective_courses[:min_electives]:
+        run = CourseRunFactory.create(course=course)
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+
+    program_enrollment = (
+        ProgramEnrollment.objects.select_related("program", "user")
+        .prefetch("certificate")
+        .prefetch_related(
+            Prefetch(
+                "program__all_requirements",
+                queryset=ProgramRequirement.objects.select_related("course"),
+            )
+        )
+        .get(pk=program_enrollment.pk)
+    )
+
+    with CaptureQueriesContext(connection) as context:
+        _, upgraded = upgrade_program_enrollment_if_eligible(program_enrollment)
+
+    program_enrollment.refresh_from_db()
+    assert len(context) == 14
     assert upgraded is True
     assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
