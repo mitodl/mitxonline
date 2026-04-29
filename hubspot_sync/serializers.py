@@ -96,17 +96,15 @@ class LineSerializer(serializers.ModelSerializer):
 
     def get_unique_app_id(self, instance):
         """Get the app_id for the object based on purchasable content"""
-        # Try to get the purchasable object from the first line item for consistency
-        # across cart-add and checkout flows
-        first_line = instance.lines.first()
-        if first_line and hasattr(first_line, 'purchased_content_type') and hasattr(first_line, 'purchased_object_id'):
-            content_type = first_line.purchased_content_type
+        # instance is a Line object, so access its purchasable content directly
+        if hasattr(instance, 'purchased_content_type') and hasattr(instance, 'purchased_object_id'):
+            content_type = instance.purchased_content_type
             if content_type:
-                object_id = first_line.purchased_object_id
+                object_id = instance.purchased_object_id
                 return f"mitxonline-{content_type.model}-{object_id}"
         
         # Fallback to order ID for backward compatibility
-        return format_app_id(instance.id)
+        return format_app_id(instance.order.id)
 
     def get_name(self, instance):
         """Get the product version name"""

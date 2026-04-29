@@ -85,7 +85,7 @@ def test_serialize_line(hubspot_order):
         "product_id": product.purchasable_object.readable_id,
         "name": format_product_name(product),
         "price": "200.00",
-        "unique_app_id": format_app_id(line.id),
+        "unique_app_id": f"mitxonline-{line.purchased_content_type.model}-{line.purchased_object_id}",
         "enrollment_mode": course_run_enrollment.enrollment_mode,
         "change_status": course_run_enrollment.change_status,
     }
@@ -106,7 +106,7 @@ def test_serialize_line_no_corresponding_enrollment(hubspot_order):
         "product_id": product.purchasable_object.readable_id,
         "name": format_product_name(product),
         "price": "200.00",
-        "unique_app_id": format_app_id(line.id),
+        "unique_app_id": f"mitxonline-{line.purchased_content_type.model}-{line.purchased_object_id}",
         "enrollment_mode": None,
         "change_status": None,
     }
