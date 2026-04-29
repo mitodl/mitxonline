@@ -1290,8 +1290,9 @@ def test_receipt_by_run_redirects(user, user_drf_client):
     order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     PaidCourseRun.objects.create(user=user, course_run=course_run, order=order)
 
+    user_drf_client.force_authenticate(user=user)
     resp = user_drf_client.get(
-        reverse("v0:receipt_by_run", kwargs={"run_id": course_run.id})
+        reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
     )
 
     assert resp.status_code == 302
@@ -1317,8 +1318,9 @@ def test_receipt_by_run_not_found(user, user_drf_client):
     """Test that a missing PaidCourseRun returns 404."""
     course_run = CourseRunFactory.create()
 
+    user_drf_client.force_authenticate(user=user)
     resp = user_drf_client.get(
-        reverse("v0:receipt_by_run", kwargs={"run_id": course_run.id})
+        reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
     )
 
     assert resp.status_code == 404
@@ -1326,7 +1328,7 @@ def test_receipt_by_run_not_found(user, user_drf_client):
 
 def test_receipt_by_run_unauthenticated(client):
     """Test that unauthenticated users cannot access the receipt by run endpoint."""
-    resp = client.get(reverse("v0:receipt_by_run", kwargs={"run_id": 1}))
+    resp = client.get(reverse("order_receipt_by_run_lookup", kwargs={"run_id": 1}))
 
     assert resp.status_code in (401, 403)
 
@@ -1339,8 +1341,9 @@ def test_receipt_by_run_uses_latest_paid_record(user, user_drf_client):
     PaidCourseRun.objects.create(user=user, course_run=course_run, order=older_order)
     PaidCourseRun.objects.create(user=user, course_run=course_run, order=newer_order)
 
+    user_drf_client.force_authenticate(user=user)
     resp = user_drf_client.get(
-        reverse("v0:receipt_by_run", kwargs={"run_id": course_run.id})
+        reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
     )
 
     assert resp.status_code == 302
@@ -1353,8 +1356,9 @@ def test_receipt_by_program_redirects(user, user_drf_client):
     order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     PaidProgram.objects.create(user=user, program=program, order=order)
 
+    user_drf_client.force_authenticate(user=user)
     resp = user_drf_client.get(
-        reverse("v0:receipt_by_program", kwargs={"program_id": program.id})
+        reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
     )
 
     assert resp.status_code == 302
@@ -1380,8 +1384,9 @@ def test_receipt_by_program_not_found(user, user_drf_client):
     """Test that a missing PaidProgram returns 404."""
     program = ProgramFactory.create()
 
+    user_drf_client.force_authenticate(user=user)
     resp = user_drf_client.get(
-        reverse("v0:receipt_by_program", kwargs={"program_id": program.id})
+        reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
     )
 
     assert resp.status_code == 404
@@ -1389,7 +1394,9 @@ def test_receipt_by_program_not_found(user, user_drf_client):
 
 def test_receipt_by_program_unauthenticated(client):
     """Test that unauthenticated users cannot access the receipt by program endpoint."""
-    resp = client.get(reverse("v0:receipt_by_program", kwargs={"program_id": 1}))
+    resp = client.get(
+        reverse("order_receipt_by_program_lookup", kwargs={"program_id": 1})
+    )
 
     assert resp.status_code in (401, 403)
 
@@ -1402,8 +1409,9 @@ def test_receipt_by_program_uses_latest_paid_record(user, user_drf_client):
     PaidProgram.objects.create(user=user, program=program, order=older_order)
     PaidProgram.objects.create(user=user, program=program, order=newer_order)
 
+    user_drf_client.force_authenticate(user=user)
     resp = user_drf_client.get(
-        reverse("v0:receipt_by_program", kwargs={"program_id": program.id})
+        reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
     )
 
     assert resp.status_code == 302
