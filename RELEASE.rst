@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.149.2
+---------------
+
+- feat: add language and is_primary_language fields to CourseRun for multilingual support (#3516)
+- Use prefetch in enrollment upgrade task (#3480)
+
 Version 1.149.1 (Released April 28, 2026)
 ---------------
 
