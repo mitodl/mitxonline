@@ -4,13 +4,9 @@ from datetime import timedelta
 
 import pytest
 from django.core.exceptions import ValidationError
-<<<<<<< HEAD
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.db.models import Prefetch
 from django.test.utils import CaptureQueriesContext
-=======
-from django.db import IntegrityError
->>>>>>> 97bdd745 (Fix a bunch of things that got missed/done weirdly)
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 
