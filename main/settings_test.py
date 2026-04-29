@@ -5,8 +5,10 @@ Validate that our settings functions work
 import sys
 from types import SimpleNamespace
 
+import re
+import tomllib
+
 import pytest
-import semantic_version
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common import envs
@@ -161,8 +163,11 @@ def test_db_ssl_enable(monkeypatch, settings_sandbox):
     assert settings_vars["DATABASES"]["default"]["OPTIONS"] == {"sslmode": "require"}
 
 
-def test_semantic_version(settings):
-    """
-    Verify that we have a semantic compatible version.
-    """
-    semantic_version.Version(settings.VERSION)
+def test_bump_my_version_format(settings):
+    """Verify that VERSION matches the bump-my-version calver format."""
+    with open("pyproject.toml", "rb") as f:  # noqa: PTH123
+        pyproject = tomllib.load(f)
+    version_pattern = pyproject["tool"]["bumpversion"]["parse"]
+    package_version = pyproject["project"]["version"]
+    assert settings.VERSION == package_version
+    assert re.fullmatch(version_pattern, settings.VERSION)
