@@ -4618,7 +4618,6 @@ components:
           maxLength: 255
         language:
           type: string
-          nullable: true
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
@@ -4733,7 +4732,6 @@ components:
           readOnly: true
         language:
           type: string
-          nullable: true
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
@@ -4863,7 +4861,6 @@ components:
           readOnly: true
         language:
           type: string
-          nullable: true
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
@@ -4974,7 +4971,6 @@ components:
           type: boolean
         language:
           type: string
-          nullable: true
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
@@ -7985,7 +7981,6 @@ components:
           readOnly: true
         language:
           type: string
-          nullable: true
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
@@ -8113,7 +8108,6 @@ components:
           readOnly: true
         language:
           type: string
-          nullable: true
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
@@ -8219,7 +8213,6 @@ components:
           type: boolean
         language:
           type: string
-          nullable: true
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
@@ -8690,7 +8683,7 @@ components:
           readOnly: true
         language:
           type: string
-          nullable: true
+          default: ''
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
@@ -8798,7 +8791,7 @@ components:
           type: boolean
         language:
           type: string
-          nullable: true
+          default: ''
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
