@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.149.2
+Version 1.149.2 (Released April 29, 2026)
 ---------------
 
 - feat: add language and is_primary_language fields to CourseRun for multilingual support (#3516)
