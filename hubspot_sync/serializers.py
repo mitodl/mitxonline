@@ -102,7 +102,7 @@ class LineSerializer(serializers.ModelSerializer):
             if content_type:
                 object_id = instance.purchased_object_id
                 return f"mitxonline-{content_type.model}-{object_id}"
-        
+
         # Fallback to order ID for backward compatibility
         return format_app_id(instance.order.id)
 
