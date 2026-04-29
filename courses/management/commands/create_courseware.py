@@ -288,7 +288,7 @@ class Command(BaseCommand):
                 parse_supplied_date(kwargs["upgrade"]) if kwargs["upgrade"] else None
             ),
             is_source_run=kwargs.get("create_run_as_sourcerun", False),
-            language=kwargs.get("language", "en"),
+            language=kwargs.get("language", ""),
             is_primary_language=kwargs.get("primary_lang", False),
         )
 
@@ -677,7 +677,6 @@ class Command(BaseCommand):
             "--lang",
             type=str,
             help='Set the language for the course run. (Default "en".)',
-            default="en",
         )
         parser.add_argument(
             "--primary-lang",

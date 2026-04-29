@@ -309,7 +309,7 @@ class Command(BaseCommand):
 
             run, page, product = run_data
 
-            if not kwargs.get("language", False):
+            if kwargs.get("language", False):
                 run.language = kwargs.get("language")
                 run.is_primary_language = kwargs.get("primary_lang", False)
 
