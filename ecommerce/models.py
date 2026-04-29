@@ -844,7 +844,7 @@ class PendingOrder(Order):
                 purchaser=user,
             )
         )
-        
+
         # If no multi-product order found, also check for individual cart-add orders
         # This enables reusing existing cart-add orders during checkout
         if not orders:
@@ -869,7 +869,7 @@ class PendingOrder(Order):
                         individual_orders.first().id,
                     )
                     break
-        
+
         # Previously, multiple PendingOrders could be created for a single user
         # for the same product, if multiple exist, grab the first.
         if orders:
