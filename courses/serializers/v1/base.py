@@ -26,6 +26,20 @@ class EnrollmentModeSerializer(serializers.ModelSerializer):
         ]
 
 
+class CourseRunLanguageOptionSerializer(serializers.ModelSerializer):
+    """Compact serializer for a single language variant of a course run."""
+
+    class Meta:
+        model = models.CourseRun
+        fields = [
+            "id",
+            "courseware_id",
+            "language",
+            "title",
+            "run_tag",
+        ]
+
+
 class BaseCourseSerializer(serializers.ModelSerializer):
     """Basic course model serializer"""
 
@@ -111,6 +125,8 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "live",
             "course_number",
             "enrollment_modes",
+            "language",
+            "is_primary_language",
         ]
 
 

@@ -1034,6 +1034,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__isnull=True)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
+            .filter(Q(language="") | Q(is_primary_language=True))
             .order_by("start_date")
             .first()
         )
@@ -1043,6 +1044,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__isnull=True)
                 .enrollable()
+                .filter(Q(language="") | Q(is_primary_language=True))
                 .order_by("start_date")
                 .first()
             )
@@ -1090,6 +1092,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__in=user_contracts)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
+            .filter(Q(language="") | Q(is_primary_language=True))
             .order_by("start_date")
             .first()
         )
@@ -1099,6 +1102,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__in=user_contracts)
                 .enrollable()
+                .filter(Q(language="") | Q(is_primary_language=True))
                 .order_by("start_date")
                 .first()
             )
@@ -1143,6 +1147,18 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return self.blocked_countries.filter(
             country=user.legal_address.country
         ).exists()
+
+    @cached_property
+    def titles(self) -> list[dict]:
+        """Return the translated titles for the course, based on its runs"""
+
+        # I think we just want the most recent live, non-source run.
+        return (
+            self.courseruns.filter(live=True, is_source_run=False)
+            .order_by("language", "-created_on")
+            .distinct("language")
+            .values("language", "title")
+        )
 
     @property
     def is_program(self):
@@ -1242,9 +1258,92 @@ class CourseRun(TimestampedModel):
         default=False,
         help_text='Designate this run as a "source" run for contract re-runs of the course.',
     )
+    language = models.CharField(
+        max_length=8,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text=(
+            "ISO 639-1 language code for this run "
+            "(e.g. 'en', 'zh', 'fr'). Leave blank for unspecified."
+        ),
+    )
+    is_primary_language = models.BooleanField(
+        default=False,
+        help_text=(
+            "Designates this run as the primary-language version for its run-tag "
+            "group. The primary run is used as the canonical run when grouping "
+            "language variants. If no run in a group is marked primary, the oldest "
+            "run by creation date is treated as primary."
+        ),
+    )
 
     class Meta:
         unique_together = ("course", "courseware_id", "run_tag")
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "course",
+                    "run_tag",
+                    "language",
+                ],
+                name="unique_courserun_course_runtag_language",
+                condition=models.Q(
+                    ~models.Q(language="") & models.Q(b2b_contract__isnull=True)
+                ),
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "course",
+                    "courseware_id",
+                    "run_tag",
+                    "language",
+                ],
+                name="unique_courserun_course_coursewareid_runtag_language",
+                condition=models.Q(
+                    ~models.Q(language="") & models.Q(b2b_contract__isnull=True)
+                ),
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "course",
+                    "run_tag",
+                    "is_primary_language",
+                ],
+                name="unique_courserun_course_runtag_language_primary",
+                condition=models.Q(
+                    ~models.Q(language="")
+                    & models.Q(is_primary_language=True)
+                    & models.Q(b2b_contract__isnull=True)
+                ),
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "course",
+                    "run_tag",
+                    "language",
+                    "b2b_contract",
+                ],
+                name="unique_courserun_course_runtag_language_b2b",
+                condition=models.Q(
+                    ~models.Q(language="") & models.Q(b2b_contract__isnull=False)
+                ),
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "course",
+                    "run_tag",
+                    "is_primary_language",
+                    "b2b_contract",
+                ],
+                name="unique_courserun_course_runtag_language_primary_b2b",
+                condition=models.Q(
+                    ~models.Q(language="")
+                    & models.Q(is_primary_language=True)
+                    & models.Q(b2b_contract__isnull=False)
+                ),
+            ),
+        ]
 
     @property
     def is_past(self):

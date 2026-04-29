@@ -70,7 +70,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
     ):
         """Create a run for the specified contract."""
         try:
-            run_tuple = create_contract_run(
+            run_tuples = create_contract_run(
                 contract=contract,
                 course=courseware,
                 skip_edx=skip_edx,
@@ -84,7 +84,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
             )
             return False
 
-        if not run_tuple:
+        if not run_tuples:
             self.stdout.write(
                 self.style.ERROR(
                     f"Failed to create run for course {courseware} for contract {contract}."
@@ -92,11 +92,12 @@ Specifying a program will only unlink the program from the contract, unless "--r
             )
             return False
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Created run {run_tuple[0]} and product {run_tuple[1]} for course {courseware} for contract {contract}."
+        for run, product in run_tuples:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Created run {run} and product {product} for course {courseware} for contract {contract}."
+                )
             )
-        )
 
         return True
 
@@ -203,7 +204,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
                 self.stdout.write(f"Attempting to import {importable_id} from edX...")
 
-                imported_run, _ = import_and_create_contract_run(
+                imported_runs = import_and_create_contract_run(
                     contract=contract,
                     course_run_id=importable_id,
                     departments=can_import.split(sep=","),
@@ -212,11 +213,12 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     org_prefix=org_prefix,
                 )
 
-                if not imported_run:
+                if not imported_runs:
                     self.stdout.write(
                         self.style.ERROR(f"Importing {importable_id} failed. Skipping")
                     )
                     continue
+                imported_run = imported_runs[0][0]
 
                 self.stdout.write(
                     self.style.SUCCESS(

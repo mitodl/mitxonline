@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.db.models import Prefetch
 from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
@@ -1237,3 +1237,163 @@ def test_create_program_without_department():
     # Fetch from DB to ensure no departments are attached
     program_from_db = Program.objects.get(pk=program.pk)
     assert program_from_db.departments.count() == 0
+
+
+# ---- Language field tests ----
+
+
+def test_courserun_language_unique_constraint():
+    """Two runs for the same course+run_tag cannot share a language."""
+
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="R1",
+        language="en",
+        courseware_id="course-v1:X+Y+R1-en",
+    )
+    with pytest.raises(IntegrityError):
+        CourseRunFactory.create(
+            course=course,
+            run_tag="R1",
+            language="en",
+            courseware_id="course-v1:X+Y+R1-en2",
+        )
+
+
+def test_courserun_language_null_not_constrained():
+    """Multiple runs with language="" should not trigger the constraint."""
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="R1",
+        language="",
+        courseware_id="course-v1:X+Y+R1a",
+    )
+    # Should not raise
+    run2 = CourseRunFactory.create(
+        course=course,
+        run_tag="R1",
+        language="",
+        courseware_id="course-v1:X+Y+R1b",
+    )
+    assert run2.pk is not None
+
+
+def test_courserun_different_tags_same_language_allowed():
+    """The same language can appear on runs with different run_tags."""
+    course = CourseFactory.create()
+    run1 = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        courseware_id="course-v1:X+Y+1T2026-en",
+    )
+    run2 = CourseRunFactory.create(
+        course=course,
+        run_tag="2T2026",
+        language="en",
+        courseware_id="course-v1:X+Y+2T2026-en",
+    )
+    assert run1.language == run2.language == "en"
+    assert run1.run_tag != run2.run_tag
+
+
+@pytest.mark.parametrize(
+    "primary",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "include_translations",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "b2b",
+    [
+        True,
+        False,
+    ],
+)
+def test_course_next_run_multiple_languages(primary, include_translations, b2b):
+    """
+    Test that the first_unexpired_run call works correctly with multiple languages.
+
+    This should only return the primary language or runs where the language is
+    not set. Otherwise, the learner may get put in a run in a random language.
+    """
+
+    if b2b:
+        contract = ContractPageFactory.create()
+
+    course = CourseFactory.create()
+    main_run = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en" if primary else "",
+        courseware_id=f"{course.readable_id}+1T2026_EN",
+        is_primary_language=primary,
+    )
+    if include_translations:
+        secondary_run_1 = CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            language="fr",
+            courseware_id=f"{course.readable_id}+1T2026_FR",
+            is_primary_language=False,
+            start_date=main_run.start_date,
+            end_date=main_run.end_date,
+            enrollment_start=main_run.enrollment_start,
+            enrollment_end=main_run.enrollment_end,
+        )
+        secondary_run_2 = CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            language="sp",
+            courseware_id=f"{course.readable_id}+1T2026_SP",
+            is_primary_language=False,
+            start_date=main_run.start_date,
+            end_date=main_run.end_date,
+            enrollment_start=main_run.enrollment_start,
+            enrollment_end=main_run.enrollment_end,
+        )
+
+    if b2b:
+        main_run.b2b_contract = contract
+        main_run.save()
+
+        nc_run = CourseRunFactory.create(
+            course=course,
+            run_tag="1T2026",
+            language="de",
+            courseware_id=f"{course.readable_id}+1T2026_DE",
+            is_primary_language=False,
+            start_date=main_run.start_date,
+            end_date=main_run.end_date,
+            enrollment_start=main_run.enrollment_start,
+            enrollment_end=main_run.enrollment_end,
+        )
+
+        if include_translations:
+            secondary_run_1.b2b_contract = contract
+            secondary_run_2.b2b_contract = contract
+            secondary_run_1.save()
+            secondary_run_2.save()
+
+        first_unexpired_run = course.get_first_unexpired_b2b_run([contract.id])
+    else:
+        first_unexpired_run = course.first_unexpired_run
+
+    if primary or not include_translations:
+        assert first_unexpired_run == main_run
+
+    if not primary and include_translations:
+        assert first_unexpired_run in [main_run, secondary_run_1, secondary_run_2]
+
+    if b2b:
+        assert first_unexpired_run != nc_run

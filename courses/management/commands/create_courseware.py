@@ -288,6 +288,8 @@ class Command(BaseCommand):
                 parse_supplied_date(kwargs["upgrade"]) if kwargs["upgrade"] else None
             ),
             is_source_run=kwargs.get("create_run_as_sourcerun", False),
+            language=kwargs.get("language", ""),
+            is_primary_language=kwargs.get("primary_lang", False),
         )
 
         if kwargs["price"]:
@@ -668,6 +670,18 @@ class Command(BaseCommand):
             help="Make the program a program-course (displays like a course).",
             action="store_const",
             const="course",
+        )
+
+        parser.add_argument(
+            "--language",
+            "--lang",
+            type=str,
+            help='Set the language for the course run. (Default "en".)',
+        )
+        parser.add_argument(
+            "--primary-lang",
+            action="store_true",
+            help="Set this course run as the default for the language.",
         )
 
     def handle(self, *_args, **kwargs):

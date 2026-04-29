@@ -85,6 +85,8 @@ def test_user_enrollments_detail(
                 "title": "Test page",
                 "type": "course",
             },
+            "is_primary_language": enrollment.run.is_primary_language,
+            "language": enrollment.run.language,
         },
         "edx_emails_subscription": enrollment.edx_emails_subscription,
         "grades": [
@@ -154,6 +156,8 @@ def test_user_enrollments_list(
                     "title": "Test page",
                     "type": "course",
                 },
+                "is_primary_language": enrollment.run.is_primary_language,
+                "language": enrollment.run.language,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
@@ -327,6 +331,8 @@ def test_user_enrollments_list_filter_exclude_b2b(
                     "title": "Test page",
                     "type": "course",
                 },
+                "is_primary_language": enrollment.run.is_primary_language,
+                "language": enrollment.run.language,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
@@ -398,6 +404,8 @@ def test_user_enrollments_list_filter_exclude_b2b(
                     "title": "Test page",
                     "type": "course",
                 },
+                "is_primary_language": enrollment.run.is_primary_language,
+                "language": enrollment.run.language,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [

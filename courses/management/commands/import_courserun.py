@@ -68,7 +68,7 @@ class Command(BaseCommand):
             "--run-tag",
             type=str,
             nargs="?",
-            help="The run tag (3T2022, etc.) to use. The + will be appended to this when combining it with the course's readable ID. Requires --program. Do not specify with --courserun.",
+            help="The run tag (3T2022, etc.) to use. The + will be appended to this when combining it with the course's readable ID. Requires --program. Do not specify with --courserun unless also specifying a language.",
         )
 
         parser.add_argument(
@@ -147,6 +147,18 @@ class Command(BaseCommand):
             "--source-course",
             action="store_true",
             help="Designate the course run(s) to import as source course runs.",
+        )
+
+        parser.add_argument(
+            "--language",
+            "--lang",
+            type=str,
+            help="Set the language for the course run.",
+        )
+        parser.add_argument(
+            "--primary-lang",
+            action="store_true",
+            help="Set this course run as the default for the language. Requires a language to be set.",
         )
 
     def _resolve_contract(self, contract_identifier):
@@ -238,7 +250,7 @@ class Command(BaseCommand):
                 return False
         elif kwargs.get("program") is not None and kwargs.get("run_tag") is not None:
             try:
-                if kwargs.get("program").isnumeric():
+                if kwargs.get("program", "").isnumeric():
                     program = Program.objects.filter(pk=kwargs.get("program")).get()
                 else:
                     program = Program.objects.filter(
@@ -296,6 +308,21 @@ class Command(BaseCommand):
                 continue
 
             run, page, product = run_data
+
+            if kwargs.get("language", False):
+                run.language = kwargs.get("language")
+                run.is_primary_language = kwargs.get("primary_lang", False)
+
+                if kwargs.get("run_tag", False):
+                    run.run_tag = kwargs.get("run_tag")
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"WARNING: No specific run tag specified for {run.courseware_id} in language {run.language}, so using the default {run.run_tag}. This is probably not what you want."
+                        )
+                    )
+
+                run.save()
 
             success_count += 1
             self.stdout.write(

@@ -19,6 +19,7 @@ from courses.models import CourseRunEnrollment, CoursesTopic, Department
 from courses.serializers.v1.base import BaseProgramSerializer
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
+    CourseRunLanguageOptionSerializer,
     CourseRunSerializer,
     CourseWithCourseRunsSerializer,
 )
@@ -130,7 +131,11 @@ def test_serialize_course(  # noqa: PLR0913
             ),
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
+            "language_options": CourseRunLanguageOptionSerializer(
+                course.courseruns.all(), many=True
+            ).data,
         },
+        ignore_order=True,
     )
 
 
@@ -176,6 +181,7 @@ def test_serialize_course_required_prerequisites(
             "programs": None,
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
+            "language_options": [],
         },
     )
 
@@ -322,3 +328,79 @@ class TestUserEnrollmentFiltering:
         result = filter_set.qs
         assert result.count() == 1
         assert result.first().id == enrollment2.id
+
+
+# ---- Language / titles serializer tests ----
+
+
+def test_course_serializer_canonical_run_per_tag():
+    """get_courseruns returns one canonical run per tag (the primary-language one)."""
+    course = CourseFactory.create()
+    run_en = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_primary_language=True,
+        courseware_id="course-v1:T+C+1T2026-en",
+        b2b_contract=None,
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        is_primary_language=False,
+        courseware_id="course-v1:T+C+1T2026-zh",
+        b2b_contract=None,
+    )
+    serializer = CourseWithCourseRunsSerializer(course)
+    assert len(serializer.data["courseruns"]) == 1
+    assert serializer.data["courseruns"][0]["courseware_id"] == run_en.courseware_id
+
+
+def test_course_serializer_canonical_run_fallback_to_oldest():
+    """When no run has is_primary_language=True, the oldest run is canonical."""
+    course = CourseFactory.create()
+    run_first = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        is_primary_language=False,
+        courseware_id="course-v1:T+C+1T2026-en",
+        b2b_contract=None,
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        is_primary_language=False,
+        courseware_id="course-v1:T+C+1T2026-zh",
+        b2b_contract=None,
+    )
+    serializer = CourseWithCourseRunsSerializer(course)
+    assert len(serializer.data["courseruns"]) == 1
+    assert serializer.data["courseruns"][0]["courseware_id"] == run_first.courseware_id
+
+
+def test_course_serializer_language_options():
+    """language_options contains all variants for each run tag."""
+    course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="en",
+        courseware_id="course-v1:T+C+1T2026-en",
+        b2b_contract=None,
+    )
+    CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        language="zh",
+        courseware_id="course-v1:T+C+1T2026-zh",
+        b2b_contract=None,
+    )
+    serializer = CourseWithCourseRunsSerializer(course)
+    languages = {opt["language"] for opt in serializer.data["language_options"]}
+    assert languages == {"en", "zh"}
+    # run_tag should be present in each option
+    for opt in serializer.data["language_options"]:
+        assert opt["run_tag"] == "1T2026"
