@@ -18,6 +18,8 @@ from django.db.models import TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
+
+log = logging.getLogger(__name__)
 from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
@@ -830,6 +832,7 @@ class PendingOrder(Order):
             product_content_types.append(product.content_type_id)
 
         # Get or create a PendingOrder
+        # First, try to find orders that match all products (multi-product orders)
         orders = (
             Order.objects.select_for_update()
             .prefetch_related("discounts")
@@ -841,10 +844,41 @@ class PendingOrder(Order):
                 purchaser=user,
             )
         )
+        
+        # If no multi-product order found, also check for individual cart-add orders
+        # This enables reusing existing cart-add orders during checkout
+        if not orders:
+            for i, product_object_id in enumerate(product_object_ids):
+                individual_orders = (
+                    Order.objects.select_for_update()
+                    .prefetch_related("discounts")
+                    .filter(
+                        lines__purchased_object_id=product_object_id,
+                        lines__purchased_content_type_id=product_content_types[i],
+                        lines__product_version=product_versions[i],
+                        state=OrderStatus.PENDING,
+                        purchaser=user,
+                    )
+                )
+                if individual_orders:
+                    orders = individual_orders
+                    log.info(
+                        "Found individual cart-add order for user %s, product_object_id=%s, order_id=%s",
+                        user.id,
+                        product_object_id,
+                        individual_orders.first().id,
+                    )
+                    break
+        
         # Previously, multiple PendingOrders could be created for a single user
         # for the same product, if multiple exist, grab the first.
         if orders:
             order = orders.first()
+            log.info(
+                "Reusing existing order for user %s, order_id=%s",
+                user.id,
+                order.id,
+            )
             # Clear discounts except for the most recent one
             # If there aren't any discounts in the basket, clear them all
             for old_discount in order.discounts.all():

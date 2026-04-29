@@ -475,11 +475,6 @@ def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
         mocker.Mock(results=[])
     )
 
-    # Mock that dealname search returns None (not found)
-    mock_find_by_dealname = mocker.patch(
-        "hubspot_sync.api._find_target_deal_id_by_dealname", return_value=None
-    )
-
     # Mock that unique_app_id search returns an existing deal ID
     mock_find_by_unique_app_id = mocker.patch(
         "hubspot_sync.api._find_target_deal_id_by_unique_app_id",
@@ -502,8 +497,7 @@ def test_sync_deal_with_hubspot_targeted_updates_when_found_by_unique_app_id(
     # Verify HubspotApi was instantiated with the correct token
     mock_hubspot_api.assert_called_once_with(access_token=test_token)
 
-    # Verify both find functions were called correctly
-    mock_find_by_dealname.assert_called_once()
+    # Verify only the unique_app_id find function was called
     mock_find_by_unique_app_id.assert_called_once()
 
     # Verify that UPDATE was called, not CREATE

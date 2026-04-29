@@ -1393,11 +1393,9 @@ def sync_deal_with_hubspot_targeted(  # noqa: C901
     dealname = deal_input.properties.get("dealname")
     unique_app_id = deal_input.properties.get("unique_app_id")
 
-    # Check if deal already exists by dealname first
-    existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
-
-    # If not found by dealname, also check by unique_app_id to prevent duplicates
-    if not existing_deal_id and unique_app_id:
+    # Check if deal already exists by unique_app_id (now consistent across cart-add and checkout)
+    existing_deal_id = None
+    if unique_app_id:
         existing_deal_id = _find_target_deal_id_by_unique_app_id(
             hubspot_client, unique_app_id
         )
@@ -1912,42 +1910,6 @@ def _find_target_product_id_by_unique_app_id(
     )
     if response.results:
         return response.results[0].id
-    return None
-
-
-def _find_target_deal_id_by_dealname(
-    hubspot_client: HubspotApi, dealname: str
-) -> str | None:
-    """Find deal id in target account by dealname."""
-    wait_for_hubspot_rate_limit()
-    try:
-        response = hubspot_client.crm.objects.search_api.do_search(
-            object_type=HubspotObjectType.DEALS.value,
-            public_object_search_request=PublicObjectSearchRequest(
-                filter_groups=[
-                    FilterGroup(
-                        filters=[
-                            Filter(
-                                property_name="dealname",
-                                operator="EQ",
-                                value=dealname,
-                            )
-                        ]
-                    )
-                ],
-                properties=["dealname"],
-                limit=1,
-            ),
-        )
-        if response.results:
-            return response.results[0].id
-    except TooManyRequestsException:
-        # Re-raise rate limit errors so calling code can retry
-        # to avoid creating duplicates when we can't search
-        log.warning("Rate limited searching for deal by dealname: %s", dealname)
-        raise
-    except Exception:
-        log.exception("Failed to search for deal by dealname: %s", dealname)
     return None
 
 
