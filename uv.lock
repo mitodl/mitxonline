@@ -1068,13 +1068,17 @@ wheels = [
 
 [[package]]
 name = "edx-opaque-keys"
-version = "2.2.2"
+version = "3.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pymongo" },
     { name = "stevedore" },
+    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8b/25/880f4bcb2bb4bacad1347d66720f9d35adc670acf158da7539959e3e9d8b/edx-opaque-keys-2.2.2.tar.gz", hash = "sha256:2510c39c947671c4a347ef05b077395ea504983bbc2a7e4f5ba1713c425864cb", size = 62316, upload-time = "2021-06-29T14:18:20.682Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ea/c5/d021457791640a9dd4284a8fe6b3e8b54ca130a9079c64f72b61df1d73fc/edx_opaque_keys-3.1.0.tar.gz", hash = "sha256:23f87d3bec2f5e0e27a443cea86e9266b2b4f2631136f23b3281b4af92f25336", size = 68186, upload-time = "2026-02-24T17:58:29.059Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/21/bac47541081f2f33b19b071d95482350809a0bed08450931e4cdd4281767/edx_opaque_keys-3.1.0-py3-none-any.whl", hash = "sha256:4779f2f9e188078252471b9c151b345656d34939a281d310e56a7d7a363fe69f", size = 77657, upload-time = "2026-02-24T17:58:28.157Z" },
+]
 
 [[package]]
 name = "et-xmlfile"
@@ -1711,17 +1715,16 @@ wheels = [
 
 [[package]]
 name = "mitol-django-apigateway"
-version = "2025.8.14"
+version = "2026.4.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "channels" },
     { name = "django" },
     { name = "django-stubs" },
-    { name = "edx-opaque-keys" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fc/1a/fb740b906e57ab33971a2956e54bfcfd198899ff5df9b34262ca299d6291/mitol_django_apigateway-2025.8.14.tar.gz", hash = "sha256:f4c6476b4fca2614d4f9d956e3470b7f0facb76a181030cbc5f397264b48c84f", size = 11754, upload-time = "2025-08-14T17:11:28.286Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e3/75/2fff064c31d355784fe887411829c0acfc8c6c2d0a4363efb1e5fdb61070/mitol_django_apigateway-2026.4.29.tar.gz", hash = "sha256:fe940a510fac1e93c90f85cca04f00685ddfe74408d867e8c326447701d06633", size = 11908, upload-time = "2026-04-30T12:56:43.727Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c0/85/d3022e8c2baae0fd11a90cccb459f8ff0cd531479201adc30a1c278ed24f/mitol_django_apigateway-2025.8.14-py3-none-any.whl", hash = "sha256:858ea8aa6e6f345ef80ececf9ec374689ab1ef2024d40ab30f0c33ecfa7158f9", size = 20165, upload-time = "2025-08-14T17:11:27.263Z" },
+    { url = "https://files.pythonhosted.org/packages/11/81/ca3592e299bf9bb5ff24c3266631cc41b2a3a05e6782d61dd78309601696/mitol_django_apigateway-2026.4.29-py3-none-any.whl", hash = "sha256:9d4a1f3f9da6ef0ee3007610f511da4466f3c44ca0b80c764bc910b932bc4e72", size = 20200, upload-time = "2026-04-30T12:56:42.478Z" },
 ]
 
 [[package]]
@@ -1745,22 +1748,20 @@ wheels = [
 
 [[package]]
 name = "mitol-django-common"
-version = "2025.12.23.2"
+version = "2026.4.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "django-redis" },
     { name = "django-stubs" },
     { name = "django-webpack-loader" },
-    { name = "factory-boy" },
-    { name = "pytest" },
     { name = "pytz" },
     { name = "requests" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/81/e0f7017bc26914bca5bc8905e5ccf6aff4db760c7ee386a548a4a5eb7263/mitol_django_common-2025.12.23.2.tar.gz", hash = "sha256:0c4800f7c0be1b36d9cb8a0e132e177b8d57e3108cde7ad4ea11f71886a7ac4d", size = 22164, upload-time = "2026-01-05T13:00:57.515Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/27/e6/a97f7e4bd28dac57cf9235627a506b2815e08dc34e01e853b941b03fe6d6/mitol_django_common-2026.4.29.tar.gz", hash = "sha256:f9845c2a953220d90f59296ab3599e485a4cf0296e702835ec809cf20df87912", size = 22704, upload-time = "2026-04-29T19:55:43.133Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/d7/4b0c1770fcd48cd16766795f5ba4747608158ffade93941c367f56d10e2e/mitol_django_common-2025.12.23.2-py3-none-any.whl", hash = "sha256:3e9f4083c8f6dfdbc2aec2f4a488bb1fc5bc1d6c43aa74800a03e23628be7656", size = 31946, upload-time = "2026-01-05T13:00:56.315Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/40/7932db5233542f59dedb6289c4c463bd8ca1a076cc19dc75862c2144b207/mitol_django_common-2026.4.29-py3-none-any.whl", hash = "sha256:cfa1af4f31fa76253d85356808ef197b93e6bf09bb0f431378963b298e8c9128", size = 32641, upload-time = "2026-04-29T19:55:42.264Z" },
 ]
 
 [[package]]
@@ -1817,7 +1818,7 @@ wheels = [
 
 [[package]]
 name = "mitol-django-hubspot-api"
-version = "2025.12.18"
+version = "2026.4.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
@@ -1829,27 +1830,28 @@ dependencies = [
     { name = "requests" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/64/b6/cf6eebe4819db7278b30f27d37202eea329469aaaf09f5a412e78c4cc1b4/mitol_django_hubspot_api-2025.12.18.tar.gz", hash = "sha256:3d67d3f64bc6b49c14548d712460321d7a1da1dbcfc61f77ba0c3023457969cb", size = 9407, upload-time = "2025-12-18T13:35:11.189Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/fa/70cae73f978781cde891019a46e7d35ec06e7adeda4a2d0f2afd5944e4e7/mitol_django_hubspot_api-2026.4.29.tar.gz", hash = "sha256:8200deb262f0de5919ec53d4cc619d146d46c631e922099aad37de8065639a20", size = 9520, upload-time = "2026-04-29T20:01:18.758Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/22/03/97446dd46de978d27dda229d2ea7208ca9729dde15e5e50d7dc311d0001b/mitol_django_hubspot_api-2025.12.18-py3-none-any.whl", hash = "sha256:ee062a5f1194f120f810bedad93f19a0f47c3e42c45eb94ced01296b8522bfe0", size = 13585, upload-time = "2025-12-18T13:35:10.182Z" },
+    { url = "https://files.pythonhosted.org/packages/de/3a/ed404aadc1237b6bf01c742899765bff0973555f3796360d393a22d4d257/mitol_django_hubspot_api-2026.4.29-py3-none-any.whl", hash = "sha256:ac5db6e463ec92c44f579f0db231cb5bc21bb94547db1bd6f1dd02df6149ee30", size = 13544, upload-time = "2026-04-29T20:01:17.792Z" },
 ]
 
 [[package]]
 name = "mitol-django-mail"
-version = "2023.12.19"
+version = "2026.4.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "django" },
     { name = "django-anymail" },
+    { name = "django-stubs" },
     { name = "html5lib" },
     { name = "mitol-django-common" },
     { name = "premailer" },
     { name = "toolz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/22/c5/a67c455de7c1c980c422f30056be3e759347c2682d5b774628976d8c5a52/mitol-django-mail-2023.12.19.tar.gz", hash = "sha256:824f6ff0a7fb7b996962e608c61e5d02d06c174e466d00896eb43fdac864148f", size = 16249, upload-time = "2023-12-19T18:14:27.295Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/93/599cacd89feedbafb1996f61f762c26fc48a22107873ee24355d3af2dec6/mitol_django_mail-2026.4.29.tar.gz", hash = "sha256:9ba4f8dc32950c1796c5121d29346db3be8a205cf60e65af7203feec5e61994d", size = 13642, upload-time = "2026-04-29T21:17:52.222Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/45/27afcb7a712c72cc3f4bbadfd696fe03c747d9fc35582b610cd0fa25b07f/mitol_django_mail-2023.12.19-py3-none-any.whl", hash = "sha256:a32853bfe7da39d4c34651d7e5bddc547678c1b5b3a54e56e492879276eab371", size = 19714, upload-time = "2023-12-19T18:14:25.682Z" },
+    { url = "https://files.pythonhosted.org/packages/38/3b/6bd15115bdf0197ba38f7d4f2f21556a9cc1abf61eeab1fcdd8d26892005/mitol_django_mail-2026.4.29-py3-none-any.whl", hash = "sha256:77e42ba048e59764cc2abd0b403515be8395a54afb5bf69a36c506bbee132406", size = 18935, upload-time = "2026-04-29T21:17:51.117Z" },
 ]
 
 [[package]]
@@ -1888,31 +1890,31 @@ wheels = [
 
 [[package]]
 name = "mitol-django-openedx"
-version = "2023.12.19"
+version = "2026.4.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
+    { name = "django-stubs" },
     { name = "edx-opaque-keys" },
-    { name = "setuptools" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b3/c7/daffa25880987de5ad652f2d23d0e6569554798e1af4ee701f5a4aaa893b/mitol-django-openedx-2023.12.19.tar.gz", hash = "sha256:d91ad3bfddbb2563eabccc643995ccac9bfc83919cf13c3e91ede7e4c8b2aef5", size = 3431, upload-time = "2023-12-19T18:15:31.664Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/56/fe/ec55652b98f79f4983755e915bf1aa875fab9463f1b6a2ff18d59e642e74/mitol_django_openedx-2026.4.29.tar.gz", hash = "sha256:51185e53a65ced55926c9c09f5e69057dc7a321ce417b7d309721c5ce0d5b1d9", size = 2682, upload-time = "2026-04-29T21:19:53.701Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/53/80f9d51423df3b2043b3201ea9eb9e111a772162d0843021bd4bcdc25d43/mitol_django_openedx-2023.12.19-py3-none-any.whl", hash = "sha256:0e1faf21ed633371f32db8427840479d68450b10603f33e50613dfdfc96fb582", size = 5143, upload-time = "2023-12-19T18:15:30.25Z" },
+    { url = "https://files.pythonhosted.org/packages/16/ea/d13190a1bfee898528c104047ebd60d76155016adf665a9c80399724345e/mitol_django_openedx-2026.4.29-py3-none-any.whl", hash = "sha256:7ac49bbe6c5bbadff7f3ca0ea736d10a3885478f4f248ec1996ebb3200e350b2", size = 4121, upload-time = "2026-04-29T21:19:52.904Z" },
 ]
 
 [[package]]
 name = "mitol-django-payment-gateway"
-version = "2023.12.19"
+version = "2026.4.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cybersource-rest-client-python" },
     { name = "django" },
+    { name = "django-stubs" },
     { name = "mitol-django-common" },
-    { name = "setuptools" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/69/7c/a59f175c5d30a6f4118f38397d3883513f1f14df26b0c4a7a8d57632efb4/mitol-django-payment-gateway-2023.12.19.tar.gz", hash = "sha256:3aa89300237c905e363e40b5d1a9cdfd84437fef67483b85c1984a3131baaf45", size = 18161, upload-time = "2023-12-19T17:37:54.101Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/98/29f4acde025f25261f3b2ca9b639d9f713ec352b751260dd1f2796912ff7/mitol_django_payment_gateway-2026.4.29.tar.gz", hash = "sha256:de5bdb4476b80e1f4eebd79e08b02771c045968db2db32d960abd84ae9a64712", size = 15331, upload-time = "2026-04-29T21:17:18.586Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/9f/ddaa47ced31624a992111f6426f92bb75ac89e2701705f2aa58d736d8451/mitol_django_payment_gateway-2023.12.19-py3-none-any.whl", hash = "sha256:50ce1457bc41ac86c4fa6bdb62f6be4bd5feeff8e24303d3ae1b8e17ba57e36d", size = 21330, upload-time = "2023-12-19T17:37:52.904Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/8f/b349f06c5f97bb572011d5ad3a6e78abfb4c1b59ab16805f1303bb2c97ec/mitol_django_payment_gateway-2026.4.29-py3-none-any.whl", hash = "sha256:72c5169e396f1721d0fe8ae5760e500841bbcde37b13f3a352ce622d70c0533e", size = 20828, upload-time = "2026-04-29T21:17:17.629Z" },
 ]
 
 [[package]]
@@ -2097,18 +2099,18 @@ requires-dist = [
     { name = "granian", specifier = ">=2.5.4,<3" },
     { name = "hubspot-api-client", specifier = ">=12.0.0,<13" },
     { name = "ipython", specifier = ">=8.0.0,<9" },
-    { name = "mitol-django-apigateway", specifier = "==2025.8.14" },
+    { name = "mitol-django-apigateway", specifier = "==2026.4.29" },
     { name = "mitol-django-authentication", specifier = ">=2025.2.12,<2026" },
-    { name = "mitol-django-common", specifier = "==2025.12.23.2" },
+    { name = "mitol-django-common", specifier = "==2026.4.29" },
     { name = "mitol-django-google-sheets", specifier = ">=2025.6.13,<2026" },
     { name = "mitol-django-google-sheets-deferrals", specifier = ">=2025.3.17,<2026" },
     { name = "mitol-django-google-sheets-refunds", specifier = ">=2025.6.13,<2026" },
-    { name = "mitol-django-hubspot-api", specifier = "==2025.12.18" },
-    { name = "mitol-django-mail", specifier = "==2023.12.19" },
+    { name = "mitol-django-hubspot-api", specifier = "==2026.4.29" },
+    { name = "mitol-django-mail", specifier = "==2026.4.29" },
     { name = "mitol-django-observability", specifier = ">=2026.1.0" },
     { name = "mitol-django-olposthog", specifier = ">=2026.3.6,<2027" },
-    { name = "mitol-django-openedx", specifier = "==2023.12.19" },
-    { name = "mitol-django-payment-gateway", specifier = "==2023.12.19" },
+    { name = "mitol-django-openedx", specifier = "==2026.4.29" },
+    { name = "mitol-django-payment-gateway", specifier = "==2026.4.29" },
     { name = "mitol-django-scim", specifier = ">=2025.5.23" },
     { name = "opentelemetry-instrumentation-celery", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-django", specifier = ">=0.52b0" },
