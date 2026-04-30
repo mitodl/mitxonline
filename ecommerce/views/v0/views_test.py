@@ -30,6 +30,7 @@ from ecommerce.constants import (
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_UNLIMITED,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.discounts import DiscountType
@@ -432,7 +433,7 @@ def test_create_basket_with_product(  # noqa: PLR0913
             ex_discount = DiscountFactory(
                 discount_type=DISCOUNT_TYPE_PERCENT_OFF,
                 amount=10 if existing_discount == "worse" else 60,
-                redemption_type="unlimited",
+                redemption_type=REDEMPTION_TYPE_UNLIMITED,
             )
             BasketDiscount.objects.create(
                 redeemed_basket=basket,
@@ -446,7 +447,7 @@ def test_create_basket_with_product(  # noqa: PLR0913
                 discount_type=DISCOUNT_TYPE_PERCENT_OFF,
                 amount=50,
                 max_redemptions=1,
-                redemption_type="unlimited",
+                redemption_type=REDEMPTION_TYPE_UNLIMITED,
             )
             order = OrderFactory.create()
             DiscountRedemption.objects.create(
@@ -459,7 +460,7 @@ def test_create_basket_with_product(  # noqa: PLR0913
             discount = DiscountFactory(
                 discount_type=DISCOUNT_TYPE_PERCENT_OFF,
                 amount=50,
-                redemption_type="unlimited",
+                redemption_type=REDEMPTION_TYPE_UNLIMITED,
             )
 
         url = reverse(
