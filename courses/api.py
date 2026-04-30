@@ -939,7 +939,7 @@ def generate_course_run_certificates(  # noqa: C901
     Hits the edX grades API and generates the certificates and grades for users for course runs.
 
     Each parameter works independently:
-    - If course_run is provided, only that course run is processed (skipping eligibility filtering).
+    - If course_run is provided, only that course run is processed (skipping course runs eligibility filtering).
     - If user is provided, only that user's grade/certificate is processed.
     - If force is True, certificate date/eligibility checks are bypassed.
 
@@ -985,8 +985,6 @@ def generate_course_run_certificates(  # noqa: C901
             except ValidationError:
                 msg = f"Can't save grade {edx_grade} for {run_user} in {run}, skipping certificate generation"
                 log.exception(msg)
-                if len(course_runs) == 1:
-                    return
                 continue
 
             if created:

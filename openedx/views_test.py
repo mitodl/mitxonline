@@ -268,17 +268,17 @@ class TestEdxEnrollmentWebhook:
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-class TestProcessCertificateWebhookView:
-    """Tests for the ProcessCertificateWebhookView"""
+class TestEdxCertificateWebhook:
+    """Tests for the edx_certificate_webhook view"""
 
-    WEBHOOK_URL = reverse("process-certificate-webhook")
+    WEBHOOK_URL = reverse("openedx-certificate-webhook")
 
     def test_unauthenticated_returns_401(self):
         """Test that unauthenticated requests are rejected"""
         client = APIClient()
         response = client.post(
             self.WEBHOOK_URL,
-            {"user_id": "test@example.com", "course_id": "course-v1:MITx+1+2024"},
+            {"email": "test@example.com", "course_id": "course-v1:MITx+1+2024"},
             format="json",
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -287,7 +287,7 @@ class TestProcessCertificateWebhookView:
         """Test that non-admin authenticated users are rejected"""
         response = user_drf_client.post(
             self.WEBHOOK_URL,
-            {"user_id": "test@example.com", "course_id": "course-v1:MITx+1+2024"},
+            {"email": "test@example.com", "course_id": "course-v1:MITx+1+2024"},
             format="json",
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -295,8 +295,8 @@ class TestProcessCertificateWebhookView:
     @pytest.mark.parametrize(
         "payload, expected_error_field",  # noqa: PT006
         [
-            ({"course_id": "course-v1:MITx+1+2024"}, "user_id"),
-            ({"user_id": "test@example.com"}, "course_id"),
+            ({"course_id": "course-v1:MITx+1+2024"}, "email"),
+            ({"email": "test@example.com"}, "course_id"),
             ({}, None),
         ],
     )
@@ -332,7 +332,7 @@ class TestProcessCertificateWebhookView:
 
         response = admin_drf_client.post(
             self.WEBHOOK_URL,
-            {"user_id": user_email, "course_id": courseware_id},
+            {"email": user_email, "course_id": courseware_id},
             format="json",
         )
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -392,7 +392,7 @@ class TestProcessCertificateWebhookView:
 
         response = admin_drf_client.post(
             self.WEBHOOK_URL,
-            {"user_id": user.email, "course_id": course_run.courseware_id},
+            {"email": user.email, "course_id": course_run.courseware_id},
             format="json",
         )
 
@@ -432,7 +432,7 @@ class TestProcessCertificateWebhookView:
 
         response1 = admin_drf_client.post(
             self.WEBHOOK_URL,
-            {"user_id": user.email, "course_id": course_run.courseware_id},
+            {"email": user.email, "course_id": course_run.courseware_id},
             format="json",
         )
         assert response1.status_code == status.HTTP_200_OK
@@ -444,7 +444,7 @@ class TestProcessCertificateWebhookView:
 
         response2 = admin_drf_client.post(
             self.WEBHOOK_URL,
-            {"user_id": user.email, "course_id": course_run.courseware_id},
+            {"email": user.email, "course_id": course_run.courseware_id},
             format="json",
         )
         assert response2.status_code == status.HTTP_200_OK

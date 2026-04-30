@@ -13,7 +13,6 @@ from rest_framework.decorators import (
 )
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from courses.api import create_local_enrollment, generate_course_run_certificates
 from courses.models import CourseRun, CourseRunCertificate
@@ -123,65 +122,98 @@ def edx_enrollment_webhook(request):
 
 
 @extend_schema(exclude=True)
-class ProcessCertificateWebhookView(APIView):
+@api_view(["POST"])
+@authentication_classes([OAuth2Authentication])
+@permission_classes([IsAdminUser])
+def edx_certificate_webhook(request):
     """
-    API view for receiving certificate creation events from Open edX.
+    Webhook endpoint for receiving certificate creation events from Open edX.
 
     When Open edX creates a certificate for a user, it sends a POST request
     to this endpoint with the user's email and the course ID. This view then
     fetches the grade from edX, syncs it locally, and creates the corresponding
     certificate in MITx Online.
+
+    Authentication: OAuth2 Bearer token (Django OAuth Toolkit access token).
+
+    Expected payload:
+        {
+            "email": "learner@example.com",
+            "course_id": "course-v1:MITx+1.001x+2025_T1"
+        }
     """
+    user_email = request.data.get("email")
+    course_run_id = request.data.get("course_id")
 
-    authentication_classes = [OAuth2Authentication]
-    permission_classes = [IsAdminUser]
+    log.info(
+        "Certificate webhook: Received (email=%s, course_id=%s)",
+        user_email,
+        course_run_id,
+    )
 
-    def post(self, request):
-        user_email = request.data.get("user_id")
-        course_run_id = request.data.get("course_id")
-
-        if not user_email or not course_run_id:
-            return Response(
-                {"error": "Both 'user_id' and 'course_id' are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            user = User.objects.get(email__iexact=user_email)
-        except User.DoesNotExist:
-            return Response(
-                {"error": f"User with email '{user_email}' not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        try:
-            course_run = CourseRun.objects.get(courseware_id=course_run_id)
-        except CourseRun.DoesNotExist:
-            return Response(
-                {"error": f"Course run with id '{course_run_id}' not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        log.info(
-            "Certificate webhook received for user %s, course run %s",
+    if not user_email or not course_run_id:
+        log.warning(
+            "Certificate webhook: missing required fields (email=%s, course_id=%s)",
             user_email,
             course_run_id,
         )
-
-        if CourseRunCertificate.objects.filter(
-            user=user, course_run=course_run
-        ).exists():
-            log.info(
-                "Certificate already exists for user %s and course run %s, skipping",
-                user_email,
-                course_run_id,
-            )
-            return Response(status=status.HTTP_200_OK)
-
-        generate_course_run_certificates(
-            user=user,
-            course_run=course_run,
-            force=True,
+        return Response(
+            {"error": "Both 'email' and 'course_id' are required."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
+    try:
+        user = User.objects.get(email__iexact=user_email)
+    except User.DoesNotExist:
+        log.warning(
+            "Certificate webhook: user not found (email=%s, course_id=%s)",
+            user_email,
+            course_run_id,
+        )
+        return Response(
+            {"error": f"User with email '{user_email}' not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        course_run = CourseRun.objects.get(courseware_id=course_run_id)
+    except CourseRun.DoesNotExist:
+        log.warning(
+            "Certificate webhook: course run not found (email=%s, course_id=%s)",
+            user_email,
+            course_run_id,
+        )
+        return Response(
+            {"error": f"Course run with id '{course_run_id}' not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    log.info(
+        "Certificate webhook: validation passed, processing certificate for user %s, course run %s",
+        user_email,
+        course_run_id,
+    )
+
+    if CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists():
+        log.info(
+            "Certificate webhook: certificate already exists for user %s and course run %s, skipping",
+            user_email,
+            course_run_id,
+        )
         return Response(status=status.HTTP_200_OK)
+
+    generate_course_run_certificates(
+        user=user,
+        course_run=course_run,
+        force=True,
+    )
+
+    log.info(
+        "Certificate webhook: finished processing for user %s, course run %s",
+        user_email,
+        course_run_id,
+    )
+
+    return Response(status=status.HTTP_200_OK)
