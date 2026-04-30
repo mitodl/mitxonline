@@ -8,6 +8,7 @@ import django_filters
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, Q
+from django.http import Http404
 from django.shortcuts import redirect
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import (
@@ -26,11 +27,19 @@ from rest_framework.generics import RetrieveAPIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
-from courses.models import Course, CourseRun, Program, ProgramRun
+from courses.models import (
+    Course,
+    CourseRun,
+    PaidCourseRun,
+    PaidProgram,
+    Program,
+    ProgramRun,
+)
 from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce.api import (
     apply_discount_to_basket,
@@ -928,3 +937,45 @@ class OrderReceiptView(RetrieveAPIView):
     def get_queryset(self):
         """Return only the user's orders"""
         return Order.objects.filter(purchaser=self.request.user).all()
+
+
+@extend_schema(exclude=True)
+class ReceiptByRunView(APIView):
+    """Redirects to the receipt page for an order associated with a course run."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, run_id):
+        paid_run = (
+            PaidCourseRun.objects.filter(
+                user=request.user,
+                course_run_id=run_id,
+                order__state=OrderStatus.FULFILLED,
+            )
+            .order_by("-created_on")
+            .first()
+        )
+        if paid_run is None:
+            raise Http404
+        return redirect(f"/orders/receipt/{paid_run.order_id}/")
+
+
+@extend_schema(exclude=True)
+class ReceiptByProgramView(APIView):
+    """Redirects to the receipt page for an order associated with a program."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, program_id):
+        paid_program = (
+            PaidProgram.objects.filter(
+                user=request.user,
+                program_id=program_id,
+                order__state=OrderStatus.FULFILLED,
+            )
+            .order_by("-created_on")
+            .first()
+        )
+        if paid_program is None:
+            raise Http404
+        return redirect(f"/orders/receipt/{paid_program.order_id}/")

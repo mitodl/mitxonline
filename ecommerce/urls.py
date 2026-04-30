@@ -21,6 +21,7 @@ from ecommerce.views.legacy import (
     ProductViewSet,
     UserDiscountViewSet,
 )
+from ecommerce.views.v0 import ReceiptByProgramView, ReceiptByRunView
 from ecommerce.views.v0.urls import urlpatterns as v0_urls
 from main.routers import SimpleRouterWithNesting
 
@@ -74,6 +75,16 @@ basketRouter.register(
 )
 
 urlpatterns = [
+    path(
+        "orders/receipt/by-run/<int:run_id>/",
+        ReceiptByRunView.as_view(),
+        name="order_receipt_by_run_lookup",
+    ),
+    path(
+        "orders/receipt/by-program/<int:program_id>/",
+        ReceiptByProgramView.as_view(),
+        name="order_receipt_by_program_lookup",
+    ),
     path("api/v0/", include((v0_urls, "v0"))),
     path("api/", include(router.urls)),
     re_path(
