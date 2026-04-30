@@ -194,9 +194,7 @@ def edx_certificate_webhook(request):
         course_run_id,
     )
 
-    if CourseRunCertificate.objects.filter(
-        user=user, course_run=course_run
-    ).exists():
+    if CourseRunCertificate.objects.filter(user=user, course_run=course_run).exists():
         log.info(
             "Certificate webhook: certificate already exists for user %s and course run %s, skipping",
             user_email,
