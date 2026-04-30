@@ -410,7 +410,6 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
             queryset=CourseRun.objects.order_by("id")
             .select_related("b2b_contract")
             .prefetch_related(modes_prefetch, products_prefetch),
-            to_attr="prefetched_courseruns",
         )
         queryset = queryset.prefetch_related(
             "departments", "in_programs", course_runs_prefetch
