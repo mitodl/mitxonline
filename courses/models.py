@@ -172,7 +172,9 @@ class UsableCourseRunManager(models.Manager):
     def get_queryset(self):
         """Return a queryset that ignores all source runs."""
 
-        return super().get_queryset().filter(is_source_run=False)
+        return (
+            super().get_queryset().filter(Q(is_source_run=False) | Q(run_tag="SOURCE"))
+        )
 
 
 class CoursesTopicQuerySet(models.QuerySet):

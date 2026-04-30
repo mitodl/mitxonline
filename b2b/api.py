@@ -299,7 +299,8 @@ def _get_source_runs_for_course(
     """
 
     primary_source_run = (
-        course.courseruns.filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
+        CourseRun.all_objects.filter(course=course)
+        .filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
         .filter(Q(is_primary_language=True) | Q(language=""))
         .first()
     )
@@ -324,9 +325,11 @@ def _get_source_runs_for_course(
         raise SourceCourseIncompleteError(msg)
 
     # Pull all the other source runs for the course and run tag combo
-    source_runs = course.courseruns.filter(
-        is_source_run=True, run_tag=primary_source_run.run_tag
-    ).all()
+    source_runs = (
+        CourseRun.all_objects.filter(course=course)
+        .filter(is_source_run=True, run_tag=primary_source_run.run_tag)
+        .all()
+    )
 
     seen_languages: list = []
     filtered_run_list = {}
