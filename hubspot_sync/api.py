@@ -1390,7 +1390,6 @@ def sync_deal_with_hubspot_targeted(  # noqa: C901
     hubspot_client = HubspotApi(access_token=token)
 
     deal_input = _build_target_deal_message(order, hubspot_client)
-    dealname = deal_input.properties.get("dealname")
     unique_app_id = deal_input.properties.get("unique_app_id")
 
     # Check if deal already exists by unique_app_id (now consistent across cart-add and checkout)

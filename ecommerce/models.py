@@ -18,8 +18,6 @@ from django.db.models import TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
-
-log = logging.getLogger(__name__)
 from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
@@ -44,6 +42,8 @@ from ecommerce.constants import (
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
 from main.plugin_manager import get_plugin_manager
 from users.models import User
+
+log = logging.getLogger(__name__)
 
 User = get_user_model()  # noqa: F811
 
@@ -793,6 +793,113 @@ class Order(TimestampedModel):
 class PendingOrder(Order):
     """An order that is pending payment"""
 
+    def _extract_product_details(self, products: List[Product]):  # noqa: UP006
+        """Extract version and identification details from products."""
+        product_versions, product_object_ids, product_content_types = [], [], []
+        for product in products:
+            product_version = Version.objects.get_for_object(product).first()
+            if not product_version:
+                msg = f"Product {product} is improperly constructed: no versions"
+                raise ValueError(msg)
+
+            product_versions.append(product_version)
+            product_object_ids.append(product.object_id)
+            product_content_types.append(product.content_type_id)
+
+        return product_versions, product_object_ids, product_content_types
+
+    def _find_existing_orders(self, user: User, product_object_ids, product_content_types, product_versions):
+        """Find existing orders for the given products and user."""
+        # First, try to find orders that match all products (multi-product orders)
+        orders = (
+            Order.objects.select_for_update()
+            .prefetch_related("discounts")
+            .filter(
+                lines__purchased_object_id__in=product_object_ids,
+                lines__purchased_content_type_id__in=product_content_types,
+                lines__product_version__in=product_versions,
+                state=OrderStatus.PENDING,
+                purchaser=user,
+            )
+        )
+
+        # If no multi-product order found, check for individual cart-add orders
+        if not orders:
+            orders = self._find_individual_orders(
+                user, product_object_ids, product_content_types, product_versions
+            )
+
+        return orders
+
+    def _find_individual_orders(self, user: User, product_object_ids, product_content_types, product_versions):
+        """Find individual cart-add orders for reuse during checkout."""
+        for i, product_object_id in enumerate(product_object_ids):
+            individual_orders = (
+                Order.objects.select_for_update()
+                .prefetch_related("discounts")
+                .filter(
+                    lines__purchased_object_id=product_object_id,
+                    lines__purchased_content_type_id=product_content_types[i],
+                    lines__product_version=product_versions[i],
+                    state=OrderStatus.PENDING,
+                    purchaser=user,
+                )
+            )
+            if individual_orders:
+                log.info(
+                    "Found individual cart-add order for user %s, product_object_id=%s, order_id=%s",
+                    user.id,
+                    product_object_id,
+                    individual_orders.first().id,
+                )
+                return individual_orders
+        return Order.objects.none()
+
+    def _get_or_create_order(self, orders, user: User):
+        """Get existing order or create new one."""
+        if orders:
+            order = orders.first()
+            log.info("Reusing existing order for user %s, order_id=%s", user.id, order.id)
+            # Clear existing discounts
+            for old_discount in order.discounts.all():
+                old_discount.delete()
+            order.refresh_from_db()
+        else:
+            order = Order.objects.create(
+                state=OrderStatus.PENDING,
+                purchaser=user,
+                total_price_paid=0,
+            )
+        return order
+
+    def _apply_discounts_to_order(self, order: Order, user: User, discounts):
+        """Apply discounts to the order."""
+        if discounts:
+            now = now_in_utc()
+            for discount in discounts:
+                if discount:
+                    order.discounts.create(
+                        redemption_date=now,
+                        redeemed_by=user,
+                        redeemed_discount=discount,
+                    )
+
+    def _create_lines_and_calculate_total(self, order: Order, products: List[Product], product_versions):  # noqa: UP006
+        """Create lines for each product and calculate total price."""
+        total = 0
+        for i, product in enumerate(products):
+            line, _ = Line.objects.get_or_create(
+                order=order,
+                purchased_object_id=product.object_id,
+                purchased_content_type_id=product.content_type_id,
+                defaults={
+                    "product_version": product_versions[i],
+                    "quantity": 1,
+                },
+            )
+            total += line.discounted_price
+        return total
+
     @transaction.atomic
     def _get_or_create(
         self,
@@ -817,108 +924,22 @@ class PendingOrder(Order):
         Returns:
             PendingOrder: the retrieved or created PendingOrder.
         """
-        # Get the details from each Product.
-        product_versions, product_object_ids, product_content_types = [], [], []
-        for product in products:
-            # Per docs, this should sort most recent first.
-            product_version = Version.objects.get_for_object(product).first()
+        # Extract product details
+        product_versions, product_object_ids, product_content_types = self._extract_product_details(products)
 
-            if not product_version:
-                msg = f"Product {product} is improperly constructed: no versions"
-                raise ValueError(msg)
+        # Find existing orders
+        orders = self._find_existing_orders(user, product_object_ids, product_content_types, product_versions)
 
-            product_versions.append(product_version)
-            product_object_ids.append(product.object_id)
-            product_content_types.append(product.content_type_id)
+        # Get or create order
+        order = self._get_or_create_order(orders, user)
 
-        # Get or create a PendingOrder
-        # First, try to find orders that match all products (multi-product orders)
-        orders = (
-            Order.objects.select_for_update()
-            .prefetch_related("discounts")
-            .filter(
-                lines__purchased_object_id__in=product_object_ids,
-                lines__purchased_content_type_id__in=product_content_types,
-                lines__product_version__in=product_versions,
-                state=OrderStatus.PENDING,
-                purchaser=user,
-            )
-        )
+        # Apply discounts
+        self._apply_discounts_to_order(order, user, discounts)
 
-        # If no multi-product order found, also check for individual cart-add orders
-        # This enables reusing existing cart-add orders during checkout
-        if not orders:
-            for i, product_object_id in enumerate(product_object_ids):
-                individual_orders = (
-                    Order.objects.select_for_update()
-                    .prefetch_related("discounts")
-                    .filter(
-                        lines__purchased_object_id=product_object_id,
-                        lines__purchased_content_type_id=product_content_types[i],
-                        lines__product_version=product_versions[i],
-                        state=OrderStatus.PENDING,
-                        purchaser=user,
-                    )
-                )
-                if individual_orders:
-                    orders = individual_orders
-                    log.info(
-                        "Found individual cart-add order for user %s, product_object_id=%s, order_id=%s",
-                        user.id,
-                        product_object_id,
-                        individual_orders.first().id,
-                    )
-                    break
-
-        # Previously, multiple PendingOrders could be created for a single user
-        # for the same product, if multiple exist, grab the first.
-        if orders:
-            order = orders.first()
-            log.info(
-                "Reusing existing order for user %s, order_id=%s",
-                user.id,
-                order.id,
-            )
-            # Clear discounts except for the most recent one
-            # If there aren't any discounts in the basket, clear them all
-            for old_discount in order.discounts.all():
-                old_discount.delete()
-
-            order.refresh_from_db()
-        else:
-            order = Order.objects.create(
-                state=OrderStatus.PENDING,
-                purchaser=user,
-                total_price_paid=0,
-            )
-
-        # Apply any discounts to the PendingOrder
-        if discounts:
-            now = now_in_utc()
-            for discount in discounts:
-                if discount:
-                    order.discounts.create(
-                        redemption_date=now,
-                        redeemed_by=user,
-                        redeemed_discount=discount,
-                    )
-
-        # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
-        total = 0
-        for i, product in enumerate(products):
-            line, _ = Line.objects.get_or_create(
-                order=order,
-                purchased_object_id=product.object_id,
-                purchased_content_type_id=product.content_type_id,
-                defaults={
-                    "product_version": product_versions[i],
-                    "quantity": 1,
-                },
-            )
-            total += line.discounted_price
+        # Create lines and calculate total
+        total = self._create_lines_and_calculate_total(order, products, product_versions)
 
         order.total_price_paid = total
-
         order.save()
 
         return order
