@@ -808,7 +808,9 @@ class PendingOrder(Order):
 
         return product_versions, product_object_ids, product_content_types
 
-    def _find_existing_orders(self, user: User, product_object_ids, product_content_types, product_versions):
+    def _find_existing_orders(
+        self, user: User, product_object_ids, product_content_types, product_versions
+    ):
         """Find existing orders for the given products and user."""
         # First, try to find orders that match all products (multi-product orders)
         orders = (
@@ -831,7 +833,9 @@ class PendingOrder(Order):
 
         return orders
 
-    def _find_individual_orders(self, user: User, product_object_ids, product_content_types, product_versions):
+    def _find_individual_orders(
+        self, user: User, product_object_ids, product_content_types, product_versions
+    ):
         """Find individual cart-add orders for reuse during checkout."""
         for i, product_object_id in enumerate(product_object_ids):
             individual_orders = (
@@ -859,7 +863,9 @@ class PendingOrder(Order):
         """Get existing order or create new one."""
         if orders:
             order = orders.first()
-            log.info("Reusing existing order for user %s, order_id=%s", user.id, order.id)
+            log.info(
+                "Reusing existing order for user %s, order_id=%s", user.id, order.id
+            )
             # Clear existing discounts
             for old_discount in order.discounts.all():
                 old_discount.delete()
@@ -884,7 +890,9 @@ class PendingOrder(Order):
                         redeemed_discount=discount,
                     )
 
-    def _create_lines_and_calculate_total(self, order: Order, products: List[Product], product_versions):  # noqa: UP006
+    def _create_lines_and_calculate_total(
+        self, order: Order, products: list[Product], product_versions
+    ):
         """Create lines for each product and calculate total price."""
         total = 0
         for i, product in enumerate(products):
@@ -925,10 +933,14 @@ class PendingOrder(Order):
             PendingOrder: the retrieved or created PendingOrder.
         """
         # Extract product details
-        product_versions, product_object_ids, product_content_types = self._extract_product_details(products)
+        product_versions, product_object_ids, product_content_types = (
+            self._extract_product_details(products)
+        )
 
         # Find existing orders
-        orders = self._find_existing_orders(user, product_object_ids, product_content_types, product_versions)
+        orders = self._find_existing_orders(
+            user, product_object_ids, product_content_types, product_versions
+        )
 
         # Get or create order
         order = self._get_or_create_order(orders, user)
@@ -937,7 +949,9 @@ class PendingOrder(Order):
         self._apply_discounts_to_order(order, user, discounts)
 
         # Create lines and calculate total
-        total = self._create_lines_and_calculate_total(order, products, product_versions)
+        total = self._create_lines_and_calculate_total(
+            order, products, product_versions
+        )
 
         order.total_price_paid = total
         order.save()
