@@ -2,6 +2,7 @@
 
 # pylint: disable=redefined-outer-name
 import itertools
+import logging
 from datetime import timedelta
 from unittest.mock import ANY, call, patch
 from urllib.parse import parse_qsl
@@ -1567,7 +1568,8 @@ def test_update_edx_user_profile_no_openedx_user(
     Test that update_edx_user_profile does not attempt to update the user profile in Open edX when Open edX user is not synced
     """
     user.openedx_users.all().delete()
-    update_edx_user_profile(user)
+    with caplog.at_level(logging.INFO):
+        update_edx_user_profile(user)
     assert "Skipping user profile update" in caplog.text
 
 
