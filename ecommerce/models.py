@@ -974,7 +974,7 @@ class PendingOrder(Order):
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
         ]
-        order = cls._get_or_create(cls, products, basket.user, discounts)
+        order = cls()._get_or_create(products, basket.user, discounts)
         return order  # noqa: RET504
 
     @classmethod
@@ -993,7 +993,7 @@ class PendingOrder(Order):
             PendingOrder: the created pending order
         """
 
-        order = cls._get_or_create(cls, [product], user, [discount])
+        order = cls()._get_or_create([product], user, [discount])
 
         return order  # noqa: RET504
 
