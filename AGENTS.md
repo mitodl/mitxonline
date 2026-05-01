@@ -18,37 +18,41 @@ MITx Online is a Django-based web platform for managing MIT online courses and p
 
 ### Python/Django
 
+**Container-first rule:** Run Python commands inside the `web` container. Prefer `docker compose exec web ...` when the container is already running. Use `docker compose run --rm web ...` as the slower but more reliable fallback when it is not.
+
 **Run tests:**
 ```bash
 # Full test suite with parallel execution
-uv run pytest -n logical
+docker compose exec web pytest -n logical
 
 # Single test file
-uv run pytest courses/api_test.py
+docker compose exec web pytest courses/api_test.py
 
 # Single test function
-uv run pytest courses/api_test.py::test_function_name
+docker compose exec web pytest courses/api_test.py::test_function_name
 
 # With coverage
-uv run pytest --cov . --cov-report html
+docker compose exec web pytest --cov . --cov-report html
+
+# Fallback if the web container is not already running
+docker compose run --rm web pytest courses/api_test.py
 ```
 
 **Linting and formatting:**
 ```bash
-# Format code (ruff)
-uv run ruff format .
+# Prefer pre-commit where possible; Ruff runs via the configured hooks
+pre-commit run ruff-format --all-files
+pre-commit run ruff --all-files
 
-# Lint with auto-fix
-uv run ruff check --fix .
-
-# Pre-commit hooks (runs all checks)
+# Run all configured checks
 pre-commit run --all-files
 ```
 
 **Run development server:**
 ```bash
 docker compose up  # Full stack
-docker compose run --rm web python manage.py <command>  # Django management commands
+docker compose exec web python manage.py <command>      # If web is already running
+docker compose run --rm web python manage.py <command>  # Fallback if it is not
 ```
 
 ### Frontend (JavaScript/React)
@@ -199,7 +203,7 @@ course = CourseFactory.create()
 
 **Always check for missing migrations before committing:**
 ```bash
-uv run python manage.py makemigrations --check --dry-run
+docker compose exec web python manage.py makemigrations --check --dry-run
 ```
 
 Test suite includes checks for:
@@ -261,8 +265,7 @@ docker compose build web celery  # Rebuild images after changes
 ### Code Style
 
 **Python:**
-- Formatted with `ruff format` (Black-compatible)
-- Linted with `ruff` (replaces flake8, isort, pylint)
+- Prefer `pre-commit run` for formatting and linting; Ruff runs via the configured `ruff-format` and `ruff` hooks
 - Type hints encouraged but not required
 - Docstrings for public APIs
 
@@ -290,7 +293,7 @@ Optional OIDC authentication via Keycloak:
    127.0.0.1  openedx.odl.local
    ```
 3. Start services: `docker compose up`
-4. Create superuser: `docker compose run --rm web python manage.py createsuperuser`
+4. Create superuser: `docker compose exec web python manage.py createsuperuser`
 5. Access at: http://mitxonline.odl.local:8013
 
 ### Running Single Tests
@@ -298,32 +301,38 @@ Optional OIDC authentication via Keycloak:
 The test suite uses `pytest-django` with parallel execution via `pytest-xdist`:
 ```bash
 # Single test module
-uv run pytest courses/models_test.py
+docker compose exec web pytest courses/models_test.py
 
 # Single test class
-uv run pytest courses/models_test.py::TestCourse
+docker compose exec web pytest courses/models_test.py::TestCourse
 
 # Single test method
-uv run pytest courses/models_test.py::TestCourse::test_course_creation
+docker compose exec web pytest courses/models_test.py::TestCourse::test_course_creation
 
 # With debugging (disables parallel execution)
-uv run pytest -n0 -s courses/models_test.py::test_function
+docker compose exec web pytest -n0 -s courses/models_test.py::test_function
+
+# Fallback if the web container is not already running
+docker compose run --rm web pytest courses/models_test.py
 ```
 
 ### Common Management Commands
 
 ```bash
-# Run inside container
+# Prefer exec when web is already running
+docker compose exec web python manage.py <command>
+
+# Fallback when web is not already running
 docker compose run --rm web python manage.py <command>
 
 # Useful commands
-manage.py migrate                    # Apply migrations
-manage.py makemigrations             # Create migrations
-manage.py createsuperuser            # Create admin user
-manage.py shell_plus                 # Enhanced shell with models loaded
-manage.py configure_wagtail          # Set up Wagtail site
-manage.py createcachetable           # Set up cache table
-manage.py collectstatic              # Collect static files
+docker compose exec web python manage.py migrate             # Apply migrations
+docker compose exec web python manage.py makemigrations      # Create migrations
+docker compose exec web python manage.py createsuperuser     # Create admin user
+docker compose exec web python manage.py shell_plus          # Enhanced shell with models loaded
+docker compose exec web python manage.py configure_wagtail   # Set up Wagtail site
+docker compose exec web python manage.py createcachetable    # Set up cache table
+docker compose exec web python manage.py collectstatic       # Collect static files
 ```
 
 ### OpenAPI Schema
@@ -331,7 +340,7 @@ manage.py collectstatic              # Collect static files
 Generate and view API schema:
 ```bash
 # Generate schema
-uv run python manage.py spectacular --file schema.yml
+docker compose exec web python manage.py spectacular --file schema.yml
 
 # View in browser
 # Navigate to http://mitxonline.odl.local:8013/api/schema/swagger-ui/
