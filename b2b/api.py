@@ -238,7 +238,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
         Product: The created Product object.
     """
 
-    run_qs = CourseRun.objects.filter(courseware_id=course_run_id)
+    run_qs = CourseRun.all_objects.filter(courseware_id=course_run_id)
 
     if run_qs.exists():
         run = run_qs.get()
