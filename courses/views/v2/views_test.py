@@ -2434,4 +2434,7 @@ def test_correct_courserun_languages(user_drf_client, primary):
         translated_regular_run.id if primary == "transreg" else regular_run.id
     )
     assert source_run.id not in seen_run_ids
-    assert translated_regular_run.id not in seen_run_ids
+
+    assert (
+        regular_run.id if primary == "transreg" else translated_regular_run.id
+    ) not in seen_run_ids
