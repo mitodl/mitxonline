@@ -1328,7 +1328,7 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     tuple of (CourseRun, CoursePage|None, Product|None) - relevant objects for the imported run
     """
 
-    if CourseRun.objects.filter(courseware_id=course_key).exists():
+    if CourseRun.all_objects.filter(courseware_id=course_key).exists():
         return False
 
     processed_course_key = CourseKey.from_string(course_key)
