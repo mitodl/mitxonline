@@ -4616,6 +4616,10 @@ components:
         courseware_id:
           type: string
           maxLength: 255
+        courseware_url:
+          type: string
+          format: uri
+          readOnly: true
         language:
           type: string
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
@@ -4633,6 +4637,7 @@ components:
           maxLength: 100
       required:
       - courseware_id
+      - courseware_url
       - id
       - run_tag
       - title
