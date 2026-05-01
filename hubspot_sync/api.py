@@ -2191,14 +2191,33 @@ def _ensure_hubspot_contact_for_user(
 def _sync_cart_add_deal_with_hubspot(
     order: Order, contact_id: str, hubspot_client: HubspotApi
 ) -> SimplePublicObject:
-    """Create cart-add deal and line-item objects and associate them in target account."""
+    """Create or update cart-add deal and line-item objects and associate them in target account."""
     deal_input = _build_target_deal_message(order, hubspot_client)
-
-    wait_for_hubspot_rate_limit()
-    deal = hubspot_client.crm.objects.basic_api.create(
-        object_type=HubspotObjectType.DEALS.value,
-        simple_public_object_input_for_create=deal_input,
+    
+    # Extract unique_app_id from deal input to check for existing deals
+    unique_app_id = deal_input.properties.get("unique_app_id")
+    
+    # Use the same dual lookup logic as checkout flow to prevent duplicates
+    existing_deal_id = _find_target_deal_id_by_dealname(
+        hubspot_client, deal_input.properties.get("dealname")
     )
+    if not existing_deal_id and unique_app_id:
+        existing_deal_id = _find_target_deal_id_by_unique_app_id(hubspot_client, unique_app_id)
+    
+    wait_for_hubspot_rate_limit()
+    if existing_deal_id:
+        # Update existing deal
+        deal = hubspot_client.crm.objects.basic_api.update(
+            object_type=HubspotObjectType.DEALS.value,
+            object_id=existing_deal_id,
+            simple_public_object_input=deal_input,
+        )
+    else:
+        # Create new deal
+        deal = hubspot_client.crm.objects.basic_api.create(
+            object_type=HubspotObjectType.DEALS.value,
+            simple_public_object_input_for_create=deal_input,
+        )
 
     wait_for_hubspot_rate_limit()
     hubspot_client.crm.associations.v4.basic_api.create_default(
