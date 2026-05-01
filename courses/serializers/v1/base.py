@@ -34,6 +34,7 @@ class CourseRunLanguageOptionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "courseware_id",
+            "courseware_url",
             "language",
             "title",
             "run_tag",
