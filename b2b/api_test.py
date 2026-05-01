@@ -1655,9 +1655,7 @@ def test_create_contract_run_duplicate_language_source_raises(mocker, in_contrac
     )
 
     if in_contract in ["no", "both"]:
-        with pytest.raises(
-            IntegrityError, match="unique_courserun_course_runtag_language"
-        ):
+        with pytest.raises(IntegrityError, match="unique_language_per_group"):
             CourseRunFactory.create(
                 course=course,
                 run_tag="1T2026",

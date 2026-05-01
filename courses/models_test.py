@@ -1,10 +1,12 @@
 """Tests for course models"""
 
+import logging
+import random
 from datetime import timedelta
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, connection
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Prefetch
 from django.test.utils import CaptureQueriesContext
 from mitol.common.utils.datetime import now_in_utc
@@ -45,6 +47,7 @@ from main.test_utils import format_as_iso8601
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
+log = logging.getLogger(__name__)
 
 
 def test_program_num_courses():
@@ -1397,3 +1400,253 @@ def test_course_next_run_multiple_languages(primary, include_translations, b2b):
 
     if b2b:
         assert first_unexpired_run != nc_run
+
+
+# Test for course run constraints
+# As a default we expect uniqueness on course, courseware_id, and run_tag
+# We also shouldn't allow:
+# ..... >1 language per run_tag and course
+# ...or >1 language per run_tag, courseware ID, and course
+# ...or >1 is_primary_language=True per course and run tag
+# ...or >1 language per B2B contract, run tag, and course
+# ...or >1 is_primary_language per B2B contract, run tag, and course
+# ...or >1 language per source run, run tag, and course
+# ...or >1 is_primary_language per source run, run tag, and course
+
+# This was written assuming the run tags in edX would be where we'd have the
+# language descriptor but we seem to be doing that in the course number instead.
+
+
+def test_run_language_constraints_regular_duplication():
+    """Test that the basic constraint works as we expect."""
+
+    start_date = now_in_utc() - timedelta(days=15)
+    course_number = random.randint(1, 3000)  # noqa: S311
+
+    course = CourseFactory.create(
+        readable_id=f"course-v1:INTL+TestCourse.{course_number}"
+    )
+
+    regular_course = CourseRun.objects.create(
+        course=course,
+        courseware_id=f"{course.readable_id}+9T9099",
+        title=course.title,
+        run_tag="9T9099",
+        start_date=start_date,
+        enrollment_start=start_date,
+        live=True,
+        language="",
+        is_primary_language=False,
+    )
+
+    assert regular_course.id
+
+    with pytest.raises(IntegrityError) as exc:
+        CourseRun.objects.create(
+            course=course,
+            courseware_id=f"{course.readable_id}+9T9099",
+            title=course.title,
+            run_tag="9T9099",
+            start_date=start_date,
+            enrollment_start=start_date,
+            live=True,
+            language="",
+            is_primary_language=False,
+        )
+
+    assert "violates unique constraint" in str(exc)
+
+
+def _generate_lang_run_data():
+    """Generate some run data for the language runs"""
+
+    start_date = now_in_utc() - timedelta(days=15)
+    course_number = random.randint(1, 3000)  # noqa: S311
+
+    course = CourseFactory.create(
+        readable_id=f"course-v1:INTL+TestCourse.{course_number}"
+    )
+
+    run_dict = {
+        "course": course,
+        "title": course.title,
+        "run_tag": "9T9099",
+        "start_date": start_date,
+        "enrollment_start": start_date,
+        "live": True,
+        "is_source_run": False,
+        "b2b_contract": None,
+    }
+
+    return (
+        course,
+        run_dict,
+    )
+
+
+def _run_primary_lang_run_test(  # noqa: PLR0913
+    course,
+    run_dict,
+    langs,
+    extra_primary_lang,
+    set_language_field,
+    set_primary,
+    *,
+    courseware_suffix="",
+):
+    """The main test logic for the below tests - will get run 3 times in total."""
+
+    run_data = {
+        **run_dict,
+        "courseware_id": f"{course.readable_id}{courseware_suffix}+9T9099",
+        "language": "en" if set_language_field else "",
+        "is_primary_language": set_primary,
+    }
+    log.info("run_data is: %s", run_data)
+
+    regular_course = CourseRun.all_objects.create(**run_data)
+
+    assert regular_course.id
+
+    for lang, suffix in langs:
+        run_data = {
+            **run_dict,
+            "courseware_id": f"{course.readable_id}{courseware_suffix}+9T9099{suffix}",
+            "language": lang if set_language_field else "",
+            "is_primary_language": False,
+        }
+        log.info("run_data is: %s", run_data)
+
+        CourseRun.all_objects.create(**run_data)
+
+    if set_primary and set_language_field:
+        # Also test what happens if we try to make another primary language
+        # If the language field isn't set, though, the constraint shouldn't be triggered.
+        run_data = {
+            **run_dict,
+            "courseware_id": f"{course.readable_id}{courseware_suffix}+9T9099{extra_primary_lang[1]}",
+            "language": extra_primary_lang[0] if set_language_field else "",
+            "is_primary_language": True,
+        }
+        log.info("run_data is: %s", run_data)
+
+        with pytest.raises(IntegrityError) as exc, transaction.atomic():
+            CourseRun.all_objects.create(**run_data)
+
+        assert "violates unique constraint" in str(exc)
+
+
+@pytest.mark.parametrize(
+    "set_language_field",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "set_primary",
+    [
+        True,
+        False,
+    ],
+)
+def test_run_language_constraints_regular_languages(set_language_field, set_primary):
+    """Test that the constraints on language for regular runs works as we expect."""
+
+    langs = [
+        (
+            "es",
+            "_ES",
+        ),
+        (
+            "de",
+            "_DE",
+        ),
+    ]
+    extra_primary_lang = (
+        "fr",
+        "_FR",
+    )
+
+    def _run_b2b_test():
+        contract = ContractPageFactory.create()
+        run_dict = starting_run_dict
+        run_dict["b2b_contract"] = contract
+        run_dict["is_source_run"] = False
+
+        _run_primary_lang_run_test(
+            course,
+            run_dict,
+            langs,
+            extra_primary_lang,
+            set_language_field,
+            set_primary,
+            courseware_suffix=f"_{contract.organization.org_key}",
+        )
+
+        assert (
+            CourseRun.all_objects.filter(course=course, b2b_contract=contract).count()
+            == 3
+        )
+
+    course, starting_run_dict = _generate_lang_run_data()
+    run_dict = starting_run_dict
+
+    _run_primary_lang_run_test(
+        course, run_dict, langs, extra_primary_lang, set_language_field, set_primary
+    )
+
+    assert CourseRun.all_objects.filter(course=course).count() == 3
+
+    # Run the above test again, but this time set up a source course.
+    # The source course constraints should be separate from the regular run ones
+    # so this should do the same things.
+
+    run_dict = starting_run_dict
+    run_dict["is_source_run"] = True
+    _run_primary_lang_run_test(
+        course,
+        run_dict,
+        langs,
+        extra_primary_lang,
+        set_language_field,
+        set_primary,
+        courseware_suffix="_SRC",
+    )
+
+    assert CourseRun.all_objects.filter(course=course, is_source_run=True).count() == 3
+
+    if set_language_field and set_primary:
+        # We should have two of these - one for the regular runs, and one for the source runs.
+        assert (
+            CourseRun.all_objects.filter(
+                course=course, language="en", is_primary_language=True
+            ).count()
+            == 2
+        )
+
+    # The penultimate time - unset source run, but add a B2B contract.
+
+    _run_b2b_test()
+
+    if set_language_field and set_primary:
+        # We should have two of these - one for the regular runs, and one for the source runs.
+        assert (
+            CourseRun.all_objects.filter(
+                course=course, language="en", is_primary_language=True
+            ).count()
+            == 3
+        )
+
+    # Final run - add another B2B contract.
+
+    _run_b2b_test()
+
+    if set_language_field and set_primary:
+        # We should have two of these - one for the regular runs, and one for the source runs.
+        assert (
+            CourseRun.all_objects.filter(
+                course=course, language="en", is_primary_language=True
+            ).count()
+            == 4
+        )

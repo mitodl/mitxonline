@@ -172,6 +172,7 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         "title",
         "courseware_id",
         "run_tag",
+        "language",
         "start_date",
         "end_date",
         "enrollment_start",
@@ -180,6 +181,7 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
     list_filter = [
         "live",
         "is_source_run",
+        "language",
         "course",
         "b2b_contract",
     ]
@@ -205,6 +207,11 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
             )
         )
         self.populate_verifiable_credentials_for_certificate(request, certificates)
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """Use the all_objects manager so we can see source runs."""
+
+        return self.model.all_objects
 
 
 @admin.register(ProgramEnrollment)

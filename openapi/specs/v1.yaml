@@ -4616,6 +4616,10 @@ components:
         courseware_id:
           type: string
           maxLength: 255
+        courseware_url:
+          type: string
+          format: uri
+          readOnly: true
         language:
           type: string
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
@@ -4633,6 +4637,7 @@ components:
           maxLength: 100
       required:
       - courseware_id
+      - courseware_url
       - id
       - run_tag
       - title
@@ -8683,13 +8688,11 @@ components:
           readOnly: true
         language:
           type: string
-          default: ''
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
         is_primary_language:
           type: boolean
-          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
@@ -8791,13 +8794,11 @@ components:
           type: boolean
         language:
           type: string
-          default: ''
           description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
             Leave blank for unspecified.
           maxLength: 8
         is_primary_language:
           type: boolean
-          default: false
           description: Designates this run as the primary-language version for its
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest

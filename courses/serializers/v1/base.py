@@ -29,11 +29,14 @@ class EnrollmentModeSerializer(serializers.ModelSerializer):
 class CourseRunLanguageOptionSerializer(serializers.ModelSerializer):
     """Compact serializer for a single language variant of a course run."""
 
+    courseware_url = serializers.URLField(read_only=True)
+
     class Meta:
         model = models.CourseRun
         fields = [
             "id",
             "courseware_id",
+            "courseware_url",
             "language",
             "title",
             "run_tag",
