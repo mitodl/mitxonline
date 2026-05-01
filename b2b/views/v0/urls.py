@@ -1,7 +1,6 @@
 """URL routing for v0 of the B2B API."""
 
-from django.urls import include, path, re_path
-from rest_framework.routers import SimpleRouter
+from django.urls import include, path
 
 from b2b.views.v0 import (
     AttachContractApi,
