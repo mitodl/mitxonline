@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.149.3
+---------------
+
+- Fix some issues with the multiple language support functionality (#3537)
+- Updating ol-django versions to latest (#3536)
+- [pre-commit.ci] pre-commit autoupdate (#3526)
+- Add receipt lookup routes by course run ID and program ID (#3527)
+
 Version 1.149.2 (Released April 29, 2026)
 ---------------
 
