@@ -71,6 +71,36 @@ class ProgramContractPageInline(admin.TabularInline):
     extra = 0
 
 
+class CourseRunInline(admin.TabularInline):
+    """Inline for course runs for a given course"""
+
+    model = CourseRun
+    extra = 0
+    fields = (
+        "id",
+        "title",
+        "courseware_id",
+        "run_tag",
+        "language",
+        "is_primary_language",
+        "is_source_run",
+        "b2b_contract",
+        "start_date",
+        "end_date",
+        "enrollment_start",
+        "upgrade_deadline",
+    )
+
+    def has_add_permission(self, *args, **kwargs):  # noqa: ARG002
+        return False
+
+    def has_change_permission(self, *args, **kwargs):  # noqa: ARG002
+        return False
+
+    def has_delete_permission(self, *args, **kwargs):  # noqa: ARG002
+        return False
+
+
 @admin.register(Program)
 class ProgramAdmin(VerifiableCredentialBackfillAdminMixin, admin.ModelAdmin):
     """Admin for Program"""
@@ -129,6 +159,7 @@ class CourseAdmin(admin.ModelAdmin):
         "readable_id",
     )
     list_filter = ["live", "departments"]
+    inlines = [CourseRunInline]
 
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}
@@ -173,6 +204,9 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         "courseware_id",
         "run_tag",
         "language",
+        "primary",
+        "source",
+        "contract",
         "start_date",
         "end_date",
         "enrollment_start",
@@ -212,6 +246,21 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         """Use the all_objects manager so we can see source runs."""
 
         return self.model.all_objects
+
+    @admin.display(description="Primary?", ordering="is_primary_language")
+    def primary(self, obj):
+        """Return the primary language run flag."""
+        return obj.is_primary_language
+
+    @admin.display(description="Source?", ordering="is_source_run")
+    def source(self, obj):
+        """Return the source run flag."""
+        return obj.is_source_run
+
+    @admin.display(description="Contract", ordering="b2b_contract")
+    def contract(self, obj):
+        """Return the B2B contract title."""
+        return obj.b2b_contract.name if obj.b2b_contract else ""
 
 
 @admin.register(ProgramEnrollment)

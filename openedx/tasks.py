@@ -109,6 +109,6 @@ def clone_courserun(target_id: int, base_key: str):
 
     from courses.models import CourseRun  # noqa: PLC0415
 
-    target_course = CourseRun.objects.get(pk=target_id)
+    target_course = CourseRun.all_objects.get(pk=target_id)
 
     api.process_course_run_clone(target_course, base_key)
