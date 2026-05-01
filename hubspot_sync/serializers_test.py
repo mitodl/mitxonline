@@ -118,10 +118,10 @@ def test_serialize_order(settings, hubspot_order, status):
     hubspot_order.state = status
     serialized_data = OrderToDealSerializer(instance=hubspot_order).data
 
-    # Calculate expected unique_app_id based on new logic (user email + purchasable object)
+    # Calculate expected unique_app_id based on new logic (user global_id + purchasable object)
     first_line = hubspot_order.lines.first()
     if first_line and first_line.purchased_object:
-        user_identifier = hubspot_order.purchaser.email.lower()
+        user_identifier = hubspot_order.purchaser.global_id
         object_type = first_line.purchased_content_type.model
         object_id = first_line.purchased_object_id
         consistent_id = f"{user_identifier}-{object_type}-{object_id}"
@@ -188,10 +188,10 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
 
     serialized_data = OrderToDealSerializer(instance=hubspot_order).data
 
-    # Calculate expected unique_app_id based on new logic (user email + purchasable object)
+    # Calculate expected unique_app_id based on new logic (user global_id + purchasable object)
     first_line = hubspot_order.lines.first()
     if first_line and first_line.purchased_object:
-        user_identifier = hubspot_order.purchaser.email.lower()
+        user_identifier = hubspot_order.purchaser.global_id
         object_type = first_line.purchased_content_type.model
         object_id = first_line.purchased_object_id
         consistent_id = f"{user_identifier}-{object_type}-{object_id}"

@@ -192,8 +192,8 @@ class OrderToDealSerializer(serializers.ModelSerializer):
         # the user and purchasable object rather than the order ID
         first_line = instance.lines.first()
         if first_line and first_line.purchased_object:
-            # Generate consistent ID based on user email and purchasable object
-            user_identifier = instance.purchaser.email.lower()
+            # Generate consistent ID based on user and purchasable object
+            user_identifier = instance.purchaser.global_id
             object_type = first_line.purchased_content_type.model
             object_id = first_line.purchased_object_id
             consistent_id = f"{user_identifier}-{object_type}-{object_id}"
