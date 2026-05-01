@@ -67,6 +67,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
         *,
         skip_edx=False,
         org_prefix=None,
+        no_reruns=False,
     ):
         """Create a run for the specified contract."""
         try:
@@ -75,6 +76,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 course=courseware,
                 skip_edx=skip_edx,
                 org_prefix=org_prefix,
+                no_reruns=no_reruns,
             )
         except InvalidKeyError:
             self.stderr.write(
@@ -139,6 +141,12 @@ Specifying a program will only unlink the program from the contract, unless "--r
             action="store_false",
         )
         add_subparser.add_argument(
+            "--allow-reruns",
+            help="Don't re-run courses that already have a run, skip over them instead. (Use if adding a language to an existing course, or cleaning up.)",
+            dest="allow_reruns",
+            action="store_false",
+        )
+        add_subparser.add_argument(
             "--force",
             help="Force adding any specified runs to the contract (overwrite existing contract associations).",
             dest="force",
@@ -182,6 +190,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
         can_import = kwargs.pop("can_import")
         org_prefix = kwargs.pop("prefix")
         make_codes = kwargs.pop("make_codes", False)
+        no_reruns = kwargs.pop("allow_reruns")
 
         managed = skipped = 0
 
@@ -292,7 +301,11 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 # This is a course, so create a run (unless we've been told not to).
 
                 if self.create_run(
-                    contract, courseware, skip_edx=create_runs, org_prefix=org_prefix
+                    contract,
+                    courseware,
+                    skip_edx=create_runs,
+                    org_prefix=org_prefix,
+                    no_reruns=no_reruns,
                 ):
                     managed += 1
                 else:
