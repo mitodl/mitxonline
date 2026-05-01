@@ -2193,17 +2193,19 @@ def _sync_cart_add_deal_with_hubspot(
 ) -> SimplePublicObject:
     """Create or update cart-add deal and line-item objects and associate them in target account."""
     deal_input = _build_target_deal_message(order, hubspot_client)
-    
+
     # Extract unique_app_id from deal input to check for existing deals
     unique_app_id = deal_input.properties.get("unique_app_id")
-    
+
     # Use the same dual lookup logic as checkout flow to prevent duplicates
     existing_deal_id = _find_target_deal_id_by_dealname(
         hubspot_client, deal_input.properties.get("dealname")
     )
     if not existing_deal_id and unique_app_id:
-        existing_deal_id = _find_target_deal_id_by_unique_app_id(hubspot_client, unique_app_id)
-    
+        existing_deal_id = _find_target_deal_id_by_unique_app_id(
+            hubspot_client, unique_app_id
+        )
+
     wait_for_hubspot_rate_limit()
     if existing_deal_id:
         # Update existing deal
