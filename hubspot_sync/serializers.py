@@ -188,7 +188,7 @@ class OrderToDealSerializer(serializers.ModelSerializer):
 
     def get_unique_app_id(self, instance):
         """Get the app_id for the object - based on user and purchasable object for consistency"""
-        # For consistency between cart-add and checkout, base the unique_app_id on 
+        # For consistency between cart-add and checkout, base the unique_app_id on
         # the user and purchasable object rather than the order ID
         first_line = instance.lines.first()
         if first_line and first_line.purchased_object:
@@ -198,7 +198,7 @@ class OrderToDealSerializer(serializers.ModelSerializer):
             object_id = first_line.purchased_object_id
             consistent_id = f"{user_identifier}-{object_type}-{object_id}"
             return format_app_id(consistent_id)
-        
+
         # Fallback to original behavior for orders without lines
         return format_app_id(instance.id)
 
