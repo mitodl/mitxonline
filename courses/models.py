@@ -166,6 +166,17 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
         return self.filter(courseware_id=text_id)
 
 
+class UsableCourseRunManager(models.Manager):
+    """Simple manager to filter out source runs."""
+
+    def get_queryset(self):
+        """Return a queryset that ignores all source runs."""
+
+        return (
+            super().get_queryset().exclude(Q(is_source_run=True) | Q(run_tag="SOURCE"))
+        )
+
+
 class CoursesTopicQuerySet(models.QuerySet):
     """
     Custom QuerySet for `CoursesTopic`
@@ -1178,7 +1189,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 class CourseRun(TimestampedModel):
     """Model for a single run/instance of a course"""
 
-    objects = CourseRunQuerySet.as_manager()
+    all_objects = CourseRunQuerySet.as_manager()
+    objects = UsableCourseRunManager.from_queryset(CourseRunQuerySet)()
+
     course = models.ForeignKey(
         Course, on_delete=models.CASCADE, related_name="courseruns", db_index=True
     )
@@ -1281,67 +1294,23 @@ class CourseRun(TimestampedModel):
     class Meta:
         unique_together = ("course", "courseware_id", "run_tag")
         constraints = [
-            models.UniqueConstraint(
+            UniqueConstraint(
+                fields=["course", "run_tag", "is_source_run", "b2b_contract"],
+                condition=Q(is_primary_language=True),
+                nulls_distinct=False,
+                name="unique_primary_language_per_group",
+            ),
+            UniqueConstraint(
                 fields=[
                     "course",
                     "run_tag",
                     "language",
-                ],
-                name="unique_courserun_course_runtag_language",
-                condition=models.Q(
-                    ~models.Q(language="") & models.Q(b2b_contract__isnull=True)
-                ),
-            ),
-            models.UniqueConstraint(
-                fields=[
-                    "course",
-                    "courseware_id",
-                    "run_tag",
-                    "language",
-                ],
-                name="unique_courserun_course_coursewareid_runtag_language",
-                condition=models.Q(
-                    ~models.Q(language="") & models.Q(b2b_contract__isnull=True)
-                ),
-            ),
-            models.UniqueConstraint(
-                fields=[
-                    "course",
-                    "run_tag",
-                    "is_primary_language",
-                ],
-                name="unique_courserun_course_runtag_language_primary",
-                condition=models.Q(
-                    ~models.Q(language="")
-                    & models.Q(is_primary_language=True)
-                    & models.Q(b2b_contract__isnull=True)
-                ),
-            ),
-            models.UniqueConstraint(
-                fields=[
-                    "course",
-                    "run_tag",
-                    "language",
+                    "is_source_run",
                     "b2b_contract",
                 ],
-                name="unique_courserun_course_runtag_language_b2b",
-                condition=models.Q(
-                    ~models.Q(language="") & models.Q(b2b_contract__isnull=False)
-                ),
-            ),
-            models.UniqueConstraint(
-                fields=[
-                    "course",
-                    "run_tag",
-                    "is_primary_language",
-                    "b2b_contract",
-                ],
-                name="unique_courserun_course_runtag_language_primary_b2b",
-                condition=models.Q(
-                    ~models.Q(language="")
-                    & models.Q(is_primary_language=True)
-                    & models.Q(b2b_contract__isnull=False)
-                ),
+                condition=~Q(language=""),
+                nulls_distinct=False,
+                name="unique_language_per_group",
             ),
         ]
 

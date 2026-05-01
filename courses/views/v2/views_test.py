@@ -2359,3 +2359,82 @@ def test_program_products_prefetch_query_count(
     assert len(product_queries) == 1, (
         f"Expected 1 product query, got {len(product_queries)}"
     )
+
+
+@pytest.mark.parametrize(
+    "primary",
+    [
+        "none",
+        "reg",
+        "transreg",
+        "source",
+    ],
+)
+def test_correct_courserun_languages(user_drf_client, primary):
+    """
+    Test that we get the correct course run back when there's multiple languages.
+
+    As described in mitodl/hq#11100, we can have multiple course runs using the
+    same run tag, and we need to make sure the proper ones come back from the API.
+    Specifically: it should not choose a B2B course run or a source course run,
+    even if those are marked such that they'd be the primary run.
+    """
+
+    test_course = CourseFactory.create()
+    start_date = now_in_utc() - timedelta(days=30)
+
+    # Run 1 - a regular course, no language
+    regular_run = CourseRunFactory.create(
+        course=test_course,
+        run_tag="1T2026",
+        courseware_id=f"{test_course.readable_id}+1T2026",
+        start_date=start_date,
+        enrollment_start=start_date,
+        live=True,
+        language="en" if primary in ["reg", "transreg"] else "",
+        is_primary_language=(primary == "reg"),
+    )
+
+    # Run 2 - a regular course, in a language
+    translated_regular_run = CourseRunFactory.create(
+        course=test_course,
+        run_tag="1T2026",
+        courseware_id=f"{test_course.readable_id}+1T2026_ES",
+        start_date=start_date,
+        enrollment_start=start_date,
+        live=True,
+        language="es",
+        is_primary_language=(primary == "transreg"),
+    )
+
+    # Run 3 - a source course
+    source_run = CourseRunFactory.create(
+        course=test_course,
+        run_tag="1T2026",
+        courseware_id=f"{test_course.readable_id}+1T2026_SOURCE",
+        start_date=start_date,
+        enrollment_start=start_date,
+        live=True,
+        language="en" if primary == "source" else "",
+        is_primary_language=(primary == "source"),
+        is_source_run=True,
+    )
+
+    resp = user_drf_client.get(
+        reverse("v2:courses_api-detail", kwargs={"pk": test_course.id}),
+    )
+
+    assert resp.status_code == 200
+
+    resp_json = resp.json()
+
+    seen_run_ids = [run["id"] for run in resp_json["courseruns"]]
+
+    assert resp_json["next_run_id"] == (
+        translated_regular_run.id if primary == "transreg" else regular_run.id
+    )
+    assert source_run.id not in seen_run_ids
+
+    assert (
+        regular_run.id if primary == "transreg" else translated_regular_run.id
+    ) not in seen_run_ids
