@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.149.4
+Version 1.149.4 (Released May 04, 2026)
 ---------------
 
 - Fixes some additional issues with the language support (#3542)
