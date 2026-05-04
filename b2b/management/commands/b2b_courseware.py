@@ -137,14 +137,14 @@ Specifying a program will only unlink the program from the contract, unless "--r
         add_subparser.add_argument(
             "--no-create-runs",
             help="Don't create contract runs in edX for the specified course, just add it to the contract.",
-            dest="create_runs",
-            action="store_false",
+            dest="no_create_runs",
+            action="store_true",
         )
         add_subparser.add_argument(
             "--allow-reruns",
-            help="Don't re-run courses that already have a run, skip over them instead. (Use if adding a language to an existing course, or cleaning up.)",
+            help="Allow courses to be re-run.",
             dest="allow_reruns",
-            action="store_false",
+            action="store_true",
         )
         add_subparser.add_argument(
             "--force",
@@ -182,17 +182,17 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         return super().add_arguments(parser)
 
-    def handle_add(self, contract, coursewares, **kwargs):  # noqa: PLR0915, C901
+    def handle_add(self, contract, coursewares, **kwargs):  # noqa: C901
         """Handle the add subcommand."""
 
-        create_runs = kwargs.pop("create_runs")
+        skip_edx = kwargs.pop("no_create_runs", False)
         force_associate = kwargs.pop("force")
         can_import = kwargs.pop("can_import")
         org_prefix = kwargs.pop("prefix")
         make_codes = kwargs.pop("make_codes", False)
-        no_reruns = kwargs.pop("allow_reruns")
+        no_reruns = not kwargs.pop("allow_reruns", True)
 
-        managed = skipped = 0
+        managed = 0
 
         if can_import:
             # Get the courseware IDs we got passed in that weren't matched to
@@ -249,8 +249,8 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     )
                 )
 
-                prog_add, prog_skip, prog_no_source = contract.add_program_courses(
-                    courseware
+                prog_add, prog_no_source = contract.add_program_courses(
+                    courseware, skip_edx=skip_edx, no_reruns=no_reruns
                 )
                 if prog_no_source > 0:
                     self.stdout.write(
@@ -260,7 +260,6 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     )
                 contract.save()
                 managed += prog_add
-                skipped += prog_skip
                 self.stdout.write(
                     self.style.SUCCESS(f"Added {courseware.readable_id} to {contract}.")
                 )
@@ -281,7 +280,6 @@ Specifying a program will only unlink the program from the contract, unless "--r
                             f"Run '{courseware.courseware_id}' is already owned by {courseware.b2b_contract}."
                         )
                     )
-                    skipped += 1
                     continue
                 elif courseware.b2b_contract == contract:
                     # Already owned by this contract, so skip
@@ -290,33 +288,22 @@ Specifying a program will only unlink the program from the contract, unless "--r
                             f"Run '{courseware.courseware_id}' is already owned by this contract."
                         )
                     )
-                    skipped += 1
                     continue
 
                 # Add the run to the contract
                 courseware.b2b_contract = contract
                 courseware.save()
                 managed += 1
-            elif create_runs:
+            elif self.create_run(
+                contract,
+                courseware,
+                skip_edx=skip_edx,
+                org_prefix=org_prefix,
+                no_reruns=no_reruns,
+            ):
                 # This is a course, so create a run (unless we've been told not to).
 
-                if self.create_run(
-                    contract,
-                    courseware,
-                    skip_edx=create_runs,
-                    org_prefix=org_prefix,
-                    no_reruns=no_reruns,
-                ):
-                    managed += 1
-                else:
-                    skipped += 1
-            else:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Skipped run creation for for course {courseware.readable_id} for contract {contract}."
-                    )
-                )
-                skipped += 1
+                managed += 1
 
         if make_codes:
             self.stdout.write(f"Queueing enrollment code check for {contract}")
@@ -324,7 +311,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Managed {managed} courseware items and skipped {skipped} courseware items for {len(coursewares)} specified courseware IDs."
+                f"Managed {managed} courseware items for {len(coursewares)} specified courseware IDs."
             )
         )
 
