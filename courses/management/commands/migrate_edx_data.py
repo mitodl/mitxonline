@@ -590,9 +590,7 @@ class Command(BaseCommand):
 
             rows = [dict(zip(columns, r)) for r in results]
 
-            total_enrollments += self._bulk_create_program_enrollments(
-                rows, batch_size
-            )
+            total_enrollments += self._bulk_create_program_enrollments(rows, batch_size)
             total_certificates += self._bulk_create_program_certificates(
                 rows, batch_size
             )
