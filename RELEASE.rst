@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.149.4
+---------------
+
+- Fixes some additional issues with the language support (#3542)
+- Update AGENTS.md to instruct docker usage (#3538)
+
 Version 1.149.3 (Released May 01, 2026)
 ---------------
 
