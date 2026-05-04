@@ -1357,6 +1357,14 @@ def test_sync_enrollments_with_edx_missing(mocker, user):
     assert results == SyncResult()
 
 
+def test_sync_enrollments_with_edx_not_synced(mocker, user):
+    """sync_enrollments_with_edx returns an empty SyncResult without calling edX when client is None"""
+    CourseRunEnrollmentFactory.create(user=user, active=True)
+    mocker.patch("openedx.api.get_edx_api_client", return_value=None)
+    result = sync_enrollments_with_edx(user)
+    assert result == SyncResult()
+
+
 def test_subscribe_to_edx_course_emails(mocker, user):
     """Tests that subscribe_to_edx_course_emails makes a call to subscribe for course emails in edX via api client"""
     mock_client = mocker.MagicMock()
@@ -1373,6 +1381,14 @@ def test_subscribe_to_edx_course_emails(mocker, user):
 
     mock_client.email_settings.subscribe.assert_called_once_with(courseware_id)
     assert subscribe_to_course_emails == subscribe_return_value
+
+
+def test_subscribe_to_edx_course_emails_not_synced(mocker, user):
+    """subscribe_to_edx_course_emails returns None without calling edX when client is None"""
+    run_enrollment = CourseRunEnrollmentFactory()
+    mocker.patch("openedx.api.get_edx_api_client", return_value=None)
+    result = subscribe_to_edx_course_emails(user, run_enrollment.run)
+    assert result is None
 
 
 @pytest.mark.parametrize(
@@ -1414,6 +1430,14 @@ def test_unsubscribe_from_edx_course_emails(mocker, user):
 
     mock_client.email_settings.unsubscribe.assert_called_once_with(courseware_id)
     assert unsubscribe_to_course_emails == unsubscribe_return_value
+
+
+def test_unsubscribe_from_edx_course_emails_not_synced(mocker, user):
+    """unsubscribe_from_edx_course_emails returns None without calling edX when client is None"""
+    run_enrollment = CourseRunEnrollmentFactory()
+    mocker.patch("openedx.api.get_edx_api_client", return_value=None)
+    result = unsubscribe_from_edx_course_emails(user, run_enrollment.run)
+    assert result is None
 
 
 @pytest.mark.parametrize(

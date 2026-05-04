@@ -457,9 +457,7 @@ def create_edx_user(user, edx_username=None):
         return False
 
     if open_edx_user.has_been_synced and _edx_user_exists(user):
-        # User already exists in edX, mark as synced and skip creation
-        open_edx_user.has_been_synced = True
-        open_edx_user.save()
+        # User already exists in edX, skip creation
         return False
 
     try:
