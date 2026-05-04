@@ -25,7 +25,6 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
     ORG_INDEX_SLUG,
 )
-from b2b.exceptions import TargetCourseRunExistsError
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
 
@@ -561,11 +560,8 @@ class ContractPage(Page, ClusterableModel):
             models.Q(courseruns__is_source_run=True)
             | models.Q(courseruns__run_tag="SOURCE")
         ).all():
-            try:
-                create_contract_run(self, course, no_reruns=True)
-                managed += 1
-            except TargetCourseRunExistsError:  # noqa: PERF203
-                skipped_run_creation += 1
+            created_runs = create_contract_run(self, course, no_reruns=True)
+            managed += len(created_runs)
 
         if order is None:
             last_item = self.contract_programs.order_by("-sort_order").first()
