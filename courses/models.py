@@ -165,6 +165,10 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
         """Applies a filter for the CourseRun's courseware_id"""
         return self.filter(courseware_id=text_id)
 
+    def source(self):
+        """Filter for source runs"""
+        return self.filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
+
 
 class UsableCourseRunManager(models.Manager):
     """Simple manager to filter out source runs."""

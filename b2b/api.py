@@ -22,7 +22,7 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
     ORG_KEY_MAX_LENGTH,
 )
-from b2b.exceptions import SourceCourseIncompleteError, TargetCourseRunExistsError
+from b2b.exceptions import SourceCourseIncompleteError
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
 from b2b.models import (
@@ -450,14 +450,17 @@ def create_contract_run(  # noqa: PLR0913
         new_run_tag = new_course_key.run
 
         if (
-            CourseRun.objects.filter(course=course, b2b_contract=contract).exists()
+            CourseRun.objects.filter(
+                course=course, b2b_contract=contract, language=clone_course_run.language
+            ).exists()
             and no_reruns
         ):
             msg = (
                 f"Can't create a run for {course} and contract {contract}: "
                 f"courseware ID {new_readable_id} already exists."
             )
-            raise TargetCourseRunExistsError(msg)
+            log.warning(msg)
+            continue
 
         course_run = CourseRun(
             course=course,
@@ -485,7 +488,7 @@ def create_contract_run(  # noqa: PLR0913
         if not skip_edx:
             clone_courserun.delay(course_run.id, clone_course_run.courseware_id)
 
-        log.debug(
+        log.info(
             "Created run %s (language=%s) for course %s in contract %s from %s",
             course_run,
             course_run.language,

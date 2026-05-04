@@ -25,7 +25,6 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
     ORG_INDEX_SLUG,
 )
-from b2b.exceptions import TargetCourseRunExistsError
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
 
@@ -530,9 +529,13 @@ class ContractPage(Page, ClusterableModel):
             .all()
         )
 
-    def add_program_courses(self, program, order=None):
+    def add_program_courses(
+        self, program, order=None, *, skip_edx=False, no_reruns=True
+    ):
         """
         Add a program, and then queue adding all its courses.
+
+        This defaults to not allowing re-runs to happen.
 
         Args:
         - program (courses.Program): the program to add
@@ -540,7 +543,6 @@ class ContractPage(Page, ClusterableModel):
         Returns:
         - tuple: Tuple with three integers:
             - number of course runs created
-            - number of course runs skipped (already existed)
             - number of courses with no source run
         """
 
@@ -551,7 +553,6 @@ class ContractPage(Page, ClusterableModel):
             delattr(program, "_courses_with_requirements_data")
 
         managed = 0
-        skipped_run_creation = 0
         no_source = program.courses_qset.exclude(
             models.Q(courseruns__is_source_run=True)
             | models.Q(courseruns__run_tag="SOURCE")
@@ -561,11 +562,10 @@ class ContractPage(Page, ClusterableModel):
             models.Q(courseruns__is_source_run=True)
             | models.Q(courseruns__run_tag="SOURCE")
         ).all():
-            try:
-                create_contract_run(self, course, no_reruns=True)
-                managed += 1
-            except TargetCourseRunExistsError:  # noqa: PERF203
-                skipped_run_creation += 1
+            created_runs = create_contract_run(
+                self, course, no_reruns=no_reruns, skip_edx=skip_edx
+            )
+            managed += len(created_runs)
 
         if order is None:
             last_item = self.contract_programs.order_by("-sort_order").first()
@@ -579,7 +579,7 @@ class ContractPage(Page, ClusterableModel):
             item = ContractProgramItem(contract=self, program=program, sort_order=order)
             item.save(skip_run_creation=True)
 
-        return (managed, skipped_run_creation, no_source)
+        return (managed, no_source)
 
     class Meta:
         """Meta options for the ContractPage."""
