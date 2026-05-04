@@ -741,7 +741,7 @@ class Command(BaseCommand):
                 "entitlements",
             ],
             default="course_runs",
-            help="Choose which migration to run: course_runs, users, certificates, program_certificates, entitlements (default: course_runs)",
+            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements (default: course_runs)",
         )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
