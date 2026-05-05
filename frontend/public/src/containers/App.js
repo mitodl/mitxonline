@@ -73,7 +73,7 @@ export class App extends React.Component<Props, void> {
     return searchParams.has("ecom-service")
   }
 
-  isCheckoutPage() {
+  isCheckoutRelatedPage() {
     const { match, location } = this.props
     return (
       !!matchPath(location.pathname, {
@@ -104,7 +104,7 @@ export class App extends React.Component<Props, void> {
 
     return (
       <div className="app" aria-flowto="notifications-container">
-        {!this.isEcomServiceMode() && !this.isCheckoutPage() && (
+        {!this.isEcomServiceMode() && !this.isCheckoutRelatedPage() && (
           <Header
             currentUser={currentUser}
             cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
