@@ -445,6 +445,8 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
             else ContentType.objects.get(app_label="courses", model="course")
         )
 
+        courseware_tier = determine_tier_courseware(courseware_object, income_usd)
+
         if not FlexiblePrice.objects.filter(
             user=user,
             courseware_content_type=content_type,
@@ -455,12 +457,11 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
                 country_of_income=country_code,
                 user=user,
                 courseware_object=courseware_object,
+                tier=courseware_tier,
                 status=FlexiblePriceStatus.APPROVED
                 if expected
                 else FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
             )
-
-        courseware_tier = determine_tier_courseware(courseware_object, income_usd)
         discount = self.create_run_and_product_and_discount(user, courseware_object)
 
         return courseware_tier, discount

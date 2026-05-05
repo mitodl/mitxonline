@@ -30,6 +30,7 @@ from ecommerce.constants import (
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_UNLIMITED,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.discounts import DiscountType
@@ -409,7 +410,10 @@ def test_create_basket_with_product(  # noqa: PLR0913
 ):
     """Test creating a basket with a single product, and/or a discount."""
 
-    product = ProductFactory.create()
+    # Use a fixed price well above any discount amount so that the discount
+    # comparison logic works correctly regardless of discount type (percent-off,
+    # dollars-off, or fixed-price).
+    product = ProductFactory.create(price=Decimal("1000.00"))
 
     basket = BasketFactory(user=user) if existing_basket else None
 
@@ -420,12 +424,16 @@ def test_create_basket_with_product(  # noqa: PLR0913
 
     if add_discount:
         if existing_discount in ["better", "worse"]:
-            # Create and apply a discount that is either better or worse than
-            # the one that'll be "supplied" below.
+            # Create and apply a percent-off discount that is either better or
+            # worse than the supplied 50% discount below. "better" = 60% off
+            # (lower final price), "worse" = 10% off (higher final price).
+            # redemption_type is set explicitly to avoid import-time randomness
+            # from DiscountFactory affecting discount validity checks.
 
             ex_discount = DiscountFactory(
-                discount_type="percent-off",
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
                 amount=10 if existing_discount == "worse" else 60,
+                redemption_type=REDEMPTION_TYPE_UNLIMITED,
             )
             BasketDiscount.objects.create(
                 redeemed_basket=basket,
@@ -436,7 +444,10 @@ def test_create_basket_with_product(  # noqa: PLR0913
 
         if bad_discount:
             discount = DiscountFactory(
-                discount_type="percent-off", amount=50, max_redemptions=1
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                amount=50,
+                max_redemptions=1,
+                redemption_type=REDEMPTION_TYPE_UNLIMITED,
             )
             order = OrderFactory.create()
             DiscountRedemption.objects.create(
@@ -446,7 +457,11 @@ def test_create_basket_with_product(  # noqa: PLR0913
                 redeemed_order=order,
             )
         else:
-            discount = DiscountFactory(discount_type="percent-off", amount=50)
+            discount = DiscountFactory(
+                discount_type=DISCOUNT_TYPE_PERCENT_OFF,
+                amount=50,
+                redemption_type=REDEMPTION_TYPE_UNLIMITED,
+            )
 
         url = reverse(
             "v0:baskets_api-create_from_product_with_discount",
