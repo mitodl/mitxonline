@@ -121,7 +121,7 @@ class AttachContractApi(APIView):
 
     @extend_schema(
         request=None,
-        responses=ContractPageSerializer(many=True),
+        responses=ContractPageSerializer,
     )
     def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002
         """
@@ -144,7 +144,7 @@ class AttachContractApi(APIView):
         - 200: Code valid but user already attached to all associated contracts
         - 404: Invalid or expired enrollment code
         - 409: Code valid but no available seats in associated contract(s)
-        - list of ContractPageSerializer - the contracts for the user
+        - ContractPageSerializer (or null) - the active contract associated with the code
         """
         now = now_in_utc()
 
@@ -199,11 +199,17 @@ class AttachContractApi(APIView):
             request.user, contracts, code
         )
 
-        active_contracts = self._get_active_user_contracts(request.user, now)
-        serialized_contracts = ContractPageSerializer(active_contracts, many=True).data
+        active_code_contract = self._get_active_code_user_contract(
+            request.user, code, now
+        )
+        serialized_contract = (
+            ContractPageSerializer(active_code_contract).data
+            if active_code_contract
+            else None
+        )
 
         if contracts_attached:
-            return Response(serialized_contracts, status=status.HTTP_201_CREATED)
+            return Response(serialized_contract, status=status.HTTP_201_CREATED)
 
         if contract_full:
             return Response(
@@ -211,12 +217,16 @@ class AttachContractApi(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        return Response(serialized_contracts, status=status.HTTP_200_OK)
+        return Response(serialized_contract, status=status.HTTP_200_OK)
 
-    def _get_active_user_contracts(self, user, now):
-        """Return active contracts for a user at the given time."""
-        return user.b2b_contracts.filter(active=True).exclude(
-            Q(contract_start__gt=now) | Q(contract_end__lt=now)
+    def _get_active_code_user_contract(self, user, code, now):
+        """Return the user's active contract associated with the redeemed code."""
+        code_contract_ids = code.b2b_contracts().values_list("id", flat=True)
+        return (
+            user.b2b_contracts.filter(active=True)
+            .exclude(Q(contract_start__gt=now) | Q(contract_end__lt=now))
+            .filter(pk__in=code_contract_ids)
+            .first()
         )
 
     def _get_valid_discount(self, enrollment_code, now):

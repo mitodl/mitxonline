@@ -121,7 +121,7 @@ paths:
         - 200: Code valid but user already attached to all associated contracts
         - 404: Invalid or expired enrollment code
         - 409: Code valid but no available seats in associated contract(s)
-        - list of ContractPageSerializer - the contracts for the user
+        - ContractPageSerializer (or null) - the active contract associated with the code
       parameters:
       - in: path
         name: enrollment_code
@@ -135,9 +135,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ContractPage'
+                $ref: '#/components/schemas/ContractPage'
           description: ''
   /api/v0/b2b/contracts/:
     get:
