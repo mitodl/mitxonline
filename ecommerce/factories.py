@@ -1,5 +1,3 @@
-import random
-
 import faker
 from factory import SubFactory, fuzzy
 from factory.django import DjangoModelFactory
@@ -41,12 +39,10 @@ class ProgramProductFactory(DjangoModelFactory):
 
 
 class DiscountFactory(DjangoModelFactory):
-    amount = random.randrange(1, 50, 1)  # noqa: S311
-    discount_type = ALL_DISCOUNT_TYPES[random.randrange(0, len(ALL_DISCOUNT_TYPES), 1)]  # noqa: S311
+    amount = fuzzy.FuzzyInteger(1, 49)
+    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
     discount_code = fuzzy.FuzzyText(length=20)
-    redemption_type = ALL_REDEMPTION_TYPES[
-        random.randrange(0, len(ALL_REDEMPTION_TYPES), 1)  # noqa: S311
-    ]
+    redemption_type = fuzzy.FuzzyChoice(ALL_REDEMPTION_TYPES)
     payment_type = None
 
     class Meta:
@@ -57,8 +53,8 @@ class DiscountFactory(DjangoModelFactory):
 
 
 class OneTimeDiscountFactory(DjangoModelFactory):
-    amount = random.randrange(1, 50, 1)  # noqa: S311
-    discount_type = ALL_DISCOUNT_TYPES[random.randrange(0, len(ALL_DISCOUNT_TYPES), 1)]  # noqa: S311
+    amount = fuzzy.FuzzyInteger(1, 49)
+    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
     discount_code = fuzzy.FuzzyText(length=20)
     redemption_type = REDEMPTION_TYPE_ONE_TIME
 
@@ -67,8 +63,8 @@ class OneTimeDiscountFactory(DjangoModelFactory):
 
 
 class OneTimePerUserDiscountFactory(DjangoModelFactory):
-    amount = random.randrange(1, 50, 1)  # noqa: S311
-    discount_type = ALL_DISCOUNT_TYPES[random.randrange(0, len(ALL_DISCOUNT_TYPES), 1)]  # noqa: S311
+    amount = fuzzy.FuzzyInteger(1, 49)
+    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
     discount_code = fuzzy.FuzzyText(length=20)
     redemption_type = REDEMPTION_TYPE_ONE_TIME_PER_USER
 
@@ -77,8 +73,8 @@ class OneTimePerUserDiscountFactory(DjangoModelFactory):
 
 
 class UnlimitedUseDiscountFactory(DjangoModelFactory):
-    amount = random.randrange(1, 50, 1)  # noqa: S311
-    discount_type = ALL_DISCOUNT_TYPES[random.randrange(0, len(ALL_DISCOUNT_TYPES), 1)]  # noqa: S311
+    amount = fuzzy.FuzzyInteger(1, 49)
+    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
     discount_code = fuzzy.FuzzyText(length=20)
     redemption_type = REDEMPTION_TYPE_UNLIMITED
 
@@ -87,11 +83,11 @@ class UnlimitedUseDiscountFactory(DjangoModelFactory):
 
 
 class SetLimitDiscountFactory(DjangoModelFactory):
-    amount = random.randrange(1, 50, 1)  # noqa: S311
-    discount_type = ALL_DISCOUNT_TYPES[random.randrange(0, len(ALL_DISCOUNT_TYPES), 1)]  # noqa: S311
+    amount = fuzzy.FuzzyInteger(1, 49)
+    discount_type = fuzzy.FuzzyChoice(ALL_DISCOUNT_TYPES)
     discount_code = fuzzy.FuzzyText(length=20)
     redemption_type = REDEMPTION_TYPE_UNLIMITED
-    max_redemptions = random.randrange(1, 5, 1)  # noqa: S311
+    max_redemptions = fuzzy.FuzzyInteger(1, 4)
 
     class Meta:
         model = models.Discount

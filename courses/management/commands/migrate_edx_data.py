@@ -16,11 +16,13 @@ from courses.models import (
     CourseRunGrade,
     Department,
     Program,
+    ProgramCertificate,
     ProgramEnrollment,
 )
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import ZERO_PAYMENT_DATA
 from ecommerce.models import PendingOrder, Product
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
 
@@ -428,7 +430,7 @@ class Command(BaseCommand):
         )
         return len(new_certificate_objects)
 
-    def _migrate_certificates(self, conn, options):
+    def _migrate_course_certificates(self, conn, options):
         """
         Migrate certificates from edX to MITx Online. Create CourseRunEnrollment, CourseRunGrade,
         and CourseRunCertificate instances.
@@ -497,6 +499,114 @@ class Command(BaseCommand):
                         f"{total_certificates} certificates created"
                     )
                 )
+
+    @staticmethod
+    def _bulk_create_program_enrollments(rows, batch_size):
+        user_ids = {row["user_mitxonline_id"] for row in rows}
+        program_ids = {row["program_id"] for row in rows}
+        existing = set(
+            ProgramEnrollment.all_objects.filter(
+                user_id__in=user_ids,
+                program_id__in=program_ids,
+            ).values_list("user_id", "program_id")
+        )
+        new_enrollment_objects = [
+            ProgramEnrollment(
+                user_id=row["user_mitxonline_id"],
+                program_id=row["program_id"],
+                enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            )
+            for row in rows
+            if (row["user_mitxonline_id"], row["program_id"]) not in existing
+        ]
+        if not new_enrollment_objects:
+            return 0
+
+        ProgramEnrollment.all_objects.bulk_create(
+            new_enrollment_objects,
+            batch_size=batch_size,
+            ignore_conflicts=True,
+        )
+        return len(new_enrollment_objects)
+
+    @staticmethod
+    def _bulk_create_program_certificates(rows, batch_size):
+        user_ids = {row["user_mitxonline_id"] for row in rows}
+        program_ids = {row["program_id"] for row in rows}
+        existing = set(
+            ProgramCertificate.all_objects.filter(
+                user_id__in=user_ids,
+                program_id__in=program_ids,
+            ).values_list("user_id", "program_id")
+        )
+        new_certificate_objects = [
+            ProgramCertificate(
+                user_id=row["user_mitxonline_id"],
+                program_id=row["program_id"],
+                issue_date=row["program_certificate_issued_on"],
+                certificate_page_revision_id=row["certificate_page_revision_id"],
+            )
+            for row in rows
+            if (row["user_mitxonline_id"], row["program_id"]) not in existing
+        ]
+        if not new_certificate_objects:
+            return 0
+
+        ProgramCertificate.objects.bulk_create(
+            new_certificate_objects,
+            batch_size=batch_size,
+            ignore_conflicts=True,
+        )
+        return len(new_certificate_objects)
+
+    def _migrate_program_certificates(self, conn, options):
+        """
+        Migrate program certificates from edX to MITx Online. Create ProgramEnrollment
+        and ProgramCertificate instances.
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+
+        cur = conn.cursor()
+
+        query = (
+            "SELECT * FROM edxorg_to_mitxonline_program_certificates "
+            "WHERE user_mitxonline_id IS NOT NULL AND program_id IS NOT NULL"
+        )
+
+        if limit is not None:
+            query += f" LIMIT {int(limit)}"
+
+        cur.execute(query)
+        columns = [desc[0] for desc in cur.description]
+
+        total_enrollments = 0
+        total_certificates = 0
+
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            rows = [dict(zip(columns, r)) for r in results]
+
+            total_enrollments += self._bulk_create_program_enrollments(rows, batch_size)
+            total_certificates += self._bulk_create_program_certificates(
+                rows, batch_size
+            )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"{total_enrollments} program enrollments created, "
+                    f"{total_certificates} program certificates created"
+                )
+            )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Program certificate migration complete: "
+                f"{total_enrollments} enrollments, {total_certificates} certificates"
+            )
+        )
 
     def _migrate_entitlements(self, conn, options):
         """
@@ -621,9 +731,15 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--type",
-            choices=["course_runs", "users", "certificates", "entitlements"],
+            choices=[
+                "course_runs",
+                "users",
+                "course_certificates",
+                "program_certificates",
+                "entitlements",
+            ],
             default="course_runs",
-            help="Choose which migration to run: course_runs, users (default: course_runs)",
+            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements (default: course_runs)",
         )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
@@ -645,11 +761,17 @@ class Command(BaseCommand):
             self.stdout.write("Migrating the edX users ...")
             self._migrate_users(conn, options)
 
-        if migrate_type == "certificates":
+        if migrate_type == "course_certificates":
             self.stdout.write(
-                "Migrating the edX enrollments, grades and certificates ..."
+                "Migrating the edX course enrollments, grades and certificates ..."
             )
-            self._migrate_certificates(conn, options)
+            self._migrate_course_certificates(conn, options)
+
+        if migrate_type == "program_certificates":
+            self.stdout.write(
+                "Migrating the edX program enrollments and certificates ..."
+            )
+            self._migrate_program_certificates(conn, options)
 
         if migrate_type == "entitlements":
             self.stdout.write(
