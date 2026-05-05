@@ -71,6 +71,7 @@ from openedx.exceptions import (
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
+    NoEdxApiAuthError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -862,9 +863,22 @@ def test_get_edx_course_outline_missing_service_token(settings):
         get_edx_course_outline("course-v1:OpenedX+DemoX+DemoCourse")
 
 
+def test_get_edx_api_client_not_synced_raises(mocker, user):
+    """get_edx_api_client raises NoEdxApiAuthError when user is not synced and IGNORE_EDX_FAILURES is False"""
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=None)
+    with pytest.raises(NoEdxApiAuthError):
+        get_edx_api_client(user)
+
+
+def test_get_edx_api_client_not_synced_ignore_failures(mocker, settings, user):
+    """get_edx_api_client returns None when user is not synced and IGNORE_EDX_FAILURES is True"""
+    settings.FEATURES = {"IGNORE_EDX_FAILURES": True}
+    mocker.patch("openedx.api.create_edx_auth_token", return_value=None)
+    assert get_edx_api_client(user) is None
+
+
 def test_get_edx_retirement_service_client(mocker, settings):
     """Tests that get_edx_retirement_service_client returns an EdxApi client"""
-
     settings.OPENEDX_API_BASE_URL = "http://example.com"
     settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID = (
         "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID"
@@ -1237,6 +1251,22 @@ def test_update_edx_user_name_creates_missing_auth(mocker, user):
     assert result == update_name_return_value
 
 
+def test_update_edx_user_name_not_synced(mocker, user):
+    """update_edx_user_name returns None without calling edX when user is not yet synced"""
+    mocker.patch("openedx.api.get_edx_api_client", return_value=None)
+    result = update_edx_user_name(user)
+    assert result is None
+
+
+def test_update_edx_user_name_not_synced_raises(mocker, user):
+    """update_edx_user_name propagates NoEdxApiAuthError when user is not synced and IGNORE_EDX_FAILURES is False"""
+    mocker.patch(
+        "openedx.api.get_edx_api_client", side_effect=NoEdxApiAuthError("not synced")
+    )
+    with pytest.raises(NoEdxApiAuthError):
+        update_edx_user_name(user)
+
+
 def test_sync_enrollments_with_edx_active(mocker, user):
     """sync_enrollments_with_edx should update the 'active' property of existing enrollment records"""
     courseware_ids = [
@@ -1327,6 +1357,14 @@ def test_sync_enrollments_with_edx_missing(mocker, user):
     assert results == SyncResult()
 
 
+def test_sync_enrollments_with_edx_not_synced(mocker, user):
+    """sync_enrollments_with_edx returns an empty SyncResult without calling edX when client is None"""
+    CourseRunEnrollmentFactory.create(user=user, active=True)
+    mocker.patch("openedx.api.get_edx_api_client", return_value=None)
+    result = sync_enrollments_with_edx(user)
+    assert result == SyncResult()
+
+
 def test_subscribe_to_edx_course_emails(mocker, user):
     """Tests that subscribe_to_edx_course_emails makes a call to subscribe for course emails in edX via api client"""
     mock_client = mocker.MagicMock()
@@ -1343,6 +1381,14 @@ def test_subscribe_to_edx_course_emails(mocker, user):
 
     mock_client.email_settings.subscribe.assert_called_once_with(courseware_id)
     assert subscribe_to_course_emails == subscribe_return_value
+
+
+def test_subscribe_to_edx_course_emails_not_synced(mocker, user):
+    """subscribe_to_edx_course_emails returns None without calling edX when client is None"""
+    run_enrollment = CourseRunEnrollmentFactory()
+    mocker.patch("openedx.api.get_edx_api_client", return_value=None)
+    result = subscribe_to_edx_course_emails(user, run_enrollment.run)
+    assert result is None
 
 
 @pytest.mark.parametrize(
@@ -1384,6 +1430,14 @@ def test_unsubscribe_from_edx_course_emails(mocker, user):
 
     mock_client.email_settings.unsubscribe.assert_called_once_with(courseware_id)
     assert unsubscribe_to_course_emails == unsubscribe_return_value
+
+
+def test_unsubscribe_from_edx_course_emails_not_synced(mocker, user):
+    """unsubscribe_from_edx_course_emails returns None without calling edX when client is None"""
+    run_enrollment = CourseRunEnrollmentFactory()
+    mocker.patch("openedx.api.get_edx_api_client", return_value=None)
+    result = unsubscribe_from_edx_course_emails(user, run_enrollment.run)
+    assert result is None
 
 
 @pytest.mark.parametrize(
