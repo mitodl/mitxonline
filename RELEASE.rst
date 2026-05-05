@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.149.5
+---------------
+
+- fix: make DiscountFactory defaults evaluate per-instance to prevent flaky test_create_basket_with_product (#3532)
+- fix: if user is not sync'd with edX yet, don't raise (#3499)
+- Update dependency postcss to v8.5.10 [SECURITY] (#3543)
+- feat: add program certificate migration to migrate_edx_data management command (#3545)
+
 Version 1.149.4 (Released May 04, 2026)
 ---------------
 
