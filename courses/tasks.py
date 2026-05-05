@@ -78,6 +78,28 @@ def send_partner_school_email(record_uuid):
 
 
 @app.task
+def generate_missing_program_certificates(dry_run=True, batch_size=500):  # noqa: FBT002
+    """
+    Task to create missing program certificates for verified enrollments that have
+    earned them but were not issued a certificate (e.g. due to a missed signal).
+
+    Args:
+        dry_run (bool): When True (default) log what would be created without
+            writing to the database.  Set to False to enable writes.
+        batch_size (int): Number of enrollments to process per pk-windowed batch.
+    """
+    from courses.api import (
+        generate_missing_program_certificates as _api_fn,
+    )
+
+    results = _api_fn(dry_run=dry_run, batch_size=batch_size)
+    log.info(
+        "generate_missing_program_certificates task finished: %s",
+        results,
+    )
+
+
+@app.task
 def upgrade_eligible_program_enrollments():
     """Upgrade eligible learners for all audit-mode program enrollments."""
     from courses.api import upgrade_program_enrollment_if_eligible

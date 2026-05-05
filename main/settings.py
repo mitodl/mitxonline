@@ -912,6 +912,16 @@ CRON_UPGRADE_PROGRAM_ENROLLMENTS_DAYS = get_string(
     default="*",
     description="'day_of_week' value for 'upgrade-eligible-program-enrollments' scheduled task (default runs daily).",
 )
+CRON_MISSING_PROGRAM_CERTIFICATES_HOURS = get_string(
+    name="CRON_MISSING_PROGRAM_CERTIFICATES_HOURS",
+    default="2",
+    description="'hours' value for the 'generate-missing-program-certificates' scheduled task (default runs at 2 AM).",
+)
+CRON_MISSING_PROGRAM_CERTIFICATES_DAYS = get_string(
+    name="CRON_MISSING_PROGRAM_CERTIFICATES_DAYS",
+    default="*",
+    description="'day_of_week' value for 'generate-missing-program-certificates' scheduled task (default runs daily).",
+)
 CRON_ORPHAN_CHECK_HOURS = get_string(
     name="CRON_ORPHAN_CHECK_HOURS",
     default="3",
@@ -1040,6 +1050,19 @@ CELERY_BEAT_SCHEDULE = {
             day_of_month="*",
             month_of_year="*",
         ),
+    },
+    "generate-missing-program-certificates": {
+        "task": "courses.tasks.generate_missing_program_certificates",
+        "schedule": crontab(
+            minute=0,
+            hour=CRON_MISSING_PROGRAM_CERTIFICATES_HOURS,
+            day_of_week=CRON_MISSING_PROGRAM_CERTIFICATES_DAYS,
+            day_of_month="*",
+            month_of_year="*",
+        ),
+        # Runs in dry-run mode by default.  Set dry_run=False in kwargs after
+        # validating output in production logs.
+        "kwargs": {"dry_run": True},
     },
     "update-b2b-enrollment-code-sheets": {
         "task": "b2b.tasks.queue_update_all_contract_enrollment_sheets",

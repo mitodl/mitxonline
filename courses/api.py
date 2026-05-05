@@ -1193,6 +1193,180 @@ def generate_multiple_programs_certificate(user, programs):
     return results
 
 
+def get_eligible_program_certificate_candidates():
+    """
+    Return a queryset of ProgramEnrollment rows that are eligible for a program
+    certificate but do not yet have one.
+
+    Filters applied:
+    - Enrollment is active
+    - Enrollment mode is verified
+    - Program is live
+    - No existing ProgramCertificate (including revoked) for the same user+program pair
+
+    The queryset is ordered by primary key for stable pk-windowed batching and
+    annotated with `has_program_cert` for transparency.
+
+    Returns:
+        QuerySet[ProgramEnrollment]
+    """
+    from django.db.models import Exists, OuterRef, Prefetch  # noqa: PLC0415
+
+    existing_cert = ProgramCertificate.all_objects.filter(
+        user_id=OuterRef("user_id"),
+        program_id=OuterRef("program_id"),
+    )
+
+    return (
+        ProgramEnrollment.objects.filter(
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            program__live=True,
+        )
+        .annotate(has_program_cert=Exists(existing_cert))
+        .filter(has_program_cert=False)
+        .select_related("user", "program")
+        .prefetch_related(
+            Prefetch(
+                "program__all_requirements",
+                queryset=ProgramRequirement.objects.select_related(
+                    "course", "required_program"
+                ),
+            )
+        )
+        .order_by("id")
+    )
+
+
+def generate_missing_program_certificates(
+    dry_run=True,  # noqa: FBT002
+    batch_size=500,
+):
+    """
+    Reconciliation job that creates program certificates for every verified,
+    live-program enrollment that is missing one and has earned it.
+
+    Processes candidates in pk-windowed batches so the full result set is never
+    materialised in memory at once.  Each enrollment is handled independently so
+    a single bad record does not abort the entire run.
+
+    Args:
+        dry_run (bool): When True (default) no certificates are written to the
+            database; counters reflect what *would* happen.
+        batch_size (int): Number of enrollments to process per iteration.
+
+    Returns:
+        dict: Summary counters:
+            - processed (int): total enrollments evaluated
+            - would_create (int): eligible enrollments in dry-run mode
+            - created (int): certificates actually written (write mode only)
+            - ineligible (int): enrollments that did not pass _has_earned_program_cert
+            - failed (int): enrollments skipped due to an unexpected exception
+    """
+    stats = {
+        "processed": 0,
+        "would_create": 0,
+        "created": 0,
+        "ineligible": 0,
+        "failed": 0,
+    }
+
+    if dry_run:
+        log.info(
+            "generate_missing_program_certificates starting in DRY-RUN mode "
+            "(no certificates will be written)."
+        )
+    else:
+        log.info(
+            "generate_missing_program_certificates starting in WRITE mode "
+            "(missing certificates will be created)."
+        )
+
+    candidate_qs = get_eligible_program_certificate_candidates()
+    last_id = 0
+
+    while True:
+        batch = list(candidate_qs.filter(id__gt=last_id)[:batch_size])
+        if not batch:
+            break
+
+        batch_stats = {
+            "would_create": 0,
+            "created": 0,
+            "ineligible": 0,
+            "failed": 0,
+        }
+
+        for enrollment in batch:
+            last_id = enrollment.id
+            stats["processed"] += 1
+
+            try:
+                if dry_run:
+                    eligible = _has_earned_program_cert(
+                        enrollment.user, enrollment.program
+                    )
+                    if eligible:
+                        stats["would_create"] += 1
+                        batch_stats["would_create"] += 1
+                        log.debug(
+                            "DRY-RUN would create program certificate: user=%s program=%s",
+                            enrollment.user.edx_username,
+                            enrollment.program.readable_id,
+                        )
+                    else:
+                        stats["ineligible"] += 1
+                        batch_stats["ineligible"] += 1
+                else:
+                    _, created = generate_program_certificate(
+                        user=enrollment.user,
+                        program=enrollment.program,
+                        force_create=False,
+                    )
+                    if created:
+                        stats["created"] += 1
+                        batch_stats["created"] += 1
+                    else:
+                        stats["ineligible"] += 1
+                        batch_stats["ineligible"] += 1
+
+            except Exception:
+                stats["failed"] += 1
+                batch_stats["failed"] += 1
+                log.exception(
+                    "Error processing program certificate for user=%s program=%s",
+                    enrollment.user_id,
+                    enrollment.program_id,
+                )
+
+        would_create_msg = (
+            f"would_create={batch_stats['would_create']}" if dry_run else ""
+        )
+        log.info(
+            "generate_missing_program_certificates batch finished: "
+            "last_id=%d batch_size=%d %s created=%d ineligible=%d failed=%d",
+            last_id,
+            len(batch),
+            would_create_msg,
+            batch_stats["created"],
+            batch_stats["ineligible"],
+            batch_stats["failed"],
+        )
+
+    log.info(
+        "generate_missing_program_certificates complete: dry_run=%s processed=%d "
+        "would_create=%d created=%d ineligible=%d failed=%d",
+        dry_run,
+        stats["processed"],
+        stats["would_create"],
+        stats["created"],
+        stats["ineligible"],
+        stats["failed"],
+    )
+
+    return stats
+
+
 def manage_program_certificate_access(user, program, revoke_state):
     """
     Revokes/Un-Revokes a program certificate.
