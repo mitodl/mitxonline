@@ -251,3 +251,75 @@ fixture-parentheses = false
 "*_test.py" = ["ARG001", "E501", "S101", "PLR2004"]
 "test_*.py" = ["ARG001", "E501", "S101", "PLR2004"]
 "**/migrations/**" = ["ARG001", "D101", "D100"]
+
+
+
+[tool.pytest.ini_options]
+addopts = "--cov . --cov-report xml --cov-report term --cov-report html --ds=main.settings --reuse-db"
+norecursedirs = [
+  "node_modules",
+  ".git",
+  "static",
+  "templates",
+  ".*",
+  "CVS",
+  "_darcs",
+  "{arch}",
+  "*.egg"
+]
+filterwarnings = [
+    "error",
+    # ol-django
+    "ignore:pkg_resources is deprecated as an API",
+    # ol-django
+    "ignore:Deprecated call to `pkg_resources.declare_namespace",
+    "ignore:sentry_sdk.configure_scope",
+    "ignore:CheckConstraint.check:django.utils.deprecation.RemovedInDjango60Warning",
+    # cybersource
+    "ignore:invalid escape sequence '\\\\R'",
+    # cybersource
+    "ignore:'imghdr' is deprecated and slated for removal in Python 3\\.13",
+    # factoryboy
+    "ignore:.*\\._after_postgeneration will stop saving the instance after postgeneration hooks in the next major release",
+    "ignore:authlib\\.jose module is deprecated, please use joserfc instead:authlib.deprecate.AuthlibDeprecationWarning",
+    "ignore:N+1 detected on",
+    "ignore:Failed to load HostKeys"
+]
+env = [
+  "CELERY_TASK_ALWAYS_EAGER=True",
+  "DEBUG=False",
+  "DJANGO_SETTINGS_MODULE=main.settings",
+  "GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE=",
+  "KEYCLOAK_BASE_URL=http://keycloak/",
+  "KEYCLOAK_REALM_NAME=ol-test",
+  "KEYCLOAK_CLIENT_ID=mitxonline",
+  "KEYCLOAK_DISCOVERY_URL=https://keycloak/",
+  "KEYCLOAK_ADMIN_CLIENT_ID=apisix",
+  "KEYCLOAK_ADMIN_CLIENT_SECRET=fake_admin_secret",
+  "KEYCLOAK_ADMIN_CLIENT_SCOPES=openid profile email",
+  "KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL=True",
+  "LOGOUT_REDIRECT_URL=https://openedx.odl.local/logout",
+  "MAILGUN_KEY=invalid-key",
+  "MAILGUN_SENDER_DOMAIN=localhost",
+  "MITX_ONLINE_BASE_URL=http://mitxonline.odl.local",
+  "MITX_ONLINE_DB_DISABLE_SSL=True",
+  "MITX_ONLINE_SECURE_SSL_REDIRECT=False",
+  "MITX_ONLINE_EMAIL_BACKEND=django.core.mail.backends.locmem.EmailBackend",
+  "MITX_ONLINE_NOTIFICATION_EMAIL_BACKEND=django.core.mail.backends.locmem.EmailBackend",
+  "MITX_ONLINE_ENVIRONMENT=pytest",
+  "MITX_ONLINE_USE_S3=False",
+  "MITXONLINE_DOCKER_BASE_URL=",
+  "OPENEDX_API_BASE_URL=http://localhost:18000",
+  "OPENEDX_API_CLIENT_ID=fake_client_id",
+  "OPENEDX_API_CLIENT_SECRET=fake_client_secret",
+  "OPENEDX_SERVICE_WORKER_API_TOKEN=fake_service_worker_token",
+  "SENTRY_DSN=",
+  "RECAPTCHA_SITE_KEY=",
+  "RECAPTCHA_SECRET_KEY=",
+  "POSTHOG_ENABLED=True",
+  "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE=True"
+]
+markers = [
+  "dont_mock_enrollments",
+  "skip_nplusone_check"
+]
