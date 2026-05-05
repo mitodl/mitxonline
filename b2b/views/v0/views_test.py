@@ -115,6 +115,76 @@ def test_b2b_contract_attachment(mocker, max_learners, code_used):
         assert DiscountContractAttachmentRedemption.objects.filter(
             contract=contract, user=user, discount=contract_codes[0]
         ).exists()
+        assert resp.json()["id"] == contract.id
+
+
+def test_b2b_contract_attachment_response_excludes_unrelated_contracts(mocker):
+    """The attach response should only include contracts tied to the redeemed code."""
+
+    mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
+
+    user = UserFactory.create()
+    unrelated_contract = ContractPageFactory.create()
+    user.b2b_contracts.add(unrelated_contract)
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+    )
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=courserun)
+
+    ensure_enrollment_codes_exist(contract)
+    contract_code = contract.get_discounts().first()
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
+    )
+    resp = client.post(url)
+
+    assert resp.status_code == 201
+    assert resp.json()["id"] == contract.id
+
+
+def test_b2b_contract_attachment_returns_matching_contract_when_already_attached(
+    mocker,
+):
+    """A valid code should return its matching contract even if already attached."""
+
+    mocked_attach_user = mocker.patch(
+        "b2b.models.OrganizationPage.attach_user", return_value=True
+    )
+
+    user = UserFactory.create()
+    unrelated_contract = ContractPageFactory.create()
+    user.b2b_contracts.add(unrelated_contract)
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+    )
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=courserun)
+
+    ensure_enrollment_codes_exist(contract)
+    contract_code = contract.get_discounts().first()
+
+    user.b2b_contracts.add(contract)
+
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
+    )
+    resp = client.post(url)
+
+    assert resp.status_code == 200
+    assert resp.json()["id"] == contract.id
+    mocked_attach_user.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -220,6 +290,7 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
 
     # Contract dates are invalid - code is valid but no contracts to attach - should return 200
     assert resp.status_code == 200
+    assert resp.data is None
 
     user.refresh_from_db()
     assert not user.b2b_contracts.filter(pk=contract.id).exists()
