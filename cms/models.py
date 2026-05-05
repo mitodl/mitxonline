@@ -1119,6 +1119,13 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         use_json_field=True,
     )
 
+    listed_price = models.SmallIntegerField(
+        default=0,
+        null=False,
+        blank=False,
+        help_text="Specify the product price. This is used by MIT Learn.",
+    )
+
     min_price = models.SmallIntegerField(
         default=0,
         null=False,
