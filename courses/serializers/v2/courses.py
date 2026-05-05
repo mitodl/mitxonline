@@ -63,7 +63,7 @@ class CourseSerializer(BaseCourseSerializer):
 
     departments = DepartmentSerializer(many=True, read_only=True)
     next_run_id = serializers.SerializerMethodField()
-    page = CoursePageSerializer(read_only=True)
+    page = CoursePageSerializer(read_only=True, allow_null=True)
     programs = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
