@@ -34,7 +34,7 @@
     {% include "partials/gtm_body.html" %}
 
     {% include 'hijack/notification.html' %}
-    {% if not request.path|startswith:'/certificate/' and 'ecom-service' not in request.GET %}
+    {% if not request.path|startswith:'/certificate/' and not request.path|startswith:'/cart/' and not request.path|startswith:'/checkout/' and not request.path|startswith:'/orders/' and 'ecom-service' not in request.GET %}
       {% banner %}
       {% block headercontent %}
         <div id="header"></div>
@@ -48,7 +48,7 @@
     {% block contact-us %}
     {% endblock %}
   </div>
-    {% if 'ecom-service' not in request.GET %}
+    {% if 'ecom-service' not in request.GET and not request.path|startswith:'/cart/' and not request.path|startswith:'/checkout/' and not request.path|startswith:'/orders/' %}
     {% block footer %}
         {% include "footer.html" %}
     {% endblock %}
