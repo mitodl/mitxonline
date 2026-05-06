@@ -194,7 +194,7 @@ class AttachContractApi(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        b2b_contract_ids = list(code.b2b_contracts.values_list("id", flat=True))
+        b2b_contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
         if not b2b_contract_ids:
             # Log an error here. We found a code, but it isn't associated with any contracts, which is generally confusing for operators.
             # We could also surface this to the user by checking in the caller for an empty return.
