@@ -11,8 +11,16 @@ from oauthlib.common import generate_token
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from courses.factories import CourseRunFactory
-from courses.models import CourseRunEnrollment
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    CourseRunGradeFactory,
+)
+from courses.models import (
+    CourseRunCertificate,
+    CourseRunEnrollment,
+)
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -258,3 +266,192 @@ class TestEdxEnrollmentWebhook:
             HTTP_AUTHORIZATION=f"Bearer {oauth_token.token}",
         )
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+
+class TestEdxCertificateWebhook:
+    """Tests for the edx_certificate_webhook view"""
+
+    WEBHOOK_URL = reverse("openedx-certificate-webhook")
+
+    def test_unauthenticated_returns_401(self):
+        """Test that unauthenticated requests are rejected"""
+        client = APIClient()
+        response = client.post(
+            self.WEBHOOK_URL,
+            {"email": "test@example.com", "course_id": "course-v1:MITx+1+2024"},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_non_admin_returns_403(self, user_drf_client):
+        """Test that non-admin authenticated users are rejected"""
+        response = user_drf_client.post(
+            self.WEBHOOK_URL,
+            {"email": "test@example.com", "course_id": "course-v1:MITx+1+2024"},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @pytest.mark.parametrize(
+        "payload, expected_error_field",  # noqa: PT006
+        [
+            ({"course_id": "course-v1:MITx+1+2024"}, "email"),
+            ({"email": "test@example.com"}, "course_id"),
+            ({}, None),
+        ],
+    )
+    def test_missing_fields_returns_400(
+        self, admin_drf_client, payload, expected_error_field
+    ):
+        """Test that missing required fields return 400"""
+        response = admin_drf_client.post(
+            self.WEBHOOK_URL,
+            payload,
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        if expected_error_field:
+            assert expected_error_field in response.data["error"]
+
+    @pytest.mark.parametrize(
+        ("user_email", "courseware_id"),
+        [
+            ("nonexistent@example.com", None),
+            (None, "course-v1:NonExistent+0+2099"),
+        ],
+        ids=["user_not_found", "course_run_not_found"],
+    )
+    def test_not_found_returns_404(
+        self, admin_drf_client, user, user_email, courseware_id
+    ):
+        """Test that a non-existent user or course run returns 404"""
+        if courseware_id is None:
+            courseware_id = CourseRunFactory.create().courseware_id
+        if user_email is None:
+            user_email = user.email
+
+        response = admin_drf_client.post(
+            self.WEBHOOK_URL,
+            {"email": user_email, "course_id": courseware_id},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.data["error"]
+
+    @pytest.mark.parametrize(
+        (
+            "enrollment_mode",
+            "grade",
+            "passed",
+            "is_self_paced",
+            "cert_should_exist",
+        ),
+        [
+            (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, True, True),
+            (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, False, True),
+            (EDX_ENROLLMENT_VERIFIED_MODE, 0.30, False, True, False),
+            (EDX_ENROLLMENT_AUDIT_MODE, 0.80, True, True, False),
+        ],
+        ids=[
+            "verified_passed_self_paced",
+            "verified_passed_instructor_paced",
+            "verified_not_passed",
+            "audit_passed",
+        ],
+    )
+    def test_certificate_status(  # noqa: PLR0913
+        self,
+        mocker,
+        admin_drf_client,
+        user,
+        enrollment_mode,
+        grade,
+        passed,
+        is_self_paced,
+        cert_should_exist,
+    ):
+        """Test certificate creation based on enrollment mode and grade"""
+        course_run = CourseRunFactory.create(is_self_paced=is_self_paced)
+        CourseRunEnrollmentFactory.create(
+            user=user, run=course_run, enrollment_mode=enrollment_mode
+        )
+        grade_obj = CourseRunGradeFactory.create(
+            course_run=course_run, user=user, grade=grade, passed=passed
+        )
+
+        mocker.patch("courses.signals.upsert_custom_properties")
+        mocker.patch("hubspot_sync.api.upsert_custom_properties")
+        mocker.patch(
+            "courses.api.get_edx_grades_with_users",
+            return_value=iter([(grade_obj, user)]),
+        )
+        mocker.patch(
+            "courses.api.ensure_course_run_grade",
+            return_value=(grade_obj, True, False),
+        )
+
+        response = admin_drf_client.post(
+            self.WEBHOOK_URL,
+            {"email": user.email, "course_id": course_run.courseware_id},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert (
+            CourseRunCertificate.objects.filter(
+                user=user, course_run=course_run
+            ).exists()
+            == cert_should_exist
+        )
+
+    def test_idempotent_certificate_already_exists(
+        self,
+        mocker,
+        admin_drf_client,
+        user,
+    ):
+        """Test that when a certificate already exists the webhook returns 200 without reprocessing"""
+        mocker.patch("courses.signals.upsert_custom_properties")
+        enrollment = CourseRunEnrollmentFactory.create(
+            user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+        course_run = enrollment.run
+        passed_grade = CourseRunGradeFactory.create(
+            course_run=course_run, user=user, grade=0.80, passed=True
+        )
+
+        mocker.patch("hubspot_sync.api.upsert_custom_properties")
+        mocker.patch(
+            "courses.api.get_edx_grades_with_users",
+            return_value=iter([(passed_grade, user)]),
+        )
+        mocker.patch(
+            "courses.api.ensure_course_run_grade",
+            return_value=(passed_grade, True, False),
+        )
+
+        response1 = admin_drf_client.post(
+            self.WEBHOOK_URL,
+            {"email": user.email, "course_id": course_run.courseware_id},
+            format="json",
+        )
+        assert response1.status_code == status.HTTP_200_OK
+        assert CourseRunCertificate.objects.filter(
+            user=user, course_run=course_run
+        ).exists()
+
+        mock_generate = mocker.patch("openedx.views.generate_course_run_certificates")
+
+        response2 = admin_drf_client.post(
+            self.WEBHOOK_URL,
+            {"email": user.email, "course_id": course_run.courseware_id},
+            format="json",
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        mock_generate.assert_not_called()
+        assert (
+            CourseRunCertificate.objects.filter(
+                user=user, course_run=course_run
+            ).count()
+            == 1
+        )

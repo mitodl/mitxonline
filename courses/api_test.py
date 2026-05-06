@@ -80,6 +80,7 @@ from courses.factories import (
 
 # pylint: disable=redefined-outer-name
 from courses.models import (
+    CourseRunCertificate,
     CourseRunEnrollment,
     EnrollmentMode,
     PaidCourseRun,
@@ -1258,6 +1259,146 @@ def test_generate_course_certificates_with_course_end_date(
         f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
         in courses_api_logs.info.call_args[0][0]
     )
+
+
+@pytest.mark.parametrize(
+    ("enrollment_mode", "grade", "passed", "should_create_cert"),
+    [
+        (EDX_ENROLLMENT_VERIFIED_MODE, 0.80, True, True),
+        (EDX_ENROLLMENT_VERIFIED_MODE, 0.30, False, False),
+        (EDX_ENROLLMENT_AUDIT_MODE, 0.80, True, False),
+    ],
+)
+@patch("courses.signals.upsert_custom_properties")
+def test_webhook_certificate_status(  # noqa: PLR0913
+    mock_upsert_custom_properties,
+    mocker,
+    user,
+    enrollment_mode,
+    grade,
+    passed,
+    should_create_cert,
+):
+    """Test that the webhook path creates a certificate based on enrollment mode and grade"""
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, enrollment_mode=enrollment_mode
+    )
+    course_run = enrollment.run
+    grade_obj = CourseRunGradeFactory.create(
+        course_run=course_run, user=user, grade=grade, passed=passed
+    )
+
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([(grade_obj, user)]),
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(grade_obj, True, False),
+    )
+
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+
+    assert (
+        CourseRunCertificate.objects.filter(user=user, course_run=course_run).exists()
+        == should_create_cert
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_webhook_certificate_already_exists(
+    mock_upsert_custom_properties,
+    mocker,
+    passed_grade_with_enrollment,
+):
+    """Test that the webhook path returns certificate_exists when certificate already created"""
+    course_run = passed_grade_with_enrollment.course_run
+    user = passed_grade_with_enrollment.user
+
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([(passed_grade_with_enrollment, user)]),
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(passed_grade_with_enrollment, False, False),
+    )
+
+    # First call creates the certificate
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+    assert CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists()
+
+    # Mock the grade fetch again for second call
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([(passed_grade_with_enrollment, user)]),
+    )
+
+    # Second call should not create a duplicate certificate
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+    assert (
+        CourseRunCertificate.objects.filter(user=user, course_run=course_run).count()
+        == 1
+    )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_webhook_certificate_bypasses_certificate_available_date(
+    mock_upsert_custom_properties,
+    mocker,
+    passed_grade_with_enrollment,
+):
+    """Test that the webhook path creates a certificate even when certificate_available_date is in the future"""
+    course_run = passed_grade_with_enrollment.course_run
+    user = passed_grade_with_enrollment.user
+
+    # Set certificate_available_date to far in the future
+    course_run.is_self_paced = False
+    course_run.certificate_available_date = now_in_utc() + timedelta(days=365)
+    course_run.save()
+
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([(passed_grade_with_enrollment, user)]),
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(passed_grade_with_enrollment, True, False),
+    )
+
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+
+    assert CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists()
+
+
+def test_webhook_no_grade_from_edx(
+    mocker,
+    user,
+):
+    """Test that the webhook path handles the case when no grade is found in edX"""
+    course_run = CourseRunFactory.create()
+
+    mocker.patch(
+        "courses.api.get_edx_grades_with_users",
+        return_value=iter([]),
+    )
+
+    generate_course_run_certificates(user=user, course_run=course_run, force=True)
+
+    assert not CourseRunCertificate.objects.filter(
+        user=user, course_run=course_run
+    ).exists()
 
 
 @patch("courses.signals.upsert_custom_properties")

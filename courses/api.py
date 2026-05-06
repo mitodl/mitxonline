@@ -930,33 +930,60 @@ def get_certificate_grade_eligible_runs(now):
     return course_runs  # noqa: RET504
 
 
-def generate_course_run_certificates():
+def generate_course_run_certificates(  # noqa: C901
+    user=None,
+    course_run=None,
+    force=False,  # noqa: FBT002
+):
     """
-    Hits the edX grades API for eligible course runs and generates the certificates and grades for users for course runs
+    Hits the edX grades API and generates the certificates and grades for users for course runs.
+
+    Each parameter works independently:
+    - If course_run is provided, only that course run is processed (skipping course runs eligibility filtering).
+    - If user is provided, only that user's grade/certificate is processed.
+    - If force is True, certificate date/eligibility checks are bypassed.
+
+    When called without arguments (periodic task path), it fetches all eligible course runs and
+    processes grades/certificates for all users in each run.
+
+    Args:
+        user (User or None): If provided, process only this user's grade/certificate.
+        course_run (CourseRun or None): If provided, process only this course run.
+        force (bool): If True, bypass certificate_available_date and eligibility checks.
+
+    Returns:
+        None
     """
     now = now_in_utc()
-    course_runs = get_certificate_grade_eligible_runs(now)
 
-    if course_runs is None or course_runs.count() == 0:
-        log.info("No course runs matched the certificates generation criteria")
-        return
+    if course_run:
+        course_runs = [course_run]
+    else:
+        course_runs = get_certificate_grade_eligible_runs(now)
+
+        if course_runs is None or course_runs.count() == 0:
+            log.info("No course runs matched the certificates generation criteria")
+            return
 
     for run in course_runs:
         edx_grade_user_iter = exception_logging_generator(
-            get_edx_grades_with_users(run)
+            get_edx_grades_with_users(run, user=user)
         )
         created_grades_count, updated_grades_count, generated_certificates_count = (
             0,
             0,
             0,
         )
-        for edx_grade, user in edx_grade_user_iter:
+        for edx_grade, run_user in edx_grade_user_iter:
             try:
                 course_run_grade, created, updated = ensure_course_run_grade(
-                    user=user, course_run=run, edx_grade=edx_grade, should_update=True
+                    user=run_user,
+                    course_run=run,
+                    edx_grade=edx_grade,
+                    should_update=True,
                 )
             except ValidationError:
-                msg = f"Can't save grade {edx_grade} for {user} in {run}, skipping certificate generation"
+                msg = f"Can't save grade {edx_grade} for {run_user} in {run}, skipping certificate generation"
                 log.exception(msg)
                 continue
 
@@ -966,12 +993,20 @@ def generate_course_run_certificates():
                 updated_grades_count += 1
 
             # Check certificate generation eligibility
+            # When force is True: bypass checks (e.g. webhook path where edX already
+            #   determined the certificate is ready)
+            # Otherwise:
             #   1. For self_paced course runs we generate certificates right away irrespective
-            #   of certificate_available_date
-            #   2. For others course runs we generate the certificates if the certificate_available_date of course run
-            #   has passed
-            if run.is_self_paced or (
-                run.certificate_available_date and run.certificate_available_date <= now
+            #      of certificate_available_date
+            #   2. For other course runs we generate certificates if the certificate_available_date
+            #      has passed
+            if (
+                force
+                or run.is_self_paced
+                or (
+                    run.certificate_available_date
+                    and run.certificate_available_date <= now
+                )
             ):
                 _, created, deleted = process_course_run_grade_certificate(
                     course_run_grade=course_run_grade
@@ -979,13 +1014,18 @@ def generate_course_run_certificates():
 
                 if deleted:
                     log.warning(
-                        "Certificate deleted for user %s and course_run %s", user, run
+                        "Certificate deleted for user %s and course_run %s",
+                        run_user,
+                        run,
                     )
                 elif created:
                     log.warning(
-                        "Certificate created for user %s and course_run %s", user, run
+                        "Certificate created for user %s and course_run %s",
+                        run_user,
+                        run,
                     )
                     generated_certificates_count += 1
+
         log.info(
             f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"  # noqa: G004
         )
