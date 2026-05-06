@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.149.5
+Version 1.149.5 (Released May 06, 2026)
 ---------------
 
 - fix: make DiscountFactory defaults evaluate per-instance to prevent flaky test_create_basket_with_product (#3532)
