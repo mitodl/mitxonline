@@ -248,6 +248,15 @@ class AttachContractApi(APIView):
     def _get_eligible_contracts(self, user, code, now):
         """Return contracts associated with the code that the user can join."""
         contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
+        if not contract_ids:
+            # Log an error here. We found a code, but it isn't associated with any contracts, which is generally confusing for operators.
+            # We could also surface this to the user by checking in the caller for an empty return.
+            log.error(
+                "B2B attach: code %s is valid but not associated with any contracts",
+                code,
+            )
+            return ContractPage.objects.none()
+
         return (
             ContractPage.objects.filter(pk__in=contract_ids)
             .exclude(pk__in=user.b2b_contracts.all())
