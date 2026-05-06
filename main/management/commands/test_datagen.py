@@ -163,5 +163,9 @@ class Command(BaseCommand):
 
             # This will result in the creation of enrollment codes for the contract above.
             call_command(
-                "b2b_courseware", "add", "test_contract", PLACEHOLDER_PROGRAM_ID
+                "b2b_courseware",
+                "add",
+                "--make-codes",
+                "test_contract",
+                PLACEHOLDER_PROGRAM_ID,
             )
