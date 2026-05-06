@@ -331,15 +331,12 @@ class ProgramSerializer(serializers.ModelSerializer):
     def get_requirements(self, instance):
         """Get program requirements using prefetched data when available"""
         if hasattr(instance, "all_requirements"):
+            all_requirements = list(instance.all_requirements.all())
             required_courses, elective_courses = (
-                self._process_course_requirements_from_all(
-                    instance.all_requirements.all()
-                )
+                self._process_course_requirements_from_all(all_requirements)
             )
             required_programs, elective_programs = (
-                self._process_program_requirements_from_all(
-                    instance.all_requirements.all()
-                )
+                self._process_program_requirements_from_all(all_requirements)
             )
         else:
             # Fallback to using model properties
