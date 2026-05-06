@@ -115,7 +115,7 @@ def test_b2b_contract_attachment(mocker, max_learners, code_used):
         assert DiscountContractAttachmentRedemption.objects.filter(
             contract=contract, user=user, discount=contract_codes[0]
         ).exists()
-        assert resp.json()["id"] == contract.id
+        assert resp.json()[0]["id"] == contract.id
 
 
 def test_b2b_contract_attachment_response_excludes_unrelated_contracts(mocker):
@@ -146,7 +146,7 @@ def test_b2b_contract_attachment_response_excludes_unrelated_contracts(mocker):
     resp = client.post(url)
 
     assert resp.status_code == 201
-    assert resp.json()["id"] == contract.id
+    assert resp.json()[0]["id"] == contract.id
 
 
 def test_b2b_contract_attachment_returns_matching_contract_when_already_attached(
@@ -183,7 +183,7 @@ def test_b2b_contract_attachment_returns_matching_contract_when_already_attached
     resp = client.post(url)
 
     assert resp.status_code == 200
-    assert resp.json()["id"] == contract.id
+    assert resp.json()[0]["id"] == contract.id
     mocked_attach_user.assert_not_called()
 
 
@@ -290,7 +290,7 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
 
     # Contract dates are invalid - code is valid but no contracts to attach - should return 200
     assert resp.status_code == 200
-    assert resp.data is None
+    assert resp.json() == []
 
     user.refresh_from_db()
     assert not user.b2b_contracts.filter(pk=contract.id).exists()

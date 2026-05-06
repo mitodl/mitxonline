@@ -121,7 +121,7 @@ class AttachContractApi(APIView):
 
     @extend_schema(
         request=None,
-        responses=ContractPageSerializer,
+        responses=ContractPageSerializer(many=True),
     )
     def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002
         """
@@ -144,7 +144,7 @@ class AttachContractApi(APIView):
         - 200: Code valid but user already attached to all associated contracts
         - 404: Invalid or expired enrollment code
         - 409: Code valid but no available seats in associated contract(s)
-        - ContractPageSerializer (or null) - the active contract associated with the code
+        - list of ContractPageSerializer - the active contract associated with the code
         """
         now = now_in_utc()
 
@@ -202,14 +202,17 @@ class AttachContractApi(APIView):
         active_code_contract = self._get_active_code_user_contract(
             request.user, code, now
         )
-        serialized_contract = (
-            ContractPageSerializer(active_code_contract).data
+        # Keep v0 response signature stable (array payload) for existing clients.
+        # When we ship a new API version, switch this endpoint to return a single
+        # contract object instead of a one-item list.
+        serialized_contracts = (
+            [ContractPageSerializer(active_code_contract).data]
             if active_code_contract
-            else None
+            else []
         )
 
         if contracts_attached:
-            return Response(serialized_contract, status=status.HTTP_201_CREATED)
+            return Response(serialized_contracts, status=status.HTTP_201_CREATED)
 
         if contract_full:
             return Response(
@@ -217,7 +220,7 @@ class AttachContractApi(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        return Response(serialized_contract, status=status.HTTP_200_OK)
+        return Response(serialized_contracts, status=status.HTTP_200_OK)
 
     def _get_active_code_user_contract(self, user, code, now):
         """Return the user's active contract associated with the redeemed code."""
