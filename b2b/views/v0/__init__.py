@@ -123,7 +123,7 @@ class AttachContractApi(APIView):
         request=None,
         responses=ContractPageSerializer(many=True),
     )
-    def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002
+    def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002, C901
         """
         Use the provided enrollment code to attach the user to a B2B contract.
 
@@ -195,6 +195,12 @@ class AttachContractApi(APIView):
             )
 
         contracts = self._get_eligible_contracts(request.user, code, now)
+        if not contracts:
+            return Response(
+                {"detail": "No eligible contracts found for this code."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         contracts_attached, contract_full = self._attach_user_to_contracts(
             request.user, contracts, code
         )
