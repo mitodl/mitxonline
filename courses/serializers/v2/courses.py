@@ -6,6 +6,7 @@ import logging
 from collections import defaultdict
 
 from django.conf import settings
+from django.utils.functional import cached_property
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -325,6 +326,8 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     courseruns = serializers.SerializerMethodField()
     language_options = serializers.SerializerMethodField()
 
+
+    @cached_property
     def _get_filtered_runs(self, instance):
         """Return sorted course runs respecting org/contract/enrollability context."""
         courseruns = (
