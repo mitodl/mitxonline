@@ -194,12 +194,20 @@ class AttachContractApi(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        contracts = self._get_eligible_contracts(request.user, code, now)
-        if not contracts:
+        b2b_contract_ids = list(code.b2b_contracts.values_list("id", flat=True))
+        if not b2b_contract_ids:
+            # Log an error here. We found a code, but it isn't associated with any contracts, which is generally confusing for operators.
+            # We could also surface this to the user by checking in the caller for an empty return.
+            log.error(
+                "B2B attach: code %s is valid but not associated with any contracts",
+                code,
+            )
             return Response(
-                {"detail": "No eligible contracts found for this code."},
+                {"detail": "No contracts found for this code."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        contracts = self._get_eligible_contracts(request.user, b2b_contract_ids, now)
 
         contracts_attached, contract_full = self._attach_user_to_contracts(
             request.user, contracts, code
@@ -251,17 +259,8 @@ class AttachContractApi(APIView):
             .get(discount_code=enrollment_code)
         )
 
-    def _get_eligible_contracts(self, user, code, now):
+    def _get_eligible_contracts(self, user, contract_ids, now):
         """Return contracts associated with the code that the user can join."""
-        contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
-        if not contract_ids:
-            # Log an error here. We found a code, but it isn't associated with any contracts, which is generally confusing for operators.
-            # We could also surface this to the user by checking in the caller for an empty return.
-            log.error(
-                "B2B attach: code %s is valid but not associated with any contracts",
-                code,
-            )
-            return ContractPage.objects.none()
 
         return (
             ContractPage.objects.filter(pk__in=contract_ids)
