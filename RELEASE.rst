@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.149.6
+---------------
+
+- only respond with enrolled contract on enrollment code redemption (#3551)
+- feat: add edx certificate webhook (#3459)
+- feat: removes the MITx site header from all checkout-related views (#3548)
+- Update pytest to not ignore all deprecations (#3550)
+
 Version 1.149.5 (Released May 06, 2026)
 ---------------
 
