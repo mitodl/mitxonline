@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.149.6
+Version 1.149.6 (Released May 06, 2026)
 ---------------
 
 - only respond with enrolled contract on enrollment code redemption (#3551)
