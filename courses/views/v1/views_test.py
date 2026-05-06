@@ -12,8 +12,7 @@ import pytest
 import reversion
 from anys import ANY_STR
 from django.db.models import Count, Q
-from django.test import RequestFactory
-from django.test.client import Client
+from django.test import Client, RequestFactory
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
