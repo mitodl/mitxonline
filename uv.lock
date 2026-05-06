@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.11.*"
 
 [[package]]
@@ -2071,7 +2071,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.1,!=8.2.0" },
     { name = "deepdiff", specifier = ">=8.0.0,<9" },
     { name = "dj-database-url", specifier = ">=0.5.0,<0.6" },
-    { name = "django", specifier = "==5.2" },
+    { name = "django", specifier = ">=5.2,<5.3" },
     { name = "django-anymail", extras = ["mailgun"], specifier = ">=11.1,<12" },
     { name = "django-cors-headers", specifier = ">=4.0.0,<5" },
     { name = "django-countries", specifier = ">=7.2.1,<8" },
