@@ -6,7 +6,7 @@ jobs:
 
     services:
       db:
-        image: postgres:15.16
+        image: postgres:15.16@sha256:2bc89eed5490967e6b1fa5175d84cb45d65f19fbb8973c7b23450dea785b9505
         # Health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
@@ -21,7 +21,7 @@ jobs:
           - 5432:5432
 
       redis:
-        image: redis:8.6.0
+        image: redis:8.6.0@sha256:7b6fb55d8b0adcd77269dc52b3cfffe5f59ca5d43dec3c90dbe18aacce7942e1
         ports:
           - 6379:6379
 
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v2-beta
+        uses: actions/setup-node@27082cecf3ff7a1742dbd5e12605f0cb59dce2d9 # v2-beta
         with:
           node-version: "20.18"
 
