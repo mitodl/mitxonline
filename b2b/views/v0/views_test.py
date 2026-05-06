@@ -52,7 +52,7 @@ def test_b2b_contract_attachment_code_with_no_contracts(user):
     resp = client.post(url)
 
     assert resp.status_code == 404
-    assert resp.json()["detail"] == "No eligible contracts found for this code."
+    assert resp.json()["detail"] == "No contracts found for this code."
     assert user.b2b_contracts.count() == 0
 
 
