@@ -214,7 +214,7 @@ class AttachContractApi(APIView):
         )
 
         active_code_contract = self._get_active_code_user_contract(
-            request.user, code, now
+            request.user, b2b_contract_ids, now
         )
         # Keep v0 response signature stable (array payload) for existing clients.
         # When we ship a new API version, switch this endpoint to return a single
@@ -236,13 +236,12 @@ class AttachContractApi(APIView):
 
         return Response(serialized_contracts, status=status.HTTP_200_OK)
 
-    def _get_active_code_user_contract(self, user, code, now):
+    def _get_active_code_user_contract(self, user, contract_ids_for_code, now):
         """Return the user's active contract associated with the redeemed code."""
-        code_contract_ids = code.b2b_contracts().values_list("id", flat=True)
         return (
             user.b2b_contracts.filter(active=True)
             .exclude(Q(contract_start__gt=now) | Q(contract_end__lt=now))
-            .filter(pk__in=code_contract_ids)
+            .filter(pk__in=contract_ids_for_code)
             .first()
         )
 
@@ -259,11 +258,11 @@ class AttachContractApi(APIView):
             .get(discount_code=enrollment_code)
         )
 
-    def _get_eligible_contracts(self, user, contract_ids, now):
+    def _get_eligible_contracts(self, user, contract_ids_for_code, now):
         """Return contracts associated with the code that the user can join."""
 
         return (
-            ContractPage.objects.filter(pk__in=contract_ids)
+            ContractPage.objects.filter(pk__in=contract_ids_for_code)
             .exclude(pk__in=user.b2b_contracts.all())
             .exclude(Q(contract_end__lt=now) | Q(contract_start__gt=now))
             .all()
