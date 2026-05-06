@@ -16,7 +16,7 @@ from b2b.factories import ContractPageFactory
 from b2b.models import DiscountContractAttachmentRedemption
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
-from ecommerce.factories import ProductFactory
+from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
 from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
@@ -38,6 +38,21 @@ def test_b2b_contract_attachment_bad_code(user):
 
     assert resp.status_code == 404
     assert resp.json()["detail"] == "Invalid or expired enrollment code."
+    assert user.b2b_contracts.count() == 0
+
+
+def test_b2b_contract_attachment_code_with_no_contracts(user):
+    """Ensure a code not tied to any B2B contracts returns 404."""
+    client = APIClient()
+    client.force_login(user)
+
+    discount = UnlimitedUseDiscountFactory.create()
+
+    url = reverse("b2b:attach-user", kwargs={"enrollment_code": discount.discount_code})
+    resp = client.post(url)
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "No eligible contracts found for this code."
     assert user.b2b_contracts.count() == 0
 
 
