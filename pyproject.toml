@@ -82,6 +82,7 @@ dependencies = [
     "mitol-django-olposthog>=2026.3.6,<2027",
     "django-removals>=1.1.6,<2",
     "django-prefetch>=1.2.3,<2",
+    "lru-method-cache>=0.2.0",
 ]
 
 [dependency-groups]

@@ -1636,6 +1636,15 @@ wheels = [
 ]
 
 [[package]]
+name = "lru-method-cache"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/36/79/ca29614d46469cde804e723769e2c96f682a1ce5d3a5a625038bf7192f05/lru_method_cache-0.2.0.tar.gz", hash = "sha256:e777a8d2dc363b121ce8c5e34dee063a28f37eabe56c35e6dd9b3a52b41000cc", size = 9239, upload-time = "2026-03-10T01:57:29.249Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a5/85/29a4de6faeebba1d491d874d3fdb6f8d80255b9f8436c5533e643b3dac52/lru_method_cache-0.2.0-py3-none-any.whl", hash = "sha256:87f23d96ae1f00d3fe2dda399565d7e7e94fc29d253cb3d356574d3ada5d7ca8", size = 7118, upload-time = "2026-03-10T01:57:26.686Z" },
+]
+
+[[package]]
 name = "lxml"
 version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1991,6 +2000,7 @@ dependencies = [
     { name = "granian" },
     { name = "hubspot-api-client" },
     { name = "ipython" },
+    { name = "lru-method-cache" },
     { name = "mitol-django-apigateway" },
     { name = "mitol-django-authentication" },
     { name = "mitol-django-common" },
@@ -2100,6 +2110,7 @@ requires-dist = [
     { name = "granian", specifier = ">=2.5.4,<3" },
     { name = "hubspot-api-client", specifier = ">=12.0.0,<13" },
     { name = "ipython", specifier = ">=8.0.0,<9" },
+    { name = "lru-method-cache", specifier = ">=0.2.0" },
     { name = "mitol-django-apigateway", specifier = "==2026.4.29" },
     { name = "mitol-django-authentication", specifier = "==2026.4.29" },
     { name = "mitol-django-common", specifier = "==2026.4.29" },
