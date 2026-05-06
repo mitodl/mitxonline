@@ -73,12 +73,26 @@ export class App extends React.Component<Props, void> {
     return searchParams.has("ecom-service")
   }
 
-  isOrderReceiptPage() {
+  isCheckoutRelatedPage() {
     const { match, location } = this.props
-    return !!matchPath(location.pathname, {
-      path:  urljoin(match.url, String(routes.orderReceipt)),
-      exact: true
-    })
+    return (
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.cart)),
+        exact: false
+      }) ||
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.orderHistory)),
+        exact: false
+      }) ||
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.orderReceipt)),
+        exact: false
+      }) ||
+      !!matchPath(location.pathname, {
+        path:  "/checkout/",
+        exact: false
+      })
+    )
   }
 
   render() {
@@ -90,7 +104,7 @@ export class App extends React.Component<Props, void> {
 
     return (
       <div className="app" aria-flowto="notifications-container">
-        {!this.isEcomServiceMode() && !this.isOrderReceiptPage() && (
+        {!this.isEcomServiceMode() && !this.isCheckoutRelatedPage() && (
           <Header
             currentUser={currentUser}
             cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}
