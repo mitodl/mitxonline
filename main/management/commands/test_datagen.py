@@ -95,6 +95,7 @@ class Command(BaseCommand):
                 create_certificate_page=True,
                 create_signatory=True,
                 set_courserun_dates_automatically=True,
+                primary_lang=True,
             )
             call_command(
                 "create_courseware",
@@ -112,6 +113,7 @@ class Command(BaseCommand):
                 create_certificate_page=True,
                 create_signatory=True,
                 set_courserun_dates_automatically=True,
+                primary_lang=True,
             )
 
             call_command(
@@ -128,26 +130,33 @@ class Command(BaseCommand):
                 create_certificate_page=True,
                 create_signatory=True,
                 set_courserun_dates_automatically=True,
+                primary_lang=True,
+            )
+
+            call_command(
+                "create_courseware",
+                "course",
+                "course-v1:PLACEHOLDER_NON_SOURCE+COURSE",
+                "PLACEHOLDER - E2E Test Course",
+                live=True,
+                create_run="PLACEHOLDER_E2E_Test_Course",
+                depts=["Math"],
+                create_depts=True,
+                create_page=True,
+                create_certificate_page=True,
+                create_signatory=True,
+                set_courserun_dates_automatically=True,
+                primary_lang=True,
             )
 
             call_command(
                 "create_instructor_pages",
                 fake=True,
-                readable_ids=f"course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_REQUIRED,course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_ELECTIVE,course-v1:PLACEHOLDER+COURSE,{PLACEHOLDER_PROGRAM_ID}",
+                readable_ids=f"course-v1:PLACEHOLDER_NON_SOURCE+COURSE,course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_REQUIRED,course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_ELECTIVE,course-v1:PLACEHOLDER+COURSE,{PLACEHOLDER_PROGRAM_ID}",
             )
 
-            # create_product only works for Courses. We need to see if products for programs are useful.
-            # Having this allows us to select a certificate course and get to the checkout page.
-            call_command(
-                "create_product",
-                "course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_REQUIRED+PLACEHOLDER_Demo_Course_in_Program_Required",
-                999,
-            )
-            call_command(
-                "create_product",
-                "course-v1:PLACEHOLDER+COURSE_IN_PROGRAM_ELECTIVE+PLACEHOLDER_Demo_Course_in_Program_Elective",
-                999,
-            )
+            # We need to make non-source runs based on the above or creating the products will fail as they're not considered Usable per UsableCourseRunManager.
+            # But we also need source runs for b2b_courseware to automatically provision contract runs and enrollment codes
 
             # Create an organization and enrollment code contract along w/ their CMS pages (which are live)
             call_command(
@@ -163,5 +172,17 @@ class Command(BaseCommand):
 
             # This will result in the creation of enrollment codes for the contract above.
             call_command(
-                "b2b_courseware", "add", "test_contract", PLACEHOLDER_PROGRAM_ID
+                "b2b_courseware",
+                "add",
+                "--make-codes",
+                "test_contract",
+                PLACEHOLDER_PROGRAM_ID,
+            )
+
+            # create_product only works for Courses. We need to see if products for programs are useful.
+            # Having this allows us to select a certificate course and get to the checkout page.
+            call_command(
+                "create_product",
+                "course-v1:PLACEHOLDER_NON_SOURCE+COURSE+PLACEHOLDER_E2E_Test_Course",
+                999,
             )
