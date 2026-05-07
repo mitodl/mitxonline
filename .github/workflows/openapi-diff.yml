@@ -81,6 +81,11 @@ jobs:
             head_spec="head/openapi/specs/$(basename "$spec")"
             if [ -f "$head_spec" ]; then
               echo "Checking $(basename "$spec") for breaking changes..."
+              err_ignore_flag=()
+              err_ignore_file="head/openapi/specs/oasdiff-err-ignore.txt"
+              if [ -f "$err_ignore_file" ]; then
+                err_ignore_flag=(--err-ignore "$err_ignore_file")
+              fi
               docker run --rm \
                 --workdir ${{ github.workspace }} \
                 --volume ${{ github.workspace }}:${{ github.workspace }}:ro \
@@ -88,6 +93,7 @@ jobs:
                 tufin/oasdiff breaking \
                 --fail-on ERR \
                 --format githubactions \
+                "${err_ignore_flag[@]}" \
                 "$base_spec" \
                 "$head_spec"
             fi
