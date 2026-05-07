@@ -1562,6 +1562,13 @@ class ProgramPage(ProductPage):
         null=True,
         help_text="If true, Learn should include this in its catalog.",
     )
+    list_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Specify the numeric list price for this program.",
+    )
 
     template = "product_page.html"
     search_fields = Page.search_fields + [  # noqa: RUF005
@@ -1575,6 +1582,7 @@ class ProgramPage(ProductPage):
     content_panels = (
         [  # noqa: RUF005
             FieldPanel("program"),
+            FieldPanel("list_price"),
         ]
         + ProductPage.content_panels
         + [FieldPanel("include_in_learn_catalog")]
@@ -1582,6 +1590,7 @@ class ProgramPage(ProductPage):
     api_fields = [
         *ProductPage.api_fields,
         APIField("program_details"),
+        APIField("list_price"),
         APIField("include_in_learn_catalog"),
     ]
 

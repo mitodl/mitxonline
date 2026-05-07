@@ -83,7 +83,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
     mocker.patch("cms.serializers.get_wagtail_img_src", return_value=fake_image_src)
 
     program = ProgramFactory(page=None)
-    program_page = ProgramPageFactory(program=program)
+    program_page = ProgramPageFactory(program=program, list_price=Decimal("99.99"))
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_program_id=program.id, parent=program_page
     )
@@ -389,7 +389,7 @@ def test_serialize_program_page(
     )
 
     program = ProgramFactory(page=None)
-    program_page = ProgramPageFactory(program=program)
+    program_page = ProgramPageFactory(program=program, list_price=Decimal("99.99"))
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_program_id=program.id, parent=program_page
     )
@@ -411,6 +411,7 @@ def test_serialize_program_page(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "list_price": 99.99,
             "include_in_learn_catalog": False,
         },
     )
@@ -462,6 +463,7 @@ def test_serialize_program_page__form_child_of_course_with_program_fk(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "list_price": None,
             "include_in_learn_catalog": False,
         },
     )
@@ -501,6 +503,7 @@ def test_serialize_program_page__with_related_financial_form(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "list_price": None,
             "include_in_learn_catalog": False,
         },
     )
@@ -534,6 +537,7 @@ def test_serialize_program_page__no_financial_form(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "list_price": None,
             "include_in_learn_catalog": False,
         },
     )
@@ -570,6 +574,7 @@ def test_serialize_program_page__with_related_program_no_financial_form(
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
+            "list_price": None,
             "include_in_learn_catalog": False,
         },
     )

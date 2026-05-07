@@ -261,6 +261,13 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
+    list_price = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        coerce_to_string=False,
+        allow_null=True,
+        read_only=True,
+    )
     financial_assistance_form_url = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
 
@@ -376,6 +383,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "length",
             "effort",
             "price",
+            "list_price",
         ]
 
 
