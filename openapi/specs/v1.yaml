@@ -5065,6 +5065,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/CoursePage'
           readOnly: true
+          nullable: true
         programs:
           type: array
           items:
@@ -8438,6 +8439,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/CoursePage'
           readOnly: true
+          nullable: true
         programs:
           type: array
           items:
@@ -8898,6 +8900,7 @@ components:
         page:
           allOf:
           - $ref: '#/components/schemas/ProgramPage'
+          nullable: true
           readOnly: true
         program_type:
           type: string
@@ -9194,6 +9197,7 @@ components:
         page:
           allOf:
           - $ref: '#/components/schemas/ProgramPage'
+          nullable: true
           readOnly: true
         program_type:
           type: string
