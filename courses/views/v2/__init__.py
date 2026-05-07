@@ -206,9 +206,9 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
             added_context["include_programs"] = True
 
         if qp.get("org_id"):
-            added_context["org_id"] = qp.get("org_id")
+            added_context["org_id"] = int(qp.get("org_id"))
         if qp.get("contract_id"):
-            added_context["contract_id"] = qp.get("contract_id")
+            added_context["contract_id"] = int(qp.get("contract_id"))
 
         return {**super().get_serializer_context(), **added_context}
 

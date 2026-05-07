@@ -1194,7 +1194,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         org_id: int | None = None,
         contract_id: int | None = None,
     ) -> list["CourseRun"]:
-        """Return sorted course runs respecting boolorg/contract/enrollability context."""
+        """Return sorted course runs respecting org/contract/enrollability context."""
         courseruns = (
             self.prefetched_courseruns
             if hasattr(self, "prefetched_courseruns")

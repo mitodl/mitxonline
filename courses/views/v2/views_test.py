@@ -1449,13 +1449,11 @@ def test_filter_courses_with_contract_id_authenticated_user(make_contract_ready_
 
     test_course_runs = [
         (
-            (
-                run["courseware_id"]
-                for run in test_course["courseruns"]
-                if test_course["id"] == course.id
-            )
-            for test_course in response.data["results"]
+            run["courseware_id"]
+            for run in test_course["courseruns"]
+            if test_course["id"] == course.id
         )
+        for test_course in response.data["results"]
     ]
 
     for unrelated_course_run in unrelated_course_runs:
