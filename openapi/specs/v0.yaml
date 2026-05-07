@@ -7118,10 +7118,20 @@ components:
           type: string
           description: Get the price text from the program page.
           readOnly: true
+        list_price:
+          type: number
+          format: double
+          maximum: 100000000
+          minimum: -100000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          nullable: true
       required:
       - description
       - feature_image_src
       - financial_assistance_form_url
+      - list_price
       - live
       - page_url
       - price
