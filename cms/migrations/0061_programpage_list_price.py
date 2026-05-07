@@ -12,7 +12,7 @@ def get_program_product(program):
     return next((product for product in products if product.is_active), products[0])
 
 
-def populate_program_list_price(apps, schema_editor):  # noqa: ARG001
+def populate_program_list_price(apps, schema_editor):
     ProgramPage = apps.get_model("cms", "ProgramPage")
 
     for program_page in ProgramPage.objects.select_related("program").prefetch_related(
@@ -54,4 +54,3 @@ class Migration(migrations.Migration):
             migrations.RunPython.noop,
         ),
     ]
-
