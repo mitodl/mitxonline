@@ -1,0 +1,21 @@
+# Spec corrections: these endpoints already returned null for `page` in practice.
+# The spec was updated to reflect actual behavior, not a behavioral breaking change.
+GET /api/v2/course_certificates/{cert_uuid}/ the response property `course_run/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+GET /api/v2/courses/ the response property `results/items/page` became nullable for the status `200`
+GET /api/v2/courses/{id}/ the response property `page` became nullable for the status `200`
+GET /api/v2/enrollments/ the response property `items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+POST /api/v2/enrollments/ the response property `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `201`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the response property `items/items/course_details/page` became nullable for the status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the response property `items/items/program_details/page` became nullable for the status `200`
+GET /api/v2/pages/{id}/ the response property `oneOf[#/components/schemas/CoursePageItem]/course_details/page` became nullable for the status `200`
+GET /api/v2/pages/{id}/ the response property `oneOf[#/components/schemas/ProgramPageItem]/program_details/page` became nullable for the status `200`
+GET /api/v2/program_certificates/{cert_uuid}/ the response property `program/page` became nullable for the status `200`
+GET /api/v2/program_enrollments/ the response property `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+GET /api/v2/program_enrollments/ the response property `items/program/page` became nullable for the status `200`
+DELETE /api/v2/program_enrollments/{id}/ the response property `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+DELETE /api/v2/program_enrollments/{id}/ the response property `items/program/page` became nullable for the status `200`
+GET /api/v2/program_enrollments/{id}/ the response property `enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+GET /api/v2/program_enrollments/{id}/ the response property `program/page` became nullable for the status `200`
+GET /api/v2/programs/ the response property `results/items/page` became nullable for the status `200`
+GET /api/v2/programs/{id}/ the response property `page` became nullable for the status `200`
+POST /api/v2/verified_program_enrollments/{courserun_id}/ the response property `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `201`
