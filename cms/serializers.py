@@ -348,22 +348,22 @@ class ProgramPageSerializer(serializers.ModelSerializer):
                     FlexiblePricingRequestForm.objects.filter(
                         selected_program_id__in=related_program_ids
                     )
-                    .select_related("selected_program")
+                    .select_related("selected_program", "selected_program__programpage")
                     .live()
                     .first()
                 )
 
                 if financial_assistance_page is not None:
-                    # Get the program page for the related program
-                    try:
-                        program_page = ProgramPage.objects.get(
-                            program=financial_assistance_page.selected_program
-                        )
-                        return self._get_financial_assistance_url(
+                    program_page = getattr(
+                        financial_assistance_page.selected_program, "page", None
+                    )
+                    return (
+                        self._get_financial_assistance_url(
                             program_page, financial_assistance_page.slug
                         )
-                    except ProgramPage.DoesNotExist:
-                        return ""
+                        if program_page
+                        else ""
+                    )
 
         return (
             self._get_financial_assistance_url(instance, financial_assistance_page.slug)
