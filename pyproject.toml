@@ -274,7 +274,7 @@ filterwarnings = [
     # ol-django
     "ignore:Deprecated call to `pkg_resources.declare_namespace",
     "ignore:sentry_sdk.configure_scope",
-    "ignore:CheckConstraint.check:django.utils.deprecation.RemovedInDjango61Warning",
+    "ignore:CheckConstraint.check:django.utils.deprecation.RemovedInDjango60Warning",
     # cybersource
     "ignore:invalid escape sequence '\\\\R'",
     # cybersource

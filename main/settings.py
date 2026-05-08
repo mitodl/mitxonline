@@ -290,12 +290,12 @@ INSTALLED_APPS = (
     "drf_spectacular",
     "mitol.apigateway.apps.ApigatewayApp",
     "b2b",
-    # "health_check",  # Temporarily disabled for testing
-    # "health_check.cache",
-    # "health_check.contrib.migrations",
-    # "health_check.contrib.celery_ping",
-    # "health_check.contrib.redis",
-    # "health_check.contrib.db_heartbeat",
+    "health_check",
+    "health_check.cache",
+    "health_check.contrib.migrations",
+    "health_check.contrib.celery_ping",
+    "health_check.contrib.redis",
+    "health_check.contrib.db_heartbeat",
     "rest_framework_api_key",
 )
 # Only include the seed data app if this isn't running in prod
