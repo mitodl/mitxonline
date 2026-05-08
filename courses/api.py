@@ -1303,11 +1303,6 @@ def generate_missing_program_certificates(
         "failed": 0,
     }
 
-    log.info(
-        "generate_missing_program_certificates starting in WRITE mode "
-        "(missing certificates will be created)."
-    )
-
     candidate_qs = get_eligible_program_certificate_candidates()
     last_id = 0
     while True:
