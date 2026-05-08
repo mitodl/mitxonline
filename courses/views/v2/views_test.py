@@ -1407,9 +1407,9 @@ def test_filter_programs_by_org_and_contract_no_duplicates(
 
 
 @pytest.mark.django_db
-def test_filter_courses_with_contract_id_authenticated_user(
-    mocker, contract_ready_course, mock_course_run_clone
-):
+@pytest.mark.skip_nplusone_check
+@pytest.mark.usefixtures("mock_course_run_clone")
+def test_filter_courses_with_contract_id_authenticated_user(make_contract_ready_course):
     """Test that filtering courses by contract_id returns contracted courses for authorized users"""
     org = OrganizationPageFactory(name="Test Org")
     contract = ContractPageFactory(organization=org, active=True)
@@ -1417,8 +1417,10 @@ def test_filter_courses_with_contract_id_authenticated_user(
     user.b2b_contracts.add(contract)
     user.refresh_from_db()
 
-    (course, _) = contract_ready_course
-    create_contract_run(contract, course)
+    courses = [make_contract_ready_course()[0] for _ in range(5)]
+
+    for course in courses:
+        create_contract_run(contract, course)
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -1430,29 +1432,32 @@ def test_filter_courses_with_contract_id_authenticated_user(
     response = client.get(url, {"contract_id": contract.id})
 
     titles = [result["title"] for result in response.data["results"]]
-    assert course.title in titles
+    for course in courses:
+        assert course.title in titles
     assert unrelated_course.title not in titles
 
     # Test that the contract runs are filtered according to the contract ID as well
 
     other_contract = ContractPageFactory(organization=org, active=True)
-    unrelated_course_run = CourseRunFactory(course=course, b2b_contract=other_contract)
+    unrelated_course_runs = [
+        CourseRunFactory(course=course, b2b_contract=other_contract)
+        for course in courses
+    ]
 
     url = reverse("v2:courses_api-list")
     response = client.get(url, {"contract_id": contract.id})
 
     test_course_runs = [
         (
-            (
-                run["courseware_id"]
-                for run in test_course["courseruns"]
-                if test_course["id"] == course.id
-            )
-            for test_course in response.data["results"]
+            run["courseware_id"]
+            for run in test_course["courseruns"]
+            if test_course["id"] == course.id
         )
+        for test_course in response.data["results"]
     ]
 
-    assert unrelated_course_run.courseware_id not in test_course_runs
+    for unrelated_course_run in unrelated_course_runs:
+        assert unrelated_course_run.courseware_id not in test_course_runs
 
 
 @pytest.mark.django_db

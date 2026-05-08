@@ -18,6 +18,7 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django_countries.fields import CountryField
+from lru_method_cache import lru_method_cache
 from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
@@ -1184,6 +1185,49 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     def is_run(self):
         """Flag to indicate if this is a run"""
         return False
+
+    @lru_method_cache(max_size=12, typed=True)
+    def get_filtered_runs(
+        self,
+        *,
+        courserun_is_enrollable: bool | None,
+        org_id: int | None = None,
+        contract_id: int | None = None,
+    ) -> list["CourseRun"]:
+        """Return sorted course runs respecting org/contract/enrollability context."""
+        courseruns = (
+            self.prefetched_courseruns
+            if hasattr(self, "prefetched_courseruns")
+            else list(self.courseruns.all())
+        )
+        courseruns = sorted(courseruns, key=lambda r: r.id)
+
+        if courserun_is_enrollable is not None:
+            courseruns = filter(
+                lambda run: (
+                    getattr(run, "is_enrollable", False) == courserun_is_enrollable
+                ),
+                courseruns,
+            )
+
+        if org_id is not None:
+            courseruns = filter(
+                lambda run: (
+                    getattr(run.b2b_contract, "organization_id", None) == org_id
+                ),
+                courseruns,
+            )
+
+        if contract_id is not None:
+            courseruns = filter(
+                lambda run: getattr(run.b2b_contract, "id", None) == contract_id,
+                courseruns,
+            )
+
+        if org_id is None and contract_id is None:
+            courseruns = filter(lambda run: run.b2b_contract_id is None, courseruns)
+
+        return list(courseruns)
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"

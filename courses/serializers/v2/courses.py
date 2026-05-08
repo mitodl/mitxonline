@@ -325,40 +325,6 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     courseruns = serializers.SerializerMethodField()
     language_options = serializers.SerializerMethodField()
 
-    def _get_filtered_runs(self, instance):
-        """Return sorted course runs respecting org/contract/enrollability context."""
-        courseruns = (
-            instance.prefetched_courseruns
-            if hasattr(instance, "prefetched_courseruns")
-            else list(instance.courseruns.all())
-        )
-        courseruns = sorted(courseruns, key=lambda r: r.id)
-
-        if "courserun_is_enrollable" in self.context:
-            courseruns = [
-                r
-                for r in courseruns
-                if getattr(r, "is_enrollable", False)
-                == bool(self.context["courserun_is_enrollable"])
-            ]
-        if "org_id" in self.context:
-            courseruns = [
-                r
-                for r in courseruns
-                if getattr(r.b2b_contract, "organization_id", None)
-                == int(self.context["org_id"])
-            ]
-        if "contract_id" in self.context:
-            courseruns = [
-                r
-                for r in courseruns
-                if getattr(r.b2b_contract, "id", None)
-                == int(self.context["contract_id"])
-            ]
-        if "org_id" not in self.context and "contract_id" not in self.context:
-            courseruns = [r for r in courseruns if r.b2b_contract_id is None]
-        return courseruns
-
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
         """
@@ -368,7 +334,11 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
         ``is_primary_language=True``. If no run in the group is so designated,
         the oldest run (lowest id) in the group is used.
         """
-        all_runs = self._get_filtered_runs(instance)
+        all_runs = instance.get_filtered_runs(
+            courserun_is_enrollable=self.context.get("courserun_is_enrollable"),
+            org_id=self.context.get("org_id"),
+            contract_id=self.context.get("contract_id"),
+        )
         canonical_runs = _get_canonical_runs_per_tag(all_runs)
         return CourseRunSerializer(
             canonical_runs, many=True, read_only=True, context=self.context
@@ -381,7 +351,11 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
 
         Each entry contains: id, courseware_id, language, title, run_tag.
         """
-        all_runs = self._get_filtered_runs(instance)
+        all_runs = instance.get_filtered_runs(
+            courserun_is_enrollable=self.context.get("courserun_is_enrollable"),
+            org_id=self.context.get("org_id"),
+            contract_id=self.context.get("contract_id"),
+        )
         return CourseRunLanguageOptionSerializer(all_runs, many=True).data
 
     class Meta:

@@ -451,7 +451,7 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
 
             user = self.request.user
             if qp.get("org_id"):
-                added_context["org_id"] = qp.get("org_id")
+                added_context["org_id"] = int(qp.get("org_id"))
                 added_context["user_contracts"] = (
                     (
                         user.b2b_contracts.filter(
@@ -464,7 +464,7 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                     else []
                 )
             if qp.get("contract_id"):
-                added_context["contract_id"] = qp.get("contract_id")
+                added_context["contract_id"] = int(qp.get("contract_id"))
                 # make sure we filter this - user should be in the contract we're
                 # filtering against
                 added_context["user_contracts"] = (
