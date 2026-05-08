@@ -43,9 +43,11 @@ from courses.api import (
     deactivate_run_enrollment,
     defer_enrollment,
     generate_course_run_certificates,
+    generate_missing_program_certificates,
     generate_openedx_course_url,
     generate_program_certificate,
     get_certificate_grade_eligible_runs,
+    get_eligible_program_certificate_candidates,
     get_verifiable_credentials_payload,
     import_courserun_from_edx,
     manage_course_run_certificate_access,
@@ -3404,62 +3406,56 @@ def test_upgrade_program_enrollment_if_eligible_returns_false_when_electives_mis
     assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
 
 
-# ---------------------------------------------------------------------------
-# generate_missing_program_certificates tests
-# ---------------------------------------------------------------------------
-from courses.api import (  # noqa: E402
-    generate_missing_program_certificates,
-    get_eligible_program_certificate_candidates,
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("scenario", "should_include"),
+    [
+        ("verified_only", True),
+        ("audit_mode", False),
+        ("has_certificate", False),
+        ("non_live_program", False),
+    ],
 )
-
-
-@pytest.mark.django_db
-def test_get_eligible_program_certificate_candidates_verified_only():
-    """Audit enrollments must not appear in the candidate queryset."""
-    verified_enrollment = ProgramEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        active=True,
-        program=ProgramFactory.create(live=True),
-    )
-    ProgramEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
-        active=True,
-        program=ProgramFactory.create(live=True),
-    )
-
+def test_get_eligible_program_certificate_candidates(scenario, should_include):
+    """Test various filter scenarios for eligible program certificate candidates."""
     qs = get_eligible_program_certificate_candidates()
+
+    if scenario == "verified_only":
+        # Verified enrollment should be included
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            program=ProgramFactory.create(live=True),
+        )
+    elif scenario == "audit_mode":
+        # Audit enrollments must not appear
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+            program=ProgramFactory.create(live=True),
+        )
+    elif scenario == "has_certificate":
+        # Enrollments with existing certificate must be excluded
+        program = ProgramFactory.create(live=True)
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            program=program,
+        )
+        ProgramCertificateFactory.create(user=enrollment.user, program=program)
+    elif scenario == "non_live_program":
+        # Enrollments in non-live programs must not appear
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            program=ProgramFactory.create(live=False),
+        )
+
     ids = list(qs.values_list("id", flat=True))
-    assert verified_enrollment.id in ids
-
-
-@pytest.mark.django_db
-def test_get_eligible_program_certificate_candidates_excludes_existing_cert():
-    """Enrollments that already have a program certificate must be excluded."""
-    program = ProgramFactory.create(live=True)
-    enrollment = ProgramEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        active=True,
-        program=program,
-    )
-    ProgramCertificateFactory.create(user=enrollment.user, program=program)
-
-    qs = get_eligible_program_certificate_candidates()
-    ids = list(qs.values_list("id", flat=True))
-    assert enrollment.id not in ids
-
-
-@pytest.mark.django_db
-def test_get_eligible_program_certificate_candidates_excludes_non_live_program():
-    """Enrollments in non-live programs must not appear."""
-    enrollment = ProgramEnrollmentFactory.create(
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        active=True,
-        program=ProgramFactory.create(live=False),
-    )
-
-    qs = get_eligible_program_certificate_candidates()
-    ids = list(qs.values_list("id", flat=True))
-    assert enrollment.id not in ids
+    if should_include:
+        assert enrollment.id in ids
+    else:
+        assert enrollment.id not in ids
 
 
 @patch("courses.signals.upsert_custom_properties")

@@ -1060,9 +1060,6 @@ CELERY_BEAT_SCHEDULE = {
             day_of_month="*",
             month_of_year="*",
         ),
-        # Runs in dry-run mode by default.  Set dry_run=False in kwargs after
-        # validating output in production logs.
-        "kwargs": {"dry_run": True},
     },
     "update-b2b-enrollment-code-sheets": {
         "task": "b2b.tasks.queue_update_all_contract_enrollment_sheets",
