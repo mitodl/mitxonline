@@ -123,7 +123,7 @@ class AttachContractApi(APIView):
         request=None,
         responses=ContractPageSerializer(many=True),
     )
-    def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002
+    def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002, C901
         """
         Use the provided enrollment code to attach the user to a B2B contract.
 
@@ -194,13 +194,26 @@ class AttachContractApi(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        contracts = self._get_eligible_contracts(request.user, code, now)
+        b2b_contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
+        if not b2b_contract_ids:
+            # Log an error here. We found a code, but it isn't associated with any contracts, which is generally confusing for operators.
+            log.error(
+                "B2B attach: code %s is valid but not associated with any contracts",
+                code,
+            )
+            return Response(
+                {"detail": "No contracts found for this code."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        contracts = self._get_eligible_contracts(request.user, b2b_contract_ids, now)
+
         contracts_attached, contract_full = self._attach_user_to_contracts(
             request.user, contracts, code
         )
 
         active_code_contract = self._get_active_code_user_contract(
-            request.user, code, now
+            request.user, b2b_contract_ids, now
         )
         # Keep v0 response signature stable (array payload) for existing clients.
         # When we ship a new API version, switch this endpoint to return a single
@@ -222,13 +235,12 @@ class AttachContractApi(APIView):
 
         return Response(serialized_contracts, status=status.HTTP_200_OK)
 
-    def _get_active_code_user_contract(self, user, code, now):
+    def _get_active_code_user_contract(self, user, contract_ids_for_code, now):
         """Return the user's active contract associated with the redeemed code."""
-        code_contract_ids = code.b2b_contracts().values_list("id", flat=True)
         return (
             user.b2b_contracts.filter(active=True)
             .exclude(Q(contract_start__gt=now) | Q(contract_end__lt=now))
-            .filter(pk__in=code_contract_ids)
+            .filter(pk__in=contract_ids_for_code)
             .first()
         )
 
@@ -245,11 +257,11 @@ class AttachContractApi(APIView):
             .get(discount_code=enrollment_code)
         )
 
-    def _get_eligible_contracts(self, user, code, now):
+    def _get_eligible_contracts(self, user, contract_ids_for_code, now):
         """Return contracts associated with the code that the user can join."""
-        contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
+
         return (
-            ContractPage.objects.filter(pk__in=contract_ids)
+            ContractPage.objects.filter(pk__in=contract_ids_for_code)
             .exclude(pk__in=user.b2b_contracts.all())
             .exclude(Q(contract_end__lt=now) | Q(contract_start__gt=now))
             .all()
