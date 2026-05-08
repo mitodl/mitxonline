@@ -1278,7 +1278,6 @@ def get_eligible_program_certificate_candidates():
 
 
 def generate_missing_program_certificates(
-    dry_run=True,  # noqa: FBT002
     batch_size=500,
 ):
     """
@@ -1290,36 +1289,26 @@ def generate_missing_program_certificates(
     a single bad record does not abort the entire run.
 
     Args:
-        dry_run (bool): When True (default) no certificates are written to the
-            database; counters reflect what *would* happen.
         batch_size (int): Number of enrollments to process per iteration.
 
     Returns:
         dict: Summary counters:
             - processed (int): total enrollments evaluated
-            - would_create (int): eligible enrollments in dry-run mode
-            - created (int): certificates actually written (write mode only)
+            - created (int): certificates actually written
             - ineligible (int): enrollments that did not pass _has_earned_program_cert
             - failed (int): enrollments skipped due to an unexpected exception
     """
     stats = {
         "processed": 0,
-        "would_create": 0,
         "created": 0,
         "ineligible": 0,
         "failed": 0,
     }
 
-    if dry_run:
-        log.info(
-            "generate_missing_program_certificates starting in DRY-RUN mode "
-            "(no certificates will be written)."
-        )
-    else:
-        log.info(
-            "generate_missing_program_certificates starting in WRITE mode "
-            "(missing certificates will be created)."
-        )
+    log.info(
+        "generate_missing_program_certificates starting in WRITE mode "
+        "(missing certificates will be created)."
+    )
 
     candidate_qs = get_eligible_program_certificate_candidates()
     last_id = 0
@@ -1330,7 +1319,6 @@ def generate_missing_program_certificates(
             break
 
         batch_stats = {
-            "would_create": 0,
             "created": 0,
             "ineligible": 0,
             "failed": 0,
@@ -1341,33 +1329,17 @@ def generate_missing_program_certificates(
             stats["processed"] += 1
 
             try:
-                if dry_run:
-                    eligible = _has_earned_program_cert(
-                        enrollment.user, enrollment.program
-                    )
-                    if eligible:
-                        stats["would_create"] += 1
-                        batch_stats["would_create"] += 1
-                        log.debug(
-                            "DRY-RUN would create program certificate: user=%s program=%s",
-                            enrollment.user.edx_username,
-                            enrollment.program.readable_id,
-                        )
-                    else:
-                        stats["ineligible"] += 1
-                        batch_stats["ineligible"] += 1
+                _, created = generate_program_certificate(
+                    user=enrollment.user,
+                    program=enrollment.program,
+                    force_create=False,
+                )
+                if created:
+                    stats["created"] += 1
+                    batch_stats["created"] += 1
                 else:
-                    _, created = generate_program_certificate(
-                        user=enrollment.user,
-                        program=enrollment.program,
-                        force_create=False,
-                    )
-                    if created:
-                        stats["created"] += 1
-                        batch_stats["created"] += 1
-                    else:
-                        stats["ineligible"] += 1
-                        batch_stats["ineligible"] += 1
+                    stats["ineligible"] += 1
+                    batch_stats["ineligible"] += 1
 
             except Exception:
                 stats["failed"] += 1
@@ -1378,26 +1350,20 @@ def generate_missing_program_certificates(
                     enrollment.program_id,
                 )
 
-        would_create_msg = (
-            f"would_create={batch_stats['would_create']}" if dry_run else ""
-        )
         log.info(
             "generate_missing_program_certificates batch finished: "
-            "last_id=%d batch_size=%d %s created=%d ineligible=%d failed=%d",
+            "last_id=%d batch_size=%d created=%d ineligible=%d failed=%d",
             last_id,
             len(batch),
-            would_create_msg,
             batch_stats["created"],
             batch_stats["ineligible"],
             batch_stats["failed"],
         )
 
     log.info(
-        "generate_missing_program_certificates complete: dry_run=%s processed=%d "
-        "would_create=%d created=%d ineligible=%d failed=%d",
-        dry_run,
+        "generate_missing_program_certificates complete: processed=%d "
+        "created=%d ineligible=%d failed=%d",
         stats["processed"],
-        stats["would_create"],
         stats["created"],
         stats["ineligible"],
         stats["failed"],

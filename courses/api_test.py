@@ -3463,12 +3463,11 @@ def test_get_eligible_program_certificate_candidates_excludes_non_live_program()
 
 
 @patch("courses.signals.upsert_custom_properties")
-def test_generate_missing_program_certificates_dry_run_no_writes(
+def test_generate_missing_program_certificates_creates_cert(
     mock_upsert, mocker, user, default_mode_records
 ):
     """
-    In dry-run mode would_create is populated correctly and no
-    ProgramCertificate records are written.
+    The missing certificate is created and the created counter reflects that.
     """
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
 
@@ -3489,41 +3488,7 @@ def test_generate_missing_program_certificates_dry_run_no_writes(
     )
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
-    stats = generate_missing_program_certificates(dry_run=True)
-
-    assert stats["would_create"] >= 1
-    assert stats["created"] == 0
-    assert ProgramCertificate.objects.filter(user=user, program=program).count() == 0
-
-
-@patch("courses.signals.upsert_custom_properties")
-def test_generate_missing_program_certificates_write_mode_creates_cert(
-    mock_upsert, mocker, user, default_mode_records
-):
-    """
-    In write mode the missing certificate is created and the created counter
-    reflects that.
-    """
-    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
-
-    program = ProgramFactory.create(live=True)
-    program.requirements_root.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.ALL_OF,
-        title="Required Courses",
-    )
-    course = CourseFactory.create()
-    program.add_requirement(course)
-    course_run = CourseRunFactory.create(course=course)
-    course_run.enrollment_modes.set(default_mode_records)
-    course_run.save()
-
-    ProgramEnrollment.objects.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
-    )
-    CourseRunCertificateFactory.create(user=user, course_run=course_run)
-
-    stats = generate_missing_program_certificates(dry_run=False)
+    stats = generate_missing_program_certificates()
 
     assert stats["created"] >= 1
     assert ProgramCertificate.objects.filter(user=user, program=program).count() == 1
@@ -3555,8 +3520,8 @@ def test_generate_missing_program_certificates_idempotent(
     )
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
-    first = generate_missing_program_certificates(dry_run=False)
-    second = generate_missing_program_certificates(dry_run=False)
+    first = generate_missing_program_certificates()
+    second = generate_missing_program_certificates()
 
     assert first["created"] >= 1
     assert second["created"] == 0
@@ -3589,7 +3554,7 @@ def test_generate_missing_program_certificates_failure_isolation(mock_upsert, mo
 
     mocker.patch("courses.api.generate_program_certificate", side_effect=_side_effect)
 
-    stats = generate_missing_program_certificates(dry_run=False)
+    stats = generate_missing_program_certificates()
 
     assert stats["failed"] == 1
     assert stats["processed"] >= 1

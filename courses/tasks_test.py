@@ -53,33 +53,16 @@ def test_send_partner_school_email(mocker):
     send_partner_school_sharing_message.assert_called_once()
 
 
-def test_generate_missing_program_certificates_task_dry_run(mocker):
-    """Task delegates to the API function with dry_run=True by default."""
-    mock_api = mocker.patch(
-        "courses.api.generate_missing_program_certificates",
-        return_value={
-            "processed": 0,
-            "would_create": 0,
-            "created": 0,
-            "ineligible": 0,
-            "failed": 0,
-        },
-    )
-    generate_missing_program_certificates.delay()
-    mock_api.assert_called_once_with(dry_run=True, batch_size=500)
-
-
-def test_generate_missing_program_certificates_task_write_mode(mocker):
-    """Task delegates to the API function with dry_run=False when requested."""
+def test_generate_missing_program_certificates_task(mocker):
+    """Task delegates to the API function."""
     mock_api = mocker.patch(
         "courses.api.generate_missing_program_certificates",
         return_value={
             "processed": 1,
-            "would_create": 0,
             "created": 1,
             "ineligible": 0,
             "failed": 0,
         },
     )
-    generate_missing_program_certificates.delay(dry_run=False)
-    mock_api.assert_called_once_with(dry_run=False, batch_size=500)
+    generate_missing_program_certificates.delay()
+    mock_api.assert_called_once_with(batch_size=500)
