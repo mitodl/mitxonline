@@ -1111,9 +1111,9 @@ def test_repair_all_faulty_openedx_users(mocker):
     repair_all_faulty_openedx_users()
 
     assert patched_repair_users.call_count == 1
-    assert sorted(
-        patched_repair_users.call_args.args[0], key=lambda u: u.id
-    ) == sorted(users, key=lambda u: u.id)
+    assert sorted(patched_repair_users.call_args.args[0], key=lambda u: u.id) == sorted(
+        users, key=lambda u: u.id
+    )
 
 
 @pytest.mark.parametrize("exception_raised", [MockHttpError, Exception, None])
@@ -1162,9 +1162,9 @@ def test_retry_users_grace_period(mocker):
 
     assert patched_repair_users.call_count == 1
 
-    assert sorted(
-        patched_repair_users.call_args.args[0], key=lambda u: u.id
-    ) == sorted(users_to_repair, key=lambda u: u.id)
+    assert sorted(patched_repair_users.call_args.args[0], key=lambda u: u.id) == sorted(
+        users_to_repair, key=lambda u: u.id
+    )
 
 
 def test_unenroll_edx_course_run(mocker):
