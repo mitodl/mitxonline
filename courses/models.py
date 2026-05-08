@@ -375,7 +375,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     @cached_property
     def active_product(self):
         """Gets the active product of the program"""
-        return self.products.filter(active=True).first()
+        return self.products.filter(is_active=True).first()
 
     @property
     def text_id(self):
