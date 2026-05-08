@@ -390,6 +390,7 @@ def test_serialize_program_page(
 
     program = ProgramFactory(page=None)
     program_page = ProgramPageFactory(program=program)
+    product = ProductFactory(purchasable_object=program, price=Decimal("99.99"))
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_program_id=program.id, parent=program_page
     )
