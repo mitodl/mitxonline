@@ -17,7 +17,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django_countries import countries
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
@@ -1250,8 +1250,6 @@ def get_eligible_program_certificate_candidates():
     Returns:
         QuerySet[ProgramEnrollment]
     """
-    from django.db.models import Exists, OuterRef, Prefetch  # noqa: PLC0415
-
     existing_cert = ProgramCertificate.all_objects.filter(
         user_id=OuterRef("user_id"),
         program_id=OuterRef("program_id"),
@@ -1312,7 +1310,6 @@ def generate_missing_program_certificates(
 
     candidate_qs = get_eligible_program_certificate_candidates()
     last_id = 0
-
     while True:
         batch = list(candidate_qs.filter(id__gt=last_id)[:batch_size])
         if not batch:
