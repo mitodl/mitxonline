@@ -1259,7 +1259,6 @@ def get_eligible_program_certificate_candidates():
 
     return (
         ProgramEnrollment.objects.filter(
-            active=True,
             enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
             program__live=True,
         )
