@@ -305,16 +305,10 @@ class ProgramPageSerializer(serializers.ModelSerializer):
 
         if instance.program is None:
             return None
-
-        program_products = list(instance.program.products.all())
-        if not program_products:
-            return None
-
-        product = next(
-            (product for product in program_products if product.is_active),
-            program_products[0],
-        )
-        return product.price
+        product = instance.program.active_product
+        if product is None:
+            return 0
+        return instance.program.active_product.price
 
     @extend_schema_field(serializers.URLField)
     def get_financial_assistance_form_url(self, instance):
