@@ -3537,6 +3537,11 @@ def test_generate_missing_program_certificates_failure_isolation(mock_upsert, mo
         active=True,
         program=ProgramFactory.create(live=True),
     )
+    ProgramEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+        program=ProgramFactory.create(live=True),
+    )
 
     call_count = 0
 
@@ -3548,9 +3553,12 @@ def test_generate_missing_program_certificates_failure_isolation(mock_upsert, mo
             raise RuntimeError(msg)
         return None, False
 
-    mocker.patch("courses.api.generate_program_certificate", side_effect=_side_effect)
+    mock_generate = mocker.patch(
+        "courses.api.generate_program_certificate", side_effect=_side_effect
+    )
 
     stats = generate_missing_program_certificates()
 
     assert stats["failed"] == 1
-    assert stats["processed"] >= 1
+    assert stats["processed"] == 2
+    assert mock_generate.call_count == 2
