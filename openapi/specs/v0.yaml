@@ -7119,14 +7119,10 @@ components:
           description: Get the price text from the program page.
           readOnly: true
         list_price:
-          type: number
-          format: double
-          maximum: 100000000
-          minimum: -100000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           readOnly: true
-          nullable: true
       required:
       - description
       - feature_image_src
