@@ -123,6 +123,18 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
                         "displayOrder": 7,
                         "hidden": False,
                     },
+                    {
+                        "value": "created",
+                        "label": "created",
+                        "displayOrder": 8,
+                        "hidden": False,
+                    },
+                    {
+                        "value": "failed",
+                        "label": "failed",
+                        "displayOrder": 9,
+                        "hidden": False,
+                    },
                 ],
             },
             {
@@ -579,6 +591,18 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
                         "value": models.OrderStatus.REVIEW,
                         "label": models.OrderStatus.REVIEW,
                         "displayOrder": 7,
+                        "hidden": False,
+                    },
+                    {
+                        "value": "created",
+                        "label": "created",
+                        "displayOrder": 8,
+                        "hidden": False,
+                    },
+                    {
+                        "value": "failed",
+                        "label": "failed",
+                        "displayOrder": 9,
                         "hidden": False,
                     },
                 ],
