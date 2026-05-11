@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.149.7
+Version 1.149.7 (Released May 11, 2026)
 ---------------
 
 - Deduplicate deals and use consistent unique_app_id (#3539)
