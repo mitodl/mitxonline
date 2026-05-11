@@ -375,6 +375,21 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     @cached_property
     def active_product(self):
         """Gets the active product of the program"""
+        prefetched_products = getattr(self, "prefetched_products", None)
+        if prefetched_products is not None:
+            return next((product for product in prefetched_products if product.is_active), None)
+
+        prefetched_objects_cache = getattr(self, "_prefetched_objects_cache", {})
+        if "products" in prefetched_objects_cache:
+            return next(
+                (
+                    product
+                    for product in prefetched_objects_cache["products"]
+                    if product.is_active
+                ),
+                None,
+            )
+
         return self.products.filter(is_active=True).first()
 
     @property
