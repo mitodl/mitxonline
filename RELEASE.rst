@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 1.150.0 (Released May 11, 2026)
+---------------
+
+- Update dependency wagtail to v7.3.2 [SECURITY] (#3569)
+- Update dependency setuptools to <80.11 (#3566)
+- Upgrade django to 5.2 (#3133)
+- Update dependency faker to >=40.15.0,<=40.15.0 (#3565)
+- Update nginx Docker tag to v1.30 (#3564)
+- Cache the results of _get_filtered_runs (#3555)
+- Log if theres a misconfigured enrollment code given in attach API, return 404 (#3554)
+- fix: sort users by id in faulty openedx user repair test assertions (#3562)
+- Update redis Docker tag to v8.6.2 (#3560)
+- Update astral-sh/setup-uv action to v8.1.0 (#3561)
+- Update dependency granian to v2.7.4 [SECURITY] (#3559)
+- Add --make-codes flag to b2b_courseware call in test_datagen and language fixes (#3552)
+
 Version 1.149.7 (Released May 11, 2026)
 ---------------
 
