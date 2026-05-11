@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.0
+Version 1.150.0 (Released May 11, 2026)
 ---------------
 
 - Update dependency wagtail to v7.3.2 [SECURITY] (#3569)
