@@ -1144,10 +1144,7 @@ def _has_earned_program_cert(user, program):
         elif node.is_program:
             # has earned certificate for the required sub-program
             return ProgramCertificate.all_objects.filter(
-                user=user,
-                program=node.required_program,
-                is_revoked=False,
-                is_active=True,
+                user=user, program=node.required_program, is_revoked=False
             ).exists()
         return False
 
