@@ -4,7 +4,7 @@ Tests for course views
 
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
 import operator as op
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 from urllib.parse import quote
 
@@ -14,6 +14,7 @@ from anys import ANY_STR
 from django.db.models import Count, Q
 from django.test import Client, RequestFactory
 from django.urls import reverse
+from mitol.common.utils import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
@@ -21,13 +22,16 @@ from rest_framework.test import APIClient
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
+from cms.factories import ProgramPageFactory
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     BlockedCountryFactory,
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
@@ -895,6 +899,47 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
         }
         for program_enrollment in program_enrollments
     ]
+
+
+def test_program_enrollments_future_program_cert(user_drf_client, user):
+    """
+    Test that v1 program enrollments returns null for a ProgramCertificate with a
+    future issue_date, treating it as though no certificate exists.
+    """
+    program_page = ProgramPageFactory.create()
+    program = program_page.program
+    ProgramEnrollmentFactory.create(user=user, program=program)
+    ProgramCertificateFactory.create(
+        user=user,
+        program=program,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    resp = user_drf_client.get(reverse("v1:user_program_enrollments_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    enrollment_data = next(e for e in resp.json() if e["program"]["id"] == program.id)
+    assert enrollment_data["certificate"] is None
+
+
+def test_user_enrollments_future_course_cert(user_drf_client, user):
+    """
+    Test that v1 user enrollments returns null for a CourseRunCertificate with a
+    future issue_date, treating it as though no certificate exists.
+    """
+    run = CourseRunFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, run=run)
+    CourseRunCertificateFactory.create(
+        user=user,
+        course_run=run,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    resp = user_drf_client.get(reverse("v1:user-enrollments-api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    enrollment_data = next(e for e in resp.json() if e["id"] == enrollment.id)
+    assert enrollment_data["certificate"] is None
 
 
 @pytest.mark.parametrize("fulfilled_order_exists", [True, False])

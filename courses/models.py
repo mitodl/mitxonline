@@ -63,7 +63,7 @@ class ActiveCertificates(models.Manager):
         return (
             super()
             .get_queryset()
-            .filter(is_revoked=False, issued_date__lte=now_in_utc())
+            .filter(is_revoked=False, issue_date__lte=now_in_utc())
         )
 
 

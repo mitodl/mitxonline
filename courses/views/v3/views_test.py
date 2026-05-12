@@ -2,15 +2,25 @@
 Tests for courses api views v3
 """
 
+from datetime import timedelta
+
 import pytest
 from django.db.models import Q
 from django.urls import reverse
+from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from courses.conftest import B2BCourses, UserWithEnrollmentsAndCerts
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
-from courses.factories import ProgramEnrollmentFactory, ProgramFactory
+from courses.factories import (
+    CourseRunCertificateFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramCertificateFactory,
+    ProgramEnrollmentFactory,
+    ProgramFactory,
+)
 from courses.models import (
     PaidProgram,
     ProgramEnrollment,
@@ -481,6 +491,51 @@ def test_program_enrollments(
         }
         for program_enrollment in program_enrollments
     ]
+
+
+def test_program_enrollments_future_program_cert(user_drf_client, user):
+    """
+    Test that v3 program enrollments returns null for a ProgramCertificate with a
+    future issue_date, treating it as though no certificate exists.
+    """
+    program = ProgramFactory.create(live=True)
+    ProgramEnrollmentFactory.create(user=user, program=program)
+    ProgramCertificateFactory.create(
+        user=user,
+        program=program,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+
+    enrollment_data = next(e for e in resp.json() if e["program"]["id"] == program.id)
+    assert enrollment_data["certificate"] is None
+
+
+def test_user_enrollments_future_course_cert(user_drf_client, user):
+    """
+    Test that v3 course enrollments returns null for a CourseRunCertificate with a
+    future issue_date, treating it as though no certificate exists.
+    """
+    run = CourseRunFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(user=user, run=run)
+    CourseRunCertificateFactory.create(
+        user=user,
+        course_run=run,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    resp = user_drf_client.get(
+        reverse("v3:user_enrollments_api-detail", kwargs={"pk": enrollment.id})
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["certificate"] is None
+
+    list_resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+    assert list_resp.status_code == status.HTTP_200_OK
+    enrollment_data = next(e for e in list_resp.json() if e["id"] == enrollment.id)
+    assert enrollment_data["certificate"] is None
 
 
 def test_create_program_enrollment(user_drf_client, user):
