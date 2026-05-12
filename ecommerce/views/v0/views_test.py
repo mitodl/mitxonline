@@ -2,6 +2,7 @@
 
 import operator as op
 import random
+from urllib.parse import parse_qs, unquote, urlparse
 from datetime import datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -1343,10 +1344,15 @@ def test_receipt_by_run_not_found(user, client):
 
 def test_receipt_by_run_unauthenticated(client):
     """Test that unauthenticated users are redirected to the login page."""
-    resp = client.get(reverse("order_receipt_by_run_lookup", kwargs={"run_id": 1}))
+    next_path = reverse("order_receipt_by_run_lookup", kwargs={"run_id": 1})
+    resp = client.get(next_path)
 
     assert resp.status_code == 302
-    assert "/login/" in resp["Location"]
+    location = resp["Location"]
+    assert "/login/" in location
+    next_values = parse_qs(urlparse(location).query).get("next")
+    assert next_values is not None
+    assert unquote(next_values[0]) == next_path
 
 
 def test_receipt_by_run_uses_latest_paid_record(user, client):
@@ -1410,12 +1416,15 @@ def test_receipt_by_program_not_found(user, client):
 
 def test_receipt_by_program_unauthenticated(client):
     """Test that unauthenticated users are redirected to the login page."""
-    resp = client.get(
-        reverse("order_receipt_by_program_lookup", kwargs={"program_id": 1})
-    )
+    next_path = reverse("order_receipt_by_program_lookup", kwargs={"program_id": 1})
+    resp = client.get(next_path)
 
     assert resp.status_code == 302
-    assert "/login/" in resp["Location"]
+    location = resp["Location"]
+    assert "/login/" in location
+    next_values = parse_qs(urlparse(location).query).get("next")
+    assert next_values is not None
+    assert unquote(next_values[0]) == next_path
 
 
 def test_receipt_by_program_uses_latest_paid_record(user, client):
