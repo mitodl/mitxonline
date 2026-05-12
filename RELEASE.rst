@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.2
+Version 1.150.2 (Released May 12, 2026)
 ---------------
 
 - Filter out certificates which have future values for their issue_date (#3575)
