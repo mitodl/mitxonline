@@ -1835,6 +1835,13 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
 
     class Meta:
         abstract = True
+        indexes = [
+            models.Index(
+                fields=["enrollment_mode"],
+                condition=models.Q(active=True),
+                name="%(app_label)s_%(class)s_mode_active_idx",
+            ),
+        ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     change_status = models.CharField(  # noqa: DJ001
