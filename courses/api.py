@@ -1143,7 +1143,7 @@ def _has_earned_program_cert(user, program):
             return node.course in [*cert_courses, *grade_courses]
         elif node.is_program:
             # has earned certificate for the required sub-program
-            return ProgramCertificate.objects.filter(
+            return ProgramCertificate.all_objects.filter(
                 user=user, program=node.required_program, is_revoked=False
             ).exists()
         return False
