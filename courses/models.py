@@ -60,7 +60,11 @@ class ActiveCertificates(models.Manager):
         Returns:
             QuerySet: queryset for un-revoked certificates
         """
-        return super().get_queryset().filter(is_revoked=False)
+        return (
+            super()
+            .get_queryset()
+            .filter(is_revoked=False, issued_date__lte=now_in_utc())
+        )
 
 
 class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
