@@ -3,28 +3,36 @@
 from django.db import migrations, models
 
 
-def get_program_product(program):
-    """Return the active product for a program, or the first product if none are active."""
-    products = list(program.products.all())
-    if not products:
-        return None
-
-    return next((product for product in products if product.is_active), products[0])
-
-
 def populate_program_list_price(apps, schema_editor):
+    ContentType = apps.get_model("contenttypes", "ContentType")
     ProgramPage = apps.get_model("cms", "ProgramPage")
+    Product = apps.get_model("ecommerce", "Product")
 
-    for program_page in ProgramPage.objects.select_related("program").prefetch_related(
-        "program__products"
-    ):
+    program_pages = list(ProgramPage.objects.select_related("program"))
+    program_ids = [program_page.program_id for program_page in program_pages]
+
+    if not program_ids:
+        return
+
+    program_content_type = ContentType.objects.get(app_label="courses", model="program")
+    products_by_program_id = {}
+    for product in Product.objects.filter(
+        content_type_id=program_content_type.id,
+        object_id__in=program_ids,
+    ).order_by("object_id", "id"):
+        products_by_program_id.setdefault(product.object_id, []).append(product)
+
+    for program_page in program_pages:
         if program_page.list_price is not None:
             continue
 
         if program_page.program is None:
             continue
 
-        product = get_program_product(program_page.program)
+        products = products_by_program_id.get(program_page.program_id, [])
+        product = next((product for product in products if product.is_active), None)
+        if product is None and products:
+            product = products[0]
         if product is None:
             continue
 
