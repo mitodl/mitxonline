@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.150.2
+---------------
+
+- Filter out certificates which have future values for their issue_date (#3575)
+- Update dependency pycountry to v26 (#3568)
+
 Version 1.150.1 (Released May 12, 2026)
 ---------------
 
