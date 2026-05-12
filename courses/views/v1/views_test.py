@@ -922,6 +922,7 @@ def test_program_enrollments_future_program_cert(user_drf_client, user):
     assert enrollment_data["certificate"] is None
 
 
+@pytest.mark.skip_nplusone_check
 def test_user_enrollments_future_course_cert(user_drf_client, user):
     """
     Test that v1 user enrollments returns null for a CourseRunCertificate with a
