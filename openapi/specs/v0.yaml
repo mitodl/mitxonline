@@ -7118,10 +7118,16 @@ components:
           type: string
           description: Get the price text from the program page.
           readOnly: true
+        list_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
       required:
       - description
       - feature_image_src
       - financial_assistance_form_url
+      - list_price
       - live
       - page_url
       - price

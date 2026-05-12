@@ -261,6 +261,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
+    list_price = serializers.SerializerMethodField()
     financial_assistance_form_url = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
 
@@ -295,6 +296,19 @@ class ProgramPageSerializer(serializers.ModelSerializer):
                 instance.price[0].value.get("text") if len(instance.price) > 0 else None
             )
         return None
+
+    @extend_schema_field(serializers.DecimalField(max_digits=10, decimal_places=2))
+    def get_list_price(self, instance):
+        """Get the page list price or fall back to the linked program product price."""
+        if instance.list_price is not None:
+            return instance.list_price
+
+        if instance.program is None:
+            return None
+        product = instance.program.active_product
+        if product is None:
+            return None
+        return product.price
 
     @extend_schema_field(serializers.URLField)
     def get_financial_assistance_form_url(self, instance):
@@ -376,6 +390,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "length",
             "effort",
             "price",
+            "list_price",
         ]
 
 
