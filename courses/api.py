@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections import namedtuple
+from collections import Counter, namedtuple
 from datetime import datetime, timedelta
 from decimal import Decimal
 from traceback import format_exc
@@ -1296,13 +1296,7 @@ def generate_missing_program_certificates(
             - ineligible (int): enrollments that did not pass _has_earned_program_cert
             - failed (int): enrollments skipped due to an unexpected exception
     """
-    stats = {
-        "processed": 0,
-        "created": 0,
-        "ineligible": 0,
-        "failed": 0,
-    }
-
+    stats = Counter()
     candidate_qs = get_eligible_program_certificate_candidates()
     last_id = 0
     while True:
@@ -1310,12 +1304,7 @@ def generate_missing_program_certificates(
         if not batch:
             break
 
-        batch_stats = {
-            "created": 0,
-            "ineligible": 0,
-            "failed": 0,
-        }
-
+        batch_stats = Counter()
         for enrollment in batch:
             last_id = enrollment.id
             stats["processed"] += 1
