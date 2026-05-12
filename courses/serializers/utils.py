@@ -1,5 +1,7 @@
 """Utility functions for serializers"""
 
+from mitol.common.utils.datetime import now_in_utc
+
 from courses.models import CoursesTopic
 
 
@@ -60,3 +62,10 @@ def get_unique_topics_from_courses(courses) -> list[dict]:
             topics.update(topic.name for topic in course.page.topics.all())
 
     return [{"name": topic} for topic in sorted(topics)]
+
+
+def validate_certificate_dates(instance):
+    """
+    Check that issue date is in the past.
+    """
+    return not instance.issue_date > now_in_utc()

@@ -1236,6 +1236,23 @@ def test_get_course_certificate():
     assert resp400.status_code == status.HTTP_400_BAD_REQUEST
 
 
+def test_get_course_certificate_future_issue_date():
+    """
+    Test that get_course_certificate returns 404 when the certificate has a future issue date.
+    """
+    courseware_page = CoursePageFactory.create()
+    cert_page = courseware_page.certificate_page
+    cert_page.save_revision()
+    certificate = CourseRunCertificateFactory.create(
+        certificate_page_revision=cert_page.revisions.last(),
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    client = APIClient()
+    resp = client.get(reverse("v2:get_course_certificate", args=[certificate.uuid]))
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
 def test_get_program_certificate():
     """
     Test that the get_course_certificate handles valid, invalid, and not-found
@@ -1257,6 +1274,23 @@ def test_get_program_certificate():
 
     resp400 = client.get(reverse("v2:get_program_certificate", args=["not-uuid"]))
     assert resp400.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_get_program_certificate_future_issue_date():
+    """
+    Test that get_program_certificate returns 404 when the certificate has a future issue date.
+    """
+    courseware_page = ProgramPageFactory.create()
+    cert_page = courseware_page.certificate_page
+    cert_page.save_revision()
+    certificate = ProgramCertificateFactory.create(
+        certificate_page_revision=cert_page.revisions.last(),
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    client = APIClient()
+    resp = client.get(reverse("v2:get_program_certificate", args=[certificate.uuid]))
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db

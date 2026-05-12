@@ -11,6 +11,7 @@ from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
 )
+from courses.serializers.utils import validate_certificate_dates
 from courses.serializers.v1.base import (
     CourseRunCertificateSerializer,
     CourseRunGradeSerializer,
@@ -227,6 +228,11 @@ class FullProgramSerializer(ProgramSerializer):
 class ProgramCertificateSerializer(serializers.ModelSerializer):
     """ProgramCertificate model serializer"""
 
+    def to_representation(self, instance):
+        if not validate_certificate_dates(instance):
+            return None
+        return super().to_representation(instance)
+
     class Meta:
         model = models.ProgramCertificate
         fields = ["uuid", "link"]
@@ -243,7 +249,9 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
         Resolve a certificate for this enrollment if it exists
         """
         certificate = user_program_enrollment.get("certificate")
-        return ProgramCertificateSerializer(certificate).data if certificate else None
+        if not certificate or not validate_certificate_dates(certificate):
+            return None
+        return ProgramCertificateSerializer(certificate).data
 
 
 class LearnerRecordSerializer(serializers.Serializer):
@@ -336,7 +344,7 @@ class LearnerRecordSerializer(serializers.Serializer):
                 .first()
             )
 
-            if certificate is not None:
+            if certificate is not None and validate_certificate_dates(certificate):
                 fmt_course["certificate"] = CourseRunCertificateSerializer(
                     certificate
                 ).data

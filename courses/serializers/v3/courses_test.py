@@ -1,10 +1,14 @@
+from datetime import timedelta
+
 import pytest
+from mitol.common.utils import now_in_utc
 
 from b2b.factories import (
     ContractPageFactory,
     OrganizationPageFactory,
 )
 from courses.factories import (
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
 )
 from courses.serializers.v3.courses import (
@@ -80,3 +84,19 @@ class TestCourseRunEnrollmentSerializerV3:
         assert serialized_data["run"]["upgrade_product_id"] is None
         assert serialized_data["run"]["upgrade_product_price"] is None
         assert serialized_data["run"]["upgrade_product_is_active"] is None
+
+    def test_future_certificate_is_null(self):
+        """
+        When a CourseRunCertificate has a future issue_date it should appear as
+        null in the nested enrollment response, not raise a 404.
+        """
+        enrollment = CourseRunEnrollmentFactory.create()
+        CourseRunCertificateFactory.create(
+            course_run=enrollment.run,
+            user=enrollment.user,
+            issue_date=now_in_utc() + timedelta(days=1),
+        )
+
+        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+
+        assert serialized_data["certificate"] is None

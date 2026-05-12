@@ -20,7 +20,11 @@ from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 
-from cms.api import create_featured_items
+from cms.api import (
+    create_featured_items,
+    ensure_certificate_index,
+    ensure_home_page_and_site,
+)
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
     CertificatePageFactory,
@@ -43,8 +47,10 @@ from cms.models import (
 )
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    ProgramCertificateFactory,
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
 )
@@ -617,6 +623,55 @@ def test_certificate_for_program_page():
         assert signatory.value.title_3 == "Title_3"
         assert signatory.value.organization == "Organization"
         assert signatory.value.signature_image.title == "Image"
+
+
+def test_program_certificate_route_future_issue_date():
+    """
+    CertificateIndexPage.program_certificate should raise Http404 when the
+    certificate's issue_date is in the future.
+    """
+    ensure_home_page_and_site()
+    cert_index = ensure_certificate_index()
+
+    program_page = ProgramPageFactory.create()
+    cert_page = program_page.certificate_page
+    cert_page.save_revision()
+
+    certificate = ProgramCertificateFactory.create(
+        program=program_page.program,
+        certificate_page_revision=cert_page.revisions.last(),
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    with pytest.raises(Http404):
+        cert_index.program_certificate(request, str(certificate.uuid))
+
+
+def test_course_certificate_route_future_issue_date():
+    """
+    CertificateIndexPage.course_certificate should raise Http404 when the
+    certificate's issue_date is in the future.
+    """
+    ensure_home_page_and_site()
+    cert_index = ensure_certificate_index()
+
+    course_page = CoursePageFactory.create()
+    cert_page = course_page.certificate_page
+    cert_page.save_revision()
+
+    certificate = CourseRunCertificateFactory.create(
+        certificate_page_revision=cert_page.revisions.last(),
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    rf = RequestFactory()
+    request = rf.get("/")
+
+    with pytest.raises(Http404):
+        cert_index.course_certificate(request, str(certificate.uuid))
 
 
 @pytest.mark.parametrize("test_course", [True, False])

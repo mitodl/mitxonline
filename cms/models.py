@@ -74,6 +74,7 @@ from courses.models import (
     Program,
     ProgramCertificate,
 )
+from courses.serializers.utils import validate_certificate_dates
 from flexiblepricing.api import (
     determine_auto_approval,
     determine_courseware_flexible_price_discount,
@@ -210,7 +211,10 @@ class CertificateIndexPage(RoutablePageMixin, Page):
         except ProgramCertificate.DoesNotExist:
             raise Http404()  # noqa: B904, RSE102
 
-        # Get a CertificatePage to serve this request
+        if not validate_certificate_dates(certificate):
+            raise Http404
+
+            # Get a CertificatePage to serve this request
         certificate_page = (
             certificate.certificate_page_revision.as_object()
             if certificate.certificate_page_revision
@@ -241,6 +245,9 @@ class CertificateIndexPage(RoutablePageMixin, Page):
             certificate = CourseRunCertificate.objects.get(uuid=uuid)
         except CourseRunCertificate.DoesNotExist:
             raise Http404()  # noqa: B904, RSE102
+
+        if not validate_certificate_dates(certificate):
+            raise Http404
 
         # Get a CertificatePage to serve this request
         certificate_page = (

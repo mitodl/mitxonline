@@ -93,5 +93,15 @@
   "users/serializers.py:254:20:ORM001",
   "users/serializers.py:301:19:ORM001",
   "users/serializers.py:431:13:ORM001",
-  "users/serializers.py:467:11:ORM001"
+  "users/serializers.py:467:11:ORM001",
+  "courses/serializers/v1/base.py:87:20:ORM002",
+"courses/serializers/v1/programs.py:182:12:ORM001",
+"courses/serializers/v1/programs.py:197:12:ORM001",
+"courses/serializers/v1/programs.py:209:12:ORM001",
+"courses/serializers/v1/programs.py:308:23:ORM001",
+"courses/serializers/v1/programs.py:315:27:ORM001",
+"courses/serializers/v1/programs.py:330:16:ORM001",
+"courses/serializers/v1/programs.py:340:16:ORM001",
+"courses/serializers/v1/programs.py:354:17:ORM001",
+"courses/serializers/v1/programs.py:376:16:ORM001"
 ]

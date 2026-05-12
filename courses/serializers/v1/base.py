@@ -6,6 +6,7 @@ from rest_framework import serializers
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
+from courses.serializers.utils import validate_certificate_dates
 from courses.utils import get_approved_flexible_price_exists
 from ecommerce.serializers import ProductFlexibilePriceSerializer
 from ecommerce.serializers.v0 import BaseProductSerializer
@@ -155,6 +156,11 @@ class BaseProgramSerializer(serializers.ModelSerializer):
 
 class CourseRunCertificateSerializer(serializers.ModelSerializer):
     """CourseRunCertificate model serializer"""
+
+    def to_representation(self, instance):
+        if not validate_certificate_dates(instance):
+            return None
+        return super().to_representation(instance)
 
     class Meta:
         model = models.CourseRunCertificate

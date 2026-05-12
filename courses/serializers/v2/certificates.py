@@ -2,6 +2,7 @@
 
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
+from rest_framework.exceptions import NotFound
 from rest_framework.reverse import reverse
 from wagtail.api.v2.serializers import (
     PageHtmlUrlField,
@@ -20,6 +21,7 @@ from courses.models import (
     ProgramCertificate,
     VerifiableCredential,
 )
+from courses.serializers.utils import validate_certificate_dates
 from courses.serializers.v2.courses import CourseRunWithCourseSerializer
 from courses.serializers.v2.programs import ProgramSerializer
 from users.serializers import PublicUserSerializer
@@ -150,6 +152,11 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
     user = PublicUserSerializer()
     certificate_page = serializers.SerializerMethodField()
     verifiable_credential_json = serializers.SerializerMethodField()
+
+    def to_representation(self, instance):
+        if not validate_certificate_dates(instance):
+            raise NotFound
+        return super().to_representation(instance)
 
     @extend_schema_field(CertificatePageModelSerializer)
     def get_certificate_page(self, instance):

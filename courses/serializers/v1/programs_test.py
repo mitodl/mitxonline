@@ -9,10 +9,13 @@ from mitol.common.utils import now_in_utc
 from cms.serializers import ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
     EnrollmentModeFactory,
+    ProgramCertificateFactory,
+    ProgramEnrollmentFactory,
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
@@ -24,6 +27,7 @@ from courses.serializers.v1.programs import (
     ProgramRequirementSerializer,
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
+    UserProgramEnrollmentDetailSerializer,
 )
 from main.test_utils import assert_drf_json_equal
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -489,3 +493,53 @@ def test_program_requirement_serializer_valid(data):
     """Verify that the ProgramRequirementSerializer validates data"""
     serializer = ProgramRequirementSerializer(data=data)
     serializer.is_valid(raise_exception=True)
+
+
+def test_program_certificate_nested_future_issue_date_is_null(user):
+    """
+    ProgramCertificateSerializer, when used nested inside
+    UserProgramEnrollmentDetailSerializer, should return null for a certificate
+    with a future issue_date — not raise a 404.
+    """
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    certificate = ProgramCertificateFactory.create(
+        program=enrollment.program,
+        user=user,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    enrollment_detail = {
+        "program": enrollment.program,
+        "enrollments": [],
+        "certificate": certificate,
+    }
+    data = UserProgramEnrollmentDetailSerializer(enrollment_detail).data
+
+    assert data["certificate"] is None
+
+
+def test_learner_record_course_cert_future_issue_date_is_null(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """
+    CourseRunCertificateSerializer, when used nested inside LearnerRecordSerializer,
+    should return null for a certificate with a future issue_date — not raise a 404.
+    """
+    program = program_with_empty_requirements
+    user = mock_context["request"].user
+
+    course = CourseFactory.create()
+    program.add_requirement(course)
+    course_run = CourseRunFactory.create(course=course)
+    CourseRunEnrollmentFactory.create(run=course_run, user=user)
+    CourseRunCertificateFactory.create(
+        course_run=course_run,
+        user=user,
+        issue_date=now_in_utc() + timedelta(days=1),
+    )
+
+    data = LearnerRecordSerializer(instance=program, context=mock_context).data
+
+    course_data = data["program"]["courses"][0]
+    assert course_data["certificate"] is None

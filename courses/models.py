@@ -1629,6 +1629,10 @@ class BaseCertificate(models.Model):
         """Get the readable id of the certificate's run/program"""
         return NotImplementedError
 
+    def is_issue_date_in_future(self):
+        """Check if the issue date is in the future"""
+        return self.issue_date > now_in_utc()
+
 
 class CourseRunCertificate(TimestampedModel, BaseCertificate):
     """
