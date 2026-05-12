@@ -8,7 +8,7 @@ from courses.factories import (
 )
 from courses.tasks import (
     generate_course_certificates,
-    generate_missing_program_certificates,
+    generate_program_certificates,
     send_partner_school_email,
     subscribe_edx_course_emails,
 )
@@ -53,10 +53,10 @@ def test_send_partner_school_email(mocker):
     send_partner_school_sharing_message.assert_called_once()
 
 
-def test_generate_missing_program_certificates_task(mocker):
+def test_generate_program_certificates_task(mocker):
     """Task delegates to the API function."""
     mock_api = mocker.patch(
-        "courses.api.generate_missing_program_certificates",
+        "courses.api.generate_missing_program_certificate",
         return_value={
             "processed": 1,
             "created": 1,
@@ -64,5 +64,5 @@ def test_generate_missing_program_certificates_task(mocker):
             "failed": 0,
         },
     )
-    generate_missing_program_certificates.delay()
+    generate_program_certificates.delay()
     mock_api.assert_called_once_with(batch_size=500)

@@ -1052,7 +1052,7 @@ CELERY_BEAT_SCHEDULE = {
         ),
     },
     "generate-missing-program-certificates": {
-        "task": "courses.tasks.generate_missing_program_certificates",
+        "task": "courses.tasks.generate_program_certificates",
         "schedule": crontab(
             minute=0,
             hour=CRON_MISSING_PROGRAM_CERTIFICATES_HOURS,

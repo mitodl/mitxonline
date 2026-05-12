@@ -78,9 +78,9 @@ def send_partner_school_email(record_uuid):
 
 
 @app.task
-def generate_missing_program_certificates(batch_size=500):
+def generate_program_certificates(batch_size=500):
     """
-    Task to create missing program certificates for verified enrollments that have
+    Task to create program certificates for verified enrollments that have
     earned them but were not issued a certificate (e.g. due to a missed signal).
 
     Args:
@@ -92,7 +92,7 @@ def generate_missing_program_certificates(batch_size=500):
 
     results = _api_fn(batch_size=batch_size)
     log.info(
-        "generate_missing_program_certificates task finished: %s",
+        "generate_program_certificates task finished: %s",
         results,
     )
 
