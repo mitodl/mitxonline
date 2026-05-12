@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.1
+Version 1.150.1 (Released May 12, 2026)
 ---------------
 
 - fix: add created and failed statuses to align with xpro statuses in hubspot deal sync task (#3570)
