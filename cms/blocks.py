@@ -17,7 +17,6 @@ class ResourceBlock(blocks.StructBlock):
     detail = blocks.RichTextBlock()
 
 
-
 class CourseRunFieldBlock(blocks.FieldBlock):
     """
     Block class that allows selecting a course run
