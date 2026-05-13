@@ -4,6 +4,7 @@ import operator as op
 import random
 from datetime import datetime, timedelta
 from decimal import Decimal
+from urllib.parse import parse_qs, unquote, urlparse
 from zoneinfo import ZoneInfo
 
 import freezegun
@@ -1299,14 +1300,14 @@ def test_program_product_purchasing(user, user_drf_client):
     ).exists()
 
 
-def test_receipt_by_run_redirects(user, user_drf_client):
+def test_receipt_by_run_redirects(user, client):
     """Test that a fulfilled PaidCourseRun redirects to the correct receipt URL."""
+    client.force_login(user)
     course_run = CourseRunFactory.create()
     order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     PaidCourseRun.objects.create(user=user, course_run=course_run, order=order)
 
-    user_drf_client.force_authenticate(user=user)
-    resp = user_drf_client.get(
+    resp = client.get(
         reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
     )
 
@@ -1329,12 +1330,12 @@ def test_receipt_by_run_redirects_on_non_api_route(user, client):
     assert resp["Location"] == f"/orders/receipt/{order.id}/"
 
 
-def test_receipt_by_run_not_found(user, user_drf_client):
+def test_receipt_by_run_not_found(user, client):
     """Test that a missing PaidCourseRun returns 404."""
+    client.force_login(user)
     course_run = CourseRunFactory.create()
 
-    user_drf_client.force_authenticate(user=user)
-    resp = user_drf_client.get(
+    resp = client.get(
         reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
     )
 
@@ -1342,22 +1343,28 @@ def test_receipt_by_run_not_found(user, user_drf_client):
 
 
 def test_receipt_by_run_unauthenticated(client):
-    """Test that unauthenticated users cannot access the receipt by run endpoint."""
-    resp = client.get(reverse("order_receipt_by_run_lookup", kwargs={"run_id": 1}))
+    """Test that unauthenticated users are redirected to the login page."""
+    next_path = reverse("order_receipt_by_run_lookup", kwargs={"run_id": 1})
+    resp = client.get(next_path)
 
-    assert resp.status_code in (401, 403)
+    assert resp.status_code == 302
+    location = resp["Location"]
+    assert "/login/" in location
+    next_values = parse_qs(urlparse(location).query).get("next")
+    assert next_values is not None
+    assert unquote(next_values[0]) == next_path
 
 
-def test_receipt_by_run_uses_latest_paid_record(user, user_drf_client):
+def test_receipt_by_run_uses_latest_paid_record(user, client):
     """Test receipt-by-run picks the latest fulfilled PaidCourseRun."""
+    client.force_login(user)
     course_run = CourseRunFactory.create()
     older_order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     newer_order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     PaidCourseRun.objects.create(user=user, course_run=course_run, order=older_order)
     PaidCourseRun.objects.create(user=user, course_run=course_run, order=newer_order)
 
-    user_drf_client.force_authenticate(user=user)
-    resp = user_drf_client.get(
+    resp = client.get(
         reverse("order_receipt_by_run_lookup", kwargs={"run_id": course_run.id})
     )
 
@@ -1365,14 +1372,14 @@ def test_receipt_by_run_uses_latest_paid_record(user, user_drf_client):
     assert resp["Location"] == f"/orders/receipt/{newer_order.id}/"
 
 
-def test_receipt_by_program_redirects(user, user_drf_client):
+def test_receipt_by_program_redirects(user, client):
     """Test that a fulfilled PaidProgram redirects to the correct receipt URL."""
+    client.force_login(user)
     program = ProgramFactory.create()
     order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     PaidProgram.objects.create(user=user, program=program, order=order)
 
-    user_drf_client.force_authenticate(user=user)
-    resp = user_drf_client.get(
+    resp = client.get(
         reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
     )
 
@@ -1395,12 +1402,12 @@ def test_receipt_by_program_redirects_on_non_api_route(user, client):
     assert resp["Location"] == f"/orders/receipt/{order.id}/"
 
 
-def test_receipt_by_program_not_found(user, user_drf_client):
+def test_receipt_by_program_not_found(user, client):
     """Test that a missing PaidProgram returns 404."""
+    client.force_login(user)
     program = ProgramFactory.create()
 
-    user_drf_client.force_authenticate(user=user)
-    resp = user_drf_client.get(
+    resp = client.get(
         reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
     )
 
@@ -1408,24 +1415,28 @@ def test_receipt_by_program_not_found(user, user_drf_client):
 
 
 def test_receipt_by_program_unauthenticated(client):
-    """Test that unauthenticated users cannot access the receipt by program endpoint."""
-    resp = client.get(
-        reverse("order_receipt_by_program_lookup", kwargs={"program_id": 1})
-    )
+    """Test that unauthenticated users are redirected to the login page."""
+    next_path = reverse("order_receipt_by_program_lookup", kwargs={"program_id": 1})
+    resp = client.get(next_path)
 
-    assert resp.status_code in (401, 403)
+    assert resp.status_code == 302
+    location = resp["Location"]
+    assert "/login/" in location
+    next_values = parse_qs(urlparse(location).query).get("next")
+    assert next_values is not None
+    assert unquote(next_values[0]) == next_path
 
 
-def test_receipt_by_program_uses_latest_paid_record(user, user_drf_client):
+def test_receipt_by_program_uses_latest_paid_record(user, client):
     """Test receipt-by-program picks the latest fulfilled PaidProgram."""
+    client.force_login(user)
     program = ProgramFactory.create()
     older_order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     newer_order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     PaidProgram.objects.create(user=user, program=program, order=older_order)
     PaidProgram.objects.create(user=user, program=program, order=newer_order)
 
-    user_drf_client.force_authenticate(user=user)
-    resp = user_drf_client.get(
+    resp = client.get(
         reverse("order_receipt_by_program_lookup", kwargs={"program_id": program.id})
     )
 

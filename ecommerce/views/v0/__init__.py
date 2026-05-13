@@ -6,10 +6,12 @@ import logging
 
 import django_filters
 from django.contrib.auth import get_user_model
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import redirect
+from django.views import View
 from django_filters import rest_framework as filters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -27,7 +29,6 @@ from rest_framework.generics import RetrieveAPIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
@@ -939,13 +940,11 @@ class OrderReceiptView(RetrieveAPIView):
         return Order.objects.filter(purchaser=self.request.user).all()
 
 
-@extend_schema(exclude=True)
-class ReceiptByRunView(APIView):
+class ReceiptByRunView(LoginRequiredMixin, View):
     """Redirects to the receipt page for an order associated with a course run."""
 
-    permission_classes = [IsAuthenticated]
-
     def get(self, request, run_id):
+        """Look up the receipt for the given course run and redirect to it."""
         paid_run = (
             PaidCourseRun.objects.filter(
                 user=request.user,
@@ -960,13 +959,11 @@ class ReceiptByRunView(APIView):
         return redirect(f"/orders/receipt/{paid_run.order_id}/")
 
 
-@extend_schema(exclude=True)
-class ReceiptByProgramView(APIView):
+class ReceiptByProgramView(LoginRequiredMixin, View):
     """Redirects to the receipt page for an order associated with a program."""
 
-    permission_classes = [IsAuthenticated]
-
     def get(self, request, program_id):
+        """Look up the receipt for the given program and redirect to it."""
         paid_program = (
             PaidProgram.objects.filter(
                 user=request.user,
