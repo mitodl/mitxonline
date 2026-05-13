@@ -7114,10 +7114,6 @@ components:
           description: A short description indicating how much effort is required
             (e.g. 1-3 hours per week).
           maxLength: 100
-        price:
-          type: string
-          description: Get the price text from the program page.
-          readOnly: true
         list_price:
           type: string
           format: decimal
@@ -7130,7 +7126,6 @@ components:
       - list_price
       - live
       - page_url
-      - price
     ProgramPageItem:
       type: object
       description: Serializer for individual program page items, including all relevant
