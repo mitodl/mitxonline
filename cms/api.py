@@ -356,15 +356,6 @@ def get_optional_placeholder_values_for_courseware_type(
     # Might make sense to use faker for some of this or allow selection of values from different presets
     # For now though, this sets up a page which is reasonably complete and can be immediately published
     values = {
-        "price": [
-            (
-                "price_details",
-                {
-                    "text": "PLACEHOLDER - Three easy payments of 99.99",
-                    "link": "https://example.com/pricing",
-                },
-            )
-        ],
         "min_weeks": 1,
         "max_weeks": 1,
         "effort": "PLACEHOLDER - 1-2 hours per week",
