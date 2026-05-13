@@ -61,6 +61,9 @@ from users.models import (
 
 log = logging.getLogger(__name__)
 
+# HubSpot internal option value for the "Checkout Abandoned" deal stage.
+CART_ADD_DEAL_STAGE = "checkout_abandoned"
+
 CUSTOM_ECOMMERCE_PROPERTIES = {
     # defines which hubspot properties are mapped with which local properties when objects are synced.
     # See https://developers.hubspot.com/docs/methods/ecomm-bridge/ecomm-bridge-overview for more details
@@ -2217,6 +2220,8 @@ def _sync_cart_add_deal_with_hubspot(
 ) -> SimplePublicObject:
     """Create or update cart-add deal and line-item objects and associate them in target account."""
     deal_input = _build_target_deal_message(order, hubspot_client)
+    # Cart-add events should always be tracked as "Checkout Abandoned".
+    deal_input.properties["dealstage"] = CART_ADD_DEAL_STAGE
 
     # Extract unique_app_id from deal input to check for existing deals
     unique_app_id = deal_input.properties.get("unique_app_id")
