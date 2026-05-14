@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections import namedtuple
+from collections import Counter, namedtuple
 from datetime import datetime, timedelta
 from decimal import Decimal
 from traceback import format_exc
@@ -17,7 +17,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django_countries import countries
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
@@ -1231,6 +1231,126 @@ def generate_multiple_programs_certificate(user, programs):
         result = generate_program_certificate(user, program)
         results.append(result)
     return results
+
+
+def get_eligible_program_certificate_candidates():
+    """
+    Return a queryset of ProgramEnrollment rows that are eligible for a program
+    certificate but do not yet have one.
+
+    Filters applied:
+    - Enrollment is active
+    - Enrollment mode is verified
+    - Program is live
+    - No existing ProgramCertificate (including revoked) for the same user+program pair
+
+    The queryset is ordered by primary key for stable pk-windowed batching and
+    annotated with `has_program_cert` for transparency.
+
+    Returns:
+        QuerySet[ProgramEnrollment]
+    """
+    existing_cert = ProgramCertificate.all_objects.filter(
+        user_id=OuterRef("user_id"),
+        program_id=OuterRef("program_id"),
+    )
+
+    return (
+        ProgramEnrollment.objects.filter(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            program__live=True,
+        )
+        .annotate(has_program_cert=Exists(existing_cert))
+        .filter(has_program_cert=False)
+        .select_related("user", "program")
+        .prefetch_related(
+            Prefetch(
+                "program__all_requirements",
+                queryset=ProgramRequirement.objects.select_related(
+                    "course", "required_program"
+                ),
+            )
+        )
+        .order_by("id")
+    )
+
+
+def generate_missing_program_certificates(
+    batch_size=500,
+):
+    """
+    Reconciliation job that creates program certificates for every verified,
+    live-program enrollment that is missing one and has earned it.
+
+    Processes candidates in pk-windowed batches so the full result set is never
+    materialised in memory at once.  Each enrollment is handled independently so
+    a single bad record does not abort the entire run.
+
+    Args:
+        batch_size (int): Number of enrollments to process per iteration.
+
+    Returns:
+        dict: Summary counters:
+            - processed (int): total enrollments evaluated
+            - created (int): certificates actually written
+            - ineligible (int): enrollments that did not pass _has_earned_program_cert
+            - failed (int): enrollments skipped due to an unexpected exception
+    """
+    stats = Counter()
+    candidate_qs = get_eligible_program_certificate_candidates()
+    last_id = 0
+    while True:
+        batch = list(candidate_qs.filter(id__gt=last_id)[:batch_size])
+        if not batch:
+            break
+
+        batch_stats = Counter()
+        for enrollment in batch:
+            last_id = enrollment.id
+            stats["processed"] += 1
+
+            try:
+                _, created = generate_program_certificate(
+                    user=enrollment.user,
+                    program=enrollment.program,
+                    force_create=False,
+                )
+                if created:
+                    stats["created"] += 1
+                    batch_stats["created"] += 1
+                else:
+                    stats["ineligible"] += 1
+                    batch_stats["ineligible"] += 1
+
+            except Exception:
+                stats["failed"] += 1
+                batch_stats["failed"] += 1
+                log.exception(
+                    "Error processing program certificate for user=%s program=%s",
+                    enrollment.user_id,
+                    enrollment.program_id,
+                )
+
+        log.info(
+            "generate_missing_program_certificates batch finished: "
+            "last_id=%d batch_size=%d created=%d ineligible=%d failed=%d",
+            last_id,
+            len(batch),
+            batch_stats["created"],
+            batch_stats["ineligible"],
+            batch_stats["failed"],
+        )
+
+    log.info(
+        "generate_missing_program_certificates complete: processed=%d "
+        "created=%d ineligible=%d failed=%d",
+        stats["processed"],
+        stats["created"],
+        stats["ineligible"],
+        stats["failed"],
+    )
+
+    return stats
 
 
 def manage_program_certificate_access(user, program, revoke_state):

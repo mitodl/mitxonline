@@ -43,9 +43,11 @@ from courses.api import (
     deactivate_run_enrollment,
     defer_enrollment,
     generate_course_run_certificates,
+    generate_missing_program_certificates,
     generate_openedx_course_url,
     generate_program_certificate,
     get_certificate_grade_eligible_runs,
+    get_eligible_program_certificate_candidates,
     get_verifiable_credentials_payload,
     import_courserun_from_edx,
     manage_course_run_certificate_access,
@@ -3402,3 +3404,161 @@ def test_upgrade_program_enrollment_if_eligible_returns_false_when_electives_mis
     program_enrollment.refresh_from_db()
     assert upgraded is False
     assert program_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("scenario", "should_include"),
+    [
+        ("verified_only", True),
+        ("audit_mode", False),
+        ("has_certificate", False),
+        ("non_live_program", False),
+    ],
+)
+def test_get_eligible_program_certificate_candidates(scenario, should_include):
+    """Test various filter scenarios for eligible program certificate candidates."""
+    qs = get_eligible_program_certificate_candidates()
+
+    if scenario == "verified_only":
+        # Verified enrollment should be included
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            program=ProgramFactory.create(live=True),
+        )
+    elif scenario == "audit_mode":
+        # Audit enrollments must not appear
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+            program=ProgramFactory.create(live=True),
+        )
+    elif scenario == "has_certificate":
+        # Enrollments with existing certificate must be excluded
+        program = ProgramFactory.create(live=True)
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            program=program,
+        )
+        ProgramCertificateFactory.create(user=enrollment.user, program=program)
+    elif scenario == "non_live_program":
+        # Enrollments in non-live programs must not appear
+        enrollment = ProgramEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+            program=ProgramFactory.create(live=False),
+        )
+
+    ids = list(qs.values_list("id", flat=True))
+    if should_include:
+        assert enrollment.id in ids
+    else:
+        assert enrollment.id not in ids
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_missing_program_certificates_creates_cert(
+    mock_upsert, mocker, user, default_mode_records
+):
+    """
+    The missing certificate is created and the created counter reflects that.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+
+    program = ProgramFactory.create(live=True)
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    course = CourseFactory.create()
+    program.add_requirement(course)
+    course_run = CourseRunFactory.create(course=course)
+    course_run.enrollment_modes.set(default_mode_records)
+    course_run.save()
+
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    CourseRunCertificateFactory.create(user=user, course_run=course_run)
+
+    stats = generate_missing_program_certificates()
+
+    assert stats["created"] >= 1
+    assert ProgramCertificate.objects.filter(user=user, program=program).count() == 1
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_missing_program_certificates_idempotent(
+    mock_upsert, mocker, user, default_mode_records
+):
+    """
+    Running the task twice must not create duplicate certificates.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+
+    program = ProgramFactory.create(live=True)
+    program.requirements_root.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    course = CourseFactory.create()
+    program.add_requirement(course)
+    course_run = CourseRunFactory.create(course=course)
+    course_run.enrollment_modes.set(default_mode_records)
+    course_run.save()
+
+    ProgramEnrollment.objects.create(
+        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    CourseRunCertificateFactory.create(user=user, course_run=course_run)
+
+    first = generate_missing_program_certificates()
+    second = generate_missing_program_certificates()
+
+    assert first["created"] >= 1
+    assert second["created"] == 0
+    assert ProgramCertificate.objects.filter(user=user, program=program).count() == 1
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_missing_program_certificates_failure_isolation(mock_upsert, mocker):
+    """
+    An exception raised for one enrollment must not prevent the others from
+    being processed.
+    """
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+
+    ProgramEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+        program=ProgramFactory.create(live=True),
+    )
+    ProgramEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+        program=ProgramFactory.create(live=True),
+    )
+
+    call_count = 0
+
+    def _side_effect(user, program, force_create=False):  # noqa: FBT002
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            msg = "simulated transient error"
+            raise RuntimeError(msg)
+        return None, False
+
+    mock_generate = mocker.patch(
+        "courses.api.generate_program_certificate", side_effect=_side_effect
+    )
+
+    stats = generate_missing_program_certificates()
+
+    assert stats["failed"] == 1
+    assert stats["processed"] == 2
+    assert mock_generate.call_count == 2

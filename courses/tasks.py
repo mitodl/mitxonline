@@ -78,6 +78,26 @@ def send_partner_school_email(record_uuid):
 
 
 @app.task
+def generate_program_certificates(batch_size=500):
+    """
+    Task to create program certificates for verified enrollments that have
+    earned them but were not issued a certificate (e.g. due to a missed signal).
+
+    Args:
+        batch_size (int): Number of enrollments to process per pk-windowed batch.
+    """
+    from courses.api import (
+        generate_missing_program_certificates as _api_fn,
+    )
+
+    results = _api_fn(batch_size=batch_size)
+    log.info(
+        "generate_program_certificates task finished: %s",
+        results,
+    )
+
+
+@app.task
 def upgrade_eligible_program_enrollments():
     """Upgrade eligible learners for all audit-mode program enrollments."""
     from courses.api import upgrade_program_enrollment_if_eligible
