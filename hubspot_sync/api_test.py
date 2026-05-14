@@ -893,6 +893,44 @@ def test_track_cart_add_with_hubspot_uai_fallback_to_primary_account(
     mock_sync_deal.assert_called_once()
 
 
+def test_sync_cart_add_deal_with_hubspot_sets_checkout_abandoned_stage(
+    mocker, hubspot_order
+):
+    """Cart-add deals should always use the checkout_abandoned deal stage."""
+    mock_client = mocker.Mock()
+    mock_client.crm.objects.basic_api.create.return_value = SimpleNamespace(id="obj-id")
+
+    mocker.patch(
+        "hubspot_sync.api._build_target_deal_message",
+        return_value=SimplePublicObjectInput(
+            properties={
+                "dealname": "MITXONLINE-ORDER-1",
+                "dealstage": "checkout_pending",
+                "unique_app_id": "test-app-id",
+            }
+        ),
+    )
+    mocker.patch(
+        "hubspot_sync.api._build_target_line_item_message",
+        return_value=SimplePublicObjectInput(properties={"name": "line-item"}),
+    )
+    mocker.patch("hubspot_sync.api._find_target_deal_id_by_dealname", return_value=None)
+    mocker.patch(
+        "hubspot_sync.api._find_target_deal_id_by_unique_app_id", return_value=None
+    )
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+
+    api._sync_cart_add_deal_with_hubspot(hubspot_order, "contact-id", mock_client)  # noqa: SLF001
+
+    deal_create_call = mock_client.crm.objects.basic_api.create.call_args_list[0]
+    assert (
+        deal_create_call.kwargs["simple_public_object_input_for_create"].properties[
+            "dealstage"
+        ]
+        == api.CART_ADD_DEAL_STAGE
+    )
+
+
 def test_normalize_deal_properties_for_target_account_pipeline_stage_mismatch(mocker):
     """Dealstage should be normalized to one allowed by the selected pipeline."""
     mock_client = mocker.Mock()
