@@ -993,6 +993,73 @@ def test_normalize_deal_properties_for_target_account_prefers_ecommerce_pipeline
     assert deal_input.properties["dealstage"] == "created"
 
 
+def test_normalize_deal_properties_for_target_account_falls_back_to_hubspot_pipeline_id(
+    mocker, settings
+):
+    """If UAI_HUBSPOT_PIPELINE_ID is unavailable, HUBSPOT_PIPELINE_ID should be used."""
+    settings.UAI_HUBSPOT_PIPELINE_ID = "missing-uai-pipeline-id"
+    settings.HUBSPOT_PIPELINE_ID = "mitx-pipeline-id"
+    mock_client = mocker.Mock()
+    mocker.patch(
+        "hubspot_sync.api._get_target_pipeline_stage_map",
+        return_value={
+            "sales-pipeline-id": ["closedwon", "closedlost"],
+            "mitx-pipeline-id": ["created", "processed"],
+            "default": ["checkout_pending"],
+        },
+    )
+    mocker.patch(
+        "hubspot_sync.api._get_target_property_options",
+        return_value=["created", "fulfilled", "failed", "refunded"],
+    )
+
+    deal_input = SimplePublicObjectInput(
+        properties={
+            "pipeline": "missing-source-pipeline-id",
+            "dealstage": "checkout_pending",
+            "status": "pending",
+        }
+    )
+
+    api._normalize_deal_properties_for_target_account(mock_client, deal_input)  # noqa: SLF001
+
+    assert deal_input.properties["pipeline"] == "mitx-pipeline-id"
+    assert deal_input.properties["dealstage"] == "created"
+
+
+def test_normalize_deal_properties_for_target_account_falls_back_to_default_pipeline(
+    mocker, settings
+):
+    """If configured pipeline ids are unavailable, the default pipeline should be used."""
+    settings.UAI_HUBSPOT_PIPELINE_ID = "missing-uai-pipeline-id"
+    settings.HUBSPOT_PIPELINE_ID = "missing-mitx-pipeline-id"
+    mock_client = mocker.Mock()
+    mocker.patch(
+        "hubspot_sync.api._get_target_pipeline_stage_map",
+        return_value={
+            "sales-pipeline-id": ["closedwon", "closedlost"],
+            "default": ["checkout_pending"],
+        },
+    )
+    mocker.patch(
+        "hubspot_sync.api._get_target_property_options",
+        return_value=["created", "fulfilled", "failed", "refunded"],
+    )
+
+    deal_input = SimplePublicObjectInput(
+        properties={
+            "pipeline": "missing-source-pipeline-id",
+            "dealstage": "checkout_pending",
+            "status": "pending",
+        }
+    )
+
+    api._normalize_deal_properties_for_target_account(mock_client, deal_input)  # noqa: SLF001
+
+    assert deal_input.properties["pipeline"] == "default"
+    assert deal_input.properties["dealstage"] == "checkout_pending"
+
+
 def test_build_target_line_item_message_uses_target_product_id_from_search(
     mocker, hubspot_order
 ):
