@@ -960,6 +960,39 @@ def test_normalize_deal_properties_for_target_account_pipeline_stage_mismatch(mo
     assert deal_input.properties["dealstage"] == "created"
 
 
+def test_normalize_deal_properties_for_target_account_prefers_ecommerce_pipeline(
+    mocker, settings
+):
+    """UAI deals should fall back to UAI_HUBSPOT_PIPELINE_ID when the source pipeline is not in the target account."""
+    settings.UAI_HUBSPOT_PIPELINE_ID = "uai-ecommerce-pipeline-id"
+    mock_client = mocker.Mock()
+    mocker.patch(
+        "hubspot_sync.api._get_target_pipeline_stage_map",
+        return_value={
+            "sales-pipeline-id": ["closedwon", "closedlost"],
+            "default": ["checkout_pending"],
+            "uai-ecommerce-pipeline-id": ["created", "processed"],
+        },
+    )
+    mocker.patch(
+        "hubspot_sync.api._get_target_property_options",
+        return_value=["created", "fulfilled", "failed", "refunded"],
+    )
+
+    deal_input = SimplePublicObjectInput(
+        properties={
+            "pipeline": "missing-pipeline-id",
+            "dealstage": "checkout_pending",
+            "status": "pending",
+        }
+    )
+
+    api._normalize_deal_properties_for_target_account(mock_client, deal_input)  # noqa: SLF001
+
+    assert deal_input.properties["pipeline"] == "uai-ecommerce-pipeline-id"
+    assert deal_input.properties["dealstage"] == "created"
+
+
 def test_build_target_line_item_message_uses_target_product_id_from_search(
     mocker, hubspot_order
 ):
