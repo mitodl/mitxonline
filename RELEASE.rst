@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.150.3 (Released May 14, 2026)
+---------------
+
+- Fix receipt lookup views to redirect unauthenticated users to login instead of returning 401/403 (#3563)
+- Adding the Listed Price field to ProductPage (#3558)
+
 Version 1.150.2 (Released May 12, 2026)
 ---------------
 
