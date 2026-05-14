@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.150.4
+---------------
+
+- Set cart-add dealstage to checkout_abandoned (#3578)
+- feat: add cron job for program certificates (#3557)
+
 Version 1.150.3 (Released May 14, 2026)
 ---------------
 
