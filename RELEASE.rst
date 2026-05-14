@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.3
+Version 1.150.3 (Released May 14, 2026)
 ---------------
 
 - Fix receipt lookup views to redirect unauthenticated users to login instead of returning 401/403 (#3563)
