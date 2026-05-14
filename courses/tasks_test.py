@@ -56,7 +56,7 @@ def test_send_partner_school_email(mocker):
 def test_generate_program_certificates_task(mocker):
     """Task delegates to the API function."""
     mock_api = mocker.patch(
-        "courses.api.generate_missing_program_certificate",
+        "courses.api.generate_program_certificates",
         return_value={
             "processed": 1,
             "created": 1,
