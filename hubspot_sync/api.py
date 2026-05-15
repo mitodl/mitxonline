@@ -2224,8 +2224,10 @@ def _sync_cart_add_deal_with_hubspot(
 ) -> SimplePublicObject:
     """Create or update cart-add deal and line-item objects and associate them in target account."""
     deal_input = _build_target_deal_message(order, hubspot_client)
-    # Cart-add events should always be tracked as "Checkout Abandoned".
+    # Prefer "Checkout Abandoned" for cart-add events, then normalize so the
+    # payload still matches the selected target-account pipeline configuration.
     deal_input.properties["dealstage"] = CART_ADD_DEAL_STAGE
+    _normalize_deal_properties_for_target_account(hubspot_client, deal_input)
 
     # Extract unique_app_id from deal input to check for existing deals
     unique_app_id = deal_input.properties.get("unique_app_id")
