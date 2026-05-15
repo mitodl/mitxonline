@@ -1730,7 +1730,11 @@ def _normalize_deal_properties_for_target_account(  # noqa: C901
         if current_pipeline not in pipeline_stage_map:
             resolved_pipeline = _pick_preferred_option(
                 list(pipeline_stage_map.keys()),
-                [str(getattr(settings, "HUBSPOT_PIPELINE_ID", "")), "default"],
+                [
+                    str(getattr(settings, "UAI_HUBSPOT_PIPELINE_ID", "")),
+                    str(getattr(settings, "HUBSPOT_PIPELINE_ID", "")),
+                    "default",
+                ],
             )
             if resolved_pipeline:
                 deal_properties["pipeline"] = resolved_pipeline
