@@ -361,9 +361,9 @@ class CertificatePage(CourseProgramChildPage):
                 )
             ],
             min_num=1,
-            max_num=5,
+            max_num=7,
         ),
-        help_text="You can choose upto 5 signatories.",
+        help_text="You can choose upto 7 signatories.",
         use_json_field=True,
     )
 
