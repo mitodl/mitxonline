@@ -2,9 +2,11 @@ name: GitHub Actions Static Analysis
 
 on:
   push:
-    branches: ["main", "jkachel/11326-add-zizmor-ci-step"]
+    paths:
+      - ".github/workflows/**"
   pull_request:
-    branches: ["**"]
+    paths:
+      - ".github/workflows/**"
 
 permissions: {}
 
