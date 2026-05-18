@@ -8578,6 +8578,10 @@ components:
           readOnly: true
           title: Revoked
           description: Indicates whether or not the certificate is revoked
+        issue_date:
+          type: string
+          format: date-time
+          readOnly: true
         certificate_page:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
@@ -8595,6 +8599,7 @@ components:
       - certificate_page_revision
       - course_run
       - is_revoked
+      - issue_date
       - user
       - uuid
       - verifiable_credential_json
@@ -9053,6 +9058,10 @@ components:
           readOnly: true
           title: Revoked
           description: Indicates whether or not the certificate is revoked
+        issue_date:
+          type: string
+          format: date-time
+          readOnly: true
         certificate_page:
           allOf:
           - $ref: '#/components/schemas/CertificatePageModel'
@@ -9069,6 +9078,7 @@ components:
       - certificate_page
       - certificate_page_revision
       - is_revoked
+      - issue_date
       - program
       - user
       - uuid
