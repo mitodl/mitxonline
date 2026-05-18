@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.4
+Version 1.150.4 (Released May 18, 2026)
 ---------------
 
 - Normalize cart-add deal stage for target account (#3584)
