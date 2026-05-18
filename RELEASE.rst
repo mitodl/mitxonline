@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 1.150.4 (Released May 18, 2026)
+---------------
+
+- Normalize cart-add deal stage for target account (#3584)
+- Prefer UAI HubSpot pipeline ID in sync (#3582)
+- fix: increase signatories limit for certificate page (#3580)
+- Update dependency ipython to v9 (#3567)
+- Set cart-add dealstage to checkout_abandoned (#3578)
+- feat: add cron job for program certificates (#3557)
+
 Version 1.150.3 (Released May 14, 2026)
 ---------------
 
