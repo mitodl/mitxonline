@@ -1,5 +1,6 @@
 // @flow
 import { assert } from "chai"
+import { shallow } from "enzyme"
 
 import LearnerRecordsPage, {
   LearnerRecordsPage as InnerLearnerRecordsPage
@@ -43,16 +44,20 @@ describe("LearnerRecordsPage", () => {
 
   it("keeps the records page title banner", async () => {
     const { inner } = await renderPage()
+    const pageHeader = inner.find(".std-page-header").first()
 
-    assert.isTrue(inner.find(".std-page-header").exists())
-    assert.include(inner.find(".std-page-header h1").text(), "Learner Records")
+    assert.isTrue(pageHeader.exists())
+    assert.equal(pageHeader.find("h1").first().text(), "Learner Records")
   })
 
   it("renders the MIT logo in the learner record header", async () => {
     const learnerRecord = makeLearnerRecord(true)
     const { inner } = await renderPage({}, { learnerRecord })
+    const learnerRecordTable = shallow(
+      inner.instance().renderLearnerRecordTable(learnerRecord)
+    )
 
-    const logo = inner.find(".learner-record-inst-logo img")
+    const logo = learnerRecordTable.find(".learner-record-inst-logo img").first()
 
     assert.isTrue(logo.exists())
     assert.equal(logo.prop("src"), "/static/images/mit-black-logo.png")
