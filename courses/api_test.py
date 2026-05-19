@@ -561,7 +561,11 @@ def test_create_program_enrollments_creation_fail(mocker, user):
     creation of local enrollment records
     """
     programs = ProgramFactory.create_batch(2)
-    enrollment = ProgramEnrollmentFactory.build(program=programs[1])
+    # Use .create() (not .build()) so the enrollment has a primary key.
+    # `create_program_enrollments` now calls `enrollment.save_and_log(None)`
+    # when get_or_create reports created=True, which writes an audit row
+    # via a ForeignKey to the enrollment and therefore requires a saved PK.
+    enrollment = ProgramEnrollmentFactory.create(user=user, program=programs[1])
     mocker.patch(
         "courses.api.ProgramEnrollment.all_objects.get_or_create",
         side_effect=[Exception(), (enrollment, True)],

@@ -159,6 +159,8 @@ def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
             "enrollment_mode": mode,
         },
     )
+    if created:
+        enrollment.save_and_log(None)
     if not created and not enrollment.active:
         enrollment.reactivate_and_save()
     if not enrollment.edx_enrolled:
@@ -249,6 +251,9 @@ def create_run_enrollments(  # noqa: C901
                 ),
             )
 
+            if created:
+                enrollment.save_and_log(None)
+
             # If the run is associated with a B2B contract, add the contract
             # to the user's contract list and update their org memberships
             if run.b2b_contract:
@@ -323,6 +328,9 @@ def create_program_enrollments(
                     "enrollment_mode": enrollment_mode,
                 },
             )
+            if created:
+                enrollment.save_and_log(None)
+
             if not created and enrollment.change_status is not None:
                 enrollment.reactivate_and_save()
 
