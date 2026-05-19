@@ -476,7 +476,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                 <h3 className="learner-record-program-title">
                   {learnerRecord ?
                     learnerRecord.program.title :
-                    "MITx Online Program Record"}
+                    "MIT Learn Program Record"}
                 </h3>
                 <p>Program Record</p>
               </div>
