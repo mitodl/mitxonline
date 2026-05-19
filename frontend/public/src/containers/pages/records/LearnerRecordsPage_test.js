@@ -57,7 +57,9 @@ describe("LearnerRecordsPage", () => {
       inner.instance().renderLearnerRecordTable(learnerRecord)
     )
 
-    const logo = learnerRecordTable.find(".learner-record-inst-logo img").first()
+    const logo = learnerRecordTable
+      .find(".learner-record-inst-logo img")
+      .first()
 
     assert.isTrue(logo.exists())
     assert.equal(logo.prop("src"), "/static/images/mit-black-logo.png")
