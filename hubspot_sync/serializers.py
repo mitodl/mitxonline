@@ -8,10 +8,8 @@ from rest_framework import serializers
 
 from courses.models import (
     CourseRun,
-    CourseRunCertificate,
     CourseRunEnrollment,
     Program,
-    ProgramCertificate,
     ProgramEnrollment,
 )
 from ecommerce import models
@@ -316,37 +314,8 @@ class ProductSerializer(serializers.ModelSerializer):
 class HubspotContactSerializer(UserSerializer):
     """User Serializer for Hubspot"""
 
-    program_certificates = serializers.SerializerMethodField()
-    course_run_certificates = serializers.SerializerMethodField()
-
-    def get_program_certificates(self, instance):
-        """Return a list of program names that the user has a certificate for."""
-        programs_user_has_cert = ProgramCertificate.objects.filter(
-            user=instance, is_revoked=False
-        ).select_related("program")
-        program_name_array = [
-            str(program_cert.program).replace(";", "")
-            for program_cert in programs_user_has_cert
-        ]
-        return ";".join(program_name_array)
-
-    def get_course_run_certificates(self, instance):
-        """Return a list of course run names that the user has a certificate for."""
-        course_runs_user_has_cert = CourseRunCertificate.objects.filter(
-            user=instance, is_revoked=False
-        ).select_related("course_run")
-        course_run_name_array = [
-            str(course_run_cert.course_run).replace(";", "")
-            for course_run_cert in course_runs_user_has_cert
-        ]
-        return ";".join(course_run_name_array)
-
     class Meta:
-        fields = (
-            *UserSerializer.Meta.fields,
-            "program_certificates",
-            "course_run_certificates",
-        )
+        fields = (*UserSerializer.Meta.fields,)
         read_only_fields = fields
         model = models.User
 

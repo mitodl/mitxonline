@@ -40,7 +40,6 @@ from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
-from courses.models import CourseRun, Program
 from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -63,6 +62,154 @@ log = logging.getLogger(__name__)
 
 # HubSpot internal option value for the "Checkout Abandoned" deal stage.
 CART_ADD_DEAL_STAGE = "checkout_abandoned"
+
+# Schema definitions used by the create_hubspot_certificate_schema command.
+CERTIFICATE_CUSTOM_OBJECT_SCHEMAS = {
+    "course_run_certificate": {
+        "labels": {
+            "singular": "Course Run Certificate",
+            "plural": "Course Run Certificates",
+        },
+        "primaryDisplayProperty": "course_run_readable_id",
+        "searchableProperties": [
+            "unique_app_id",
+            "course_run_readable_id",
+            "user_email",
+        ],
+        "associatedObjects": ["CONTACT"],
+        "properties": [
+            {
+                "name": "unique_app_id",
+                "label": "Unique App ID",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+                "hasUniqueValue": True,
+            },
+            {
+                "name": "course_run_readable_id",
+                "label": "Course Run Readable ID",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "course_run_title",
+                "label": "Course Run Title",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "user_email",
+                "label": "User Email",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "issue_date",
+                "label": "Issue Date",
+                "type": "datetime",
+                "fieldType": "date",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "is_revoked",
+                "label": "Is Revoked",
+                "type": "enumeration",
+                "fieldType": "booleancheckbox",
+                "groupName": "certificateinformation",
+                "options": [
+                    {
+                        "label": "True",
+                        "value": "true",
+                        "hidden": False,
+                        "displayOrder": 0,
+                    },
+                    {
+                        "label": "False",
+                        "value": "false",
+                        "hidden": False,
+                        "displayOrder": 1,
+                    },
+                ],
+            },
+        ],
+    },
+    "program_certificate": {
+        "labels": {
+            "singular": "Program Certificate",
+            "plural": "Program Certificates",
+        },
+        "primaryDisplayProperty": "program_readable_id",
+        "searchableProperties": [
+            "unique_app_id",
+            "program_readable_id",
+            "user_email",
+        ],
+        "associatedObjects": ["CONTACT"],
+        "properties": [
+            {
+                "name": "unique_app_id",
+                "label": "Unique App ID",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+                "hasUniqueValue": True,
+            },
+            {
+                "name": "program_readable_id",
+                "label": "Program Readable ID",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "program_title",
+                "label": "Program Title",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "user_email",
+                "label": "User Email",
+                "type": "string",
+                "fieldType": "text",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "issue_date",
+                "label": "Issue Date",
+                "type": "datetime",
+                "fieldType": "date",
+                "groupName": "certificateinformation",
+            },
+            {
+                "name": "is_revoked",
+                "label": "Is Revoked",
+                "type": "enumeration",
+                "fieldType": "booleancheckbox",
+                "groupName": "certificateinformation",
+                "options": [
+                    {
+                        "label": "True",
+                        "value": "true",
+                        "hidden": False,
+                        "displayOrder": 0,
+                    },
+                    {
+                        "label": "False",
+                        "value": "false",
+                        "hidden": False,
+                        "displayOrder": 1,
+                    },
+                ],
+            },
+        ],
+    },
+}
 
 CUSTOM_ECOMMERCE_PROPERTIES = {
     # defines which hubspot properties are mapped with which local properties when objects are synced.
@@ -696,64 +843,6 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
 }
 
 
-def _get_course_run_certificate_hubspot_property():
-    """
-    Creates a dictionary representation of a Hubspot checkbox,
-    populated with options using the string representation of all course runs.
-
-    Returns:
-        dict: dictionary representing the properties for a HubSpot checkbox,
-        populated with the string representation of all course runs.
-    """
-    course_runs = CourseRun.objects.all()
-    options_array = [
-        {
-            "value": str(course_run).replace(";", ""),
-            "label": str(course_run).replace(";", ""),
-            "hidden": False,
-        }
-        for course_run in course_runs
-    ]
-    return {
-        "name": "course_run_certificates",
-        "label": "Course Run certificates",
-        "description": "Earned course run certificates.",
-        "groupName": "contactinformation",
-        "type": "enumeration",
-        "fieldType": "checkbox",
-        "options": options_array,
-    }
-
-
-def _get_program_certificate_hubspot_property():
-    """
-    Creates a dictionary representation of a Hubspot checkbox,
-    populated with options using string representation of all programs.
-
-    Returns:
-        dict: dictionary representing the properties for a HubSpot checkbox,
-        populated with the string representation of all programs.
-    """
-    programs = Program.objects.all()
-    options_array = [
-        {
-            "value": str(program).replace(";", ""),
-            "label": str(program).replace(";", ""),
-            "hidden": False,
-        }
-        for program in programs
-    ]
-    return {
-        "name": "program_certificates",
-        "label": "Program certificates",
-        "description": "Earned program certificates.",
-        "groupName": "contactinformation",
-        "type": "enumeration",
-        "fieldType": "checkbox",
-        "options": options_array,
-    }
-
-
 def upsert_custom_properties():
     """Create or update all custom properties and groups"""
     for ecommerce_object_type, ecommerce_object in CUSTOM_ECOMMERCE_PROPERTIES.items():
@@ -767,8 +856,272 @@ def upsert_custom_properties():
                 ecommerce_object_type,
             )
             sync_object_property(ecommerce_object_type, obj_property)
-    sync_object_property("contacts", _get_course_run_certificate_hubspot_property())
-    sync_object_property("contacts", _get_program_certificate_hubspot_property())
+
+
+# ---------------------------------------------------------------------------
+# Certificate custom object sync helpers
+# ---------------------------------------------------------------------------
+
+
+def _format_cert_unique_app_id(prefix: str, cert_id: int) -> str:
+    """Return a stable unique_app_id for a certificate record."""
+    return format_app_id(f"{prefix}-{cert_id}")
+
+
+def _find_hubspot_certificate_by_unique_app_id(
+    hubspot_client: HubspotApi,
+    object_type: str,
+    unique_app_id: str,
+) -> str | None:
+    """Search HubSpot for an existing certificate custom object by unique_app_id.
+
+    Returns the HubSpot object id string, or None if not found.
+    """
+    wait_for_hubspot_rate_limit()
+    response = hubspot_client.crm.objects.search_api.do_search(
+        object_type=object_type,
+        public_object_search_request=PublicObjectSearchRequest(
+            filter_groups=[
+                FilterGroup(
+                    filters=[
+                        Filter(
+                            property_name="unique_app_id",
+                            operator="EQ",
+                            value=unique_app_id,
+                        )
+                    ]
+                )
+            ],
+            properties=["unique_app_id"],
+            limit=1,
+        ),
+    )
+    if response.results:
+        return response.results[0].id
+    return None
+
+
+def _associate_certificate_with_contact(
+    hubspot_client: HubspotApi,
+    cert_object_type: str,
+    cert_hubspot_id: str,
+    contact_hubspot_id: str,
+    association_type_id: int,
+) -> None:
+    """Create a v4 association between a certificate custom object and a contact."""
+    from hubspot.crm.associations.v4.models import AssociationSpec  # noqa: PLC0415
+
+    wait_for_hubspot_rate_limit()
+    hubspot_client.crm.associations.v4.basic_api.create(
+        from_object_type=cert_object_type,
+        from_object_id=cert_hubspot_id,
+        to_object_type=HubspotObjectType.CONTACTS.value,
+        to_object_id=contact_hubspot_id,
+        association_spec=[
+            AssociationSpec(
+                association_category="HUBSPOT_DEFINED",
+                association_type_id=association_type_id,
+            )
+        ],
+    )
+
+
+def _get_cert_contact_association_type_id(
+    hubspot_client: HubspotApi,
+    cert_object_type: str,
+    setting_name: str,
+) -> int | None:
+    """Return the association typeId for cert_object_type → contacts.
+
+    Checks settings first, then queries HubSpot. Returns None if unavailable.
+    """
+    setting_value = getattr(settings, setting_name, None)
+    if setting_value:
+        return int(setting_value)
+    try:
+        wait_for_hubspot_rate_limit()
+        types_response = hubspot_client.crm.associations.v4.definition_api.get_all(
+            from_object_type=cert_object_type,
+            to_object_type=HubspotObjectType.CONTACTS.value,
+        )
+        if types_response.results:
+            return types_response.results[0].type_id
+    except Exception:
+        log.exception(
+            "Failed to fetch association type ID for custom object %s",
+            cert_object_type,
+        )
+    return None
+
+
+def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
+    """Upsert a CourseRunCertificate as a HubSpot custom object and associate it to the owner contact.
+
+    Requires HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE to be set in settings
+    (run the create_hubspot_certificate_schema management command first).
+
+    Returns:
+        SimplePublicObject: The HubSpot object, or None if the object type is not configured.
+    """
+    object_type = getattr(
+        settings, "HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE", None
+    )
+    if not object_type or not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
+        log.debug(
+            "Skipping course run certificate HubSpot sync: "
+            "HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE is not configured."
+        )
+        return None
+
+    unique_app_id = _format_cert_unique_app_id("crc", cert.id)
+    properties = {
+        "unique_app_id": unique_app_id,
+        "course_run_readable_id": cert.course_run.courseware_id,
+        "course_run_title": cert.course_run.title,
+        "user_email": cert.user.email,
+        "issue_date": str(int(cert.issue_date.timestamp() * 1000)),
+        "is_revoked": "true" if cert.is_revoked else "false",
+    }
+
+    hubspot_client = HubspotApi(
+        access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
+    )
+
+    existing_id = _find_hubspot_certificate_by_unique_app_id(
+        hubspot_client, object_type, unique_app_id
+    )
+
+    wait_for_hubspot_rate_limit()
+    if existing_id:
+        result = hubspot_client.crm.objects.basic_api.update(
+            object_type=object_type,
+            object_id=existing_id,
+            simple_public_object_input=SimplePublicObjectInput(properties=properties),
+        )
+    else:
+        result = hubspot_client.crm.objects.basic_api.create(
+            object_type=object_type,
+            simple_public_object_input_for_create=SimplePublicObjectInput(
+                properties=properties
+            ),
+        )
+
+    # Associate with the owning contact.
+    contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
+    if contact_id:
+        assoc_type_id = _get_cert_contact_association_type_id(
+            hubspot_client,
+            object_type,
+            "HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID",
+        )
+        if assoc_type_id:
+            try:
+                _associate_certificate_with_contact(
+                    hubspot_client, object_type, result.id, contact_id, assoc_type_id
+                )
+            except Exception:
+                log.exception(
+                    "Failed to associate course run certificate %s (hs_id=%s) "
+                    "with contact %s",
+                    cert.id,
+                    result.id,
+                    contact_id,
+                )
+        else:
+            log.warning(
+                "Skipping contact association for course run certificate %s: "
+                "HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID is not set. "
+                "Run the create_hubspot_certificate_schema management command and "
+                "add the returned association_type_id to settings.",
+                cert.id,
+            )
+
+    return result
+
+
+def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
+    """Upsert a ProgramCertificate as a HubSpot custom object and associate it to the owner contact.
+
+    Requires HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE to be set in settings
+    (run the create_hubspot_certificate_schema management command first).
+
+    Returns:
+        SimplePublicObject: The HubSpot object, or None if the object type is not configured.
+    """
+    object_type = getattr(
+        settings, "HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE", None
+    )
+    if not object_type or not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
+        log.debug(
+            "Skipping program certificate HubSpot sync: "
+            "HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE is not configured."
+        )
+        return None
+
+    unique_app_id = _format_cert_unique_app_id("pgc", cert.id)
+    properties = {
+        "unique_app_id": unique_app_id,
+        "program_readable_id": cert.program.readable_id,
+        "program_title": cert.program.title,
+        "user_email": cert.user.email,
+        "issue_date": str(int(cert.issue_date.timestamp() * 1000)),
+        "is_revoked": "true" if cert.is_revoked else "false",
+    }
+
+    hubspot_client = HubspotApi(
+        access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
+    )
+
+    existing_id = _find_hubspot_certificate_by_unique_app_id(
+        hubspot_client, object_type, unique_app_id
+    )
+
+    wait_for_hubspot_rate_limit()
+    if existing_id:
+        result = hubspot_client.crm.objects.basic_api.update(
+            object_type=object_type,
+            object_id=existing_id,
+            simple_public_object_input=SimplePublicObjectInput(properties=properties),
+        )
+    else:
+        result = hubspot_client.crm.objects.basic_api.create(
+            object_type=object_type,
+            simple_public_object_input_for_create=SimplePublicObjectInput(
+                properties=properties
+            ),
+        )
+
+    # Associate with the owning contact.
+    contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
+    if contact_id:
+        assoc_type_id = _get_cert_contact_association_type_id(
+            hubspot_client,
+            object_type,
+            "HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID",
+        )
+        if assoc_type_id:
+            try:
+                _associate_certificate_with_contact(
+                    hubspot_client, object_type, result.id, contact_id, assoc_type_id
+                )
+            except Exception:
+                log.exception(
+                    "Failed to associate program certificate %s (hs_id=%s) "
+                    "with contact %s",
+                    cert.id,
+                    result.id,
+                    contact_id,
+                )
+        else:
+            log.warning(
+                "Skipping contact association for program certificate %s: "
+                "HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID is not set. "
+                "Run the create_hubspot_certificate_schema management command and "
+                "add the returned association_type_id to settings.",
+                cert.id,
+            )
+
+    return result
 
 
 def make_contact_create_message_list_from_user_ids(
@@ -828,8 +1181,7 @@ def make_contact_sync_message_from_user(
 
     Args:
         user (User): User object.
-        skip_certificates (bool): If True, exclude certificate properties from the contact data.
-                                 Used for UAI HubSpot accounts that don't have certificate properties.
+        skip_certificates (bool): Deprecated no-op, retained for backward compatibility.
     Returns:
         SimplePublicObjectInput: Input object for upserting User data to Hubspot
     """
@@ -856,23 +1208,13 @@ def make_contact_sync_message_from_user(
         "type_is_other": "typeisother",
     }
 
-    # Only include certificate properties if not skipping them
-    if not skip_certificates:
-        contact_properties_map.update(
-            {
-                "program_certificates": "program_certificates",
-                "course_run_certificates": "course_run_certificates",
-            }
-        )
+    # skip_certificates is kept for backward API compatibility but is now a no-op
+    # because certificates are synced as HubSpot custom objects, not contact properties.
+    _ = skip_certificates
 
     properties = HubspotContactSerializer(user).data
     properties.update(properties.pop("legal_address") or {})
     properties.update(properties.pop("user_profile") or {})
-
-    # Remove certificate data if skipping certificates
-    if skip_certificates:
-        properties.pop("program_certificates", None)
-        properties.pop("course_run_certificates", None)
 
     hubspot_props = transform_object_properties(properties, contact_properties_map)
     return make_object_properties_message(hubspot_props)
@@ -1822,14 +2164,9 @@ def _ensure_target_hubspot_custom_properties(
         }
         for object_type, config in CUSTOM_ECOMMERCE_PROPERTIES.items()
     }
-    # Skip certificate properties for UAI courses since they don't need them
-    if not skip_certificates:
-        object_configs[HubspotObjectType.CONTACTS.value]["properties"].extend(
-            [
-                _get_course_run_certificate_hubspot_property(),
-                _get_program_certificate_hubspot_property(),
-            ]
-        )
+    # skip_certificates is kept for backward compatibility; certificate sync
+    # now uses custom objects and no longer adds contact properties.
+    _ = skip_certificates
 
     for object_type, config in object_configs.items():
         wait_for_hubspot_rate_limit()

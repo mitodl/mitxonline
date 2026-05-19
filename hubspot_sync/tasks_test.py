@@ -22,6 +22,7 @@ from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
+from courses.factories import CourseRunCertificateFactory, ProgramCertificateFactory
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
@@ -34,8 +35,10 @@ from hubspot_sync.tasks import (
     batch_upsert_associations_chunked,
     sync_cart_add_event_with_hubspot,
     sync_contact_with_hubspot,
+    sync_course_run_certificate_with_hubspot,
     sync_deal_with_hubspot,
     sync_deal_with_hubspot_targeted,
+    sync_program_certificate_with_hubspot,
     sync_product_with_hubspot,
 )
 from users.factories import UserFactory
@@ -88,6 +91,34 @@ def test_task_sync_deal_with_hubspot(mocker):
 
     assert sync_deal_with_hubspot(mock_object.id) == mock_result.id
     mock_api_call.assert_called_once_with(mock_object)
+
+
+def test_task_sync_course_run_certificate_with_hubspot(mocker):
+    """Course run certificate task should call API and return hubspot id."""
+    cert = CourseRunCertificateFactory.create()
+    mock_result = SimplePublicObjectFactory()
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_course_run_certificate_with_hubspot",
+        return_value=mock_result,
+    )
+
+    assert sync_course_run_certificate_with_hubspot(cert.id) == mock_result.id
+    mock_api_call.assert_called_once()
+
+
+def test_task_sync_program_certificate_with_hubspot(mocker):
+    """Program certificate task should call API and return hubspot id."""
+    cert = ProgramCertificateFactory.create()
+    mock_result = SimplePublicObjectFactory()
+
+    mock_api_call = mocker.patch(
+        "hubspot_sync.tasks.api.sync_program_certificate_with_hubspot",
+        return_value=mock_result,
+    )
+
+    assert sync_program_certificate_with_hubspot(cert.id) == mock_result.id
+    mock_api_call.assert_called_once()
 
 
 def test_task_sync_cart_add_event_with_hubspot(mocker):

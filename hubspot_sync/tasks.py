@@ -251,6 +251,42 @@ def sync_deal_with_hubspot_targeted(order_id: int, *, is_uai: bool) -> str | Non
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
+def sync_course_run_certificate_with_hubspot(cert_id: int) -> str | None:
+    """Sync a CourseRunCertificate to a HubSpot custom object record."""
+    from courses.models import CourseRunCertificate  # noqa: PLC0415
+
+    cert = CourseRunCertificate.all_objects.get(id=cert_id)
+    result = api.sync_course_run_certificate_with_hubspot(cert)
+    return result.id if result else None
+
+
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429
+@single_task(10, key=task_obj_lock)
+def sync_program_certificate_with_hubspot(cert_id: int) -> str | None:
+    """Sync a ProgramCertificate to a HubSpot custom object record."""
+    from courses.models import ProgramCertificate  # noqa: PLC0415
+
+    cert = ProgramCertificate.all_objects.get(id=cert_id)
+    result = api.sync_program_certificate_with_hubspot(cert)
+    return result.id if result else None
+
+
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429
+@single_task(10, key=task_obj_lock)
 def sync_line_with_hubspot(line_id: int) -> str:
     """
     Sync a Line with a hubspot line
