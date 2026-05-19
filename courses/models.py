@@ -1711,6 +1711,10 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     def clean(self):
         from cms.models import CertificatePage, CoursePage  # noqa: PLC0415
 
+        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
+        if self.certificate_page_revision is None:
+            return
+
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),
         )
@@ -1803,6 +1807,10 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
 
     def clean(self):
         from cms.models import CertificatePage, ProgramPage  # noqa: PLC0415
+
+        # Skip validation if certificate_page_revision is not set (e.g., when revoking)
+        if self.certificate_page_revision is None:
+            return
 
         certpage = CertificatePage.objects.filter(
             pk=int(self.certificate_page_revision.object_id),

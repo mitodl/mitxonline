@@ -521,6 +521,20 @@ def test_course_run_certificate_start_end_dates_and_page_revision(mocker):
     )
 
 
+def test_course_run_certificate_clean_allows_missing_page_revision(mocker):
+    """Revoking a certificate can clear certificate_page_revision before save."""
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    certificate = CourseRunCertificateFactory.create(
+        course_run__course__page__certificate_page__product_name="product_name"
+    )
+    certificate.certificate_page_revision = None
+
+    # Should not raise when revision is intentionally unset.
+    certificate.clean()
+
+
 def test_program_certificate_start_end_dates_and_page_revision(user, mocker):
     """
     Test that the ProgramCertificate start_end_dates property works properly.
