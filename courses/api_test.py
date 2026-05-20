@@ -84,10 +84,12 @@ from courses.factories import (
 from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
+    CourseRunEnrollmentAudit,
     EnrollmentMode,
     PaidCourseRun,
     ProgramCertificate,
     ProgramEnrollment,
+    ProgramEnrollmentAudit,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
@@ -243,6 +245,26 @@ def test_create_local_enrollment_existing_enrollment(
     assert enrollment.edx_enrolled is True
 
 
+def test_create_local_enrollment_writes_audit_on_creation(user):
+    """
+    create_local_enrollment should write a CourseRunEnrollmentAudit row when a
+    brand-new enrollment is created. Without this, the very first event in an
+    enrollment's lifecycle would be missing from the audit table.
+    """
+    run = CourseRunFactory.create()
+
+    enrollment, created = create_local_enrollment(user, run)
+
+    assert created is True
+    audit_rows = CourseRunEnrollmentAudit.objects.filter(enrollment=enrollment)
+    assert audit_rows.count() == 1
+    audit_row = audit_rows.first()
+    assert audit_row.acting_user is None
+    assert audit_row.data_after["id"] == enrollment.id
+    assert audit_row.data_after["active"] is True
+    assert audit_row.data_after["edx_enrolled"] is True
+
+
 @pytest.mark.parametrize(
     "enrollment_mode", [EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
 )
@@ -293,6 +315,32 @@ def test_create_run_enrollments(
             assert enrollment.run == run
             assert enrollment.enrollment_mode == enrollment_mode
             patched_send_enrollment_email.assert_any_call(enrollment)
+
+
+def test_create_run_enrollments_writes_audit_on_creation(mocker, user):
+    """
+    create_run_enrollments should write a CourseRunEnrollmentAudit row for every
+    newly-created enrollment.
+    """
+    runs = CourseRunFactory.create_batch(2)
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    successful_enrollments, edx_request_success = create_run_enrollments(user, runs)
+
+    assert edx_request_success is True
+    assert len(successful_enrollments) == len(runs)
+    for enrollment in successful_enrollments:
+        audit_rows = CourseRunEnrollmentAudit.objects.filter(enrollment=enrollment)
+        assert audit_rows.count() == 1, (
+            f"expected exactly one audit row for the newly-created enrollment {enrollment.id}, "
+            f"found {audit_rows.count()}"
+        )
+        audit_row = audit_rows.first()
+        assert audit_row.acting_user is None
+        assert audit_row.data_after["id"] == enrollment.id
+        assert audit_row.data_after["active"] is True
 
 
 @pytest.mark.parametrize("is_active", [True, False])
@@ -524,6 +572,28 @@ def test_create_program_enrollments_creation(user, mode):
         assert enrollment.active is True
         assert enrollment.program == program
         assert enrollment.enrollment_mode == mode
+
+
+def test_create_program_enrollments_writes_audit_on_creation(user):
+    """
+    create_program_enrollments should write a ProgramEnrollmentAudit row for
+    every newly-created enrollment.
+    """
+    programs = ProgramFactory.create_batch(2)
+
+    successful_enrollments = create_program_enrollments(user, programs)
+
+    assert len(successful_enrollments) == len(programs)
+    for enrollment in successful_enrollments:
+        audit_rows = ProgramEnrollmentAudit.objects.filter(enrollment=enrollment)
+        assert audit_rows.count() == 1, (
+            f"expected exactly one audit row for the newly-created enrollment {enrollment.id}, "
+            f"found {audit_rows.count()}"
+        )
+        audit_row = audit_rows.first()
+        assert audit_row.acting_user is None
+        assert audit_row.data_after["id"] == enrollment.id
+        assert audit_row.data_after["active"] is True
 
 
 @pytest.mark.parametrize("active", [True, False])

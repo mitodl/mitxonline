@@ -68,10 +68,6 @@ class Command(BaseCommand):
                             ),
                         )
                         if created:
-                            # `get_or_create` bypasses `save_and_log`, so the
-                            # initial creation is not audited by default.
-                            # Re-save through `save_and_log` to record the
-                            # create event in CourseRunEnrollmentAudit.
                             enrollment.save_and_log(None)
                             created_count[courseware_id] += 1
 
