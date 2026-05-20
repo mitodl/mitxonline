@@ -47,7 +47,7 @@ describe("LearnerRecordsPage", () => {
     const pageHeader = inner.find(".std-page-header").first()
 
     assert.isTrue(pageHeader.exists())
-    assert.equal(pageHeader.find("h1").first().text(), "Learner Records")
+    assert.equal(pageHeader.find("h1").first().text(), "Program Records")
   })
 
   it("renders the MIT logo in the learner record header", async () => {
