@@ -203,19 +203,31 @@ def is_uai_program(program):
 
 def is_uai_order(order):
     """
-    Check if an order contains any UAI courses.
+    Check if an order contains any UAI course runs or programs.
 
     Args:
         order: Order instance
 
     Returns:
-        bool: True if the order contains UAI courses, False otherwise
+        bool: True if the order contains UAI course runs/programs, False otherwise
     """
     for line in order.lines.all():
-        if hasattr(line.product, "purchasable_object"):
-            course_run = line.product.purchasable_object
-            if hasattr(course_run, "courseware_id") and is_uai_course_run(course_run):
-                return True
+        purchasable_object = getattr(line, "purchased_object", None)
+        if not purchasable_object and hasattr(line.product, "purchasable_object"):
+            purchasable_object = line.product.purchasable_object
+
+        if not purchasable_object:
+            continue
+
+        if isinstance(purchasable_object, CourseRun) and is_uai_course_run(
+            purchasable_object
+        ):
+            return True
+
+        if hasattr(purchasable_object, "readable_id") and is_uai_program(
+            purchasable_object
+        ):
+            return True
     return False
 
 
