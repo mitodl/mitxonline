@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.5
+Version 1.150.5 (Released May 20, 2026)
 ---------------
 
 - Add issue_date to certificates api (#3587)
