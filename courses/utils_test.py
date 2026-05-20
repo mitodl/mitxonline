@@ -335,7 +335,9 @@ def test_is_uai_course_run(courseware_id, expected):
         (SimpleNamespace(readable_id="program-v1:MITx+PROG+2026"), False),
     ],
 )
-def test_is_uai_order_detects_uai_course_runs_and_programs(purchasable_object, expected):
+def test_is_uai_order_detects_uai_course_runs_and_programs(
+    purchasable_object, expected
+):
     """UAI order detection should account for both course runs and programs."""
 
     if hasattr(purchasable_object, "courseware_id"):
