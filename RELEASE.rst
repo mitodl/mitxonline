@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.6
+Version 1.150.6 (Released May 20, 2026)
 ---------------
 
 - Detect UAI programs; prefer purchased_object (#3594)
