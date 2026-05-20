@@ -15,7 +15,7 @@ from courses.factories import (
     CourseRunFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
-    ProgramFactory,  # noqa: F401
+    ProgramFactory,
     program_with_requirements,  # noqa: F401,
 )
 from courses.models import Course, CourseRun
@@ -324,6 +324,7 @@ def test_is_uai_course_run(courseware_id, expected):
     """UAI detection should match expected value across supported key formats."""
     course_run = CourseRunFactory.create(courseware_id=courseware_id)
     assert is_uai_course_run(course_run) is expected
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
