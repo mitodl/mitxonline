@@ -16,7 +16,7 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,  # noqa: F401
-    program_with_requirements,  # noqa: F401
+    program_with_requirements,  # noqa: F401,
 )
 from courses.models import Course, CourseRun
 from courses.utils import (
@@ -325,7 +325,7 @@ def test_is_uai_course_run(courseware_id, expected):
     course_run = CourseRunFactory.create(courseware_id=courseware_id)
     assert is_uai_course_run(course_run) is expected
 
-
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("purchasable_object", "expected"),
     [
@@ -337,7 +337,17 @@ def test_is_uai_course_run(courseware_id, expected):
 )
 def test_is_uai_order_detects_uai_course_runs_and_programs(purchasable_object, expected):
     """UAI order detection should account for both course runs and programs."""
-    line = SimpleNamespace(product=SimpleNamespace(purchasable_object=purchasable_object))
+
+    if hasattr(purchasable_object, "courseware_id"):
+        # Use CourseRunFactory for courseware_id
+        obj = CourseRunFactory.create(courseware_id=purchasable_object.courseware_id)
+    elif hasattr(purchasable_object, "readable_id"):
+        # Use ProgramFactory for readable_id
+        obj = ProgramFactory.create(readable_id=purchasable_object.readable_id)
+    else:
+        obj = purchasable_object
+
+    line = SimpleNamespace(product=SimpleNamespace(purchasable_object=obj))
     order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
 
     assert is_uai_order(order) is expected

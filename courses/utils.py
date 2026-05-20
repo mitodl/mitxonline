@@ -219,9 +219,8 @@ def is_uai_order(order):
         if not purchasable_object:
             continue
 
-        if hasattr(purchasable_object, "courseware_id") and is_uai_course_run(
-            purchasable_object
-        ):
+
+        if isinstance(purchasable_object, CourseRun) and is_uai_course_run(purchasable_object):
             return True
 
         if hasattr(purchasable_object, "readable_id") and is_uai_program(
