@@ -95,6 +95,20 @@ export class App extends React.Component<Props, void> {
     )
   }
 
+  isLearnerRecordsPage() {
+    const { match, location } = this.props
+    return (
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.learnerRecords)),
+        exact: false
+      }) ||
+      !!matchPath(location.pathname, {
+        path:  urljoin(match.url, String(routes.sharedLearnerRecord)),
+        exact: false
+      })
+    )
+  }
+
   render() {
     const { match, currentUser, cartItemsCount, location } = this.props
     if (!currentUser) {
@@ -104,7 +118,9 @@ export class App extends React.Component<Props, void> {
 
     return (
       <div className="app" aria-flowto="notifications-container">
-        {!this.isEcomServiceMode() && !this.isCheckoutRelatedPage() && (
+        {!this.isEcomServiceMode() &&
+          !this.isCheckoutRelatedPage() &&
+          !this.isLearnerRecordsPage() && (
           <Header
             currentUser={currentUser}
             cartItemsCount={currentUser.is_authenticated ? cartItemsCount : 0}

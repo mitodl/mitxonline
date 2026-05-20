@@ -183,6 +183,40 @@ describe("Top-level App", () => {
     assert.isFalse(inner.find("Header").exists())
   })
 
+  it("does not render header on learner record page", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
+    renderPage = helper.configureMountRenderer(
+      App,
+      InnerApp,
+      {},
+      {
+        match:    { url: routes.root },
+        location: {
+          pathname: "/records/1/"
+        }
+      }
+    )
+    const { inner } = await renderPage()
+    assert.isFalse(inner.find("Header").exists())
+  })
+
+  it("does not render header on shared learner record page", async () => {
+    helper.handleRequestStub.returns(anonymousUser)
+    renderPage = helper.configureMountRenderer(
+      App,
+      InnerApp,
+      {},
+      {
+        match:    { url: routes.root },
+        location: {
+          pathname: "/records/shared/test-uuid/"
+        }
+      }
+    )
+    const { inner } = await renderPage()
+    assert.isFalse(inner.find("Header").exists())
+  })
+
   it("renders header on dashboard page", async () => {
     helper.handleRequestStub.returns(anonymousUser)
     renderPage = helper.configureMountRenderer(

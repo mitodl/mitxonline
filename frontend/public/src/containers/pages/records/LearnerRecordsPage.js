@@ -476,7 +476,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                 <h3 className="learner-record-program-title">
                   {learnerRecord ?
                     learnerRecord.program.title :
-                    "MITx Online Program Record"}
+                    "MIT Learn Program Record"}
                 </h3>
                 <p>Program Record</p>
               </div>
@@ -517,7 +517,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                   id="learner-record-school-name"
                 >
                   <div className="w-auto">
-                    <div>MITx Online Program Record</div>
+                    <div>MIT Learn Program Record</div>
                     <h1 className="learner-record-program-title">
                       {learnerRecord ? learnerRecord.program.title : null}
                     </h1>
@@ -537,8 +537,8 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                   </div>
                   <div className="learner-record-inst-logo">
                     <img
-                      src="/static/images/mitx-online-logo.png"
-                      alt="MITx Online Logo"
+                      src="/static/images/mit-black-logo.png"
+                      alt="MIT Logo"
                     />
                   </div>
                 </div>
