@@ -58,6 +58,7 @@ def test_serialize_certificate(is_program):
         "user": PublicUserSerializer(certificate.user).data,
         "uuid": certificate.uuid,
         "is_revoked": certificate.is_revoked,
+        "issue_date": certificate.issue_date,
         "certificate_page_revision": cert_page.revisions.last().id,
         "certificate_page": {
             "id": cert_page.id,
