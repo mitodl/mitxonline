@@ -87,7 +87,6 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
     """CourseRunEnrollment model serializer"""
 
     run = CourseRunWithCourseSerializer(read_only=True)
-    run_id = serializers.IntegerField(write_only=True)
     certificate = CourseRunCertificateSerializer(read_only=True, allow_null=True)
 
     b2b_organization_id = serializers.SerializerMethodField(read_only=True)
