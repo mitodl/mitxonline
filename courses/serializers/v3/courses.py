@@ -136,7 +136,6 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         fields = [
             *BaseCourseRunEnrollmentSerializer.Meta.fields,
             "run",
-            "run_id",
             "b2b_organization_id",
             "b2b_contract_id",
             "certificate",
