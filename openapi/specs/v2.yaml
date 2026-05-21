@@ -2684,6 +2684,36 @@ paths:
         schema:
           type: string
       - in: query
+        name: courseruns__variant_industry
+        schema:
+          type: string
+          enum:
+          - ''
+          - E
+          - F
+          - HC
+        description: |-
+          Variant: Describes the industry the run is adapted for.
+
+          * `` - Original
+          * `E` - Energy
+          * `F` - Finance
+          * `HC` - Healthcare
+      - in: query
+        name: courseruns__variant_length
+        schema:
+          type: string
+          enum:
+          - ''
+          - L
+          - S
+        description: |-
+          Variant: Describes the length of the run (short/long).
+
+          * `` - Normal
+          * `S` - Short
+          * `L` - Long
+      - in: query
         name: id
         schema:
           type: array
@@ -4746,6 +4776,31 @@ components:
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
             run by creation date is treated as primary.
+        language_label:
+          type: string
+          description: Return the label for the language, using the override if necessary
+          readOnly: true
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         products:
           type: array
           items:
@@ -4767,6 +4822,7 @@ components:
       - is_archived
       - is_enrollable
       - is_upgradable
+      - language_label
       - products
       - run_tag
       - title
@@ -4875,6 +4931,31 @@ components:
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
             run by creation date is treated as primary.
+        language_label:
+          type: string
+          description: Return the label for the language, using the override if necessary
+          readOnly: true
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         upgrade_product_id:
           type: integer
           nullable: true
@@ -4903,6 +4984,7 @@ components:
       - is_archived
       - is_enrollable
       - is_upgradable
+      - language_label
       - run_tag
       - title
       - upgrade_product_id
@@ -4985,6 +5067,27 @@ components:
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
             run by creation date is treated as primary.
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
       required:
       - courseware_id
       - run_tag
@@ -8002,6 +8105,31 @@ components:
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
             run by creation date is treated as primary.
+        language_label:
+          type: string
+          description: Return the label for the language, using the override if necessary
+          readOnly: true
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         products:
           type: array
           items:
@@ -8021,6 +8149,7 @@ components:
       - is_archived
       - is_enrollable
       - is_upgradable
+      - language_label
       - products
       - run_tag
       - title
@@ -8129,6 +8258,31 @@ components:
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
             run by creation date is treated as primary.
+        language_label:
+          type: string
+          description: Return the label for the language, using the override if necessary
+          readOnly: true
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         products:
           type: array
           items:
@@ -8154,6 +8308,7 @@ components:
       - is_archived
       - is_enrollable
       - is_upgradable
+      - language_label
       - products
       - run_tag
       - title
@@ -8234,6 +8389,27 @@ components:
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
             run by creation date is treated as primary.
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
       required:
       - courseware_id
       - run_tag
@@ -8710,6 +8886,31 @@ components:
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
             run by creation date is treated as primary.
+        language_label:
+          type: string
+          description: Return the label for the language, using the override if necessary
+          readOnly: true
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         products:
           type: array
           items:
@@ -8736,6 +8937,7 @@ components:
       - is_archived
       - is_enrollable
       - is_upgradable
+      - language_label
       - products
       - run_tag
       - title
@@ -8816,6 +9018,27 @@ components:
             run-tag group. The primary run is used as the canonical run when grouping
             language variants. If no run in a group is marked primary, the oldest
             run by creation date is treated as primary.
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         b2b_contract:
           type: integer
           nullable: true
@@ -9524,6 +9747,33 @@ components:
       required:
       - certificate
       - program
+    VariantIndustryEnum:
+      enum:
+      - E
+      - F
+      - HC
+      type: string
+      description: |-
+        * `` - Original
+        * `E` - Energy
+        * `F` - Finance
+        * `HC` - Healthcare
+      x-enum-descriptions:
+      - Energy
+      - Finance
+      - Healthcare
+    VariantLengthEnum:
+      enum:
+      - S
+      - L
+      type: string
+      description: |-
+        * `` - Normal
+        * `S` - Short
+        * `L` - Long
+      x-enum-descriptions:
+      - Short
+      - Long
     YearsExperienceEnum:
       enum:
       - 2

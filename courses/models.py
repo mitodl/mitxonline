@@ -7,6 +7,7 @@ import logging
 import uuid
 from decimal import ROUND_HALF_EVEN, Decimal
 
+import pycountry
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
@@ -32,6 +33,9 @@ from wagtail.models import ClusterableModel, Orderable, Page, Revision
 from courses.constants import (
     AVAILABILITY_ANYTIME,
     AVAILABILITY_CHOICES,
+    COURSE_VARIANT_INDUSTRY,
+    COURSE_VARIANT_LANGUAGE_OVERRIDE,
+    COURSE_VARIANT_LENGTH,
     ENROLL_CHANGE_STATUS_CHOICES,
     ENROLLABLE_ITEM_ID_SEPARATOR,
     PROGRAM_DISPLAY_MODE_CHOICES,
@@ -1364,6 +1368,22 @@ class CourseRun(TimestampedModel):
             "run by creation date is treated as primary."
         ),
     )
+    variant_length = models.CharField(
+        max_length=1,
+        choices=COURSE_VARIANT_LENGTH,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Variant: Describes the length of the run (short/long).",
+    )
+    variant_industry = models.CharField(
+        max_length=3,
+        choices=COURSE_VARIANT_INDUSTRY,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Variant: Describes the industry the run is adapted for.",
+    )
 
     class Meta:
         unique_together = ("course", "courseware_id", "run_tag")
@@ -1381,6 +1401,8 @@ class CourseRun(TimestampedModel):
                     "language",
                     "is_source_run",
                     "b2b_contract",
+                    "variant_length",
+                    "variant_industry",
                 ],
                 condition=~Q(language=""),
                 nulls_distinct=False,
@@ -1552,6 +1574,16 @@ class CourseRun(TimestampedModel):
 
         return get_edx_course_modes(self.courseware_id)
 
+    @cached_property
+    def language_label(self) -> str:
+        """Return the label for the language, using the override if necessary"""
+
+        return (
+            COURSE_VARIANT_LANGUAGE_OVERRIDE[self.language]
+            if self.language in COURSE_VARIANT_LANGUAGE_OVERRIDE
+            else pycountry.languages.lookup(self.language).name
+        )
+
     def __str__(self):
         title = f"{self.courseware_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
@@ -1574,6 +1606,15 @@ class CourseRun(TimestampedModel):
 
         if self.end_date and self.expiration_date < self.end_date:
             raise ValidationError("Expiration date must be later than end date.")  # noqa: EM101
+
+        if not self.language:
+            return
+
+        if self.language not in COURSE_VARIANT_LANGUAGE_OVERRIDE:
+            try:
+                pycountry.languages.lookup(self.language)
+            except LookupError as lke:
+                raise ValidationError("Course language is invalid") from lke  # noqa: EM101
 
     def save(
         self,

@@ -321,6 +321,8 @@ class CourseFilterSet(django_filters.FilterSet):
             "contract_id",
             "include_approved_financial_aid",
             "courseruns__language",
+            "courseruns__variant_length",
+            "courseruns__variant_industry",
         ]
 
     def filter_org_id(self, queryset, _, value):
