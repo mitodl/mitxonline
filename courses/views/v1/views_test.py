@@ -31,6 +31,8 @@ from courses.factories import (
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    LearnerProgramRecordShareFactory,
+    PartnerSchoolFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -39,6 +41,7 @@ from courses.models import (
     Course,
     CourseRun,
     CourseRunEnrollment,
+    LearnerProgramRecordShare,
     PaidProgram,
     Program,
     ProgramEnrollment,
@@ -1188,3 +1191,163 @@ def test_destroy_program_enrollment_paid_fails(user_drf_client, user):
 
     enrollment.refresh_from_db()
     assert enrollment.active is True
+
+
+def test_get_learner_record_requires_program_enrollment(user_drf_client):
+    """The learner record endpoint should return 404 without a program enrollment."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.get(reverse("get-learner-record", kwargs={"pk": program.id}))
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_get_learner_record(user_drf_client, user):
+    """The learner record endpoint should return data for an enrolled user."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    partner_school = PartnerSchoolFactory.create()
+
+    resp = user_drf_client.get(
+        reverse("get-learner-record", kwargs={"pk": enrollment.program.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["program"]["title"] == enrollment.program.title
+    assert resp.json()["partner_schools"] == [
+        {"id": partner_school.id, "name": partner_school.name}
+    ]
+
+
+def test_share_learner_record_requires_program_enrollment(user_drf_client):
+    """The learner record share endpoint should return 404 without a program enrollment."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": program.id}),
+        data={"partnerSchool": None},
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_share_learner_record(user_drf_client, user, mocker):
+    """The learner record share endpoint should create an active anonymous share."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    partner_school = PartnerSchoolFactory.create()
+    patched_send_email = mocker.patch("courses.views.v1.send_partner_school_email.delay")
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
+        data={"partnerSchool": None},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["partner_schools"] == [
+        {"id": partner_school.id, "name": partner_school.name}
+    ]
+    assert LearnerProgramRecordShare.objects.filter(
+        user=user,
+        program=enrollment.program,
+        partner_school=None,
+        is_active=True,
+    ).count() == 1
+    patched_send_email.assert_not_called()
+
+
+def test_share_learner_record_partner_school(user_drf_client, user, mocker):
+    """The learner record share endpoint should create an active partner school share."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    partner_school = PartnerSchoolFactory.create()
+    patched_send_email = mocker.patch("courses.views.v1.send_partner_school_email.delay")
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
+        data={"partnerSchool": partner_school.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert all("email" not in school for school in resp.json()["partner_schools"])
+    share = LearnerProgramRecordShare.objects.get(
+        user=user,
+        program=enrollment.program,
+        partner_school=partner_school,
+    )
+    assert share.is_active is True
+    patched_send_email.assert_called_once_with(share.share_uuid)
+
+
+def test_revoke_learner_record_share_requires_program_enrollment(user_drf_client):
+    """The learner record revoke endpoint should return 404 without a program enrollment."""
+    program = ProgramFactory.create()
+
+    resp = user_drf_client.post(
+        reverse("revoke-learner-record-share", kwargs={"pk": program.id})
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_revoke_learner_record_share(user_drf_client, user):
+    """The learner record revoke endpoint should disable only anonymous shares."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    anonymous_share = LearnerProgramRecordShareFactory.create(
+        user=user,
+        program=enrollment.program,
+        partner_school=None,
+        is_active=True,
+    )
+    partner_school_share = LearnerProgramRecordShareFactory.create(
+        user=user,
+        program=enrollment.program,
+        is_active=True,
+    )
+
+    resp = user_drf_client.post(
+        reverse("revoke-learner-record-share", kwargs={"pk": enrollment.program.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    anonymous_share.refresh_from_db()
+    partner_school_share.refresh_from_db()
+    assert anonymous_share.is_active is False
+    assert partner_school_share.is_active is True
+
+
+def test_get_shared_learner_record(user):
+    """The shared learner record endpoint should expose active shared records."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    share = LearnerProgramRecordShareFactory.create(
+        user=user,
+        program=enrollment.program,
+        partner_school=None,
+        is_active=True,
+    )
+    client = APIClient()
+
+    resp = client.get(
+        reverse("shared_learner_record_from_uuid", kwargs={"uuid": share.share_uuid})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["program"]["title"] == enrollment.program.title
+    assert resp.json()["sharing"] == []
+    assert resp.json()["partner_schools"] == []
+
+
+def test_get_shared_learner_record_inactive_share_returns_404(user):
+    """The shared learner record endpoint should return 404 for inactive links."""
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    share = LearnerProgramRecordShareFactory.create(
+        user=user,
+        program=enrollment.program,
+        partner_school=None,
+        is_active=False,
+    )
+    client = APIClient()
+
+    resp = client.get(
+        reverse("shared_learner_record_from_uuid", kwargs={"uuid": share.share_uuid})
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+    assert resp.json() == []
