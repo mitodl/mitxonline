@@ -1641,6 +1641,9 @@ def test_generate_program_certificate_success_single_requirement_course(
     course_run = CourseRunFactory.create(course=course)
     course_run.enrollment_modes.set(default_mode_records)
     course_run.save()
+    CourseRunEnrollmentFactory.create(
+        run=course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
     CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
 
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
@@ -1686,6 +1689,12 @@ def test_generate_program_certificate_success_multiple_required_courses(
         run.enrollment_modes.set(default_mode_records)
         run.save()
 
+    CourseRunEnrollmentFactory.create_batch(
+        3,
+        run=factory.Iterator(course_runs),
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
     CourseRunCertificateFactory.create_batch(
         3, user=user, course_run=factory.Iterator(course_runs)
     )
@@ -1995,6 +2004,9 @@ def test_generate_program_certificate_with_subprogram_requirement(  # noqa: PLR0
     sub_course_run = CourseRunFactory.create(course=sub_course)
     sub_course_run.enrollment_modes.set(default_mode_records)
     sub_course_run.save()
+    CourseRunEnrollmentFactory.create(
+        run=sub_course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
     CourseRunGradeFactory.create(
         course_run=sub_course_run, user=user, passed=True, grade=1
     )
@@ -2065,6 +2077,9 @@ def test_generate_program_certificate_with_revoked_subprogram_certificate(
 
     # User completes the sub-program and gets a certificate, but it gets revoked
     sub_course_run = CourseRunFactory.create(course=sub_course)
+    CourseRunEnrollmentFactory.create(
+        run=sub_course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
     CourseRunGradeFactory.create(
         course_run=sub_course_run, user=user, passed=True, grade=1
     )
@@ -3486,6 +3501,9 @@ def test_generate_missing_program_certificates_creates_cert(
     course_run = CourseRunFactory.create(course=course)
     course_run.enrollment_modes.set(default_mode_records)
     course_run.save()
+    CourseRunEnrollmentFactory.create(
+        run=course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
 
     ProgramEnrollment.objects.create(
         user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
@@ -3518,6 +3536,9 @@ def test_generate_missing_program_certificates_idempotent(
     course_run = CourseRunFactory.create(course=course)
     course_run.enrollment_modes.set(default_mode_records)
     course_run.save()
+    CourseRunEnrollmentFactory.create(
+        run=course_run, user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
 
     ProgramEnrollment.objects.create(
         user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
