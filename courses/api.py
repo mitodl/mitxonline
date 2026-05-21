@@ -1115,18 +1115,25 @@ def _has_earned_program_cert(user, program):
         bool: True if a user has earned all the course certificates required
               for a given program else False
     """
-    program_course_ids = [course[0].id for course in program.courses]
+
+    user_courseruns = CourseRun.objects.filter(
+        enrollments__user=user,
+        enrollments__active=True,
+        enrollments__change_status__isnull=True,
+    ).filter(course__in=program.courses_qset)
 
     cert_courses = Course.objects.filter(
-        id__in=program_course_ids,
+        courseruns__in=user_courseruns,
         courseruns__courseruncertificates__user=user,
         courseruns__courseruncertificates__is_revoked=False,
     )
     grade_courses = Course.objects.filter(
-        id__in=program_course_ids,
+        courseruns__in=user_courseruns.exclude(
+            enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+        ),
         courseruns__grades__user=user,
         courseruns__grades__passed=True,
-    ).exclude(courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE)
+    )
     root = ProgramRequirement.get_root_nodes().get(program=program)
 
     def _has_earned(node):
