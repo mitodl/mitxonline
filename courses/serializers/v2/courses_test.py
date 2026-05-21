@@ -414,3 +414,81 @@ def test_course_serializer_language_options():
     # run_tag should be present in each option
     for opt in serializer.data["language_options"]:
         assert opt["run_tag"] == "1T2026"
+
+
+class TestCourseRunEnrollmentSerializerV2PaymentGuard:
+    """Tests for payment guard in v2 CourseRunEnrollmentSerializer.create()."""
+
+    def test_blocked_when_payment_required_and_not_paid(self):
+        """Enrollment is rejected when all modes require payment and the user has not paid."""
+        from rest_framework.exceptions import ValidationError  # noqa: PLC0415
+
+        from users.factories import UserFactory  # noqa: PLC0415
+
+        user = UserFactory.create()
+        run = CourseRunFactory.create(
+            enrollment_modes=[
+                EnrollmentModeFactory.create(
+                    mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, requires_payment=True
+                )
+            ]
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        with pytest.raises(ValidationError) as exc_info:
+            serializer.save()
+        assert "run_id" in exc_info.value.detail
+
+    def test_allowed_when_audit_mode_available(self, mocker):
+        """Free enrollment is permitted when the run has a free mode."""
+        from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE  # noqa: PLC0415
+        from users.factories import UserFactory  # noqa: PLC0415
+
+        user = UserFactory.create()
+        run = CourseRunFactory.create(
+            enrollment_modes=[
+                EnrollmentModeFactory.create(
+                    mode_slug=EDX_ENROLLMENT_AUDIT_MODE, requires_payment=False
+                )
+            ]
+        )
+        mocker.patch(
+            "courses.serializers.v2.courses.create_run_enrollments",
+            return_value=([mocker.Mock()], True),
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        result = serializer.save()
+        assert result is not None
+
+    def test_allowed_when_user_has_paid(self, mocker):
+        """Enrollment is permitted when all modes require payment but the user has paid."""
+        from courses.models import PaidCourseRun  # noqa: PLC0415
+        from ecommerce.factories import OrderFactory  # noqa: PLC0415
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
+        from users.factories import UserFactory  # noqa: PLC0415
+
+        user = UserFactory.create()
+        run = CourseRunFactory.create(
+            enrollment_modes=[
+                EnrollmentModeFactory.create(
+                    mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, requires_payment=True
+                )
+            ]
+        )
+        order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+        PaidCourseRun.objects.create(user=user, course_run=run, order=order)
+        mocker.patch(
+            "courses.serializers.v2.courses.create_run_enrollments",
+            return_value=([mocker.Mock()], True),
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        result = serializer.save()
+        assert result is not None

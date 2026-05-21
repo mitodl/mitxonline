@@ -10,7 +10,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from courses import models
-from courses.api import create_run_enrollments
+from courses.api import create_run_enrollments, run_requires_payment_for_user
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
@@ -87,6 +87,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
     """CourseRunEnrollment model serializer"""
 
     run = CourseRunWithCourseSerializer(read_only=True)
+    run_id = serializers.IntegerField(write_only=True)
     certificate = CourseRunCertificateSerializer(read_only=True, allow_null=True)
 
     b2b_organization_id = serializers.SerializerMethodField(read_only=True)
@@ -113,6 +114,11 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         if run is None or run.b2b_contract_id is not None:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
 
+        if run_requires_payment_for_user(user, run):
+            raise ValidationError(
+                {"run_id": "Payment is required to enroll in this course run."}
+            )
+
         successful_enrollments, _ = create_run_enrollments(
             user,
             [run],
@@ -131,6 +137,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         fields = [
             *BaseCourseRunEnrollmentSerializer.Meta.fields,
             "run",
+            "run_id",
             "b2b_organization_id",
             "b2b_contract_id",
             "certificate",

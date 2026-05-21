@@ -3,6 +3,7 @@ import faker
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import Prefetch
+from rest_framework.exceptions import ValidationError
 
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
 from cms.serializers import CoursePageSerializer
@@ -11,8 +12,10 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
+    EnrollmentModeFactory,
+    UserFactory,
 )
-from courses.models import Course, CourseRun, Department
+from courses.models import Course, CourseRun, Department, PaidCourseRun
 from courses.serializers.v1.base import BaseCourseSerializer, CourseRunGradeSerializer
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
@@ -22,10 +25,13 @@ from courses.serializers.v1.courses import (
     CourseWithCourseRunsSerializer,
 )
 from courses.serializers.v1.programs import ProgramSerializer
+from ecommerce.factories import OrderFactory
+from ecommerce.models import OrderStatus
 from ecommerce.serializers.v0 import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -263,3 +269,86 @@ def test_serialize_course_run_enrollments_with_grades():
         "certificate": None,
         "grades": CourseRunGradeSerializer([grade], many=True).data,
     }
+
+
+class TestCourseRunEnrollmentSerializerCreate:
+    """Tests for enrollment creation validation in CourseRunEnrollmentSerializer."""
+
+    def test_create_enrollment_allowed_when_audit_mode_available(self, mocker):
+        """Free enrollment is permitted when the run has a free (non-payment-required) mode."""
+        user = UserFactory.create()
+        run = CourseRunFactory.create(
+            enrollment_modes=[
+                EnrollmentModeFactory.create(
+                    mode_slug=EDX_ENROLLMENT_AUDIT_MODE, requires_payment=False
+                )
+            ]
+        )
+        mocker.patch(
+            "courses.serializers.v1.courses.create_run_enrollments",
+            return_value=([mocker.Mock()], True),
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        result = serializer.save()
+        assert result is not None
+
+    def test_create_enrollment_blocked_when_payment_required_and_not_paid(self):
+        """Enrollment is rejected when all modes require payment and the user has not paid."""
+        user = UserFactory.create()
+        run = CourseRunFactory.create(
+            enrollment_modes=[
+                EnrollmentModeFactory.create(
+                    mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, requires_payment=True
+                )
+            ]
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        with pytest.raises(ValidationError) as exc_info:
+            serializer.save()
+        assert "run_id" in exc_info.value.detail
+
+    def test_create_enrollment_allowed_when_payment_required_and_user_paid(
+        self, mocker
+    ):
+        """Enrollment is permitted when all modes require payment but the user has paid."""
+        user = UserFactory.create()
+        run = CourseRunFactory.create(
+            enrollment_modes=[
+                EnrollmentModeFactory.create(
+                    mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, requires_payment=True
+                )
+            ]
+        )
+        order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+        PaidCourseRun.objects.create(user=user, course_run=run, order=order)
+        mocker.patch(
+            "courses.serializers.v1.courses.create_run_enrollments",
+            return_value=([mocker.Mock()], True),
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        result = serializer.save()
+        assert result is not None
+
+    def test_create_enrollment_allowed_when_no_enrollment_modes(self, mocker):
+        """Enrollment is permitted when no enrollment modes are set (no restriction enforced)."""
+        user = UserFactory.create()
+        run = CourseRunFactory.create(enrollment_modes=[])
+        mocker.patch(
+            "courses.serializers.v1.courses.create_run_enrollments",
+            return_value=([mocker.Mock()], True),
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        result = serializer.save()
+        assert result is not None
