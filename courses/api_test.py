@@ -2122,6 +2122,14 @@ def test_generate_program_certificate_audit_courses(user, default_mode_records):
     program.add_requirement(cert_course)
     program.add_requirement(audit_course)
 
+    # Add some additional course runs for the audit course.
+    # This test missed a case - if the course had a mix of runs that were both
+    # audit-only and not, the certificates wouldn't be generated.
+
+    audit_verified_course_run = CourseRunFactory.create(course=audit_course)
+    audit_verified_course_run.enrollment_modes.set(default_mode_records)
+    audit_verified_course_run.save()
+
     ProgramEnrollment.objects.create(
         user=user,
         program=program,
