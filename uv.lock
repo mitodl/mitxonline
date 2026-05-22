@@ -681,10 +681,11 @@ wheels = [
 
 [[package]]
 name = "django-health-check"
-version = "3.20.1.dev10+g53f9bdc3a"
-source = { git = "https://github.com/revsys/django-health-check?rev=53f9bdc3a7acc8a577319987fef0bd3040eef4b4#53f9bdc3a7acc8a577319987fef0bd3040eef4b4" }
+version = "4.4.2.dev1+g9bf167d8d"
+source = { git = "https://github.com/revsys/django-health-check?rev=9bf167d8ddad0bf18349aef188969f35d4ceabfc#9bf167d8ddad0bf18349aef188969f35d4ceabfc" }
 dependencies = [
     { name = "django" },
+    { name = "dnspython" },
 ]
 
 [[package]]
@@ -2100,7 +2101,7 @@ requires-dist = [
     { name = "django-cors-headers", specifier = ">=4.0.0,<5" },
     { name = "django-countries", specifier = ">=7.2.1,<8" },
     { name = "django-filter", specifier = ">=24.3,<25" },
-    { name = "django-health-check", git = "https://github.com/revsys/django-health-check?rev=53f9bdc3a7acc8a577319987fef0bd3040eef4b4" },
+    { name = "django-health-check", git = "https://github.com/revsys/django-health-check?rev=9bf167d8ddad0bf18349aef188969f35d4ceabfc" },
     { name = "django-hijack", specifier = ">=3.6.0,<4" },
     { name = "django-ipware", specifier = ">=7.0.0,<8" },
     { name = "django-oauth-toolkit", specifier = "==3.1" },
