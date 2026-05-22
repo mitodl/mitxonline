@@ -20,7 +20,7 @@ dependencies = [
     "django-cors-headers>=4.0.0,<5",
     "django-countries>=7.2.1,<8",
     "django-filter>=24.3,<25",
-    "django-health-check",
+    "django-health-check[celery,redis]>=4.0.0",
     "django-hijack>=3.6.0,<4",
     "django-ipware>=7.0.0,<8",
     "django-redis>=6.0.0,<7",
@@ -118,9 +118,6 @@ dev = [
 [tool.uv]
 package = false
 default-groups = "all"
-
-[tool.uv.sources]
-django-health-check = { git = "https://github.com/revsys/django-health-check", rev = "53f9bdc3a7acc8a577319987fef0bd3040eef4b4" } # pragma: allowlist secret
 
 [tool.uv.build-backend]
 module-root = ""

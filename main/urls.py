@@ -52,6 +52,7 @@ urlpatterns = [
         SpectacularSwaggerView.as_view(url_name="schema"),
         name="swagger",
     ),
+    path("", include("main.urls_healthcheck")),
     path("", include("authentication.urls")),
     path("", include("openedx.urls")),
     path("", include("mail.urls")),
@@ -90,7 +91,6 @@ urlpatterns = [
     re_path(r"^records/.*", index, {"noindex": True}, name="learner-records"),
     re_path(r"^catalog/", index, name="catalog"),
     path("api/instructor/<int:pk>/", instructor_page, name="cms_instructor_page"),
-    re_path(r"^health/", include("health_check.urls")),
     # Wagtail
     re_path(
         r"^cms/login", cms_signin_redirect_to_site_signin, name="wagtailadmin_login"
