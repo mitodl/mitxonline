@@ -33,9 +33,7 @@ from wagtail.models import ClusterableModel, Orderable, Page, Revision
 from courses.constants import (
     AVAILABILITY_ANYTIME,
     AVAILABILITY_CHOICES,
-    COURSE_VARIANT_INDUSTRY,
     COURSE_VARIANT_LANGUAGE_OVERRIDE,
-    COURSE_VARIANT_LENGTH,
     ENROLL_CHANGE_STATUS_CHOICES,
     ENROLLABLE_ITEM_ID_SEPARATOR,
     PROGRAM_DISPLAY_MODE_CHOICES,
@@ -48,6 +46,7 @@ from openedx.constants import (
     EDX_ENROLLMENT_VERIFIED_MODE,
     EDX_ENROLLMENTS_PAID_MODES,
 )
+from variants.models import VariantOptionsModel
 
 User = get_user_model()
 
@@ -1264,7 +1263,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
 
 
-class CourseRun(TimestampedModel):
+class CourseRun(TimestampedModel, VariantOptionsModel):
     """Model for a single run/instance of a course"""
 
     all_objects = CourseRunQuerySet.as_manager()
@@ -1349,16 +1348,6 @@ class CourseRun(TimestampedModel):
         default=False,
         help_text='Designate this run as a "source" run for contract re-runs of the course.',
     )
-    language = models.CharField(
-        max_length=8,
-        blank=True,
-        default="",
-        db_index=True,
-        help_text=(
-            "ISO 639-1 language code for this run "
-            "(e.g. 'en', 'zh', 'fr'). Leave blank for unspecified."
-        ),
-    )
     is_primary_language = models.BooleanField(
         default=False,
         help_text=(
@@ -1367,22 +1356,6 @@ class CourseRun(TimestampedModel):
             "language variants. If no run in a group is marked primary, the oldest "
             "run by creation date is treated as primary."
         ),
-    )
-    variant_length = models.CharField(
-        max_length=1,
-        choices=COURSE_VARIANT_LENGTH,
-        blank=True,
-        default="",
-        db_index=True,
-        help_text="Variant: Describes the length of the run (short/long).",
-    )
-    variant_industry = models.CharField(
-        max_length=3,
-        choices=COURSE_VARIANT_INDUSTRY,
-        blank=True,
-        default="",
-        db_index=True,
-        help_text="Variant: Describes the industry the run is adapted for.",
     )
 
     class Meta:
@@ -1607,14 +1580,7 @@ class CourseRun(TimestampedModel):
         if self.end_date and self.expiration_date < self.end_date:
             raise ValidationError("Expiration date must be later than end date.")  # noqa: EM101
 
-        if not self.language:
-            return
-
-        if self.language not in COURSE_VARIANT_LANGUAGE_OVERRIDE:
-            try:
-                pycountry.languages.lookup(self.language)
-            except LookupError as lke:
-                raise ValidationError("Course language is invalid") from lke  # noqa: EM101
+        self.clean_language()
 
     def save(
         self,
