@@ -4,6 +4,7 @@ Admin site bindings for profiles
 
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
+from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db import models
 from django.forms import TextInput
 from django.urls import reverse
@@ -69,6 +70,14 @@ class ProgramContractPageInline(admin.TabularInline):
 
     model = ContractProgramItem
     extra = 0
+
+
+class CoursePossibleVariantInline(GenericTabularInline):
+    """Inline for possible variants for a course"""
+
+    from variants.models import SupportedVariant  # noqa: PLC0415
+
+    model = SupportedVariant
 
 
 class CourseRunInline(admin.TabularInline):
@@ -159,7 +168,7 @@ class CourseAdmin(admin.ModelAdmin):
         "readable_id",
     )
     list_filter = ["live", "departments"]
-    inlines = [CourseRunInline]
+    inlines = [CourseRunInline, CoursePossibleVariantInline]
 
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}

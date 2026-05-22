@@ -3363,6 +3363,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/CourseOutlineServerErrorResponse'
           description: ''
+  /api/v3/courses/variant_runs/:
+    get:
+      operationId: course_variant_runs_v3
+      description: Fetch variant runs for a course(s) matching the specified filters.
+      parameters:
+      - in: query
+        name: contract
+        schema:
+          type: integer
+        description: Contract to filter by
+        required: true
+      - in: query
+        name: course_id
+        schema:
+          type: array
+          items:
+            type: integer
+        description: Course ID(s) to use
+        required: true
+      - in: query
+        name: industry
+        schema:
+          type: string
+        description: Industry focus to retrieve
+      - in: query
+        name: language
+        schema:
+          type: string
+        description: Language to retrieve
+      - in: query
+        name: length
+        schema:
+          type: string
+        description: Language to retrieve
+      tags:
+      - courses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseVariantRunsResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseVariantRunBadRequest'
+          description: ''
   /api/v3/enrollments/:
     get:
       operationId: user_enrollments_list_v3
@@ -3627,6 +3676,148 @@ components:
       - readable_id
       - title
       - type
+    BaseCourseRun:
+      type: object
+      description: Minimal CourseRun model serializer
+      properties:
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        expiration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner should not see link to this
+            course run on their dashboard.
+        courseware_url:
+          type: string
+          nullable: true
+          description: Get the courseware URL
+          readOnly: true
+        courseware_id:
+          type: string
+          maxLength: 255
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        upgrade_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The date beyond which the learner can not enroll in paid course
+            mode.
+        is_upgradable:
+          type: boolean
+          description: Check if the course run is upgradable
+          readOnly: true
+        is_enrollable:
+          type: boolean
+          description: Check if the course run is enrollable
+          readOnly: true
+        is_archived:
+          type: boolean
+          description: Check if the course run is archived
+          readOnly: true
+        is_self_paced:
+          type: boolean
+        run_tag:
+          type: string
+          description: 'A string that identifies the set of runs that this run belongs
+            to (example: ''R2'')'
+          maxLength: 100
+        id:
+          type: integer
+          readOnly: true
+        live:
+          type: boolean
+        course_number:
+          type: string
+          description: Get the course number
+          readOnly: true
+        enrollment_modes:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: Get the enrollment modes for the course run
+          readOnly: true
+        language:
+          type: string
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+          maxLength: 8
+        is_primary_language:
+          type: boolean
+          description: Designates this run as the primary-language version for its
+            run-tag group. The primary run is used as the canonical run when grouping
+            language variants. If no run in a group is marked primary, the oldest
+            run by creation date is treated as primary.
+        language_label:
+          type: string
+          description: Return the label for the language, using the override if necessary
+          readOnly: true
+        variant_industry:
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_length:
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+      required:
+      - course_number
+      - courseware_id
+      - courseware_url
+      - enrollment_modes
+      - id
+      - is_archived
+      - is_enrollable
+      - is_upgradable
+      - language_label
+      - run_tag
+      - title
     BaseProduct:
       type: object
       description: Simple serializer for Product without related purchasable objects
@@ -5140,6 +5331,26 @@ components:
       required:
       - readable_id
       - title
+    CourseVariantRunBadRequest:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    CourseVariantRunsResponse:
+      type: object
+      description: Serializer for the course variant run API.
+      properties:
+        id:
+          type: integer
+        courseruns:
+          type: array
+          items:
+            $ref: '#/components/schemas/BaseCourseRun'
+      required:
+      - courseruns
+      - id
     CourseWithCourseRunsSerializerV2:
       type: object
       description: Course model serializer - also serializes child course runs
@@ -5249,14 +5460,10 @@ components:
         ingest_content_files_for_ai:
           type: boolean
           readOnly: true
-        possible_variants:
+        possible_variant_sets:
           type: array
           items:
             $ref: '#/components/schemas/SupportedVariant'
-          readOnly: true
-        default_variant:
-          allOf:
-          - $ref: '#/components/schemas/SupportedVariant'
           readOnly: true
         courseruns:
           type: array
@@ -5273,7 +5480,6 @@ components:
       - certificate_available
       - certificate_type
       - courseruns
-      - default_variant
       - departments
       - duration
       - id
@@ -5288,7 +5494,7 @@ components:
       - min_weeks
       - next_run_id
       - page
-      - possible_variants
+      - possible_variant_sets
       - programs
       - readable_id
       - required_prerequisites
@@ -7565,9 +7771,6 @@ components:
       type: object
       description: Serializer for the SupportedVariant model.
       properties:
-        id:
-          type: integer
-          readOnly: true
         language:
           type: string
           readOnly: true
@@ -7611,7 +7814,6 @@ components:
       - active
       - b2b_only
       - default_variant
-      - id
       - language
       - variant_industry
       - variant_length
@@ -8767,20 +8969,15 @@ components:
         ingest_content_files_for_ai:
           type: boolean
           readOnly: true
-        possible_variants:
+        possible_variant_sets:
           type: array
           items:
             $ref: '#/components/schemas/SupportedVariant'
-          readOnly: true
-        default_variant:
-          allOf:
-          - $ref: '#/components/schemas/SupportedVariant'
           readOnly: true
       required:
       - availability
       - certificate_available
       - certificate_type
-      - default_variant
       - departments
       - duration
       - id
@@ -8794,7 +8991,7 @@ components:
       - min_weeks
       - next_run_id
       - page
-      - possible_variants
+      - possible_variant_sets
       - programs
       - readable_id
       - required_prerequisites

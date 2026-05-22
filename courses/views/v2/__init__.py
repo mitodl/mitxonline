@@ -432,11 +432,14 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
 
         # Prefetch the variant sets but filter B2B according to the query params.
         qp = self.request.query_params
-        variant_b2b_enabled = qp.get("org_id") or qp.get("contract_id")
+        variant_b2b_enabled = "org_id" in qp or "contract_id" in qp
+
         queryset = queryset.prefetch_related(
             Prefetch(
                 "possible_variant_sets",
-                queryset=SupportedVariant.objects.filter(b2b_only=variant_b2b_enabled),
+                queryset=SupportedVariant.objects.filter(
+                    Q(b2b_only=variant_b2b_enabled) | Q(default_variant=True)
+                ),
             )
         )
 

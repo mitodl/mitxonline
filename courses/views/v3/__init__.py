@@ -7,6 +7,7 @@ import re
 
 import django_filters
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
@@ -30,6 +31,7 @@ from rest_framework.response import Response
 from courses.api import create_program_enrollments, deactivate_run_enrollment
 from courses.constants import COURSE_KEY_PATTERN, ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
+    Course,
     CourseRunEnrollment,
     Program,
     ProgramEnrollment,
@@ -37,15 +39,18 @@ from courses.models import (
 from courses.serializers.v3.courses import (
     CourseOutlineResponseSerializer,
     CourseRunEnrollmentSerializer,
+    CourseVariantRunsResponseSerializer,
 )
 from courses.serializers.v3.programs import (
     ProgramEnrollmentCreateSerializer,
     ProgramEnrollmentSerializer,
 )
+from courses.utils import get_enrollable_courseruns_qs
 from ecommerce.models import Product
 from main import features
 from openedx.api import get_edx_course_outline
 from openedx.exceptions import EdxApiCourseOutlineError
+from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
 
@@ -359,3 +364,133 @@ def get_course_outline(request, course_id):  # noqa: ARG001
         )
 
     return Response(outline_data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    operation_id="course_variant_runs_v3",
+    description="Fetch variant runs for a course(s) matching the specified filters.",
+    parameters=[
+        OpenApiParameter(
+            name="course_id",
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            required=True,
+            many=True,
+            description="Course ID(s) to use",
+        ),
+        OpenApiParameter(
+            name="contract",
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            required=True,
+            description="Contract to filter by",
+        ),
+        OpenApiParameter(
+            name="language",
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description="Language to retrieve",
+        ),
+        OpenApiParameter(
+            name="industry",
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description="Industry focus to retrieve",
+        ),
+        OpenApiParameter(
+            name="length",
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description="Language to retrieve",
+        ),
+    ],
+    responses={
+        200: CourseVariantRunsResponseSerializer,
+        400: inline_serializer(
+            name="CourseVariantRunBadRequestSerializer",
+            fields={"detail": serializers.CharField()},
+        ),
+    },
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_course_variant_runs(request):
+    """Get the variant runs for a course with filtering"""
+
+    course_ids = request.query_params.get("course_id", False)
+    contract = request.query_params.get("contract", None)
+    language = request.query_params.get("language", "")
+    length = request.query_params.get("length", "")
+    industry = request.query_params.get("industry", "")
+
+    if not course_ids:
+        return Response(
+            {"detail": "Must specify courses to fetch."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not contract:
+        return Response(
+            {"detail": "Must specify contract."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if (
+        not request.user.is_superuser
+        and not request.user.b2b_contracts.filter(id=contract).exists()
+    ):
+        return Response(
+            {"detail": "Must specify valid contract."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    course_ct = ContentType.objects.get_for_model(Course)
+
+    course_ids = [int(course_id) for course_id in course_ids.split(",")]
+
+    courses = Course.objects.filter(pk__in=course_ids)
+
+    if not courses.count():
+        return Response(
+            {
+                "detail": "No courses found.",
+                "course_ids": course_ids,
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    default_variants = SupportedVariant.objects.filter(
+        content_type=course_ct, object_id__in=course_ids, default_variant=True
+    ).all()
+
+    # construct filter
+    variant_filter = (
+        Q(language=language) & Q(variant_length=length) & Q(variant_industry=industry)
+    )
+
+    output = []
+
+    for course in courses:
+        default_variant = [
+            variant for variant in default_variants if variant.object_id == course.id
+        ].pop()
+        default_variant_filter = (
+            Q(language=default_variant.language)
+            & Q(variant_length=default_variant.variant_length)
+            & Q(variant_industry=default_variant.variant_industry)
+        )
+        runs_qs = (
+            get_enrollable_courseruns_qs(valid_courses=[course])
+            .filter(Q(default_variant_filter) | Q(variant_filter))
+            .filter(b2b_contract_id=contract)
+            .all()
+        )
+
+        output.append(
+            {
+                "id": course.id,
+                "courseruns": runs_qs,
+            }
+        )
+
+    return Response(CourseVariantRunsResponseSerializer(output, many=True).data)

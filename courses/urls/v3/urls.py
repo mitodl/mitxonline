@@ -26,4 +26,9 @@ urlpatterns += [
         v3.get_course_outline,
         name="course_outline",
     ),
+    path(
+        "courses/variant_runs/",
+        v3.get_course_variant_runs,
+        name="course_variant_runs",
+    ),
 ]
