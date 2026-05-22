@@ -208,8 +208,7 @@ class Command(BaseCommand):
 
         if not csv_path and not users_str and not courseware_id:
             raise CommandError(
-                "Provide --csv, --users with --run, or --run alone "  # noqa: EM101
-                "to unenroll all active learners from a course run."
+                "Provide --csv, --users with --run, or --run alone."  # noqa: EM101
             )
 
         if csv_path:
