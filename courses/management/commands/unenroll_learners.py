@@ -1,22 +1,24 @@
 """
 Management command to unenroll learners from course runs in both edX and MITx Online.
 
+By default, the command runs in dry-run mode (preview only). Use --commit to apply changes.
+
 **Usage:**
 
-1. Unenroll a single user from a course run:
-./manage.py unenroll_learners --users=user@example.com --run=course-v1:MITx+6.00.1x+2024
+1. Unenroll all active learners from a course run (preview):
+./manage.py unenroll_learners --run=course-v1:MITx+6.00.1x+2024
 
-2. Unenroll specific users (inline) from a course run:
-./manage.py unenroll_learners --users=user1@example.com,user2@example.com --run=course-v1:MITx+6.00.1x+2024
+2. Unenroll specific users from a course run:
+./manage.py unenroll_learners --users=user1@example.com,user2@example.com --run=course-v1:MITx+6.00.1x+2024 --commit
 
 3. Unenroll users listed in a CSV file (columns: user, courseware_id):
-./manage.py unenroll_learners --csv=unenrollments.csv
+./manage.py unenroll_learners --csv=unenrollments.csv --commit
 
-4. Dry run (preview only, no changes):
-./manage.py unenroll_learners --csv=unenrollments.csv --dry-run
+4. Suppress unenrollment emails:
+./manage.py unenroll_learners --run=course-v1:MITx+6.00.1x+2024 --commit --no-email
 
 5. Keep local enrollment records even if edX unenrollment fails:
-./manage.py unenroll_learners --users=user1@example.com --run=course-v1:MITx+6.00.1x+2024 -k
+./manage.py unenroll_learners --users=user1@example.com --run=course-v1:MITx+6.00.1x+2024 --commit -k
 """
 
 import csv
@@ -37,13 +39,12 @@ class Command(BaseCommand):
     help = "Unenroll learners from course runs in both edX and MITx Online"
 
     def add_arguments(self, parser):
-        group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument(
+        parser.add_argument(
             "--csv",
             type=str,
             help="Path to a CSV file with columns: user, courseware_id",
         )
-        group.add_argument(
+        parser.add_argument(
             "--users",
             type=str,
             help="Comma-separated list of user emails or usernames",
@@ -51,7 +52,9 @@ class Command(BaseCommand):
         parser.add_argument(
             "--run",
             type=str,
-            help="The 'courseware_id' value for a CourseRun (required with --users)",
+            help="The 'courseware_id' value for a CourseRun. "
+            "When used alone, unenrolls ALL active learners from this run. "
+            "When used with --users, scopes unenrollment to those users.",
         )
         parser.add_argument(
             "-k",
@@ -61,10 +64,17 @@ class Command(BaseCommand):
             help="Keep local enrollment records even if edX unenrollment fails",
         )
         parser.add_argument(
-            "--dry-run",
+            "--commit",
             action="store_true",
-            dest="dry_run",
-            help="Preview which enrollments would be unenrolled without making changes",
+            dest="commit",
+            help="Actually perform unenrollments. Without this flag, "
+            "the command runs in dry-run mode (preview only).",
+        )
+        parser.add_argument(
+            "--no-email",
+            action="store_true",
+            dest="no_email",
+            help="Suppress unenrollment notification emails to learners",
         )
 
     def _parse_csv(self, csv_path):
@@ -115,6 +125,26 @@ class Command(BaseCommand):
         """
         return [(u.strip(), courseware_id) for u in users_str.split(",") if u.strip()]
 
+    def _entries_for_run(self, courseware_id):
+        """
+        Build entries list for all active enrollments in a course run.
+
+        Args:
+            courseware_id (str): The courseware_id for the course run
+
+        Returns:
+            list[tuple[str, str]]: List of (user_email, courseware_id) tuples
+        """
+        course_run = CourseRun.objects.filter(courseware_id=courseware_id).first()
+        if course_run is None:
+            raise CommandError(
+                f"Could not find course run with courseware_id={courseware_id}"  # noqa: EM102
+            )
+        enrollments = CourseRunEnrollment.objects.filter(
+            run=course_run, active=True
+        ).select_related("user")
+        return [(e.user.email, courseware_id) for e in enrollments]
+
     def _dry_run(self, entries):
         """Preview which enrollments would be unenrolled without making changes."""
         succeeded = 0
@@ -161,6 +191,38 @@ class Command(BaseCommand):
                 f"Summary: {succeeded} would be unenrolled, {skipped} skipped"
             )
         )
+        if succeeded > 0:
+            self.stdout.write(
+                self.style.WARNING("Re-run with --commit to apply changes.")
+            )
+
+    def _resolve_entries(self, csv_path, users_str, courseware_id):
+        """Validate arguments and return the list of (user, courseware_id) entries."""
+        if csv_path and (users_str or courseware_id):
+            raise CommandError(
+                "--csv cannot be combined with --users or --run"  # noqa: EM101
+            )
+
+        if users_str and not courseware_id:
+            raise CommandError("--run is required when using --users")  # noqa: EM101
+
+        if not csv_path and not users_str and not courseware_id:
+            raise CommandError(
+                "Provide --csv, --users with --run, or --run alone "  # noqa: EM101
+                "to unenroll all active learners from a course run."
+            )
+
+        if csv_path:
+            entries = self._parse_csv(csv_path)
+        elif users_str:
+            entries = self._parse_inline_users(users_str, courseware_id)
+        else:
+            entries = self._entries_for_run(courseware_id)
+
+        if not entries:
+            raise CommandError("No valid entries found to process")  # noqa: EM101
+
+        return entries
 
     def handle(self, *args, **options):  # noqa: ARG002
         """Handle command execution"""
@@ -168,19 +230,12 @@ class Command(BaseCommand):
         users_str = options.get("users")
         courseware_id = options.get("run")
         keep_failed = options.get("keep_failed_enrollments")
-        dry_run = options.get("dry_run")
+        commit = options.get("commit")
+        no_email = options.get("no_email")
 
-        if users_str and not courseware_id:
-            raise CommandError("--run is required when using --users")  # noqa: EM101
+        entries = self._resolve_entries(csv_path, users_str, courseware_id)
 
-        if csv_path:
-            entries = self._parse_csv(csv_path)
-        else:
-            entries = self._parse_inline_users(users_str, courseware_id)
-
-        if not entries:
-            raise CommandError("No valid entries found to process")  # noqa: EM101
-
+        dry_run = not commit
         self.stdout.write(
             f"Processing {len(entries)} unenrollment(s)..."
             + (" (DRY RUN)" if dry_run else "")
@@ -190,7 +245,11 @@ class Command(BaseCommand):
             self._dry_run(entries)
             return
 
-        summary = bulk_unenroll_learners(entries, keep_failed_enrollments=keep_failed)
+        summary = bulk_unenroll_learners(
+            entries,
+            keep_failed_enrollments=keep_failed,
+            send_notification=not no_email,
+        )
 
         # Print details
         for _user_id, _cw_id, status, message in summary["details"]:

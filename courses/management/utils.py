@@ -66,7 +66,9 @@ def create_or_update_enrollment(model_cls, defaults=None, **kwargs):
     return enrollment, created
 
 
-def unenroll_learner_from_run(user, course_run, *, keep_failed_enrollments=False):
+def unenroll_learner_from_run(
+    user, course_run, *, keep_failed_enrollments=False, send_notification=True
+):
     """
     Unenroll a single learner from a course run in both edX and MITx Online.
 
@@ -75,6 +77,7 @@ def unenroll_learner_from_run(user, course_run, *, keep_failed_enrollments=False
         course_run (CourseRun): The course run to unenroll from
         keep_failed_enrollments (bool): If True, keeps the local enrollment record
             even if the edX unenrollment fails.
+        send_notification (bool): If True, sends unenrollment email to the learner.
 
     Returns:
         tuple[CourseRunEnrollment | None, str]: (enrollment_result, message)
@@ -92,6 +95,7 @@ def unenroll_learner_from_run(user, course_run, *, keep_failed_enrollments=False
         enrollment,
         change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
         keep_failed_enrollments=keep_failed_enrollments,
+        send_notification=send_notification,
     )
     if result:
         return (
@@ -104,7 +108,9 @@ def unenroll_learner_from_run(user, course_run, *, keep_failed_enrollments=False
     )
 
 
-def bulk_unenroll_learners(entries, *, keep_failed_enrollments=False):
+def bulk_unenroll_learners(
+    entries, *, keep_failed_enrollments=False, send_notification=True
+):
     """
     Unenroll multiple learners from course runs in both edX and MITx Online.
 
@@ -116,6 +122,7 @@ def bulk_unenroll_learners(entries, *, keep_failed_enrollments=False):
             user_identifier can be email, username, or user id.
         keep_failed_enrollments (bool): If True, keeps local enrollment records
             even if the edX unenrollment fails.
+        send_notification (bool): If True, sends unenrollment email to each learner.
 
     Returns:
         dict: Summary with keys 'succeeded', 'failed', 'skipped' (int counts)
@@ -154,6 +161,7 @@ def bulk_unenroll_learners(entries, *, keep_failed_enrollments=False):
             user,
             course_run,
             keep_failed_enrollments=keep_failed_enrollments,
+            send_notification=send_notification,
         )
         if result:
             log.info(message)
