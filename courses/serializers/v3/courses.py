@@ -10,7 +10,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from courses import models
-from courses.api import create_run_enrollments
+from courses.api import create_run_enrollments, run_requires_payment_for_user
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
@@ -112,6 +112,11 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
 
         if run is None or run.b2b_contract_id is not None:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+
+        if run_requires_payment_for_user(user, run):
+            raise ValidationError(
+                {"run_id": "Payment is required to enroll in this course run."}
+            )
 
         successful_enrollments, _ = create_run_enrollments(
             user,

@@ -133,6 +133,23 @@ def get_user_relevant_program_course_run_qset(
     return enrollable_run_qset.order_by("enrollment_start")
 
 
+def run_requires_payment_for_user(user, run) -> bool:
+    """
+    Returns True if the course run requires payment and the user has not yet paid.
+
+    A run requires payment when all of its enrollment modes have requires_payment=True
+    and at least one mode is configured. If the run has no enrollment modes, no
+    restriction is enforced and False is returned.
+    """
+    enrollment_modes = list(run.enrollment_modes.all())
+    if not enrollment_modes:
+        return False
+    has_free_mode = any(not mode.requires_payment for mode in enrollment_modes)
+    if has_free_mode:
+        return False
+    return not PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
+
+
 def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
     """
     Creates a local-only CourseRunEnrollment record without calling the edX API.

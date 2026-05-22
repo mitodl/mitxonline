@@ -70,6 +70,7 @@ from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_TYPE_ENROLL_PAYMENT_REQUIRED,
     USER_MSG_TYPE_ENROLLED,
 )
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
@@ -729,6 +730,36 @@ def test_create_enrollments_blocked_country(user_client, user):
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {
             "type": USER_MSG_TYPE_ENROLL_BLOCKED,
+        }
+    )
+
+
+def test_create_enrollments_payment_required(user_client, user):
+    """
+    Create enrollment view should redirect with a payment-required message if all enrollment
+    modes on the run require payment and the user has not paid.
+    """
+    from courses.factories import EnrollmentModeFactory  # noqa: PLC0415
+    from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
+
+    run = CourseRunFactory.create(
+        enrollment_modes=[
+            EnrollmentModeFactory.create(
+                mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, requires_payment=True
+            )
+        ]
+    )
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id)},
+        HTTP_REFERER=EXAMPLE_URL,
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == EXAMPLE_URL
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_ENROLL_PAYMENT_REQUIRED,
         }
     )
 

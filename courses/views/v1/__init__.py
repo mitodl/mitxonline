@@ -32,6 +32,7 @@ from courses.api import (
     deactivate_run_enrollment,
     get_relevant_course_run_qset,
     get_user_relevant_program_course_run_qset,
+    run_requires_payment_for_user,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -72,6 +73,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_TYPE_ENROLL_PAYMENT_REQUIRED,
     USER_MSG_TYPE_ENROLLED,
 )
 from main.utils import encode_json_cookie_value, redirect_with_user_message
@@ -338,6 +340,18 @@ def _validate_enrollment_post_request(
         resp = redirect_with_user_message(
             reverse("user-dashboard"),
             {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
+        )
+        return resp, None, None
+    if run_requires_payment_for_user(user, run):
+        resp = HttpResponseRedirect(request.headers["Referer"])
+        resp.set_cookie(
+            key=USER_MSG_COOKIE_NAME,
+            value=encode_json_cookie_value(
+                {
+                    "type": USER_MSG_TYPE_ENROLL_PAYMENT_REQUIRED,
+                }
+            ),
+            max_age=USER_MSG_COOKIE_MAX_AGE,
         )
         return resp, None, None
     return None, user, run

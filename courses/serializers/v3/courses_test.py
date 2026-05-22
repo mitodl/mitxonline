@@ -80,3 +80,95 @@ class TestCourseRunEnrollmentSerializerV3:
         assert serialized_data["run"]["upgrade_product_id"] is None
         assert serialized_data["run"]["upgrade_product_price"] is None
         assert serialized_data["run"]["upgrade_product_is_active"] is None
+
+
+class TestCourseRunEnrollmentSerializerV3PaymentGuard:
+    """Tests for payment guard in v3 CourseRunEnrollmentSerializer.create()."""
+
+    def test_blocked_when_payment_required_and_not_paid(self):
+        """Enrollment is rejected when all modes require payment and the user has not paid."""
+        from rest_framework.exceptions import ValidationError  # noqa: PLC0415
+
+        from courses.factories import (  # noqa: PLC0415
+            CourseRunFactory,
+            EnrollmentModeFactory,
+        )
+        from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
+        from users.factories import UserFactory  # noqa: PLC0415
+
+        user = UserFactory.create()
+        run = CourseRunFactory.create(
+            enrollment_modes=[
+                EnrollmentModeFactory.create(
+                    mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, requires_payment=True
+                )
+            ]
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        with pytest.raises(ValidationError) as exc_info:
+            serializer.save()
+        assert "run_id" in exc_info.value.detail
+
+    def test_allowed_when_audit_mode_available(self, mocker):
+        """Free enrollment is permitted when the run has a free mode."""
+        from courses.factories import (  # noqa: PLC0415
+            CourseRunFactory,
+            EnrollmentModeFactory,
+        )
+        from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE  # noqa: PLC0415
+        from users.factories import UserFactory  # noqa: PLC0415
+
+        user = UserFactory.create()
+        run = CourseRunFactory.create(
+            enrollment_modes=[
+                EnrollmentModeFactory.create(
+                    mode_slug=EDX_ENROLLMENT_AUDIT_MODE, requires_payment=False
+                )
+            ]
+        )
+        mocker.patch(
+            "courses.serializers.v3.courses.create_run_enrollments",
+            return_value=([mocker.Mock()], True),
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        result = serializer.save()
+        assert result is not None
+
+    def test_allowed_when_user_has_paid(self, mocker):
+        """Enrollment is permitted when all modes require payment but the user has paid."""
+        from courses.factories import (  # noqa: PLC0415
+            CourseRunFactory,
+            EnrollmentModeFactory,
+        )
+        from courses.models import PaidCourseRun  # noqa: PLC0415
+        from ecommerce.factories import OrderFactory  # noqa: PLC0415
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
+        from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
+        from users.factories import UserFactory  # noqa: PLC0415
+
+        user = UserFactory.create()
+        run = CourseRunFactory.create(
+            enrollment_modes=[
+                EnrollmentModeFactory.create(
+                    mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, requires_payment=True
+                )
+            ]
+        )
+        order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
+        PaidCourseRun.objects.create(user=user, course_run=run, order=order)
+        mocker.patch(
+            "courses.serializers.v3.courses.create_run_enrollments",
+            return_value=([mocker.Mock()], True),
+        )
+        serializer = CourseRunEnrollmentSerializer(
+            data={"run_id": run.id}, context={"user": user}
+        )
+        assert serializer.is_valid(), serializer.errors
+        result = serializer.save()
+        assert result is not None
