@@ -62,7 +62,7 @@ class VariantOptionsModel(models.Model):
     def clean_language(self):
         """Ensure the language field is set properly."""
 
-        if not self.language:
+        if not self.language or self.language == "":
             return
 
         if self.language not in COURSE_VARIANT_LANGUAGE_OVERRIDE:
@@ -74,6 +74,9 @@ class VariantOptionsModel(models.Model):
     @cached_property
     def language_label(self) -> str:
         """Return the label for the language, using the override if necessary"""
+
+        if not self.language or self.language == "":
+            return ""
 
         return (
             COURSE_VARIANT_LANGUAGE_OVERRIDE[self.language]

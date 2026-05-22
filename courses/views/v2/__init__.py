@@ -77,6 +77,7 @@ from main import features
 from openapi.utils import extend_schema_get_queryset
 from openedx.api import sync_enrollments_with_edx
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
 VPE_MAX_PROGRAMS = 2
@@ -426,6 +427,16 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                 filter=Q(
                     courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
                 ),
+            )
+        )
+
+        # Prefetch the variant sets but filter B2B according to the query params.
+        qp = self.request.query_params
+        variant_b2b_enabled = qp.get("org_id") or qp.get("contract_id")
+        queryset = queryset.prefetch_related(
+            Prefetch(
+                "possible_variant_sets",
+                queryset=SupportedVariant.objects.filter(b2b_only=variant_b2b_enabled),
             )
         )
 
