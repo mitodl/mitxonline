@@ -7,6 +7,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 
 from courses.constants import (
@@ -69,6 +70,16 @@ class VariantOptionsModel(models.Model):
                 pycountry.languages.lookup(self.language)
             except LookupError as lke:
                 raise ValidationError("Course language is invalid") from lke  # noqa: EM101
+
+    @cached_property
+    def language_label(self) -> str:
+        """Return the label for the language, using the override if necessary"""
+
+        return (
+            COURSE_VARIANT_LANGUAGE_OVERRIDE[self.language]
+            if self.language in COURSE_VARIANT_LANGUAGE_OVERRIDE
+            else pycountry.languages.lookup(self.language).name
+        )
 
 
 class SupportedVariant(TimestampedModel, VariantOptionsModel):

@@ -5249,6 +5249,15 @@ components:
         ingest_content_files_for_ai:
           type: boolean
           readOnly: true
+        possible_variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupportedVariant'
+          readOnly: true
+        default_variant:
+          allOf:
+          - $ref: '#/components/schemas/SupportedVariant'
+          readOnly: true
         courseruns:
           type: array
           items:
@@ -5264,6 +5273,7 @@ components:
       - certificate_available
       - certificate_type
       - courseruns
+      - default_variant
       - departments
       - duration
       - id
@@ -5278,6 +5288,7 @@ components:
       - min_weeks
       - next_run_id
       - page
+      - possible_variants
       - programs
       - readable_id
       - required_prerequisites
@@ -7550,6 +7561,60 @@ components:
       - Refunded
       - Review
       - Partially Refunded
+    SupportedVariant:
+      type: object
+      description: Serializer for the SupportedVariant model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        language:
+          type: string
+          readOnly: true
+          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
+            Leave blank for unspecified.
+        variant_length:
+          readOnly: true
+          description: |-
+            Variant: Describes the length of the run (short/long).
+
+            * `` - Normal
+            * `S` - Short
+            * `L` - Long
+          oneOf:
+          - $ref: '#/components/schemas/VariantLengthEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        variant_industry:
+          readOnly: true
+          description: |-
+            Variant: Describes the industry the run is adapted for.
+
+            * `` - Original
+            * `E` - Energy
+            * `F` - Finance
+            * `HC` - Healthcare
+          oneOf:
+          - $ref: '#/components/schemas/VariantIndustryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        active:
+          type: boolean
+          readOnly: true
+        b2b_only:
+          type: boolean
+          readOnly: true
+          title: Set if this variant only applies within a B2B context.
+        default_variant:
+          type: boolean
+          readOnly: true
+          title: Set if this set of options is the default.
+      required:
+      - active
+      - b2b_only
+      - default_variant
+      - id
+      - language
+      - variant_industry
+      - variant_length
     Topic:
       type: object
       description: Serializer for topics used in course pages.
@@ -8702,10 +8767,20 @@ components:
         ingest_content_files_for_ai:
           type: boolean
           readOnly: true
+        possible_variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupportedVariant'
+          readOnly: true
+        default_variant:
+          allOf:
+          - $ref: '#/components/schemas/SupportedVariant'
+          readOnly: true
       required:
       - availability
       - certificate_available
       - certificate_type
+      - default_variant
       - departments
       - duration
       - id
@@ -8719,6 +8794,7 @@ components:
       - min_weeks
       - next_run_id
       - page
+      - possible_variants
       - programs
       - readable_id
       - required_prerequisites

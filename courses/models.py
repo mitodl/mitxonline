@@ -7,9 +7,9 @@ import logging
 import uuid
 from decimal import ROUND_HALF_EVEN, Decimal
 
-import pycountry
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -33,7 +33,6 @@ from wagtail.models import ClusterableModel, Orderable, Page, Revision
 from courses.constants import (
     AVAILABILITY_ANYTIME,
     AVAILABILITY_CHOICES,
-    COURSE_VARIANT_LANGUAGE_OVERRIDE,
     ENROLL_CHANGE_STATUS_CHOICES,
     ENROLLABLE_ITEM_ID_SEPARATOR,
     PROGRAM_DISPLAY_MODE_CHOICES,
@@ -46,7 +45,7 @@ from openedx.constants import (
     EDX_ENROLLMENT_VERIFIED_MODE,
     EDX_ENROLLMENTS_PAID_MODES,
 )
-from variants.models import VariantOptionsModel
+from variants.models import SupportedVariant, VariantOptionsModel
 
 User = get_user_model()
 
@@ -1034,6 +1033,11 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         object_id_field="courseware_object_id",
         content_type_field="courseware_content_type",
     )
+    possible_variants = GenericRelation(
+        "variants.SupportedVariant",
+        object_id_field="object_id",
+        content_type_field="content_type",
+    )
 
     @cached_property
     def course_number(self):
@@ -1117,6 +1121,24 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """
 
         return getattr(self.page, "ingest_content_files_for_ai", False)
+
+    @cached_property
+    def default_variant(self) -> SupportedVariant:
+        """
+        Return the default option set for this course.
+
+        If there's not one, we'll create one.
+        """
+
+        default_variant, _ = SupportedVariant.objects.filter(
+            object_id=self.pk,
+            content_type=ContentType.objects.get_for_model(self),
+            default_variant=True,
+        ).get_or_create(
+            defaults={"variant_object": self, "language": "en", "default_variant": True}
+        )
+
+        return default_variant
 
     def get_first_unexpired_b2b_run(self, user_contracts):
         """
@@ -1546,16 +1568,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         from openedx.api import get_edx_course_modes  # noqa: PLC0415
 
         return get_edx_course_modes(self.courseware_id)
-
-    @cached_property
-    def language_label(self) -> str:
-        """Return the label for the language, using the override if necessary"""
-
-        return (
-            COURSE_VARIANT_LANGUAGE_OVERRIDE[self.language]
-            if self.language in COURSE_VARIANT_LANGUAGE_OVERRIDE
-            else pycountry.languages.lookup(self.language).name
-        )
 
     def __str__(self):
         title = f"{self.courseware_id} | {self.title}"
