@@ -383,8 +383,8 @@ export const makeLearnerRecordProgram = (): LearnerRecordProgram => ({
 })
 
 export const makePartnerSchool = (): PartnerSchool => ({
-  id:    genPartnerSchoolId.next().value,
-  name:  casual.company_name
+  id:   genPartnerSchoolId.next().value,
+  name: casual.company_name
 })
 
 export const makeLearnerRecordShare = (
