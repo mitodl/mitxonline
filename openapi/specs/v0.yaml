@@ -6673,27 +6673,12 @@ components:
         id:
           type: integer
           readOnly: true
-        created_on:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_on:
-          type: string
-          format: date-time
-          readOnly: true
         name:
           type: string
           maxLength: 255
-        email:
-          type: string
-        is_active:
-          type: boolean
       required:
-      - created_on
-      - email
       - id
       - name
-      - updated_on
     PartnerSchoolRequest:
       type: object
       properties:
@@ -6701,13 +6686,7 @@ components:
           type: string
           minLength: 1
           maxLength: 255
-        email:
-          type: string
-          minLength: 1
-        is_active:
-          type: boolean
       required:
-      - email
       - name
     PatchedChangeEmailRequestUpdateRequest:
       type: object
