@@ -81,9 +81,7 @@ def unenroll_learner_from_run(user, course_run, *, keep_failed_enrollments=False
             enrollment_result is the deactivated enrollment on success, None on failure.
             message is a human-readable status string.
     """
-    enrollment = CourseRunEnrollment.objects.filter(
-        user=user, run=course_run
-    ).first()
+    enrollment = CourseRunEnrollment.objects.filter(user=user, run=course_run).first()
     if enrollment is None or not enrollment.active:
         return (
             None,
@@ -142,9 +140,7 @@ def bulk_unenroll_learners(entries, *, keep_failed_enrollments=False):
 
         # Resolve course run (with caching)
         if cw_id not in run_cache:
-            run_cache[cw_id] = CourseRun.objects.filter(
-                courseware_id=cw_id
-            ).first()
+            run_cache[cw_id] = CourseRun.objects.filter(courseware_id=cw_id).first()
         course_run = run_cache[cw_id]
         if course_run is None:
             msg = f"Course run not found: {cw_id}"

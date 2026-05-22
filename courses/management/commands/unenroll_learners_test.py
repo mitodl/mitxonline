@@ -9,10 +9,11 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 
 from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
+from courses.management.utils import bulk_unenroll_learners
 from users.factories import UserFactory
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_bulk_unenroll(mocker):
     """Mock bulk_unenroll_learners to avoid edX API calls"""
     return mocker.patch(
@@ -87,7 +88,12 @@ class TestBulkUnenrollInlineUsers:
             "details": [
                 ("a@b.com", "run-1", "succeeded", "Unenrolled: a@b.com from run-1"),
                 ("b@c.com", "run-1", "failed", "Failed to unenroll b@c.com from run-1"),
-                ("c@d.com", "run-1", "skipped", "No active enrollment for c@d.com in run-1"),
+                (
+                    "c@d.com",
+                    "run-1",
+                    "skipped",
+                    "No active enrollment for c@d.com in run-1",
+                ),
             ],
         }
 
@@ -135,10 +141,12 @@ class TestBulkUnenrollCSV:
             ],
         }
 
-        csv_path = self._write_csv([
-            {"user": "a@b.com", "courseware_id": "run-1"},
-            {"user": "c@d.com", "courseware_id": "run-2"},
-        ])
+        csv_path = self._write_csv(
+            [
+                {"user": "a@b.com", "courseware_id": "run-1"},
+                {"user": "c@d.com", "courseware_id": "run-2"},
+            ]
+        )
 
         out = StringIO()
         call_command("unenroll_learners", csv=csv_path, stdout=out)
@@ -180,10 +188,12 @@ class TestBulkUnenrollCSV:
             ],
         }
 
-        csv_path = self._write_csv([
-            {"user": "", "courseware_id": "course-v1:x+y+z"},
-            {"user": "a@b.com", "courseware_id": "run-1"},
-        ])
+        csv_path = self._write_csv(
+            [
+                {"user": "", "courseware_id": "course-v1:x+y+z"},
+                {"user": "a@b.com", "courseware_id": "run-1"},
+            ]
+        )
 
         out = StringIO()
         call_command("unenroll_learners", csv=csv_path, stdout=out)
@@ -257,8 +267,6 @@ class TestBulkUnenrollLearnersUtil:
 
     def test_successful_unenrollment(self, mocker):
         """Should unenroll active enrollments successfully"""
-        from courses.management.utils import bulk_unenroll_learners
-
         enrollment = CourseRunEnrollmentFactory.create(active=True)
         mocker.patch(
             "courses.management.utils.deactivate_run_enrollment",
@@ -275,8 +283,6 @@ class TestBulkUnenrollLearnersUtil:
 
     def test_user_not_found(self):
         """Should skip when user doesn't exist"""
-        from courses.management.utils import bulk_unenroll_learners
-
         run = CourseRunFactory.create()
         result = bulk_unenroll_learners(
             [("nonexistent@example.com", run.courseware_id)]
@@ -287,20 +293,14 @@ class TestBulkUnenrollLearnersUtil:
 
     def test_course_run_not_found(self):
         """Should skip when course run doesn't exist"""
-        from courses.management.utils import bulk_unenroll_learners
-
         user = UserFactory.create()
-        result = bulk_unenroll_learners(
-            [(user.email, "course-v1:fake+fake+fake")]
-        )
+        result = bulk_unenroll_learners([(user.email, "course-v1:fake+fake+fake")])
 
         assert result["skipped"] == 1
         assert result["succeeded"] == 0
 
     def test_no_active_enrollment(self):
         """Should skip when enrollment is inactive"""
-        from courses.management.utils import bulk_unenroll_learners
-
         enrollment = CourseRunEnrollmentFactory.create(active=False)
         result = bulk_unenroll_learners(
             [(enrollment.user.email, enrollment.run.courseware_id)]
@@ -311,8 +311,6 @@ class TestBulkUnenrollLearnersUtil:
 
     def test_deactivation_failure(self, mocker):
         """Should count as failed when deactivate_run_enrollment returns None"""
-        from courses.management.utils import bulk_unenroll_learners
-
         enrollment = CourseRunEnrollmentFactory.create(active=True)
         mocker.patch(
             "courses.management.utils.deactivate_run_enrollment",
@@ -328,8 +326,6 @@ class TestBulkUnenrollLearnersUtil:
 
     def test_keep_failed_enrollments_passed(self, mocker):
         """Should pass keep_failed_enrollments to deactivate_run_enrollment"""
-        from courses.management.utils import bulk_unenroll_learners
-
         enrollment = CourseRunEnrollmentFactory.create(active=True)
         mock_deactivate = mocker.patch(
             "courses.management.utils.deactivate_run_enrollment",

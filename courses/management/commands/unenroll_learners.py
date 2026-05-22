@@ -84,7 +84,7 @@ class Command(BaseCommand):
                 if not reader.fieldnames or not {"user", "courseware_id"}.issubset(
                     set(reader.fieldnames)
                 ):
-                    raise CommandError(  # noqa: TRY301
+                    raise CommandError(
                         "CSV file must have 'user' and 'courseware_id' columns"  # noqa: EM101
                     )
                 for row_num, row in enumerate(reader, start=2):
@@ -113,11 +113,7 @@ class Command(BaseCommand):
         Returns:
             list[tuple[str, str]]: List of (user_identifier, courseware_id) tuples
         """
-        return [
-            (u.strip(), courseware_id)
-            for u in users_str.split(",")
-            if u.strip()
-        ]
+        return [(u.strip(), courseware_id) for u in users_str.split(",") if u.strip()]
 
     def _dry_run(self, entries):
         """Preview which enrollments would be unenrolled without making changes."""
@@ -136,9 +132,7 @@ class Command(BaseCommand):
                 continue
 
             if cw_id not in run_cache:
-                run_cache[cw_id] = CourseRun.objects.filter(
-                    courseware_id=cw_id
-                ).first()
+                run_cache[cw_id] = CourseRun.objects.filter(courseware_id=cw_id).first()
             course_run = run_cache[cw_id]
             if course_run is None:
                 self.stderr.write(
@@ -196,12 +190,10 @@ class Command(BaseCommand):
             self._dry_run(entries)
             return
 
-        summary = bulk_unenroll_learners(
-            entries, keep_failed_enrollments=keep_failed
-        )
+        summary = bulk_unenroll_learners(entries, keep_failed_enrollments=keep_failed)
 
         # Print details
-        for user_id, cw_id, status, message in summary["details"]:
+        for _user_id, _cw_id, status, message in summary["details"]:
             if status == "succeeded":
                 self.stdout.write(self.style.SUCCESS(f"  {message}"))
             elif status == "skipped":
