@@ -38,8 +38,8 @@ from hubspot_sync.tasks import (
     sync_course_run_certificate_with_hubspot,
     sync_deal_with_hubspot,
     sync_deal_with_hubspot_targeted,
-    sync_program_certificate_with_hubspot,
     sync_product_with_hubspot,
+    sync_program_certificate_with_hubspot,
 )
 from users.factories import UserFactory
 from users.models import User

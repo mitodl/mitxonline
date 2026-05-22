@@ -83,7 +83,9 @@ def test_sync_course_run_certificate_with_hubspot(mocker, settings):
         "hubspot_sync.api._get_cert_contact_association_type_id",
         return_value=27,
     )
-    mock_associate = mocker.patch("hubspot_sync.api._associate_certificate_with_contact")
+    mock_associate = mocker.patch(
+        "hubspot_sync.api._associate_certificate_with_contact"
+    )
     mock_hubspot_api = mocker.patch("hubspot_sync.api.HubspotApi")
     mock_client = mock_hubspot_api.return_value
     mocker.patch(
@@ -125,7 +127,9 @@ def test_sync_program_certificate_with_hubspot(mocker, settings):
         "hubspot_sync.api._get_cert_contact_association_type_id",
         return_value=28,
     )
-    mock_associate = mocker.patch("hubspot_sync.api._associate_certificate_with_contact")
+    mock_associate = mocker.patch(
+        "hubspot_sync.api._associate_certificate_with_contact"
+    )
     mock_hubspot_api = mocker.patch("hubspot_sync.api.HubspotApi")
     mock_client = mock_hubspot_api.return_value
     mocker.patch(

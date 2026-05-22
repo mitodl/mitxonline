@@ -46,9 +46,7 @@ class Command(BaseCommand):
             # Add the name field to the payload for HubSpot API
             payload_with_name = {"name": schema_name, **schema_payload}
             try:
-                schema = hubspot_client.crm.schemas.core_api.create(
-                    payload_with_name
-                )
+                schema = hubspot_client.crm.schemas.core_api.create(payload_with_name)
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"Created schema {schema_name} (objectTypeId={schema.object_type_id})"
@@ -57,9 +55,7 @@ class Command(BaseCommand):
                 created_or_existing[schema_name] = schema
             except Exception as e:
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"Failed to create schema {schema_name}: {e}"
-                    )
+                    self.style.ERROR(f"Failed to create schema {schema_name}: {e}")
                 )
                 raise
 

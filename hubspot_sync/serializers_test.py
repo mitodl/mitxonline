@@ -212,5 +212,3 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
         "pipeline": settings.HUBSPOT_PIPELINE_ID,
         "unique_app_id": expected_unique_app_id,
     }
-
-

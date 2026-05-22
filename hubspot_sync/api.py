@@ -981,12 +981,12 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
         )
         return None
 
-    hubspot_client = HubspotApi(
-        access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
-    )
+    hubspot_client = HubspotApi(access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN)
 
     # Look up the objectTypeId from the custom object name
-    object_type_id = _get_custom_object_type_id_by_name(hubspot_client, object_type_name)
+    object_type_id = _get_custom_object_type_id_by_name(
+        hubspot_client, object_type_name
+    )
     if not object_type_id:
         log.warning(
             "Could not find objectTypeId for custom object %s; skipping sync",
@@ -1061,12 +1061,12 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
         )
         return None
 
-    hubspot_client = HubspotApi(
-        access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
-    )
+    hubspot_client = HubspotApi(access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN)
 
     # Look up the objectTypeId from the custom object name
-    object_type_id = _get_custom_object_type_id_by_name(hubspot_client, object_type_name)
+    object_type_id = _get_custom_object_type_id_by_name(
+        hubspot_client, object_type_name
+    )
     if not object_type_id:
         log.warning(
             "Could not find objectTypeId for custom object %s; skipping sync",
@@ -1112,8 +1112,7 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
             )
         except Exception:
             log.exception(
-                "Failed to associate program certificate %s (hs_id=%s) "
-                "with contact %s",
+                "Failed to associate program certificate %s (hs_id=%s) with contact %s",
                 cert.id,
                 result.id,
                 contact_id,
