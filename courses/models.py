@@ -1033,7 +1033,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         object_id_field="courseware_object_id",
         content_type_field="courseware_content_type",
     )
-    possible_variants = GenericRelation(
+    possible_variant_sets = GenericRelation(
         "variants.SupportedVariant",
         object_id_field="object_id",
         content_type_field="content_type",
@@ -1123,7 +1123,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return getattr(self.page, "ingest_content_files_for_ai", False)
 
     @cached_property
-    def default_variant(self) -> SupportedVariant:
+    def default_variant_set(self) -> SupportedVariant:
         """
         Return the default option set for this course.
 

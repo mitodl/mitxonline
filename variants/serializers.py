@@ -11,7 +11,6 @@ class SupportedVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model = SupportedVariant
         fields = [
-            "id",
             "language",
             "variant_length",
             "variant_industry",
@@ -20,7 +19,6 @@ class SupportedVariantSerializer(serializers.ModelSerializer):
             "default_variant",
         ]
         read_only_fields = [
-            "id",
             "language",
             "variant_length",
             "variant_industry",
