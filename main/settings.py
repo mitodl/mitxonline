@@ -256,6 +256,7 @@ INSTALLED_APPS = (
     # Put our apps after this point
     "main",
     "authentication",
+    "variants",
     "courses",
     "hubspot_sync",
     "mail.apps.MailApp",
