@@ -221,6 +221,15 @@ def test_serialize_program_certificate_available(
     assert data["certificate_available"] is expected
 
 
+def test_serialize_program_with_no_page(mock_context):
+    """Test that a program with no CMS page serializes page as None."""
+    program = ProgramFactory.create(page=None)
+
+    data = ProgramSerializer(instance=program, context=mock_context).data
+
+    assert data["page"] is None
+
+
 def test_serialize_program_with_products(
     mock_context,
     program_with_empty_requirements,  # noqa: F811

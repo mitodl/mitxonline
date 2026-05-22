@@ -183,6 +183,7 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
             "user",
             "uuid",
             "is_revoked",
+            "issue_date",
             "certificate_page",
             "verifiable_credential_json",
         ]
@@ -190,6 +191,7 @@ class BaseCertificateSerializer(serializers.ModelSerializer):
             "user",
             "uuid",
             "is_revoked",
+            "issue_date",
             "certificate_page",
             "verifiable_credential_json",
         ]

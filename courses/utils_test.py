@@ -15,8 +15,8 @@ from courses.factories import (
     CourseRunFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
-    ProgramFactory,  # noqa: F401
-    program_with_requirements,  # noqa: F401
+    ProgramFactory,
+    program_with_requirements,  # noqa: F401,
 )
 from courses.models import Course, CourseRun
 from courses.utils import (
@@ -27,6 +27,7 @@ from courses.utils import (
     get_unenrollable_courses,
     is_contract_order,
     is_uai_course_run,
+    is_uai_order,
 )
 
 
@@ -323,3 +324,44 @@ def test_is_uai_course_run(courseware_id, expected):
     """UAI detection should match expected value across supported key formats."""
     course_run = CourseRunFactory.create(courseware_id=courseware_id)
     assert is_uai_course_run(course_run) is expected
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("purchasable_object", "expected"),
+    [
+        (SimpleNamespace(courseware_id="course-v1:UAI_MIT+1.001x+2025_C12"), True),
+        (SimpleNamespace(readable_id="program-v1:UAI+PROG+2026"), True),
+        (SimpleNamespace(courseware_id="course-v1:MITx+6.00.1x+1T2026"), False),
+        (SimpleNamespace(readable_id="program-v1:MITx+PROG+2026"), False),
+    ],
+)
+def test_is_uai_order_detects_uai_course_runs_and_programs(
+    purchasable_object, expected
+):
+    """UAI order detection should account for both course runs and programs."""
+
+    if hasattr(purchasable_object, "courseware_id"):
+        # Use CourseRunFactory for courseware_id
+        obj = CourseRunFactory.create(courseware_id=purchasable_object.courseware_id)
+    elif hasattr(purchasable_object, "readable_id"):
+        # Use ProgramFactory for readable_id
+        obj = ProgramFactory.create(readable_id=purchasable_object.readable_id)
+    else:
+        obj = purchasable_object
+
+    line = SimpleNamespace(product=SimpleNamespace(purchasable_object=obj))
+    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
+
+    assert is_uai_order(order) is expected
+
+
+def test_is_uai_order_uses_purchased_object_when_available():
+    """UAI order detection should work from line.purchased_object for fulfilled lines."""
+    line = SimpleNamespace(
+        purchased_object=SimpleNamespace(readable_id="program-v1:UAI+PROG+2026"),
+        product=SimpleNamespace(purchasable_object=None),
+    )
+    order = SimpleNamespace(lines=SimpleNamespace(all=lambda: [line]))
+
+    assert is_uai_order(order) is True

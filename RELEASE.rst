@@ -1,6 +1,31 @@
 Release Notes
 =============
 
+Version 1.150.6 (Released May 20, 2026)
+---------------
+
+- Detect UAI programs; prefer purchased_object (#3594)
+
+Version 1.150.5 (Released May 20, 2026)
+---------------
+
+- Add issue_date to certificates api (#3587)
+- fix: make page a nullable property and specs updated (#3426)
+- Skip certificate validation if page revision missing (#3572)
+- Remove unique app id from the line items (#3581)
+- Update dependency authlib to v1.7.1 [SECURITY] (#3590)
+- Add workflow file for zizmor (#3586)
+
+Version 1.150.4 (Released May 18, 2026)
+---------------
+
+- Normalize cart-add deal stage for target account (#3584)
+- Prefer UAI HubSpot pipeline ID in sync (#3582)
+- fix: increase signatories limit for certificate page (#3580)
+- Update dependency ipython to v9 (#3567)
+- Set cart-add dealstage to checkout_abandoned (#3578)
+- feat: add cron job for program certificates (#3557)
+
 Version 1.150.3 (Released May 14, 2026)
 ---------------
 

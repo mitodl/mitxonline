@@ -125,10 +125,18 @@ def test_program_certificate_management_revoke_unrevoke_success(user, revoke, un
     assert certificate.is_revoked is (False if unrevoke else True)  # noqa: SIM211
 
 
+@pytest.mark.parametrize(
+    "force_cert",
+    [
+        True,
+        False,
+    ],
+)
 def test_program_certificate_management_create(
     user,
     program_with_empty_requirements,  # noqa: F811
     mocker,
+    force_cert,
 ):
     """
     Test that create operation for program certificate management command
@@ -162,13 +170,14 @@ def test_program_certificate_management_create(
         create=True,
         program=program_with_empty_requirements.readable_id,
         user=user.edx_username,
+        force=force_cert,
     )
 
     generated_certificates = ProgramCertificate.objects.filter(
         user=user, program=program_with_empty_requirements
     )
 
-    assert generated_certificates.count() == 1
+    assert generated_certificates.count() == (1 if force_cert else 0)
 
 
 def test_program_certificate_management_force_create(

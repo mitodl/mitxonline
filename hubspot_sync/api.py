@@ -758,16 +758,6 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
                 ],
             },
             {
-                "name": "unique_app_id",
-                "label": "Unique App ID",
-                "description": "The unique app ID for the lineitem",
-                "groupName": "lineiteminformation",
-                "type": "string",
-                "fieldType": "text",
-                "hasUniqueValue": True,
-                "hidden": True,
-            },
-            {
                 "name": "enrollment_mode",
                 "label": "Enrollment Mode",
                 "description": "The enrollment mode the user is currently enrolled into the product as.",

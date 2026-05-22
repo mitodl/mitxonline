@@ -54,7 +54,7 @@ class Command(BaseCommand):
                     user = User.objects.filter(username=edx_enrollment.user).first()
                     if user:
                         (
-                            _,
+                            enrollment,
                             created,
                         ) = CourseRunEnrollment.all_objects.get_or_create(
                             user=user,
@@ -68,6 +68,7 @@ class Command(BaseCommand):
                             ),
                         )
                         if created:
+                            enrollment.save_and_log(None)
                             created_count[courseware_id] += 1
 
                 except:  # noqa: PERF203, E722
