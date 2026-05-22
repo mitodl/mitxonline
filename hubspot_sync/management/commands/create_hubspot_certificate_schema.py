@@ -43,15 +43,25 @@ class Command(BaseCommand):
                 continue
 
             wait_for_hubspot_rate_limit()
-            schema = hubspot_client.crm.schemas.core_api.create(
-                object_schema=schema_payload
-            )
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Created schema {schema_name} (objectTypeId={schema.object_type_id})"
+            # Add the name field to the payload for HubSpot API
+            payload_with_name = {"name": schema_name, **schema_payload}
+            try:
+                schema = hubspot_client.crm.schemas.core_api.create(
+                    payload_with_name
                 )
-            )
-            created_or_existing[schema_name] = schema
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Created schema {schema_name} (objectTypeId={schema.object_type_id})"
+                    )
+                )
+                created_or_existing[schema_name] = schema
+            except Exception as e:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Failed to create schema {schema_name}: {e}"
+                    )
+                )
+                raise
 
         self.stdout.write("\nCertificate schema details:\n")
         env_output = []
@@ -59,35 +69,52 @@ class Command(BaseCommand):
         for schema_name, schema in created_or_existing.items():
             object_type_id = schema.object_type_id
 
-            wait_for_hubspot_rate_limit()
-            assoc_types = hubspot_client.crm.associations.v4.definition_api.get_all(
-                from_object_type=object_type_id,
-                to_object_type=HubspotObjectType.CONTACTS.value,
-            )
+            # Try to fetch the association type ID, but don't fail if unavailable
             assoc_type_id = None
-            if getattr(assoc_types, "results", None):
-                assoc_type_id = assoc_types.results[0].type_id
+            try:
+                wait_for_hubspot_rate_limit()
+                assoc_types = hubspot_client.crm.associations.v4.definition_api.get_all(
+                    from_object_type=object_type_id,
+                    to_object_type=HubspotObjectType.CONTACTS.value,
+                )
+                if getattr(assoc_types, "results", None):
+                    assoc_type_id = assoc_types.results[0].type_id
+            except Exception as e:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Could not fetch association type ID for {schema_name}: {e}"
+                    )
+                )
 
             self.stdout.write(f"- {schema_name}")
             self.stdout.write(f"  objectTypeId: {object_type_id}")
-            self.stdout.write(f"  contact association typeId: {assoc_type_id}")
+            if assoc_type_id:
+                self.stdout.write(f"  contact association typeId: {assoc_type_id}")
+            else:
+                self.stdout.write(
+                    "  contact association typeId: (will need to be set manually or auto-created on first sync)"
+                )
 
             if schema_name == "course_run_certificate":
                 env_output.extend(
                     [
                         f"HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE={schema_name}",
-                        "HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID="
-                        f"{assoc_type_id}",
                     ]
                 )
+                if assoc_type_id:
+                    env_output.append(
+                        f"HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID={assoc_type_id}"
+                    )
             elif schema_name == "program_certificate":
                 env_output.extend(
                     [
                         f"HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE={schema_name}",
-                        "HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID="
-                        f"{assoc_type_id}",
                     ]
                 )
+                if assoc_type_id:
+                    env_output.append(
+                        f"HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID={assoc_type_id}"
+                    )
 
         self.stdout.write("\nAdd/update these environment settings:\n")
         for env_line in env_output:

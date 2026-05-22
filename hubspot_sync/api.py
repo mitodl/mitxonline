@@ -896,24 +896,42 @@ def _associate_certificate_with_contact(
     cert_object_type: str,
     cert_hubspot_id: str,
     contact_hubspot_id: str,
-    association_type_id: int,
+    association_type_id: int = None,  # noqa: ARG001
 ) -> None:
-    """Create a v4 association between a certificate custom object and a contact."""
-    from hubspot.crm.associations.v4.models import AssociationSpec  # noqa: PLC0415
+    """Create a v4 association between a certificate custom object and a contact.
 
+    Uses create_default() which auto-creates associations with the default type.
+    The association_type_id parameter is kept for backward compatibility but not used.
+    """
     wait_for_hubspot_rate_limit()
-    hubspot_client.crm.associations.v4.basic_api.create(
+    hubspot_client.crm.associations.v4.basic_api.create_default(
         from_object_type=cert_object_type,
         from_object_id=cert_hubspot_id,
         to_object_type=HubspotObjectType.CONTACTS.value,
         to_object_id=contact_hubspot_id,
-        association_spec=[
-            AssociationSpec(
-                association_category="HUBSPOT_DEFINED",
-                association_type_id=association_type_id,
-            )
-        ],
     )
+
+
+def _get_custom_object_type_id_by_name(
+    hubspot_client: HubspotApi,
+    object_type_name: str,
+) -> str | None:
+    """Look up the objectTypeId (e.g., '2-62918642') from the custom object name.
+
+    Returns the objectTypeId needed for API calls, or None if not found.
+    """
+    try:
+        wait_for_hubspot_rate_limit()
+        schemas = hubspot_client.crm.schemas.core_api.get_all()
+        for schema in getattr(schemas, "results", []):
+            if schema.name == object_type_name:
+                return schema.object_type_id
+    except Exception:
+        log.exception(
+            "Failed to fetch objectTypeId for custom object name %s",
+            object_type_name,
+        )
+    return None
 
 
 def _get_cert_contact_association_type_id(
@@ -953,13 +971,26 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     Returns:
         SimplePublicObject: The HubSpot object, or None if the object type is not configured.
     """
-    object_type = getattr(
+    object_type_name = getattr(
         settings, "HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE", None
     )
-    if not object_type or not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
+    if not object_type_name or not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         log.debug(
             "Skipping course run certificate HubSpot sync: "
             "HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE is not configured."
+        )
+        return None
+
+    hubspot_client = HubspotApi(
+        access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
+    )
+
+    # Look up the objectTypeId from the custom object name
+    object_type_id = _get_custom_object_type_id_by_name(hubspot_client, object_type_name)
+    if not object_type_id:
+        log.warning(
+            "Could not find objectTypeId for custom object %s; skipping sync",
+            object_type_name,
         )
         return None
 
@@ -973,24 +1004,20 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
         "is_revoked": "true" if cert.is_revoked else "false",
     }
 
-    hubspot_client = HubspotApi(
-        access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
-    )
-
     existing_id = _find_hubspot_certificate_by_unique_app_id(
-        hubspot_client, object_type, unique_app_id
+        hubspot_client, object_type_id, unique_app_id
     )
 
     wait_for_hubspot_rate_limit()
     if existing_id:
         result = hubspot_client.crm.objects.basic_api.update(
-            object_type=object_type,
+            object_type=object_type_id,
             object_id=existing_id,
             simple_public_object_input=SimplePublicObjectInput(properties=properties),
         )
     else:
         result = hubspot_client.crm.objects.basic_api.create(
-            object_type=object_type,
+            object_type=object_type_id,
             simple_public_object_input_for_create=SimplePublicObjectInput(
                 properties=properties
             ),
@@ -999,31 +1026,17 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     # Associate with the owning contact.
     contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
     if contact_id:
-        assoc_type_id = _get_cert_contact_association_type_id(
-            hubspot_client,
-            object_type,
-            "HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID",
-        )
-        if assoc_type_id:
-            try:
-                _associate_certificate_with_contact(
-                    hubspot_client, object_type, result.id, contact_id, assoc_type_id
-                )
-            except Exception:
-                log.exception(
-                    "Failed to associate course run certificate %s (hs_id=%s) "
-                    "with contact %s",
-                    cert.id,
-                    result.id,
-                    contact_id,
-                )
-        else:
-            log.warning(
-                "Skipping contact association for course run certificate %s: "
-                "HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID is not set. "
-                "Run the create_hubspot_certificate_schema management command and "
-                "add the returned association_type_id to settings.",
+        try:
+            _associate_certificate_with_contact(
+                hubspot_client, object_type_id, result.id, contact_id
+            )
+        except Exception:
+            log.exception(
+                "Failed to associate course run certificate %s (hs_id=%s) "
+                "with contact %s",
                 cert.id,
+                result.id,
+                contact_id,
             )
 
     return result
@@ -1038,13 +1051,26 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     Returns:
         SimplePublicObject: The HubSpot object, or None if the object type is not configured.
     """
-    object_type = getattr(
+    object_type_name = getattr(
         settings, "HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE", None
     )
-    if not object_type or not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
+    if not object_type_name or not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         log.debug(
             "Skipping program certificate HubSpot sync: "
             "HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE is not configured."
+        )
+        return None
+
+    hubspot_client = HubspotApi(
+        access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
+    )
+
+    # Look up the objectTypeId from the custom object name
+    object_type_id = _get_custom_object_type_id_by_name(hubspot_client, object_type_name)
+    if not object_type_id:
+        log.warning(
+            "Could not find objectTypeId for custom object %s; skipping sync",
+            object_type_name,
         )
         return None
 
@@ -1058,24 +1084,20 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
         "is_revoked": "true" if cert.is_revoked else "false",
     }
 
-    hubspot_client = HubspotApi(
-        access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN
-    )
-
     existing_id = _find_hubspot_certificate_by_unique_app_id(
-        hubspot_client, object_type, unique_app_id
+        hubspot_client, object_type_id, unique_app_id
     )
 
     wait_for_hubspot_rate_limit()
     if existing_id:
         result = hubspot_client.crm.objects.basic_api.update(
-            object_type=object_type,
+            object_type=object_type_id,
             object_id=existing_id,
             simple_public_object_input=SimplePublicObjectInput(properties=properties),
         )
     else:
         result = hubspot_client.crm.objects.basic_api.create(
-            object_type=object_type,
+            object_type=object_type_id,
             simple_public_object_input_for_create=SimplePublicObjectInput(
                 properties=properties
             ),
@@ -1084,31 +1106,17 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     # Associate with the owning contact.
     contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
     if contact_id:
-        assoc_type_id = _get_cert_contact_association_type_id(
-            hubspot_client,
-            object_type,
-            "HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID",
-        )
-        if assoc_type_id:
-            try:
-                _associate_certificate_with_contact(
-                    hubspot_client, object_type, result.id, contact_id, assoc_type_id
-                )
-            except Exception:
-                log.exception(
-                    "Failed to associate program certificate %s (hs_id=%s) "
-                    "with contact %s",
-                    cert.id,
-                    result.id,
-                    contact_id,
-                )
-        else:
-            log.warning(
-                "Skipping contact association for program certificate %s: "
-                "HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID is not set. "
-                "Run the create_hubspot_certificate_schema management command and "
-                "add the returned association_type_id to settings.",
+        try:
+            _associate_certificate_with_contact(
+                hubspot_client, object_type_id, result.id, contact_id
+            )
+        except Exception:
+            log.exception(
+                "Failed to associate program certificate %s (hs_id=%s) "
+                "with contact %s",
                 cert.id,
+                result.id,
+                contact_id,
             )
 
     return result
