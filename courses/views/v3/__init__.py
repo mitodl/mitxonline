@@ -417,7 +417,7 @@ def get_course_outline(request, course_id):  # noqa: ARG001
 def get_course_variant_runs(request):
     """Get the variant runs for a course with filtering"""
 
-    course_ids = request.query_params.get("course_id", False)
+    course_ids = request.query_params.getlist("course_id")
     contract = request.query_params.get("contract", None)
     language = request.query_params.get("language", "")
     length = request.query_params.get("length", "")
@@ -436,7 +436,7 @@ def get_course_variant_runs(request):
         )
 
     try:
-        course_ids = [int(course_id) for course_id in course_ids.split(",")]
+        course_ids = [int(course_id) for course_id in course_ids]
         contract = int(contract)
     except ValueError:
         return Response(
