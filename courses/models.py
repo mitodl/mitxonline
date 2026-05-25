@@ -1124,21 +1124,13 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
     @cached_property
     def default_variant_set(self) -> SupportedVariant:
-        """
-        Return the default option set for this course.
+        """Return the default option set for this course."""
 
-        If there's not one, we'll create one.
-        """
-
-        default_variant, _ = SupportedVariant.objects.filter(
+        return SupportedVariant.objects.filter(
             object_id=self.pk,
             content_type=ContentType.objects.get_for_model(self),
             default_variant=True,
-        ).get_or_create(
-            defaults={"variant_object": self, "language": "en", "default_variant": True}
-        )
-
-        return default_variant
+        ).first()
 
     def get_first_unexpired_b2b_run(self, user_contracts):
         """
@@ -1583,6 +1575,8 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
         1. Later than end_date if end_date is set
         2. Later than start_date if start_date is set
         """
+        self.clean_language()
+
         if not self.expiration_date:
             return
 
@@ -1591,8 +1585,6 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
 
         if self.end_date and self.expiration_date < self.end_date:
             raise ValidationError("Expiration date must be later than end date.")  # noqa: EM101
-
-        self.clean_language()
 
     def save(
         self,
