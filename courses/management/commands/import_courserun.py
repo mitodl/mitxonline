@@ -20,9 +20,15 @@ create_courseware_page command for the course run.
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.management import BaseCommand
 
 from courses.api import import_courserun_from_edx
+from courses.constants import (
+    COURSE_VARIANT_INDUSTRY,
+    COURSE_VARIANT_LANGUAGE,
+    COURSE_VARIANT_LENGTH,
+)
 from courses.models import Program
 from openedx.api import get_edx_api_course_detail_client
 
@@ -30,6 +36,10 @@ try:
     from b2b.models import ContractPage
 except ImportError:
     ContractPage = None
+
+INDUSTRY_OPTS = [opt[0] for opt in COURSE_VARIANT_INDUSTRY]
+LENGTH_OPTS = [opt[0] for opt in COURSE_VARIANT_LENGTH]
+LANG_OPTS = [opt[0] for opt in COURSE_VARIANT_LANGUAGE]
 
 
 class Command(BaseCommand):
@@ -153,12 +163,29 @@ class Command(BaseCommand):
             "--language",
             "--lang",
             type=str,
-            help="Set the language for the course run.",
+            help='Set the language for the course run. Defaults to "en".',
+            choices=LANG_OPTS,
+            default="en",
         )
         parser.add_argument(
             "--primary-lang",
             action="store_true",
             help="Set this course run as the default for the language. Requires a language to be set.",
+        )
+
+        parser.add_argument(
+            "--length",
+            "--len",
+            type=str,
+            choices=LENGTH_OPTS,
+            help="Customization option: course content length.",
+        )
+        parser.add_argument(
+            "--industry",
+            "--ind",
+            type=str,
+            choices=LENGTH_OPTS,
+            help="Customization option: course industry focus.",
         )
 
     def _resolve_contract(self, contract_identifier):
@@ -309,6 +336,10 @@ class Command(BaseCommand):
 
             run, page, product = run_data
 
+            run.variant_industry = kwargs.get("industry", "")
+            run.variant_length = kwargs.get("length", "")
+            run.save()
+
             if kwargs.get("language", False):
                 run.language = kwargs.get("language")
                 run.is_primary_language = kwargs.get("primary_lang", False)
@@ -322,7 +353,14 @@ class Command(BaseCommand):
                         )
                     )
 
-                run.save()
+                try:
+                    run.save()
+                except ValidationError:
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"ERROR: Language code {run.language} specified is invalid, cannot set."
+                        )
+                    )
 
             success_count += 1
             self.stdout.write(
@@ -337,6 +375,13 @@ class Command(BaseCommand):
             if product:
                 self.stdout.write(
                     self.style.SUCCESS(f"\t --> Created product {product}")
+                )
+
+            if run and not run.course.validate_variant_run(run):
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Created run {run.courseware_id} is not a valid variant for course {run.course.readable_id}. Consider adjusting the run settings or course variant options."
+                    )
                 )
 
         self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))

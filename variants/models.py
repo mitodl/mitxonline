@@ -169,3 +169,12 @@ class SupportedVariant(TimestampedModel, VariantOptionsModel):
             using=using,
             update_fields=update_fields,
         )
+
+    def to_q_filter(self):
+        """Return the options as a Q filter."""
+
+        return (
+            models.Q(language=self.language)
+            & models.Q(variant_industry=self.variant_industry)
+            & models.Q(variant_length=self.variant_length)
+        )

@@ -1123,7 +1123,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return getattr(self.page, "ingest_content_files_for_ai", False)
 
     @cached_property
-    def default_variant_set(self) -> SupportedVariant:
+    def default_variant_options(self) -> SupportedVariant:
         """Return the default option set for this course."""
 
         return SupportedVariant.objects.filter(
@@ -1271,6 +1271,19 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             courseruns = filter(lambda run: run.b2b_contract_id is None, courseruns)
 
         return list(courseruns)
+
+    def validate_variant_run(self, run) -> bool:
+        """Validate that the run matches a configured variant set"""
+
+        return (
+            run.course.id == self.id
+            and self.possible_variant_sets.filter(
+                language=run.language,
+                variant_length=run.variant_length,
+                variant_industry=run.variant_industry,
+                b2b_only=bool(run.b2b_contract),
+            ).exists()
+        )
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
