@@ -134,6 +134,7 @@ def test_serialize_course(  # noqa: PLR0913
             "language_options": CourseRunLanguageOptionSerializer(
                 course.courseruns.all(), many=True
             ).data,
+            "possible_variant_sets": [],
         },
         ignore_order=True,
     )
