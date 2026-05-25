@@ -435,6 +435,15 @@ def get_course_variant_runs(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    try:
+        course_ids = [int(course_id) for course_id in course_ids.split(",")]
+        contract = int(contract)
+    except ValueError:
+        return Response(
+            {"detail": "Must specify valid contract and/or course ID(s)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     if (
         not request.user.is_superuser
         and not request.user.b2b_contracts.filter(id=contract).exists()
@@ -445,8 +454,6 @@ def get_course_variant_runs(request):
         )
 
     course_ct = ContentType.objects.get_for_model(Course)
-
-    course_ids = [int(course_id) for course_id in course_ids.split(",")]
 
     courses = Course.objects.filter(pk__in=course_ids)
 
@@ -485,7 +492,7 @@ def get_course_variant_runs(request):
                 & Q(variant_length=default_variant.variant_length)
                 & Q(variant_industry=default_variant.variant_industry)
             )
-            runs_qs = runs_qs.filter(Q(default_variant_filter) | Q(variant_filter))
+            runs_qs = runs_qs.filter(default_variant_filter | variant_filter)
         else:
             runs_qs = runs_qs.filter(variant_filter)
 
