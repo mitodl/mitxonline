@@ -132,6 +132,11 @@ class SupportedVariant(TimestampedModel, VariantOptionsModel):
                 nulls_distinct=True,
                 name="unique_default_primary_per_object",
             ),
+            models.CheckConstraint(
+                condition=models.Q(default_variant=False)
+                | (models.Q(default_variant=True) & models.Q(b2b_only=False)),
+                name="check_default_not_b2b",
+            ),
         ]
 
     def __str__(self):

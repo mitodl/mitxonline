@@ -107,4 +107,15 @@ class Migration(migrations.Migration):
                 nulls_distinct=True,
             ),
         ),
+        migrations.AddConstraint(
+            model_name="supportedvariant",
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    ("default_variant", False),
+                    models.Q(("default_variant", True), ("b2b_only", False)),
+                    _connector="OR",
+                ),
+                name="check_default_not_b2b",
+            ),
+        ),
     ]
