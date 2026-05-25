@@ -37,6 +37,7 @@ def backwards_func(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("courses", "0095_add_courserun_course_variant_options"),
+        ("variants", "0001_add_supported_variant_model"),
     ]
 
     operations = [migrations.RunPython(forwards_func, backwards_func)]
