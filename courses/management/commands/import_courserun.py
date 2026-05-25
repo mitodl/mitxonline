@@ -184,7 +184,7 @@ class Command(BaseCommand):
             "--industry",
             "--ind",
             type=str,
-            choices=LENGTH_OPTS,
+            choices=INDUSTRY_OPTS,
             help="Customization option: course industry focus.",
         )
 
