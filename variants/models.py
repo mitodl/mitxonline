@@ -1,6 +1,7 @@
 """Models for the variants app."""
 
 import json
+import logging
 
 import pycountry
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -15,6 +16,8 @@ from courses.constants import (
     COURSE_VARIANT_LANGUAGE_OVERRIDE,
     COURSE_VARIANT_LENGTH,
 )
+
+log = logging.getLogger(__name__)
 
 
 def valid_variant_objects():
@@ -78,11 +81,15 @@ class VariantOptionsModel(models.Model):
         if not self.language or self.language == "":
             return ""
 
-        return (
-            COURSE_VARIANT_LANGUAGE_OVERRIDE[self.language]
-            if self.language in COURSE_VARIANT_LANGUAGE_OVERRIDE
-            else pycountry.languages.lookup(self.language).name
-        )
+        try:
+            return (
+                COURSE_VARIANT_LANGUAGE_OVERRIDE[self.language]
+                if self.language in COURSE_VARIANT_LANGUAGE_OVERRIDE
+                else pycountry.languages.lookup(self.language).name
+            )
+        except LookupError:
+            log.exception("Invalid language code for %s", self)
+            return "INVALID"
 
 
 class SupportedVariant(TimestampedModel, VariantOptionsModel):
@@ -111,6 +118,21 @@ class SupportedVariant(TimestampedModel, VariantOptionsModel):
         default=False,
         blank=True,
     )
+
+    class Meta:
+        """Meta opts for the model"""
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "object_id",
+                    "content_type",
+                ],
+                condition=models.Q(default_variant=True),
+                nulls_distinct=True,
+                name="unique_default_primary_per_object",
+            ),
+        ]
 
     def __str__(self):
         """Return variant opts as a JSON string."""

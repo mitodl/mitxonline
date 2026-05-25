@@ -98,4 +98,13 @@ class Migration(migrations.Migration):
                 "abstract": False,
             },
         ),
+        migrations.AddConstraint(
+            model_name="supportedvariant",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("default_variant", True)),
+                fields=("object_id", "content_type"),
+                name="unique_default_primary_per_object",
+                nulls_distinct=True,
+            ),
+        ),
     ]

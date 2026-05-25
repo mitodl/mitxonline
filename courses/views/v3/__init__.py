@@ -473,23 +473,26 @@ def get_course_variant_runs(request):
     for course in courses:
         default_variant = [
             variant for variant in default_variants if variant.object_id == course.id
-        ].pop()
-        default_variant_filter = (
-            Q(language=default_variant.language)
-            & Q(variant_length=default_variant.variant_length)
-            & Q(variant_industry=default_variant.variant_industry)
+        ]
+        runs_qs = get_enrollable_courseruns_qs(valid_courses=[course]).filter(
+            b2b_contract_id=contract
         )
-        runs_qs = (
-            get_enrollable_courseruns_qs(valid_courses=[course])
-            .filter(Q(default_variant_filter) | Q(variant_filter))
-            .filter(b2b_contract_id=contract)
-            .all()
-        )
+
+        if len(default_variant) > 0:
+            default_variant = default_variant.pop()
+            default_variant_filter = (
+                Q(language=default_variant.language)
+                & Q(variant_length=default_variant.variant_length)
+                & Q(variant_industry=default_variant.variant_industry)
+            )
+            runs_qs = runs_qs.filter(Q(default_variant_filter) | Q(variant_filter))
+        else:
+            runs_qs = runs_qs.filter(variant_filter)
 
         output.append(
             {
                 "id": course.id,
-                "courseruns": runs_qs,
+                "courseruns": runs_qs.all(),
             }
         )
 
