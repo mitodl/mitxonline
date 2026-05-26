@@ -17,6 +17,13 @@ from courses.models import (
 from hubspot_sync import tasks as hubspot_tasks
 
 
+def upsert_custom_properties():
+    """Proxy kept for backward compatibility with tests patching this symbol."""
+    from hubspot_sync.api import upsert_custom_properties as _upsert_custom_properties  # noqa: PLC0415
+
+    return _upsert_custom_properties()
+
+
 @receiver(
     post_save,
     sender=CourseRunCertificate,

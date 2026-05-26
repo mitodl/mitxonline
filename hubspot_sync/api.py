@@ -848,6 +848,70 @@ def upsert_custom_properties():
             sync_object_property(ecommerce_object_type, obj_property)
 
 
+def _get_course_run_certificate_hubspot_property() -> dict:
+    """Build the legacy contact property definition for course run certificates.
+
+    Retained for backward compatibility with tests and admin flows that still
+    reference the old contact-property-based implementation.
+    """
+    from courses.models import CourseRun  # noqa: PLC0415
+
+    options = []
+    for idx, course_run in enumerate(CourseRun.objects.order_by("id")):
+        sanitized_title = course_run.title.replace(";", "")
+        option_value = f"{course_run.courseware_id} - {sanitized_title}"
+        options.append(
+            {
+                "value": option_value,
+                "label": option_value,
+                "displayOrder": idx,
+                "hidden": False,
+            }
+        )
+
+    return {
+        "name": "course_run_certificates",
+        "label": "Course Run Certificates",
+        "description": "Course run certificates earned by user",
+        "groupName": "contactinformation",
+        "type": "enumeration",
+        "fieldType": "checkbox",
+        "options": options,
+    }
+
+
+def _get_program_certificate_hubspot_property() -> dict:
+    """Build the legacy contact property definition for program certificates.
+
+    Retained for backward compatibility with tests and admin flows that still
+    reference the old contact-property-based implementation.
+    """
+    from courses.models import Program  # noqa: PLC0415
+
+    options = []
+    for idx, program in enumerate(Program.objects.order_by("id")):
+        sanitized_title = program.title.replace(";", "")
+        option_value = f"{program.readable_id} - {sanitized_title}"
+        options.append(
+            {
+                "value": option_value,
+                "label": option_value,
+                "displayOrder": idx,
+                "hidden": False,
+            }
+        )
+
+    return {
+        "name": "program_certificates",
+        "label": "Program Certificates",
+        "description": "Program certificates earned by user",
+        "groupName": "contactinformation",
+        "type": "enumeration",
+        "fieldType": "checkbox",
+        "options": options,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Certificate custom object sync helpers
 # ---------------------------------------------------------------------------
@@ -896,7 +960,7 @@ def _associate_certificate_with_contact(
     cert_object_type: str,
     cert_hubspot_id: str,
     contact_hubspot_id: str,
-    association_type_id: int = None,  # noqa: ARG001
+    association_type_id: int | None = None,  # noqa: ARG001
 ) -> None:
     """Create a v4 association between a certificate custom object and a contact.
 
@@ -974,7 +1038,7 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     object_type_name = getattr(
         settings, "HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE", None
     )
-    if not object_type_name or not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
+    if not object_type_name:
         log.debug(
             "Skipping course run certificate HubSpot sync: "
             "HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE is not configured."
@@ -989,10 +1053,10 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     )
     if not object_type_id:
         log.warning(
-            "Could not find objectTypeId for custom object %s; skipping sync",
+            "Could not find objectTypeId for custom object %s; "
+            "falling back to object type name",
             object_type_name,
         )
-        return None
 
     unique_app_id = _format_cert_unique_app_id("crc", cert.id)
     properties = {
@@ -1005,19 +1069,19 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     }
 
     existing_id = _find_hubspot_certificate_by_unique_app_id(
-        hubspot_client, object_type_id, unique_app_id
+        hubspot_client, object_type, unique_app_id
     )
 
     wait_for_hubspot_rate_limit()
     if existing_id:
         result = hubspot_client.crm.objects.basic_api.update(
-            object_type=object_type_id,
+            object_type=object_type,
             object_id=existing_id,
             simple_public_object_input=SimplePublicObjectInput(properties=properties),
         )
     else:
         result = hubspot_client.crm.objects.basic_api.create(
-            object_type=object_type_id,
+            object_type=object_type,
             simple_public_object_input_for_create=SimplePublicObjectInput(
                 properties=properties
             ),
@@ -1026,9 +1090,18 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     # Associate with the owning contact.
     contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
     if contact_id:
+        association_type_id = _get_cert_contact_association_type_id(
+            hubspot_client,
+            object_type_name,
+            "HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID",
+        )
         try:
             _associate_certificate_with_contact(
-                hubspot_client, object_type_id, result.id, contact_id
+                hubspot_client,
+                object_type_name,
+                result.id,
+                contact_id,
+                association_type_id,
             )
         except Exception:
             log.exception(
@@ -1054,7 +1127,7 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     object_type_name = getattr(
         settings, "HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE", None
     )
-    if not object_type_name or not settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
+    if not object_type_name:
         log.debug(
             "Skipping program certificate HubSpot sync: "
             "HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE is not configured."
@@ -1069,10 +1142,10 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     )
     if not object_type_id:
         log.warning(
-            "Could not find objectTypeId for custom object %s; skipping sync",
+            "Could not find objectTypeId for custom object %s; "
+            "falling back to object type name",
             object_type_name,
         )
-        return None
 
     unique_app_id = _format_cert_unique_app_id("pgc", cert.id)
     properties = {
@@ -1085,19 +1158,19 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     }
 
     existing_id = _find_hubspot_certificate_by_unique_app_id(
-        hubspot_client, object_type_id, unique_app_id
+        hubspot_client, object_type, unique_app_id
     )
 
     wait_for_hubspot_rate_limit()
     if existing_id:
         result = hubspot_client.crm.objects.basic_api.update(
-            object_type=object_type_id,
+            object_type=object_type,
             object_id=existing_id,
             simple_public_object_input=SimplePublicObjectInput(properties=properties),
         )
     else:
         result = hubspot_client.crm.objects.basic_api.create(
-            object_type=object_type_id,
+            object_type=object_type,
             simple_public_object_input_for_create=SimplePublicObjectInput(
                 properties=properties
             ),
@@ -1106,9 +1179,18 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     # Associate with the owning contact.
     contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
     if contact_id:
+        association_type_id = _get_cert_contact_association_type_id(
+            hubspot_client,
+            object_type_name,
+            "HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID",
+        )
         try:
             _associate_certificate_with_contact(
-                hubspot_client, object_type_id, result.id, contact_id
+                hubspot_client,
+                object_type_name,
+                result.id,
+                contact_id,
+                association_type_id,
             )
         except Exception:
             log.exception(
