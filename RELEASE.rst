@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.150.7 (Released May 26, 2026)
+---------------
+
+- Fix consideration for program certificate generation (#3597)
+- Update Learner Program Record Styling and remove header (#3593)
+
 Version 1.150.6 (Released May 20, 2026)
 ---------------
 
