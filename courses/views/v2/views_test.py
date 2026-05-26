@@ -2474,7 +2474,7 @@ def test_correct_courserun_languages(user_drf_client, primary):
         start_date=start_date,
         enrollment_start=start_date,
         live=True,
-        language="en" if primary in ["reg", "transreg"] else "",
+        language="en",
         is_primary_language=(primary == "reg"),
     )
 
@@ -2498,7 +2498,7 @@ def test_correct_courserun_languages(user_drf_client, primary):
         start_date=start_date,
         enrollment_start=start_date,
         live=True,
-        language="en" if primary == "source" else "",
+        language="en",
         is_primary_language=(primary == "source"),
         is_source_run=True,
     )
