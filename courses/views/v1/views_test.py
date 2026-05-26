@@ -1234,7 +1234,9 @@ def test_share_learner_record(user_drf_client, user, mocker):
     """The learner record share endpoint should create an active anonymous share."""
     enrollment = ProgramEnrollmentFactory.create(user=user)
     partner_school = PartnerSchoolFactory.create()
-    patched_send_email = mocker.patch("courses.views.v1.send_partner_school_email.delay")
+    patched_send_email = mocker.patch(
+        "courses.views.v1.send_partner_school_email.delay"
+    )
 
     resp = user_drf_client.post(
         reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
@@ -1245,12 +1247,15 @@ def test_share_learner_record(user_drf_client, user, mocker):
     assert resp.json()["partner_schools"] == [
         {"id": partner_school.id, "name": partner_school.name}
     ]
-    assert LearnerProgramRecordShare.objects.filter(
-        user=user,
-        program=enrollment.program,
-        partner_school=None,
-        is_active=True,
-    ).count() == 1
+    assert (
+        LearnerProgramRecordShare.objects.filter(
+            user=user,
+            program=enrollment.program,
+            partner_school=None,
+            is_active=True,
+        ).count()
+        == 1
+    )
     patched_send_email.assert_not_called()
 
 
@@ -1258,7 +1263,9 @@ def test_share_learner_record_partner_school(user_drf_client, user, mocker):
     """The learner record share endpoint should create an active partner school share."""
     enrollment = ProgramEnrollmentFactory.create(user=user)
     partner_school = PartnerSchoolFactory.create()
-    patched_send_email = mocker.patch("courses.views.v1.send_partner_school_email.delay")
+    patched_send_email = mocker.patch(
+        "courses.views.v1.send_partner_school_email.delay"
+    )
 
     resp = user_drf_client.post(
         reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
