@@ -211,8 +211,6 @@ class TestImportCourserunCommand:
         assert courserun_qs.exists()
         courserun = courserun_qs.get()
         assert courserun.language != "qq"
-        assert courserun.variant_length == "S"
-        assert courserun.variant_industry == "E"
 
     @pytest.mark.parametrize(
         "valid_variant",
@@ -266,3 +264,10 @@ class TestImportCourserunCommand:
         assert "Created new run" in std_out_str
         if not valid_variant:
             assert "not a valid variant" in std_out_str
+
+        courserun = CourseRun.objects.get(
+            courseware_id=mock_edx_course_detail.course_id
+        )
+
+        assert courserun.variant_length == "S"
+        assert courserun.variant_industry == "E"

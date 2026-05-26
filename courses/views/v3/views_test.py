@@ -97,6 +97,9 @@ def test_user_enrollments_detail(
             },
             "is_primary_language": enrollment.run.is_primary_language,
             "language": enrollment.run.language,
+            "language_label": enrollment.run.language_label,
+            "variant_industry": enrollment.run.variant_industry,
+            "variant_length": enrollment.run.variant_length,
         },
         "edx_emails_subscription": enrollment.edx_emails_subscription,
         "grades": [
@@ -168,6 +171,9 @@ def test_user_enrollments_list(
                 },
                 "is_primary_language": enrollment.run.is_primary_language,
                 "language": enrollment.run.language,
+                "language_label": enrollment.run.language_label,
+                "variant_industry": enrollment.run.variant_industry,
+                "variant_length": enrollment.run.variant_length,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
@@ -343,6 +349,9 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 },
                 "is_primary_language": enrollment.run.is_primary_language,
                 "language": enrollment.run.language,
+                "language_label": enrollment.run.language_label,
+                "variant_industry": enrollment.run.variant_industry,
+                "variant_length": enrollment.run.variant_length,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
@@ -416,6 +425,9 @@ def test_user_enrollments_list_filter_exclude_b2b(
                 },
                 "is_primary_language": enrollment.run.is_primary_language,
                 "language": enrollment.run.language,
+                "language_label": enrollment.run.language_label,
+                "variant_industry": enrollment.run.variant_industry,
+                "variant_length": enrollment.run.variant_length,
             },
             "edx_emails_subscription": enrollment.edx_emails_subscription,
             "grades": [
