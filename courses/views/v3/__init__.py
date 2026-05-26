@@ -28,6 +28,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
+from b2b.models import ContractPage
 from courses.api import create_program_enrollments, deactivate_run_enrollment
 from courses.constants import COURSE_KEY_PATTERN, ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -447,6 +448,9 @@ def get_course_variant_runs(request):
     if (
         not request.user.is_superuser
         and not request.user.b2b_contracts.filter(id=contract).exists()
+    ) or (
+        request.user.is_superuser
+        and not ContractPage.objects.filter(id=contract).exists()
     ):
         return Response(
             {"detail": "Must specify valid contract."},
