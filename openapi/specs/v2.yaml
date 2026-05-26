@@ -3490,7 +3490,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CourseVariantRunsResponse'
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseVariantRunsResponse'
           description: ''
         '400':
           content:
