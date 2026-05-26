@@ -183,6 +183,7 @@ def test_serialize_course_required_prerequisites(
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
             "language_options": [],
+            "possible_variant_sets": [],
         },
     )
 
