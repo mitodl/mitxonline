@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.http import Http404
@@ -27,6 +28,7 @@ from b2b.constants import (
 )
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
+from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
 
@@ -339,6 +341,11 @@ class ContractPage(Page, ClusterableModel):
         max_length=100,
         help_text="The index or title of the worksheet in the Google Sheet to put the codes.",
     )
+    variant_options = GenericRelation(
+        "variants.SupportedVariant",
+        object_id_field="object_id",
+        content_type_field="content_type",
+    )
 
     @property
     def programs(self):
@@ -359,6 +366,12 @@ class ContractPage(Page, ClusterableModel):
             if hasattr(self, "_contract_program_ids")
             else self.contract_programs.order_by("sort_order").all()
         )
+
+    @cached_property
+    def default_variant_options(self):
+        """Return the default variant set for this contract."""
+
+        return self.variant_options.filter(default_variant=True).first()
 
     content_panels = [
         FieldPanel("name"),
@@ -475,6 +488,46 @@ class ContractPage(Page, ClusterableModel):
         return (
             CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
         )
+
+    def get_variant_courses(self):
+        """
+        Get the courses that match up with the configured variants.
+
+        This will include courses that may not necessarily have any runs for the
+        contract, since we don't attach courses to the contract (just runs).
+        """
+
+        course_filter = None
+        course_content_type = ContentType.objects.get(
+            app_label="courses", model="course"
+        )
+
+        for variant_set in self.variant_options.all():
+            if course_filter:
+                course_filter = course_filter | variant_set.to_q_filter()
+            else:
+                course_filter = variant_set.to_q_filter()
+
+        return [
+            sv.variant_object
+            for sv in SupportedVariant.objects.filter(content_type=course_content_type)
+            .filter(models.Q(b2b_only=True) | models.Q(default_variant=True))
+            .filter(course_filter)
+            .all()
+        ]
+
+    def get_variant_runs(self):
+        """Get runs matching the non-default variant set."""
+
+        run_qs = self.get_course_runs()
+
+        if self.variant_options.filter(default_variant=False).count() == 0:
+            return run_qs
+
+        for variant_set in self.variant_options.filter(default_variant=False).all():
+            run_qs.filter(variant_set.to_q_filter())
+
+        return run_qs
 
     def get_enrollments(self):
         """Get the enrollments for the contract's runs"""
