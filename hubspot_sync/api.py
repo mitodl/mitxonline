@@ -1057,6 +1057,7 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
             "falling back to object type name",
             object_type_name,
         )
+    object_type = object_type_id or object_type_name
 
     unique_app_id = _format_cert_unique_app_id("crc", cert.id)
     properties = {
@@ -1146,6 +1147,7 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
             "falling back to object type name",
             object_type_name,
         )
+    object_type = object_type_id or object_type_name
 
     unique_app_id = _format_cert_unique_app_id("pgc", cert.id)
     properties = {

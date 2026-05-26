@@ -15,12 +15,13 @@ from courses.models import (
     ProgramCertificate,
 )
 from hubspot_sync import tasks as hubspot_tasks
+from hubspot_sync.api import (
+    upsert_custom_properties as _upsert_custom_properties,
+)
 
 
 def upsert_custom_properties():
     """Proxy kept for backward compatibility with tests patching this symbol."""
-    from hubspot_sync.api import upsert_custom_properties as _upsert_custom_properties  # noqa: PLC0415
-
     return _upsert_custom_properties()
 
 
@@ -71,7 +72,7 @@ def handle_create_course_run_certificate(
 def handle_create_program_certificate(
     sender,  # pylint: disable=unused-argument  # noqa: ARG001
     instance,
-    created,
+    _created,  # pylint: disable=unused-argument
     **kwargs,  # pylint: disable=unused-argument  # noqa: ARG001
 ):
     """When a ProgramCertificate model is created."""
