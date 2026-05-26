@@ -118,6 +118,7 @@ COURSE_VARIANT_LANGUAGE = [
     ),
     ("es_419", "es_419"),
     ("es_ES", "es_ES"),
+    ("en", "en"),
     (
         "fa",
         "fa",
