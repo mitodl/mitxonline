@@ -23,7 +23,6 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management import BaseCommand
-from django.db import IntegrityError
 
 from courses.api import import_courserun_from_edx
 from courses.constants import (
@@ -376,17 +375,6 @@ class Command(BaseCommand):
 
             try:
                 run.save()
-            except IntegrityError:
-                log.exception(
-                    "import_courserun: IntegrityError reached importing %s",
-                    run.courseware_id,
-                )
-                self.stderr.write(
-                    self.style.ERROR(
-                        f"ERROR: Could not set options on {run.courseware_id}, so variant options will be blank."
-                    )
-                )
-                continue
             except ValidationError:
                 log.exception(
                     "import_courserun: ValidationError reached importing %s",
