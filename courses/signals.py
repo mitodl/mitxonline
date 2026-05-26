@@ -72,10 +72,11 @@ def handle_create_course_run_certificate(
 def handle_create_program_certificate(
     sender,  # pylint: disable=unused-argument  # noqa: ARG001
     instance,
-    _created,  # pylint: disable=unused-argument
+    created=None,
     **kwargs,  # pylint: disable=unused-argument  # noqa: ARG001
 ):
     """When a ProgramCertificate model is created."""
+    _ = created
     try:
         transaction.on_commit(
             lambda: hubspot_tasks.sync_program_certificate_with_hubspot.delay(
