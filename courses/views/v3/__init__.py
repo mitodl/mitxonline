@@ -406,7 +406,7 @@ def get_course_outline(request, course_id):  # noqa: ARG001
         ),
     ],
     responses={
-        200: CourseVariantRunsResponseSerializer,
+        200: CourseVariantRunsResponseSerializer(many=True),
         400: inline_serializer(
             name="CourseVariantRunBadRequestSerializer",
             fields={"detail": serializers.CharField()},
