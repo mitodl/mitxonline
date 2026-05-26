@@ -17,11 +17,13 @@ take care of it). If the creation is successful, this will optionally run the
 create_courseware_page command for the course run.
 """
 
+import logging
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management import BaseCommand
+from django.db import IntegrityError
 
 from courses.api import import_courserun_from_edx
 from courses.constants import (
@@ -40,6 +42,8 @@ except ImportError:
 INDUSTRY_OPTS = [opt[0] for opt in COURSE_VARIANT_INDUSTRY]
 LENGTH_OPTS = [opt[0] for opt in COURSE_VARIANT_LENGTH]
 LANG_OPTS = [opt[0] for opt in COURSE_VARIANT_LANGUAGE]
+
+log = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -178,6 +182,7 @@ class Command(BaseCommand):
             "--len",
             type=str,
             choices=LENGTH_OPTS,
+            default="",
             help="Customization option: course content length.",
         )
         parser.add_argument(
@@ -185,6 +190,7 @@ class Command(BaseCommand):
             "--ind",
             type=str,
             choices=INDUSTRY_OPTS,
+            default="",
             help="Customization option: course industry focus.",
         )
 
@@ -336,10 +342,16 @@ class Command(BaseCommand):
 
             run, page, product = run_data
 
+            if page:
+                self.stdout.write(self.style.SUCCESS(f"\t --> Created page {page}"))
+
+            if product:
+                self.stdout.write(
+                    self.style.SUCCESS(f"\t --> Created product {product}")
+                )
+
             run.variant_industry = kwargs.get("industry", "")
             run.variant_length = kwargs.get("length", "")
-            run.save()
-
             run.language = kwargs.get("language")
             run.is_primary_language = kwargs.get("primary_lang", False)
 
@@ -353,13 +365,39 @@ class Command(BaseCommand):
                 )
 
             try:
-                run.save()
+                run.clean_language()
             except ValidationError:
                 self.stderr.write(
                     self.style.ERROR(
                         f"ERROR: Language code {run.language} specified is invalid, cannot set."
                     )
                 )
+                continue
+
+            try:
+                run.save()
+            except IntegrityError:
+                log.exception(
+                    "import_courserun: IntegrityError reached importing %s",
+                    run.courseware_id,
+                )
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"ERROR: Could not set options on {run.courseware_id}, so variant options will be blank."
+                    )
+                )
+                continue
+            except ValidationError:
+                log.exception(
+                    "import_courserun: ValidationError reached importing %s",
+                    run.courseware_id,
+                )
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"ERROR: Could not set options on {run.courseware_id}, so variant options will be blank."
+                    )
+                )
+                continue
 
             success_count += 1
             self.stdout.write(
@@ -367,14 +405,6 @@ class Command(BaseCommand):
                     f"Created new run {run.courseware_id} in course {run.course.readable_id}"
                 )
             )
-
-            if page:
-                self.stdout.write(self.style.SUCCESS(f"\t --> Created page {page}"))
-
-            if product:
-                self.stdout.write(
-                    self.style.SUCCESS(f"\t --> Created product {product}")
-                )
 
             if run and not run.course.validate_variant_run(run):
                 self.stdout.write(

@@ -209,7 +209,10 @@ class TestImportCourserunCommand:
 
         assert len(std_err.getvalue()) > 0
         assert courserun_qs.exists()
-        assert courserun_qs.get().language != "qq"
+        courserun = courserun_qs.get()
+        assert courserun.language != "qq"
+        assert courserun.variant_length == "S"
+        assert courserun.variant_industry == "E"
 
     @pytest.mark.parametrize(
         "valid_variant",
