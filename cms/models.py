@@ -450,7 +450,9 @@ class CertificatePage(CourseProgramChildPage):
                 "title_2": page.title_2,
                 "title_3": page.title_3,
                 "organization": page.organization,
-                "signature_image": page.signature_image.file.url,
+                "signature_image": page.signature_image.file.url
+                if page.signature_image
+                else None,
             }
             for page in self.signatory_pages
         ]
