@@ -5,9 +5,15 @@ import logging
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Prefetch, Q
 from django.views.decorators.csrf import csrf_exempt
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    extend_schema,
+    inline_serializer,
+)
 from mitol.common.utils.datetime import now_in_utc
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -26,6 +32,7 @@ from b2b.serializers.v0 import (
     OrganizationPageSerializer,
 )
 from courses.models import CourseRun
+from courses.serializers.v1.base import BaseCourseRunSerializer
 from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
 from ecommerce.models import Discount, Product
 from main.authentication import CsrfExemptSessionAuthentication
@@ -78,6 +85,49 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
                 to_attr="_contract_program_ids",
             )
         )
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="course_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                many=True,
+                description="Course ID(s) to use",
+            ),
+        ],
+        responses={
+            200: BaseCourseRunSerializer(many=True),
+            400: inline_serializer(
+                name="ContractPageVariantRunBadRequestSerializer",
+                fields={"detail": serializers.CharField()},
+            ),
+        },
+    )
+    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
+    def variant_runs(self, request, pk=None):
+        """Return the variant runs for a contract."""
+
+        if (
+            not request.user.is_superuser
+            and not request.user.b2b_contracts.filter(slug=pk).exists()
+        ) or (
+            request.user.is_superuser
+            and not ContractPage.objects.filter(slug=pk).exists()
+        ):
+            return Response(
+                {"detail": "Invalid contract specified."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        variant_run_qs = ContractPage.objects.filter(slug=pk).get().get_variant_runs()
+        filter_courses = request.query_params.getlist("course_id")
+
+        if len(filter_courses) > 0:
+            variant_run_qs.filter(course__id__in=filter_courses)
+
+        return Response(BaseCourseRunSerializer(variant_run_qs.all(), many=True).data)
 
 
 class Enroll(APIView):

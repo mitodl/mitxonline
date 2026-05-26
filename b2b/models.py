@@ -489,12 +489,13 @@ class ContractPage(Page, ClusterableModel):
             CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
         )
 
-    def get_variant_courses(self):
+    def get_variant_courses(self, *, only_relevant=False):
         """
         Get the courses that match up with the configured variants.
 
-        This will include courses that may not necessarily have any runs for the
-        contract, since we don't attach courses to the contract (just runs).
+        By default, this will return all the courses that have variants that match
+        any of the variant options configured for the contract. Set only_relevant
+        to return just the courses that also have a B2B run for the contract.
         """
 
         course_filter = None
@@ -508,26 +509,41 @@ class ContractPage(Page, ClusterableModel):
             else:
                 course_filter = variant_set.to_q_filter()
 
-        return [
-            sv.variant_object
-            for sv in SupportedVariant.objects.filter(content_type=course_content_type)
+        sv_qset = (
+            SupportedVariant.objects.filter(content_type=course_content_type)
             .filter(models.Q(b2b_only=True) | models.Q(default_variant=True))
             .filter(course_filter)
-            .all()
-        ]
+        )
+
+        if only_relevant:
+            run_courses = (
+                self.get_course_runs()
+                .distinct("course")
+                .values_list("course__id", flat=True)
+            )
+            sv_qset = sv_qset.filter(object_id__in=run_courses)
+
+        return [sv.variant_object for sv in sv_qset.all()]
 
     def get_variant_runs(self):
-        """Get runs matching the non-default variant set."""
+        """Get runs matching the configured variants for the contract."""
+
+        # If there's no default variant, then the config is bad. Send an empty
+        # list and log an error.
+        if self.variant_options.filter(default_variant=False).count() == 0:
+            log.error(
+                "get_variant_runs couldn't find a default variant set for %s - check contract configuration"
+            )
+            return []
 
         run_qs = self.get_course_runs()
 
-        if self.variant_options.filter(default_variant=False).count() == 0:
-            return run_qs
+        run_qs_filter = self.default_variant_options.to_q_filter()
 
         for variant_set in self.variant_options.filter(default_variant=False).all():
-            run_qs.filter(variant_set.to_q_filter())
+            run_qs_filter = run_qs_filter | variant_set.to_q_filter()
 
-        return run_qs
+        return run_qs.filter(run_qs_filter).all()
 
     def get_enrollments(self):
         """Get the enrollments for the contract's runs"""
