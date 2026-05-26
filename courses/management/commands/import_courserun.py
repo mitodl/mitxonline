@@ -340,27 +340,26 @@ class Command(BaseCommand):
             run.variant_length = kwargs.get("length", "")
             run.save()
 
-            if kwargs.get("language", False):
-                run.language = kwargs.get("language")
-                run.is_primary_language = kwargs.get("primary_lang", False)
+            run.language = kwargs.get("language")
+            run.is_primary_language = kwargs.get("primary_lang", False)
 
-                if kwargs.get("run_tag", False):
-                    run.run_tag = kwargs.get("run_tag")
-                else:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"WARNING: No specific run tag specified for {run.courseware_id} in language {run.language}, so using the default {run.run_tag}. This is probably not what you want."
-                        )
+            if kwargs.get("run_tag", False):
+                run.run_tag = kwargs.get("run_tag")
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"WARNING: No specific run tag specified for {run.courseware_id} in language {run.language}, so using the default {run.run_tag}. This is probably not what you want."
                     )
+                )
 
-                try:
-                    run.save()
-                except ValidationError:
-                    self.stderr.write(
-                        self.style.ERROR(
-                            f"ERROR: Language code {run.language} specified is invalid, cannot set."
-                        )
+            try:
+                run.save()
+            except ValidationError:
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"ERROR: Language code {run.language} specified is invalid, cannot set."
                     )
+                )
 
             success_count += 1
             self.stdout.write(
