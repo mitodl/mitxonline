@@ -59,9 +59,7 @@ class Command(BaseCommand):
                 created_or_existing[schema_name] = schema
             except ApiException as exc:
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"Failed to create schema {schema_name}: {exc}"
-                    )
+                    self.style.ERROR(f"Failed to create schema {schema_name}: {exc}")
                 )
                 raise
 
