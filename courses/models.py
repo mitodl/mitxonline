@@ -1083,8 +1083,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__isnull=True)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(language__in=["", "en"]) | Q(is_primary_language=True))
-            .order_by("start_date")
+            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
+            .order_by("start_date", "-is_primary_language")
             .first()
         )
 
@@ -1093,8 +1093,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__isnull=True)
                 .enrollable()
-                .filter(Q(language__in=["", "en"]) | Q(is_primary_language=True))
-                .order_by("start_date")
+                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
+                .order_by("start_date", "-is_primary_language")
                 .first()
             )
 
@@ -1151,8 +1151,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__in=user_contracts)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(language__in=["", "en"]) | Q(is_primary_language=True))
-            .order_by("start_date")
+            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
+            .order_by("start_date", "-is_primary_language")
             .first()
         )
 
@@ -1161,8 +1161,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__in=user_contracts)
                 .enrollable()
-                .filter(Q(language__in=["", "en"]) | Q(is_primary_language=True))
-                .order_by("start_date")
+                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
+                .order_by("start_date", "-is_primary_language")
                 .first()
             )
 
