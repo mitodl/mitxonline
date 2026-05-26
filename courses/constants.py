@@ -82,8 +82,8 @@ COURSE_VARIANT_LENGTH = [
         "Short",
     ),
     (
-        "L",
-        "Long",
+        "F",
+        "Full",
     ),
 ]
 

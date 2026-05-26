@@ -13,6 +13,7 @@ from mitol.common.models import TimestampedModel
 
 from courses.constants import (
     COURSE_VARIANT_INDUSTRY,
+    COURSE_VARIANT_LANGUAGE,
     COURSE_VARIANT_LANGUAGE_OVERRIDE,
     COURSE_VARIANT_LENGTH,
 )
@@ -33,7 +34,8 @@ class VariantOptionsModel(models.Model):
     language = models.CharField(
         max_length=8,
         blank=True,
-        default="",
+        default="en",
+        choices=COURSE_VARIANT_LANGUAGE,
         db_index=True,
         help_text=(
             "ISO 639-1 language code for this run "
