@@ -2683,6 +2683,92 @@ paths:
         name: courseruns__language
         schema:
           type: string
+          enum:
+          - af_ZA
+          - ar
+          - az
+          - bo
+          - da
+          - de
+          - de_DE
+          - el
+          - en
+          - es_419
+          - es_ES
+          - fa
+          - fr
+          - fr_CA
+          - he
+          - hi
+          - hu
+          - id
+          - it_IT
+          - ja
+          - ka
+          - kk
+          - ko
+          - lv
+          - nl
+          - pl
+          - pt_BR
+          - pt_PT
+          - ro
+          - ru
+          - sq
+          - sv
+          - sw
+          - te
+          - th
+          - tr_TR
+          - uk
+          - uz
+          - vi
+          - zh_CN
+          - zh_HK
+        description: |-
+          ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+          * `af_ZA` - af_ZA
+          * `ar` - ar
+          * `az` - az
+          * `bo` - bo
+          * `da` - da
+          * `de` - de
+          * `de_DE` - de_DE
+          * `el` - el
+          * `es_419` - es_419
+          * `es_ES` - es_ES
+          * `en` - en
+          * `fa` - fa
+          * `fr` - fr
+          * `fr_CA` - fr_CA
+          * `he` - he
+          * `hi` - hi
+          * `hu` - hu
+          * `id` - id
+          * `it_IT` - it_IT
+          * `ja` - ja
+          * `ka` - ka
+          * `kk` - kk
+          * `ko` - ko
+          * `lv` - lv
+          * `nl` - nl
+          * `pl` - pl
+          * `pt_BR` - pt_BR
+          * `pt_PT` - pt_PT
+          * `ro` - ro
+          * `ru` - ru
+          * `sq` - sq
+          * `sv` - sv
+          * `sw` - sw
+          * `te` - te
+          * `th` - th
+          * `tr_TR` - tr_TR
+          * `uk` - uk
+          * `uz` - uz
+          * `vi` - vi
+          * `zh_CN` - zh_CN
+          * `zh_HK` - zh_HK
       - in: query
         name: courseruns__variant_industry
         schema:
@@ -2705,14 +2791,14 @@ paths:
           type: string
           enum:
           - ''
-          - L
+          - F
           - S
         description: |-
           Variant: Describes the length of the run (short/long).
 
           * `` - Normal
           * `S` - Short
-          * `L` - Long
+          * `F` - Full
       - in: query
         name: id
         schema:
@@ -3771,10 +3857,53 @@ components:
           description: Get the enrollment modes for the course run
           readOnly: true
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         is_primary_language:
           type: boolean
           description: Designates this run as the primary-language version for its
@@ -3802,7 +3931,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -4842,10 +4971,53 @@ components:
           format: uri
           readOnly: true
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         title:
           type: string
           description: The title of the course. This value is synced automatically
@@ -4957,10 +5129,53 @@ components:
           description: Get the enrollment modes for the course run
           readOnly: true
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         is_primary_language:
           type: boolean
           description: Designates this run as the primary-language version for its
@@ -4988,7 +5203,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -5112,10 +5327,53 @@ components:
           description: Get the enrollment modes for the course run
           readOnly: true
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         is_primary_language:
           type: boolean
           description: Designates this run as the primary-language version for its
@@ -5143,7 +5401,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -5248,10 +5506,53 @@ components:
         live:
           type: boolean
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         is_primary_language:
           type: boolean
           description: Designates this run as the primary-language version for its
@@ -5275,7 +5576,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -6025,6 +6326,134 @@ components:
       - Managed
       - Enrollment Code
       - Auto Enrollment
+    LanguageEnum:
+      enum:
+      - af_ZA
+      - ar
+      - az
+      - bo
+      - da
+      - de
+      - de_DE
+      - el
+      - es_419
+      - es_ES
+      - en
+      - fa
+      - fr
+      - fr_CA
+      - he
+      - hi
+      - hu
+      - id
+      - it_IT
+      - ja
+      - ka
+      - kk
+      - ko
+      - lv
+      - nl
+      - pl
+      - pt_BR
+      - pt_PT
+      - ro
+      - ru
+      - sq
+      - sv
+      - sw
+      - te
+      - th
+      - tr_TR
+      - uk
+      - uz
+      - vi
+      - zh_CN
+      - zh_HK
+      type: string
+      description: |-
+        * `af_ZA` - af_ZA
+        * `ar` - ar
+        * `az` - az
+        * `bo` - bo
+        * `da` - da
+        * `de` - de
+        * `de_DE` - de_DE
+        * `el` - el
+        * `es_419` - es_419
+        * `es_ES` - es_ES
+        * `en` - en
+        * `fa` - fa
+        * `fr` - fr
+        * `fr_CA` - fr_CA
+        * `he` - he
+        * `hi` - hi
+        * `hu` - hu
+        * `id` - id
+        * `it_IT` - it_IT
+        * `ja` - ja
+        * `ka` - ka
+        * `kk` - kk
+        * `ko` - ko
+        * `lv` - lv
+        * `nl` - nl
+        * `pl` - pl
+        * `pt_BR` - pt_BR
+        * `pt_PT` - pt_PT
+        * `ro` - ro
+        * `ru` - ru
+        * `sq` - sq
+        * `sv` - sv
+        * `sw` - sw
+        * `te` - te
+        * `th` - th
+        * `tr_TR` - tr_TR
+        * `uk` - uk
+        * `uz` - uz
+        * `vi` - vi
+        * `zh_CN` - zh_CN
+        * `zh_HK` - zh_HK
+      x-enum-descriptions:
+      - af_ZA
+      - ar
+      - az
+      - bo
+      - da
+      - de
+      - de_DE
+      - el
+      - es_419
+      - es_ES
+      - en
+      - fa
+      - fr
+      - fr_CA
+      - he
+      - hi
+      - hu
+      - id
+      - it_IT
+      - ja
+      - ka
+      - kk
+      - ko
+      - lv
+      - nl
+      - pl
+      - pt_BR
+      - pt_PT
+      - ro
+      - ru
+      - sq
+      - sv
+      - sw
+      - te
+      - th
+      - tr_TR
+      - uk
+      - uz
+      - vi
+      - zh_CN
+      - zh_HK
     LearnerProgramRecordShare:
       type: object
       properties:
@@ -7751,10 +8180,53 @@ components:
       description: Serializer for the SupportedVariant model.
       properties:
         language:
-          type: string
+          allOf:
+          - $ref: '#/components/schemas/LanguageEnum'
           readOnly: true
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
         variant_length:
           readOnly: true
           description: |-
@@ -7762,7 +8234,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -8341,10 +8813,53 @@ components:
           description: Get the enrollment modes for the course run
           readOnly: true
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         is_primary_language:
           type: boolean
           description: Designates this run as the primary-language version for its
@@ -8372,7 +8887,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -8494,10 +9009,53 @@ components:
           description: Get the enrollment modes for the course run
           readOnly: true
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         is_primary_language:
           type: boolean
           description: Designates this run as the primary-language version for its
@@ -8525,7 +9083,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -8625,10 +9183,53 @@ components:
         live:
           type: boolean
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         is_primary_language:
           type: boolean
           description: Designates this run as the primary-language version for its
@@ -8652,7 +9253,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -9128,10 +9729,53 @@ components:
           description: Get the enrollment modes for the course run
           readOnly: true
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         is_primary_language:
           type: boolean
           description: Designates this run as the primary-language version for its
@@ -9159,7 +9803,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -9260,10 +9904,53 @@ components:
         live:
           type: boolean
         language:
-          type: string
-          description: ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr').
-            Leave blank for unspecified.
-          maxLength: 8
+          description: |-
+            ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
+
+            * `af_ZA` - af_ZA
+            * `ar` - ar
+            * `az` - az
+            * `bo` - bo
+            * `da` - da
+            * `de` - de
+            * `de_DE` - de_DE
+            * `el` - el
+            * `es_419` - es_419
+            * `es_ES` - es_ES
+            * `en` - en
+            * `fa` - fa
+            * `fr` - fr
+            * `fr_CA` - fr_CA
+            * `he` - he
+            * `hi` - hi
+            * `hu` - hu
+            * `id` - id
+            * `it_IT` - it_IT
+            * `ja` - ja
+            * `ka` - ka
+            * `kk` - kk
+            * `ko` - ko
+            * `lv` - lv
+            * `nl` - nl
+            * `pl` - pl
+            * `pt_BR` - pt_BR
+            * `pt_PT` - pt_PT
+            * `ro` - ro
+            * `ru` - ru
+            * `sq` - sq
+            * `sv` - sv
+            * `sw` - sw
+            * `te` - te
+            * `th` - th
+            * `tr_TR` - tr_TR
+            * `uk` - uk
+            * `uz` - uz
+            * `vi` - vi
+            * `zh_CN` - zh_CN
+            * `zh_HK` - zh_HK
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         is_primary_language:
           type: boolean
           description: Designates this run as the primary-language version for its
@@ -9287,7 +9974,7 @@ components:
 
             * `` - Normal
             * `S` - Short
-            * `L` - Long
+            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -10017,15 +10704,15 @@ components:
     VariantLengthEnum:
       enum:
       - S
-      - L
+      - F
       type: string
       description: |-
         * `` - Normal
         * `S` - Short
-        * `L` - Long
+        * `F` - Full
       x-enum-descriptions:
       - Short
-      - Long
+      - Full
     YearsExperienceEnum:
       enum:
       - 2
