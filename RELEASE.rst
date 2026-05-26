@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.7
+Version 1.150.7 (Released May 26, 2026)
 ---------------
 
 - Fix consideration for program certificate generation (#3597)
