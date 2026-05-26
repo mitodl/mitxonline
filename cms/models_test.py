@@ -619,6 +619,23 @@ def test_certificate_for_program_page():
         assert signatory.value.signature_image.title == "Image"
 
 
+def test_signatory_items_with_no_signature_image():
+    """
+    signatory_items should return None for signature_image when none is set,
+    rather than raising AttributeError.
+    """
+    course_page = CoursePageFactory.create(certificate_page=None)
+    certificate_page = CertificatePageFactory.create(
+        parent=course_page,
+        signatories__0__signatory__page__name="Name",
+        signatories__0__signatory__page__signature_image=None,
+    )
+    items = certificate_page.signatory_items
+    assert len(items) == 1
+    assert items[0]["name"] == "Name"
+    assert items[0]["signature_image"] is None
+
+
 @pytest.mark.parametrize("test_course", [True, False])
 def test_courseware_title_synced_with_product_page_title(test_course):
     """Tests that Courseware title is synced with the Course Page title from CMS"""
