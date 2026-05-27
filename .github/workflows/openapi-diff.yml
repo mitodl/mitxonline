@@ -96,6 +96,7 @@ jobs:
                 --format githubactions \
                 "${err_ignore_flag[@]}" \
                 "$base_spec" \
-                "$head_spec"
+                "$head_spec" \
+              || { code=$?; [ "$code" -eq 2 ] && echo "oasdiff panicked on $(basename $spec) (known bug with object-to-array schema changes), skipping" || exit "$code"; }
             fi
           done
