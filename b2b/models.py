@@ -525,18 +525,19 @@ class ContractPage(Page, ClusterableModel):
 
         return [sv.variant_object for sv in sv_qset.all()]
 
-    def get_variant_runs(self):
+    def get_all_variant_runs(self):
         """Get runs matching the configured variants for the contract."""
+
+        run_qs = self.get_course_runs()
 
         # If there's no default variant, then the config is bad. Send an empty
         # list and log an error.
-        if self.variant_options.filter(default_variant=False).count() == 0:
+        if self.variant_options.filter(default_variant=True).count() == 0:
             log.error(
-                "get_variant_runs couldn't find a default variant set for %s - check contract configuration"
+                "get_variant_runs couldn't find a default variant set for %s - check contract configuration",
+                self.slug,
             )
-            return []
-
-        run_qs = self.get_course_runs()
+            return run_qs.none()
 
         run_qs_filter = self.default_variant_options.to_q_filter()
 

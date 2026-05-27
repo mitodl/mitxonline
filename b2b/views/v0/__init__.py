@@ -106,23 +106,34 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
         },
     )
     @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
-    def variant_runs(self, request, pk=None):
+    def all_variant_runs(self, request, contract_slug: str | None = None):
         """Return the variant runs for a contract."""
+
+        if contract_slug and contract_slug.isdecimal():
+            contract = ContractPage.objects.filter(pk=contract_slug)
+        else:
+            contract = ContractPage.objects.filter(slug=contract_slug)
+
+        if not contract.exists():
+            return Response(
+                {"detail": "Invalid contract specified."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        contract = contract.get()
 
         if (
             not request.user.is_superuser
-            and not request.user.b2b_contracts.filter(slug=pk).exists()
-        ) or (
-            request.user.is_superuser
-            and not ContractPage.objects.filter(slug=pk).exists()
+            and not request.user.b2b_contracts.filter(pk=contract.id).exists()
         ):
             return Response(
                 {"detail": "Invalid contract specified."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        variant_run_qs = ContractPage.objects.filter(slug=pk).get().get_variant_runs()
         filter_courses = request.query_params.getlist("course_id")
+
+        variant_run_qs = contract.get_all_variant_runs()
 
         if len(filter_courses) > 0:
             variant_run_qs.filter(course__id__in=filter_courses)

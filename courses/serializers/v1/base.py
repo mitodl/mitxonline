@@ -133,6 +133,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "language_label",
             "variant_industry",
             "variant_length",
+            "course_id",
         ]
 
 
