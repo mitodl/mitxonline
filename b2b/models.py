@@ -529,8 +529,15 @@ class ContractPage(Page, ClusterableModel):
             .all()
         )
 
-    def add_program_courses(
-        self, program, order=None, *, skip_edx=False, no_reruns=True
+    def add_program_courses(  # noqa: PLR0913
+        self,
+        program,
+        order=None,
+        *,
+        skip_edx=False,
+        no_reruns=True,
+        ignore_langs=False,
+        only_lang=None,
     ):
         """
         Add a program, and then queue adding all its courses.
@@ -563,7 +570,12 @@ class ContractPage(Page, ClusterableModel):
             | models.Q(courseruns__run_tag="SOURCE")
         ).all():
             created_runs = create_contract_run(
-                self, course, no_reruns=no_reruns, skip_edx=skip_edx
+                self,
+                course,
+                no_reruns=no_reruns,
+                skip_edx=skip_edx,
+                ignore_langs=ignore_langs,
+                only_lang=only_lang,
             )
             managed += len(created_runs)
 

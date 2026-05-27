@@ -60,7 +60,7 @@ Specifying a course will unlink any of the course's runs that are attached to th
 Specifying a program will only unlink the program from the contract, unless "--remove-program-runs" is set. If it is, then all the runs that belong to both the contract and the program's courses will be removed from the contract. Note that doing this and then re-adding the program will *not* re-attach the existing runs to the contract - you will need to do that manually.
     """
 
-    def create_run(
+    def create_run(  # noqa: PLR0913
         self,
         contract,
         courseware,
@@ -68,6 +68,8 @@ Specifying a program will only unlink the program from the contract, unless "--r
         skip_edx=False,
         org_prefix=None,
         no_reruns=False,
+        ignore_langs=False,
+        only_lang=None,
     ):
         """Create a run for the specified contract."""
         try:
@@ -77,6 +79,8 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 skip_edx=skip_edx,
                 org_prefix=org_prefix,
                 no_reruns=no_reruns,
+                ignore_langs=ignore_langs,
+                only_lang=only_lang,
             )
         except InvalidKeyError:
             self.stderr.write(
@@ -168,6 +172,16 @@ Specifying a program will only unlink the program from the contract, unless "--r
             action="store_true",
             help="Create enrollment codes after adding course(s) to the contract. (Skips this by default; run b2b_codes validate afterward if the contract requires codes.)",
         )
+        add_subparser.add_argument(
+            "--no-lang",
+            action="store_true",
+            help="Ignore languages - only create runs for the primary language (or the blank language)",
+        )
+        add_subparser.add_argument(
+            "--lang",
+            type=str,
+            help="Include the default and the specified language code only.",
+        )
 
         remove_subparser = subparsers.add_parser(
             "remove",
@@ -182,7 +196,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         return super().add_arguments(parser)
 
-    def handle_add(self, contract, coursewares, **kwargs):  # noqa: C901
+    def handle_add(self, contract, coursewares, **kwargs):  # noqa: C901, PLR0915
         """Handle the add subcommand."""
 
         skip_edx = kwargs.pop("no_create_runs", False)
@@ -191,6 +205,8 @@ Specifying a program will only unlink the program from the contract, unless "--r
         org_prefix = kwargs.pop("prefix")
         make_codes = kwargs.pop("make_codes", False)
         no_reruns = not kwargs.pop("allow_reruns", True)
+        ignore_langs = kwargs.pop("no_lang", False)
+        only_lang = kwargs.pop("lang", None)
 
         managed = 0
 
@@ -250,7 +266,11 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 )
 
                 prog_add, prog_no_source = contract.add_program_courses(
-                    courseware, skip_edx=skip_edx, no_reruns=no_reruns
+                    courseware,
+                    skip_edx=skip_edx,
+                    no_reruns=no_reruns,
+                    ignore_langs=ignore_langs,
+                    only_lang=only_lang,
                 )
                 if prog_no_source > 0:
                     self.stdout.write(
@@ -300,6 +320,8 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 skip_edx=skip_edx,
                 org_prefix=org_prefix,
                 no_reruns=no_reruns,
+                ignore_langs=ignore_langs,
+                only_lang=only_lang,
             ):
                 # This is a course, so create a run (unless we've been told not to).
 
