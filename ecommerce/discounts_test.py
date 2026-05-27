@@ -88,9 +88,12 @@ def test_discount_factory_adjustment(discounts, products):
     ("discount_type", "product_price", "discount_amount", "expected_price"),
     [
         pytest.param("dollars-off", Decimal("39.33"), 10, Decimal("29.33")),
+        pytest.param("dollars-off", Decimal("9.99"), 10, Decimal("0.00")),
         pytest.param("fixed-price", Decimal("100.00"), 42, Decimal("42.00")),
+        pytest.param("fixed-price", Decimal("42.00"), 42, Decimal("42.00")),
         pytest.param("fixed-price", Decimal("39.33"), 42, Decimal("39.33")),
         pytest.param("percent-off", Decimal("39.33"), 25, Decimal("29.50")),
+        pytest.param("percent-off", Decimal("19.99"), 33, Decimal("13.39")),
     ],
 )
 def test_discounted_price(
@@ -123,3 +126,32 @@ def test_discounted_price(
 
     assert manually_discounted_prices == expected_price
     assert test_discounted_price == manually_discounted_prices
+
+
+def test_discounted_price_uses_best_price_across_multiple_discounts():
+    """The lowest valid price should win when multiple discounts are present."""
+    product = ProductFactory.create(price=Decimal("100.00"))
+    applied_discounts = [
+        UnlimitedUseDiscountFactory.create(
+            discount_type="dollars-off",
+            amount=20,
+        ),
+        UnlimitedUseDiscountFactory.create(
+            discount_type="fixed-price",
+            amount=90,
+        ),
+        UnlimitedUseDiscountFactory.create(
+            discount_type="percent-off",
+            amount=25,
+        ),
+    ]
+
+    discounted_prices = [
+        DiscountType.for_discount(discount).get_product_price(product)
+        for discount in applied_discounts
+    ]
+
+    assert DiscountType.get_discounted_price(applied_discounts, product) == min(
+        discounted_prices + [product.price]
+    )
+
