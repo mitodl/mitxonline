@@ -472,7 +472,7 @@ def get_course_variant_runs(request):
 
     default_variants = SupportedVariant.objects.filter(
         content_type=course_ct, object_id__in=course_ids, default_variant=True
-    ).all()
+    )
 
     # construct filter
     variant_filter = (

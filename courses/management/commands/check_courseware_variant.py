@@ -1,6 +1,9 @@
 """
-Check course variants for validity.
+Check a course's runs against the supported variant options. Check that the
+course has a valid default set.
 """
+
+from argparse import RawTextHelpFormatter
 
 from django.core.management import BaseCommand
 from django.core.management.base import CommandParser
@@ -14,7 +17,41 @@ from variants.models import SupportedVariant
 class Command(BaseCommand):
     """Check course variants for validity."""
 
-    help = "Check course variants for validity. By default, only checks publicly-available runs."
+    help = """Check course variants for validity.
+
+Ensures that the course has runs for each of the valid variant options that are
+configured for the course, and makes sure there's a default option set up. If a
+set of options is supported by the course but no runs exist for it, the output
+will note that.
+
+Ex: course course-v1:MITxT+1.234S has a default (lang=en, industry="", length="")
+and supports a Portugese translation (lang=pt, industry="", length=""). It has
+one run in English and no others, so the output would be:
+
+    Language = en Industry =  Length =
+            course-v1:MITxT+1.234S+1T2026
+
+    Language = pt Industry =  Length =
+            NO RUNS
+
+If there were runs for Portugese, they would be displayed.
+
+If there's no default set, the command will note that and then quit. You can use
+the --fix-default flag to add a default option set to the course. The default is:
+    (language = "en", industry = "", length = "")
+Specifying the flag will add the default set and then perform the check.
+
+By default, this only checks publicly-available runs. Check for runs belonging to
+a contract by using --contract. Note that this checks against what is supported
+by the course, which may include variant options that the contract does not include."""
+
+    def create_parser(self, *args, **kwargs):
+        """Change the formatter class so the above help is formatted better."""
+
+        parser = super().create_parser(*args, **kwargs)
+        parser.formatter_class = RawTextHelpFormatter
+
+        return parser
 
     def add_arguments(self, parser: CommandParser) -> None:
         """Add arguments to the command."""
