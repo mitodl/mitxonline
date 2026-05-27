@@ -69,7 +69,7 @@ class ProgramRequirementTreeSerializer(BaseProgramRequirementTreeSerializer):
 class PartnerSchoolSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.PartnerSchool
-        fields = "__all__"
+        fields = ["id", "name"]
 
 
 class LearnerProgramRecordShareSerializer(serializers.ModelSerializer):

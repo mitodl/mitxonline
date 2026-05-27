@@ -19,3 +19,15 @@ GET /api/v2/program_enrollments/{id}/ the response property `program/page` becam
 GET /api/v2/programs/ the response property `results/items/page` became nullable for the status `200`
 GET /api/v2/programs/{id}/ the response property `page` became nullable for the status `200`
 POST /api/v2/verified_program_enrollments/{courserun_id}/ the response property `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `201`
+GET /api/records/program/{id}/ removed the required property `partner_schools/items/created_on` from the response with the `200` status
+GET /api/records/program/{id}/ removed the required property `partner_schools/items/email` from the response with the `200` status
+GET /api/records/program/{id}/ removed the required property `partner_schools/items/updated_on` from the response with the `200` status
+POST /api/records/program/{id}/revoke/ removed the required property `partner_schools/items/created_on` from the response with the `200` status
+POST /api/records/program/{id}/revoke/ removed the required property `partner_schools/items/email` from the response with the `200` status
+POST /api/records/program/{id}/revoke/ removed the required property `partner_schools/items/updated_on` from the response with the `200` status
+POST /api/records/program/{id}/share/ removed the required property `partner_schools/items/created_on` from the response with the `200` status
+POST /api/records/program/{id}/share/ removed the required property `partner_schools/items/email` from the response with the `200` status
+POST /api/records/program/{id}/share/ removed the required property `partner_schools/items/updated_on` from the response with the `200` status
+GET /api/records/shared/{uuid}/ removed the required property `partner_schools/items/created_on` from the response with the `200` status
+GET /api/records/shared/{uuid}/ removed the required property `partner_schools/items/email` from the response with the `200` status
+GET /api/records/shared/{uuid}/ removed the required property `partner_schools/items/updated_on` from the response with the `200` status
