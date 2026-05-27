@@ -19,7 +19,6 @@ jobs:
           path: base
       - name: Generate oasdiff changelog
         id: oasdif_changelog
-        continue-on-error: true
         run: | # Capture changelog as a multiline output
           echo "changelog<<EOF" > $GITHUB_OUTPUT
           for spec in base/openapi/specs/*.yaml; do
@@ -96,7 +95,6 @@ jobs:
                 --format githubactions \
                 "${err_ignore_flag[@]}" \
                 "$base_spec" \
-                "$head_spec" \
-              || { code=$?; [ "$code" -eq 2 ] && echo "oasdiff panicked on $(basename $spec) (known bug with object-to-array schema changes), skipping" || exit "$code"; }
+                "$head_spec"
             fi
           done
