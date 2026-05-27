@@ -154,4 +154,3 @@ def test_discounted_price_uses_best_price_across_multiple_discounts():
     assert DiscountType.get_discounted_price(applied_discounts, product) == min(
         discounted_prices + [product.price]
     )
-
