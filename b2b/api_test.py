@@ -1713,12 +1713,14 @@ def test_get_source_course_runs_no_variants():
         variant_length="",
     )
 
-    other_runs = CourseRunFactory.create_batch(3, course=course, is_source_run=False)
+    CourseRunFactory.create_batch(3, course=course, is_source_run=False)
 
     source_runs = _get_source_runs_for_course(course)
 
     assert source_runs.count() == 1
-    assert source_runs.first().id == main_source_course.id
+    source_run = source_runs.first()
+    assert source_run
+    assert source_run.id == main_source_course.id
 
 
 @pytest.mark.parametrize(
@@ -1754,7 +1756,7 @@ def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
         variant_length="F",
     )
 
-    filter = None
+    variant_filter = None
     if use_filter:
         contract = factories.ContractPageFactory.create()
         SupportedVariant.objects.create(
@@ -1771,7 +1773,7 @@ def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
             variant_industry="HC",
             variant_length="F",
         )
-        filter = contract.variant_options.all()
+        variant_filter = contract.variant_options.all()
 
     main_source_course = CourseRunFactory.create(
         course=course,
@@ -1783,7 +1785,7 @@ def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
         variant_length="",
     )
 
-    other_runs = CourseRunFactory.create_batch(3, course=course, is_source_run=False)
+    CourseRunFactory.create_batch(3, course=course, is_source_run=False)
 
     if variant_runs_exist:
         variant_1 = CourseRunFactory.create(
@@ -1805,7 +1807,7 @@ def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
             variant_length="F",
         )
 
-    source_runs = _get_source_runs_for_course(course, filter_variants=filter)
+    source_runs = _get_source_runs_for_course(course, filter_variants=variant_filter)
 
     if variant_runs_exist and not use_filter:
         assert (
@@ -1828,58 +1830,6 @@ def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
     # pull, so this should return just the main one.
 
     assert source_runs.count() == 1
-    assert source_runs.first().id == main_source_course.id
-
-
-# def test_get_source_course_runs():
-#     """Test that the internal _get_source_runs_for_course returns properly when there are variants."""
-
-#     course = CourseFactory.create()
-
-#     main_source_course = CourseRunFactory.create(
-#         course=course,
-#         run_tag="1T2026",
-#         is_source_run=True,
-#         language="en",
-#         is_primary_language=True,
-#     )
-
-#     translated_1T_runs = [
-#         CourseRunFactory.create(
-#             course=course,
-#             run_tag="1T2026",
-#             is_source_run=True,
-#             language=lang,
-#             is_primary_language=False,
-#             start_date=main_source_course.start_date,
-#             end_date=main_source_course.end_date,
-#             enrollment_start=main_source_course.start_date,
-#             enrollment_end=main_source_course.end_date,
-#         )
-#         for lang in ["fr", "es"]
-#     ]
-
-#     translated_3T_runs = [
-#         CourseRunFactory.create(
-#             course=course,
-#             run_tag="3T2025",
-#             is_source_run=True,
-#             language=lang,
-#             is_primary_language=False,
-#             start_date=main_source_course.start_date,
-#             end_date=main_source_course.end_date,
-#             enrollment_start=main_source_course.start_date,
-#             enrollment_end=main_source_course.end_date,
-#         )
-#         for lang in ["fr", "es"]
-#     ]
-
-#     runs = _get_source_runs_for_course(course)
-
-#     assert len(runs) == 3
-
-#     for run in translated_1T_runs:
-#         assert run in runs
-
-#     for run in translated_3T_runs:
-#         assert run not in runs
+    source_run = source_runs.first()
+    assert source_run
+    assert source_run.id == main_source_course.id

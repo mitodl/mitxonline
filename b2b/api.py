@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
@@ -275,15 +275,15 @@ def import_and_create_contract_run(  # noqa: PLR0913
     )
 
 
-def _get_source_runs_for_course(
+def _get_source_runs_for_course(  # noqa: PLR0913
     course: Course,
     *,
     require_designated: bool = True,
-    ignore_langs: bool = True,
+    ignore_langs: bool = False,
     only_lang: str | None = None,
     filter_variants: Union[list, None] = None,
     no_variants: bool = False,
-) -> list[CourseRun]:
+) -> Manager[CourseRun]:
     """
     Return the set of source runs for a course.
 
@@ -315,14 +315,15 @@ def _get_source_runs_for_course(
         Q(is_source_run=True) | Q(run_tag="SOURCE")
     )
 
-    if not course.default_variant_options:
-        log.warning(
-            "_get_source_runs_for_course: course %s has no default variant options, falling back to prior behavior",
-            course,
-        )
+    if not course.default_variant_options or ignore_langs:
+        if not course.default_variant_options:
+            log.warning(
+                "_get_source_runs_for_course: course %s has no default variant options, falling back to prior behavior",
+                course,
+            )
         source_runs = source_runs.filter(
             Q(language__in=["", "en"]) | Q(is_primary_language=True)
-        ).order_by("-is_primary_langauge")
+        ).order_by("-is_primary_language")
     elif no_variants:
         source_runs = source_runs.filter(
             language=course.default_variant_options.language,
@@ -341,6 +342,9 @@ def _get_source_runs_for_course(
                 for fv in filter_variants
             ]
             course_variants = [cv for cv in course_variants if cv in fvs]
+
+        if only_lang:
+            course_variants = [cv for cv in course_variants if cv[0] == only_lang]
 
         variant_opts = Q(
             Q(language=course_variants[0][0])
@@ -370,41 +374,10 @@ def _get_source_runs_for_course(
                 course,
                 fallback,
             )
-            return [fallback]
+            return fallback
         msg = f"No source run found for {course}."
         raise SourceCourseIncompleteError(msg)
 
-    if ignore_langs:
-        return [primary_source_run]
-
-    # Pull all the other source runs for the course and run tag combo
-    source_runs = (
-        CourseRun.all_objects.filter(course=course)
-        .filter(is_source_run=True, run_tag=primary_source_run.run_tag)
-        .all()
-    )
-
-    if only_lang:
-        source_runs = source_runs.filter(
-            Q(language=only_lang) | (Q(language="") | Q(is_primary_language=True))
-        )
-
-    seen_languages: list = []
-    filtered_run_list = {}
-    for run in source_runs:
-        lang = run.language  # may be None for legacy runs
-        if lang in seen_languages:
-            msg = (
-                f"Course {course} has more than one source run for "
-                f"language '{lang}': {filtered_run_list[lang]} and {run}. "
-                "Resolve by unsetting is_source_run on the duplicates."
-            )
-            raise SourceCourseIncompleteError(msg)
-
-        seen_languages.append(lang)
-        filtered_run_list[lang] = run
-
-    return [filtered_run_list[r] for r in filtered_run_list]
     return source_runs.all()
 
 
