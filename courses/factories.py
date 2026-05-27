@@ -310,6 +310,24 @@ class ProgramCertificateFactory(DjangoModelFactory):
     class Meta:
         model = ProgramCertificate
 
+    class Params:
+        past_issue_date = factory.Trait(
+            issue_date=factory.Faker(
+                "date_time_between",
+                start_date="-5y",
+                end_date="-1h",
+                tzinfo=ZoneInfo("UTC"),
+            )
+        )
+        future_issue_date = factory.Trait(
+            issue_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+1m",
+                tzinfo=ZoneInfo("UTC"),
+            )
+        )
+
 
 class CourseRunEnrollmentFactory(DjangoModelFactory):
     """Factory for CourseRunEnrollment"""
@@ -330,6 +348,24 @@ class CourseRunCertificateFactory(DjangoModelFactory):
 
     class Meta:
         model = CourseRunCertificate
+
+    class Params:
+        past_issue_date = factory.Trait(
+            issue_date=factory.Faker(
+                "date_time_between",
+                start_date="-5y",
+                end_date="-1h",
+                tzinfo=ZoneInfo("UTC"),
+            )
+        )
+        future_issue_date = factory.Trait(
+            issue_date=factory.Faker(
+                "date_time_between",
+                start_date="+1d",
+                end_date="+1m",
+                tzinfo=ZoneInfo("UTC"),
+            )
+        )
 
 
 class ProgramEnrollmentFactory(DjangoModelFactory):

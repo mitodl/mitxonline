@@ -23,6 +23,16 @@ router.register(
     v2.UserProgramEnrollmentsViewSet,
     basename="user_program_enrollments_api",
 )
+router.register(
+    r"course_certificates",
+    v2.CourseCertificateRetrieveViewSet,
+    basename="course_certificates_api",
+)
+router.register(
+    r"program_certificates",
+    v2.ProgramCertificateRetrieveViewSet,
+    basename="program_certificates_api",
+)
 
 urlpatterns = [
     *router.urls,
@@ -30,16 +40,6 @@ urlpatterns = [
         r"verified_program_enrollments/<str:courserun_id>/",
         v2.add_verified_program_course_enrollment,
         name="add_verified_program_course_enrollment",
-    ),
-    path(
-        r"course_certificates/<str:cert_uuid>/",
-        v2.get_course_certificate,
-        name="get_course_certificate",
-    ),
-    path(
-        r"program_certificates/<str:cert_uuid>/",
-        v2.get_program_certificate,
-        name="get_program_certificate",
     ),
     path(
         "verifiable_course_credential/<uuid:credential_id>/download/",

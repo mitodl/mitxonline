@@ -62,10 +62,15 @@ class CourseLocalizedTitleSerializer(serializers.Serializer):
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer"""
 
+    required_prefetches: list[str] = [
+        *BaseCourseSerializer.required_prefetches,
+        "programs",
+    ]
+
     departments = DepartmentSerializer(many=True, read_only=True)
     next_run_id = serializers.SerializerMethodField()
     page = CoursePageSerializer(read_only=True, allow_null=True)
-    programs = serializers.SerializerMethodField()
+    programs = BaseProgramSerializer(many=True, read_only=True)
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
     certificate_available = serializers.SerializerMethodField()
@@ -142,44 +147,6 @@ class CourseSerializer(BaseCourseSerializer):
         else:
             run = instance.first_unexpired_run
         return run.id if run is not None else None
-
-    @extend_schema_field(BaseProgramSerializer(many=True, allow_null=True))
-    def get_programs(self, instance):
-        """
-        Include appropriate programs.
-
-        If the org or contract ID is set, include only programs that match. If
-        neither is specified, filter programs that have "b2b_only" set.
-        """
-        if self.context.get("include_programs", False):
-            programs_qs = instance.in_programs
-
-            if self.context.get("org_id"):
-                programs_qs = programs_qs.filter(
-                    program__contract_memberships__contract__organization__pk=self.context.get(
-                        "org_id"
-                    )
-                )
-            elif self.context.get("contract_id"):
-                programs_qs = programs_qs.filter(
-                    program__contract_memberships__contract__pk=self.context.get(
-                        "contract_id"
-                    )
-                )
-            else:
-                programs_qs = programs_qs.filter(program__b2b_only=False)
-
-            programs_qs = programs_qs.filter(
-                program__live=True, program__page__live=True
-            )
-
-            programs = [
-                req.program for req in programs_qs.prefetch_related("program").all()
-            ]
-
-            return BaseProgramSerializer(programs, many=True).data
-
-        return None
 
     @extend_schema_field(list[dict])
     def get_topics(self, instance):

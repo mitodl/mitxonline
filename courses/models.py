@@ -11,6 +11,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -55,23 +56,6 @@ User = get_user_model()
 log = logging.getLogger(__name__)
 
 
-class ActiveCertificates(models.Manager):
-    """
-    Return the active certificates only
-    """
-
-    def get_queryset(self):
-        """
-        Returns:
-            QuerySet: queryset for un-revoked certificates
-        """
-        return (
-            super()
-            .get_queryset()
-            .filter(is_revoked=False, issue_date__lte=now_in_utc())
-        )
-
-
 class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
     def live(self):
         """Applies a filter for Programs with live=True"""
@@ -82,7 +66,7 @@ class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
         return self.filter(readable_id=text_id)
 
 
-class CourseQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
+class CourseQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: disable=missing-docstring
     def live(self):
         """Applies a filter for Courses with live=True"""
         return self.filter(live=True)
@@ -90,109 +74,6 @@ class CourseQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
     def courses_in_program(self, program):
         """Return a list of courses that are required by a given program"""
         return self.filter(in_programs__program=program)
-
-
-class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
-    def exclude_b2b(self):
-        """Exclude B2B course runs."""
-
-        return self.filter(b2b_contract__isnull=True)
-
-    def live(self, *, include_b2b=False):
-        """Applies a filter for Course runs with live=True"""
-
-        queryset = self.filter(live=True)
-        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
-
-    def available(self, *, include_b2b=False):
-        """Applies a filter for Course runs with end_date in future"""
-
-        q_filter = models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
-
-        if include_b2b:
-            return self.filter(q_filter)
-        return self.filter(b2b_contract__isnull=True).filter(q_filter)
-
-    def enrollable(self, enrollment_end_date=None):
-        """
-        Applies a filter for Course runs that are open for enrollment.
-
-        This mirrors the logic from CourseRun.is_enrollable property but allows
-        for custom enrollment_end_date parameter.
-
-        Args:
-            enrollment_end_date: datetime, the date to check for enrollment end.
-                               If None, uses current time.
-        """
-        return self.filter(self.get_enrollable_filter(enrollment_end_date))
-
-    def unenrollable(self):
-        """Applies a filter for Course runs that are closed for enrollment."""
-
-        now = now_in_utc()
-        return self.filter(
-            models.Q(live=False)
-            | models.Q(start_date__isnull=True)
-            | (models.Q(enrollment_end__lte=now) | models.Q(enrollment_start__gt=now))
-        )
-
-    @classmethod
-    def get_enrollable_filter(cls, enrollment_end_date=None):
-        """
-        Returns Q filter for enrollable course runs.
-
-        This allows other functions to use the same enrollment logic
-        while composing it with additional filters.
-
-        Args:
-            enrollment_end_date: datetime, the date to check for enrollment end.
-                               If None, uses current time.
-
-        Returns:
-            Q: Django Q filter for enrollable course runs
-        """
-
-        now = now_in_utc()
-        if enrollment_end_date is None:
-            enrollment_end_date = now
-
-        return (
-            # Check if enrollment has not ended
-            (
-                models.Q(enrollment_end__isnull=True)
-                | models.Q(enrollment_end__gt=enrollment_end_date)
-            )
-            # Ensure enrollment has started
-            & models.Q(enrollment_start__isnull=False)
-            & models.Q(enrollment_start__lte=now)
-            # Course run must be live
-            & models.Q(live=True)
-            # Course run must have started
-            & models.Q(start_date__isnull=False)
-        )
-
-    def with_text_id(self, text_id):
-        """Applies a filter for the CourseRun's courseware_id"""
-        return self.filter(courseware_id=text_id)
-
-    def source(self):
-        """Filter for source runs"""
-        return self.filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
-
-    def nonvariant(self):
-        """Filter for non-variant - languages OK, industry/length not OK"""
-        return self.filter(variant_industry="", variant_length="")
-
-
-class UsableCourseRunManager(models.Manager):
-    """Simple manager to filter out source runs."""
-
-    def get_queryset(self):
-        """Return a queryset that ignores all source runs."""
-
-        return (
-            super().get_queryset().exclude(Q(is_source_run=True) | Q(run_tag="SOURCE"))
-        )
 
 
 class CoursesTopicQuerySet(models.QuerySet):
@@ -221,6 +102,10 @@ class EnrollmentManager(
     models.Manager.from_queryset(EnrollmentQuerySet), PrefetchManagerMixin
 ):
     """Base manager class for enrollments"""
+
+    @classmethod
+    def get_queryset_class(cls):
+        return EnrollmentQuerySet
 
 
 class ActiveEnrollmentManager(EnrollmentManager):
@@ -1017,13 +902,62 @@ class CoursesTopic(TimestampedModel):
         return self.name
 
 
+class CourseProgramPrefetcher(Prefetcher):
+    """Prefetcher for Course programs."""
+
+    queryset: CourseQuerySet
+
+    def __init__(self, *args, **kwargs):
+        self.queryset = kwargs.pop(  # safest default is non-b2b
+            "queryset", Program.objects.filter(b2b_only=False)
+        )
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def mapper(course):
+        """Map each course to Course.id"""
+        return course.id
+
+    def filter(self, course_ids):
+        if not course_ids:
+            return self.queryset.none()
+
+        return self.queryset.filter(
+            all_requirements__course_id__in=course_ids,
+        ).annotate(
+            course_ids=ArrayAgg(
+                "all_requirements__course_id",
+                distinct=True,
+                filter=Q(all_requirements__node_type=ProgramRequirementNodeType.COURSE),
+            )
+        )
+
+    @staticmethod
+    def reverse_mapper(program):
+        return program.course_ids
+
+    @staticmethod
+    def decorator(course, programs=None):
+        course.programs = programs or []
+
+
+class CourseManager(models.Manager.from_queryset(CourseQuerySet), PrefetchManagerMixin):
+    """Manager for Course"""
+
+    @classmethod
+    def get_queryset_class(cls):
+        return CourseQuerySet
+
+    prefetch_definitions = {"programs": CourseProgramPrefetcher}
+
+
 class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
 
     class Meta:
         ordering = ["readable_id"]
 
-    objects = CourseQuerySet.as_manager()
+    objects = CourseManager()
     title = models.CharField(max_length=255)
     readable_id = models.CharField(
         max_length=255, unique=True, validators=[validate_url_path_field]
@@ -1176,29 +1110,23 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return best_run
 
     @cached_property
-    def programs(self):
+    def programs(self) -> list[Program]:
         """
         Returns a list of Programs which have this Course (self) as a dependency.
 
         Returns:
             list: List of Programs this Course is a requirement or elective for.
         """
-        programs_containing_course = (
+        requirements_with_course = (
             ProgramRequirement.objects.filter(
                 node_type=ProgramRequirementNodeType.COURSE, course=self
             )
-            .all()
+            .prefetch_related("program")
             .distinct("program_id")
             .order_by("program_id")
-            .values_list("program_id", flat=True)
         )
 
-        return [  # noqa: C416
-            program
-            for program in Program.objects.filter(
-                pk__in=[id for id in programs_containing_course]  # noqa: A001, C416
-            ).all()
-        ]
+        return [requirement.program for requirement in requirements_with_course]
 
     def is_country_blocked(self, user):
         """
@@ -1297,11 +1225,124 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
 
 
+class CourseRunQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: disable=missing-docstring
+    def exclude_b2b(self):
+        """Exclude B2B course runs."""
+
+        return self.filter(b2b_contract__isnull=True)
+
+    def live(self, *, include_b2b=False):
+        """Applies a filter for Course runs with live=True"""
+
+        queryset = self.filter(live=True)
+        return queryset if include_b2b else queryset.filter(b2b_contract__isnull=True)
+
+    def available(self, *, include_b2b=False):
+        """Applies a filter for Course runs with end_date in future"""
+
+        q_filter = models.Q(end_date__isnull=True) | models.Q(end_date__gt=now_in_utc())
+
+        if include_b2b:
+            return self.filter(q_filter)
+        return self.filter(b2b_contract__isnull=True).filter(q_filter)
+
+    def enrollable(self, enrollment_end_date=None):
+        """
+        Applies a filter for Course runs that are open for enrollment.
+
+        This mirrors the logic from CourseRun.is_enrollable property but allows
+        for custom enrollment_end_date parameter.
+
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+        """
+        return self.filter(self.get_enrollable_filter(enrollment_end_date))
+
+    def unenrollable(self):
+        """Applies a filter for Course runs that are closed for enrollment."""
+
+        now = now_in_utc()
+        return self.filter(
+            models.Q(live=False)
+            | models.Q(start_date__isnull=True)
+            | (models.Q(enrollment_end__lte=now) | models.Q(enrollment_start__gt=now))
+        )
+
+    @classmethod
+    def get_enrollable_filter(cls, enrollment_end_date=None):
+        """
+        Returns Q filter for enrollable course runs.
+
+        This allows other functions to use the same enrollment logic
+        while composing it with additional filters.
+
+        Args:
+            enrollment_end_date: datetime, the date to check for enrollment end.
+                               If None, uses current time.
+
+        Returns:
+            Q: Django Q filter for enrollable course runs
+        """
+
+        now = now_in_utc()
+        if enrollment_end_date is None:
+            enrollment_end_date = now
+
+        return (
+            # Check if enrollment has not ended
+            (
+                models.Q(enrollment_end__isnull=True)
+                | models.Q(enrollment_end__gt=enrollment_end_date)
+            )
+            # Ensure enrollment has started
+            & models.Q(enrollment_start__isnull=False)
+            & models.Q(enrollment_start__lte=now)
+            # Course run must be live
+            & models.Q(live=True)
+            # Course run must have started
+            & models.Q(start_date__isnull=False)
+        )
+
+    def with_text_id(self, text_id):
+        """Applies a filter for the CourseRun's courseware_id"""
+        return self.filter(courseware_id=text_id)
+
+    def source(self):
+        """Filter for source runs"""
+        return self.filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
+
+    def nonvariant(self):
+        """Filter for non-variant - languages OK, industry/length not OK"""
+        return self.filter(variant_industry="", variant_length="")
+
+
+class CourseRunManager(
+    models.Manager.from_queryset(CourseRunQuerySet), PrefetchManagerMixin
+):
+    """Manager for CourseRun"""
+
+    @classmethod
+    def get_queryset_class(cls):
+        return CourseRunQuerySet
+
+
+class UsableCourseRunManager(CourseRunManager):
+    """Simple manager to filter out source runs."""
+
+    def get_queryset(self):
+        """Return a queryset that ignores all source runs."""
+
+        return (
+            super().get_queryset().exclude(Q(is_source_run=True) | Q(run_tag="SOURCE"))
+        )
+
+
 class CourseRun(TimestampedModel, VariantOptionsModel):
     """Model for a single run/instance of a course"""
 
-    all_objects = CourseRunQuerySet.as_manager()
-    objects = UsableCourseRunManager.from_queryset(CourseRunQuerySet)()
+    all_objects = CourseRunManager()
+    objects = UsableCourseRunManager()
 
     course = models.ForeignKey(
         Course, on_delete=models.CASCADE, related_name="courseruns", db_index=True
@@ -1660,6 +1701,27 @@ class VerifiableCredential(TimestampedModel):
     )
 
 
+class CertificatesManager(PrefetchManagerMixin):
+    """Manager for ceritificates"""
+
+
+class ActiveCertificatesManager(CertificatesManager):
+    """
+    Return the active certificates only
+    """
+
+    def get_queryset(self):
+        """
+        Returns:
+            QuerySet: queryset for un-revoked certificates
+        """
+        return (
+            super()
+            .get_queryset()
+            .filter(is_revoked=False, issue_date__lte=now_in_utc())
+        )
+
+
 class BaseCertificate(models.Model):
     """
     Common properties for certificate models
@@ -1715,8 +1777,8 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         limit_choices_to=limit_to_certificate_pages,
     )
 
-    objects = ActiveCertificates()
-    all_objects = models.Manager()  # noqa: DJ012
+    objects = ActiveCertificatesManager()
+    all_objects = CertificatesManager()
 
     class Meta:
         unique_together = ("user", "course_run")
@@ -1805,8 +1867,8 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         limit_choices_to=limit_to_certificate_pages,
     )
 
-    objects = ActiveCertificates()
-    all_objects = models.Manager()  # noqa: DJ012
+    objects = ActiveCertificatesManager()
+    all_objects = CertificatesManager()
 
     class Meta:
         unique_together = ("user", "program")
