@@ -83,6 +83,7 @@ from main.constants import (
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
+from variants.models import SupportedVariant
 
 FAKE = faker.Faker()
 pytestmark = [
@@ -1693,10 +1694,14 @@ def test_create_contract_run_single_language_legacy(mocker):
     assert product.object_id == run.id
 
 
-def test_get_source_course_runs():
-    """Test that the internal _get_source_runs_for_course returns properly when there's a mix of translated runs."""
+def test_get_source_course_runs_no_variants():
+    """Test that _get_source_runs returns properly when there aren't any variants."""
 
     course = CourseFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=course,
+        default_variant=True,
+    )
 
     main_source_course = CourseRunFactory.create(
         course=course,
@@ -1704,44 +1709,177 @@ def test_get_source_course_runs():
         is_source_run=True,
         language="en",
         is_primary_language=True,
+        variant_industry="",
+        variant_length="",
     )
 
-    translated_1T_runs = [
-        CourseRunFactory.create(
+    other_runs = CourseRunFactory.create_batch(3, course=course, is_source_run=False)
+
+    source_runs = _get_source_runs_for_course(course)
+
+    assert source_runs.count() == 1
+    assert source_runs.first().id == main_source_course.id
+
+
+@pytest.mark.parametrize(
+    "variant_runs_exist",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "use_filter",
+    [
+        True,
+        False,
+    ],
+)
+def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
+    """Test that _get_source_runs returns properly when there aren't any variants."""
+
+    course = CourseFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=course,
+        default_variant=True,
+    )
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="fr",
+    )
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="de_DE",
+        variant_industry="HC",
+        variant_length="F",
+    )
+
+    filter = None
+    if use_filter:
+        contract = factories.ContractPageFactory.create()
+        SupportedVariant.objects.create(
+            variant_object=contract,
+            default_variant=True,
+        )
+        SupportedVariant.objects.create(
+            variant_object=contract,
+            language="hi",
+        )
+        SupportedVariant.objects.create(
+            variant_object=contract,
+            language="de_DE",
+            variant_industry="HC",
+            variant_length="F",
+        )
+        filter = contract.variant_options.all()
+
+    main_source_course = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        is_source_run=True,
+        language="en",
+        is_primary_language=True,
+        variant_industry="",
+        variant_length="",
+    )
+
+    other_runs = CourseRunFactory.create_batch(3, course=course, is_source_run=False)
+
+    if variant_runs_exist:
+        variant_1 = CourseRunFactory.create(
             course=course,
             run_tag="1T2026",
             is_source_run=True,
-            language=lang,
+            language="fr",
             is_primary_language=False,
-            start_date=main_source_course.start_date,
-            end_date=main_source_course.end_date,
-            enrollment_start=main_source_course.start_date,
-            enrollment_end=main_source_course.end_date,
+            variant_industry="",
+            variant_length="",
         )
-        for lang in ["fr", "es"]
-    ]
-
-    translated_3T_runs = [
-        CourseRunFactory.create(
+        variant_2 = CourseRunFactory.create(
             course=course,
-            run_tag="3T2025",
+            run_tag="1T2026",
             is_source_run=True,
-            language=lang,
+            language="de_DE",
             is_primary_language=False,
-            start_date=main_source_course.start_date,
-            end_date=main_source_course.end_date,
-            enrollment_start=main_source_course.start_date,
-            enrollment_end=main_source_course.end_date,
+            variant_industry="HC",
+            variant_length="F",
         )
-        for lang in ["fr", "es"]
-    ]
 
-    runs = _get_source_runs_for_course(course)
+    source_runs = _get_source_runs_for_course(course, filter_variants=filter)
 
-    assert len(runs) == 3
+    if variant_runs_exist and not use_filter:
+        assert (
+            source_runs.filter(
+                id__in=[main_source_course.id, variant_1.id, variant_2.id]
+            ).count()
+            == 3
+        )
+        return
+    elif variant_runs_exist and use_filter:
+        assert (
+            source_runs.filter(
+                id__in=[main_source_course.id, variant_1.id, variant_2.id]
+            ).count()
+            == 2
+        )
+        return
 
-    for run in translated_1T_runs:
-        assert run in runs
+    # At this point - even if we have the filter, there aren't variant runs to
+    # pull, so this should return just the main one.
 
-    for run in translated_3T_runs:
-        assert run not in runs
+    assert source_runs.count() == 1
+    assert source_runs.first().id == main_source_course.id
+
+
+# def test_get_source_course_runs():
+#     """Test that the internal _get_source_runs_for_course returns properly when there are variants."""
+
+#     course = CourseFactory.create()
+
+#     main_source_course = CourseRunFactory.create(
+#         course=course,
+#         run_tag="1T2026",
+#         is_source_run=True,
+#         language="en",
+#         is_primary_language=True,
+#     )
+
+#     translated_1T_runs = [
+#         CourseRunFactory.create(
+#             course=course,
+#             run_tag="1T2026",
+#             is_source_run=True,
+#             language=lang,
+#             is_primary_language=False,
+#             start_date=main_source_course.start_date,
+#             end_date=main_source_course.end_date,
+#             enrollment_start=main_source_course.start_date,
+#             enrollment_end=main_source_course.end_date,
+#         )
+#         for lang in ["fr", "es"]
+#     ]
+
+#     translated_3T_runs = [
+#         CourseRunFactory.create(
+#             course=course,
+#             run_tag="3T2025",
+#             is_source_run=True,
+#             language=lang,
+#             is_primary_language=False,
+#             start_date=main_source_course.start_date,
+#             end_date=main_source_course.end_date,
+#             enrollment_start=main_source_course.start_date,
+#             enrollment_end=main_source_course.end_date,
+#         )
+#         for lang in ["fr", "es"]
+#     ]
+
+#     runs = _get_source_runs_for_course(course)
+
+#     assert len(runs) == 3
+
+#     for run in translated_1T_runs:
+#         assert run in runs
+
+#     for run in translated_3T_runs:
+#         assert run not in runs

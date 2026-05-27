@@ -281,11 +281,16 @@ def _get_source_runs_for_course(
     require_designated: bool = True,
     ignore_langs: bool = True,
     only_lang: str | None = None,
+    filter_variants: Union[list, None] = None,
+    no_variants: bool = False,
 ) -> list[CourseRun]:
     """
     Return the set of source runs for a course.
 
-    Courses may have
+    Courses may have any number of available variants, so this retrieves the
+    source runs for all variants for the course. Alternatively, pass in a set of
+    SupportedVariant to filter by both what's available for the course and for
+    what is specified.
 
     Args:
         course: The course to inspect.
@@ -295,6 +300,8 @@ def _get_source_runs_for_course(
             set or has the language code set to empty string.
         only_lang: If set, only add the specified additional language (plus the
             default)
+        filter_variants: If provided, a list of SupportedVariant objects to filter by.
+        no_variants: If True, only return runs that match the default variant set.
     Returns:
         List of distinct source CourseRun objects, one per language (or one
         for the "no language" legacy case).
@@ -304,14 +311,51 @@ def _get_source_runs_for_course(
             language.
     """
 
-    primary_source_run = (
-        CourseRun.all_objects.filter(course=course)
-        .filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
-        .filter(Q(is_primary_language=True) | Q(language=""))
-        .first()
+    source_runs = CourseRun.all_objects.filter(course=course).filter(
+        Q(is_source_run=True) | Q(run_tag="SOURCE")
     )
 
-    if not primary_source_run:
+    if not course.default_variant_options:
+        log.warning(
+            "_get_source_runs_for_course: course %s has no default variant options, falling back to prior behavior",
+            course,
+        )
+        source_runs = source_runs.filter(
+            Q(language__in=["", "en"]) | Q(is_primary_language=True)
+        ).order_by("-is_primary_langauge")
+    elif no_variants:
+        source_runs = source_runs.filter(
+            language=course.default_variant_options.language,
+            variant_length=course.default_variant_options.variant_length,
+            variant_industry=course.default_variant_options.variant_industry,
+        )
+    else:
+        course_variants = [
+            (sv.language, sv.variant_length, sv.variant_industry)
+            for sv in course.possible_variant_sets.filter(active=True).all()
+        ]
+
+        if filter_variants:
+            fvs = [
+                (fv.language, fv.variant_length, fv.variant_industry)
+                for fv in filter_variants
+            ]
+            course_variants = [cv for cv in course_variants if cv in fvs]
+
+        variant_opts = Q(
+            Q(language=course_variants[0][0])
+            & Q(variant_length=course_variants[0][1])
+            & Q(variant_industry=course_variants[0][2])
+        )
+
+        for v in course_variants[1:]:
+            variant_opts = variant_opts | Q(
+                Q(language=v[0]) & Q(variant_length=v[1]) & Q(variant_industry=v[2])
+            )
+
+        source_runs = source_runs.filter(variant_opts)
+
+    if not source_runs.count():
         if not require_designated:
             fallback = (
                 course.courseruns.filter(b2b_contract__isnull=True)
@@ -361,6 +405,7 @@ def _get_source_runs_for_course(
         filtered_run_list[lang] = run
 
     return [filtered_run_list[r] for r in filtered_run_list]
+    return source_runs.all()
 
 
 def create_contract_run(  # noqa: PLR0913
