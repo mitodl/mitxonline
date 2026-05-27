@@ -161,6 +161,9 @@ def test_serialize_course_run():
             "enrollment_modes": [],
             "is_primary_language": course_run.is_primary_language,
             "language": course_run.language,
+            "language_label": course_run.language_label,
+            "variant_industry": "",
+            "variant_length": "",
         },
     )
 
@@ -197,6 +200,9 @@ def test_serialize_course_run_with_course():
         "enrollment_modes": [],
         "is_primary_language": course_run.is_primary_language,
         "language": course_run.language,
+        "language_label": course_run.language_label,
+        "variant_industry": course_run.variant_industry,
+        "variant_length": course_run.variant_length,
     }
 
 

@@ -25,6 +25,7 @@ from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
 from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
+from variants.serializers import SupportedVariantSerializer
 
 log = logging.getLogger(__name__)
 
@@ -80,6 +81,7 @@ class CourseSerializer(BaseCourseSerializer):
     max_price = serializers.SerializerMethodField()
     include_in_learn_catalog = serializers.BooleanField(read_only=True)
     ingest_content_files_for_ai = serializers.BooleanField(read_only=True)
+    possible_variant_sets = SupportedVariantSerializer(read_only=True, many=True)
 
     @extend_schema_field(bool)
     def get_required_prerequisites(self, instance):
@@ -274,6 +276,7 @@ class CourseSerializer(BaseCourseSerializer):
             "max_weekly_hours",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
+            "possible_variant_sets",
         ]
 
 

@@ -255,6 +255,7 @@ INSTALLED_APPS = (
     "treebeard",
     # Put our apps after this point
     "main",
+    "variants",
     "authentication",
     "courses",
     "hubspot_sync",

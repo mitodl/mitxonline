@@ -1,8 +1,10 @@
 """Tests for import_courserun management command"""
 
+from io import StringIO
 from unittest.mock import Mock
 
 import pytest
+from django.core.management import call_command
 
 from b2b.factories import ContractPageFactory
 from courses.factories import (
@@ -11,6 +13,8 @@ from courses.factories import (
     ProgramFactory,
 )
 from courses.management.commands import import_courserun
+from courses.models import CourseRun
+from variants.models import SupportedVariant
 
 pytestmark = [pytest.mark.django_db]
 
@@ -174,3 +178,96 @@ class TestImportCourserunCommand:
         _, kwargs = import_mock.call_args
         assert kwargs["course_key"] == mock_edx_course_detail.course_id
         assert kwargs["use_specific_course"] == use_specific_course
+
+    def test_bad_language(self, mocker, mock_edx_api_client, mock_edx_course_detail):
+        """Test that specifying a bad language fails"""
+
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+        mocker.patch(
+            "courses.api.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+        std_out = StringIO()
+        std_err = StringIO()
+
+        call_command(
+            "import_courserun",
+            stdout=std_out,
+            stderr=std_err,
+            courserun=mock_edx_course_detail.course_id,
+            language="qq",
+            length="S",
+            industry="E",
+        )
+
+        courserun_qs = CourseRun.objects.filter(
+            courseware_id=mock_edx_course_detail.course_id
+        )
+
+        assert len(std_err.getvalue()) > 0
+        assert courserun_qs.exists()
+        courserun = courserun_qs.get()
+        assert courserun.language != "qq"
+
+    @pytest.mark.parametrize(
+        "valid_variant",
+        [
+            True,
+            False,
+        ],
+    )
+    def test_variant_options(
+        self, mocker, mock_edx_api_client, mock_edx_course_detail, valid_variant
+    ):
+        """Test that the variant options are set properly."""
+
+        mocker.patch(
+            "courses.management.commands.import_courserun.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+        mocker.patch(
+            "courses.api.get_edx_api_course_detail_client",
+            return_value=mock_edx_api_client,
+        )
+
+        if valid_variant:
+            course = CourseFactory.create(readable_id="course-v1:MITx+6.00x")
+            SupportedVariant.objects.create(
+                variant_object=course,
+                language="fr",
+                variant_length="S",
+                variant_industry="E",
+                default_variant=False,
+                b2b_only=False,
+            )
+
+        std_out = StringIO()
+        std_err = StringIO()
+
+        call_command(
+            "import_courserun",
+            stdout=std_out,
+            stderr=std_err,
+            courserun=mock_edx_course_detail.course_id,
+            language="fr",
+            length="S",
+            industry="E",
+        )
+
+        std_err_str = std_err.getvalue()
+        std_out_str = std_out.getvalue()
+
+        assert len(std_err_str) == 0
+        assert "Created new run" in std_out_str
+        if not valid_variant:
+            assert "not a valid variant" in std_out_str
+
+        courserun = CourseRun.objects.get(
+            courseware_id=mock_edx_course_detail.course_id
+        )
+
+        assert courserun.variant_length == "S"
+        assert courserun.variant_industry == "E"

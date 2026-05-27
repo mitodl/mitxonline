@@ -9,6 +9,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -44,6 +45,7 @@ from openedx.constants import (
     EDX_ENROLLMENT_VERIFIED_MODE,
     EDX_ENROLLMENTS_PAID_MODES,
 )
+from variants.models import SupportedVariant, VariantOptionsModel
 
 User = get_user_model()
 
@@ -1031,6 +1033,11 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         object_id_field="courseware_object_id",
         content_type_field="courseware_content_type",
     )
+    possible_variant_sets = GenericRelation(
+        "variants.SupportedVariant",
+        object_id_field="object_id",
+        content_type_field="content_type",
+    )
 
     @cached_property
     def course_number(self):
@@ -1076,8 +1083,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__isnull=True)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(language="") | Q(is_primary_language=True))
-            .order_by("start_date")
+            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
+            .order_by("start_date", "-is_primary_language")
             .first()
         )
 
@@ -1086,8 +1093,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__isnull=True)
                 .enrollable()
-                .filter(Q(language="") | Q(is_primary_language=True))
-                .order_by("start_date")
+                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
+                .order_by("start_date", "-is_primary_language")
                 .first()
             )
 
@@ -1115,6 +1122,16 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         return getattr(self.page, "ingest_content_files_for_ai", False)
 
+    @cached_property
+    def default_variant_options(self) -> SupportedVariant:
+        """Return the default option set for this course."""
+
+        return SupportedVariant.objects.filter(
+            object_id=self.pk,
+            content_type=ContentType.objects.get_for_model(self),
+            default_variant=True,
+        ).first()
+
     def get_first_unexpired_b2b_run(self, user_contracts):
         """
         Gets the first unexpired/enrollable CourseRun associated with both this
@@ -1134,8 +1151,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             self.courseruns.filter(b2b_contract__in=user_contracts)
             .enrollable()
             .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(language="") | Q(is_primary_language=True))
-            .order_by("start_date")
+            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
+            .order_by("start_date", "-is_primary_language")
             .first()
         )
 
@@ -1144,8 +1161,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             best_run = (
                 self.courseruns.filter(b2b_contract__in=user_contracts)
                 .enrollable()
-                .filter(Q(language="") | Q(is_primary_language=True))
-                .order_by("start_date")
+                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
+                .order_by("start_date", "-is_primary_language")
                 .first()
             )
 
@@ -1255,12 +1272,25 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         return list(courseruns)
 
+    def validate_variant_run(self, run) -> bool:
+        """Validate that the run matches a configured variant set"""
+
+        return (
+            run.course.id == self.id
+            and self.possible_variant_sets.filter(
+                language=run.language,
+                variant_length=run.variant_length,
+                variant_industry=run.variant_industry,
+                b2b_only=bool(run.b2b_contract),
+            ).exists()
+        )
+
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."  # noqa: PLR2004
 
 
-class CourseRun(TimestampedModel):
+class CourseRun(TimestampedModel, VariantOptionsModel):
     """Model for a single run/instance of a course"""
 
     all_objects = CourseRunQuerySet.as_manager()
@@ -1345,16 +1375,6 @@ class CourseRun(TimestampedModel):
         default=False,
         help_text='Designate this run as a "source" run for contract re-runs of the course.',
     )
-    language = models.CharField(
-        max_length=8,
-        blank=True,
-        default="",
-        db_index=True,
-        help_text=(
-            "ISO 639-1 language code for this run "
-            "(e.g. 'en', 'zh', 'fr'). Leave blank for unspecified."
-        ),
-    )
     is_primary_language = models.BooleanField(
         default=False,
         help_text=(
@@ -1381,6 +1401,8 @@ class CourseRun(TimestampedModel):
                     "language",
                     "is_source_run",
                     "b2b_contract",
+                    "variant_length",
+                    "variant_industry",
                 ],
                 condition=~Q(language=""),
                 nulls_distinct=False,
@@ -1566,6 +1588,8 @@ class CourseRun(TimestampedModel):
         1. Later than end_date if end_date is set
         2. Later than start_date if start_date is set
         """
+        self.clean_language()
+
         if not self.expiration_date:
             return
 
