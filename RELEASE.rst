@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 1.150.8
+---------------
+
+- Add language handling flags for b2b_courserun (#3610)
+- Fix issues with learner record api (#3600)
+- fix: handle missing signature image in CertificatePage signatory_items (#3608)
+- fix: add audit trail on first enrollment as well (#3589)
+- [pre-commit.ci] pre-commit autoupdate (#3588)
+- Update dependency webpack-dev-server to v5.2.4 [SECURITY] (#3591)
+
 Version 1.150.7 (Released May 26, 2026)
 ---------------
 
