@@ -1,9 +1,7 @@
-import random
 from decimal import Decimal
 
 import pytest
 
-from ecommerce.constants import ALL_DISCOUNT_TYPES
 from ecommerce.discounts import (
     DiscountType,
     DollarsOffDiscount,
@@ -86,24 +84,42 @@ def test_discount_factory_adjustment(discounts, products):
             )
 
 
-@pytest.mark.parametrize("discount_type", ALL_DISCOUNT_TYPES)
-def test_discounted_price(products, discount_type):
+@pytest.mark.parametrize(
+    ("discount_type", "product_price", "discount_amount", "expected_price"),
+    [
+        pytest.param("dollars-off", Decimal("39.33"), 10, Decimal("29.33")),
+        pytest.param("fixed-price", Decimal("100.00"), 42, Decimal("42.00")),
+        pytest.param("fixed-price", Decimal("39.33"), 42, Decimal("39.33")),
+        pytest.param("percent-off", Decimal("39.33"), 25, Decimal("29.50")),
+    ],
+)
+def test_discounted_price(
+    discount_type, product_price, discount_amount, expected_price
+):
     """
-    Tests the get_discounted_price call with some products to make sure the
-    discount is applied successfully.
+    Tests the get_discounted_price call with deterministic inputs.
+
+    In particular, fixed-price discounts should be ignored when the fixed price
+    is higher than the product price because get_discounted_price applies the
+    best available price.
     """
-    product = products[random.randrange(0, len(products), 1)]  # noqa: S311
+    product = ProductFactory.create(price=product_price)
 
     applied_discounts = [
-        UnlimitedUseDiscountFactory.create(discount_type=discount_type)
+        UnlimitedUseDiscountFactory.create(
+            discount_type=discount_type,
+            amount=discount_amount,
+        )
     ]
 
-    manually_discounted_prices = DiscountType.for_discount(
-        applied_discounts[0]
-    ).get_product_price(product)
+    manually_discounted_prices = min(
+        DiscountType.for_discount(applied_discounts[0]).get_product_price(product),
+        product.price,
+    )
 
     test_discounted_price = DiscountType.get_discounted_price(
         applied_discounts, product
     )
 
+    assert manually_discounted_prices == expected_price
     assert test_discounted_price == manually_discounted_prices
