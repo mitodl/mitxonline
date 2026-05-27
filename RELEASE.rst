@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.9
+Version 1.150.9 (Released May 27, 2026)
 ---------------
 
 - Initial variant support (#3605)
