@@ -262,3 +262,191 @@ def test_add_courserun_existing_contract(force):
 
     run.refresh_from_db()
     assert run.b2b_contract == (contract if force else existing_contract)
+
+
+@pytest.mark.parametrize(
+    "explicit_primary",
+    [
+        True,
+        False,
+    ],
+)
+def test_add_course_ignore_langs(mock_clone_courserun, explicit_primary):
+    """Test that adding a single course with translations works still if we ignore the translations."""
+
+    primary_opts = {
+        "language": "en" if explicit_primary else "",
+        "is_primary_language": explicit_primary,
+    }
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(
+        is_source_run=True,
+        **primary_opts,
+    )
+    _add_run_languages(run)
+
+    command = b2b_courseware.Command()
+
+    command.handle(
+        subcommand="add",
+        contract=str(contract.id),
+        courseware=str(run.course.readable_id),
+        allow_reruns=True,
+        force=False,
+        can_import="",
+        prefix="",
+        make_code=False,
+        no_lang=True,
+    )
+
+    assert contract.get_course_runs().count() == 1
+
+
+@pytest.mark.parametrize(
+    "explicit_primary",
+    [
+        True,
+        False,
+    ],
+)
+def test_add_program_ignore_langs(mock_clone_courserun, explicit_primary):
+    """Test that adding a program with translations works still if we ignore the translations."""
+
+    primary_opts = {
+        "language": "en" if explicit_primary else "",
+        "is_primary_language": explicit_primary,
+    }
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(
+        is_source_run=True,
+        **primary_opts,
+    )
+    _add_run_languages(run)
+
+    run2 = CourseRunFactory.create(
+        is_source_run=True,
+        **primary_opts,
+    )
+    _add_run_languages(run2)
+
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    program.add_requirement(run2.course)
+
+    command = b2b_courseware.Command()
+
+    command.handle(
+        subcommand="add",
+        contract=str(contract.id),
+        courseware=str(program.readable_id),
+        allow_reruns=True,
+        force=False,
+        can_import="",
+        prefix="",
+        make_code=False,
+        no_lang=True,
+    )
+
+    assert contract.get_course_runs().count() == 2
+    assert contract.get_course_runs().filter(course=run.course).count() == 1
+    assert contract.get_course_runs().filter(course=run2.course).count() == 1
+
+
+@pytest.mark.parametrize(
+    "explicit_primary",
+    [
+        True,
+        False,
+    ],
+)
+def test_add_course_specific_lang(mock_clone_courserun, explicit_primary):
+    """Test that adding a single course with translations works still if we ignore the translations."""
+
+    primary_opts = {
+        "language": "en" if explicit_primary else "",
+        "is_primary_language": explicit_primary,
+    }
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(
+        is_source_run=True,
+        **primary_opts,
+    )
+    _add_run_languages(run)
+
+    command = b2b_courseware.Command()
+
+    command.handle(
+        subcommand="add",
+        contract=str(contract.id),
+        courseware=str(run.course.readable_id),
+        allow_reruns=True,
+        force=False,
+        can_import="",
+        prefix="",
+        make_code=False,
+        lang="sw",
+    )
+
+    assert contract.get_course_runs().count() == 2
+    assert contract.get_course_runs().filter(language="sw").exists()
+
+
+@pytest.mark.parametrize(
+    "explicit_primary",
+    [
+        True,
+        False,
+    ],
+)
+def test_add_program_specific_lang(mock_clone_courserun, explicit_primary):
+    """Test that adding a program with translations works still if we ignore the translations."""
+
+    primary_opts = {
+        "language": "en" if explicit_primary else "",
+        "is_primary_language": explicit_primary,
+    }
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(
+        is_source_run=True,
+        **primary_opts,
+    )
+    _add_run_languages(run)
+
+    run2 = CourseRunFactory.create(
+        is_source_run=True,
+        **primary_opts,
+    )
+    _add_run_languages(run2)
+
+    program = ProgramFactory.create()
+    program.add_requirement(run.course)
+    program.add_requirement(run2.course)
+
+    command = b2b_courseware.Command()
+
+    command.handle(
+        subcommand="add",
+        contract=str(contract.id),
+        courseware=str(program.readable_id),
+        allow_reruns=True,
+        force=False,
+        can_import="",
+        prefix="",
+        make_code=False,
+        lang="sw",
+    )
+
+    assert contract.get_course_runs().count() == 4
+    assert contract.get_course_runs().filter(course=run.course).count() == 2
+    assert (
+        contract.get_course_runs().filter(course=run.course, language="sw").count() == 1
+    )
+    assert contract.get_course_runs().filter(course=run2.course).count() == 2
+    assert (
+        contract.get_course_runs().filter(course=run2.course, language="sw").count()
+        == 1
+    )

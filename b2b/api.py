@@ -279,6 +279,8 @@ def _get_source_runs_for_course(
     course: Course,
     *,
     require_designated: bool = True,
+    ignore_langs: bool = True,
+    only_lang: str | None = None,
 ) -> list[CourseRun]:
     """
     Return the set of source runs for a course.
@@ -289,6 +291,10 @@ def _get_source_runs_for_course(
         course: The course to inspect.
         require_designated: If True, raise SourceCourseIncompleteError when no
             source run exists. If False, fall back to the newest non-B2B run.
+        ignore_langs: If True, only pull the source run that has `is_primary_language`
+            set or has the language code set to empty string.
+        only_lang: If set, only add the specified additional language (plus the
+            default)
     Returns:
         List of distinct source CourseRun objects, one per language (or one
         for the "no language" legacy case).
@@ -324,12 +330,20 @@ def _get_source_runs_for_course(
         msg = f"No source run found for {course}."
         raise SourceCourseIncompleteError(msg)
 
+    if ignore_langs:
+        return [primary_source_run]
+
     # Pull all the other source runs for the course and run tag combo
     source_runs = (
         CourseRun.all_objects.filter(course=course)
         .filter(is_source_run=True, run_tag=primary_source_run.run_tag)
         .all()
     )
+
+    if only_lang:
+        source_runs = source_runs.filter(
+            Q(language=only_lang) | (Q(language="") | Q(is_primary_language=True))
+        )
 
     seen_languages: list = []
     filtered_run_list = {}
@@ -358,6 +372,8 @@ def create_contract_run(  # noqa: PLR0913
     org_prefix: str | None = UAI_COURSEWARE_ID_PREFIX,
     no_reruns: bool = False,
     queue_codes: bool = False,
+    ignore_langs: bool = False,
+    only_lang: str | None = None,
 ) -> list[tuple[CourseRun, Product]]:
     """
     Create run(s) for the specified contract.
@@ -405,13 +421,18 @@ def create_contract_run(  # noqa: PLR0913
         org_prefix (str): Organization prefix. For UAI courses, this should be "UAI_".
         no_reruns (bool): Don't rerun the course - raise an exception instead.
         queue_codes (bool): Queue enrollment code generation after saving.
+        ignore_langs (bool): Only create a run for the primary language.
+        only_lang (str|None): Only create a run for the primary language and the specified one.
     Returns:
         list[tuple[CourseRun, Product]]: One (CourseRun, Product) pair per
         source language run. Legacy single-language courses produce a one-element
         list.
     """
     source_runs = _get_source_runs_for_course(
-        course, require_designated=require_designated_source_run
+        course,
+        require_designated=require_designated_source_run,
+        ignore_langs=ignore_langs,
+        only_lang=only_lang,
     )
 
     content_type = ContentType.objects.filter(
