@@ -581,6 +581,8 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
             courseware_id=target_course_id,
             run_tag=CourseKey.from_string(target_course_id).run,
             b2b_contract=contract,
+            language="en",
+            is_primary_language=True,
         )
 
         [(new_run, _)] = create_contract_run(contract, course)
@@ -592,6 +594,8 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
         collision_idx = collision_key.run[0]
         assert new_run_key.run[0] == str(int(collision_idx) + 1)
         return
+
+    target_course_id = f"{target_course_id}_en"
 
     assert not course.courseruns.filter(courseware_id=target_course_id).exists()
 
