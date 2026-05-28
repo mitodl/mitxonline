@@ -566,6 +566,8 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
         courseware_id=str(source_course_run_key),
         run_tag="SOURCE",
         is_source_run=True,
+        language="en",
+        is_primary_language=True,
     )
 
     target_course_id = create_contract_run_key(source_run, contract)
@@ -1589,7 +1591,16 @@ def test_create_contract_run_multi_language(mocker):
     """create_contract_run produces one run+product per language source run."""
     mocker.patch("openedx.tasks.clone_courserun.delay")
     contract = ContractPageFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=contract,
+        language="zh_CN",
+    )
     course = CourseFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="zh_CN",
+        b2b_only=True,
+    )
     CourseRunFactory.create(
         course=course,
         run_tag="1T2026",
@@ -1601,14 +1612,14 @@ def test_create_contract_run_multi_language(mocker):
     CourseRunFactory.create(
         course=course,
         run_tag="1T2026",
-        language="zh",
+        language="zh_CN",
         is_source_run=True,
         courseware_id=f"{course.readable_id}+1T2026-zh",
     )
     results = create_contract_run(contract, course, require_designated_source_run=True)
     assert len(results) == 2
     languages = {run.language for run, _ in results}
-    assert languages == {"en", "zh"}
+    assert languages == {"en", "zh_CN"}
     # Each result should have a distinct product
     products = [product for _, product in results]
     assert len({p.id for p in products}) == 2
@@ -1681,6 +1692,10 @@ def test_create_contract_run_single_language_legacy(mocker):
     mocker.patch("openedx.tasks.clone_courserun.delay")
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
+
+    contract.variant_options.all().delete()
+    course.possible_variant_sets.all().delete()
+
     CourseRunFactory.create(
         course=course,
         language="",
@@ -1698,10 +1713,6 @@ def test_get_source_course_runs_no_variants():
     """Test that _get_source_runs returns properly when there aren't any variants."""
 
     course = CourseFactory.create()
-    SupportedVariant.objects.create(
-        variant_object=course,
-        default_variant=True,
-    )
 
     main_source_course = CourseRunFactory.create(
         course=course,
@@ -1743,10 +1754,6 @@ def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
     course = CourseFactory.create()
     SupportedVariant.objects.create(
         variant_object=course,
-        default_variant=True,
-    )
-    SupportedVariant.objects.create(
-        variant_object=course,
         language="fr",
     )
     SupportedVariant.objects.create(
@@ -1759,10 +1766,6 @@ def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
     variant_filter = None
     if use_filter:
         contract = factories.ContractPageFactory.create()
-        SupportedVariant.objects.create(
-            variant_object=contract,
-            default_variant=True,
-        )
         SupportedVariant.objects.create(
             variant_object=contract,
             language="hi",
@@ -1852,10 +1855,6 @@ def test_get_source_course_runs_with_variants_lang_filter(filter_type):
     """
 
     course = CourseFactory.create()
-    SupportedVariant.objects.create(
-        variant_object=course,
-        default_variant=True,
-    )
     SupportedVariant.objects.create(
         variant_object=course,
         language="fr",

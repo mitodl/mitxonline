@@ -14,7 +14,9 @@ def _create_usable_program():
     """Create a usable program with a handful of courses."""
 
     program = ProgramFactory.create()
-    runs = CourseRunFactory.create_batch(4, is_source_run=True)
+    runs = CourseRunFactory.create_batch(
+        4, is_source_run=True, language="en", is_primary_language=True
+    )
 
     [program.add_requirement(run.course) for run in runs[:2]]
     [program.add_elective(run.course) for run in runs[2:]]
@@ -33,6 +35,11 @@ def _add_run_languages(run):
     run.language = "en"
     run.is_primary_language = True
     run.save()
+
+    for lang in langs:
+        SupportedVariant.objects.create(
+            variant_object=run.course, language=lang, b2b_only=True
+        )
 
     return [
         CourseRunFactory.create(
@@ -95,6 +102,8 @@ def test_add_program(mock_clone_courserun, with_languages, no_create_runs, try_r
 
     if with_languages:
         [_add_run_languages(run) for run in runs]
+        SupportedVariant.objects.create(variant_object=contract, language="sw")
+        SupportedVariant.objects.create(variant_object=contract, language="fr")
 
     command.handle(
         subcommand="add",
@@ -163,13 +172,15 @@ def test_add_course(mock_clone_courserun, with_languages, no_create_runs, try_re
     contract = ContractPageFactory.create()
     run = CourseRunFactory.create(
         is_source_run=True,
-        language="en" if with_languages else "",
+        language="en",
         is_primary_language=with_languages,
     )
     command = b2b_courseware.Command()
 
     if with_languages:
         _add_run_languages(run)
+        SupportedVariant.objects.create(variant_object=contract, language="sw")
+        SupportedVariant.objects.create(variant_object=contract, language="fr")
 
     command.handle(
         subcommand="add",
@@ -366,7 +377,7 @@ def test_add_course_specific_lang(mock_clone_courserun, explicit_primary):
     """Test that adding a single course with translations works still if we ignore the translations."""
 
     primary_opts = {
-        "language": "en" if explicit_primary else "",
+        "language": "en",
         "is_primary_language": explicit_primary,
     }
 
@@ -376,6 +387,9 @@ def test_add_course_specific_lang(mock_clone_courserun, explicit_primary):
         **primary_opts,
     )
     _add_run_languages(run)
+    SupportedVariant.objects.create(
+        variant_object=contract, language="sw", b2b_only=True
+    )
 
     command = b2b_courseware.Command()
 
@@ -391,7 +405,7 @@ def test_add_course_specific_lang(mock_clone_courserun, explicit_primary):
         lang="sw",
     )
 
-    assert contract.get_course_runs().count() == 2
+    assert contract.get_course_runs().count() == 1
     assert contract.get_course_runs().filter(language="sw").exists()
 
 
@@ -406,11 +420,15 @@ def test_add_program_specific_lang(mock_clone_courserun, explicit_primary):
     """Test that adding a program with translations works still if we ignore the translations."""
 
     primary_opts = {
-        "language": "en" if explicit_primary else "",
+        "language": "en",
         "is_primary_language": explicit_primary,
     }
 
     contract = ContractPageFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=contract, language="sw", b2b_only=True
+    )
+
     run = CourseRunFactory.create(
         is_source_run=True,
         **primary_opts,
@@ -441,12 +459,12 @@ def test_add_program_specific_lang(mock_clone_courserun, explicit_primary):
         lang="sw",
     )
 
-    assert contract.get_course_runs().count() == 4
-    assert contract.get_course_runs().filter(course=run.course).count() == 2
+    assert contract.get_course_runs().count() == 2
+    assert contract.get_course_runs().filter(course=run.course).count() == 1
     assert (
         contract.get_course_runs().filter(course=run.course, language="sw").count() == 1
     )
-    assert contract.get_course_runs().filter(course=run2.course).count() == 2
+    assert contract.get_course_runs().filter(course=run2.course).count() == 1
     assert (
         contract.get_course_runs().filter(course=run2.course, language="sw").count()
         == 1
