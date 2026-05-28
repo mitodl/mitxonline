@@ -8,7 +8,6 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_object_actions import DjangoObjectActions, action
-from hijack.contrib.admin import HijackUserAdminMixin
 from mitol.common.admin import TimestampedModelAdmin
 
 from b2b.models import UserOrganization
@@ -114,7 +113,7 @@ class UserOrganizationInline(admin.TabularInline):
 
 @admin.register(User)
 class UserAdmin(
-    DjangoObjectActions, ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin
+    DjangoObjectActions, ContribUserAdmin, TimestampedModelAdmin
 ):
     """Admin views for user"""
 
