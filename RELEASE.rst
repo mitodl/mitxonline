@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.150.10
+----------------
+
+- fix: add extend_schema response types to B2B manager contract actions (#3611)
+- Upgrade django_health_checks (#3602)
+
 Version 1.150.9 (Released May 27, 2026)
 ---------------
 
