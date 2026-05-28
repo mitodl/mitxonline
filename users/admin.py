@@ -112,9 +112,7 @@ class UserOrganizationInline(admin.TabularInline):
 
 
 @admin.register(User)
-class UserAdmin(
-    DjangoObjectActions, ContribUserAdmin, TimestampedModelAdmin
-):
+class UserAdmin(DjangoObjectActions, ContribUserAdmin, TimestampedModelAdmin):
     """Admin views for user"""
 
     include_created_on_in_list = True
