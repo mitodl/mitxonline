@@ -2,6 +2,7 @@
 
 from uuid import uuid4
 
+import factory
 import faker
 import wagtail_factories
 from factory import Factory, LazyAttribute, LazyFunction, SubFactory
@@ -22,6 +23,7 @@ from cms.factories import HomePageFactory
 from cms.models import HomePage
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from users.factories import UserFactory
+from variants.factories import ContractSupportedVariantFactory
 
 FAKE = faker.Faker()
 
@@ -73,6 +75,24 @@ class ContractPageFactory(wagtail_factories.PageFactory):
     )
     membership_type = LazyAttribute(lambda o: o.integration_type)
     slug = LazyAttribute(lambda _: FAKE.unique.slug())
+
+    @factory.post_generation
+    def variant_options(self, create, extracted, **kwargs):  # noqa: ARG002
+        """Craete a default variant set, unless provided some."""
+
+        if not create:
+            return
+
+        if extracted:
+            self.variant_options.add(extracted)
+        else:
+            ContractSupportedVariantFactory.create(
+                variant_object=self,
+                language="en",
+                variant_industry="",
+                variant_length="",
+                default_variant=True,
+            )
 
     class Meta:
         model = ContractPage

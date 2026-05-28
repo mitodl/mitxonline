@@ -4,7 +4,8 @@ import pytest
 
 from b2b.factories import ContractPageFactory
 from b2b.management.commands import b2b_courseware
-from courses.factories import CourseRunFactory, ProgramFactory
+from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
+from variants.models import SupportedVariant
 
 pytestmark = [pytest.mark.django_db]
 
@@ -449,4 +450,132 @@ def test_add_program_specific_lang(mock_clone_courserun, explicit_primary):
     assert (
         contract.get_course_runs().filter(course=run2.course, language="sw").count()
         == 1
+    )
+
+
+@pytest.mark.parametrize(
+    "add_filtering",
+    [
+        True,
+        False,
+    ],
+)
+def test_add_course_variants(mock_clone_courserun, add_filtering):
+    """Test that adding a course with variants works as expected."""
+
+    command = b2b_courseware.Command()
+    addl_course_variants = (
+        (
+            "en",
+            "",
+            "",
+            True,
+        ),
+        (
+            "fr",
+            "",
+            "",
+            False,
+        ),
+        ("pt_BR", "", "", False),
+        (
+            "hu",
+            "HC",
+            "",
+            False,
+        ),
+        (
+            "th",
+            "F",
+            "S",
+            False,
+        ),
+        (
+            "pt",
+            "E",
+            "F",
+            False,
+        ),
+    )
+    addl_contract_variants = (
+        (
+            "fr",
+            "",
+            "",
+            False,
+        ),
+        ("pt_BR", "", "", False),
+        (
+            "hu",
+            "HC",
+            "",
+            False,
+        ),
+        (
+            "th",
+            "F",
+            "S",
+            False,
+        ),
+        (
+            "lv",
+            "HC",
+            "S",
+            False,
+        ),
+    )
+
+    contract = ContractPageFactory.create()
+    for variant in addl_contract_variants:
+        SupportedVariant.objects.create(
+            variant_object=contract,
+            language=variant[0],
+            variant_industry=variant[1],
+            variant_length=variant[2],
+            default_variant=variant[3],
+        )
+
+    course = CourseFactory.create()
+    for variant in addl_course_variants:
+        if not variant[3]:
+            SupportedVariant.objects.create(
+                variant_object=course,
+                language=variant[0],
+                variant_industry=variant[1],
+                variant_length=variant[2],
+                default_variant=variant[3],
+            )
+
+    for variant in addl_course_variants:
+        CourseRunFactory.create(
+            course=course,
+            is_source_run=True,
+            language=variant[0],
+            variant_industry=variant[1],
+            variant_length=variant[2],
+            run_tag="9T2099",
+        )
+
+    filter_variants = ["fr", "hu,HC", "th,F,S"] if add_filtering else []
+    language_check = (
+        ["fr", "hu", "th"] if add_filtering else ["fr", "hu", "th", "pt_BR", "en"]
+    )
+
+    command.handle(
+        subcommand="add",
+        contract=str(contract.id),
+        courseware=str(course.readable_id),
+        allow_reruns=False,
+        force=False,
+        can_import="",
+        prefix="",
+        make_code=False,
+        variant=filter_variants,
+    )
+
+    contract_runs = contract.get_course_runs()
+
+    assert contract_runs.count() == len(language_check)
+    assert contract_runs.filter(language__in=language_check).count() == len(
+        language_check
     )

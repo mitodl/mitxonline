@@ -35,6 +35,7 @@ from courses.models import (
 )
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
+from variants.factories import CourseSupportedVariantFactory
 
 FAKE = faker.Factory.create()
 
@@ -114,6 +115,24 @@ class CourseFactory(DjangoModelFactory):
         if not create or not extracted:
             return
         self.departments.add(*extracted)
+
+    @factory.post_generation
+    def possible_variant_sets(self, create, extracted, **kwargs):  # noqa: ARG002
+        """Craete a default variant set, unless provided some."""
+
+        if not create:
+            return
+
+        if extracted:
+            self.possible_variant_sets.add(extracted)
+        else:
+            CourseSupportedVariantFactory.create(
+                variant_object=self,
+                language="en",
+                variant_industry="",
+                variant_length="",
+                default_variant=True,
+            )
 
     class Meta:
         model = Course

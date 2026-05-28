@@ -608,6 +608,7 @@ class ContractPage(Page, ClusterableModel):
         no_reruns=True,
         ignore_langs=False,
         only_lang=None,
+        filter_variants=None,
     ):
         """
         Add a program, and then queue adding all its courses.
@@ -646,6 +647,7 @@ class ContractPage(Page, ClusterableModel):
                 skip_edx=skip_edx,
                 ignore_langs=ignore_langs,
                 only_lang=only_lang,
+                filter_variants=filter_variants,
             )
             managed += len(created_runs)
 

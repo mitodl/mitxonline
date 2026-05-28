@@ -1833,3 +1833,84 @@ def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
     source_run = source_runs.first()
     assert source_run
     assert source_run.id == main_source_course.id
+
+
+@pytest.mark.parametrize(
+    "filter_type",
+    [
+        "ignore_langs",
+        "only_lang",
+    ],
+)
+def test_get_source_course_runs_with_variants_lang_filter(filter_type):
+    """
+    Test that _g_s_c_r's ignore_langs and only_lang flags work.
+
+    These were implemented in sort of a liminal space in between just translation
+    support and contract variants. They're still useful filters though, especially
+    for non-B2B stuff, so make sure they also still work.
+    """
+
+    course = CourseFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=course,
+        default_variant=True,
+    )
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="fr",
+    )
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="de_DE",
+        variant_industry="HC",
+        variant_length="F",
+    )
+    main_source_course = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        is_source_run=True,
+        language="en",
+        is_primary_language=True,
+        variant_industry="",
+        variant_length="",
+    )
+    variant_1 = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        is_source_run=True,
+        language="fr",
+        is_primary_language=False,
+        variant_industry="",
+        variant_length="",
+    )
+    variant_2 = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        is_source_run=True,
+        language="de_DE",
+        is_primary_language=False,
+        variant_industry="HC",
+        variant_length="F",
+    )
+
+    if filter_type == "ignore_langs":
+        source_runs = _get_source_runs_for_course(course, ignore_langs=True)
+    else:
+        source_runs = _get_source_runs_for_course(course, only_lang="de_DE")
+
+    assert source_runs.count() == 1
+    assert (
+        source_runs.filter(
+            id__in=[main_source_course.id, variant_1.id, variant_2.id]
+        ).count()
+        == 1
+    )
+
+    returned_run = source_runs.first()
+    assert returned_run
+
+    if filter_type == "ignore_langs":
+        assert returned_run.id == main_source_course.id
+    else:
+        assert returned_run.id == variant_2.id

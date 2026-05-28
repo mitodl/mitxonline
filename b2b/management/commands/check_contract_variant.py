@@ -75,7 +75,7 @@ class Command(BaseCommand):
             f"{len(other_options)} supported variants + default for contract {contract_obj.slug}"
         )
 
-        runs_qs = contract_obj.get_variant_runs()
+        runs_qs = contract_obj.get_all_variant_runs()
 
         for variant in [default_variant, *other_options.all()]:
             variant_runs = runs_qs.filter(variant.to_q_filter()).all()

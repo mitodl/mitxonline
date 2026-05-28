@@ -392,6 +392,7 @@ def create_contract_run(  # noqa: PLR0913
     queue_codes: bool = False,
     ignore_langs: bool = False,
     only_lang: str | None = None,
+    filter_variants: Union[list, None] = None,
 ) -> list[tuple[CourseRun, Product]]:
     """
     Create run(s) for the specified contract.
@@ -451,6 +452,7 @@ def create_contract_run(  # noqa: PLR0913
         require_designated=require_designated_source_run,
         ignore_langs=ignore_langs,
         only_lang=only_lang,
+        filter_variants=filter_variants,
     )
 
     content_type = ContentType.objects.filter(
