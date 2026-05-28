@@ -70,7 +70,7 @@ class Command(BaseCommand):
     ) -> int | None:
         try:
             wait_for_hubspot_rate_limit()
-            assoc_types = hubspot_client.crm.associations.v4.definition_api.get_all(
+            assoc_types = hubspot_client.crm.associations.v4.schema.definitions_api.get_all(
                 from_object_type=object_type_id,
                 to_object_type=HubspotObjectType.CONTACTS.value,
             )
