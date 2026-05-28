@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.151.0
+---------------
+
+- Add variant support to contracts (#3618)
+
 Version 1.150.10 (Released May 28, 2026)
 ----------------
 
