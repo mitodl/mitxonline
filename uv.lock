@@ -681,10 +681,23 @@ wheels = [
 
 [[package]]
 name = "django-health-check"
-version = "3.20.1.dev10+g53f9bdc3a"
-source = { git = "https://github.com/revsys/django-health-check?rev=53f9bdc3a7acc8a577319987fef0bd3040eef4b4#53f9bdc3a7acc8a577319987fef0bd3040eef4b4" }
+version = "4.4.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
+    { name = "dnspython" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d8/c3/99dbf858f939cbf709bf82648daa63632a81484d59b888e92ec687601091/django_health_check-4.4.1.tar.gz", hash = "sha256:2658c21710c09632f75318bb66b5865ff0721f82bab812193d479680773e4c0b", size = 21751, upload-time = "2026-05-15T16:08:37.517Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/26/df/697390fe7bdfefd1e48e29c190ebe255c45db4c1819d58b76fbc826bc5a8/django_health_check-4.4.1-py3-none-any.whl", hash = "sha256:363d94e839c90a75e822694f260ca31bd42978d948ad77ea1df18c7f68ff9021", size = 26877, upload-time = "2026-05-15T16:08:36.192Z" },
+]
+
+[package.optional-dependencies]
+celery = [
+    { name = "celery" },
+]
+redis = [
+    { name = "redis" },
 ]
 
 [[package]]
@@ -1990,7 +2003,7 @@ dependencies = [
     { name = "django-cors-headers" },
     { name = "django-countries" },
     { name = "django-filter" },
-    { name = "django-health-check" },
+    { name = "django-health-check", extra = ["celery", "redis"] },
     { name = "django-hijack" },
     { name = "django-ipware" },
     { name = "django-oauth-toolkit" },
@@ -2100,7 +2113,7 @@ requires-dist = [
     { name = "django-cors-headers", specifier = ">=4.0.0,<5" },
     { name = "django-countries", specifier = ">=7.2.1,<8" },
     { name = "django-filter", specifier = ">=24.3,<25" },
-    { name = "django-health-check", git = "https://github.com/revsys/django-health-check?rev=53f9bdc3a7acc8a577319987fef0bd3040eef4b4" },
+    { name = "django-health-check", extras = ["celery", "redis"], specifier = ">=4.0.0" },
     { name = "django-hijack", specifier = ">=3.6.0,<4" },
     { name = "django-ipware", specifier = ">=7.0.0,<8" },
     { name = "django-oauth-toolkit", specifier = "==3.1" },
