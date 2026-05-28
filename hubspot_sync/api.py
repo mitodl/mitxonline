@@ -1012,9 +1012,11 @@ def _get_cert_contact_association_type_id(
         return int(setting_value)
     try:
         wait_for_hubspot_rate_limit()
-        types_response = hubspot_client.crm.associations.v4.schema.definitions_api.get_all(
-            from_object_type=cert_object_type,
-            to_object_type=HubspotObjectType.CONTACTS.value,
+        types_response = (
+            hubspot_client.crm.associations.v4.schema.definitions_api.get_all(
+                from_object_type=cert_object_type,
+                to_object_type=HubspotObjectType.CONTACTS.value,
+            )
         )
         if types_response.results:
             return types_response.results[0].type_id
