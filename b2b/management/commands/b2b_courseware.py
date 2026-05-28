@@ -46,7 +46,16 @@ Specifying a course run will attach it to the contract unless the contract is al
 
 Specifying a course will attempt to create a course run for the contract for the specified course. It will try to create a course run in edX as well unless "--no-create-runs" is specified. This flag is ignored if "--import" is specified.
 
-Specifying a program will iterate through the program's courses and create runs for each. It will also link the program to the contract.
+Specifying a course will create course runs for variant options if:
+- The course has supported variants, and there are source runs for those variants
+- The contract has supported variants
+- The course and contract variants agree to any extent
+
+E.g.: adding a course with 5 variants (and source runs) to a contract that has 3 variants will result in contract runs for variants that match up between the contract and course. (This will usually include the standard default set but that's not a guarantee.)
+
+You can also filter on variant options by using the --variant flag. Filtering in this manner will not include the default - make sure to include it if you want it.
+
+Specifying a program will iterate through the program's courses and create runs for each. It will also link the program to the contract. Variant runs will be created for each course in the program, according to the rules above.
 
 To remove:
     b2b_courseware remove [--remove-program-runs] contract courseware [--also courseware] [--also courseware...]
@@ -70,6 +79,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
         no_reruns=False,
         ignore_langs=False,
         only_lang=None,
+        filter_variants=None,
     ):
         """Create a run for the specified contract."""
         try:
@@ -81,6 +91,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 no_reruns=no_reruns,
                 ignore_langs=ignore_langs,
                 only_lang=only_lang,
+                filter_variants=filter_variants,
             )
         except InvalidKeyError:
             self.stderr.write(
@@ -182,6 +193,13 @@ Specifying a program will only unlink the program from the contract, unless "--r
             type=str,
             help="Include the default and the specified language code only.",
         )
+        add_subparser.add_argument(
+            "--variant",
+            type=str,
+            action="append",
+            default=[],
+            help="Limit to variant(s) specified. Specify as comma-separated values in format 'lang,industry,length'. Repeat as necessary.",
+        )
 
         remove_subparser = subparsers.add_parser(
             "remove",
@@ -207,8 +225,33 @@ Specifying a program will only unlink the program from the contract, unless "--r
         no_reruns = not kwargs.pop("allow_reruns", True)
         ignore_langs = kwargs.pop("no_lang", False)
         only_lang = kwargs.pop("lang", None)
+        variants = kwargs.pop("variant", [])
 
         managed = 0
+
+        # Parse out the variants specified.
+        filter_variants = (
+            list(contract.variant_options.all()) if len(variants) == 0 else []
+        )
+
+        for variant in variants:
+            opts = variant.split(",")
+            filter_val = contract.variant_options
+            if len(opts) >= 1:
+                filter_val = filter_val.filter(language=opts[0])
+            if len(opts) >= 2:  # noqa: PLR2004
+                filter_val = filter_val.filter(variant_industry=opts[1])
+            if len(opts) == 3:  # noqa: PLR2004
+                filter_val = filter_val.filter(variant_length=opts[2])
+            if len(opts) > 3:  # noqa: PLR2004
+                self.stderr.write(
+                    self.style.ERROR(f"Bad variant options specified: {opts}")
+                )
+                return -1
+
+            filter_val = filter_val.first()
+            if filter_val:
+                filter_variants.append(filter_val)
 
         if can_import:
             # Get the courseware IDs we got passed in that weren't matched to
@@ -271,6 +314,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                     no_reruns=no_reruns,
                     ignore_langs=ignore_langs,
                     only_lang=only_lang,
+                    filter_variants=filter_variants,
                 )
                 if prog_no_source > 0:
                     self.stdout.write(
@@ -322,6 +366,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 no_reruns=no_reruns,
                 ignore_langs=ignore_langs,
                 only_lang=only_lang,
+                filter_variants=filter_variants,
             ):
                 # This is a course, so create a run (unless we've been told not to).
 

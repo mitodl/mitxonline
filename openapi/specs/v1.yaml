@@ -174,6 +174,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContractPage'
           description: ''
+  /api/v0/b2b/contracts/{contract_slug}/all_variant_runs/:
+    get:
+      operationId: b2b_contracts_all_variant_runs_list
+      description: Return the variant runs for a contract.
+      parameters:
+      - in: path
+        name: contract_slug
+        schema:
+          type: string
+          description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
+        required: true
+      - in: query
+        name: course_id
+        schema:
+          type: array
+          items:
+            type: integer
+        description: Course ID(s) to use
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BaseCourseRun'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractPageVariantRunBadRequest'
+          description: ''
   /api/v0/b2b/enroll/{readable_id}/:
     post:
       operationId: b2b_enroll_create
@@ -3938,7 +3973,11 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        course_id:
+          type: integer
+          readOnly: true
       required:
+      - course_id
       - course_number
       - courseware_id
       - courseware_url
@@ -4363,6 +4402,11 @@ components:
           items:
             type: integer
           readOnly: true
+        variant_options:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupportedVariant'
+          readOnly: true
       required:
       - active
       - contract_end
@@ -4375,8 +4419,16 @@ components:
       - organization
       - programs
       - slug
+      - variant_options
       - welcome_message
       - welcome_message_extra
+    ContractPageVariantRunBadRequest:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     Country:
       type: object
       description: Serializer for pycountry countries, with states for US/CA
@@ -5210,6 +5262,9 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        course_id:
+          type: integer
+          readOnly: true
         products:
           type: array
           items:
@@ -5223,6 +5278,7 @@ components:
           nullable: true
       required:
       - approved_flexible_price_exists
+      - course_id
       - course_number
       - courseware_id
       - courseware_url
@@ -5408,6 +5464,9 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        course_id:
+          type: integer
+          readOnly: true
         upgrade_product_id:
           type: integer
           nullable: true
@@ -5428,6 +5487,7 @@ components:
           readOnly: true
       required:
       - course
+      - course_id
       - course_number
       - courseware_id
       - courseware_url
@@ -6644,6 +6704,11 @@ components:
           items:
             type: integer
           readOnly: true
+        variant_options:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupportedVariant'
+          readOnly: true
         attachment_percentage:
           type: number
           format: double
@@ -6674,6 +6739,7 @@ components:
       - slug
       - total_codes
       - total_enrollments
+      - variant_options
       - welcome_message
       - welcome_message_extra
     ManagerCourseRun:
@@ -8996,6 +9062,9 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        course_id:
+          type: integer
+          readOnly: true
         products:
           type: array
           items:
@@ -9007,6 +9076,7 @@ components:
           readOnly: true
       required:
       - approved_flexible_price_exists
+      - course_id
       - course_number
       - courseware_id
       - courseware_url
@@ -9192,6 +9262,9 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        course_id:
+          type: integer
+          readOnly: true
         products:
           type: array
           items:
@@ -9209,6 +9282,7 @@ components:
       required:
       - approved_flexible_price_exists
       - course
+      - course_id
       - course_number
       - courseware_id
       - courseware_url
@@ -9912,6 +9986,9 @@ components:
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
+        course_id:
+          type: integer
+          readOnly: true
         products:
           type: array
           items:
@@ -9930,6 +10007,7 @@ components:
       required:
       - approved_flexible_price_exists
       - course
+      - course_id
       - course_number
       - courseware_id
       - courseware_url

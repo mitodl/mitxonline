@@ -31,6 +31,8 @@ def make_contract_ready_course():
             enrollment_start=None,
             enrollment_end=None,
             is_source_run=True,
+            language="en",
+            is_primary_language=True,
         )
 
         return (course, source_course_run)

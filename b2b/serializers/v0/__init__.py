@@ -6,6 +6,7 @@ from rest_framework import serializers
 from b2b.models import ContractPage, OrganizationPage
 from main.constants import USER_MSG_TYPE_B2B_CHOICES
 from main.serializers import RichTextSerializer
+from variants.serializers import SupportedVariantSerializer
 
 
 class BaseContractPageSerializer(serializers.ModelSerializer):
@@ -50,6 +51,7 @@ class ContractPageSerializer(BaseContractPageSerializer):
         help_text=ContractPage._meta.get_field("welcome_message_extra").help_text,  # noqa: SLF001, not private https://docs.djangoproject.com/en/5.0/ref/models/meta/
         read_only=True,
     )
+    variant_options = SupportedVariantSerializer(many=True, read_only=True)
 
     @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_programs(self, instance):
@@ -64,6 +66,7 @@ class ContractPageSerializer(BaseContractPageSerializer):
             "welcome_message_extra",
             "integration_type",
             "programs",
+            "variant_options",
         ]
         read_only_fields = [
             *BaseContractPageSerializer.Meta.read_only_fields,
@@ -71,6 +74,7 @@ class ContractPageSerializer(BaseContractPageSerializer):
             "welcome_message_extra",
             "integration_type",
             "programs",
+            "variant_options",
         ]
 
 

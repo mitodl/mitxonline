@@ -14,6 +14,7 @@ from main.test_utils import drf_datetime
 from users.api import User
 from users.factories import UserFactory
 from users.models import ChangeEmailRequest
+from variants.serializers import SupportedVariantSerializer
 
 
 @pytest.mark.django_db
@@ -83,6 +84,10 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
                             "slug": contract.slug,
                             "organization": contract.organization.id,
                             "programs": [],
+                            "variant_options": [
+                                SupportedVariantSerializer(sv).data
+                                for sv in contract.variant_options.all()
+                            ],
                         }
                     ],
                 }

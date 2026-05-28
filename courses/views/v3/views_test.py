@@ -59,6 +59,7 @@ def test_user_enrollments_detail(
         "id": enrollment.id,
         "run": {
             "id": enrollment.run.id,
+            "course_id": enrollment.run.course.id,
             "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
             "is_enrollable": enrollment.run.is_enrollable,
             "is_self_paced": enrollment.run.is_self_paced,
@@ -133,6 +134,7 @@ def test_user_enrollments_list(
             "id": enrollment.id,
             "run": {
                 "id": enrollment.run.id,
+                "course_id": enrollment.run.course.id,
                 "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
                 "is_enrollable": enrollment.run.is_enrollable,
                 "is_self_paced": enrollment.run.is_self_paced,
@@ -311,6 +313,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
             "id": enrollment.id,
             "run": {
                 "id": enrollment.run.id,
+                "course_id": enrollment.run.course.id,
                 "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
                 "is_enrollable": enrollment.run.is_enrollable,
                 "is_self_paced": enrollment.run.is_self_paced,
@@ -387,6 +390,7 @@ def test_user_enrollments_list_filter_exclude_b2b(
             "id": enrollment.id,
             "run": {
                 "id": enrollment.run.id,
+                "course_id": enrollment.run.course.id,
                 "is_archived": enrollment.run.is_enrollable and enrollment.run.is_past,
                 "is_enrollable": enrollment.run.is_enrollable,
                 "is_self_paced": enrollment.run.is_self_paced,

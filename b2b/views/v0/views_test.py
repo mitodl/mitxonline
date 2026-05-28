@@ -434,7 +434,9 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrol
         integration_type=CONTRACT_MEMBERSHIP_SSO,
         enrollment_fixed_price=100 if has_price else 0,
     )
-    source_courserun = CourseRunFactory.create(is_source_run=True)
+    source_courserun = CourseRunFactory.create(
+        is_source_run=True, language="en", is_primary_language=True
+    )
 
     [
         (courserun, _),

@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
@@ -275,17 +275,22 @@ def import_and_create_contract_run(  # noqa: PLR0913
     )
 
 
-def _get_source_runs_for_course(
+def _get_source_runs_for_course(  # noqa: PLR0913
     course: Course,
     *,
     require_designated: bool = True,
-    ignore_langs: bool = True,
+    ignore_langs: bool = False,
     only_lang: str | None = None,
-) -> list[CourseRun]:
+    filter_variants: Union[list, None] = None,
+    no_variants: bool = False,
+) -> Manager[CourseRun]:
     """
     Return the set of source runs for a course.
 
-    Courses may have
+    Courses may have any number of available variants, so this retrieves the
+    source runs for all variants for the course. Alternatively, pass in a set of
+    SupportedVariant to filter by both what's available for the course and for
+    what is specified.
 
     Args:
         course: The course to inspect.
@@ -295,6 +300,8 @@ def _get_source_runs_for_course(
             set or has the language code set to empty string.
         only_lang: If set, only add the specified additional language (plus the
             default)
+        filter_variants: If provided, a list of SupportedVariant objects to filter by.
+        no_variants: If True, only return runs that match the default variant set.
     Returns:
         List of distinct source CourseRun objects, one per language (or one
         for the "no language" legacy case).
@@ -304,14 +311,55 @@ def _get_source_runs_for_course(
             language.
     """
 
-    primary_source_run = (
-        CourseRun.all_objects.filter(course=course)
-        .filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
-        .filter(Q(is_primary_language=True) | Q(language=""))
-        .first()
+    source_runs = CourseRun.all_objects.filter(course=course).filter(
+        Q(is_source_run=True) | Q(run_tag="SOURCE")
     )
 
-    if not primary_source_run:
+    if not course.default_variant_options or ignore_langs:
+        if not course.default_variant_options:
+            log.warning(
+                "_get_source_runs_for_course: course %s has no default variant options, falling back to prior behavior",
+                course,
+            )
+        source_runs = source_runs.filter(
+            Q(language__in=["", "en"]) | Q(is_primary_language=True)
+        ).order_by("-is_primary_language")
+    elif no_variants:
+        source_runs = source_runs.filter(
+            language=course.default_variant_options.language,
+            variant_length=course.default_variant_options.variant_length,
+            variant_industry=course.default_variant_options.variant_industry,
+        )
+    else:
+        course_variants = [
+            (sv.language, sv.variant_length, sv.variant_industry)
+            for sv in course.possible_variant_sets.filter(active=True).all()
+        ]
+
+        if filter_variants:
+            fvs = [
+                (fv.language, fv.variant_length, fv.variant_industry)
+                for fv in filter_variants
+            ]
+            course_variants = [cv for cv in course_variants if cv in fvs]
+
+        if only_lang:
+            course_variants = [cv for cv in course_variants if cv[0] == only_lang]
+
+        variant_opts = Q(
+            Q(language=course_variants[0][0])
+            & Q(variant_length=course_variants[0][1])
+            & Q(variant_industry=course_variants[0][2])
+        )
+
+        for v in course_variants[1:]:
+            variant_opts = variant_opts | Q(
+                Q(language=v[0]) & Q(variant_length=v[1]) & Q(variant_industry=v[2])
+            )
+
+        source_runs = source_runs.filter(variant_opts)
+
+    if not source_runs.count():
         if not require_designated:
             fallback = (
                 course.courseruns.filter(b2b_contract__isnull=True)
@@ -326,41 +374,11 @@ def _get_source_runs_for_course(
                 course,
                 fallback,
             )
-            return [fallback]
+            return fallback
         msg = f"No source run found for {course}."
         raise SourceCourseIncompleteError(msg)
 
-    if ignore_langs:
-        return [primary_source_run]
-
-    # Pull all the other source runs for the course and run tag combo
-    source_runs = (
-        CourseRun.all_objects.filter(course=course)
-        .filter(is_source_run=True, run_tag=primary_source_run.run_tag)
-        .all()
-    )
-
-    if only_lang:
-        source_runs = source_runs.filter(
-            Q(language=only_lang) | (Q(language="") | Q(is_primary_language=True))
-        )
-
-    seen_languages: list = []
-    filtered_run_list = {}
-    for run in source_runs:
-        lang = run.language  # may be None for legacy runs
-        if lang in seen_languages:
-            msg = (
-                f"Course {course} has more than one source run for "
-                f"language '{lang}': {filtered_run_list[lang]} and {run}. "
-                "Resolve by unsetting is_source_run on the duplicates."
-            )
-            raise SourceCourseIncompleteError(msg)
-
-        seen_languages.append(lang)
-        filtered_run_list[lang] = run
-
-    return [filtered_run_list[r] for r in filtered_run_list]
+    return source_runs.all()
 
 
 def create_contract_run(  # noqa: PLR0913
@@ -374,6 +392,7 @@ def create_contract_run(  # noqa: PLR0913
     queue_codes: bool = False,
     ignore_langs: bool = False,
     only_lang: str | None = None,
+    filter_variants: Union[list, None] = None,
 ) -> list[tuple[CourseRun, Product]]:
     """
     Create run(s) for the specified contract.
@@ -433,6 +452,7 @@ def create_contract_run(  # noqa: PLR0913
         require_designated=require_designated_source_run,
         ignore_langs=ignore_langs,
         only_lang=only_lang,
+        filter_variants=filter_variants,
     )
 
     content_type = ContentType.objects.filter(

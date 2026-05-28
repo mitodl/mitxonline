@@ -3,6 +3,7 @@
 from collections.abc import Sequence
 
 from django.contrib import admin
+from django.contrib.contenttypes.admin import GenericTabularInline
 
 from b2b.models import (
     ContractPage,
@@ -61,6 +62,15 @@ class UserOrganizationAdminInline(admin.TabularInline):
         """Return the user's email address."""
 
         return obj.user.email
+
+
+class ContractPagePossibleVariantInline(GenericTabularInline):
+    """Inline for possible variants for a course"""
+
+    from variants.models import SupportedVariant  # noqa: PLC0415
+
+    model = SupportedVariant
+    extra = 0
 
 
 class ReadOnlyModelAdmin(admin.ModelAdmin):
@@ -202,7 +212,11 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         "max_learners",
         "enrollment_fixed_price",
     ]
-    inlines = [ContractPageCourseRunInline, ContractPageProgramInline]
+    inlines = [
+        ContractPageCourseRunInline,
+        ContractPageProgramInline,
+        ContractPagePossibleVariantInline,
+    ]
 
 
 @admin.register(OrganizationPage)
