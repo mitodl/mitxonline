@@ -300,6 +300,8 @@ env = [
   "LOGOUT_REDIRECT_URL=https://openedx.odl.local/logout",
   "MAILGUN_KEY=invalid-key",
   "MAILGUN_SENDER_DOMAIN=localhost",
+  "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE=True",
+  "MITOL_HUBSPOT_API_PRIVATE_TOKEN=",
   "MITX_ONLINE_BASE_URL=http://mitxonline.odl.local",
   "MITX_ONLINE_DB_DISABLE_SSL=True",
   "MITX_ONLINE_SECURE_SSL_REDIRECT=False",
@@ -316,7 +318,7 @@ env = [
   "RECAPTCHA_SITE_KEY=",
   "RECAPTCHA_SECRET_KEY=",
   "POSTHOG_ENABLED=True",
-  "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE=True"
+  "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN=",
 ]
 markers = [
   "dont_mock_enrollments",
