@@ -58,7 +58,11 @@ class ProgramRequirementSerializer(StrictFieldsSerializer):
     def get_fields(self):
         """Override because 'children' is a recursive structure"""
         fields = super().get_fields()
-        fields["children"] = ProgramRequirementSerializer(many=True, default=[])
+        children = ProgramRequirementSerializer(many=True, default=[])
+        children._spectacular_annotation = {
+            "field": {"type": "array", "items": {"type": "object"}}
+        }
+        fields["children"] = children
         return fields
 
 

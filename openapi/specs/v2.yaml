@@ -9586,7 +9586,7 @@ components:
         children:
           type: array
           items:
-            $ref: '#/components/schemas/V1ProgramRequirement'
+            type: object
           default: []
       required:
       - data
@@ -10712,7 +10712,7 @@ components:
         children:
           type: array
           items:
-            $ref: '#/components/schemas/V2ProgramRequirement'
+            type: object
           default: []
       required:
       - data
