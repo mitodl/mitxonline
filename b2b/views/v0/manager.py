@@ -155,6 +155,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             return BaseContractPageSerializer
         return ManagerContractDetailSerializer
 
+    @extend_schema(
+        responses=ManagerCourseRunSerializer(many=True),
+        description="List course runs available for a specific contract.",
+    )
     @action(detail=True, methods=["get"])
     def course_runs(self, request, **kwargs):  # noqa: ARG002
         """
@@ -168,6 +172,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
     @extend_schema(
+        responses=ManagerEnrollmentSerializer(many=True),
         parameters=[
             OpenApiParameter(
                 name="course_run_id",
@@ -203,6 +208,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         serializer = ManagerEnrollmentSerializer(enrollments, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        responses=ManagerEnrollmentCodeSerializer(many=True),
+        description="List enrollment codes for a contract. Only shows codes for contracts that require them (non-auto membership types). Logic varies based on whether contract has learner limits.",
+    )
     @action(detail=True, methods=["get"])
     def codes(self, request, **kwargs):  # noqa: ARG002
         """

@@ -52,6 +52,8 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
 class ManagerCourseRunSerializer(serializers.ModelSerializer):
     """Serializer for course runs in a contract."""
 
+    readable_id = serializers.CharField(read_only=True)
+
     class Meta:
         model = CourseRun
         fields = [

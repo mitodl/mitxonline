@@ -264,12 +264,10 @@ paths:
           description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/:
     get:
-      operationId: b2b_manager_organizations_contracts_codes_retrieve
-      description: |-
-        List enrollment codes for a contract.
-
-        Only shows codes for contracts that require them (non-auto membership types).
-        Logic varies based on whether contract has learner limits.
+      operationId: b2b_manager_organizations_contracts_codes_list
+      description: List enrollment codes for a contract. Only shows codes for contracts
+        that require them (non-auto membership types). Logic varies based on whether
+        contract has learner limits.
       parameters:
       - in: path
         name: id
@@ -290,15 +288,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagerContractDetail'
+                type: array
+                items:
+                  $ref: '#/components/schemas/ManagerEnrollmentCode'
           description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/:
     get:
-      operationId: b2b_manager_organizations_contracts_course_runs_retrieve
-      description: |-
-        List course runs available for a specific contract.
-
-        GET /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/course_runs/
+      operationId: b2b_manager_organizations_contracts_course_runs_list
+      description: List course runs available for a specific contract.
       parameters:
       - in: path
         name: id
@@ -319,11 +316,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagerContractDetail'
+                type: array
+                items:
+                  $ref: '#/components/schemas/ManagerCourseRun'
           description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/:
     get:
-      operationId: b2b_manager_organizations_contracts_course_runs_enrollments_retrieve
+      operationId: b2b_manager_organizations_contracts_course_runs_enrollments_list
       description: List enrollments for a specific course run within a contract.
       parameters:
       - in: path
@@ -351,7 +350,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ManagerContractDetail'
+                type: array
+                items:
+                  $ref: '#/components/schemas/ManagerEnrollment'
           description: ''
   /api/v0/b2b/manager/organizations/{id}/:
     get:
@@ -6675,6 +6676,108 @@ components:
       - total_enrollments
       - welcome_message
       - welcome_message_extra
+    ManagerCourseRun:
+      type: object
+      description: Serializer for course runs in a contract.
+      properties:
+        readable_id:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          description: The title of the course. This value is synced automatically
+            with edX studio.
+          maxLength: 255
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day the course begins. This value is synced automatically
+            with edX studio.
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day the course is active. This value is synced automatically
+            with edX studio.
+        enrollment_start:
+          type: string
+          format: date-time
+          nullable: true
+          description: The first day students can enroll. This value is synced automatically
+            with edX studio.
+        enrollment_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: The last day students can enroll. This value is synced automatically
+            with edX studio.
+        certificate_available_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: The day certificates should be available to users. This value
+            is synced automatically with edX studio.
+        live:
+          type: boolean
+      required:
+      - readable_id
+      - title
+    ManagerEnrollment:
+      type: object
+      description: Serializer for enrollments in a specific course run.
+      properties:
+        learner_name:
+          type: string
+        learner_email:
+          type: string
+        enrollment_date:
+          type: string
+          format: date-time
+        enrollment_type:
+          type: string
+        enrollment_status:
+          type: string
+        active:
+          type: boolean
+          description: Indicates whether or not this enrollment should be considered
+            active
+      required:
+      - enrollment_date
+      - enrollment_status
+      - enrollment_type
+      - learner_email
+      - learner_name
+    ManagerEnrollmentCode:
+      type: object
+      description: Serializer for enrollment codes available to a contract.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+        is_redeemed:
+          type: boolean
+          description: Check if this code has been used for contract attachment.
+          readOnly: true
+        redeemed_by:
+          type: string
+          nullable: true
+          description: Return the user that redeemed the code (last).
+          readOnly: true
+        redeemed_on:
+          type: string
+          format: date-time
+          nullable: true
+          description: Return the date that the code was redeemed on last.
+          readOnly: true
+      required:
+      - code
+      - id
+      - is_redeemed
+      - redeemed_by
+      - redeemed_on
     Nested:
       type: object
       properties:
