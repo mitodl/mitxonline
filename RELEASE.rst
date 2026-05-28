@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.150.10
+Version 1.150.10 (Released May 28, 2026)
 ----------------
 
 - fix: add extend_schema response types to B2B manager contract actions (#3611)
