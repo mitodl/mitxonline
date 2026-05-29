@@ -1161,6 +1161,17 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE}
 
+    if not ContractPage.active_objects.filter(
+        id=purchasable_object.b2b_contract.id
+    ).exists():
+        log.error(
+            "B2B enroll: %s attempted to use %s but contract %s either doesn't exist or is invalid",
+            user,
+            product,
+            purchasable_object.b2b_contract,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
     if not user.b2b_contracts.filter(id=purchasable_object.b2b_contract.id).exists():
         log.error(
             "B2B enroll: attempted to use %s but %s is not in the contract %s",
