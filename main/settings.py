@@ -268,8 +268,6 @@ INSTALLED_APPS = (
     # "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
-    "hijack",
-    "hijack.contrib.admin",
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
@@ -311,7 +309,6 @@ MIDDLEWARE = (
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
     "django_user_agents.middleware.UserAgentMiddleware",
-    "hijack.middleware.HijackUserMiddleware",
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
     "oauth2_provider.middleware.OAuth2TokenMiddleware",
@@ -1032,11 +1029,6 @@ CELERY_BEAT_SCHEDULE = {
         ),
     },
 }
-
-# Hijack
-HIJACK_ALLOW_GET_REQUESTS = True
-HIJACK_LOGOUT_REDIRECT_URL = "/admin/users/user"
-HIJACK_REGISTER_ADMIN = False
 
 # django cache back-ends
 CACHES = {

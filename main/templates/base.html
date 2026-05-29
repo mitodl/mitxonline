@@ -1,4 +1,4 @@
-{% load static hijack js_interop %}
+{% load static js_interop %}
 {% load wagtailcore_tags startswith noindex_meta banner %}
 {% load render_bundle from webpack_loader %}
 <!DOCTYPE html>
@@ -33,7 +33,6 @@
     <a href="#main" class="visually-hidden visually-hidden-focusable">Skip to main content</a>
     {% include "partials/gtm_body.html" %}
 
-    {% include 'hijack/notification.html' %}
     {% if not request.path|startswith:'/certificate/' and not request.path|startswith:'/cart/' and not request.path|startswith:'/checkout/' and not request.path|startswith:'/orders/' and 'ecom-service' not in request.GET %}
       {% banner %}
       {% block headercontent %}

@@ -701,18 +701,6 @@ redis = [
 ]
 
 [[package]]
-name = "django-hijack"
-version = "3.7.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/44/84/9b525b0ae0236f2d7b099809cea4c711adedda853cc63b5f1c1017d46429/django_hijack-3.7.6.tar.gz", hash = "sha256:a1f3b16d0eae3d72c27988692453f0a923c665d96783325034798a8020f0ceb4", size = 14310, upload-time = "2026-01-06T16:49:49.254Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1f/5e/e076ed1056dec17879f842655e4034cb17c079f40473d53d73c8e9041905/django_hijack-3.7.6-py3-none-any.whl", hash = "sha256:b43703b57b77b17a2f754dced65356899178d8d3664b36e7e26a7d414fd61e7f", size = 31484, upload-time = "2026-01-06T16:49:48.098Z" },
-]
-
-[[package]]
 name = "django-ipware"
 version = "7.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2004,7 +1992,6 @@ dependencies = [
     { name = "django-countries" },
     { name = "django-filter" },
     { name = "django-health-check", extra = ["celery", "redis"] },
-    { name = "django-hijack" },
     { name = "django-ipware" },
     { name = "django-oauth-toolkit" },
     { name = "django-object-actions" },
@@ -2114,7 +2101,6 @@ requires-dist = [
     { name = "django-countries", specifier = ">=7.2.1,<8" },
     { name = "django-filter", specifier = ">=24.3,<25" },
     { name = "django-health-check", extras = ["celery", "redis"], specifier = ">=4.0.0" },
-    { name = "django-hijack", specifier = ">=3.6.0,<4" },
     { name = "django-ipware", specifier = ">=7.0.0,<8" },
     { name = "django-oauth-toolkit", specifier = "==3.1" },
     { name = "django-object-actions", specifier = ">=5.0.0,<6" },
