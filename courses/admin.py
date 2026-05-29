@@ -78,6 +78,7 @@ class CoursePossibleVariantInline(GenericTabularInline):
     from variants.models import SupportedVariant  # noqa: PLC0415
 
     model = SupportedVariant
+    extra = 0
 
 
 class CourseRunInline(admin.TabularInline):
@@ -99,6 +100,7 @@ class CourseRunInline(admin.TabularInline):
         "enrollment_start",
         "upgrade_deadline",
     )
+    show_change_link = True
 
     def has_add_permission(self, *args, **kwargs):  # noqa: ARG002
         return False
@@ -229,6 +231,56 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         "b2b_contract",
     ]
     raw_id_fields = ("course",)
+    fieldsets = [
+        (
+            None,
+            {
+                "fields": [
+                    "title",
+                    "course",
+                    "courseware_id",
+                    "run_tag",
+                    "has_courseware_url",
+                    "is_source_run",
+                    "live",
+                    "enrollment_modes",
+                ],
+            },
+        ),
+        (
+            "Dates/Pacing",
+            {
+                "fields": [
+                    "is_self_paced",
+                    "start_date",
+                    "end_date",
+                    "enrollment_start",
+                    "enrollment_end",
+                    "upgrade_deadline",
+                    "certificate_available_date",
+                ]
+            },
+        ),
+        (
+            "B2B",
+            {
+                "fields": [
+                    "b2b_contract",
+                ],
+            },
+        ),
+        (
+            "Customization Variant",
+            {
+                "fields": [
+                    "language",
+                    "is_primary_language",
+                    "variant_industry",
+                    "variant_length",
+                ],
+            },
+        ),
+    ]
 
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})},

@@ -75,15 +75,11 @@ COURSE_VARIANT_INDUSTRY = [
 COURSE_VARIANT_LENGTH = [
     (
         "",
-        "Normal",
+        "Full",
     ),
     (
         "S",
         "Short",
-    ),
-    (
-        "F",
-        "Full",
     ),
 ]
 
