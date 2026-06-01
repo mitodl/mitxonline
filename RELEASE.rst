@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.151.1
+Version 1.151.1 (Released June 01, 2026)
 ---------------
 
 - Remove django-hijack integration (#3617)
