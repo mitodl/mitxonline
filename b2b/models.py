@@ -701,6 +701,8 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
         help_text="The user that redeemed the discount.",
         related_name="+",
     )
@@ -710,6 +712,38 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
         help_text="The contract that the user was attached to.",
         related_name="code_redemptions",
     )
+
+    assigned_email = models.EmailField(  # noqa: DJ001
+        null=True,
+        blank=True,
+        help_text="Email to assign discount code to. This may correspond to a user which has not been created yet.",
+    )
+    assigned_name = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+
+    # This should only ever be null if a user has been deleted after assigning a code
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    redeemed_on = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the code was claimed. None indicates that it has been assigned, but not yet claimed.",
+    )
+    last_reminder_sent_on = models.DateTimeField(
+        null=True, blank=True, help_text="When the code last had a reminder email sent."
+    )
+
+    @property
+    def status(self):
+        # This is used for display in the enrollment code serializer.
+        # A code without a DiscountContractAttachmentRedemption row is considered "unassigned"
+        # A code which has been allocated but not redeemed is "assigned"
+
+        # We could get away w/ just checking user if we make sure we link the user on code redemption.
+        if self.redeemed_on or self.user:
+            return "redeemed"
+        else:
+            return "assigned"
 
 
 class UserOrganization(models.Model):
