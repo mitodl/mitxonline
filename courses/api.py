@@ -1457,6 +1457,10 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     include_in_learn_catalog: bool = False,
     ingest_content_files_for_ai: bool = False,
     is_source_run: bool = False,
+    language: str = "en",
+    is_primary_language: bool = False,
+    variant_length: str = "",
+    variant_industry: str = "",
 ):
     """
     Import a course run from edX.
@@ -1558,6 +1562,10 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         live=live,
         is_self_paced=edx_course_run.is_self_paced(),
         is_source_run=is_source_run,
+        language=language,
+        is_primary_language=is_primary_language,
+        variant_industry=variant_industry,
+        variant_length=variant_length,
     )
 
     course_page = None

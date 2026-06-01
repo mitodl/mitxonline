@@ -203,14 +203,10 @@ class TestImportCourserunCommand:
             industry="E",
         )
 
-        courserun_qs = CourseRun.objects.filter(
-            courseware_id=mock_edx_course_detail.course_id
-        )
-
         assert len(std_err.getvalue()) > 0
-        assert courserun_qs.exists()
-        courserun = courserun_qs.get()
-        assert courserun.language != "qq"
+        assert not CourseRun.objects.filter(
+            courseware_id=mock_edx_course_detail.course_id
+        ).exists()
 
     @pytest.mark.parametrize(
         "valid_variant",

@@ -219,7 +219,7 @@ class Command(BaseCommand):
 
         return None
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915, ARG002
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0911, PLR0915, ARG002
         if kwargs.get("publish_cms_page") and kwargs.get("draft_cms_page"):
             self.stderr.write(
                 self.style.ERROR(
@@ -319,22 +319,51 @@ class Command(BaseCommand):
         success_count = 0
 
         for edx_course in edx_courses:
-            run_data = import_courserun_from_edx(
-                course_key=edx_course.course_id,
-                live=kwargs.get("live", False),
-                use_specific_course=kwargs.get("use_specific_course"),
-                price=price,
-                block_countries=kwargs.get("block_countries"),
-                departments=kwargs.get("depts"),
-                create_depts=kwargs.get("create_depts", False),
-                create_cms_page=kwargs.get("create_cms_page", False),
-                publish_cms_page=publish_cms_page,
-                include_in_learn_catalog=kwargs.get("include_in_learn_catalog", False),
-                ingest_content_files_for_ai=kwargs.get(
-                    "ingest_content_files_for_ai", False
-                ),
-                is_source_run=kwargs.get("source_course", False),
-            )
+            try:
+                run_data = import_courserun_from_edx(
+                    course_key=edx_course.course_id,
+                    live=kwargs.get("live", False),
+                    use_specific_course=kwargs.get("use_specific_course"),
+                    price=price,
+                    block_countries=kwargs.get("block_countries"),
+                    departments=kwargs.get("depts"),
+                    create_depts=kwargs.get("create_depts", False),
+                    create_cms_page=kwargs.get("create_cms_page", False),
+                    publish_cms_page=publish_cms_page,
+                    include_in_learn_catalog=kwargs.get(
+                        "include_in_learn_catalog", False
+                    ),
+                    ingest_content_files_for_ai=kwargs.get(
+                        "ingest_content_files_for_ai", False
+                    ),
+                    is_source_run=kwargs.get("source_course", False),
+                    variant_industry=kwargs.get("industry", ""),
+                    variant_length=kwargs.get("length", ""),
+                    language=kwargs.get("language", "en"),
+                    is_primary_language=kwargs.get("primary_lang", False),
+                )
+            except ValidationError:
+                log.exception(
+                    "import_courserun couldn't import %s - validation error",
+                    edx_course.course_id,
+                )
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"Validation error importing {edx_course.course_id}."
+                    )
+                )
+                return f"Validation error importing {edx_course.course_id}."
+            except LookupError:
+                log.exception(
+                    "import_courserun: couldn't import %s - lookup error (probably bad language code?)",
+                    edx_course.course_id,
+                )
+                self.stderr.write(
+                    self.style.ERROR(
+                        f"Lookup error importing {edx_course.course_id}. (This is likely a bad language code or variant option.)"
+                    )
+                )
+                return f"Lookup error importing {edx_course.course_id}. (This is likely a bad language code or variant option.)"
 
             if not isinstance(run_data, tuple) or len(run_data) != 3:  # noqa: PLR2004
                 continue
@@ -349,11 +378,6 @@ class Command(BaseCommand):
                     self.style.SUCCESS(f"\t --> Created product {product}")
                 )
 
-            run.variant_industry = kwargs.get("industry", "")
-            run.variant_length = kwargs.get("length", "")
-            run.language = kwargs.get("language")
-            run.is_primary_language = kwargs.get("primary_lang", False)
-
             if kwargs.get("run_tag", False):
                 run.run_tag = kwargs.get("run_tag")
             else:
@@ -362,16 +386,6 @@ class Command(BaseCommand):
                         f"WARNING: No specific run tag specified for {run.courseware_id} in language {run.language}, so using the default {run.run_tag}. This is probably not what you want."
                     )
                 )
-
-            try:
-                run.clean_language()
-            except ValidationError:
-                self.stderr.write(
-                    self.style.ERROR(
-                        f"ERROR: Language code {run.language} specified is invalid, cannot set."
-                    )
-                )
-                continue
 
             try:
                 run.save()
