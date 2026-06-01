@@ -62,6 +62,11 @@ by the course, which may include variant options that the contract does not incl
             help="The course readable ID to work with. (Use either this or --run.)",
         )
         parser.add_argument(
+            "--b2b",
+            action="store_true",
+            help="Check B2B-only variant sets (and only display matching source runs)",
+        )
+        parser.add_argument(
             "--contract",
             type=str,
             help="Check only the specified contract ID or slug.",
@@ -76,6 +81,7 @@ by the course, which may include variant options that the contract does not incl
         """Perform the check."""
 
         course = kwargs.pop("course")
+        b2b_flag = kwargs.pop("b2b", False)
         contract = kwargs.pop("contract", False)
         contract_obj = False
 
@@ -100,6 +106,8 @@ by the course, which may include variant options that the contract does not incl
                 return
 
             self.stdout.write(f"Checking for contract {contract_obj}")
+        elif b2b_flag:
+            self.stdout.write("Checking B2B variants")
         else:
             self.stdout.write("Checking publicly-available courses")
 
@@ -126,7 +134,7 @@ by the course, which may include variant options that the contract does not incl
                 return
 
         other_options = course_obj.possible_variant_sets.filter(
-            default_variant=False, b2b_only=bool(contract_obj)
+            default_variant=False, b2b_only=bool(contract_obj or b2b_flag)
         )
 
         self.stdout.write(
@@ -136,6 +144,9 @@ by the course, which may include variant options that the contract does not incl
         runs_qs = course_obj.courseruns.filter(
             b2b_contract=(contract_obj if contract_obj else None)
         )
+
+        if b2b_flag:
+            runs_qs = runs_qs.filter(is_source_run=True)
 
         seen_run_ids = []
 

@@ -437,7 +437,7 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
         queryset = queryset.prefetch_related(
             Prefetch(
                 "possible_variant_sets",
-                queryset=SupportedVariant.objects.filter(
+                queryset=SupportedVariant.objects.filter(active=True).filter(
                     Q(b2b_only=variant_b2b_enabled) | Q(default_variant=True)
                 ),
             )
