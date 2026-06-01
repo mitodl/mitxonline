@@ -1316,6 +1316,12 @@ MITX_ONLINE_FASTLY_URL = get_string(
     description="The URL to the Fastly API.",
 )
 
+MITX_ONLINE_FASTLY_SERVICE_ID = get_string(
+    name="FASTLY_SERVICE_ID",
+    default=None,
+    description="Fastly service ID used for surrogate key (tag) purging.",
+)
+
 # Hubspot sync settings
 MITOL_HUBSPOT_API_PRIVATE_TOKEN = get_string(
     name="MITOL_HUBSPOT_API_PRIVATE_TOKEN",

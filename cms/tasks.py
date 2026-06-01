@@ -9,6 +9,7 @@ from cms.models import Page
 from main.celery import app
 from main.settings import (
     MITX_ONLINE_FASTLY_AUTH_TOKEN,
+    MITX_ONLINE_FASTLY_SERVICE_ID,
     MITX_ONLINE_FASTLY_URL,
     SITE_BASE_URL,
 )
@@ -94,6 +95,67 @@ def queue_fastly_full_purge():
 
     logger.error("Purge request failed.")
     return False
+
+
+@app.task
+def queue_fastly_surrogate_key_purge(surrogate_key):
+    """
+    Purges all Fastly cached responses tagged with the given surrogate key.
+
+    Uses the Fastly purge-by-tag API:
+    POST /service/{service_id}/purge/{surrogate_key}
+
+    This allows MIT Learn pages to declare which MITxOnline surrogate keys they
+    subscribe to (via the Surrogate-Key response header), and MITxOnline to
+    invalidate those pages when course/program data changes.
+
+    Key format: mitxonline:course:<readable_id> or mitxonline:program:<readable_id>
+
+    Args:
+        surrogate_key (str): The surrogate key to purge, e.g.
+            "mitxonline:course:course-v1:MITx+6.00.1x"
+    """
+    logger = logging.getLogger("fastly_purge")
+
+    if not MITX_ONLINE_FASTLY_SERVICE_ID:
+        logger.warning(
+            "FASTLY_SERVICE_ID is not set; skipping surrogate key purge for %s",
+            surrogate_key,
+        )
+        return False
+
+    if not MITX_ONLINE_FASTLY_AUTH_TOKEN:
+        logger.warning(
+            "FASTLY_AUTH_TOKEN is not set; skipping surrogate key purge for %s",
+            surrogate_key,
+        )
+        return False
+
+    logger.info("Purging Fastly surrogate key: %s", surrogate_key)
+
+    api_url = urljoin(
+        MITX_ONLINE_FASTLY_URL,
+        f"/service/{MITX_ONLINE_FASTLY_SERVICE_ID}/purge/{surrogate_key}",
+    )
+    headers = {
+        "Fastly-Key": MITX_ONLINE_FASTLY_AUTH_TOKEN,
+        "fastly-soft-purge": "1",
+    }
+
+    resp = requests.post(api_url, headers=headers, timeout=10)
+
+    if resp.status_code >= 400:  # noqa: PLR2004
+        logger.error(
+            "Fastly surrogate key purge failed for %s: %s %s",
+            surrogate_key,
+            resp.status_code,
+            resp.reason,
+        )
+        logger.error("Fastly returned: %s", resp.text)
+        return False
+
+    logger.info("Fastly surrogate key purge OK for %s: %s", surrogate_key, resp.text)
+    return True
 
 
 @app.task
