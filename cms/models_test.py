@@ -618,21 +618,23 @@ def test_certificate_for_program_page():
         assert signatory.value.signature_image.title == "Image"
 
 
-def test_signatory_items_with_no_signature_image():
+def test_signatory_page_requires_signature_image():
     """
-    signatory_items should return None for signature_image when none is set,
-    rather than raising AttributeError.
+    SignatoryPage.signature_image is now required (null=False, blank=False).
+    This test verifies that the field is properly configured as mandatory.
     """
     course_page = CoursePageFactory.create(certificate_page=None)
     certificate_page = CertificatePageFactory.create(
         parent=course_page,
         signatories__0__signatory__page__name="Name",
-        signatories__0__signatory__page__signature_image=None,
+        signatories__0__signatory__page__title_1="Title_1",
+        signatories__0__signatory__page__signature_image__title="Image",
     )
     items = certificate_page.signatory_items
     assert len(items) == 1
     assert items[0]["name"] == "Name"
-    assert items[0]["signature_image"] is None
+    assert items[0]["signature_image"] is not None
+    assert "image" in items[0]["signature_image"].lower()
 
 
 @pytest.mark.parametrize("test_course", [True, False])

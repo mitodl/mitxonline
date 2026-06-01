@@ -2064,9 +2064,9 @@ class SignatoryPage(Page):
 
     signature_image = models.ForeignKey(
         Image,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
+        null=False,
+        blank=False,
+        on_delete=models.PROTECT,
         related_name="+",
         help_text="Signature image size must be at least 150x50 pixels.",
     )
