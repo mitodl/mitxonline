@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.151.1
+---------------
+
+- Remove django-hijack integration (#3617)
+- Update flaky test test_discounted_price (#3614)
+
 Version 1.151.0 (Released May 28, 2026)
 ---------------
 
