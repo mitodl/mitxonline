@@ -5,10 +5,9 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0062_alter_certificatepage_signatories'),
-        ('wagtailimages', '0027_image_description'),
+        ("cms", "0062_alter_certificatepage_signatories"),
+        ("wagtailimages", "0027_image_description"),
     ]
 
     operations = [
@@ -17,8 +16,15 @@ class Migration(migrations.Migration):
             reverse_sql=migrations.RunSQL.noop,
         ),
         migrations.AlterField(
-            model_name='signatorypage',
-            name='signature_image',
-            field=models.ForeignKey(blank=False, help_text='Signature image size must be at least 150x50 pixels.', null=False, on_delete=django.db.models.deletion.PROTECT, related_name='+', to='wagtailimages.image'),
+            model_name="signatorypage",
+            name="signature_image",
+            field=models.ForeignKey(
+                blank=False,
+                help_text="Signature image size must be at least 150x50 pixels.",
+                null=False,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="+",
+                to="wagtailimages.image",
+            ),
         ),
     ]
