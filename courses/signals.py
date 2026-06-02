@@ -2,7 +2,6 @@
 Signals for mitxonline course certificates
 """
 
-import logging
 
 from django.db import transaction
 from django.db.models.signals import post_save
@@ -73,7 +72,5 @@ def handle_create_program_certificate(
     """When a ProgramCertificate model is created."""
     _ = created
     transaction.on_commit(
-        lambda: hubspot_tasks.sync_program_certificate_with_hubspot.delay(
-            instance.id
-        )
+        lambda: hubspot_tasks.sync_program_certificate_with_hubspot.delay(instance.id)
     )
