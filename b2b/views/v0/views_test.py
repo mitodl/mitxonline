@@ -19,6 +19,7 @@ from courses.models import CourseRunEnrollment
 from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
 from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+    USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
@@ -70,7 +71,15 @@ def test_b2b_contract_attachment_code_with_no_contracts(user):
         False,
     ],
 )
-def test_b2b_contract_attachment(mocker, max_learners, code_used):
+@pytest.mark.parametrize(
+    "contract_active",
+    [
+        "active",
+        "date",
+        "flag",
+    ],
+)
+def test_b2b_contract_attachment(mocker, max_learners, code_used, contract_active):
     """Ensure a supplied code results in attachment for the user."""
 
     mocked_attach_user = mocker.patch(
@@ -99,6 +108,14 @@ def test_b2b_contract_attachment(mocker, max_learners, code_used):
             contract=contract,
         )
 
+    if contract_active == "date":
+        contract.contract_start = now_in_utc() + timedelta(days=30)
+        contract.save()
+
+    if contract_active == "flag":
+        contract.active = False
+        contract.save()
+
     client = APIClient()
     client.force_login(user)
 
@@ -109,10 +126,13 @@ def test_b2b_contract_attachment(mocker, max_learners, code_used):
 
     user.refresh_from_db()
 
-    if code_used and max_learners:
+    if (code_used and max_learners) or contract_active in ["flag", "date"]:
         # Code already used for attachment and is not unlimited - should return 404
         assert resp.status_code == 404
-        assert resp.json()["detail"] == "Invalid or expired enrollment code."
+        assert resp.json()["detail"] in [
+            "No contracts found for this code.",
+            "Invalid or expired enrollment code.",
+        ]
         assert not user.b2b_organizations.filter(pk=contract.organization.id).exists()
         assert not user.b2b_contracts.filter(pk=contract.id).exists()
 
@@ -303,9 +323,9 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
     with freeze_time(slightly_future_time):
         resp = client.post(url)
 
-    # Contract dates are invalid - code is valid but no contracts to attach - should return 200
-    assert resp.status_code == 200
-    assert resp.json() == []
+    # Contract dates are invalid - code is valid but no contracts to attach - should return 404
+    assert resp.status_code == 404
+    assert "detail" in resp.json()
 
     user.refresh_from_db()
     assert not user.b2b_contracts.filter(pk=contract.id).exists()
@@ -420,7 +440,17 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
 @pytest.mark.parametrize("user_has_edx_user", [True, False])
 @pytest.mark.parametrize("has_price", [True, False])
 @pytest.mark.parametrize("run_is_enrollable", [True, False])
-def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrollable):
+@pytest.mark.parametrize(
+    "contract_active",
+    [
+        "active",
+        "date",
+        "flag",
+    ],
+)
+def test_b2b_enroll(  # noqa: PLR0915, PLR0913
+    mocker, settings, user_has_edx_user, has_price, run_is_enrollable, contract_active
+):
     """Make sure that hitting the enroll endpoint actually results in enrollments"""
 
     mocker.patch("hubspot_sync.tasks.sync_cart_add_event_with_hubspot.apply_async")
@@ -462,6 +492,14 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrol
     else:
         assert not user.openedx_user
 
+    if contract_active == "date":
+        contract.contract_start = now_in_utc() + timedelta(days=30)
+        contract.save()
+
+    if contract_active == "flag":
+        contract.active = False
+        contract.save()
+
     client = APIClient()
     client.force_login(user)
 
@@ -471,6 +509,11 @@ def test_b2b_enroll(mocker, settings, user_has_edx_user, has_price, run_is_enrol
     if not run_is_enrollable:
         assert resp.status_code == 406
         assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE
+        return
+
+    if contract_active in ["date", "flag"]:
+        assert resp.status_code == 406
+        assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
         return
 
     if has_price:

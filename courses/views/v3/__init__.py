@@ -471,12 +471,18 @@ def get_course_variant_runs(request):
         )
 
     default_variants = SupportedVariant.objects.filter(
-        content_type=course_ct, object_id__in=course_ids, default_variant=True
+        content_type=course_ct,
+        object_id__in=course_ids,
+        default_variant=True,
+        active=True,
     )
 
     # construct filter
     variant_filter = (
-        Q(language=language) & Q(variant_length=length) & Q(variant_industry=industry)
+        Q(language=language)
+        & Q(variant_length=length)
+        & Q(variant_industry=industry)
+        & Q(active=True)
     )
 
     output = []

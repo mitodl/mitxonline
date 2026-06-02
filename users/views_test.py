@@ -80,7 +80,6 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
                             "integration_type": contract.integration_type,
                             "contract_start": None,
                             "contract_end": None,
-                            "active": True,
                             "slug": contract.slug,
                             "organization": contract.organization.id,
                             "programs": [],
@@ -162,7 +161,7 @@ def test_get_user_by_me_excludes_inactive_contracts(client, user):
     # Create active and inactive contracts in the same organization
     active_contract = ContractPageFactory.create(active=True)
     inactive_contract = ContractPageFactory.create(
-        active=False, organization=active_contract.organization
+        organization=active_contract.organization
     )
 
     # Add user to the organization
@@ -171,6 +170,9 @@ def test_get_user_by_me_excludes_inactive_contracts(client, user):
     user.b2b_contracts.add(active_contract)
     user.b2b_contracts.add(inactive_contract)
     user.save()
+
+    inactive_contract.active = False
+    inactive_contract.save()
 
     resp = client.get(reverse("users_api-me"))
 
@@ -185,7 +187,6 @@ def test_get_user_by_me_excludes_inactive_contracts(client, user):
     # Should only include the active contract
     assert len(org_data["contracts"]) == 1
     assert org_data["contracts"][0]["id"] == active_contract.id
-    assert org_data["contracts"][0]["active"] is True
 
     # Should not include the inactive contract
     contract_ids = [contract["id"] for contract in org_data["contracts"]]

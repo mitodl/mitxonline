@@ -268,10 +268,27 @@ class ContractProgramItem(Orderable):
             )
 
 
+class ActiveContractManager(models.Manager):
+    """Manager that excludes contracts that aren't valid for use."""
+
+    def get_queryset(self):
+        """Perform the filtering - contract must be active, start before now, end after now."""
+
+        now = now_in_utc()
+
+        return (
+            super()
+            .get_queryset()
+            .filter(active=True)
+            .exclude(models.Q(contract_start__gt=now) | models.Q(contract_end__lt=now))
+        )
+
+
 class ContractPage(Page, ClusterableModel):
     """Stores information about a contract with an organization."""
 
     parent_page_types = ["b2b.OrganizationPage"]
+    active_objects = ActiveContractManager()
 
     name = models.CharField(max_length=255, help_text="The name of the contract.")
     description = RichTextField(

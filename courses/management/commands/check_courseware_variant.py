@@ -62,6 +62,11 @@ by the course, which may include variant options that the contract does not incl
             help="The course readable ID to work with. (Use either this or --run.)",
         )
         parser.add_argument(
+            "--b2b",
+            action="store_true",
+            help="Check B2B-only variant sets (and only display matching source runs)",
+        )
+        parser.add_argument(
             "--contract",
             type=str,
             help="Check only the specified contract ID or slug.",
@@ -72,10 +77,11 @@ by the course, which may include variant options that the contract does not incl
             help="Add a default variant if there's not one.",
         )
 
-    def handle(self, *_args, **kwargs):
+    def handle(self, *_args, **kwargs):  # noqa: C901
         """Perform the check."""
 
         course = kwargs.pop("course")
+        b2b_flag = kwargs.pop("b2b", False)
         contract = kwargs.pop("contract", False)
         contract_obj = False
 
@@ -100,6 +106,8 @@ by the course, which may include variant options that the contract does not incl
                 return
 
             self.stdout.write(f"Checking for contract {contract_obj}")
+        elif b2b_flag:
+            self.stdout.write("Checking B2B variants")
         else:
             self.stdout.write("Checking publicly-available courses")
 
@@ -126,7 +134,7 @@ by the course, which may include variant options that the contract does not incl
                 return
 
         other_options = course_obj.possible_variant_sets.filter(
-            default_variant=False, b2b_only=bool(contract_obj)
+            default_variant=False, b2b_only=bool(contract_obj or b2b_flag)
         )
 
         self.stdout.write(
@@ -137,6 +145,11 @@ by the course, which may include variant options that the contract does not incl
             b2b_contract=(contract_obj if contract_obj else None)
         )
 
+        if b2b_flag:
+            runs_qs = runs_qs.filter(is_source_run=True)
+
+        seen_run_ids = []
+
         for variant in [default_variant, *other_options.all()]:
             variant_runs = runs_qs.filter(variant.to_q_filter()).all()
 
@@ -145,6 +158,7 @@ by the course, which may include variant options that the contract does not incl
             for variant_run in variant_runs:
                 source_flag = "(Source)" if variant_run.is_source_run else ""
                 runs.append(f"{variant_run.courseware_id}{source_flag}")
+                seen_run_ids.append(variant_run.id)
 
             runs = " ".join(runs) if len(runs) > 0 else self.style.WARNING("NO RUNS")
 
@@ -152,3 +166,16 @@ by the course, which may include variant options that the contract does not incl
                 f"Language = {variant.language} Industry = {variant.variant_industry} Length = {variant.variant_length}"
             )
             self.stdout.write(f"\t{runs}")
+
+        unseen_runs = runs_qs.exclude(pk__in=seen_run_ids).all()
+
+        if unseen_runs.count():
+            self.stdout.write(f"\nNon-matching runs ({unseen_runs.count()} total)")
+
+            for run in unseen_runs:
+                primary = (
+                    "(Primary)" if run.language == "" or run.is_primary_language else ""
+                )
+                self.stdout.write(
+                    f"\t{run.courseware_id} - {run.run_tag}: Language = {run.language}{primary} Industry = {run.variant_industry} Length = {run.variant_length}"
+                )

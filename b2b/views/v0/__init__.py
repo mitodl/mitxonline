@@ -78,7 +78,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter to only return active contracts by default."""
-        return ContractPage.objects.filter(active=True).prefetch_related(
+        return ContractPage.active_objects.prefetch_related(
             Prefetch(
                 "contract_programs",
                 queryset=ContractProgramItem.objects.order_by("sort_order"),
@@ -110,9 +110,9 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
         """Return the variant runs for a contract."""
 
         if contract_slug and contract_slug.isdecimal():
-            contract = ContractPage.objects.filter(pk=contract_slug)
+            contract = ContractPage.active_objects.filter(pk=contract_slug)
         else:
-            contract = ContractPage.objects.filter(slug=contract_slug)
+            contract = ContractPage.active_objects.filter(slug=contract_slug)
 
         if not contract.exists():
             return Response(
@@ -184,7 +184,7 @@ class AttachContractApi(APIView):
         request=None,
         responses=ContractPageSerializer(many=True),
     )
-    def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002, C901
+    def post(self, request, enrollment_code: str, format=None):  # noqa: A002, ARG002
         """
         Use the provided enrollment code to attach the user to a B2B contract.
 
@@ -229,16 +229,11 @@ class AttachContractApi(APIView):
             )
 
             for discount in fallback_discounts:
-                for contract in discount.b2b_contracts():
-                    if not contract.active:
-                        continue
-
-                    if contract.contract_start and contract.contract_start > now:
-                        continue
-
-                    if contract.contract_end and contract.contract_end < now:
-                        continue
-
+                for contract in (
+                    discount.b2b_contracts()
+                    .filter(active=True)
+                    .exclude(Q(contract_start__gte=now) | Q(contract_end__lt=now))
+                ):
                     if contract.is_full():
                         log.error(  # noqa: TRY400
                             "B2B attach: checked contract %s for code %s but it's full",
@@ -255,9 +250,15 @@ class AttachContractApi(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        b2b_contract_ids = list(code.b2b_contracts().values_list("id", flat=True))
+        b2b_contract_ids = list(
+            code.b2b_contracts()
+            .filter(active=True)
+            .exclude(Q(contract_start__gte=now) | Q(contract_end__lt=now))
+            .values_list("id", flat=True)
+        )
         if not b2b_contract_ids:
-            # Log an error here. We found a code, but it isn't associated with any contracts, which is generally confusing for operators.
+            # Log an error here. We found a code, but it isn't associated with
+            # any active contracts, which is generally confusing for operators.
             log.error(
                 "B2B attach: code %s is valid but not associated with any contracts",
                 code,
@@ -267,7 +268,7 @@ class AttachContractApi(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        contracts = self._get_eligible_contracts(request.user, b2b_contract_ids, now)
+        contracts = self._get_eligible_contracts(request.user, b2b_contract_ids)
 
         contracts_attached, contract_full = self._attach_user_to_contracts(
             request.user, contracts, code
@@ -318,13 +319,12 @@ class AttachContractApi(APIView):
             .get(discount_code=enrollment_code)
         )
 
-    def _get_eligible_contracts(self, user, contract_ids_for_code, now):
+    def _get_eligible_contracts(self, user, contract_ids_for_code):
         """Return contracts associated with the code that the user can join."""
 
         return (
-            ContractPage.objects.filter(pk__in=contract_ids_for_code)
+            ContractPage.active_objects.filter(pk__in=contract_ids_for_code)
             .exclude(pk__in=user.b2b_contracts.all())
-            .exclude(Q(contract_end__lt=now) | Q(contract_start__gt=now))
             .all()
         )
 

@@ -24,7 +24,6 @@ class BaseContractPageSerializer(serializers.ModelSerializer):
             "organization",
             "contract_start",
             "contract_end",
-            "active",
             "slug",
         ]
         read_only_fields = [
@@ -36,7 +35,6 @@ class BaseContractPageSerializer(serializers.ModelSerializer):
             "organization",
             "contract_start",
             "contract_end",
-            "active",
             "slug",
         ]
 

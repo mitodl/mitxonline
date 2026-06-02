@@ -2827,14 +2827,12 @@ paths:
           type: string
           enum:
           - ''
-          - F
           - S
         description: |-
           Variant: Describes the length of the run (short/long).
 
-          * `` - Normal
+          * `` - Full
           * `S` - Short
-          * `F` - Full
       - in: query
         name: id
         schema:
@@ -3758,17 +3756,12 @@ components:
           readOnly: true
           nullable: true
           description: The end date of the contract.
-        active:
-          type: boolean
-          readOnly: true
-          description: Whether this contract is active or not. Date rules still apply.
         slug:
           type: string
           readOnly: true
           description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
           pattern: ^[-\w]+$
       required:
-      - active
       - contract_end
       - contract_start
       - description
@@ -3967,9 +3960,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -4368,10 +4360,6 @@ components:
           readOnly: true
           nullable: true
           description: The end date of the contract.
-        active:
-          type: boolean
-          readOnly: true
-          description: Whether this contract is active or not. Date rules still apply.
         slug:
           type: string
           readOnly: true
@@ -4408,7 +4396,6 @@ components:
             $ref: '#/components/schemas/SupportedVariant'
           readOnly: true
       required:
-      - active
       - contract_end
       - contract_start
       - description
@@ -5256,9 +5243,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -5458,9 +5444,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -5637,9 +5622,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -6670,10 +6654,6 @@ components:
           readOnly: true
           nullable: true
           description: The end date of the contract.
-        active:
-          type: boolean
-          readOnly: true
-          description: Whether this contract is active or not. Date rules still apply.
         slug:
           type: string
           readOnly: true
@@ -6725,7 +6705,6 @@ components:
           description: Get total number of discount codes for this contract.
           readOnly: true
       required:
-      - active
       - attachment_percentage
       - contract_end
       - contract_start
@@ -8403,9 +8382,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -9056,9 +9034,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -9256,9 +9233,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -9430,9 +9406,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -9980,9 +9955,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -10155,9 +10129,8 @@ components:
           description: |-
             Variant: Describes the length of the run (short/long).
 
-            * `` - Normal
+            * `` - Full
             * `S` - Short
-            * `F` - Full
           oneOf:
           - $ref: '#/components/schemas/VariantLengthEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -10887,15 +10860,12 @@ components:
     VariantLengthEnum:
       enum:
       - S
-      - F
       type: string
       description: |-
-        * `` - Normal
+        * `` - Full
         * `S` - Short
-        * `F` - Full
       x-enum-descriptions:
       - Short
-      - Full
     YearsExperienceEnum:
       enum:
       - 2
