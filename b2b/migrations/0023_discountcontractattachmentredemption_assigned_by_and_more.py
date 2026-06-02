@@ -5,6 +5,26 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def backfill_redemption_fields(apps, schema_editor):
+    """
+    Backfill assigned_email/assigned_name from the linked user record,
+    and set redeemed_on to created_on for all existing redemption rows
+    (pre-existing rows represent completed redemptions).
+    """
+    DiscountContractAttachmentRedemption = apps.get_model(
+        "b2b", "DiscountContractAttachmentRedemption"
+    )
+    for redemption in DiscountContractAttachmentRedemption.objects.select_related(
+        "user"
+    ).all():
+        redemption.assigned_email = redemption.user.email
+        redemption.assigned_name = redemption.user.name
+        redemption.redeemed_on = redemption.created_on
+        redemption.save(
+            update_fields=["assigned_email", "assigned_name", "redeemed_on"]
+        )
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("b2b", "0022_backfill_default_variants"),
@@ -54,6 +74,10 @@ class Migration(migrations.Migration):
                 help_text="When the code was claimed. None indicates that it has been assigned, but not yet claimed.",
                 null=True,
             ),
+        ),
+        migrations.RunPython(
+            code=backfill_redemption_fields,
+            reverse_code=migrations.RunPython.noop,
         ),
         migrations.AlterField(
             model_name="discountcontractattachmentredemption",

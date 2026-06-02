@@ -724,7 +724,7 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
     )
     assigned_name = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
 
-    # This should only ever be null if a user has been deleted after assigning a code
+    # This shouldn't be null much, but can be if a user has been deleted, and for anything assigned before this field was added.
     assigned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
     )
