@@ -4,7 +4,7 @@ from datetime import datetime
 
 from rest_framework import serializers
 
-from b2b.models import ContractPage
+from b2b.models import REDEMPTION_STATUS_UNASSIGNED, ContractPage
 from b2b.serializers.v0 import ContractPageSerializer
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
@@ -93,40 +93,63 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     """Serializer for enrollment codes available to a contract."""
 
     code = serializers.CharField(source="discount_code")
-    is_redeemed = serializers.SerializerMethodField()
-    redeemed_by = serializers.SerializerMethodField()
+    redemption_status = serializers.SerializerMethodField()
+    assigned_to = serializers.SerializerMethodField()
+    assigned_on = serializers.SerializerMethodField()
     redeemed_on = serializers.SerializerMethodField()
+    last_sent = serializers.SerializerMethodField()
 
     class Meta:
         model = Discount
-        fields = ["id", "code", "is_redeemed", "redeemed_by", "redeemed_on"]
+        fields = [
+            "id",
+            "code",
+            "redemption_status",
+            "assigned_to",
+            "assigned_on",
+            "redeemed_on",
+            "last_sent",
+        ]
 
-    def get_is_redeemed(self, obj) -> bool:
-        """Check if this code has been used for contract attachment."""
-        contract = self.context.get("contract")
-        if not contract:
-            return False
+    def _get_redemption(self, obj):
+        """
+        Return the most recent DiscountContractAttachmentRedemption
+        For contracts where max_learners is set, we should only ever have 0 or 1 redemption per code.
+        """
+        redemptions = getattr(obj, "prefetched_redemptions", None)
+        return redemptions[0] if redemptions else None
 
-        return obj.is_redeemed
+    def get_redemption_status(self, obj) -> str:
+        """
+        Return the redemption status of this code.
 
-    def get_redeemed_by(self, obj) -> str | None:
-        """Return the user that redeemed the code (last)."""
+        - "unassigned": no DiscountContractAttachmentRedemption record exists
+        - "assigned": a record exists but the code has not been claimed yet
+        - "redeemed": the code has been claimed
+        """
+        redemption = self._get_redemption(obj)
+        return redemption.status if redemption else REDEMPTION_STATUS_UNASSIGNED
 
-        contract = self.context.get("contract")
-        if not contract:
+    def get_assigned_to(self, obj) -> str | None:
+        """Return the email address this code is assigned to."""
+        redemption = self._get_redemption(obj)
+        if not redemption:
             return None
-
-        return (
-            obj.last_redemption_email if hasattr(obj, "last_redemption_email") else None
+        return redemption.assigned_email or (
+            redemption.user.email if redemption.user else None
         )
+
+    def get_assigned_on(self, obj) -> datetime | None:
+        """Return when the invite/assignment was created."""
+        redemption = self._get_redemption(obj)
+        return redemption.created_on if redemption else None
 
     def get_redeemed_on(self, obj) -> datetime | None:
-        """Return the date that the code was redeemed on last."""
+        """Return when the code was actually claimed."""
+        redemption = self._get_redemption(obj)
+        return redemption.redeemed_on if redemption else None
 
-        contract = self.context.get("contract")
-        if not contract:
-            return None
-
-        return (
-            obj.last_redemption_date if hasattr(obj, "last_redemption_date") else None
-        )
+    def get_last_sent(self, obj) -> datetime | None:
+        """Return when the last reminder email was sent."""
+        redemption = self._get_redemption(obj)
+        return redemption.last_reminder_sent_on if redemption else None

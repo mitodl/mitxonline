@@ -432,8 +432,8 @@ def test_org_contract_codes(org_setup, manager_drf_client):
             assert sorted(used_codes) == sorted(resp_codes[:3])
             assert resp_codes[3:] == contract_codes[:17]
 
-            assert resp.json()[0]["is_redeemed"]
-            assert not resp.json()[3]["is_redeemed"]
+            assert resp.json()[0]["redemption_status"] == "redeemed"
+            assert resp.json()[3]["redemption_status"] == "unassigned"
         else:
             # For the unlimited seat one, we only get back the single code.
 

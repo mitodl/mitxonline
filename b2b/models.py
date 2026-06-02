@@ -32,6 +32,10 @@ from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
 
+REDEMPTION_STATUS_UNASSIGNED = "unassigned"
+REDEMPTION_STATUS_ASSIGNED = "assigned"
+REDEMPTION_STATUS_REDEEMED = "redeemed"
+
 
 class OrganizationObjectIndexPage(Page):
     """The index page for organizations - provides the root level folder."""
@@ -741,9 +745,9 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
 
         # We could get away w/ just checking user if we make sure we link the user on code redemption.
         if self.redeemed_on or self.user:
-            return "redeemed"
+            return REDEMPTION_STATUS_REDEEMED
         else:
-            return "assigned"
+            return REDEMPTION_STATUS_ASSIGNED
 
 
 class UserOrganization(models.Model):

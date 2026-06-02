@@ -1,7 +1,7 @@
 """B2B manager dashboard views."""
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -226,30 +226,13 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         if contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS:
             return Response([])
 
-        discounts = (
-            contract.get_discounts()
-            .annotate(
-                is_redeemed=Exists(
-                    DiscountContractAttachmentRedemption.objects.filter(
-                        discount=OuterRef("pk")
-                    )
-                )
-            )
-            .annotate(
-                last_redemption_email=Subquery(
-                    DiscountContractAttachmentRedemption.objects.select_related("user")
-                    .filter(discount=OuterRef("pk"))
-                    .order_by("-created_on")
-                    .values("user__email")[:1]
-                )
-            )
-            .annotate(
-                last_redemption_date=Subquery(
-                    DiscountContractAttachmentRedemption.objects.select_related("user")
-                    .filter(discount=OuterRef("pk"))
-                    .order_by("-created_on")
-                    .values("created_on")[:1]
-                )
+        discounts = contract.get_discounts().prefetch_related(
+            Prefetch(
+                "contract_redemptions",
+                queryset=DiscountContractAttachmentRedemption.objects.select_related(
+                    "user"
+                ).order_by("-created_on"),
+                to_attr="prefetched_redemptions",
             )
         )
 
@@ -258,7 +241,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             return Response(
                 ManagerEnrollmentCodeSerializer(
                     [discounts.order_by("id").first()],
-                    context={"contract": contract},
                     many=True,
                 ).data
             )
@@ -283,7 +265,5 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 codes_for_output = discounts.all()[: contract.max_learners]
 
             return Response(
-                ManagerEnrollmentCodeSerializer(
-                    codes_for_output, many=True, context={"contract": contract}
-                ).data
+                ManagerEnrollmentCodeSerializer(codes_for_output, many=True).data
             )
