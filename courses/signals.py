@@ -73,7 +73,5 @@ def handle_create_program_certificate(
     """When a ProgramCertificate model is created."""
     _ = created
     transaction.on_commit(
-        lambda: hubspot_tasks.sync_program_certificate_with_hubspot.delay(
-            instance.id
-        )
+        lambda: hubspot_tasks.sync_program_certificate_with_hubspot.delay(instance.id)
     )
