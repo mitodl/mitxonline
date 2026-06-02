@@ -78,7 +78,7 @@ class ContractPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter to only return active contracts by default."""
-        return ContractPage.active_objects.filter(active=True).prefetch_related(
+        return ContractPage.active_objects.prefetch_related(
             Prefetch(
                 "contract_programs",
                 queryset=ContractProgramItem.objects.order_by("sort_order"),
