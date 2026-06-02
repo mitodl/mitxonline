@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.151.2
+---------------
+
+- Move where variant options are set during import_courserun (#3626)
+- Force color terminal output under GH actions (#3631)
+- Fix run tag generation and re-run check issues when re-running a variant (#3628)
+- Mock requests for all tests (#3619)
+
 Version 1.151.1 (Released June 01, 2026)
 ---------------
 
