@@ -8,10 +8,8 @@ from rest_framework import serializers
 
 from courses.models import (
     CourseRun,
-    CourseRunCertificate,
     CourseRunEnrollment,
     Program,
-    ProgramCertificate,
     ProgramEnrollment,
 )
 from ecommerce import models
@@ -42,6 +40,57 @@ ORDER_STATUS_MAPPING = {
 }
 
 
+def _get_prefetched_first_related(instance, relation_name: str):
+    """Return first prefetched related object if relation was prefetched."""
+    prefetched = getattr(instance, "_prefetched_objects_cache", {})
+    related_items = prefetched.get(relation_name)
+    if related_items is None:
+        return None
+    return related_items[0] if related_items else None
+
+
+def _resolve_product_from_version(version):
+    """Resolve a product from a ProductVersion while preserving previous behavior."""
+    if version is None:
+        return None
+
+    product = Product.all_objects.filter(id=version.object_id).first()
+    if product:
+        return resolve_product_version(product, product_version=version)
+    return version.object
+
+
+def _get_line_enrollment(instance):
+    """Return enrollment related to the purchased object and order purchaser."""
+    purchased_object = instance.purchased_object
+    purchaser = instance.order.purchaser
+    if isinstance(purchased_object, CourseRun):
+        return CourseRunEnrollment.all_objects.filter(
+            run=purchased_object, user=purchaser
+        ).first()
+    if isinstance(purchased_object, Program):
+        return ProgramEnrollment.all_objects.filter(
+            program=purchased_object, user=purchaser
+        ).first()
+    return None
+
+
+def _get_first_order_line(instance):
+    """Return first order line, preferring prefetched relation when available."""
+    first_line = _get_prefetched_first_related(instance, "lines")
+    if first_line is not None:
+        return first_line
+    return models.Line.objects.filter(order=instance).first()
+
+
+def _get_first_order_redemption(instance):
+    """Return first order redemption, preferring prefetched relation when available."""
+    first_redemption = _get_prefetched_first_related(instance, "discounts")
+    if first_redemption is not None:
+        return first_redemption
+    return instance.discounts.first()
+
+
 class LineSerializer(serializers.ModelSerializer):
     """Line Serializer for Hubspot"""
 
@@ -54,35 +103,25 @@ class LineSerializer(serializers.ModelSerializer):
     enrollment_mode = serializers.SerializerMethodField()
     change_status = serializers.SerializerMethodField()
 
-    _product = None
-    _enrollment = None
-
     def _get_product(self, instance):
-        """Retrieve the line product just once"""
-        if not self._product:
-            version = instance.product_version
-            product = Product.all_objects.filter(id=version.object_id).first()
-            if product:
-                self._product = resolve_product_version(
-                    product, product_version=version
-                )
-            else:
-                self._product = version.object
-        return self._product
+        """Retrieve the line product and cache it on the model instance."""
+        cache_attr = "_hubspot_line_product"
+        if hasattr(instance, cache_attr):
+            return getattr(instance, cache_attr)
+
+        product = _resolve_product_from_version(instance.product_version)
+        setattr(instance, cache_attr, product)
+        return product
 
     def _get_enrollment(self, instance):
         """Returns the enrollment associated with the Order, if one exists, else None"""
-        if isinstance(instance.purchased_object, CourseRun):
-            self._enrollment = CourseRunEnrollment.all_objects.filter(
-                run=instance.purchased_object, user=instance.order.purchaser
-            ).first()
-        elif isinstance(instance.purchased_object, Program):
-            self._enrollment = ProgramEnrollment.all_objects.filter(
-                program=instance.purchased_object, user=instance.order.purchaser
-            ).first()
-        else:
-            self._enrollment = None
-        return self._enrollment
+        cache_attr = "_hubspot_line_enrollment"
+        if hasattr(instance, cache_attr):
+            return getattr(instance, cache_attr)
+
+        enrollment = _get_line_enrollment(instance)
+        setattr(instance, cache_attr, enrollment)
+        return enrollment
 
     def get_enrollment_mode(self, instance):
         """Returns the enrollment's mode associated with the Order, if an enrollment exists, else None"""
@@ -160,37 +199,37 @@ class OrderToDealSerializer(serializers.ModelSerializer):
     pipeline = serializers.ReadOnlyField(default=settings.HUBSPOT_PIPELINE_ID)
     status = serializers.ReadOnlyField(source="state")
 
-    _discount_checked = False
-    _discount = None
-    _product = None
-
     def _get_product(self, instance):
-        """Retrieve the line product just once"""
-        if not self._product:
-            version = instance.lines.first().product_version
-            product = Product.objects.filter(id=version.object_id).first()
-            if product:
-                self._product = resolve_product_version(
-                    product, product_version=version
-                )
-            else:
-                self._product = version.object
-        return self._product
+        """Retrieve the first line's product and cache it on the order instance."""
+        cache_attr = "_hubspot_order_product"
+        if hasattr(instance, cache_attr):
+            return getattr(instance, cache_attr)
+
+        first_line = _get_first_order_line(instance)
+        product = (
+            _resolve_product_from_version(first_line.product_version)
+            if first_line is not None
+            else None
+        )
+        setattr(instance, cache_attr, product)
+        return product
 
     def _get_discount(self, instance):
-        """Return the order discount"""
-        if self._discount is None and not self._discount_checked:
-            redemption = instance.discounts.first()
-            self._discount_checked = True
-            if redemption:
-                self._discount = instance.discounts.first().redeemed_discount
-        return self._discount
+        """Return the first redeemed discount for the order."""
+        cache_attr = "_hubspot_order_discount"
+        if hasattr(instance, cache_attr):
+            return getattr(instance, cache_attr)
+
+        redemption = _get_first_order_redemption(instance)
+        discount = redemption.redeemed_discount if redemption else None
+        setattr(instance, cache_attr, discount)
+        return discount
 
     def get_unique_app_id(self, instance):
         """Get the app_id for the object - based on user and purchasable object for consistency"""
         # For consistency between cart-add and checkout, base the unique_app_id on
         # the user and purchasable object rather than the order ID
-        first_line = instance.lines.first()
+        first_line = _get_first_order_line(instance)
         if first_line and first_line.purchased_object:
             # Generate consistent ID based on user and purchasable object
             user_identifier = instance.purchaser.global_id
@@ -316,37 +355,8 @@ class ProductSerializer(serializers.ModelSerializer):
 class HubspotContactSerializer(UserSerializer):
     """User Serializer for Hubspot"""
 
-    program_certificates = serializers.SerializerMethodField()
-    course_run_certificates = serializers.SerializerMethodField()
-
-    def get_program_certificates(self, instance):
-        """Return a list of program names that the user has a certificate for."""
-        programs_user_has_cert = ProgramCertificate.objects.filter(
-            user=instance, is_revoked=False
-        ).select_related("program")
-        program_name_array = [
-            str(program_cert.program).replace(";", "")
-            for program_cert in programs_user_has_cert
-        ]
-        return ";".join(program_name_array)
-
-    def get_course_run_certificates(self, instance):
-        """Return a list of course run names that the user has a certificate for."""
-        course_runs_user_has_cert = CourseRunCertificate.objects.filter(
-            user=instance, is_revoked=False
-        ).select_related("course_run")
-        course_run_name_array = [
-            str(course_run_cert.course_run).replace(";", "")
-            for course_run_cert in course_runs_user_has_cert
-        ]
-        return ";".join(course_run_name_array)
-
     class Meta:
-        fields = (
-            *UserSerializer.Meta.fields,
-            "program_certificates",
-            "course_run_certificates",
-        )
+        fields = (*UserSerializer.Meta.fields,)
         read_only_fields = fields
         model = models.User
 

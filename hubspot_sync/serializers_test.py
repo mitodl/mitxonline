@@ -5,7 +5,6 @@ Tests for hubspot_sync serializers
 # pylint: disable=unused-argument, redefined-outer-name
 
 from decimal import Decimal
-from unittest.mock import patch
 
 import pytest
 from django.contrib.contenttypes.models import ContentType
@@ -14,11 +13,8 @@ from mitol.hubspot_api.api import format_app_id
 from mitol.hubspot_api.models import HubspotObject
 
 from courses.factories import (
-    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    ProgramCertificateFactory,
-    ProgramFactory,
 )
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -33,7 +29,6 @@ from ecommerce.factories import (
 from ecommerce.models import OrderStatus, Product
 from hubspot_sync.serializers import (
     ORDER_STATUS_MAPPING,
-    HubspotContactSerializer,
     LineSerializer,
     OrderToDealSerializer,
     ProductSerializer,
@@ -217,96 +212,3 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
         "pipeline": settings.HUBSPOT_PIPELINE_ID,
         "unique_app_id": expected_unique_app_id,
     }
-
-
-@pytest.mark.django_db
-@patch("courses.signals.upsert_custom_properties")
-@patch("hubspot_sync.task_helpers.sync_hubspot_user")
-def test_serialize_contact(mock_sync_user, mock_upsert, settings, user, mocker):
-    """Test that HubspotContactSerializer includes program and course run certificates for the user"""
-    mocker.patch("mitol.hubspot_api.api.sync_object_property")
-    mocker.patch("hubspot_sync.api.upsert_custom_properties")
-    program_cert_1 = ProgramCertificateFactory.create(user=user)
-    program_cert_2 = ProgramCertificateFactory.create(user=user)
-    course_run_cert_1 = CourseRunCertificateFactory.create(user=user)
-    course_run_cert_2 = CourseRunCertificateFactory.create(user=user)
-    serialized_data = HubspotContactSerializer(instance=user).data
-    assert (
-        serialized_data["program_certificates"]
-        == f"{program_cert_1.program!s};{program_cert_2.program!s}"
-    )
-    assert (
-        serialized_data["course_run_certificates"]
-        == f"{course_run_cert_1.course_run!s};{course_run_cert_2.course_run!s}"
-    )
-
-
-@pytest.mark.django_db
-@patch("courses.signals.upsert_custom_properties")
-@patch("hubspot_sync.task_helpers.sync_hubspot_user")
-def test_serialize_contact_removes_semicolons_from_program_names(
-    mock_sync_user, mock_upsert, settings, user, mocker
-):
-    """Test that HubspotContactSerializer removes semicolons from program certificate names"""
-    # Create a program certificate where the program's string representation contains a semicolon
-    program = ProgramFactory.create(
-        title="Test Program; With Semicolon", readable_id="test-program-with-semicolon"
-    )
-    ProgramCertificateFactory.create(user=user, program=program)
-
-    serialized_data = HubspotContactSerializer(instance=user).data
-
-    # Ensure no semicolons remain in the final string
-    assert ";" not in serialized_data["program_certificates"]
-
-
-@pytest.mark.django_db
-@patch("courses.signals.upsert_custom_properties")
-@patch("hubspot_sync.task_helpers.sync_hubspot_user")
-def test_serialize_contact_removes_semicolons_from_course_run_names(
-    mock_sync_user, mock_upsert, settings, user, mocker
-):
-    """Test that HubspotContactSerializer removes semicolons from course run certificate names"""
-    # Create a course run certificate where the course run's string representation contains a semicolon
-    course_run = CourseRunFactory.create(
-        title="Test Course; Run With Semicolon",
-        courseware_id="test-course-run-with-semicolon",
-    )
-    CourseRunCertificateFactory.create(user=user, course_run=course_run)
-
-    serialized_data = HubspotContactSerializer(instance=user).data
-
-    assert ";" not in serialized_data["course_run_certificates"]
-
-
-@pytest.mark.django_db
-@patch("courses.signals.upsert_custom_properties")
-@patch("hubspot_sync.task_helpers.sync_hubspot_user")
-def test_serialize_contact_multiple_certificates_with_semicolons(
-    mock_sync_user, mock_upsert, settings, user, mocker
-):
-    """Test that HubspotContactSerializer properly handles multiple certificates with semicolons"""
-
-    program_1 = ProgramFactory.create(title="Program; One", readable_id="program-one")
-    program_2 = ProgramFactory.create(title="Program; Two", readable_id="program-two")
-    course_run_1 = CourseRunFactory.create(
-        title="Course; Run One", courseware_id="course-run-one"
-    )
-    course_run_2 = CourseRunFactory.create(
-        title="Course; Run Two", courseware_id="course-run-two"
-    )
-    # Create multiple certificates
-    ProgramCertificateFactory.create(user=user, program=program_1)
-    ProgramCertificateFactory.create(user=user, program=program_2)
-    CourseRunCertificateFactory.create(user=user, course_run=course_run_1)
-    CourseRunCertificateFactory.create(user=user, course_run=course_run_2)
-
-    serialized_data = HubspotContactSerializer(instance=user).data
-
-    # Count semicolons to ensure only separator semicolons remain
-    program_semicolons = serialized_data["program_certificates"].count(";")
-    course_run_semicolons = serialized_data["course_run_certificates"].count(";")
-
-    # Should have exactly 1 separator semicolon (2 items = 1 separator)
-    assert program_semicolons == 1
-    assert course_run_semicolons == 1

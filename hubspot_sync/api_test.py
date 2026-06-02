@@ -43,10 +43,10 @@ def test_make_contact_sync_message(user, mocker):
     mocker.patch(
         "hubspot_sync.api.upsert_custom_properties",
     )
-    course_certificate_1 = CourseRunCertificateFactory.create(user=user)
-    course_certificate_2 = CourseRunCertificateFactory.create(user=user)
-    program_certificate_1 = ProgramCertificateFactory.create(user=user)
-    program_certificate_2 = ProgramCertificateFactory.create(user=user)
+    CourseRunCertificateFactory.create(user=user)
+    CourseRunCertificateFactory.create(user=user)
+    ProgramCertificateFactory.create(user=user)
+    ProgramCertificateFactory.create(user=user)
     contact_sync_message = api.make_contact_sync_message_from_user(user)
     assert contact_sync_message.properties == {
         "country": user.legal_address.country,
@@ -67,13 +67,101 @@ def test_make_contact_sync_message(user, mocker):
         "typeisprofessional": user.user_profile.type_is_professional,
         "typeiseducator": user.user_profile.type_is_educator,
         "typeisother": user.user_profile.type_is_other,
-        "program_certificates": str(program_certificate_1.program)
-        + ";"
-        + str(program_certificate_2.program),
-        "course_run_certificates": str(course_certificate_1.course_run)
-        + ";"
-        + str(course_certificate_2.course_run),
     }
+
+
+def test_sync_course_run_certificate_with_hubspot(mocker, settings):
+    """Course run certificates should be upserted as HubSpot custom objects."""
+    cert = SimpleNamespace(
+        id=1,
+        is_revoked=False,
+        issue_date=now_in_utc(),
+        user=SimpleNamespace(email="course-cert@example.com"),
+        course_run=SimpleNamespace(
+            courseware_id="course-v1:MITx+8.01x+2026_T1",
+            title="Classical Mechanics",
+        ),
+    )
+    settings.HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE = "course_run_certificate"
+
+    mock_find_contact = mocker.patch(
+        "hubspot_sync.api._find_hubspot_contact_id_by_email",
+        return_value="contact-123",
+    )
+    mock_associate = mocker.patch(
+        "hubspot_sync.api._associate_certificate_with_contact"
+    )
+    mock_hubspot_api = mocker.patch("hubspot_sync.api.HubspotApi")
+    mock_client = mock_hubspot_api.return_value
+    mocker.patch(
+        "hubspot_sync.api._get_custom_object_type_id_by_name",
+        return_value="2-12345",
+    )
+    mocker.patch(
+        "hubspot_sync.api._find_hubspot_certificate_by_unique_app_id",
+        return_value=None,
+    )
+    created = SimplePublicObjectFactory(id="cert-001")
+    mock_client.crm.objects.basic_api.create.return_value = created
+
+    result = api.sync_course_run_certificate_with_hubspot(cert)
+
+    assert result == created
+    mock_client.crm.objects.basic_api.create.assert_called_once()
+    mock_find_contact.assert_called_once_with(mock_client, cert.user.email)
+    mock_associate.assert_called_once_with(
+        mock_client,
+        "2-12345",
+        "cert-001",
+        "contact-123",
+    )
+
+
+def test_sync_program_certificate_with_hubspot(mocker, settings):
+    """Program certificates should be upserted as HubSpot custom objects."""
+    cert = SimpleNamespace(
+        id=2,
+        is_revoked=False,
+        issue_date=now_in_utc(),
+        user=SimpleNamespace(email="program-cert@example.com"),
+        program=SimpleNamespace(
+            readable_id="program-v1:MITx+SPOC+2026",
+            title="MITx MicroMasters",
+        ),
+    )
+    settings.HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE = "program_certificate"
+
+    mock_find_contact = mocker.patch(
+        "hubspot_sync.api._find_hubspot_contact_id_by_email",
+        return_value="contact-456",
+    )
+    mock_associate = mocker.patch(
+        "hubspot_sync.api._associate_certificate_with_contact"
+    )
+    mock_hubspot_api = mocker.patch("hubspot_sync.api.HubspotApi")
+    mock_client = mock_hubspot_api.return_value
+    mocker.patch(
+        "hubspot_sync.api._get_custom_object_type_id_by_name",
+        return_value="2-67890",
+    )
+    mocker.patch(
+        "hubspot_sync.api._find_hubspot_certificate_by_unique_app_id",
+        return_value=None,
+    )
+    created = SimplePublicObjectFactory(id="cert-002")
+    mock_client.crm.objects.basic_api.create.return_value = created
+
+    result = api.sync_program_certificate_with_hubspot(cert)
+
+    assert result == created
+    mock_client.crm.objects.basic_api.create.assert_called_once()
+    mock_find_contact.assert_called_once_with(mock_client, cert.user.email)
+    mock_associate.assert_called_once_with(
+        mock_client,
+        "2-67890",
+        "cert-002",
+        "contact-456",
+    )
 
 
 @pytest.mark.django_db
