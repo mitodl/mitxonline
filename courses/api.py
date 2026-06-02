@@ -1503,6 +1503,10 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     - include_in_learn_catalog (bool): Set the "include_in_learn_catalog" flag on the new page.
     - ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
     - is_source_run (bool): Set the "is_source_run" flag on the course run to designate it as a B2B source course.
+    - language (str): The language to set the imported run to. Defaults to "en".
+    - is_primary_language (bool): Whether or not this is the primary run for this language. Defaults False.
+    - variant_length (str): One of the length codes. Defaults to empty string (Full).
+    - variant_industry (str): One of the industry focus codes. Defaults to empty string (Original).
     Returns:
     tuple of (CourseRun, CoursePage|None, Product|None) - relevant objects for the imported run
     """
