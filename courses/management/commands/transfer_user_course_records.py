@@ -59,7 +59,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                "Transferred records from {source_email} to {destination_email}: "  # noqa: EM102
+                "Transferred records from {source_email} to {destination_email}: "
                 "{counts}".format(
                     source_email=source_user.email,
                     destination_email=destination_user.email,
