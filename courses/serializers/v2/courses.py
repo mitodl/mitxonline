@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from decimal import Decimal
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from decimal import Decimal
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
