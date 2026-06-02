@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from decimal import Decimal
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
@@ -235,7 +236,7 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
-    def get_min_price(self, instance) -> int | None:
+    def get_min_price(self, instance) -> Decimal | None:
         """
         Get the min price of the product from the CMS page.
         """
@@ -243,7 +244,7 @@ class CourseSerializer(BaseCourseSerializer):
             return instance.page.min_price
         return None
 
-    def get_max_price(self, instance) -> int | None:
+    def get_max_price(self, instance) -> Decimal | None:
         """
         Get the max price of the product from the CMS page.
         """
