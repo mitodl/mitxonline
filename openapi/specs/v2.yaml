@@ -4678,14 +4678,14 @@ components:
           items:
             $ref: '#/components/schemas/PriceItem'
         min_price:
-          type: integer
-          maximum: 32767
-          minimum: -32768
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           description: Specify the minimum product price. This is used by MIT Learn.
         max_price:
-          type: integer
-          maximum: 32767
-          minimum: -32768
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           description: Specify the maximum product price. This is used by MIT Learn.
         prerequisites:
           type: string
@@ -5787,12 +5787,14 @@ components:
           description: Get the max weeks of the course from the CMS page.
           readOnly: true
         min_price:
-          type: integer
+          type: number
+          format: double
           nullable: true
           description: Get the min price of the product from the CMS page.
           readOnly: true
         max_price:
-          type: integer
+          type: number
+          format: double
           nullable: true
           description: Get the max price of the product from the CMS page.
           readOnly: true
@@ -8087,14 +8089,14 @@ components:
           items:
             $ref: '#/components/schemas/PriceItem'
         min_price:
-          type: integer
-          maximum: 32767
-          minimum: -32768
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           description: Specify the minimum product price. This is used by MIT Learn.
         max_price:
-          type: integer
-          maximum: 32767
-          minimum: -32768
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           description: Specify the maximum product price. This is used by MIT Learn.
         prerequisites:
           type: string
@@ -9691,12 +9693,14 @@ components:
           description: Get the max weeks of the course from the CMS page.
           readOnly: true
         min_price:
-          type: integer
+          type: number
+          format: double
           nullable: true
           description: Get the min price of the product from the CMS page.
           readOnly: true
         max_price:
-          type: integer
+          type: number
+          format: double
           nullable: true
           description: Get the max price of the product from the CMS page.
           readOnly: true
@@ -10334,12 +10338,14 @@ components:
           description: Get the max weeks of the program from the CMS page.
           readOnly: true
         min_price:
-          type: integer
+          type: number
+          format: double
           nullable: true
           description: Get the min price of the product from the CMS page.
           readOnly: true
         max_price:
-          type: integer
+          type: number
+          format: double
           nullable: true
           description: Get the max price of the product from the CMS page.
           readOnly: true
@@ -10636,12 +10642,14 @@ components:
           description: Get the max weeks of the program from the CMS page.
           readOnly: true
         min_price:
-          type: integer
+          type: number
+          format: double
           nullable: true
           description: Get the min price of the product from the CMS page.
           readOnly: true
         max_price:
-          type: integer
+          type: number
+          format: double
           nullable: true
           description: Get the max price of the product from the CMS page.
           readOnly: true
