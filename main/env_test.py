@@ -1,6 +1,7 @@
 import pytest
 
 from main.env import EnvironmentVariableParseException, get_float
+from main.test_utils import assert_drf_json_equal
 
 FAKE_ENVIRONS = {
     "true": "True",
@@ -17,6 +18,10 @@ FAKE_ENVIRONS = {
     "list_of_int": "[3,4,5]",
     "list_of_str": '["x", "y", \'z\']',
 }
+
+
+def test_fail():
+    assert_drf_json_equal([], [1, 2, 3])
 
 
 def test_get_float(mocker):

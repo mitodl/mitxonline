@@ -253,7 +253,7 @@ fixture-parentheses = false
 
 
 [tool.pytest.ini_options]
-addopts = "--cov . --cov-report xml --cov-report term --cov-report html --ds=main.settings --reuse-db"
+addopts = "--cov . --cov-report xml --cov-report term --cov-report html --ds=main.settings --reuse-db --color=yes"
 norecursedirs = [
   "node_modules",
   ".git",
