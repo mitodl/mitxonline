@@ -609,6 +609,149 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     mocked_clone_run.assert_called()
 
 
+def test_create_contract_run_variants(mocker):
+    """
+    Test creating runs for a contract when there are variant runs.
+
+    Variants should be created successfully, even if some of the variant options
+    overlap (i.e. same language, same industry, etc.)
+    """
+
+    mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
+    extra_variants = (
+        (
+            "en",
+            "HC",
+            "S",
+        ),
+        (
+            "fr",
+            "F",
+            "S",
+        ),
+        (
+            "fr",
+            "HC",
+            "S",
+        ),
+        (
+            "fr",
+            "",
+            "",
+        ),
+    )
+
+    contract = factories.ContractPageFactory.create()
+    course = CourseFactory.create()
+
+    source_course_run_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
+    default_source_run = CourseRunFactory.create(
+        course=course,
+        courseware_id=str(source_course_run_key),
+        run_tag="SOURCE",
+        is_source_run=True,
+        language="en",
+        is_primary_language=True,
+    )
+    variant_source_runs = []
+    for language, variant_industry, variant_length in extra_variants:
+        SupportedVariant.objects.create(
+            variant_object=course,
+            language=language,
+            variant_industry=variant_industry,
+            variant_length=variant_length,
+        )
+
+        # Technically we'll format the created runs without dunders if there's a
+        # blank but it's fine for the source run.
+        variant_source_runs.append(
+            CourseRunFactory.create(
+                course=course,
+                courseware_id=f"{source_course_run_key!s}_{language}_{variant_industry}_{variant_length}",
+                run_tag="SOURCE",
+                is_source_run=True,
+                language=language,
+                variant_industry=variant_industry,
+                variant_length=variant_length,
+            )
+        )
+
+    target_course_id = create_contract_run_key(default_source_run, contract)
+
+    assert not course.courseruns.filter(
+        courseware_id__startswith=target_course_id
+    ).exists()
+
+    create_contract_run(contract, course)
+    mocked_clone_run.assert_called()
+
+    assert (
+        course.courseruns.filter(courseware_id__startswith=target_course_id).count()
+        == 5
+    )
+    run_check_qs = course.courseruns.filter(b2b_contract=contract)
+
+    found_count = 0
+    for language, variant_industry, variant_length in [
+        (
+            "en",
+            "",
+            "",
+        ),
+        *extra_variants,
+    ]:
+        found_it = False
+        if run_check_qs.filter(
+            language=language,
+            variant_industry=variant_industry,
+            variant_length=variant_length,
+        ).exists():
+            found_it = True
+            found_count += 1
+
+        assert found_it
+
+    assert found_count == 5
+
+    # Test reruns now - if we re-run create_contract_run, we should get a new
+    # source of runs, but with a new starting run tag.
+
+    # Side effect! Test the create_contract_run_key for this scenario too.
+    target_course_id = create_contract_run_key(default_source_run, contract)
+    target_course_id_key = CourseKey.from_string(target_course_id)
+    assert target_course_id_key.run[0] == "2"
+
+    create_contract_run(contract, course, no_reruns=False)
+    mocked_clone_run.assert_called()
+
+    assert course.courseruns.filter(b2b_contract=contract).count() == 10
+    run_check_qs = course.courseruns.filter(
+        b2b_contract=contract, courseware_id__startswith=target_course_id
+    )
+
+    found_count = 0
+    for language, variant_industry, variant_length in [
+        (
+            "en",
+            "",
+            "",
+        ),
+        *extra_variants,
+    ]:
+        found_it = False
+        if run_check_qs.filter(
+            language=language,
+            variant_industry=variant_industry,
+            variant_length=variant_length,
+        ).exists():
+            found_it = True
+            found_count += 1
+
+        assert found_it
+
+    assert found_count == 5
+
+
 def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
     """Test that we can get a list of B2B orgs from somewhere and fix a user's associations."""
 

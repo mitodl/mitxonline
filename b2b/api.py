@@ -151,6 +151,8 @@ def create_contract_run_key(
             courseware_id__startswith=new_course_key,
             run_tag__endswith=mostly_run_tag,
             language=source_course.language,
+            variant_industry=source_course.variant_industry,
+            variant_length=source_course.variant_length,
         )
         .select_for_update()
         .order_by("-courseware_id")
@@ -482,23 +484,40 @@ def create_contract_run(  # noqa: PLR0913
         )
         new_readable_id = str(new_course_key)
 
-        # If there's a language, we want to change the courseware ID (which is
-        # sent to edX) but not the run tag, because we group translated course
-        # runs by run tag.
-        if clone_course_run.language:
-            new_readable_id = f"{new_readable_id}_{clone_course_run.language}"
+        # We group runs by the run tag that gets stored in the run_tag field. edX
+        # has a run tag too, though, but not any of the other extra fields so
+        # we need to throw some additional data into the run tag so we're not
+        # colliding with the other runs in this tag.
+
+        lang_tag = f"_{clone_course_run.language}" if clone_course_run.language else ""
+        industry_tag = (
+            f"_{clone_course_run.variant_industry}"
+            if clone_course_run.variant_industry
+            else ""
+        )
+        length_tag = (
+            f"_{clone_course_run.variant_length}"
+            if clone_course_run.variant_length
+            else ""
+        )
+
+        new_readable_id = f"{new_readable_id}{lang_tag}{industry_tag}{length_tag}"
 
         new_run_tag = new_course_key.run
 
         if (
             CourseRun.objects.filter(
-                course=course, b2b_contract=contract, language=clone_course_run.language
+                course=course,
+                b2b_contract=contract,
+                language=clone_course_run.language,
+                variant_industry=clone_course_run.variant_industry,
+                variant_length=clone_course_run.variant_length,
             ).exists()
             and no_reruns
         ):
             msg = (
                 f"Can't create a run for {course} and contract {contract}: "
-                f"courseware ID {new_readable_id} already exists."
+                f"courseware ID {new_readable_id} already exists and we're not rerunning it."
             )
             log.warning(msg)
             continue
@@ -518,6 +537,8 @@ def create_contract_run(  # noqa: PLR0913
             b2b_contract=contract,
             language=clone_course_run.language,
             is_primary_language=clone_course_run.is_primary_language,
+            variant_length=clone_course_run.variant_length,
+            variant_industry=clone_course_run.variant_industry,
         )
         course_run.save()
 
@@ -538,7 +559,9 @@ def create_contract_run(  # noqa: PLR0913
             clone_course_run,
         )
 
-        lang_suffix = f" [{course_run.language}]" if course_run.language else ""
+        lang_suffix = (
+            f" [{lang_tag}{industry_tag}{length_tag}]" if course_run.language else ""
+        )
         with reversion.create_revision():
             course_run_product = Product(
                 price=(
