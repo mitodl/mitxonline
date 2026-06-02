@@ -681,22 +681,23 @@ wheels = [
 
 [[package]]
 name = "django-health-check"
-version = "3.20.1.dev10+g53f9bdc3a"
-source = { git = "https://github.com/revsys/django-health-check?rev=53f9bdc3a7acc8a577319987fef0bd3040eef4b4#53f9bdc3a7acc8a577319987fef0bd3040eef4b4" }
-dependencies = [
-    { name = "django" },
-]
-
-[[package]]
-name = "django-hijack"
-version = "3.7.6"
+version = "4.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
+    { name = "dnspython" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/44/84/9b525b0ae0236f2d7b099809cea4c711adedda853cc63b5f1c1017d46429/django_hijack-3.7.6.tar.gz", hash = "sha256:a1f3b16d0eae3d72c27988692453f0a923c665d96783325034798a8020f0ceb4", size = 14310, upload-time = "2026-01-06T16:49:49.254Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/c3/99dbf858f939cbf709bf82648daa63632a81484d59b888e92ec687601091/django_health_check-4.4.1.tar.gz", hash = "sha256:2658c21710c09632f75318bb66b5865ff0721f82bab812193d479680773e4c0b", size = 21751, upload-time = "2026-05-15T16:08:37.517Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1f/5e/e076ed1056dec17879f842655e4034cb17c079f40473d53d73c8e9041905/django_hijack-3.7.6-py3-none-any.whl", hash = "sha256:b43703b57b77b17a2f754dced65356899178d8d3664b36e7e26a7d414fd61e7f", size = 31484, upload-time = "2026-01-06T16:49:48.098Z" },
+    { url = "https://files.pythonhosted.org/packages/26/df/697390fe7bdfefd1e48e29c190ebe255c45db4c1819d58b76fbc826bc5a8/django_health_check-4.4.1-py3-none-any.whl", hash = "sha256:363d94e839c90a75e822694f260ca31bd42978d948ad77ea1df18c7f68ff9021", size = 26877, upload-time = "2026-05-15T16:08:36.192Z" },
+]
+
+[package.optional-dependencies]
+celery = [
+    { name = "celery" },
+]
+redis = [
+    { name = "redis" },
 ]
 
 [[package]]
@@ -1990,8 +1991,7 @@ dependencies = [
     { name = "django-cors-headers" },
     { name = "django-countries" },
     { name = "django-filter" },
-    { name = "django-health-check" },
-    { name = "django-hijack" },
+    { name = "django-health-check", extra = ["celery", "redis"] },
     { name = "django-ipware" },
     { name = "django-oauth-toolkit" },
     { name = "django-object-actions" },
@@ -2073,6 +2073,7 @@ dev = [
     { name = "pytest-django" },
     { name = "pytest-env" },
     { name = "pytest-mock" },
+    { name = "pytest-urllib3" },
     { name = "pytest-xdist", extra = ["psutil"] },
     { name = "responses" },
     { name = "ruff" },
@@ -2100,8 +2101,7 @@ requires-dist = [
     { name = "django-cors-headers", specifier = ">=4.0.0,<5" },
     { name = "django-countries", specifier = ">=7.2.1,<8" },
     { name = "django-filter", specifier = ">=24.3,<25" },
-    { name = "django-health-check", git = "https://github.com/revsys/django-health-check?rev=53f9bdc3a7acc8a577319987fef0bd3040eef4b4" },
-    { name = "django-hijack", specifier = ">=3.6.0,<4" },
+    { name = "django-health-check", extras = ["celery", "redis"], specifier = ">=4.0.0" },
     { name = "django-ipware", specifier = ">=7.0.0,<8" },
     { name = "django-oauth-toolkit", specifier = "==3.1" },
     { name = "django-object-actions", specifier = ">=5.0.0,<6" },
@@ -2183,6 +2183,7 @@ dev = [
     { name = "pytest-django", specifier = ">=4.5.2,<5" },
     { name = "pytest-env", specifier = ">=1.0.0,<2" },
     { name = "pytest-mock", specifier = ">=3.11.1,<4" },
+    { name = "pytest-urllib3", specifier = ">=0.2.0" },
     { name = "pytest-xdist", extras = ["psutil"], specifier = ">=3.6.1,<4" },
     { name = "responses", specifier = ">=0.26.0,<0.27" },
     { name = "ruff", specifier = ">=0.15,<0.16" },
@@ -2997,6 +2998,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/68/14/eb014d26be205d38ad5ad20d9a80f7d201472e08167f0bb4361e251084a9/pytest_mock-3.15.1.tar.gz", hash = "sha256:1849a238f6f396da19762269de72cb1814ab44416fa73a8686deac10b0d87a0f", size = 34036, upload-time = "2025-09-16T16:37:27.081Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5a/cc/06253936f4a7fa2e0f48dfe6d851d9c56df896a9ab09ac019d70b760619c/pytest_mock-3.15.1-py3-none-any.whl", hash = "sha256:0a25e2eb88fe5168d535041d09a4529a188176ae608a6d249ee65abc0949630d", size = 10095, upload-time = "2025-09-16T16:37:25.734Z" },
+]
+
+[[package]]
+name = "pytest-urllib3"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b0/f6/1674ea24af48ec944c484613142594e0c660b881823e3a31a9154d89ff2f/pytest_urllib3-0.2.0.tar.gz", hash = "sha256:f8eaf5b70ab05d9459bec4f70f1363f6a64ed9145f8cacec142299620006c3c7", size = 12755, upload-time = "2026-03-09T12:11:56.439Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0e/06/694fb100b5d458c34951204fb038340af8d1ad84899893d47294c1d49fd2/pytest_urllib3-0.2.0-py3-none-any.whl", hash = "sha256:0f46e4cb14c19898bb98ded223bfc9dc9fe0c045a9dbcbcf1f7779e290e602d0", size = 15079, upload-time = "2026-03-09T12:11:57.411Z" },
 ]
 
 [[package]]

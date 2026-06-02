@@ -1457,6 +1457,10 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     include_in_learn_catalog: bool = False,
     ingest_content_files_for_ai: bool = False,
     is_source_run: bool = False,
+    language: str = "en",
+    is_primary_language: bool = False,
+    variant_length: str = "",
+    variant_industry: str = "",
 ):
     """
     Import a course run from edX.
@@ -1499,6 +1503,10 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
     - include_in_learn_catalog (bool): Set the "include_in_learn_catalog" flag on the new page.
     - ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
     - is_source_run (bool): Set the "is_source_run" flag on the course run to designate it as a B2B source course.
+    - language (str): The language to set the imported run to. Defaults to "en".
+    - is_primary_language (bool): Whether or not this is the primary run for this language. Defaults False.
+    - variant_length (str): One of the length codes. Defaults to empty string (Full).
+    - variant_industry (str): One of the industry focus codes. Defaults to empty string (Original).
     Returns:
     tuple of (CourseRun, CoursePage|None, Product|None) - relevant objects for the imported run
     """
@@ -1558,6 +1566,10 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         live=live,
         is_self_paced=edx_course_run.is_self_paced(),
         is_source_run=is_source_run,
+        language=language,
+        is_primary_language=is_primary_language,
+        variant_industry=variant_industry,
+        variant_length=variant_length,
     )
 
     course_page = None

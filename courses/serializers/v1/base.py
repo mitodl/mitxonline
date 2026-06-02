@@ -130,6 +130,10 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "enrollment_modes",
             "language",
             "is_primary_language",
+            "language_label",
+            "variant_industry",
+            "variant_length",
+            "course_id",
         ]
 
 

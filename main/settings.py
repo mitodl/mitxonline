@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.150.6"
+VERSION = "1.151.1"
 
 log = logging.getLogger()
 
@@ -253,8 +253,10 @@ INSTALLED_APPS = (
     "reversion",
     # django-treebeard
     "treebeard",
+    "health_check",
     # Put our apps after this point
     "main",
+    "variants",
     "authentication",
     "courses",
     "hubspot_sync",
@@ -266,8 +268,6 @@ INSTALLED_APPS = (
     # "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
-    "hijack",
-    "hijack.contrib.admin",
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
@@ -290,50 +290,11 @@ INSTALLED_APPS = (
     "drf_spectacular",
     "mitol.apigateway.apps.ApigatewayApp",
     "b2b",
-    "health_check",
-    "health_check.cache",
-    "health_check.contrib.migrations",
-    "health_check.contrib.celery_ping",
-    "health_check.contrib.redis",
-    "health_check.contrib.db_heartbeat",
     "rest_framework_api_key",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
 #     INSTALLED_APPS += ("localdev.seed",)  # noqa: ERA001
-
-HEALTH_CHECK = {
-    "SUBSETS": {
-        # The 'startup' subset includes checks that must pass before the application can
-        # start.
-        "startup": [
-            "MigrationsHealthCheck",  # Ensures database migrations are applied.
-            "CacheBackend",  # Verifies the cache backend is operational.
-            "RedisHealthCheck",  # Confirms Redis is reachable and functional.
-            "DatabaseHeartBeatCheck",  # Checks the database connection is alive.
-        ],
-        # The 'liveness' subset includes checks to determine if the application is
-        # running.
-        "liveness": ["DatabaseHeartBeatCheck"],  # Minimal check to ensure the app is
-        # alive.
-        # The 'readiness' subset includes checks to determine if the application is
-        # ready to serve requests.
-        "readiness": [
-            "CacheBackend",  # Ensures the cache is ready for use.
-            "RedisHealthCheck",  # Confirms Redis is ready for use.
-            "DatabaseHeartBeatCheck",  # Verifies the database is ready for queries.
-        ],
-        # The 'full' subset includes all available health checks for a comprehensive
-        # status report.
-        "full": [
-            "MigrationsHealthCheck",  # Ensures database migrations are applied.
-            "CacheBackend",  # Verifies the cache backend is operational.
-            "RedisHealthCheck",  # Confirms Redis is reachable and functional.
-            "DatabaseHeartBeatCheck",  # Checks the database connection is alive.
-            "CeleryPingHealthCheck",  # Verifies Celery workers are responsive.
-        ],
-    }
-}
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
@@ -348,7 +309,6 @@ MIDDLEWARE = (
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
     "django_user_agents.middleware.UserAgentMiddleware",
-    "hijack.middleware.HijackUserMiddleware",
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
     "oauth2_provider.middleware.OAuth2TokenMiddleware",
@@ -1069,11 +1029,6 @@ CELERY_BEAT_SCHEDULE = {
         ),
     },
 }
-
-# Hijack
-HIJACK_ALLOW_GET_REQUESTS = True
-HIJACK_LOGOUT_REDIRECT_URL = "/admin/users/user"
-HIJACK_REGISTER_ADMIN = False
 
 # django cache back-ends
 CACHES = {

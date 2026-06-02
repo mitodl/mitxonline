@@ -26,6 +26,7 @@ from courses.serializers.v2.courses import (
 from courses.views.v2 import UserEnrollmentFilterSet
 from main.test_utils import assert_drf_json_equal
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from variants.serializers import SupportedVariantSerializer
 
 pytestmark = [pytest.mark.django_db]
 
@@ -134,6 +135,10 @@ def test_serialize_course(  # noqa: PLR0913
             "language_options": CourseRunLanguageOptionSerializer(
                 course.courseruns.all(), many=True
             ).data,
+            "possible_variant_sets": [
+                SupportedVariantSerializer(vs).data
+                for vs in course.possible_variant_sets.all()
+            ],
         },
         ignore_order=True,
     )
@@ -182,6 +187,10 @@ def test_serialize_course_required_prerequisites(
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
             "language_options": [],
+            "possible_variant_sets": [
+                SupportedVariantSerializer(vs).data
+                for vs in course.possible_variant_sets.all()
+            ],
         },
     )
 

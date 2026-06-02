@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.http import Http404
@@ -27,6 +28,7 @@ from b2b.constants import (
 )
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import Program
+from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
 
@@ -339,6 +341,11 @@ class ContractPage(Page, ClusterableModel):
         max_length=100,
         help_text="The index or title of the worksheet in the Google Sheet to put the codes.",
     )
+    variant_options = GenericRelation(
+        "variants.SupportedVariant",
+        object_id_field="object_id",
+        content_type_field="content_type",
+    )
 
     @property
     def programs(self):
@@ -359,6 +366,12 @@ class ContractPage(Page, ClusterableModel):
             if hasattr(self, "_contract_program_ids")
             else self.contract_programs.order_by("sort_order").all()
         )
+
+    @cached_property
+    def default_variant_options(self):
+        """Return the default variant set for this contract."""
+
+        return self.variant_options.filter(default_variant=True).first()
 
     content_panels = [
         FieldPanel("name"),
@@ -476,6 +489,63 @@ class ContractPage(Page, ClusterableModel):
             CourseRun.objects.prefetch_related("course").filter(b2b_contract=self).all()
         )
 
+    def get_variant_courses(self, *, only_relevant=False):
+        """
+        Get the courses that match up with the configured variants.
+
+        By default, this will return all the courses that have variants that match
+        any of the variant options configured for the contract. Set only_relevant
+        to return just the courses that also have a B2B run for the contract.
+        """
+
+        course_filter = None
+        course_content_type = ContentType.objects.get(
+            app_label="courses", model="course"
+        )
+
+        for variant_set in self.variant_options.all():
+            if course_filter:
+                course_filter = course_filter | variant_set.to_q_filter()
+            else:
+                course_filter = variant_set.to_q_filter()
+
+        sv_qset = (
+            SupportedVariant.objects.filter(content_type=course_content_type)
+            .filter(models.Q(b2b_only=True) | models.Q(default_variant=True))
+            .filter(course_filter)
+        )
+
+        if only_relevant:
+            run_courses = (
+                self.get_course_runs()
+                .distinct("course")
+                .values_list("course__id", flat=True)
+            )
+            sv_qset = sv_qset.filter(object_id__in=run_courses)
+
+        return [sv.variant_object for sv in sv_qset.all()]
+
+    def get_all_variant_runs(self):
+        """Get runs matching the configured variants for the contract."""
+
+        run_qs = self.get_course_runs()
+
+        # If there's no default variant, then the config is bad. Send an empty
+        # list and log an error.
+        if self.variant_options.filter(default_variant=True).count() == 0:
+            log.error(
+                "get_variant_runs couldn't find a default variant set for %s - check contract configuration",
+                self.slug,
+            )
+            return run_qs.none()
+
+        run_qs_filter = self.default_variant_options.to_q_filter()
+
+        for variant_set in self.variant_options.filter(default_variant=False).all():
+            run_qs_filter = run_qs_filter | variant_set.to_q_filter()
+
+        return run_qs.filter(run_qs_filter).all()
+
     def get_enrollments(self):
         """Get the enrollments for the contract's runs"""
 
@@ -529,8 +599,16 @@ class ContractPage(Page, ClusterableModel):
             .all()
         )
 
-    def add_program_courses(
-        self, program, order=None, *, skip_edx=False, no_reruns=True
+    def add_program_courses(  # noqa: PLR0913
+        self,
+        program,
+        order=None,
+        *,
+        skip_edx=False,
+        no_reruns=True,
+        ignore_langs=False,
+        only_lang=None,
+        filter_variants=None,
     ):
         """
         Add a program, and then queue adding all its courses.
@@ -563,7 +641,13 @@ class ContractPage(Page, ClusterableModel):
             | models.Q(courseruns__run_tag="SOURCE")
         ).all():
             created_runs = create_contract_run(
-                self, course, no_reruns=no_reruns, skip_edx=skip_edx
+                self,
+                course,
+                no_reruns=no_reruns,
+                skip_edx=skip_edx,
+                ignore_langs=ignore_langs,
+                only_lang=only_lang,
+                filter_variants=filter_variants,
             )
             managed += len(created_runs)
 

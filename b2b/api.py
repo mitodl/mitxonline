@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
 from wagtail.models import Page
@@ -151,6 +151,8 @@ def create_contract_run_key(
             courseware_id__startswith=new_course_key,
             run_tag__endswith=mostly_run_tag,
             language=source_course.language,
+            variant_industry=source_course.variant_industry,
+            variant_length=source_course.variant_length,
         )
         .select_for_update()
         .order_by("-courseware_id")
@@ -275,20 +277,33 @@ def import_and_create_contract_run(  # noqa: PLR0913
     )
 
 
-def _get_source_runs_for_course(
+def _get_source_runs_for_course(  # noqa: PLR0913
     course: Course,
     *,
     require_designated: bool = True,
-) -> list[CourseRun]:
+    ignore_langs: bool = False,
+    only_lang: str | None = None,
+    filter_variants: Union[list, None] = None,
+    no_variants: bool = False,
+) -> Manager[CourseRun]:
     """
     Return the set of source runs for a course.
 
-    Courses may have
+    Courses may have any number of available variants, so this retrieves the
+    source runs for all variants for the course. Alternatively, pass in a set of
+    SupportedVariant to filter by both what's available for the course and for
+    what is specified.
 
     Args:
         course: The course to inspect.
         require_designated: If True, raise SourceCourseIncompleteError when no
             source run exists. If False, fall back to the newest non-B2B run.
+        ignore_langs: If True, only pull the source run that has `is_primary_language`
+            set or has the language code set to empty string.
+        only_lang: If set, only add the specified additional language (plus the
+            default)
+        filter_variants: If provided, a list of SupportedVariant objects to filter by.
+        no_variants: If True, only return runs that match the default variant set.
     Returns:
         List of distinct source CourseRun objects, one per language (or one
         for the "no language" legacy case).
@@ -298,14 +313,55 @@ def _get_source_runs_for_course(
             language.
     """
 
-    primary_source_run = (
-        CourseRun.all_objects.filter(course=course)
-        .filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
-        .filter(Q(is_primary_language=True) | Q(language=""))
-        .first()
+    source_runs = CourseRun.all_objects.filter(course=course).filter(
+        Q(is_source_run=True) | Q(run_tag="SOURCE")
     )
 
-    if not primary_source_run:
+    if not course.default_variant_options or ignore_langs:
+        if not course.default_variant_options:
+            log.warning(
+                "_get_source_runs_for_course: course %s has no default variant options, falling back to prior behavior",
+                course,
+            )
+        source_runs = source_runs.filter(
+            Q(language__in=["", "en"]) | Q(is_primary_language=True)
+        ).order_by("-is_primary_language")
+    elif no_variants:
+        source_runs = source_runs.filter(
+            language=course.default_variant_options.language,
+            variant_length=course.default_variant_options.variant_length,
+            variant_industry=course.default_variant_options.variant_industry,
+        )
+    else:
+        course_variants = [
+            (sv.language, sv.variant_length, sv.variant_industry)
+            for sv in course.possible_variant_sets.filter(active=True).all()
+        ]
+
+        if filter_variants:
+            fvs = [
+                (fv.language, fv.variant_length, fv.variant_industry)
+                for fv in filter_variants
+            ]
+            course_variants = [cv for cv in course_variants if cv in fvs]
+
+        if only_lang:
+            course_variants = [cv for cv in course_variants if cv[0] == only_lang]
+
+        variant_opts = Q(
+            Q(language=course_variants[0][0])
+            & Q(variant_length=course_variants[0][1])
+            & Q(variant_industry=course_variants[0][2])
+        )
+
+        for v in course_variants[1:]:
+            variant_opts = variant_opts | Q(
+                Q(language=v[0]) & Q(variant_length=v[1]) & Q(variant_industry=v[2])
+            )
+
+        source_runs = source_runs.filter(variant_opts)
+
+    if not source_runs.count():
         if not require_designated:
             fallback = (
                 course.courseruns.filter(b2b_contract__isnull=True)
@@ -320,33 +376,11 @@ def _get_source_runs_for_course(
                 course,
                 fallback,
             )
-            return [fallback]
+            return fallback
         msg = f"No source run found for {course}."
         raise SourceCourseIncompleteError(msg)
 
-    # Pull all the other source runs for the course and run tag combo
-    source_runs = (
-        CourseRun.all_objects.filter(course=course)
-        .filter(is_source_run=True, run_tag=primary_source_run.run_tag)
-        .all()
-    )
-
-    seen_languages: list = []
-    filtered_run_list = {}
-    for run in source_runs:
-        lang = run.language  # may be None for legacy runs
-        if lang in seen_languages:
-            msg = (
-                f"Course {course} has more than one source run for "
-                f"language '{lang}': {filtered_run_list[lang]} and {run}. "
-                "Resolve by unsetting is_source_run on the duplicates."
-            )
-            raise SourceCourseIncompleteError(msg)
-
-        seen_languages.append(lang)
-        filtered_run_list[lang] = run
-
-    return [filtered_run_list[r] for r in filtered_run_list]
+    return source_runs.all()
 
 
 def create_contract_run(  # noqa: PLR0913
@@ -358,6 +392,9 @@ def create_contract_run(  # noqa: PLR0913
     org_prefix: str | None = UAI_COURSEWARE_ID_PREFIX,
     no_reruns: bool = False,
     queue_codes: bool = False,
+    ignore_langs: bool = False,
+    only_lang: str | None = None,
+    filter_variants: Union[list, None] = None,
 ) -> list[tuple[CourseRun, Product]]:
     """
     Create run(s) for the specified contract.
@@ -405,13 +442,19 @@ def create_contract_run(  # noqa: PLR0913
         org_prefix (str): Organization prefix. For UAI courses, this should be "UAI_".
         no_reruns (bool): Don't rerun the course - raise an exception instead.
         queue_codes (bool): Queue enrollment code generation after saving.
+        ignore_langs (bool): Only create a run for the primary language.
+        only_lang (str|None): Only create a run for the primary language and the specified one.
     Returns:
         list[tuple[CourseRun, Product]]: One (CourseRun, Product) pair per
         source language run. Legacy single-language courses produce a one-element
         list.
     """
     source_runs = _get_source_runs_for_course(
-        course, require_designated=require_designated_source_run
+        course,
+        require_designated=require_designated_source_run,
+        ignore_langs=ignore_langs,
+        only_lang=only_lang,
+        filter_variants=filter_variants,
     )
 
     content_type = ContentType.objects.filter(
@@ -441,23 +484,40 @@ def create_contract_run(  # noqa: PLR0913
         )
         new_readable_id = str(new_course_key)
 
-        # If there's a language, we want to change the courseware ID (which is
-        # sent to edX) but not the run tag, because we group translated course
-        # runs by run tag.
-        if clone_course_run.language:
-            new_readable_id = f"{new_readable_id}_{clone_course_run.language}"
+        # We group runs by the run tag that gets stored in the run_tag field. edX
+        # has a run tag too, though, but not any of the other extra fields so
+        # we need to throw some additional data into the run tag so we're not
+        # colliding with the other runs in this tag.
+
+        lang_tag = f"_{clone_course_run.language}" if clone_course_run.language else ""
+        industry_tag = (
+            f"_{clone_course_run.variant_industry}"
+            if clone_course_run.variant_industry
+            else ""
+        )
+        length_tag = (
+            f"_{clone_course_run.variant_length}"
+            if clone_course_run.variant_length
+            else ""
+        )
+
+        new_readable_id = f"{new_readable_id}{lang_tag}{industry_tag}{length_tag}"
 
         new_run_tag = new_course_key.run
 
         if (
             CourseRun.objects.filter(
-                course=course, b2b_contract=contract, language=clone_course_run.language
+                course=course,
+                b2b_contract=contract,
+                language=clone_course_run.language,
+                variant_industry=clone_course_run.variant_industry,
+                variant_length=clone_course_run.variant_length,
             ).exists()
             and no_reruns
         ):
             msg = (
                 f"Can't create a run for {course} and contract {contract}: "
-                f"courseware ID {new_readable_id} already exists."
+                f"courseware ID {new_readable_id} already exists and we're not rerunning it."
             )
             log.warning(msg)
             continue
@@ -477,6 +537,8 @@ def create_contract_run(  # noqa: PLR0913
             b2b_contract=contract,
             language=clone_course_run.language,
             is_primary_language=clone_course_run.is_primary_language,
+            variant_length=clone_course_run.variant_length,
+            variant_industry=clone_course_run.variant_industry,
         )
         course_run.save()
 
@@ -497,7 +559,9 @@ def create_contract_run(  # noqa: PLR0913
             clone_course_run,
         )
 
-        lang_suffix = f" [{course_run.language}]" if course_run.language else ""
+        lang_suffix = (
+            f" [{lang_tag}{industry_tag}{length_tag}]" if course_run.language else ""
+        )
         with reversion.create_revision():
             course_run_product = Product(
                 price=(

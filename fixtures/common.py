@@ -11,6 +11,8 @@ from zeal import zeal_ignore
 
 from users.factories import UserFactory
 
+pytestmark = [pytest.mark.usefixtures("urllib3_mock")]
+
 
 @pytest.fixture
 def user(db):  # noqa: ARG001
@@ -69,7 +71,7 @@ def admin_drf_client(admin_user):
     return client
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mocked_responses():
     """Mocked responses for requests library"""
     with responses.RequestsMock() as rsps:

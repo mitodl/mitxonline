@@ -1371,7 +1371,7 @@ def test_course_next_run_multiple_languages(primary, include_translations, b2b):
         secondary_run_2 = CourseRunFactory.create(
             course=course,
             run_tag="1T2026",
-            language="sp",
+            language="es",
             courseware_id=f"{course.readable_id}+1T2026_SP",
             is_primary_language=False,
             start_date=main_run.start_date,
@@ -1387,7 +1387,7 @@ def test_course_next_run_multiple_languages(primary, include_translations, b2b):
         nc_run = CourseRunFactory.create(
             course=course,
             run_tag="1T2026",
-            language="de",
+            language="de_DE",
             courseware_id=f"{course.readable_id}+1T2026_DE",
             is_primary_language=False,
             start_date=main_run.start_date,

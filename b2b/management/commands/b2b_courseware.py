@@ -46,7 +46,16 @@ Specifying a course run will attach it to the contract unless the contract is al
 
 Specifying a course will attempt to create a course run for the contract for the specified course. It will try to create a course run in edX as well unless "--no-create-runs" is specified. This flag is ignored if "--import" is specified.
 
-Specifying a program will iterate through the program's courses and create runs for each. It will also link the program to the contract.
+Specifying a course will create course runs for variant options if:
+- The course has supported variants, and there are source runs for those variants
+- The contract has supported variants
+- The course and contract variants agree to any extent
+
+E.g.: adding a course with 5 variants (and source runs) to a contract that has 3 variants will result in contract runs for variants that match up between the contract and course. (This will usually include the standard default set but that's not a guarantee.)
+
+You can also filter on variant options by using the --variant flag. Filtering in this manner will not include the default - make sure to include it if you want it.
+
+Specifying a program will iterate through the program's courses and create runs for each. It will also link the program to the contract. Variant runs will be created for each course in the program, according to the rules above.
 
 To remove:
     b2b_courseware remove [--remove-program-runs] contract courseware [--also courseware] [--also courseware...]
@@ -60,7 +69,7 @@ Specifying a course will unlink any of the course's runs that are attached to th
 Specifying a program will only unlink the program from the contract, unless "--remove-program-runs" is set. If it is, then all the runs that belong to both the contract and the program's courses will be removed from the contract. Note that doing this and then re-adding the program will *not* re-attach the existing runs to the contract - you will need to do that manually.
     """
 
-    def create_run(
+    def create_run(  # noqa: PLR0913
         self,
         contract,
         courseware,
@@ -68,6 +77,9 @@ Specifying a program will only unlink the program from the contract, unless "--r
         skip_edx=False,
         org_prefix=None,
         no_reruns=False,
+        ignore_langs=False,
+        only_lang=None,
+        filter_variants=None,
     ):
         """Create a run for the specified contract."""
         try:
@@ -77,6 +89,9 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 skip_edx=skip_edx,
                 org_prefix=org_prefix,
                 no_reruns=no_reruns,
+                ignore_langs=ignore_langs,
+                only_lang=only_lang,
+                filter_variants=filter_variants,
             )
         except InvalidKeyError:
             self.stderr.write(
@@ -168,6 +183,23 @@ Specifying a program will only unlink the program from the contract, unless "--r
             action="store_true",
             help="Create enrollment codes after adding course(s) to the contract. (Skips this by default; run b2b_codes validate afterward if the contract requires codes.)",
         )
+        add_subparser.add_argument(
+            "--no-lang",
+            action="store_true",
+            help="Ignore languages - only create runs for the primary language (or the blank language)",
+        )
+        add_subparser.add_argument(
+            "--lang",
+            type=str,
+            help="Include the default and the specified language code only.",
+        )
+        add_subparser.add_argument(
+            "--variant",
+            type=str,
+            action="append",
+            default=[],
+            help="Limit to variant(s) specified. Specify as comma-separated values in format 'lang,industry,length'. Repeat as necessary.",
+        )
 
         remove_subparser = subparsers.add_parser(
             "remove",
@@ -182,7 +214,7 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
         return super().add_arguments(parser)
 
-    def handle_add(self, contract, coursewares, **kwargs):  # noqa: C901
+    def handle_add(self, contract, coursewares, **kwargs):  # noqa: C901, PLR0915
         """Handle the add subcommand."""
 
         skip_edx = kwargs.pop("no_create_runs", False)
@@ -191,8 +223,35 @@ Specifying a program will only unlink the program from the contract, unless "--r
         org_prefix = kwargs.pop("prefix")
         make_codes = kwargs.pop("make_codes", False)
         no_reruns = not kwargs.pop("allow_reruns", True)
+        ignore_langs = kwargs.pop("no_lang", False)
+        only_lang = kwargs.pop("lang", None)
+        variants = kwargs.pop("variant", [])
 
         managed = 0
+
+        # Parse out the variants specified.
+        filter_variants = (
+            list(contract.variant_options.all()) if len(variants) == 0 else []
+        )
+
+        for variant in variants:
+            opts = variant.split(",")
+            filter_val = contract.variant_options
+            if len(opts) >= 1:
+                filter_val = filter_val.filter(language=opts[0])
+            if len(opts) >= 2:  # noqa: PLR2004
+                filter_val = filter_val.filter(variant_industry=opts[1])
+            if len(opts) == 3:  # noqa: PLR2004
+                filter_val = filter_val.filter(variant_length=opts[2])
+            if len(opts) > 3:  # noqa: PLR2004
+                self.stderr.write(
+                    self.style.ERROR(f"Bad variant options specified: {opts}")
+                )
+                return -1
+
+            filter_val = filter_val.first()
+            if filter_val:
+                filter_variants.append(filter_val)
 
         if can_import:
             # Get the courseware IDs we got passed in that weren't matched to
@@ -250,7 +309,12 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 )
 
                 prog_add, prog_no_source = contract.add_program_courses(
-                    courseware, skip_edx=skip_edx, no_reruns=no_reruns
+                    courseware,
+                    skip_edx=skip_edx,
+                    no_reruns=no_reruns,
+                    ignore_langs=ignore_langs,
+                    only_lang=only_lang,
+                    filter_variants=filter_variants,
                 )
                 if prog_no_source > 0:
                     self.stdout.write(
@@ -300,6 +364,9 @@ Specifying a program will only unlink the program from the contract, unless "--r
                 skip_edx=skip_edx,
                 org_prefix=org_prefix,
                 no_reruns=no_reruns,
+                ignore_langs=ignore_langs,
+                only_lang=only_lang,
+                filter_variants=filter_variants,
             ):
                 # This is a course, so create a run (unless we've been told not to).
 

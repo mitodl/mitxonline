@@ -166,3 +166,11 @@ class CourseOutlineResponseSerializer(serializers.Serializer):
     course_id = serializers.CharField()
     generated_at = serializers.DateTimeField()
     modules = CourseOutlineModuleSerializer(many=True)
+
+
+@extend_schema_serializer(component_name="CourseVariantRunsResponse")
+class CourseVariantRunsResponseSerializer(serializers.Serializer):
+    """Serializer for the course variant run API."""
+
+    id = serializers.IntegerField()
+    courseruns = BaseCourseRunSerializer(many=True)

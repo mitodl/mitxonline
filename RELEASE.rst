@@ -1,6 +1,40 @@
 Release Notes
 =============
 
+Version 1.151.1 (Released June 01, 2026)
+---------------
+
+- Remove django-hijack integration (#3617)
+- Update flaky test test_discounted_price (#3614)
+
+Version 1.151.0 (Released May 28, 2026)
+---------------
+
+- Add variant support to contracts (#3618)
+
+Version 1.150.10 (Released May 28, 2026)
+----------------
+
+- fix: add extend_schema response types to B2B manager contract actions (#3611)
+- Upgrade django_health_checks (#3602)
+
+Version 1.150.9 (Released May 27, 2026)
+---------------
+
+- Initial variant support (#3605)
+- Add language handling flags for b2b_courserun (#3610)
+- Fix issues with learner record api (#3600)
+- fix: handle missing signature image in CertificatePage signatory_items (#3608)
+- fix: add audit trail on first enrollment as well (#3589)
+- [pre-commit.ci] pre-commit autoupdate (#3588)
+- Update dependency webpack-dev-server to v5.2.4 [SECURITY] (#3591)
+
+Version 1.150.7 (Released May 26, 2026)
+---------------
+
+- Fix consideration for program certificate generation (#3597)
+- Update Learner Program Record Styling and remove header (#3593)
+
 Version 1.150.6 (Released May 20, 2026)
 ---------------
 

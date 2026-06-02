@@ -83,6 +83,7 @@ from main.constants import (
 from main.utils import date_to_datetime
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
+from variants.models import SupportedVariant
 
 FAKE = faker.Faker()
 pytestmark = [
@@ -565,6 +566,8 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
         courseware_id=str(source_course_run_key),
         run_tag="SOURCE",
         is_source_run=True,
+        language="en",
+        is_primary_language=True,
     )
 
     target_course_id = create_contract_run_key(source_run, contract)
@@ -578,6 +581,8 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
             courseware_id=target_course_id,
             run_tag=CourseKey.from_string(target_course_id).run,
             b2b_contract=contract,
+            language="en",
+            is_primary_language=True,
         )
 
         [(new_run, _)] = create_contract_run(contract, course)
@@ -590,6 +595,8 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
         assert new_run_key.run[0] == str(int(collision_idx) + 1)
         return
 
+    target_course_id = f"{target_course_id}_en"
+
     assert not course.courseruns.filter(courseware_id=target_course_id).exists()
 
     [(created_run, created_product)] = create_contract_run(contract, course)
@@ -600,6 +607,149 @@ def test_create_contract_run(mocker, source_run_exists, run_exists):
     assert settings.OPENEDX_COURSE_BASE_URL in created_run.courseware_url
 
     mocked_clone_run.assert_called()
+
+
+def test_create_contract_run_variants(mocker):
+    """
+    Test creating runs for a contract when there are variant runs.
+
+    Variants should be created successfully, even if some of the variant options
+    overlap (i.e. same language, same industry, etc.)
+    """
+
+    mocked_clone_run = mocker.patch("openedx.tasks.clone_courserun.delay")
+    extra_variants = (
+        (
+            "en",
+            "HC",
+            "S",
+        ),
+        (
+            "fr",
+            "F",
+            "S",
+        ),
+        (
+            "fr",
+            "HC",
+            "S",
+        ),
+        (
+            "fr",
+            "",
+            "",
+        ),
+    )
+
+    contract = factories.ContractPageFactory.create()
+    course = CourseFactory.create()
+
+    source_course_run_key = CourseKey.from_string(f"{course.readable_id}+SOURCE")
+    default_source_run = CourseRunFactory.create(
+        course=course,
+        courseware_id=str(source_course_run_key),
+        run_tag="SOURCE",
+        is_source_run=True,
+        language="en",
+        is_primary_language=True,
+    )
+    variant_source_runs = []
+    for language, variant_industry, variant_length in extra_variants:
+        SupportedVariant.objects.create(
+            variant_object=course,
+            language=language,
+            variant_industry=variant_industry,
+            variant_length=variant_length,
+        )
+
+        # Technically we'll format the created runs without dunders if there's a
+        # blank but it's fine for the source run.
+        variant_source_runs.append(
+            CourseRunFactory.create(
+                course=course,
+                courseware_id=f"{source_course_run_key!s}_{language}_{variant_industry}_{variant_length}",
+                run_tag="SOURCE",
+                is_source_run=True,
+                language=language,
+                variant_industry=variant_industry,
+                variant_length=variant_length,
+            )
+        )
+
+    target_course_id = create_contract_run_key(default_source_run, contract)
+
+    assert not course.courseruns.filter(
+        courseware_id__startswith=target_course_id
+    ).exists()
+
+    create_contract_run(contract, course)
+    mocked_clone_run.assert_called()
+
+    assert (
+        course.courseruns.filter(courseware_id__startswith=target_course_id).count()
+        == 5
+    )
+    run_check_qs = course.courseruns.filter(b2b_contract=contract)
+
+    found_count = 0
+    for language, variant_industry, variant_length in [
+        (
+            "en",
+            "",
+            "",
+        ),
+        *extra_variants,
+    ]:
+        found_it = False
+        if run_check_qs.filter(
+            language=language,
+            variant_industry=variant_industry,
+            variant_length=variant_length,
+        ).exists():
+            found_it = True
+            found_count += 1
+
+        assert found_it
+
+    assert found_count == 5
+
+    # Test reruns now - if we re-run create_contract_run, we should get a new
+    # source of runs, but with a new starting run tag.
+
+    # Side effect! Test the create_contract_run_key for this scenario too.
+    target_course_id = create_contract_run_key(default_source_run, contract)
+    target_course_id_key = CourseKey.from_string(target_course_id)
+    assert target_course_id_key.run[0] == "2"
+
+    create_contract_run(contract, course, no_reruns=False)
+    mocked_clone_run.assert_called()
+
+    assert course.courseruns.filter(b2b_contract=contract).count() == 10
+    run_check_qs = course.courseruns.filter(
+        b2b_contract=contract, courseware_id__startswith=target_course_id
+    )
+
+    found_count = 0
+    for language, variant_industry, variant_length in [
+        (
+            "en",
+            "",
+            "",
+        ),
+        *extra_variants,
+    ]:
+        found_it = False
+        if run_check_qs.filter(
+            language=language,
+            variant_industry=variant_industry,
+            variant_length=variant_length,
+        ).exists():
+            found_it = True
+            found_count += 1
+
+        assert found_it
+
+    assert found_count == 5
 
 
 def test_b2b_reconcile_user_orgs():  # noqa: PLR0915
@@ -1588,7 +1738,16 @@ def test_create_contract_run_multi_language(mocker):
     """create_contract_run produces one run+product per language source run."""
     mocker.patch("openedx.tasks.clone_courserun.delay")
     contract = ContractPageFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=contract,
+        language="zh_CN",
+    )
     course = CourseFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="zh_CN",
+        b2b_only=True,
+    )
     CourseRunFactory.create(
         course=course,
         run_tag="1T2026",
@@ -1600,14 +1759,14 @@ def test_create_contract_run_multi_language(mocker):
     CourseRunFactory.create(
         course=course,
         run_tag="1T2026",
-        language="zh",
+        language="zh_CN",
         is_source_run=True,
         courseware_id=f"{course.readable_id}+1T2026-zh",
     )
     results = create_contract_run(contract, course, require_designated_source_run=True)
     assert len(results) == 2
     languages = {run.language for run, _ in results}
-    assert languages == {"en", "zh"}
+    assert languages == {"en", "zh_CN"}
     # Each result should have a distinct product
     products = [product for _, product in results]
     assert len({p.id for p in products}) == 2
@@ -1680,6 +1839,10 @@ def test_create_contract_run_single_language_legacy(mocker):
     mocker.patch("openedx.tasks.clone_courserun.delay")
     contract = ContractPageFactory.create()
     course = CourseFactory.create()
+
+    contract.variant_options.all().delete()
+    course.possible_variant_sets.all().delete()
+
     CourseRunFactory.create(
         course=course,
         language="",
@@ -1693,8 +1856,8 @@ def test_create_contract_run_single_language_legacy(mocker):
     assert product.object_id == run.id
 
 
-def test_get_source_course_runs():
-    """Test that the internal _get_source_runs_for_course returns properly when there's a mix of translated runs."""
+def test_get_source_course_runs_no_variants():
+    """Test that _get_source_runs returns properly when there aren't any variants."""
 
     course = CourseFactory.create()
 
@@ -1704,44 +1867,196 @@ def test_get_source_course_runs():
         is_source_run=True,
         language="en",
         is_primary_language=True,
+        variant_industry="",
+        variant_length="",
     )
 
-    translated_1T_runs = [
-        CourseRunFactory.create(
+    CourseRunFactory.create_batch(3, course=course, is_source_run=False)
+
+    source_runs = _get_source_runs_for_course(course)
+
+    assert source_runs.count() == 1
+    source_run = source_runs.first()
+    assert source_run
+    assert source_run.id == main_source_course.id
+
+
+@pytest.mark.parametrize(
+    "variant_runs_exist",
+    [
+        True,
+        False,
+    ],
+)
+@pytest.mark.parametrize(
+    "use_filter",
+    [
+        True,
+        False,
+    ],
+)
+def test_get_source_course_runs_with_variants(variant_runs_exist, use_filter):
+    """Test that _get_source_runs returns properly when there aren't any variants."""
+
+    course = CourseFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="fr",
+    )
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="de_DE",
+        variant_industry="HC",
+        variant_length="F",
+    )
+
+    variant_filter = None
+    if use_filter:
+        contract = factories.ContractPageFactory.create()
+        SupportedVariant.objects.create(
+            variant_object=contract,
+            language="hi",
+        )
+        SupportedVariant.objects.create(
+            variant_object=contract,
+            language="de_DE",
+            variant_industry="HC",
+            variant_length="F",
+        )
+        variant_filter = contract.variant_options.all()
+
+    main_source_course = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        is_source_run=True,
+        language="en",
+        is_primary_language=True,
+        variant_industry="",
+        variant_length="",
+    )
+
+    CourseRunFactory.create_batch(3, course=course, is_source_run=False)
+
+    if variant_runs_exist:
+        variant_1 = CourseRunFactory.create(
             course=course,
             run_tag="1T2026",
             is_source_run=True,
-            language=lang,
+            language="fr",
             is_primary_language=False,
-            start_date=main_source_course.start_date,
-            end_date=main_source_course.end_date,
-            enrollment_start=main_source_course.start_date,
-            enrollment_end=main_source_course.end_date,
+            variant_industry="",
+            variant_length="",
         )
-        for lang in ["fr", "es"]
-    ]
-
-    translated_3T_runs = [
-        CourseRunFactory.create(
+        variant_2 = CourseRunFactory.create(
             course=course,
-            run_tag="3T2025",
+            run_tag="1T2026",
             is_source_run=True,
-            language=lang,
+            language="de_DE",
             is_primary_language=False,
-            start_date=main_source_course.start_date,
-            end_date=main_source_course.end_date,
-            enrollment_start=main_source_course.start_date,
-            enrollment_end=main_source_course.end_date,
+            variant_industry="HC",
+            variant_length="F",
         )
-        for lang in ["fr", "es"]
-    ]
 
-    runs = _get_source_runs_for_course(course)
+    source_runs = _get_source_runs_for_course(course, filter_variants=variant_filter)
 
-    assert len(runs) == 3
+    if variant_runs_exist and not use_filter:
+        assert (
+            source_runs.filter(
+                id__in=[main_source_course.id, variant_1.id, variant_2.id]
+            ).count()
+            == 3
+        )
+        return
+    elif variant_runs_exist and use_filter:
+        assert (
+            source_runs.filter(
+                id__in=[main_source_course.id, variant_1.id, variant_2.id]
+            ).count()
+            == 2
+        )
+        return
 
-    for run in translated_1T_runs:
-        assert run in runs
+    # At this point - even if we have the filter, there aren't variant runs to
+    # pull, so this should return just the main one.
 
-    for run in translated_3T_runs:
-        assert run not in runs
+    assert source_runs.count() == 1
+    source_run = source_runs.first()
+    assert source_run
+    assert source_run.id == main_source_course.id
+
+
+@pytest.mark.parametrize(
+    "filter_type",
+    [
+        "ignore_langs",
+        "only_lang",
+    ],
+)
+def test_get_source_course_runs_with_variants_lang_filter(filter_type):
+    """
+    Test that _g_s_c_r's ignore_langs and only_lang flags work.
+
+    These were implemented in sort of a liminal space in between just translation
+    support and contract variants. They're still useful filters though, especially
+    for non-B2B stuff, so make sure they also still work.
+    """
+
+    course = CourseFactory.create()
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="fr",
+    )
+    SupportedVariant.objects.create(
+        variant_object=course,
+        language="de_DE",
+        variant_industry="HC",
+        variant_length="F",
+    )
+    main_source_course = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        is_source_run=True,
+        language="en",
+        is_primary_language=True,
+        variant_industry="",
+        variant_length="",
+    )
+    variant_1 = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        is_source_run=True,
+        language="fr",
+        is_primary_language=False,
+        variant_industry="",
+        variant_length="",
+    )
+    variant_2 = CourseRunFactory.create(
+        course=course,
+        run_tag="1T2026",
+        is_source_run=True,
+        language="de_DE",
+        is_primary_language=False,
+        variant_industry="HC",
+        variant_length="F",
+    )
+
+    if filter_type == "ignore_langs":
+        source_runs = _get_source_runs_for_course(course, ignore_langs=True)
+    else:
+        source_runs = _get_source_runs_for_course(course, only_lang="de_DE")
+
+    assert source_runs.count() == 1
+    assert (
+        source_runs.filter(
+            id__in=[main_source_course.id, variant_1.id, variant_2.id]
+        ).count()
+        == 1
+    )
+
+    returned_run = source_runs.first()
+    assert returned_run
+
+    if filter_type == "ignore_langs":
+        assert returned_run.id == main_source_course.id
+    else:
+        assert returned_run.id == variant_2.id

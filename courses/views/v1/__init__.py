@@ -633,8 +633,21 @@ class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = PartnerSchool.objects.all()
 
 
+def get_enrolled_program_or_404(user, program_id: int) -> Program:
+    """Return a program only if the user has an active enrollment for it."""
+
+    enrollment = get_object_or_404(
+        ProgramEnrollment.objects.select_related("program"),
+        user=user,
+        program_id=program_id,
+    )
+    return enrollment.program
+
+
 class GetLearnerRecordView(APIView):
     """View to get learner record by program ID"""
+
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
         operation_id="learner_record_retrieve_by_id",
@@ -645,7 +658,7 @@ class GetLearnerRecordView(APIView):
         """
         Retrieve the learner record for a specific program.
         """
-        program = Program.objects.get(pk=pk)
+        program = get_enrolled_program_or_404(request.user, pk)
         serializer = LearnerRecordSerializer(program, context={"request": request})
         return Response(serializer.data)
 
@@ -662,7 +675,7 @@ class LearnerRecordShareView(APIView):
         Sets up a sharing link for the learner's record. Returns back the entire
         learner record.
         """
-        program = Program.objects.get(pk=pk)
+        program = get_enrolled_program_or_404(request.user, pk)
 
         school = None
 
@@ -672,7 +685,7 @@ class LearnerRecordShareView(APIView):
         ):
             try:
                 school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
-            except:  # noqa: E722
+            except PartnerSchool.DoesNotExist:
                 return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
 
             (ps_share, _) = LearnerProgramRecordShare.objects.filter(
@@ -707,7 +720,7 @@ class RevokeLearnerRecordShareView(APIView):
         anonymous ones; shares sent to partner schools are always allowed once they
         are sent.
         """
-        program = Program.objects.get(pk=pk)
+        program = get_enrolled_program_or_404(request.user, pk)
 
         LearnerProgramRecordShare.objects.filter(
             user=request.user, partner_school=None, program=program

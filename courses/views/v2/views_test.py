@@ -499,11 +499,15 @@ def test_filter_with_org_id_multiple_courses_same_org(
     create_contract_run(contract, course1)
 
     course2 = CourseFactory()
-    CourseRunFactory(course=course2, is_source_run=True)
+    CourseRunFactory(
+        course=course2, is_source_run=True, language="en", is_primary_language=True
+    )
     create_contract_run(contract, course2)
 
     course3 = CourseFactory()
-    CourseRunFactory(course=course3, is_source_run=True)
+    CourseRunFactory(
+        course=course3, is_source_run=True, language="en", is_primary_language=True
+    )
     create_contract_run(contract, course3)
 
     # Create unrelated course (no contract_run - should not appear in results)
@@ -531,7 +535,7 @@ def test_filter_with_org_id_inactive_contract_excluded(
 ):
     """Test that courses from inactive contracts are not returned"""
     org = OrganizationPageFactory(name="Test Org")
-    contract = ContractPageFactory(organization=org, active=False)
+    contract = ContractPageFactory(organization=org)
     user = UserFactory()
     user.b2b_organizations.add(org)
     user.b2b_contracts.add(contract)
@@ -539,6 +543,9 @@ def test_filter_with_org_id_inactive_contract_excluded(
 
     (course, _) = contract_ready_course
     create_contract_run(contract, course)
+
+    contract.active = False
+    contract.save()
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -567,7 +574,9 @@ def test_filter_with_org_id_multiple_orgs(contract_ready_course, mock_course_run
     create_contract_run(contract1, course1)
 
     course2 = CourseFactory()
-    CourseRunFactory(course=course2, is_source_run=True)
+    CourseRunFactory(
+        course=course2, is_source_run=True, language="en", is_primary_language=True
+    )
     create_contract_run(contract2, course2)
 
     client = APIClient()
@@ -726,7 +735,9 @@ def test_filter_with_org_id_pagination(contract_ready_course, mock_course_run_cl
     # Create more courses to test pagination
     for i in range(15):
         course = CourseFactory(title=f"Org Course {i}")
-        CourseRunFactory(course=course, is_source_run=True)
+        CourseRunFactory(
+            course=course, is_source_run=True, language="en", is_primary_language=True
+        )
         create_contract_run(contract, course)
 
     client = APIClient()
@@ -759,7 +770,9 @@ def test_filter_with_org_id_combined_with_other_filters(
     create_contract_run(contract, course1)
 
     course2 = CourseFactory()
-    CourseRunFactory(course=course2, is_source_run=True)
+    CourseRunFactory(
+        course=course2, is_source_run=True, language="en", is_primary_language=True
+    )
     create_contract_run(contract, course2)
 
     unrelated_course = CourseFactory()
@@ -1131,7 +1144,9 @@ def test_program_filter_for_b2b_org(user, mock_course_run_clone):
     regular_program.save()
 
     b2b_course = CourseFactory.create()
-    CourseRunFactory.create(course=b2b_course, is_source_run=True)
+    CourseRunFactory.create(
+        course=b2b_course, is_source_run=True, language="en", is_primary_language=True
+    )
     b2b_program.add_requirement(b2b_course)
     b2b_program.add_requirement(regular_course)
     b2b_program.b2b_only = True
@@ -2474,7 +2489,7 @@ def test_correct_courserun_languages(user_drf_client, primary):
         start_date=start_date,
         enrollment_start=start_date,
         live=True,
-        language="en" if primary in ["reg", "transreg"] else "",
+        language="en",
         is_primary_language=(primary == "reg"),
     )
 
@@ -2498,7 +2513,7 @@ def test_correct_courserun_languages(user_drf_client, primary):
         start_date=start_date,
         enrollment_start=start_date,
         live=True,
-        language="en" if primary == "source" else "",
+        language="en",
         is_primary_language=(primary == "source"),
         is_source_run=True,
     )

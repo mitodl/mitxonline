@@ -51,9 +51,6 @@ class ProfileDetailsAPIView(APIView):
     @extend_schema(exclude=True)
     def post(self, request):
         """Processes a request"""
-        if bool(request.session.get("hijack_history")):
-            return Response(status=status.HTTP_403_FORBIDDEN)
-
         serializer_cls = self.get_serializer_cls()
         serializer = serializer_cls(
             data=request.data,
