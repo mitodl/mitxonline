@@ -98,9 +98,9 @@ class Command(BaseCommand):
                 )
             ),
             "course_run_certificates": list(
-                CourseRunCertificate.all_objects.filter(user=source_user).select_related(
-                    "course_run"
-                )
+                CourseRunCertificate.all_objects.filter(
+                    user=source_user
+                ).select_related("course_run")
             ),
             "program_certificates": list(
                 ProgramCertificate.all_objects.filter(user=source_user).select_related(
@@ -180,7 +180,10 @@ class Command(BaseCommand):
                 "course run grades for {}".format(
                     ", ".join(
                         sorted(
-                            {grade.course_run.courseware_id for grade in conflicting_grades}
+                            {
+                                grade.course_run.courseware_id
+                                for grade in conflicting_grades
+                            }
                         )
                     )
                 )
