@@ -63,6 +63,55 @@ log = logging.getLogger(__name__)
 # HubSpot internal option value for the "Checkout Abandoned" deal stage.
 CART_ADD_DEAL_STAGE = "checkout_abandoned"
 
+# Shared custom object property definitions for certificate schemas.
+CERTIFICATE_IS_REVOKED_OPTIONS = [
+    {
+        "label": "True",
+        "value": "true",
+        "hidden": False,
+        "displayOrder": 0,
+    },
+    {
+        "label": "False",
+        "value": "false",
+        "hidden": False,
+        "displayOrder": 1,
+    },
+]
+
+CERTIFICATE_COMMON_PROPERTIES = {
+    "unique_app_id": {
+        "name": "unique_app_id",
+        "label": "Unique App ID",
+        "type": "string",
+        "fieldType": "text",
+        "groupName": "certificateinformation",
+        "hasUniqueValue": True,
+    },
+    "user_email": {
+        "name": "user_email",
+        "label": "User Email",
+        "type": "string",
+        "fieldType": "text",
+        "groupName": "certificateinformation",
+    },
+    "issue_date": {
+        "name": "issue_date",
+        "label": "Issue Date",
+        "type": "datetime",
+        "fieldType": "date",
+        "groupName": "certificateinformation",
+    },
+    "is_revoked": {
+        "name": "is_revoked",
+        "label": "Is Revoked",
+        "type": "enumeration",
+        "fieldType": "booleancheckbox",
+        "groupName": "certificateinformation",
+        "options": CERTIFICATE_IS_REVOKED_OPTIONS,
+    },
+}
+
 # Schema definitions used by the create_hubspot_certificate_schema command.
 CERTIFICATE_CUSTOM_OBJECT_SCHEMAS = {
     "course_run_certificate": {
@@ -78,14 +127,7 @@ CERTIFICATE_CUSTOM_OBJECT_SCHEMAS = {
         ],
         "associatedObjects": ["CONTACT"],
         "properties": [
-            {
-                "name": "unique_app_id",
-                "label": "Unique App ID",
-                "type": "string",
-                "fieldType": "text",
-                "groupName": "certificateinformation",
-                "hasUniqueValue": True,
-            },
+            CERTIFICATE_COMMON_PROPERTIES["unique_app_id"],
             {
                 "name": "course_run_readable_id",
                 "label": "Course Run Readable ID",
@@ -100,41 +142,9 @@ CERTIFICATE_CUSTOM_OBJECT_SCHEMAS = {
                 "fieldType": "text",
                 "groupName": "certificateinformation",
             },
-            {
-                "name": "user_email",
-                "label": "User Email",
-                "type": "string",
-                "fieldType": "text",
-                "groupName": "certificateinformation",
-            },
-            {
-                "name": "issue_date",
-                "label": "Issue Date",
-                "type": "datetime",
-                "fieldType": "date",
-                "groupName": "certificateinformation",
-            },
-            {
-                "name": "is_revoked",
-                "label": "Is Revoked",
-                "type": "enumeration",
-                "fieldType": "booleancheckbox",
-                "groupName": "certificateinformation",
-                "options": [
-                    {
-                        "label": "True",
-                        "value": "true",
-                        "hidden": False,
-                        "displayOrder": 0,
-                    },
-                    {
-                        "label": "False",
-                        "value": "false",
-                        "hidden": False,
-                        "displayOrder": 1,
-                    },
-                ],
-            },
+            CERTIFICATE_COMMON_PROPERTIES["user_email"],
+            CERTIFICATE_COMMON_PROPERTIES["issue_date"],
+            CERTIFICATE_COMMON_PROPERTIES["is_revoked"],
         ],
     },
     "program_certificate": {
@@ -150,14 +160,7 @@ CERTIFICATE_CUSTOM_OBJECT_SCHEMAS = {
         ],
         "associatedObjects": ["CONTACT"],
         "properties": [
-            {
-                "name": "unique_app_id",
-                "label": "Unique App ID",
-                "type": "string",
-                "fieldType": "text",
-                "groupName": "certificateinformation",
-                "hasUniqueValue": True,
-            },
+            CERTIFICATE_COMMON_PROPERTIES["unique_app_id"],
             {
                 "name": "program_readable_id",
                 "label": "Program Readable ID",
@@ -172,41 +175,9 @@ CERTIFICATE_CUSTOM_OBJECT_SCHEMAS = {
                 "fieldType": "text",
                 "groupName": "certificateinformation",
             },
-            {
-                "name": "user_email",
-                "label": "User Email",
-                "type": "string",
-                "fieldType": "text",
-                "groupName": "certificateinformation",
-            },
-            {
-                "name": "issue_date",
-                "label": "Issue Date",
-                "type": "datetime",
-                "fieldType": "date",
-                "groupName": "certificateinformation",
-            },
-            {
-                "name": "is_revoked",
-                "label": "Is Revoked",
-                "type": "enumeration",
-                "fieldType": "booleancheckbox",
-                "groupName": "certificateinformation",
-                "options": [
-                    {
-                        "label": "True",
-                        "value": "true",
-                        "hidden": False,
-                        "displayOrder": 0,
-                    },
-                    {
-                        "label": "False",
-                        "value": "false",
-                        "hidden": False,
-                        "displayOrder": 1,
-                    },
-                ],
-            },
+            CERTIFICATE_COMMON_PROPERTIES["user_email"],
+            CERTIFICATE_COMMON_PROPERTIES["issue_date"],
+            CERTIFICATE_COMMON_PROPERTIES["is_revoked"],
         ],
     },
 }
@@ -960,12 +931,10 @@ def _associate_certificate_with_contact(
     cert_object_type: str,
     cert_hubspot_id: str,
     contact_hubspot_id: str,
-    association_type_id: int | None = None,  # noqa: ARG001
 ) -> None:
     """Create a v4 association between a certificate custom object and a contact.
 
     Uses create_default() which auto-creates associations with the default type.
-    The association_type_id parameter is kept for backward compatibility but not used.
     """
     wait_for_hubspot_rate_limit()
     hubspot_client.crm.associations.v4.basic_api.create_default(
@@ -994,36 +963,6 @@ def _get_custom_object_type_id_by_name(
         log.exception(
             "Failed to fetch objectTypeId for custom object name %s",
             object_type_name,
-        )
-    return None
-
-
-def _get_cert_contact_association_type_id(
-    hubspot_client: HubspotApi,
-    cert_object_type: str,
-    setting_name: str,
-) -> int | None:
-    """Return the association typeId for cert_object_type → contacts.
-
-    Checks settings first, then queries HubSpot. Returns None if unavailable.
-    """
-    setting_value = getattr(settings, setting_name, None)
-    if setting_value:
-        return int(setting_value)
-    try:
-        wait_for_hubspot_rate_limit()
-        types_response = (
-            hubspot_client.crm.associations.v4.schema.definitions_api.get_all(
-                from_object_type=cert_object_type,
-                to_object_type=HubspotObjectType.CONTACTS.value,
-            )
-        )
-        if types_response.results:
-            return types_response.results[0].type_id
-    except Exception:
-        log.exception(
-            "Failed to fetch association type ID for custom object %s",
-            cert_object_type,
         )
     return None
 
@@ -1077,13 +1016,13 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
 
     wait_for_hubspot_rate_limit()
     if existing_id:
-        result = hubspot_client.crm.objects.basic_api.update(
+        hubspot_certificate_result = hubspot_client.crm.objects.basic_api.update(
             object_type=object_type,
             object_id=existing_id,
             simple_public_object_input=SimplePublicObjectInput(properties=properties),
         )
     else:
-        result = hubspot_client.crm.objects.basic_api.create(
+        hubspot_certificate_result = hubspot_client.crm.objects.basic_api.create(
             object_type=object_type,
             simple_public_object_input_for_create=SimplePublicObjectInput(
                 properties=properties
@@ -1093,29 +1032,23 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     # Associate with the owning contact.
     contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
     if contact_id:
-        association_type_id = _get_cert_contact_association_type_id(
-            hubspot_client,
-            object_type_name,
-            "HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID",
-        )
         try:
             _associate_certificate_with_contact(
                 hubspot_client,
-                object_type_name,
-                result.id,
+                object_type,
+                hubspot_certificate_result.id,
                 contact_id,
-                association_type_id,
             )
         except Exception:
             log.exception(
                 "Failed to associate course run certificate %s (hs_id=%s) "
                 "with contact %s",
                 cert.id,
-                result.id,
+                hubspot_certificate_result.id,
                 contact_id,
             )
 
-    return result
+    return hubspot_certificate_result
 
 
 def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
@@ -1167,13 +1100,13 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
 
     wait_for_hubspot_rate_limit()
     if existing_id:
-        result = hubspot_client.crm.objects.basic_api.update(
+        hubspot_certificate_result = hubspot_client.crm.objects.basic_api.update(
             object_type=object_type,
             object_id=existing_id,
             simple_public_object_input=SimplePublicObjectInput(properties=properties),
         )
     else:
-        result = hubspot_client.crm.objects.basic_api.create(
+        hubspot_certificate_result = hubspot_client.crm.objects.basic_api.create(
             object_type=object_type,
             simple_public_object_input_for_create=SimplePublicObjectInput(
                 properties=properties
@@ -1183,28 +1116,22 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     # Associate with the owning contact.
     contact_id = _find_hubspot_contact_id_by_email(hubspot_client, cert.user.email)
     if contact_id:
-        association_type_id = _get_cert_contact_association_type_id(
-            hubspot_client,
-            object_type_name,
-            "HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID",
-        )
         try:
             _associate_certificate_with_contact(
                 hubspot_client,
-                object_type_name,
-                result.id,
+                object_type,
+                hubspot_certificate_result.id,
                 contact_id,
-                association_type_id,
             )
         except Exception:
             log.exception(
                 "Failed to associate program certificate %s (hs_id=%s) with contact %s",
                 cert.id,
-                result.id,
+                hubspot_certificate_result.id,
                 contact_id,
             )
 
-    return result
+    return hubspot_certificate_result
 
 
 def make_contact_create_message_list_from_user_ids(

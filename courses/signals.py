@@ -52,16 +52,11 @@ def handle_create_course_run_certificate(
                 lambda: generate_multiple_programs_certificate(user, programs)
             )
 
-    try:
-        transaction.on_commit(
-            lambda: hubspot_tasks.sync_course_run_certificate_with_hubspot.delay(
-                instance.id
-            )
+    transaction.on_commit(
+        lambda: hubspot_tasks.sync_course_run_certificate_with_hubspot.delay(
+            instance.id
         )
-    except Exception:  # pylint: disable=broad-except
-        logger = logging.getLogger(__name__)
-        logger.exception("Error syncing HubSpot course run certificate")
-        # avoid blocking certificate save flow
+    )
 
 
 @receiver(
@@ -77,13 +72,8 @@ def handle_create_program_certificate(
 ):
     """When a ProgramCertificate model is created."""
     _ = created
-    try:
-        transaction.on_commit(
-            lambda: hubspot_tasks.sync_program_certificate_with_hubspot.delay(
-                instance.id
-            )
+    transaction.on_commit(
+        lambda: hubspot_tasks.sync_program_certificate_with_hubspot.delay(
+            instance.id
         )
-    except Exception:  # pylint: disable=broad-except
-        logger = logging.getLogger(__name__)
-        logger.exception("Error syncing HubSpot program certificate")
-        # avoid blocking certificate save flow
+    )
