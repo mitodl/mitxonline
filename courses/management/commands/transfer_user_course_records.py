@@ -49,7 +49,7 @@ class Command(BaseCommand):
         destination_user = self._fetch_user(options["to_email"], "to_email")
 
         if source_user.pk == destination_user.pk:
-            raise CommandError("Source and destination users must be different.")
+            raise CommandError("Source and destination users must be different.")  # noqa: EM101
 
         source_records = self._load_source_records(source_user)
         self._raise_on_conflicts(source_records, destination_user)
@@ -59,7 +59,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                "Transferred records from {source_email} to {destination_email}: "
+                "Transferred records from {source_email} to {destination_email}: "  # noqa: EM102
                 "{counts}".format(
                     source_email=source_user.email,
                     destination_email=destination_user.email,
@@ -229,7 +229,7 @@ class Command(BaseCommand):
 
         if conflicts:
             raise CommandError(
-                "Transfer aborted because the destination user already has {}.".format(
+                "Transfer aborted because the destination user already has {}.".format(  # noqa: EM103
                     "; ".join(conflicts)
                 )
             )
