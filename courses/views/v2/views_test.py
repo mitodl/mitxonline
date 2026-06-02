@@ -535,7 +535,7 @@ def test_filter_with_org_id_inactive_contract_excluded(
 ):
     """Test that courses from inactive contracts are not returned"""
     org = OrganizationPageFactory(name="Test Org")
-    contract = ContractPageFactory(organization=org, active=False)
+    contract = ContractPageFactory(organization=org)
     user = UserFactory()
     user.b2b_organizations.add(org)
     user.b2b_contracts.add(contract)
@@ -543,6 +543,9 @@ def test_filter_with_org_id_inactive_contract_excluded(
 
     (course, _) = contract_ready_course
     create_contract_run(contract, course)
+
+    contract.active = False
+    contract.save()
 
     client = APIClient()
     client.force_authenticate(user=user)
