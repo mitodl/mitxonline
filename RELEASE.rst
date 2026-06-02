@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.151.2
+Version 1.151.2 (Released June 02, 2026)
 ---------------
 
 - Move where variant options are set during import_courserun (#3626)
