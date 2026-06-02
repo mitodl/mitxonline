@@ -218,7 +218,13 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         List enrollment codes for a contract.
 
         Only shows codes for contracts that require them (non-auto membership types).
-        Logic varies based on whether contract has learner limits.
+        Logic varies based on whether contract has learner limits. There are three main cases:
+        - If the contract has an auto membership type, no codes are needed, so we return an empty list.
+        - If the contract does not have a learner limit, we show the first code only.
+          We don't show individual redemptions because this case is unlikely to be a useful setup for contracts
+        - If the contract has a learner limit, we show all redeemed and assigned codes, plus enough unredeemed codes to fill the remaining seats.
+          This ensures that managers can see all the codes that are currently in use, while also seeing some of the unused codes that are available to be redeemed.
+
         """
         contract = self.get_object()
 
