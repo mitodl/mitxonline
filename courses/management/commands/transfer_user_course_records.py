@@ -26,13 +26,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--source-email",
+            "--from_email",
+            "--from-email",
+            dest="from_email",
             type=str,
             required=True,
             help="Email address for the user records should be moved from",
         )
         parser.add_argument(
-            "--destination-email",
+            "--to_email",
+            "--to-email",
+            dest="to_email",
             type=str,
             required=True,
             help="Email address for the user records should be moved to",
@@ -41,10 +45,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):  # noqa: ARG002
         """Handle command execution."""
-        source_user = self._fetch_user(options["source_email"], "source-email")
-        destination_user = self._fetch_user(
-            options["destination_email"], "destination-email"
-        )
+        source_user = self._fetch_user(options["from_email"], "from_email")
+        destination_user = self._fetch_user(options["to_email"], "to_email")
 
         if source_user.pk == destination_user.pk:
             raise CommandError("Source and destination users must be different.")
