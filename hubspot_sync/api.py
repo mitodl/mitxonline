@@ -182,6 +182,9 @@ CERTIFICATE_CUSTOM_OBJECT_SCHEMAS = {
     },
 }
 
+COURSE_RUN_CERTIFICATE_OBJECT_TYPE = "course_run_certificate"
+PROGRAM_CERTIFICATE_OBJECT_TYPE = "program_certificate"
+
 CUSTOM_ECOMMERCE_PROPERTIES = {
     # defines which hubspot properties are mapped with which local properties when objects are synced.
     # See https://developers.hubspot.com/docs/methods/ecomm-bridge/ecomm-bridge-overview for more details
@@ -970,21 +973,13 @@ def _get_custom_object_type_id_by_name(
 def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     """Upsert a CourseRunCertificate as a HubSpot custom object and associate it to the owner contact.
 
-    Requires HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE to be set in settings
+    Uses the "course_run_certificate" custom object schema
     (run the create_hubspot_certificate_schema management command first).
 
     Returns:
-        SimplePublicObject: The HubSpot object, or None if the object type is not configured.
+        SimplePublicObject: The HubSpot object.
     """
-    object_type_name = getattr(
-        settings, "HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE", None
-    )
-    if not object_type_name:
-        log.debug(
-            "Skipping course run certificate HubSpot sync: "
-            "HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE is not configured."
-        )
-        return None
+    object_type_name = COURSE_RUN_CERTIFICATE_OBJECT_TYPE
 
     hubspot_client = HubspotApi(access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN)
 
@@ -1054,21 +1049,13 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
 def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     """Upsert a ProgramCertificate as a HubSpot custom object and associate it to the owner contact.
 
-    Requires HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE to be set in settings
+    Uses the "program_certificate" custom object schema
     (run the create_hubspot_certificate_schema management command first).
 
     Returns:
-        SimplePublicObject: The HubSpot object, or None if the object type is not configured.
+        SimplePublicObject: The HubSpot object.
     """
-    object_type_name = getattr(
-        settings, "HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE", None
-    )
-    if not object_type_name:
-        log.debug(
-            "Skipping program certificate HubSpot sync: "
-            "HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE is not configured."
-        )
-        return None
+    object_type_name = PROGRAM_CERTIFICATE_OBJECT_TYPE
 
     hubspot_client = HubspotApi(access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN)
 

@@ -82,8 +82,6 @@ def test_sync_course_run_certificate_with_hubspot(mocker, settings):
             title="Classical Mechanics",
         ),
     )
-    settings.HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE = "course_run_certificate"
-
     mock_find_contact = mocker.patch(
         "hubspot_sync.api._find_hubspot_contact_id_by_email",
         return_value="contact-123",
@@ -129,8 +127,6 @@ def test_sync_program_certificate_with_hubspot(mocker, settings):
             title="MITx MicroMasters",
         ),
     )
-    settings.HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE = "program_certificate"
-
     mock_find_contact = mocker.patch(
         "hubspot_sync.api._find_hubspot_contact_id_by_email",
         return_value="contact-456",
