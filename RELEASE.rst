@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.151.6
+---------------
+
+- Fix migration conflict in the cms app (#3639)
+- Make min and max price decimal number (#3629)
+
 Version 1.151.4 (Released June 03, 2026)
 ---------------
 
