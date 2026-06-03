@@ -92,7 +92,7 @@ faker = Faker()
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
 def test_get_programs(
-    user_drf_client, django_assert_max_num_queries, course_catalog_data
+    user_drf_client, django_assert_max_num_queries, course_catalog_data, mock_context
 ):
     """Test the view that handles requests for all Programs"""
     course_catalog_data  # noqa: B018
@@ -116,7 +116,9 @@ def test_get_programs(
         if hasattr(program, "_courses_with_requirements_data"):
             delattr(program, "_courses_with_requirements_data")
         assert_drf_json_equal(
-            program_data, ProgramDetailSerializer(program).data, ignore_order=True
+            program_data,
+            ProgramDetailSerializer(program, context=mock_context).data,
+            ignore_order=True,
         )
 
 
@@ -257,7 +259,6 @@ def test_delete_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-@pytest.mark.skip_nplusone_check
 @pytest.mark.usefixtures("course_catalog_data")
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [2], indirect=True)
@@ -294,7 +295,11 @@ def test_get_courses(
 
     for course in courses:
         courses_from_fixture.append(
-            CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+            {
+                **CourseWithCourseRunsSerializer(
+                    instance=course, context=mock_context
+                ).data,
+            }
         )
         num_queries += num_queries_from_course(course, "v1")
 
@@ -309,11 +314,6 @@ def test_get_courses(
     duplicate_queries_check(context)
     courses_data = resp.json()["results"]
     assert len(courses_data) == len(courses_from_fixture)
-    """
-    Due to the number of relations in our current course endpoint, and the potential for re-ordering of those nested
-    objects, deepdiff has an ignore_order flag which I've added with an optional boolean argument to the assert_drf_json
-    function.
-    """
     assert_drf_json_equal(courses_data, courses_from_fixture, ignore_order=True)
 
 

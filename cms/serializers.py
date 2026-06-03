@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import bleach
 from drf_spectacular.utils import extend_schema_field
+from mitol.common.serializers import BaseSerializer
 from rest_framework import serializers
 
 from cms import models
 from cms.api import get_wagtail_img_src
-from cms.models import FlexiblePricingRequestForm, ProgramPage
+from cms.models import FlexiblePricingRequestForm, InstructorPageLink, ProgramPage
 
 
-class BaseCoursePageSerializer(serializers.ModelSerializer):
+class BaseCoursePageSerializer(BaseSerializer):
     """Course page model serializer"""
+
+    required_prefetches = []
 
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
@@ -66,11 +69,54 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
         ]
 
 
+class LinkedInstructorSerializer(BaseSerializer):
+    """LinkedInstructor model serializer"""
+
+    required_prefetches = [
+        "linked_instructor_page",
+    ]
+
+    name = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+
+    def get_name(self, instance) -> str:
+        """Get the name"""
+        if instance.linked_instructor_page is None:
+            return ""
+        return getattr(instance.linked_instructor_page, "instructor_name", "")
+
+    def get_description(self, instance) -> str:
+        """Get the description"""
+        if instance.linked_instructor_page is None:
+            return ""
+
+        return (
+            bleach.clean(
+                getattr(instance.linked_instructor_page, "instructor_bio_short", ""),
+                tags={},
+                strip=True,
+            )
+            if getattr(instance.linked_instructor_page, "instructor_bio_short", None)
+            else ""
+        )
+
+    class Meta:
+        model = InstructorPageLink
+        fields = ["name", "description"]
+        read_only_fields = ["*"]
+
+
 class CoursePageSerializer(BaseCoursePageSerializer):
     """Course page model serializer"""
 
+    required_prefetches = [
+        "linked_instructors",
+    ]
+
     financial_assistance_form_url = serializers.SerializerMethodField()
-    instructors = serializers.SerializerMethodField()
+    instructors = LinkedInstructorSerializer(
+        source="linked_instructors", many=True, read_only=True
+    )
     current_price = serializers.SerializerMethodField()
 
     def _get_financial_assistance_url(self, page, slug):
@@ -215,36 +261,6 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         except (ValueError, AttributeError, TypeError):
             relevant_product = None
         return relevant_product.price if relevant_product else None
-
-    @extend_schema_field(list)
-    def get_instructors(self, instance):
-        """Get instructor information"""
-        # Handle both QuerySet and prefetched list cases
-        linked_instructors = instance.linked_instructors
-
-        if hasattr(linked_instructors, "all"):
-            # It's a Manager/QuerySet - apply select_related and get all
-            instructor_links = linked_instructors.select_related(
-                "linked_instructor_page"
-            ).all()
-        else:
-            # It's already a prefetched list - use directly
-            instructor_links = linked_instructors
-
-        return [
-            {
-                "name": getattr(link.linked_instructor_page, "instructor_name", ""),
-                "description": bleach.clean(
-                    getattr(link.linked_instructor_page, "instructor_bio_short", ""),
-                    tags={},
-                    strip=True,
-                )
-                if getattr(link.linked_instructor_page, "instructor_bio_short", None)
-                else "",
-            }
-            for link in instructor_links
-            if link.linked_instructor_page
-        ]
 
     class Meta:
         model = models.CoursePage

@@ -14,7 +14,6 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
-from courses.serializers.utils import get_topics_from_page
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentWithFlexiblePriceSerializer,
     BaseCourseRunSerializer,
@@ -58,6 +57,28 @@ class CourseLocalizedTitleSerializer(serializers.Serializer):
     title = serializers.CharField()
 
 
+class CoursesTopicFlattenedListSerializer(serializers.ListSerializer):
+    """Serializer that flattens the course topics and their parents into a single list"""
+
+    def to_representation(self, data):
+        return super().to_representation(
+            [
+                *data,
+                *[topic.parent for topic in data],
+            ]
+        )
+
+
+class CoursesTopicSerializer(serializers.ModelSerializer):
+    """Serializer for CoursesTopic"""
+
+    class Meta:
+        model = models.CoursesTopic
+        fields = ["name"]
+        read_only_fields = ["name"]
+        list_serializer_class = CoursesTopicFlattenedListSerializer
+
+
 @extend_schema_serializer(component_name="V2Course")
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer"""
@@ -71,7 +92,7 @@ class CourseSerializer(BaseCourseSerializer):
     next_run_id = serializers.SerializerMethodField()
     page = CoursePageSerializer(read_only=True, allow_null=True)
     programs = BaseProgramSerializer(many=True, read_only=True)
-    topics = serializers.SerializerMethodField()
+    topics = CoursesTopicSerializer(source="page__topics", many=True, read_only=True)
     certificate_type = serializers.SerializerMethodField()
     certificate_available = serializers.SerializerMethodField()
     availability = serializers.SerializerMethodField()
@@ -147,13 +168,6 @@ class CourseSerializer(BaseCourseSerializer):
         else:
             run = instance.first_unexpired_run
         return run.id if run is not None else None
-
-    @extend_schema_field(list[dict])
-    def get_topics(self, instance):
-        """List topics of a course"""
-        if hasattr(instance, "page") and instance.page is not None:
-            return get_topics_from_page(instance.page)
-        return []
 
     @extend_schema_field(str)
     def get_certificate_type(self, instance):

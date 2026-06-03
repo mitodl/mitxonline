@@ -7,8 +7,9 @@ import logging
 import django_filters
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.contenttypes.prefetch import GenericPrefetch
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import Http404
 from django.shortcuts import redirect
 from django.views import View
@@ -275,10 +276,20 @@ def _create_basket_from_product(
         except Discount.DoesNotExist:
             pass
 
-    basket.refresh_from_db()
-
     if checkout:
         return redirect("checkout_interstitial_page")
+
+    basket = Basket.objects.prefetch_related(
+        GenericPrefetch(
+            "basket_items__product",
+            [
+                CourseRun.objects.prefetch_related(
+                    "course__page__linked_instructors",
+                    "course__page__linked_instructors__linked_instructor_page",
+                ),
+            ],
+        )
+    ).get(id=basket.id)
 
     return Response(
         BasketWithProductSerializer(basket).data,

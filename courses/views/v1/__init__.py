@@ -122,6 +122,10 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
             Program.objects.filter(b2b_only=False)
             .prefetch_related("departments", "enrollment_modes")
             .select_related("page")
+            .prefetch_related(
+                "page__linked_instructors",
+                "page__linked_instructors__linked_instructor_page",
+            )
         )
 
     def paginate_queryset(self, queryset):
@@ -175,39 +179,19 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
-        courserun_is_enrollable = self.request.query_params.get(
-            "courserun_is_enrollable", None
+        return (
+            Course.objects.filter()
+            .select_related("page")
+            .prefetch_related(
+                "departments",
+                "courseruns__course__page__linked_instructors",
+                "courseruns__course__page__linked_instructors__linked_instructor_page",
+                Prefetch(
+                    "courseruns__enrollment_modes",
+                    to_attr="prefetched_enrollment_modes",
+                ),
+            )
         )
-
-        if courserun_is_enrollable:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related(
-                    "departments",
-                    Prefetch(
-                        "courseruns__enrollment_modes",
-                        to_attr="prefetched_enrollment_modes",
-                    ),
-                )
-                .all()
-            )
-        else:
-            queryset = (
-                Course.objects.filter()
-                .select_related("page")
-                .prefetch_related(
-                    "courseruns",
-                    "departments",
-                    Prefetch(
-                        "courseruns__enrollment_modes",
-                        to_attr="prefetched_enrollment_modes",
-                    ),
-                )
-                .all()
-            )
-
-        return queryset
 
     def get_serializer_context(self):
         added_context = {}
@@ -276,6 +260,8 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
                 .prefetch_related(
                     "course__departments",
                     "course__page",
+                    "course__page__linked_instructors",
+                    "course__page__linked_instructors__linked_instructor_page",
                     Prefetch("enrollment_modes", to_attr="prefetched_enrollment_modes"),
                 )
                 .filter(live=True)
@@ -452,7 +438,9 @@ class UserEnrollmentsApiViewSet(
                 Prefetch(
                     "run__enrollment_modes",
                     to_attr="prefetched_enrollment_modes",
-                )
+                ),
+                "run__course__page__linked_instructors",
+                "run__course__page__linked_instructors__linked_instructor_page",
             )
             .prefetch("certificate", "grades")
         )
@@ -551,6 +539,10 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             ProgramEnrollment.objects.select_related(
                 "program",
                 "program__page",
+            )
+            .prefetch_related(
+                "program__page__linked_instructors",
+                "program__page__linked_instructors__linked_instructor_page",
             )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
