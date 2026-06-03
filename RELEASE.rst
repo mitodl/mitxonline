@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.151.6
+Version 1.151.6 (Released June 03, 2026)
 ---------------
 
 - Fix migration conflict in the cms app (#3639)
