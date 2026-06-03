@@ -4,10 +4,10 @@ Course API Views version 3
 
 import logging
 import re
+from typing import NamedTuple
 
 import django_filters
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
@@ -33,6 +33,7 @@ from courses.api import create_program_enrollments, deactivate_run_enrollment
 from courses.constants import COURSE_KEY_PATTERN, ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     Course,
+    CourseRun,
     CourseRunEnrollment,
     Program,
     ProgramEnrollment,
@@ -51,9 +52,13 @@ from ecommerce.models import Product
 from main import features
 from openedx.api import get_edx_course_outline
 from openedx.exceptions import EdxApiCourseOutlineError
-from variants.models import SupportedVariant
 
 log = logging.getLogger(__name__)
+
+
+class CourseWithVariants(NamedTuple):
+    id: int
+    courseruns: list[CourseRun]
 
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
@@ -420,7 +425,7 @@ def get_course_variant_runs(request):
 
     course_ids = request.query_params.getlist("course_id")
     contract = request.query_params.get("contract", None)
-    language = request.query_params.get("language", "")
+    language = request.query_params.get("language", "en")
     length = request.query_params.get("length", "")
     industry = request.query_params.get("industry", "")
 
@@ -457,8 +462,6 @@ def get_course_variant_runs(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    course_ct = ContentType.objects.get_for_model(Course)
-
     courses = Course.objects.filter(pk__in=course_ids)
 
     if not courses.count():
@@ -470,47 +473,20 @@ def get_course_variant_runs(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    default_variants = SupportedVariant.objects.filter(
-        content_type=course_ct,
-        object_id__in=course_ids,
-        default_variant=True,
-        active=True,
-    )
-
-    # construct filter
     variant_filter = (
-        Q(language=language)
-        & Q(variant_length=length)
-        & Q(variant_industry=industry)
-        & Q(active=True)
+        Q(language=language) & Q(variant_length=length) & Q(variant_industry=industry)
     )
 
-    output = []
-
-    for course in courses:
-        default_variant = [
-            variant for variant in default_variants if variant.object_id == course.id
-        ]
-        runs_qs = get_enrollable_courseruns_qs(valid_courses=[course]).filter(
-            b2b_contract_id=contract
-        )
-
-        if len(default_variant) > 0:
-            default_variant = default_variant.pop()
-            default_variant_filter = (
-                Q(language=default_variant.language)
-                & Q(variant_length=default_variant.variant_length)
-                & Q(variant_industry=default_variant.variant_industry)
+    output = [
+        CourseWithVariants(c.id, c.courseruns.all())
+        for c in courses.prefetch_related(
+            Prefetch(
+                "courseruns",
+                queryset=get_enrollable_courseruns_qs()
+                .filter(b2b_contract_id=contract)
+                .filter(variant_filter),
             )
-            runs_qs = runs_qs.filter(default_variant_filter | variant_filter)
-        else:
-            runs_qs = runs_qs.filter(variant_filter)
-
-        output.append(
-            {
-                "id": course.id,
-                "courseruns": runs_qs.all(),
-            }
         )
+    ]
 
     return Response(CourseVariantRunsResponseSerializer(output, many=True).data)
