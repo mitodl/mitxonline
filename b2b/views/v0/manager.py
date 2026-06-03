@@ -242,7 +242,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 "contract_redemptions",
                 queryset=DiscountContractAttachmentRedemption.objects.select_related(
                     "user"
-                ).order_by("-created_on"),
+                ).order_by("-created_on")[:1],
                 to_attr="prefetched_redemptions",
             )
         )
