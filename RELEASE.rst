@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.151.4
+---------------
+
+- Don't return the default if the requested variant set doesn't have a match (#3635)
+- B2B/variants: add some documentation and clean up some things (#3621)
+
 Version 1.151.3 (Released June 03, 2026)
 ---------------
 
