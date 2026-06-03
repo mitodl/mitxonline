@@ -153,6 +153,7 @@ class ProductsPagination(RefinePagination):
     default_limit = 2
 
 
+@extend_schema(exclude=True)
 class AllProductViewSet(ModelViewSet):
     """This doesn't filter unenrollable products out, and adds name search for
     courseware object readable id. It's really for the staff dashboard.

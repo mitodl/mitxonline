@@ -288,7 +288,7 @@ def test_basket_with_program_product_serializer():
     ],
 )
 def test_basket_product_serializer_with_zero_value_discount(
-    discount_amount, discount_type
+    discount_amount, discount_type, mock_context
 ):
     """
     Tests serialization of a basket with the attached products and different discount values and types.
@@ -307,7 +307,9 @@ def test_basket_product_serializer_with_zero_value_discount(
     )
     basket_discount.save()
 
-    serialized_basket = BasketWithProductSerializer(basket_item.basket).data
+    serialized_basket = BasketWithProductSerializer(
+        basket_item.basket, context=mock_context
+    ).data
 
     logic = DiscountType.for_discount(discount)
     discount_price = logic.get_discounted_price([discount], basket_item.product)

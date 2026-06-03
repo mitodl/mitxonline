@@ -112,23 +112,29 @@ class InvalidCertificateError(Exception):
 
 
 def get_relevant_course_run_qset(
+    *,
     course: Course,
-) -> QuerySet:
-    """
-    Returns a QuerySet of relevant course runs
-    """
-    enrollable_run_qset = get_enrollable_courseruns_qs(valid_courses=[course])
-    return enrollable_run_qset.order_by("enrollment_start")
-
-
-def get_user_relevant_program_course_run_qset(
-    program: Program,
+    queryset: QuerySet | None = None,
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
     """
     enrollable_run_qset = get_enrollable_courseruns_qs(
-        valid_courses=program.courses_qset.all()
+        queryset=queryset, valid_courses=[course]
+    )
+    return enrollable_run_qset.order_by("enrollment_start")
+
+
+def get_user_relevant_program_course_run_qset(
+    *,
+    program: Program,
+    queryset: QuerySet | None = None,
+) -> QuerySet:
+    """
+    Returns a QuerySet of relevant course runs
+    """
+    enrollable_run_qset = get_enrollable_courseruns_qs(
+        queryset=queryset, valid_courses=program.courses_qset.all()
     )
     return enrollable_run_qset.order_by("enrollment_start")
 

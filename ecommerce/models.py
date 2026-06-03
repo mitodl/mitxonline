@@ -22,7 +22,11 @@ from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
 
-from courses.models import CourseRun, PaidCourseRun, Program
+from courses.models import (
+    CourseRun,
+    PaidCourseRun,
+    Program,
+)
 from courses.utils import is_contract_order, is_uai_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,

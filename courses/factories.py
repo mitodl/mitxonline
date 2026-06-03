@@ -299,6 +299,11 @@ class CoursesTopicFactory(DjangoModelFactory):
     class Meta:
         model = CoursesTopic
 
+    class Params:
+        with_parent = factory.Trait(
+            parent=factory.SubFactory("courses.factories.CoursesTopicFactory")
+        )
+
 
 class ProgramCertificateFactory(DjangoModelFactory):
     """Factory for ProgramCertificate"""

@@ -65,7 +65,12 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
         )
         dated_runs_prefetch = Prefetch(
             "courseruns",
-            queryset=CourseRun.all_objects.enrollable().filter(is_self_paced=False),
+            queryset=CourseRun.all_objects.enrollable()
+            .filter(is_self_paced=False)
+            .prefetch_related(
+                "course__page__linked_instructors",
+                "course__page__linked_instructors__linked_instructor_page",
+            ),
             to_attr="prefetched_dated_courseruns",
         )
         queryset = queryset.prefetch_related(

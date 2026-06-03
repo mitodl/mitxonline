@@ -70,7 +70,7 @@ def test_serialize_course(
             "courseruns": [CourseRunSerializer(run).data for run in course_runs],
             "next_run_id": course.first_unexpired_run.id,
             "departments": [{"name": department}],
-            "page": CoursePageSerializer(course.page).data,
+            "page": CoursePageSerializer(course.page, context=mock_context).data,
             "programs": (
                 ProgramSerializer(course.programs, many=True).data
                 if include_programs
@@ -209,13 +209,17 @@ def test_serialize_course_run_with_course():
 
 
 @pytest.mark.parametrize("receipts_enabled", [True, False])
-def test_serialize_course_run_enrollments(settings, receipts_enabled):
+def test_serialize_course_run_enrollments(settings, receipts_enabled, mock_context):
     """Test that CourseRunEnrollmentSerializer has correct data"""
     settings.ENABLE_ORDER_RECEIPTS = receipts_enabled
     course_run_enrollment = CourseRunEnrollmentFactory.create()
-    serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
+    serialized_data = CourseRunEnrollmentSerializer(
+        course_run_enrollment, context=mock_context
+    ).data
     assert serialized_data == {
-        "run": CourseRunWithCourseSerializer(course_run_enrollment.run).data,
+        "run": CourseRunWithCourseSerializer(
+            course_run_enrollment.run, context=mock_context
+        ).data,
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",
@@ -227,7 +231,7 @@ def test_serialize_course_run_enrollments(settings, receipts_enabled):
 
 @pytest.mark.parametrize("approved_flexible_price_exists", [True, False])
 def test_serialize_course_run_enrollments_with_flexible_pricing(
-    approved_flexible_price_exists,
+    approved_flexible_price_exists, mock_context
 ):
     """Test that CourseRunEnrollmentSerializer has correct data"""
     course_run_enrollment = CourseRunEnrollmentFactory.create()
@@ -241,9 +245,13 @@ def test_serialize_course_run_enrollments_with_flexible_pricing(
         courseware_object=course_run_enrollment.run.course,
         status=status,
     )
-    serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
+    serialized_data = CourseRunEnrollmentSerializer(
+        course_run_enrollment, context=mock_context
+    ).data
     assert serialized_data == {
-        "run": CourseRunWithCourseSerializer(course_run_enrollment.run).data,
+        "run": CourseRunWithCourseSerializer(
+            course_run_enrollment.run, context=mock_context
+        ).data,
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",
@@ -253,7 +261,7 @@ def test_serialize_course_run_enrollments_with_flexible_pricing(
     }
 
 
-def test_serialize_course_run_enrollments_with_grades():
+def test_serialize_course_run_enrollments_with_grades(mock_context):
     """Test that CourseRunEnrollmentSerializer has correct data"""
     course_run_enrollment = CourseRunEnrollmentFactory.create()
 
@@ -261,9 +269,13 @@ def test_serialize_course_run_enrollments_with_grades():
         course_run=course_run_enrollment.run, user=course_run_enrollment.user
     )
 
-    serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
+    serialized_data = CourseRunEnrollmentSerializer(
+        course_run_enrollment, context=mock_context
+    ).data
     assert serialized_data == {
-        "run": CourseRunWithCourseSerializer(course_run_enrollment.run).data,
+        "run": CourseRunWithCourseSerializer(
+            course_run_enrollment.run, context=mock_context
+        ).data,
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",

@@ -1110,4 +1110,11 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         # It didn't just clear the order so something went wrong
         raise VerifiedProgramInvalidOrderError
 
-    return courserun.enrollments.filter(user=request.user).get()
+    return (
+        courserun.enrollments.filter(user=request.user)
+        .prefetch_related(
+            "run__course__page__linked_instructors",
+            "run__course__page__linked_instructors__linked_instructor_page",
+        )
+        .get()
+    )
