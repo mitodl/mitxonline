@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.151.4
+Version 1.151.4 (Released June 03, 2026)
 ---------------
 
 - Don't return the default if the requested variant set doesn't have a match (#3635)
