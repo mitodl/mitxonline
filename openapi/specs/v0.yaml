@@ -4986,8 +4986,8 @@ components:
           readOnly: true
         instructors:
           type: array
-          items: {}
-          description: Get instructor information
+          items:
+            $ref: '#/components/schemas/LinkedInstructor'
           readOnly: true
       required:
       - current_price
@@ -6050,9 +6050,7 @@ components:
         topics:
           type: array
           items:
-            type: object
-            additionalProperties: {}
-          description: List topics of a course
+            $ref: '#/components/schemas/CoursesTopic'
           readOnly: true
         certificate_type:
           type: string
@@ -6158,6 +6156,15 @@ components:
       - time_commitment
       - title
       - topics
+    CoursesTopic:
+      type: object
+      description: Serializer for CoursesTopic
+      properties:
+        name:
+          type: string
+          readOnly: true
+      required:
+      - name
     CreateB2BEnrollment:
       type: object
       description: |-
@@ -6941,6 +6948,21 @@ components:
       - quantity
       - total_price
       - unit_price
+    LinkedInstructor:
+      type: object
+      description: LinkedInstructor model serializer
+      properties:
+        name:
+          type: string
+          description: Get the name
+          readOnly: true
+        description:
+          type: string
+          description: Get the description
+          readOnly: true
+      required:
+      - description
+      - name
     ManagerContractDetail:
       type: object
       description: Serializer for detailed contract view with statistics.
@@ -9999,9 +10021,7 @@ components:
         topics:
           type: array
           items:
-            type: object
-            additionalProperties: {}
-          description: List topics of a course
+            $ref: '#/components/schemas/CoursesTopic'
           readOnly: true
         certificate_type:
           type: string
