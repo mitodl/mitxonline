@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.151.3
+Version 1.151.3 (Released June 03, 2026)
 ---------------
 
 - Make SignatoryPage.signature_image required (#3623)
