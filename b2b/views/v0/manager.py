@@ -7,6 +7,7 @@ from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
 )
+from rest_framework import status as http_status
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -273,3 +274,84 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             return Response(
                 ManagerEnrollmentCodeSerializer(codes_for_output, many=True).data
             )
+
+    @extend_schema(
+        description="Assign an available enrollment code to an email address and send an invite email.",
+        responses={405: None},
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to assign.",
+                required=True,
+            ),
+        ],
+    )
+    @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/assign")
+    def assign_code(self, request, **kwargs):  # noqa: ARG002
+        """
+        Assign an enrollment code to an email address.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/assign/
+        """
+        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(
+        description="Revoke the assignment for a specific enrollment code, returning it to the unassigned pool.",
+        responses={405: None},
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to revoke.",
+                required=True,
+            ),
+        ],
+    )
+    @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/revoke")
+    def revoke_code(self, request, **kwargs):  # noqa: ARG002
+        """
+        Revoke the assignment for a specific enrollment code.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/revoke/
+        """
+        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(
+        description="Send a reminder email to the user assigned to a specific enrollment code who has not yet claimed it.",
+        responses={405: None},
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to send a reminder for.",
+                required=True,
+            ),
+        ],
+    )
+    @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/remind")
+    def remind_code(self, request, **kwargs):  # noqa: ARG002
+        """
+        Send a reminder email to the assignee of a specific enrollment code.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/remind/
+        """
+        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(
+        description="Bulk-assign enrollment codes from a CSV or plain-text file. "
+        "Each row should contain an email address and an optional name. "
+        "An invite email is sent to each successfully assigned address.",
+        responses={405: None},
+    )
+    @action(detail=True, methods=["post"], url_path="codes/bulk_assign")
+    def bulk_assign(self, request, **kwargs):  # noqa: ARG002
+        """
+        Bulk-assign enrollment codes from an uploaded file.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/bulk_assign/
+        """
+        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
