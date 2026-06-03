@@ -1121,14 +1121,18 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         use_json_field=True,
     )
 
-    min_price = models.SmallIntegerField(
+    min_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
         default=0,
         null=False,
         blank=False,
         help_text="Specify the minimum product price. This is used by MIT Learn.",
     )
 
-    max_price = models.SmallIntegerField(
+    max_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
         default=0,
         null=False,
         blank=False,
