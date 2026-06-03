@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.151.5
+---------------
+
+- Make min and max price decimal number (#3629)
+
 Version 1.151.4 (Released June 03, 2026)
 ---------------
 
