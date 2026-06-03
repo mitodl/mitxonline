@@ -717,12 +717,12 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
         related_name="code_redemptions",
     )
 
-    assigned_email = models.EmailField(  # noqa: DJ001
-        null=True,
+    assigned_email = models.EmailField(
+        default="",
         blank=True,
         help_text="Email to assign discount code to. This may correspond to a user which has not been created yet.",
     )
-    assigned_name = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    assigned_name = models.CharField(max_length=255, default="", blank=True)
 
     # This shouldn't be null much, but can be if a user has been deleted, and for anything assigned before this field was added.
     assigned_by = models.ForeignKey(

@@ -49,13 +49,13 @@ class Migration(migrations.Migration):
                 blank=True,
                 help_text="Email to assign discount code to. This may correspond to a user which has not been created yet.",
                 max_length=254,
-                null=True,
+                default="",
             ),
         ),
         migrations.AddField(
             model_name="discountcontractattachmentredemption",
             name="assigned_name",
-            field=models.CharField(blank=True, max_length=255, null=True),
+            field=models.CharField(blank=True, max_length=255, default=""),
         ),
         migrations.AddField(
             model_name="discountcontractattachmentredemption",
