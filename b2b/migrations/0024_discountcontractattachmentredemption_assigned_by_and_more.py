@@ -27,7 +27,7 @@ def backfill_redemption_fields(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("b2b", "0022_backfill_default_variants"),
+        ("b2b", "0023_add_active_objects_manager"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
