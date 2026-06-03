@@ -4,7 +4,6 @@ Course API Views version 3
 
 import logging
 import re
-from typing import NamedTuple
 
 import django_filters
 from django.conf import settings
@@ -33,7 +32,6 @@ from courses.api import create_program_enrollments, deactivate_run_enrollment
 from courses.constants import COURSE_KEY_PATTERN, ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     Course,
-    CourseRun,
     CourseRunEnrollment,
     Program,
     ProgramEnrollment,
@@ -54,11 +52,6 @@ from openedx.api import get_edx_course_outline
 from openedx.exceptions import EdxApiCourseOutlineError
 
 log = logging.getLogger(__name__)
-
-
-class CourseWithVariants(NamedTuple):
-    id: int
-    courseruns: list[CourseRun]
 
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
@@ -477,16 +470,13 @@ def get_course_variant_runs(request):
         Q(language=language) & Q(variant_length=length) & Q(variant_industry=industry)
     )
 
-    output = [
-        CourseWithVariants(c.id, c.courseruns.all())
-        for c in courses.prefetch_related(
-            Prefetch(
-                "courseruns",
-                queryset=get_enrollable_courseruns_qs()
-                .filter(b2b_contract_id=contract)
-                .filter(variant_filter),
-            )
+    output = courses.prefetch_related(
+        Prefetch(
+            "courseruns",
+            queryset=get_enrollable_courseruns_qs()
+            .filter(b2b_contract_id=contract)
+            .filter(variant_filter),
         )
-    ]
+    )
 
     return Response(CourseVariantRunsResponseSerializer(output, many=True).data)
