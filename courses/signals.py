@@ -84,8 +84,8 @@ def purge_fastly_cache_on_course_save(
     **kwargs,  # noqa: ARG001
 ):
     """
-    Purges the Fastly surrogate key for a Course when it is saved via Django
-    admin, so that MIT Learn product pages reflecting this course are invalidated.
+    Purges the Fastly surrogate key for a Course when it is saved,
+    so that MIT Learn product pages reflecting this course are invalidated.
     """
     from cms.tasks import queue_fastly_surrogate_key_purge  # noqa: PLC0415
 
@@ -101,7 +101,7 @@ def purge_fastly_cache_on_course_run_save(
 ):
     """
     Purges the Fastly surrogate key for the parent Course when a CourseRun is
-    saved via Django admin (e.g. enrollment mode changes), so that MIT Learn
+    saved (e.g. enrollment mode changes), so that MIT Learn
     product pages are invalidated.
     """
     from cms.tasks import queue_fastly_surrogate_key_purge  # noqa: PLC0415
@@ -117,9 +117,9 @@ def purge_fastly_cache_on_program_save(
     **kwargs,  # noqa: ARG001
 ):
     """
-    Purges the Fastly surrogate key for a Program when it is saved via Django
-    admin (e.g. program requirements, enrollment modes), so that MIT Learn
-    product pages are invalidated.
+    Purges the Fastly surrogate key for a Program when it is
+    saved (e.g. program requirements, enrollment modes),
+    so that MIT Learn product pages are invalidated.
     """
     from cms.tasks import queue_fastly_surrogate_key_purge  # noqa: PLC0415
 
