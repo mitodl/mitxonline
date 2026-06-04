@@ -1,5 +1,6 @@
 """B2B manager dashboard views."""
 
+from b2b.mail import send_enrollment_code_assignment_email
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from django.shortcuts import get_object_or_404
@@ -16,7 +17,6 @@ from rest_framework.response import Response
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
-from b2b.mail import send_enrollment_code_assignment_email
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
