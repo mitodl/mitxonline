@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.151.7
+---------------
+
+- feat: add unenroll_learners management command for bulk unenrollment (#3603)
+
 Version 1.151.6 (Released June 03, 2026)
 ---------------
 
