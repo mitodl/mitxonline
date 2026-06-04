@@ -68,7 +68,11 @@ class IsEtlUser(BasePermission):
     def has_permission(self, request, view):  # noqa: ARG002
         """Check the user's is_etl flag."""
 
-        return request.user and not request.user.is_anonymous and request.user.is_etl
+        return (
+            request.user
+            and not request.user.is_anonymous
+            and (request.user.is_etl or request.user.is_superuser)
+        )
 
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
