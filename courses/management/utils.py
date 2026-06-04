@@ -1,11 +1,15 @@
 """Utility functions/classes for course management commands"""
 
 import json
+import logging
 
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from mitol.common.utils.collections import has_equal_properties
 
 from courses import mail_api
+from courses.api import deactivate_run_enrollment
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import CourseRun, CourseRunEnrollment, Program, ProgramEnrollment
 from main import settings
 from openedx.api import enroll_in_edx_course_runs
@@ -14,6 +18,10 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+from users.api import fetch_user
+
+User = get_user_model()
+log = logging.getLogger(__name__)
 
 
 def enrollment_summary(enrollment):
@@ -56,6 +64,130 @@ def create_or_update_enrollment(model_cls, defaults=None, **kwargs):
             setattr(enrollment, field_name, field_value)
         enrollment.save_and_log(None)
     return enrollment, created
+
+
+def unenroll_learner_from_run(
+    user, course_run, *, keep_failed_enrollments=False, send_notification=True
+):
+    """
+    Unenroll a single learner from a course run in both edX and MITx Online.
+
+    Args:
+        user (User): The user to unenroll
+        course_run (CourseRun): The course run to unenroll from
+        keep_failed_enrollments (bool): If True, keeps the local enrollment record
+            even if the edX unenrollment fails.
+        send_notification (bool): If True, sends unenrollment email to the learner.
+
+    Returns:
+        tuple[CourseRunEnrollment | None, str]: (enrollment_result, message)
+            enrollment_result is the deactivated enrollment on success, None on failure.
+            message is a human-readable status string.
+    """
+    enrollment = CourseRunEnrollment.objects.filter(user=user, run=course_run).first()
+    if enrollment is None or not enrollment.active:
+        return (
+            None,
+            f"No active enrollment for {user.email} in {course_run.courseware_id}",
+        )
+
+    result = deactivate_run_enrollment(
+        enrollment,
+        change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+        keep_failed_enrollments=keep_failed_enrollments,
+        send_notification=send_notification,
+    )
+    if result:
+        return (
+            result,
+            f"Unenrolled: {user.email} from {course_run.courseware_id}",
+        )
+    return (
+        None,
+        f"Failed to unenroll {user.email} from {course_run.courseware_id}",
+    )
+
+
+def bulk_unenroll_learners(
+    entries, *, keep_failed_enrollments=False, send_notification=True
+):
+    """
+    Unenroll multiple learners from course runs in both edX and MITx Online.
+
+    Resolves users and course runs from string identifiers, logs progress,
+    and returns a summary of results.
+
+    Args:
+        entries (list[tuple[str, str]]): List of (user_identifier, courseware_id) tuples.
+            user_identifier can be email, username, or user id.
+        keep_failed_enrollments (bool): If True, keeps local enrollment records
+            even if the edX unenrollment fails.
+        send_notification (bool): If True, sends unenrollment email to each learner.
+
+    Returns:
+        dict: Summary with keys 'succeeded', 'failed', 'skipped' (int counts)
+            and 'details' (list of (user_identifier, courseware_id, status, message) tuples).
+    """
+    run_cache = {}
+    succeeded = 0
+    failed = 0
+    skipped = 0
+    details = []
+
+    for user_identifier, cw_id in entries:
+        # Resolve user
+        try:
+            user = fetch_user(user_identifier)
+        except User.DoesNotExist:
+            msg = f"User not found: {user_identifier}"
+            log.warning(msg)
+            skipped += 1
+            details.append((user_identifier, cw_id, "skipped", msg))
+            continue
+
+        # Resolve course run (with caching)
+        if cw_id not in run_cache:
+            run_cache[cw_id] = CourseRun.objects.filter(courseware_id=cw_id).first()
+        course_run = run_cache[cw_id]
+        if course_run is None:
+            msg = f"Course run not found: {cw_id}"
+            log.warning(msg)
+            skipped += 1
+            details.append((user_identifier, cw_id, "skipped", msg))
+            continue
+
+        # Perform unenrollment
+        result, message = unenroll_learner_from_run(
+            user,
+            course_run,
+            keep_failed_enrollments=keep_failed_enrollments,
+            send_notification=send_notification,
+        )
+        if result:
+            log.info(message)
+            succeeded += 1
+            details.append((user_identifier, cw_id, "succeeded", message))
+        elif "No active enrollment" in message:
+            log.warning(message)
+            skipped += 1
+            details.append((user_identifier, cw_id, "skipped", message))
+        else:
+            log.error(message)
+            failed += 1
+            details.append((user_identifier, cw_id, "failed", message))
+
+    log.info(
+        "Bulk unenroll complete: %d succeeded, %d failed, %d skipped",
+        succeeded,
+        failed,
+        skipped,
+    )
+    return {
+        "succeeded": succeeded,
+        "failed": failed,
+        "skipped": skipped,
+        "details": details,
+    }
 
 
 class EnrollmentChangeCommand(BaseCommand):

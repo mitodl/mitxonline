@@ -36,7 +36,7 @@ def backfill_missing_signatory_images(apps, _schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0062_alter_certificatepage_signatories"),
+        ("cms", "0063_alter_coursepage_max_price_alter_coursepage_min_price_and_more"),
         ("wagtailimages", "0027_image_description"),
     ]
 

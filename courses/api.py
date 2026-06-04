@@ -369,6 +369,7 @@ def deactivate_run_enrollment(
     run_enrollment,
     change_status,
     keep_failed_enrollments=None,
+    send_notification=True,  # noqa: FBT002
 ):
     """
     Helper method to deactivate a CourseRunEnrollment
@@ -379,6 +380,8 @@ def deactivate_run_enrollment(
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
             If None, defaults to the value of the IGNORE_EDX_FAILURES feature flag.
+        send_notification (bool): If True, sends unenrollment email to the learner.
+            Defaults to True.
 
     Returns:
         CourseRunEnrollment: The deactivated enrollment
@@ -404,7 +407,8 @@ def deactivate_run_enrollment(
         edx_unenrolled = False
     else:
         edx_unenrolled = True
-        mail_api.send_course_run_unenrollment_email(run_enrollment)
+        if send_notification:
+            mail_api.send_course_run_unenrollment_email(run_enrollment)
     if edx_unenrolled:
         run_enrollment.edx_enrolled = False
         run_enrollment.edx_emails_subscription = False

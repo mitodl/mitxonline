@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal  # noqa: TC003
 
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
@@ -527,7 +528,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
-    def get_min_price(self, instance) -> int | None:
+    def get_min_price(self, instance) -> Decimal | None:
         """
         Get the min price of the product from the CMS page.
         """
@@ -535,7 +536,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             return instance.page.min_price
         return None
 
-    def get_max_price(self, instance) -> int | None:
+    def get_max_price(self, instance) -> Decimal | None:
         """
         Get the max price of the product from the CMS page.
         """

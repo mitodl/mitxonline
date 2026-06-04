@@ -1,6 +1,24 @@
 Release Notes
 =============
 
+Version 1.151.6 (Released June 03, 2026)
+---------------
+
+- Fix migration conflict in the cms app (#3639)
+- Make min and max price decimal number (#3629)
+
+Version 1.151.4 (Released June 03, 2026)
+---------------
+
+- Don't return the default if the requested variant set doesn't have a match (#3635)
+- B2B/variants: add some documentation and clean up some things (#3621)
+
+Version 1.151.3 (Released June 03, 2026)
+---------------
+
+- Make SignatoryPage.signature_image required (#3623)
+- Hubspot certificate object (#3604)
+
 Version 1.151.2 (Released June 02, 2026)
 ---------------
 
