@@ -113,7 +113,3 @@ class Command(BaseCommand):
                 self.stdout.write(
                     "  contact association typeId: (will need to be set manually or auto-created on first sync)"
                 )
-
-        self.stdout.write(
-            "\nNo additional certificate environment settings are required."
-        )

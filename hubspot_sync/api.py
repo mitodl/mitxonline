@@ -182,9 +182,6 @@ CERTIFICATE_CUSTOM_OBJECT_SCHEMAS = {
     },
 }
 
-COURSE_RUN_CERTIFICATE_OBJECT_TYPE = "course_run_certificate"
-PROGRAM_CERTIFICATE_OBJECT_TYPE = "program_certificate"
-
 CUSTOM_ECOMMERCE_PROPERTIES = {
     # defines which hubspot properties are mapped with which local properties when objects are synced.
     # See https://developers.hubspot.com/docs/methods/ecomm-bridge/ecomm-bridge-overview for more details
@@ -979,7 +976,7 @@ def sync_course_run_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     Returns:
         SimplePublicObject: The HubSpot object.
     """
-    object_type_name = COURSE_RUN_CERTIFICATE_OBJECT_TYPE
+    object_type_name = "course_run_certificate"
 
     hubspot_client = HubspotApi(access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN)
 
@@ -1055,7 +1052,7 @@ def sync_program_certificate_with_hubspot(cert) -> SimplePublicObject | None:
     Returns:
         SimplePublicObject: The HubSpot object.
     """
-    object_type_name = PROGRAM_CERTIFICATE_OBJECT_TYPE
+    object_type_name = "program_certificate"
 
     hubspot_client = HubspotApi(access_token=settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN)
 
