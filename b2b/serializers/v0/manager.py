@@ -89,6 +89,13 @@ class ManagerEnrollmentSerializer(serializers.ModelSerializer):
         ]
 
 
+class AssignCodeSerializer(serializers.Serializer):
+    """Serializer for the assign_code request body."""
+
+    email = serializers.EmailField()
+    name = serializers.CharField(max_length=255, default="", allow_blank=True)
+
+
 class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     """Serializer for enrollment codes available to a contract."""
 
