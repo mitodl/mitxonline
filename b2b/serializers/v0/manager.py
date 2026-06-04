@@ -89,7 +89,7 @@ class ManagerEnrollmentSerializer(serializers.ModelSerializer):
         ]
 
 
-class AssignCodeSerializer(serializers.Serializer):
+class AssignRevokeCodeSerializer(serializers.Serializer):
     """Serializer for the assign_code request body."""
 
     email = serializers.EmailField()

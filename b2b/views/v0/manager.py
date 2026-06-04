@@ -29,7 +29,7 @@ from b2b.serializers.v0 import (
     OrganizationPageSerializer,
 )
 from b2b.serializers.v0.manager import (
-    AssignCodeSerializer,
+    AssignRevokeCodeSerializer,
     ManagerContractDetailSerializer,
     ManagerCourseRunSerializer,
     ManagerEnrollmentCodeSerializer,
@@ -284,7 +284,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         description="Assign an available enrollment code to an email address and send an invite email.",
-        request=AssignCodeSerializer,
+        request=AssignRevokeCodeSerializer,
         responses={200: ManagerEnrollmentCodeSerializer, 400: None, 409: None},
         parameters=[
             OpenApiParameter(
@@ -306,7 +306,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         contract = self.get_object()
         code = kwargs.get("code")
 
-        serializer = AssignCodeSerializer(data=request.data)
+        serializer = AssignRevokeCodeSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
 
@@ -344,6 +344,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         description="Revoke the assignment for a specific enrollment code, returning it to the unassigned pool.",
+        request=AssignRevokeCodeSerializer,
         responses={405: None},
         parameters=[
             OpenApiParameter(
@@ -356,17 +357,51 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         ],
     )
     @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/revoke")
-    def revoke_code(self, request, **kwargs):  # noqa: ARG002
+    def revoke_code(self, request, **kwargs):
         """
         Revoke the assignment for a specific enrollment code.
 
         POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/revoke/
         """
-        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
+
+        # Need to decide if we want to keep this a POST or not. It's not a restful DELETE operation, but it might still be less confusing that way
+        contract = self.get_object()
+        code = kwargs.get("code")
+
+        serializer = AssignRevokeCodeSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+
+        discount = contract.get_discounts().filter(discount_code=code).first()
+        if not discount:
+            return Response(
+                {"detail": "Code not found for this contract."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        assignment_record = discount.contract_redemptions.filter(
+            assigned_email=email
+        ).first()
+        if not assignment_record:
+            return Response(
+                {"detail": "Assignment for email does not exist"},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        # Need to determine if we need to do other cleanup here.
+        assignment_record.delete()
+
+        return Response(
+            ManagerEnrollmentCodeSerializer(discount).data,
+            status=http_status.HTTP_200_OK,
+        )
 
     @extend_schema(
         description="Send a reminder email to the user assigned to a specific enrollment code who has not yet claimed it.",
         responses={405: None},
+        request=AssignRevokeCodeSerializer,
         parameters=[
             OpenApiParameter(
                 name="code",
@@ -378,13 +413,45 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         ],
     )
     @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/remind")
-    def remind_code(self, request, **kwargs):  # noqa: ARG002
+    def send_reminder_for_code_assignment(self, request, **kwargs):
         """
         Send a reminder email to the assignee of a specific enrollment code.
 
         POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/remind/
         """
-        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
+        # Need to decide if we want to keep this a POST or not. It's not a restful DELETE operation, but it might still be less confusing that way
+        contract = self.get_object()
+        code = kwargs.get("code")
+
+        serializer = AssignRevokeCodeSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data["email"]
+
+        discount = contract.get_discounts().filter(discount_code=code).first()
+        if not discount:
+            return Response(
+                {"detail": "Code not found for this contract."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        assignment_record = discount.contract_redemptions.filter(
+            assigned_email=email
+        ).first()
+        if not assignment_record:
+            return Response(
+                {"detail": "Assignment for email does not exist"},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        # Just send the email reminder, no need to do anything else.
+        send_enrollment_code_assignment_email(assignment_record)
+
+        return Response(
+            ManagerEnrollmentCodeSerializer(discount).data,
+            status=http_status.HTTP_200_OK,
+        )
 
     @extend_schema(
         description="Bulk-assign enrollment codes from a CSV or plain-text file. "
