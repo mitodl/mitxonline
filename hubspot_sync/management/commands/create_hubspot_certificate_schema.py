@@ -86,27 +86,6 @@ class Command(BaseCommand):
             )
         return None
 
-    @staticmethod
-    def _build_env_output(schema_name: str, assoc_type_id: int | None) -> list[str]:
-        env_output = []
-        if schema_name == "course_run_certificate":
-            env_output.append(
-                "HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE=course_run_certificate"
-            )
-            if assoc_type_id:
-                env_output.append(
-                    f"HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID={assoc_type_id}"
-                )
-        elif schema_name == "program_certificate":
-            env_output.append(
-                "HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE=program_certificate"
-            )
-            if assoc_type_id:
-                env_output.append(
-                    f"HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID={assoc_type_id}"
-                )
-        return env_output
-
     def handle(self, *_args, **_options):
         """Create missing certificate schemas and print related environment settings."""
         hubspot_client = self._get_hubspot_client()
@@ -116,7 +95,6 @@ class Command(BaseCommand):
         )
 
         self.stdout.write("\nCertificate schema details:\n")
-        env_output = []
 
         for schema_name, schema in created_or_existing.items():
             object_type_id = schema.object_type_id
@@ -135,9 +113,3 @@ class Command(BaseCommand):
                 self.stdout.write(
                     "  contact association typeId: (will need to be set manually or auto-created on first sync)"
                 )
-
-            env_output.extend(self._build_env_output(schema_name, assoc_type_id))
-
-        self.stdout.write("\nAdd/update these environment settings:\n")
-        for env_line in env_output:
-            self.stdout.write(env_line)

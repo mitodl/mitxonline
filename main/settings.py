@@ -1347,26 +1347,6 @@ HUBSPOT_TASK_DELAY = get_int(
     default=60,
     description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
-HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE = get_string(
-    name="HUBSPOT_COURSE_RUN_CERTIFICATE_OBJECT_TYPE",
-    default="course_run_certificate",
-    description="HubSpot custom object type name for course run certificates",
-)
-HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE = get_string(
-    name="HUBSPOT_PROGRAM_CERTIFICATE_OBJECT_TYPE",
-    default="program_certificate",
-    description="HubSpot custom object type name for program certificates",
-)
-HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID = get_string(
-    name="HUBSPOT_COURSE_RUN_CERTIFICATE_ASSOCIATION_TYPE_ID",
-    default=None,
-    description="HubSpot association type ID for course_run_certificate -> contact (set after schema registration)",
-)
-HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID = get_string(
-    name="HUBSPOT_PROGRAM_CERTIFICATE_ASSOCIATION_TYPE_ID",
-    default=None,
-    description="HubSpot association type ID for program_certificate -> contact (set after schema registration)",
-)
 
 # HomePage Hubspot Form Settings
 HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
