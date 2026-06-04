@@ -24,6 +24,7 @@ from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import (
     AllowAny,
+    BasePermission,
     IsAuthenticated,
 )
 from rest_framework.response import Response
@@ -57,6 +58,17 @@ from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.exceptions import EdxApiCourseOutlineError
 
 log = logging.getLogger(__name__)
+
+
+class IsEtlUser(BasePermission):
+    """Allow only is_etl flagged users through."""
+
+    message = "Invalid user."
+
+    def has_permission(self, request, view):  # noqa: ARG002
+        """Check the user's is_etl flag."""
+
+        return request.user and not request.user.is_anonymous and request.user.is_etl
 
 
 class UserEnrollmentFilterSet(django_filters.FilterSet):
@@ -498,7 +510,9 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     pagination_class = Pagination
-    permission_classes = []
+    permission_classes = [
+        IsEtlUser,
+    ]
     serializer_class = IngestibleCourseWithCourseRunsSerializer
 
     def get_queryset(self):
