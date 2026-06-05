@@ -466,3 +466,57 @@ def test_org_contract_codes(org_setup, manager_drf_client):
     )
     resp = manager_drf_client.get(manager_contract_code_list)
     assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_org_contract_codes_redeemed_by_differs_from_assigned_to(
+    org_setup, manager_drf_client, mocker
+):
+    """
+    redeemed_by should reflect the redeeming user's email, not the email the
+    code was originally assigned to, when those two addresses differ.
+    """
+    mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
+
+    _, _, (contract_1, *_), *_ = org_setup
+
+    # Pick a code that has not yet been redeemed.
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    # A learner whose email differs from the assignee who will redeems the code.
+    redeeming_user = UserFactory.create(email="redeemer@example.com")
+    learner_client = APIClient()
+    learner_client.force_login(redeeming_user)
+
+    # This test will change a bit once we have an assign endpoint. Once implemented:
+    # - We'll assign the code to an email address via forthcoming API
+    # - We'll attach/redeem the code to whoever is logged in, which in this case will be the user with a different email address
+    # - We'll verify that the codes endpoint reflects the difference between the assgined email and the redeeming user's email
+
+    attach_url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": discount.discount_code}
+    )
+    attach_resp = learner_client.post(attach_url)
+    assert attach_resp.status_code == status.HTTP_201_CREATED
+
+    dcar = DiscountContractAttachmentRedemption.objects.get(
+        discount=discount, user=redeeming_user
+    )
+    dcar.assigned_email = "assignee@example.com"
+    dcar.save()
+
+    # The manager fetches the codes list.
+    manager_contract_code_list = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+    resp = manager_drf_client.get(manager_contract_code_list)
+    assert resp.status_code == status.HTTP_200_OK
+
+    redeemed_code = next(
+        code for code in resp.json() if code["code"] == discount.discount_code
+    )
+    assert redeemed_code["assigned_to"] == "assignee@example.com"
+    assert redeemed_code["redeemed_by"] == "redeemer@example.com"
