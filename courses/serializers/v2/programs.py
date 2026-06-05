@@ -640,8 +640,6 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
         """
         certificate = instance.get("certificate")
         return ProgramCertificateSerializer(certificate).data if certificate else None
-<<<<<<< Updated upstream
-=======
 
 
 def _get_program_collection_ids(instance: Program) -> list[int]:
@@ -693,5 +691,3 @@ def _get_unique_topics_from_course_ids(course_ids: list[int]) -> list[dict[str, 
     )
 
     return [{"name": topic_name} for topic_name in topic_names]
-
->>>>>>> Stashed changes

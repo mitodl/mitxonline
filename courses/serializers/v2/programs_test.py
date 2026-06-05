@@ -17,9 +17,7 @@ from courses.factories import (  # noqa: F401
     ProgramFactory,
     program_with_empty_requirements,
 )
-<<<<<<< Updated upstream
-from courses.models import CoursesTopic, Department, ProgramCollectionItem
-=======
+
 from courses.models import (
     CoursesTopic,
     Department,
@@ -27,7 +25,6 @@ from courses.models import (
     ProgramCollectionItem,
     ProgramRequirement,
 )
->>>>>>> Stashed changes
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.programs import (
     ProgramDetailSerializer,
@@ -174,8 +171,6 @@ def test_serialize_program(
     )
 
 
-<<<<<<< Updated upstream
-=======
 def test_serialize_program_uses_prefetched_collection_memberships(
     mock_context,
     program_with_empty_requirements,  # noqa: F811
@@ -271,7 +266,6 @@ def test_serialize_program_topics_use_prefetched_all_requirements(
     assert topics_data == [{"name": topic.name} for topic in topics]
 
 
->>>>>>> Stashed changes
 @pytest.mark.parametrize(
     ("parent_program_live", "parent_page_live", "expected_in_programs"),
     [
