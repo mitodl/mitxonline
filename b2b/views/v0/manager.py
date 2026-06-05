@@ -302,6 +302,13 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/assign/
         """
+
+        """
+        This endpoint creates a DiscountContractAttachmentRedemption record to assign the code to the email address, and sends an invite email to the assignee.
+        It's worth noting that "assigning" a code mostly just affects the count of seats filled against limits.
+        Since we explicitly do not check that a redemption user matches the assigned email and we don't necessarily want to require preassignment
+        This feature is mostly useful for tracking who a code is intended for and sending reminder emails, rather than being a strict gate on who can redeem a code.
+        """
         contract = self.get_object()
         code = kwargs.get("code")
 
@@ -363,6 +370,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/revoke/
         """
 
+        """
+            This endpoint removes the DiscountContractAttachmentRedemption record for the specified code and email address.
+        """
         # Need to decide if we want to keep this a POST or not. It's not a restful DELETE operation, but it might still be less confusing that way
         contract = self.get_object()
         code = kwargs.get("code")
@@ -445,7 +455,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
 
         # Just send the email reminder, no need to do anything else.
-        send_enrollment_code_assignment_email(assignment_record)
+        send_enrollment_code_assignment_email(assignment_record, code)
 
         return Response(
             ManagerEnrollmentCodeSerializer(discount).data,

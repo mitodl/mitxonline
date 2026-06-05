@@ -20,11 +20,6 @@ def send_enrollment_code_assignment_email(assignment, code):
             containing the assignee's email, name, and discount code.
         code (str): The code assigned to the redemption.
     """
-    log.info(
-        "send_enrollment_code_assignment_email: stub called for redemption %s (email=%s)",
-        assignment.pk,
-        assignment.assigned_email,
-    )
     try:
         with get_message_sender(EnrollmentCodeAssignmentMessage) as sender:
             sender.build_and_send_message(
