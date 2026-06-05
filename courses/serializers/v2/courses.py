@@ -20,7 +20,6 @@ from courses.serializers.v1.base import (
     BaseCourseRunSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
-    CourseRunLanguageOptionSerializer,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
@@ -327,7 +326,6 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
     courseruns = serializers.SerializerMethodField()
-    language_options = serializers.SerializerMethodField()
 
     @extend_schema_field(CourseRunSerializer(many=True))
     def get_courseruns(self, instance):
@@ -348,23 +346,9 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
             canonical_runs, many=True, read_only=True, context=self.context
         ).data
 
-    @extend_schema_field(CourseRunLanguageOptionSerializer(many=True))
-    def get_language_options(self, instance):
-        """
-        For every run_tag group return all language variants as a flat list.
-
-        Each entry contains: id, courseware_id, language, title, run_tag.
-        """
-        all_runs = instance.get_filtered_runs(
-            courserun_is_enrollable=self.context.get("courserun_is_enrollable"),
-            org_id=self.context.get("org_id"),
-            contract_id=self.context.get("contract_id"),
-        )
-        return CourseRunLanguageOptionSerializer(all_runs, many=True).data
-
     class Meta:
         model = models.Course
-        fields = [*CourseSerializer.Meta.fields, "courseruns", "language_options"]
+        fields = [*CourseSerializer.Meta.fields, "courseruns"]
 
 
 @extend_schema_serializer(component_name="V2CourseRunWithCourse")
