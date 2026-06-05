@@ -6998,6 +6998,11 @@ components:
           nullable: true
           description: Return when the code was actually claimed.
           readOnly: true
+        redeemed_by:
+          type: string
+          nullable: true
+          description: Return the email address of the user who redeemed this code.
+          readOnly: true
         last_sent:
           type: string
           format: date-time
@@ -7010,6 +7015,7 @@ components:
       - code
       - id
       - last_sent
+      - redeemed_by
       - redeemed_on
       - redemption_status
     Nested:
