@@ -1,10 +1,7 @@
-import uuid
-
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.models import Q
-from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
 from trino.auth import BasicAuthentication
 from trino.dbapi import connect
@@ -18,23 +15,13 @@ from courses.models import (
     CourseRunEnrollment,
     CourseRunGrade,
     Department,
-    PaidCourseRun,
     Program,
     ProgramCertificate,
     ProgramEnrollment,
 )
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import ZERO_PAYMENT_DATA
-from ecommerce.models import (
-    Discount,
-    DiscountRedemption,
-    Line,
-    Order,
-    OrderStatus,
-    PendingOrder,
-    Product,
-    Transaction,
-)
+from ecommerce.models import Discount, PendingOrder, Product
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
@@ -461,7 +448,7 @@ class Command(BaseCommand):
 
         query = (
             "SELECT * FROM edxorg_to_mitxonline_enrollments "
-            "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL"
+            "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL "
             "AND courseruncertificate_created_on IS NOT NULL"
         )
         if courserun_readable_ids:
@@ -727,46 +714,6 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"Created {created_orders} Orders"))
 
-    @staticmethod
-    def _create_verified_enrollment_order(
-        user, product, product_version, discount, courserun_id
-    ):
-        """
-        Directly create a fulfilled order for a verified enrollment without triggering
-        enrollment hooks (which would send notification emails).
-        """
-        order = Order.objects.create(
-            state=OrderStatus.FULFILLED,
-            purchaser=user,
-            total_price_paid=0,
-        )
-        Line.objects.create(
-            order=order,
-            product_version=product_version,
-            quantity=1,
-            purchased_content_type_id=product.content_type_id,
-            purchased_object_id=product.object_id,
-        )
-        Transaction.objects.create(
-            order=order,
-            transaction_id=uuid.uuid1(),
-            amount=0,
-            data=ZERO_PAYMENT_DATA,
-        )
-        if discount:
-            DiscountRedemption.objects.create(
-                redeemed_discount=discount,
-                redeemed_by=user,
-                redeemed_order=order,
-                redemption_date=now_in_utc(),
-            )
-        PaidCourseRun.objects.get_or_create(
-            user=user,
-            course_run_id=courserun_id,
-            defaults={"order": order},
-        )
-        return order
-
     def _migrate_enrollments(self, conn, options):
         """
         Migrate the edX future enrollments from edX to MITx Online. Create Orders for the verified enrollments.
@@ -868,12 +815,13 @@ class Command(BaseCommand):
                         continue
 
                     with transaction.atomic():
-                        self._create_verified_enrollment_order(
-                            user,
-                            product,
-                            product_version,
-                            discount,
-                            row["courserun_id"],
+                        order = PendingOrder.create_from_product(
+                            product, user, discount=discount
+                        )
+                        fulfill_completed_order(
+                            order,
+                            payment_data=ZERO_PAYMENT_DATA,
+                            already_enrolled=True,
                         )
                         total_orders += 1
 
@@ -923,9 +871,10 @@ class Command(BaseCommand):
                 "course_certificates",
                 "program_certificates",
                 "entitlements",
+                "future_enrollments",
             ],
             default="course_runs",
-            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements (default: course_runs)",
+            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements, future_enrollments (default: course_runs)",
         )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
