@@ -368,16 +368,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
         required: true
       responses:
-        '405':
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagerEnrollmentCode'
+          description: ''
+        '400':
+          description: No response body
+        '409':
           description: No response body
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/:
     post:
@@ -409,13 +417,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
         required: true
       responses:
         '405':
@@ -450,13 +458,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
         required: true
       responses:
         '405':
@@ -3882,6 +3890,20 @@ paths:
           description: No response body
 components:
   schemas:
+    AssignRevokeCodeRequestRequest:
+      type: object
+      description: Serializer for the assign_code request body.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        name:
+          type: string
+          default: ''
+          maxLength: 255
+      required:
+      - email
     AvailabilityEnum:
       enum:
       - anytime

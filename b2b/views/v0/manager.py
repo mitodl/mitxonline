@@ -29,7 +29,7 @@ from b2b.serializers.v0 import (
     OrganizationPageSerializer,
 )
 from b2b.serializers.v0.manager import (
-    AssignRevokeCodeSerializer,
+    AssignRevokeCodeRequestSerializer,
     ManagerContractDetailSerializer,
     ManagerCourseRunSerializer,
     ManagerEnrollmentCodeSerializer,
@@ -283,7 +283,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         description="Assign an available enrollment code to an email address and send an invite email.",
-        request=AssignRevokeCodeSerializer,
+        request=AssignRevokeCodeRequestSerializer,
         responses={200: ManagerEnrollmentCodeSerializer, 400: None, 409: None},
         parameters=[
             OpenApiParameter(
@@ -305,7 +305,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         contract = self.get_object()
         code = kwargs.get("code")
 
-        serializer = AssignRevokeCodeSerializer(data=request.data)
+        serializer = AssignRevokeCodeRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
 
@@ -343,7 +343,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         description="Revoke the assignment for a specific enrollment code, returning it to the unassigned pool.",
-        request=AssignRevokeCodeSerializer,
+        request=AssignRevokeCodeRequestSerializer,
         responses={405: None},
         parameters=[
             OpenApiParameter(
@@ -367,7 +367,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         contract = self.get_object()
         code = kwargs.get("code")
 
-        serializer = AssignRevokeCodeSerializer(data=request.data)
+        serializer = AssignRevokeCodeRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
 
@@ -400,7 +400,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         description="Send a reminder email to the user assigned to a specific enrollment code who has not yet claimed it.",
         responses={405: None},
-        request=AssignRevokeCodeSerializer,
+        request=AssignRevokeCodeRequestSerializer,
         parameters=[
             OpenApiParameter(
                 name="code",
@@ -422,7 +422,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         contract = self.get_object()
         code = kwargs.get("code")
 
-        serializer = AssignRevokeCodeSerializer(data=request.data)
+        serializer = AssignRevokeCodeRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
 
