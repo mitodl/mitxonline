@@ -77,3 +77,4 @@ GET /api/v2/programs/{id}/ the `max_price` response's property type/format chang
 GET /api/v2/programs/{id}/ the `min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
 POST /api/v2/verified_program_enrollments/{courserun_id}/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `201`
 POST /api/v2/verified_program_enrollments/{courserun_id}/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `201`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/ removed the required property `items/is_redeemed` from the response with the `200` status

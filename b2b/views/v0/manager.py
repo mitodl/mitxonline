@@ -1,12 +1,13 @@
 """B2B manager dashboard views."""
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
 )
+from rest_framework import status as http_status
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -219,37 +220,30 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         Only shows codes for contracts that require them (non-auto membership types).
         Logic varies based on whether contract has learner limits.
+
         """
         contract = self.get_object()
+
+        """
+        There are three main cases:
+        - If the contract has an auto membership type, no codes are needed, so we return an empty list.
+        - If the contract does not have a learner limit, we show the first code only.
+          We don't show individual redemptions because this case is unlikely to be a useful setup for contracts
+        - If the contract has a learner limit, we show all redeemed and assigned codes, plus enough unredeemed codes to fill the remaining seats.
+          This ensures that managers can see all the codes that are currently in use, while also seeing some of the unused codes that are available to be redeemed.
+        """
 
         # Skip if contract has auto membership type (no codes needed)
         if contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS:
             return Response([])
 
-        discounts = (
-            contract.get_discounts()
-            .annotate(
-                is_redeemed=Exists(
-                    DiscountContractAttachmentRedemption.objects.filter(
-                        discount=OuterRef("pk")
-                    )
-                )
-            )
-            .annotate(
-                last_redemption_email=Subquery(
-                    DiscountContractAttachmentRedemption.objects.select_related("user")
-                    .filter(discount=OuterRef("pk"))
-                    .order_by("-created_on")
-                    .values("user__email")[:1]
-                )
-            )
-            .annotate(
-                last_redemption_date=Subquery(
-                    DiscountContractAttachmentRedemption.objects.select_related("user")
-                    .filter(discount=OuterRef("pk"))
-                    .order_by("-created_on")
-                    .values("created_on")[:1]
-                )
+        discounts = contract.get_discounts().prefetch_related(
+            Prefetch(
+                "contract_redemptions",
+                queryset=DiscountContractAttachmentRedemption.objects.select_related(
+                    "user"
+                ).order_by("-created_on")[:1],
+                to_attr="prefetched_redemptions",
             )
         )
 
@@ -258,7 +252,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             return Response(
                 ManagerEnrollmentCodeSerializer(
                     [discounts.order_by("id").first()],
-                    context={"contract": contract},
                     many=True,
                 ).data
             )
@@ -283,7 +276,86 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 codes_for_output = discounts.all()[: contract.max_learners]
 
             return Response(
-                ManagerEnrollmentCodeSerializer(
-                    codes_for_output, many=True, context={"contract": contract}
-                ).data
+                ManagerEnrollmentCodeSerializer(codes_for_output, many=True).data
             )
+
+    @extend_schema(
+        description="Assign an available enrollment code to an email address and send an invite email.",
+        responses={405: None},
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to assign.",
+                required=True,
+            ),
+        ],
+    )
+    @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/assign")
+    def assign_code(self, request, **kwargs):  # noqa: ARG002
+        """
+        Assign an enrollment code to an email address.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/assign/
+        """
+        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(
+        description="Revoke the assignment for a specific enrollment code, returning it to the unassigned pool.",
+        responses={405: None},
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to revoke.",
+                required=True,
+            ),
+        ],
+    )
+    @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/revoke")
+    def revoke_code(self, request, **kwargs):  # noqa: ARG002
+        """
+        Revoke the assignment for a specific enrollment code.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/revoke/
+        """
+        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(
+        description="Send a reminder email to the user assigned to a specific enrollment code who has not yet claimed it.",
+        responses={405: None},
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to send a reminder for.",
+                required=True,
+            ),
+        ],
+    )
+    @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/remind")
+    def remind_code(self, request, **kwargs):  # noqa: ARG002
+        """
+        Send a reminder email to the assignee of a specific enrollment code.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/remind/
+        """
+        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(
+        description="Bulk-assign enrollment codes from a CSV or plain-text file. "
+        "Each row should contain an email address and an optional name. "
+        "An invite email is sent to each successfully assigned address.",
+        responses={405: None},
+    )
+    @action(detail=True, methods=["post"], url_path="codes/bulk_assign")
+    def bulk_assign(self, request, **kwargs):  # noqa: ARG002
+        """
+        Bulk-assign enrollment codes from an uploaded file.
+
+        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/bulk_assign/
+        """
+        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)

@@ -9,7 +9,13 @@ from rest_framework.test import APIClient
 from b2b.api import ensure_enrollment_codes_exist
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
 from b2b.factories import ContractPageFactory
-from b2b.models import DiscountContractAttachmentRedemption, UserOrganization
+from b2b.models import (
+    REDEMPTION_STATUS_ASSIGNED,
+    REDEMPTION_STATUS_REDEEMED,
+    REDEMPTION_STATUS_UNASSIGNED,
+    DiscountContractAttachmentRedemption,
+    UserOrganization,
+)
 from b2b.serializers.v0 import (
     BaseContractPageSerializer,
 )
@@ -408,6 +414,15 @@ def test_org_contract_codes(org_setup, manager_drf_client):
 
         if contract.max_learners > 1:
             discounts_to_use = contract.get_discounts().order_by("-id")[:3]
+
+            # Create one "assigned" redemption (pre-assigned but not yet claimed)
+            # using a different discount so all three statuses appear in the response.
+            assigned_discount = contract.get_discounts().order_by("id").first()
+            DiscountContractAttachmentRedemption.objects.create(
+                discount=assigned_discount,
+                assigned_email="assigned@example.com",
+                contract=contract,
+            )
         else:
             # This is the unlimited seat one, so just use the same discount 3 times.
             discount_to_use = contract.get_discounts().order_by("id").last()
@@ -426,14 +441,17 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         if contract.max_learners > 1:
             assert len(resp_codes) == expected_code_count
 
-            # The redeemed codes should be at the top, followed by the same set we
-            # had before (up to the end of the list)
-            used_codes = [discount.discount_code for discount in discounts_to_use]
-            assert sorted(used_codes) == sorted(resp_codes[:3])
-            assert resp_codes[3:] == contract_codes[:17]
+            # All codes with redemptions (redeemed and assigned) must appear in
+            # the response; the remaining slots are filled with unassigned codes.
+            used_codes = {discount.discount_code for discount in discounts_to_use}
+            assert used_codes.issubset(set(resp_codes))
+            assert assigned_discount.discount_code in resp_codes
 
-            assert resp.json()[0]["is_redeemed"]
-            assert not resp.json()[3]["is_redeemed"]
+            # Verify all three redemption statuses are represented in the response.
+            response_statuses = {code["redemption_status"] for code in resp.json()}
+            assert REDEMPTION_STATUS_REDEEMED in response_statuses
+            assert REDEMPTION_STATUS_ASSIGNED in response_statuses
+            assert REDEMPTION_STATUS_UNASSIGNED in response_statuses
         else:
             # For the unlimited seat one, we only get back the single code.
 
@@ -448,3 +466,57 @@ def test_org_contract_codes(org_setup, manager_drf_client):
     )
     resp = manager_drf_client.get(manager_contract_code_list)
     assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_org_contract_codes_redeemed_by_differs_from_assigned_to(
+    org_setup, manager_drf_client, mocker
+):
+    """
+    redeemed_by should reflect the redeeming user's email, not the email the
+    code was originally assigned to, when those two addresses differ.
+    """
+    mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
+
+    _, _, (contract_1, *_), *_ = org_setup
+
+    # Pick a code that has not yet been redeemed.
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    # A learner whose email differs from the assignee who will redeems the code.
+    redeeming_user = UserFactory.create(email="redeemer@example.com")
+    learner_client = APIClient()
+    learner_client.force_login(redeeming_user)
+
+    # This test will change a bit once we have an assign endpoint. Once implemented:
+    # - We'll assign the code to an email address via forthcoming API
+    # - We'll attach/redeem the code to whoever is logged in, which in this case will be the user with a different email address
+    # - We'll verify that the codes endpoint reflects the difference between the assgined email and the redeeming user's email
+
+    attach_url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": discount.discount_code}
+    )
+    attach_resp = learner_client.post(attach_url)
+    assert attach_resp.status_code == status.HTTP_201_CREATED
+
+    dcar = DiscountContractAttachmentRedemption.objects.get(
+        discount=discount, user=redeeming_user
+    )
+    dcar.assigned_email = "assignee@example.com"
+    dcar.save()
+
+    # The manager fetches the codes list.
+    manager_contract_code_list = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+    resp = manager_drf_client.get(manager_contract_code_list)
+    assert resp.status_code == status.HTTP_200_OK
+
+    redeemed_code = next(
+        code for code in resp.json() if code["code"] == discount.discount_code
+    )
+    assert redeemed_code["assigned_to"] == "assignee@example.com"
+    assert redeemed_code["redeemed_by"] == "redeemer@example.com"
