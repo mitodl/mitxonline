@@ -2,6 +2,9 @@ from datetime import timedelta
 from unittest.mock import ANY
 
 import pytest
+from django.db import connection
+from django.db.models import Prefetch
+from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory
@@ -14,7 +17,17 @@ from courses.factories import (  # noqa: F401
     ProgramFactory,
     program_with_empty_requirements,
 )
+<<<<<<< Updated upstream
 from courses.models import CoursesTopic, Department, ProgramCollectionItem
+=======
+from courses.models import (
+    CoursesTopic,
+    Department,
+    Program,
+    ProgramCollectionItem,
+    ProgramRequirement,
+)
+>>>>>>> Stashed changes
 from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.programs import (
     ProgramDetailSerializer,
@@ -161,6 +174,104 @@ def test_serialize_program(
     )
 
 
+<<<<<<< Updated upstream
+=======
+def test_serialize_program_uses_prefetched_collection_memberships(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """ProgramSerializer should prefer prefetched collection memberships when present."""
+    included_collection = ProgramCollectionFactory.create(title="Included Collection")
+    excluded_collection = ProgramCollectionFactory.create(title="Excluded Collection")
+
+    included_membership = ProgramCollectionItem.objects.create(
+        collection=included_collection,
+        program=program_with_empty_requirements,
+        sort_order=0,
+    )
+    ProgramCollectionItem.objects.create(
+        collection=excluded_collection,
+        program=program_with_empty_requirements,
+        sort_order=1,
+    )
+
+    program_with_empty_requirements.prefetched_collection_memberships = [
+        included_membership
+    ]
+
+    data = ProgramSerializer(
+        instance=program_with_empty_requirements, context=mock_context
+    ).data
+
+    assert data["collections"] == [included_collection.id]
+
+
+def test_serialize_program_uses_collection_membership_prefetch_cache(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """ProgramSerializer should use Django's prefetch cache for collection IDs."""
+    included_collection = ProgramCollectionFactory.create(title="Cached Collection")
+    ProgramCollectionItem.objects.create(
+        collection=included_collection,
+        program=program_with_empty_requirements,
+        sort_order=0,
+    )
+
+    prefetched_program = Program.objects.prefetch_related("collection_memberships").get(
+        pk=program_with_empty_requirements.pk
+    )
+
+    data = ProgramSerializer(instance=prefetched_program, context=mock_context).data
+
+    assert data["collections"] == [included_collection.id]
+
+
+def test_serialize_program_topics_use_prefetched_all_requirements(
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """ProgramSerializer should reuse prefetched requirements and topics for topics."""
+    run1 = CourseRunFactory.create(
+        course__page=None,
+        start_date=now() + timedelta(hours=1),
+    )
+    course1 = run1.course
+    CoursePageFactory.create(course=course1)
+
+    run2 = CourseRunFactory.create(
+        course__page=None,
+        start_date=now() + timedelta(hours=2),
+    )
+    course2 = run2.course
+    CoursePageFactory.create(course=course2)
+
+    topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
+    course1.page.topics.set([topics[0], topics[1]])
+    course2.page.topics.set([topics[1], topics[2]])
+
+    program_with_empty_requirements.add_requirement(course1)
+    program_with_empty_requirements.add_requirement(course2)
+
+    prefetched_program = Program.objects.prefetch_related(
+        Prefetch(
+            "all_requirements",
+            queryset=ProgramRequirement.objects.select_related(
+                "course", "course__page"
+            ).prefetch_related("course__page__topics"),
+        )
+    ).get(pk=program_with_empty_requirements.pk)
+
+    serializer = ProgramSerializer(context=mock_context)
+
+    with CaptureQueriesContext(connection) as context:
+        topics_data = serializer.get_topics(prefetched_program)
+
+    assert len(context) == 0
+    assert topics_data == [{"name": topic.name} for topic in topics]
+
+
+>>>>>>> Stashed changes
 @pytest.mark.parametrize(
     ("parent_program_live", "parent_page_live", "expected_in_programs"),
     [

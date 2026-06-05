@@ -6,6 +6,7 @@ from decimal import Decimal  # noqa: TC003
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
+from cms.models import CoursePage
 from cms.serializers import ProgramPageSerializer
 from courses.models import (
     Program,
@@ -470,17 +471,14 @@ class ProgramSerializer(serializers.ModelSerializer):
     )
     def get_topics(self, instance):
         """Get unique topics from courses using prefetched data to avoid N+1 queries"""
-        # Check if we have prefetched all_requirements to avoid N+1 queries
-        if hasattr(instance, "all_requirements"):
-            courses = [
-                req.course
-                for req in instance.all_requirements.all()
-                if req.node_type == ProgramRequirementNodeType.COURSE and req.course
-            ]
+        courses = _get_program_courses(instance)
+        if not courses:
+            return []
+
+        if _has_prefetched_program_requirements(instance):
             return get_unique_topics_from_courses(courses)
-        else:
-            # Fallback to original courses property if prefetch not available
-            return get_unique_topics_from_courses(instance.courses)
+
+        return _get_unique_topics_from_course_ids([course.id for course in courses])
 
     @extend_schema_field(str)
     def get_certificate_type(self, instance):
@@ -642,3 +640,58 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
         """
         certificate = instance.get("certificate")
         return ProgramCertificateSerializer(certificate).data if certificate else None
+<<<<<<< Updated upstream
+=======
+
+
+def _get_program_collection_ids(instance: Program) -> list[int]:
+    """Return collection IDs using prefetched memberships when available."""
+    memberships = getattr(instance, "prefetched_collection_memberships", None)
+    if memberships is not None:
+        return [membership.collection_id for membership in memberships]
+
+    prefetched_memberships = getattr(instance, "_prefetched_objects_cache", {}).get(
+        "collection_memberships"
+    )
+    if prefetched_memberships is not None:
+        return [membership.collection_id for membership in prefetched_memberships]
+
+    return list(
+        ProgramCollection.objects.filter(collection_items__program_id=instance.id)
+        .values_list("id", flat=True)
+        .order_by("collection_items__sort_order", "id")
+    )
+
+
+def _has_prefetched_program_requirements(instance: Program) -> bool:
+    """Return True when all_requirements has been prefetched on the program."""
+    return (
+        getattr(instance, "_prefetched_objects_cache", {}).get("all_requirements")
+        is not None
+    )
+
+
+def _get_program_courses(instance: Program) -> list:
+    """Return live course objects for a program using normalized requirement data."""
+    return [
+        course
+        for course, _ in instance.get_courses_with_requirements_data()["courses"]
+        if course and course.live
+    ]
+
+
+def _get_unique_topics_from_course_ids(course_ids: list[int]) -> list[dict[str, str]]:
+    """Return unique topic payloads for the given course IDs with a single query."""
+    if not course_ids:
+        return []
+
+    topic_names = (
+        CoursePage.objects.filter(course_id__in=course_ids, topics__isnull=False)
+        .values_list("topics__name", flat=True)
+        .distinct()
+        .order_by("topics__name")
+    )
+
+    return [{"name": topic_name} for topic_name in topic_names]
+
+>>>>>>> Stashed changes

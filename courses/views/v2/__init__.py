@@ -234,6 +234,7 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                     "all_requirements",
                     queryset=ProgramRequirement.objects.select_related(
                         "course",
+                        "course__page",
                     )
                     .prefetch_related(
                         Prefetch(
