@@ -334,7 +334,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             last_reminder_sent_on=now_in_utc(),
         )
 
-        send_enrollment_code_assignment_email(redemption)
+        send_enrollment_code_assignment_email(redemption, code)
 
         return Response(
             ManagerEnrollmentCodeSerializer(discount).data,

@@ -1,20 +1,34 @@
-"""B2B email sending functions."""
-
 import logging
 
-log = logging.getLogger(__name__)
+from mitol.mail.api import get_message_sender
+from mitol.mail.messages import TemplatedMessage
+
+log = logging.getLogger()
 
 
-def send_enrollment_code_assignment_email(redemption):
+class EnrollmentCodeAssignmentMessage(TemplatedMessage):
+    template_name = "mail/enrollment_code_assignment"
+    name = "Enrollment Code Assignment"
+
+
+def send_enrollment_code_assignment_email(assignment, code):
     """
     Send an enrollment code assignment invite email.
 
     Args:
-        redemption (DiscountContractAttachmentRedemption): The redemption record
+        assignment (DiscountContractAttachmentRedemption): The assignment record
             containing the assignee's email, name, and discount code.
+        code (str): The code assigned to the redemption.
     """
     log.info(
         "send_enrollment_code_assignment_email: stub called for redemption %s (email=%s)",
-        redemption.pk,
-        redemption.assigned_email,
+        assignment.pk,
+        assignment.assigned_email,
     )
+    try:
+        with get_message_sender(EnrollmentCodeAssignmentMessage) as sender:
+            sender.build_and_send_message(
+                assignment.assigned_email, {assignment: assignment, code: code}
+            )
+    except:  # pylint: disable=bare-except  # noqa: E722
+        log.exception("Error sending enrollment code assignment email.")
