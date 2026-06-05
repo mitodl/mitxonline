@@ -714,6 +714,32 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"Created {created_orders} Orders"))
 
+    @staticmethod
+    def _upgrade_enrollment_modes(verified_rows, existing_enrollments):
+        """
+        Upgrade enrollment mode to verified for any existing enrollments whose
+        current mode differs. Scoped only to verified rows to avoid downgrading
+        enrollments not covered by this migration.
+        """
+        upgrade_user_ids, upgrade_run_ids = set(), set()
+        for row in verified_rows:
+            existing_mode = existing_enrollments.get(
+                (row["user_mitxonline_id"], row["courserun_id"])
+            )
+            if (
+                existing_mode is not None
+                and existing_mode != EDX_ENROLLMENT_VERIFIED_MODE
+            ):
+                upgrade_user_ids.add(row["user_mitxonline_id"])
+                upgrade_run_ids.add(row["courserun_id"])
+        if upgrade_user_ids:
+            CourseRunEnrollment.all_objects.filter(
+                user_id__in=upgrade_user_ids,
+                run_id__in=upgrade_run_ids,
+            ).exclude(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE).update(
+                enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+            )
+
     def _migrate_enrollments(self, conn, options):
         """
         Migrate the edX future enrollments from edX to MITx Online. Create Orders for the verified enrollments.
@@ -764,9 +790,18 @@ class Command(BaseCommand):
                 )
                 continue
 
+            user_ids = {row["user_mitxonline_id"] for row in verified_rows}
+            existing_enrollments = {
+                (uid, rid): mode
+                for uid, rid, mode in CourseRunEnrollment.all_objects.filter(
+                    user_id__in=user_ids,
+                    run_id__in={row["courserun_id"] for row in verified_rows},
+                ).values_list("user_id", "run_id", "enrollment_mode")
+            }
+
+            self._upgrade_enrollment_modes(verified_rows, existing_enrollments)
             total_enrollments += self._bulk_create_enrollments(rows, batch_size)
 
-            user_ids = {row["user_mitxonline_id"] for row in verified_rows}
             product_version_ids = {
                 row["product_version_id"]
                 for row in verified_rows
@@ -784,6 +819,14 @@ class Command(BaseCommand):
 
             for row in verified_rows:
                 try:
+                    if (
+                        existing_enrollments.get(
+                            (row["user_mitxonline_id"], row["courserun_id"])
+                        )
+                        == EDX_ENROLLMENT_VERIFIED_MODE
+                    ):
+                        continue
+
                     user = users.get(row["user_mitxonline_id"])
                     product_version = product_versions.get(
                         row.get("product_version_id")
@@ -831,13 +874,6 @@ class Command(BaseCommand):
                             f"Failed to create order for enrollment row: {row} error: {e}"
                         )
                     )
-
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"{total_enrollments} enrollments created, "
-                    f"{total_orders} verified orders created"
-                )
-            )
 
         self.stdout.write(
             self.style.SUCCESS(
