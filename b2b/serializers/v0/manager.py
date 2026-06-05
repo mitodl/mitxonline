@@ -97,6 +97,7 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     assigned_to = serializers.SerializerMethodField()
     assigned_on = serializers.SerializerMethodField()
     redeemed_on = serializers.SerializerMethodField()
+    redeemed_by = serializers.SerializerMethodField()
     last_sent = serializers.SerializerMethodField()
 
     class Meta:
@@ -108,6 +109,7 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
             "assigned_to",
             "assigned_on",
             "redeemed_on",
+            "redeemed_by",
             "last_sent",
         ]
 
@@ -135,9 +137,7 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         redemption = self._get_redemption(obj)
         if not redemption:
             return None
-        return redemption.assigned_email or (
-            redemption.user.email if redemption.user else None
-        )
+        return redemption.assigned_email
 
     def get_assigned_on(self, obj) -> datetime | None:
         """Return when the invite/assignment was created."""
@@ -148,6 +148,13 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         """Return when the code was actually claimed."""
         redemption = self._get_redemption(obj)
         return redemption.redeemed_on if redemption else None
+
+    def get_redeemed_by(self, obj) -> str | None:
+        """Return the email address of the user who redeemed this code."""
+        redemption = self._get_redemption(obj)
+        if not redemption or not redemption.user:
+            return None
+        return redemption.user.email
 
     def get_last_sent(self, obj) -> datetime | None:
         """Return when the last reminder email was sent."""
