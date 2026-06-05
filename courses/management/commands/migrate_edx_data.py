@@ -721,7 +721,7 @@ class Command(BaseCommand):
         current mode differs. Scoped only to verified rows to avoid downgrading
         enrollments not covered by this migration.
         """
-        upgrade_user_ids, upgrade_run_ids = set(), set()
+        upgrade_q = Q()
         for row in verified_rows:
             existing_mode = existing_enrollments.get(
                 (row["user_mitxonline_id"], row["courserun_id"])
@@ -730,13 +730,12 @@ class Command(BaseCommand):
                 existing_mode is not None
                 and existing_mode != EDX_ENROLLMENT_VERIFIED_MODE
             ):
-                upgrade_user_ids.add(row["user_mitxonline_id"])
-                upgrade_run_ids.add(row["courserun_id"])
-        if upgrade_user_ids:
-            CourseRunEnrollment.all_objects.filter(
-                user_id__in=upgrade_user_ids,
-                run_id__in=upgrade_run_ids,
-            ).exclude(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE).update(
+                upgrade_q |= Q(
+                    user_id=row["user_mitxonline_id"],
+                    run_id=row["courserun_id"],
+                )
+        if upgrade_q:
+            CourseRunEnrollment.all_objects.filter(upgrade_q).update(
                 enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
             )
 
