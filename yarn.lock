@@ -4121,6 +4121,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@posthog/core@npm:1.30.10":
+  version: 1.30.10
+  resolution: "@posthog/core@npm:1.30.10"
+  dependencies:
+    "@posthog/types": 1.382.0
+  checksum: 1c6e76b8bdb2d8b4d4ffaca553f6d740a561f32fedc66bdbb48eae26218b9d91f0d196ed12e2ad837f1e7fdc0a0980c2adc2f910bba7395f67f75e4f278ab34b
+  languageName: node
+  linkType: hard
+
+"@posthog/types@npm:1.382.0":
+  version: 1.382.0
+  resolution: "@posthog/types@npm:1.382.0"
+  checksum: 45b2daa582f43f86dfc1ca229e4625cd50091982389be42c498cf7f12e84d6318d30ea6480c944df0860cc8bb07d60efd006efff6f32232e6a025376b3663e5a
+  languageName: node
+  linkType: hard
+
 "@prettier/eslint@npm:prettier-eslint@^16.1.0, prettier-eslint@npm:^16.3.0":
   version: 16.4.1
   resolution: "prettier-eslint@npm:16.4.1"
@@ -5460,7 +5476,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/trusted-types@npm:^2.0.2":
+"@types/trusted-types@npm:^2.0.2, @types/trusted-types@npm:^2.0.7":
   version: 2.0.7
   resolution: "@types/trusted-types@npm:2.0.7"
   checksum: 8e4202766a65877efcf5d5a41b7dd458480b36195e580a3b1085ad21e948bc417d55d6f8af1fd2a7ad008015d4117d5fdfe432731157da3c68678487174e4ba3
@@ -9542,6 +9558,18 @@ __metadata:
   dependencies:
     domelementtype: ^2.3.0
   checksum: 0f58f4a6af63e6f3a4320aa446d28b5790a009018707bce2859dcb1d21144c7876482b5188395a188dfa974238c019e0a1e610d2fc269a12b2c192ea2b0b131c
+  languageName: node
+  linkType: hard
+
+"dompurify@npm:^3.3.2":
+  version: 3.4.8
+  resolution: "dompurify@npm:3.4.8"
+  dependencies:
+    "@types/trusted-types": ^2.0.7
+  dependenciesMeta:
+    "@types/trusted-types":
+      optional: true
+  checksum: 77775a7a22a40d6b169ee9dc53c15e48882c88b1c26b634bd10cb804f76328277893791f08a6339105c67e23c205c12fd931d8d986d2b8c15332bf2edcd3c948
   languageName: node
   linkType: hard
 
@@ -18367,29 +18395,25 @@ __metadata:
   linkType: hard
 
 "posthog-js@npm:^1.75.4":
-  version: 1.239.0
-  resolution: "posthog-js@npm:1.239.0"
+  version: 1.382.0
+  resolution: "posthog-js@npm:1.382.0"
   dependencies:
+    "@posthog/core": 1.30.10
+    "@posthog/types": 1.382.0
     core-js: ^3.38.1
+    dompurify: ^3.3.2
     fflate: ^0.4.8
-    preact: ^10.19.3
-    web-vitals: ^4.2.4
-  peerDependencies:
-    "@rrweb/types": 2.0.0-alpha.17
-    rrweb-snapshot: 2.0.0-alpha.17
-  peerDependenciesMeta:
-    "@rrweb/types":
-      optional: true
-    rrweb-snapshot:
-      optional: true
-  checksum: 775bb1c7e7bbd35ee2a6c7613fafa323a77967400dae1ddaa41432b6daf827c36e8620b993eb7d459ca95d0194eadc23ae0c2ae925482805cb1d3cfbafd0f664
+    preact: ^10.28.2
+    query-selector-shadow-dom: ^1.0.1
+    web-vitals: ^5.1.0
+  checksum: f5b3fd5ad948a5017a935a2b080891c3c718ec6667c44dfd329fbf8697e5ab30a03febb5528457387fe8db53cd7b6d908c7be97a89dde85b7694bff39c0902fa
   languageName: node
   linkType: hard
 
-"preact@npm:^10.19.3":
-  version: 10.26.5
-  resolution: "preact@npm:10.26.5"
-  checksum: 3ef769e82bdb26314e51f02d09aea9ba566cad291504a5d79833055b1ff3ca7db647516315d2278498261881c61949917aac05cc56f172c32d013796378c304b
+"preact@npm:^10.28.2":
+  version: 10.29.2
+  resolution: "preact@npm:10.29.2"
+  checksum: 55fd387996094ea3b44ce603939f0c5ba3789a6478a9bc2b5ae73d1b47e85cc8ca05bdb68daa4641ef88bd6a018c6b5b6d4d74b426903f4dad77be00578b0adc
   languageName: node
   linkType: hard
 
@@ -18743,6 +18767,13 @@ __metadata:
   dependencies:
     side-channel: ^1.1.0
   checksum: 135ae673e6367d258208baf9f49c169eff045f0671f5aae02a289eee54909c1c054029d1e3d4dd600c6a33847e40736b6293db3794ecef74896e583457198eae
+  languageName: node
+  linkType: hard
+
+"query-selector-shadow-dom@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "query-selector-shadow-dom@npm:1.0.1"
+  checksum: 8ab1cdd5e1927b583503b590165d66770fb91c87ac28b50a43596b755db3792c0e506250f46d0af97f0064a5cc12a1de449fd5c2cfcadf18b0880a4d8aecebbd
   languageName: node
   linkType: hard
 
@@ -23906,10 +23937,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"web-vitals@npm:^4.2.4":
-  version: 4.2.4
-  resolution: "web-vitals@npm:4.2.4"
-  checksum: 5b3ffe1db33f23aebf8cc8560ac574401a95939baafde5841835c1bb1c01f9a2478442f319f77aa0d7914739fc2f6b020c5d5b128c16c5c77ca6be2f9dfbbde6
+"web-vitals@npm:^5.1.0":
+  version: 5.3.0
+  resolution: "web-vitals@npm:5.3.0"
+  checksum: 0140e84c1ecf42e4f3097f451c3d8d97141b1eb3d9756efa80c1d9c0cc1b087d451280603e5bc12d83af078b91979e685823a9c567db0c13bad30600b42eb24f
   languageName: node
   linkType: hard
 
