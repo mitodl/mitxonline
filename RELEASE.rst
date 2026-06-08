@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.152.0
+---------------
+
+- Program serializer: get topics (#3645)
+
 Version 1.151.8 (Released June 08, 2026)
 ---------------
 
