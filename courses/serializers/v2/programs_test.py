@@ -16,6 +16,7 @@ from courses.factories import (  # noqa: F401
     ProgramCollectionFactory,
     ProgramFactory,
     program_with_empty_requirements,
+    program_with_requirements,
 )
 
 from courses.models import (
@@ -224,29 +225,17 @@ def test_serialize_program_uses_collection_membership_prefetch_cache(
 
 def test_serialize_program_topics_use_prefetched_all_requirements(
     mock_context,
-    program_with_empty_requirements,  # noqa: F811
+    program_with_requirements,  # noqa: F811
 ):
     """ProgramSerializer should reuse prefetched requirements and topics for topics."""
-    run1 = CourseRunFactory.create(
-        course__page=None,
-        start_date=now() + timedelta(hours=1),
-    )
-    course1 = run1.course
-    CoursePageFactory.create(course=course1)
-
-    run2 = CourseRunFactory.create(
-        course__page=None,
-        start_date=now() + timedelta(hours=2),
-    )
-    course2 = run2.course
-    CoursePageFactory.create(course=course2)
+    program = program_with_requirements.program
+    course1, course2 = program_with_requirements.required_courses[:2]
 
     topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
     course1.page.topics.set([topics[0], topics[1]])
     course2.page.topics.set([topics[1], topics[2]])
-
-    program_with_empty_requirements.add_requirement(course1)
-    program_with_empty_requirements.add_requirement(course2)
+    course1.page.save()
+    course2.page.save()
 
     prefetched_program = Program.objects.prefetch_related(
         Prefetch(
@@ -255,7 +244,7 @@ def test_serialize_program_topics_use_prefetched_all_requirements(
                 "course", "course__page"
             ).prefetch_related("course__page__topics"),
         )
-    ).get(pk=program_with_empty_requirements.pk)
+    ).get(pk=program.pk)
 
     serializer = ProgramSerializer(context=mock_context)
 

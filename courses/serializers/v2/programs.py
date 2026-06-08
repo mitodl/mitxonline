@@ -193,18 +193,7 @@ class ProgramSerializer(serializers.ModelSerializer):
         return [course[0].id for course in instance.courses if course[0].live]
 
     def get_collections(self, instance) -> list[int]:
-        if hasattr(instance, "programcollection_set"):
-            return [
-                collection.id for collection in instance.programcollection_set.all()
-            ]
-
-        # Fallback to database query
-        return [
-            collection.id
-            for collection in ProgramCollection.objects.filter(
-                collection_items__program__id=instance.id
-            )
-        ]
+        return _get_program_collection_ids(instance)
 
     @extend_schema_field(
         {
