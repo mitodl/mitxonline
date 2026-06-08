@@ -96,6 +96,7 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     redemption_status = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
     assigned_on = serializers.SerializerMethodField()
+    assigned_name = serializers.SerializerMethodField()
     redeemed_on = serializers.SerializerMethodField()
     redeemed_by = serializers.SerializerMethodField()
     last_sent = serializers.SerializerMethodField()
@@ -108,6 +109,7 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
             "redemption_status",
             "assigned_to",
             "assigned_on",
+            "assigned_name",
             "redeemed_on",
             "redeemed_by",
             "last_sent",
@@ -155,6 +157,13 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         if not redemption or not redemption.user:
             return None
         return redemption.user.email
+
+    def get_assigned_name(self, obj) -> str | None:
+        """Return the name of the user this code is assigned to."""
+        redemption = self._get_redemption(obj)
+        if not redemption:
+            return None
+        return redemption.assigned_email
 
     def get_last_sent(self, obj) -> datetime | None:
         """Return when the last reminder email was sent."""
