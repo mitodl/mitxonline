@@ -15,7 +15,6 @@ from courses.models import (
     ProgramRequirementNodeType,
 )
 from courses.serializers.base import BaseProgramRequirementTreeSerializer
-from courses.serializers.utils import get_unique_topics_from_courses
 from courses.serializers.v1.base import (
     BaseProgramSerializer,
     EnrollmentModeSerializer,
@@ -464,9 +463,6 @@ class ProgramSerializer(serializers.ModelSerializer):
         if not courses:
             return []
 
-        if _has_prefetched_program_requirements(instance):
-            return get_unique_topics_from_courses(courses)
-
         return _get_unique_topics_from_course_ids([course.id for course in courses])
 
     @extend_schema_field(str)
@@ -648,15 +644,6 @@ def _get_program_collection_ids(instance: Program) -> list[int]:
         .values_list("id", flat=True)
         .order_by("collection_items__sort_order", "id")
     )
-
-
-def _has_prefetched_program_requirements(instance: Program) -> bool:
-    """Return True when all_requirements has been prefetched on the program."""
-    return (
-        getattr(instance, "_prefetched_objects_cache", {}).get("all_requirements")
-        is not None
-    )
-
 
 def _get_program_courses(instance: Program) -> list:
     """Return live course objects for a program using normalized requirement data."""

@@ -226,7 +226,7 @@ def test_serialize_program_topics_use_prefetched_all_requirements(
     mock_context,
     program_with_requirements,  # noqa: F811
 ):
-    """ProgramSerializer should reuse prefetched requirements and topics for topics."""
+    """ProgramSerializer should use one bulk topic query with prefetched requirements."""
     program = program_with_requirements.program
     course1, course2 = program_with_requirements.required_courses[:2]
 
@@ -250,7 +250,7 @@ def test_serialize_program_topics_use_prefetched_all_requirements(
     with CaptureQueriesContext(connection) as context:
         topics_data = serializer.get_topics(prefetched_program)
 
-    assert len(context) == 0
+    assert len(context) == 1
     assert topics_data == [{"name": topic.name} for topic in topics]
 
 

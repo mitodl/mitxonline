@@ -27,6 +27,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
+from cms.models import CoursePage
 from courses.api import (
     create_program_enrollments,
     create_run_enrollments,
@@ -234,13 +235,6 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                     "all_requirements",
                     queryset=ProgramRequirement.objects.select_related(
                         "course",
-                        "course__page",
-                    )
-                    .prefetch_related(
-                        Prefetch(
-                            "course__page__topics",
-                            queryset=CoursesTopic.objects.only("name"),
-                        )
                     )
                     .only(
                         "id",
@@ -255,6 +249,15 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                         "required_program_id",
                         "title",
                         "elective_flag",
+                    ),
+                ),
+                Prefetch(
+                    "all_requirements__course__page",
+                    queryset=CoursePage.objects.prefetch_related(
+                        Prefetch(
+                            "topics",
+                            queryset=CoursesTopic.objects.only("name"),
+                        )
                     ),
                 ),
                 Prefetch(
