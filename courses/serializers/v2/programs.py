@@ -645,6 +645,7 @@ def _get_program_collection_ids(instance: Program) -> list[int]:
         .order_by("collection_items__sort_order", "id")
     )
 
+
 def _get_program_courses(instance: Program) -> list:
     """Return live course objects for a program using normalized requirement data."""
     return [

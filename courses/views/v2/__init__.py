@@ -235,8 +235,7 @@ class ProgramViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                     "all_requirements",
                     queryset=ProgramRequirement.objects.select_related(
                         "course",
-                    )
-                    .only(
+                    ).only(
                         "id",
                         "path",
                         "depth",
