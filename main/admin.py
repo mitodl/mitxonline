@@ -1,5 +1,7 @@
 """Django admin functionality that is relevant to the entire app"""
 
+from collections.abc import Sequence
+
 from django.contrib import admin
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 
@@ -62,3 +64,49 @@ class ModelAdminRunActionsForAllMixin:
             request._set_post(post)  # noqa: SLF001
 
         return super().changelist_view(request, extra_context)
+
+
+class DisplayOnlyAdminMixin:
+    """Admin that doesn't allow for editing."""
+
+    extra = 0
+
+    def has_add_permission(self, request, obj):  # noqa: ARG002
+        """Determine if the user can add new ones from here (no, they cannot)"""
+
+        return False
+
+    def has_change_permission(self, request, obj=None):  # noqa: ARG002
+        """Determine if the user can add new ones from here (no, they cannot)"""
+
+        return False
+
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
+        """Determine if the user can add new ones from here (no, they cannot)"""
+
+        return False
+
+
+class ReadOnlyModelAdmin(admin.ModelAdmin):
+    """Read-only admin for models."""
+
+    fields: Sequence[str] = []
+
+    def __init__(self, *args, **kwargs):
+        """Set the readonly_fields to the fields if we can."""
+
+        self.readonly_fields = self.fields or [
+            field.name
+            for field in self.model._meta.fields  # noqa: SLF001
+        ]
+        super().__init__(*args, **kwargs)
+
+    def has_add_permission(self, request):  # noqa: ARG002
+        """Disable create."""
+
+        return False
+
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
+        """Disable deletions."""
+
+        return False
