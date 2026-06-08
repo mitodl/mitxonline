@@ -18,7 +18,6 @@ from courses.factories import (  # noqa: F401
     program_with_empty_requirements,
     program_with_requirements,
 )
-
 from courses.models import (
     CoursesTopic,
     Department,
