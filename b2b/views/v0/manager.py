@@ -1,5 +1,7 @@
 """B2B manager dashboard views."""
 
+from dataclasses import dataclass
+
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from django.shortcuts import get_object_or_404
@@ -37,6 +39,15 @@ from b2b.serializers.v0.manager import (
 )
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
+
+
+@dataclass
+class CodeAssignment:
+    contract: ContractPage
+    discount: Discount
+    email: str
+    name: str
+    code: str
 
 
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -281,6 +292,22 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 ManagerEnrollmentCodeSerializer(codes_for_output, many=True).data
             )
 
+    def assign_codes_and_send_emails(
+        self, assignments: list[CodeAssignment], assigning_user
+    ) -> None:
+        # Use bulk_create for this
+        for assignment in assignments:
+            redemption = DiscountContractAttachmentRedemption.objects.create(
+                discount=assignment.discount,
+                contract=assignment.contract,
+                assigned_email=assignment.email,
+                assigned_name=assignment.name,
+                assigned_by=assigning_user,
+                last_reminder_sent_on=now_in_utc(),
+            )
+
+            send_enrollment_code_assignment_email(redemption, assignment.code)
+
     @extend_schema(
         description="Assign an available enrollment code to an email address and send an invite email.",
         request=AssignRevokeCodeRequestSerializer,
@@ -332,16 +359,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_409_CONFLICT,
             )
 
-        redemption = DiscountContractAttachmentRedemption.objects.create(
-            discount=discount,
-            contract=contract,
-            assigned_email=email,
-            assigned_name=name,
-            assigned_by=request.user,
-            last_reminder_sent_on=now_in_utc(),
+        assignment = CodeAssignment(
+            code=code, contract=contract, discount=discount, email=email, name=name
         )
-
-        send_enrollment_code_assignment_email(redemption, code)
+        self.assign_codes_and_send_emails([assignment], request.user)
 
         return Response(
             ManagerEnrollmentCodeSerializer(discount).data,
