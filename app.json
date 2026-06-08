@@ -142,6 +142,10 @@
       "description": "Optional token for the Fastly purge API.",
       "required": false
     },
+    "FASTLY_SERVICE_ID": {
+      "description": "Fastly service ID used for surrogate key (tag) purging of MIT Learn product pages.",
+      "required": false
+    },
     "FASTLY_URL": {
       "description": "The URL to the Fastly API.",
       "required": false

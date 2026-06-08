@@ -4,6 +4,7 @@ from django.db import transaction
 from wagtail.signals import page_published
 
 from cms.models import CoursePage, FlexiblePricingRequestForm, ProgramPage
+from cms.tasks import queue_fastly_surrogate_key_purge
 from flexiblepricing.utils import ensure_flexprice_form_fields
 
 logger = logging.getLogger("cms.signalreceiver")
@@ -42,8 +43,6 @@ def purge_fastly_cache_on_publish(sender, **kwargs):  # noqa: ARG001
         CoursePage   -> mitxonline:course:<readable_id>
         ProgramPage  -> mitxonline:program:<readable_id>
     """
-    from cms.tasks import queue_fastly_surrogate_key_purge  # noqa: PLC0415
-
     instance = kwargs["instance"]
 
     if isinstance(instance, CoursePage):
