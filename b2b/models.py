@@ -4,6 +4,7 @@ import logging
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -213,6 +214,7 @@ class OrganizationPage(Page):
         )
 
     @property
+    @admin.display(description="Title")
     def title_linked(self):
         """Return the title with a link to the page"""
 
@@ -705,6 +707,7 @@ class ContractPage(Page, ClusterableModel):
         return (managed, no_source)
 
     @property
+    @admin.display(description="Title")
     def title_linked(self):
         """Return the title with a link to the page"""
 

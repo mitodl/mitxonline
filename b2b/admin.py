@@ -96,33 +96,31 @@ class ContractPageProgramInline(DisplayOnlyAdminMixin, admin.TabularInline):
     readonly_fields = ["program", "sort_order"]
 
 
-class ContractPageCourseRunInline(admin.TabularInline):
+class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
     """Inline to display course runs for contract pages."""
 
     model = CourseRun
     fk_name = "b2b_contract"
     extra = 0
     fields = [
-        "courseware_id",
+        "title_linked",
         "title",
+        "run_tag",
+        "language",
+        "variant_length",
+        "variant_industry",
     ]
+    readonly_fields = [
+        "title_linked",
+        "title",
+        "run_tag",
+        "language",
+        "variant_length",
+        "variant_industry",
+    ]
+
     verbose_name = "Contract Course Run"
     verbose_name_plural = "Contract Course Runs"
-
-    def has_add_permission(self, request, obj):  # noqa: ARG002
-        """Turn off add permission. These admins are supposed to be read-only."""
-
-        return False
-
-    def has_delete_permission(self, request, obj):  # noqa: ARG002
-        """Turn off delete permission. These admins are supposed to be read-only."""
-
-        return False
-
-    def has_change_permission(self, request, obj):  # noqa: ARG002
-        """Turn off change permission. These admins are supposed to be read-only."""
-
-        return False
 
 
 @admin.register(DiscountContractAttachmentRedemption)
