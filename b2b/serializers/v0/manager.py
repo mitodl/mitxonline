@@ -163,7 +163,7 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         redemption = self._get_redemption(obj)
         if not redemption:
             return None
-        return redemption.assigned_email
+        return redemption.assigned_name
 
     def get_last_sent(self, obj) -> datetime | None:
         """Return when the last reminder email was sent."""
