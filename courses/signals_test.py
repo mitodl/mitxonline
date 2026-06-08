@@ -117,3 +117,47 @@ def test_sync_program_certificate_with_hubspot_on_save(
 
     assert sync_program_cert_mock.call_count == 2
     sync_program_cert_mock.assert_called_with(cert.id)
+
+
+# ---------------------------------------------------------------------------
+# Fastly surrogate-key purge signal tests
+# ---------------------------------------------------------------------------
+
+
+@patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
+@patch("cms.tasks.queue_fastly_surrogate_key_purge.delay")
+def test_purge_fastly_cache_on_course_save_update(mock_purge_delay, mock_on_commit):
+    """
+    Updating (re-saving) a Course enqueues a fresh purge each time.
+    """
+    course = CourseFactory.create()
+    mock_purge_delay.assert_called_with(f"mitxonline:course:{course.readable_id}")
+
+    course.title = "Updated Title"
+    course.save()
+
+    mock_purge_delay.assert_called_with(f"mitxonline:course:{course.readable_id}")
+
+
+@patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
+@patch("cms.tasks.queue_fastly_surrogate_key_purge.delay")
+def test_purge_fastly_cache_on_course_run_save(mock_purge_delay, mock_on_commit):
+    """
+    Saving a CourseRun enqueues a Fastly surrogate-key purge for the parent
+    course: mitxonline:course:<readable_id>.
+    """
+    course_run = CourseRunFactory.create()
+    mock_purge_delay.assert_called_with(
+        f"mitxonline:course:{course_run.course.readable_id}"
+    )
+
+
+@patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
+@patch("cms.tasks.queue_fastly_surrogate_key_purge.delay")
+def test_purge_fastly_cache_on_program_save(mock_purge_delay, mock_on_commit):
+    """
+    Saving a Program enqueues a Fastly surrogate-key purge for
+    mitxonline:program:<readable_id>.
+    """
+    program = ProgramFactory.create()
+    mock_purge_delay.assert_called_with(f"mitxonline:program:{program.readable_id}")

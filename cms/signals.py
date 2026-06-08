@@ -1,8 +1,9 @@
 import logging
 
+from django.db import transaction
 from wagtail.signals import page_published
 
-from cms.models import FlexiblePricingRequestForm
+from cms.models import CoursePage, FlexiblePricingRequestForm, ProgramPage
 from flexiblepricing.utils import ensure_flexprice_form_fields
 
 logger = logging.getLogger("cms.signalreceiver")
@@ -32,4 +33,31 @@ def flex_pricing_field_check(sender, **kwargs):  # noqa: ARG001
             logger.info("Form changed (or needs changes)")
 
 
+def purge_fastly_cache_on_publish(sender, **kwargs):  # noqa: ARG001
+    """
+    Receives the Wagtail page_published signal and purges the corresponding
+    Fastly surrogate key so that MIT Learn product pages are invalidated.
+
+    Key format:
+        CoursePage   -> mitxonline:course:<readable_id>
+        ProgramPage  -> mitxonline:program:<readable_id>
+    """
+    from cms.tasks import queue_fastly_surrogate_key_purge  # noqa: PLC0415
+
+    instance = kwargs["instance"]
+
+    if isinstance(instance, CoursePage):
+        surrogate_key = f"mitxonline:course:{instance.course.readable_id}"
+    elif isinstance(instance, ProgramPage):
+        surrogate_key = f"mitxonline:program:{instance.program.readable_id}"
+    else:
+        return
+
+    logger.info(
+        "Scheduling Fastly surrogate key purge on page publish: %s", surrogate_key
+    )
+    transaction.on_commit(lambda: queue_fastly_surrogate_key_purge.delay(surrogate_key))
+
+
 page_published.connect(flex_pricing_field_check)
+page_published.connect(purge_fastly_cache_on_publish)
