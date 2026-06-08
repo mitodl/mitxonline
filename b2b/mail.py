@@ -23,7 +23,13 @@ def send_enrollment_code_assignment_email(assignment, code):
     try:
         with get_message_sender(EnrollmentCodeAssignmentMessage) as sender:
             sender.build_and_send_message(
-                assignment.assigned_email, {assignment: assignment, code: code}
+                assignment.assigned_email,
+                {
+                    "assignment": assignment,
+                    "code": code,
+                    "code_url": "",
+                    "organization_name": "",
+                },
             )
     except:  # pylint: disable=bare-except  # noqa: E722
         log.exception("Error sending enrollment code assignment email.")
