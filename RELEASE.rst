@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.151.8
+Version 1.151.8 (Released June 08, 2026)
 ---------------
 
 - feat: purge Fastly cache on course/program changes (#3624)
