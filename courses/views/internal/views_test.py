@@ -160,7 +160,7 @@ def test_get_ingestible_courses(b2b_courses):
         )
 
     params = {"page_size": 100}
-    resp = api_client.get(reverse("v3:ingestible_courses_api-list"), params)
+    resp = api_client.get(reverse("internal_ingestible_courses-list"), params)
 
     assert resp.status_code == 200
 
