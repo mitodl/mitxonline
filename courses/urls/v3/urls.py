@@ -18,11 +18,6 @@ router.register(
     v3.UserProgramEnrollmentsViewSet,
     basename="user_program_enrollments_api",
 )
-router.register(
-    r"courses/ingestible",
-    v3.IngestibleCourseViewSet,
-    basename="ingestible_courses_api",
-)
 
 urlpatterns = router.urls
 urlpatterns += [

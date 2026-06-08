@@ -16,10 +16,6 @@ from courses.serializers.v1.base import (
     BaseCourseRunSerializer,
     BaseCourseSerializer,
 )
-from courses.serializers.v2.courses import CourseRunSerializer
-from courses.serializers.v2.courses import (
-    CourseSerializer as IngestibleCourseSerializer,
-)
 from courses.serializers.v3.certificates import CourseRunCertificateSerializer
 from main import features
 
@@ -178,30 +174,3 @@ class CourseVariantRunsResponseSerializer(serializers.Serializer):
 
     id = serializers.IntegerField()
     courseruns = BaseCourseRunSerializer(many=True)
-
-
-@extend_schema_serializer(component_name="IngestibleCourseWithCourseRunsSerializerV3")
-class IngestibleCourseWithCourseRunsSerializer(IngestibleCourseSerializer):
-    """Course model serializer - also serializes child course runs"""
-
-    courseruns = serializers.SerializerMethodField()
-
-    def _get_courseruns(self, instance):
-        """Return either the prefetched courseruns or use the FK directly."""
-
-        return getattr(instance, "prefetched_courseruns", instance.courseruns)
-
-    @extend_schema_field(CourseRunSerializer(many=True))
-    def get_courseruns(self, instance):
-        """Get courseruns. This should be all of them."""
-
-        return CourseRunSerializer(
-            self._get_courseruns(instance),
-            many=True,
-            read_only=True,
-            context=self.context,
-        ).data
-
-    class Meta:
-        model = models.Course
-        fields = [*IngestibleCourseSerializer.Meta.fields, "courseruns"]

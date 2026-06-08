@@ -1,9 +1,17 @@
 """Course API URL routes"""
 
 from django.urls import include, path
+from rest_framework import routers
 
 from courses.urls.v1 import urls as v1_urls
-from courses.views import v1
+from courses.views import internal, v1
+
+router = routers.SimpleRouter()
+router.register(
+    r"api/internal/courses",
+    internal.IngestibleCourseViewSet,
+    basename="internal_ingestible_courses",
+)
 
 urlpatterns = [
     # there is some circular import error somewhere that
@@ -36,4 +44,5 @@ urlpatterns = [
         v1.CreateEnrollmentView.as_view(),
         name="create-enrollment-via-form",
     ),
+    *router.urls,
 ]
