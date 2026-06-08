@@ -50,6 +50,23 @@ class CodeAssignment:
     code: str
 
 
+def assign_codes_and_send_emails(
+    assignments: list[CodeAssignment], assigning_user
+) -> None:
+    # Use bulk_create for this
+    for assignment in assignments:
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=assignment.discount,
+            contract=assignment.contract,
+            assigned_email=assignment.email,
+            assigned_name=assignment.name,
+            assigned_by=assigning_user,
+            last_reminder_sent_on=now_in_utc(),
+        )
+
+        send_enrollment_code_assignment_email(redemption, assignment.code)
+
+
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
     """List organizations available for the current user."""
 
@@ -292,22 +309,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 ManagerEnrollmentCodeSerializer(codes_for_output, many=True).data
             )
 
-    def assign_codes_and_send_emails(
-        self, assignments: list[CodeAssignment], assigning_user
-    ) -> None:
-        # Use bulk_create for this
-        for assignment in assignments:
-            redemption = DiscountContractAttachmentRedemption.objects.create(
-                discount=assignment.discount,
-                contract=assignment.contract,
-                assigned_email=assignment.email,
-                assigned_name=assignment.name,
-                assigned_by=assigning_user,
-                last_reminder_sent_on=now_in_utc(),
-            )
-
-            send_enrollment_code_assignment_email(redemption, assignment.code)
-
     @extend_schema(
         description="Assign an available enrollment code to an email address and send an invite email.",
         request=AssignRevokeCodeRequestSerializer,
@@ -362,7 +363,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         assignment = CodeAssignment(
             code=code, contract=contract, discount=discount, email=email, name=name
         )
-        self.assign_codes_and_send_emails([assignment], request.user)
+        assign_codes_and_send_emails([assignment], request.user)
 
         return Response(
             ManagerEnrollmentCodeSerializer(discount).data,
