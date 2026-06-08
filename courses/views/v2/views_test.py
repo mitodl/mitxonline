@@ -43,6 +43,7 @@ from courses.factories import (
 from courses.models import (
     Course,
     CourseRunEnrollment,
+    CoursesTopic,
     PaidProgram,
     Program,
     ProgramEnrollment,
@@ -182,6 +183,28 @@ def test_get_program(
         ProgramDetailSerializer(program, context={"include_programs": True}).data,
         ignore_order=True,
     )
+
+
+def test_get_program_includes_topics_from_required_courses(user_drf_client):
+    """Program detail API should return unique topics from required courses."""
+    program = ProgramFactory.create()
+    course1, course2 = CourseFactory.create_batch(2)
+
+    program.add_requirement(course1)
+    program.add_requirement(course2)
+
+    topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
+    course1.page.topics.set([topics[0], topics[1]])
+    course2.page.topics.set([topics[1], topics[2]])
+    course1.page.save()
+    course2.page.save()
+
+    resp = user_drf_client.get(
+        reverse("v2:programs_api-detail", kwargs={"pk": program.id})
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["topics"] == [{"name": topic.name} for topic in topics]
 
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)

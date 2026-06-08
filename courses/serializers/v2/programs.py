@@ -6,6 +6,7 @@ from decimal import Decimal  # noqa: TC003
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
+from cms.models import CoursePage
 from cms.serializers import ProgramPageSerializer
 from courses.models import (
     Program,
@@ -14,7 +15,6 @@ from courses.models import (
     ProgramRequirementNodeType,
 )
 from courses.serializers.base import BaseProgramRequirementTreeSerializer
-from courses.serializers.utils import get_unique_topics_from_courses
 from courses.serializers.v1.base import (
     BaseProgramSerializer,
     EnrollmentModeSerializer,
@@ -192,18 +192,7 @@ class ProgramSerializer(serializers.ModelSerializer):
         return [course[0].id for course in instance.courses if course[0].live]
 
     def get_collections(self, instance) -> list[int]:
-        if hasattr(instance, "programcollection_set"):
-            return [
-                collection.id for collection in instance.programcollection_set.all()
-            ]
-
-        # Fallback to database query
-        return [
-            collection.id
-            for collection in ProgramCollection.objects.filter(
-                collection_items__program__id=instance.id
-            )
-        ]
+        return _get_program_collection_ids(instance)
 
     @extend_schema_field(
         {
@@ -470,17 +459,11 @@ class ProgramSerializer(serializers.ModelSerializer):
     )
     def get_topics(self, instance):
         """Get unique topics from courses using prefetched data to avoid N+1 queries"""
-        # Check if we have prefetched all_requirements to avoid N+1 queries
-        if hasattr(instance, "all_requirements"):
-            courses = [
-                req.course
-                for req in instance.all_requirements.all()
-                if req.node_type == ProgramRequirementNodeType.COURSE and req.course
-            ]
-            return get_unique_topics_from_courses(courses)
-        else:
-            # Fallback to original courses property if prefetch not available
-            return get_unique_topics_from_courses(instance.courses)
+        courses = _get_program_courses(instance)
+        if not courses:
+            return []
+
+        return _get_unique_topics_from_course_ids([course.id for course in courses])
 
     @extend_schema_field(str)
     def get_certificate_type(self, instance):
@@ -642,3 +625,46 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
         """
         certificate = instance.get("certificate")
         return ProgramCertificateSerializer(certificate).data if certificate else None
+
+
+def _get_program_collection_ids(instance: Program) -> list[int]:
+    """Return collection IDs using prefetched memberships when available."""
+    memberships = getattr(instance, "prefetched_collection_memberships", None)
+    if memberships is not None:
+        return [membership.collection_id for membership in memberships]
+
+    prefetched_memberships = getattr(instance, "_prefetched_objects_cache", {}).get(
+        "collection_memberships"
+    )
+    if prefetched_memberships is not None:
+        return [membership.collection_id for membership in prefetched_memberships]
+
+    return list(
+        ProgramCollection.objects.filter(collection_items__program_id=instance.id)
+        .values_list("id", flat=True)
+        .order_by("collection_items__sort_order", "id")
+    )
+
+
+def _get_program_courses(instance: Program) -> list:
+    """Return live course objects for a program using normalized requirement data."""
+    return [
+        course
+        for course, _ in instance.get_courses_with_requirements_data()["courses"]
+        if course and course.live
+    ]
+
+
+def _get_unique_topics_from_course_ids(course_ids: list[int]) -> list[dict[str, str]]:
+    """Return unique topic payloads for the given course IDs with a single query."""
+    if not course_ids:
+        return []
+
+    topic_names = (
+        CoursePage.objects.filter(course_id__in=course_ids, topics__isnull=False)
+        .values_list("topics__name", flat=True)
+        .distinct()
+        .order_by("topics__name")
+    )
+
+    return [{"name": topic_name} for topic_name in topic_names]
