@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.151.8
+---------------
+
+- feat: purge Fastly cache on course/program changes (#3624)
+- Update dependency django to v5.2.15 [SECURITY] (#3648)
+- Model changes for discount code pre-assignment (#3625)
+- Remove now-unused language options field from course API responses (#3630)
+- Use fixed HubSpot certificate object types (#3637)
+
 Version 1.151.7 (Released June 08, 2026)
 ---------------
 
