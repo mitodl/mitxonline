@@ -7,6 +7,7 @@ from typing import NamedTuple
 import pytest
 from django.contrib.auth import get_user_model
 from faker import Faker
+from opaque_keys.edx.keys import CourseKey
 
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import ContractPage, OrganizationPage
@@ -293,6 +294,27 @@ def _create_source_variant_runs(course, *, b2b_only=True):
             is_self_paced=primary_source_run.is_self_paced,
         )
         variant_sources.append(source_run)
+
+    return variant_sources
+
+
+def _create_b2b_run_from_source(contract, source_run, run_tag_prefix):
+    """Create a B2B run for the specified contract and source run"""
+
+    sr_fields = source_run.__dict__
+    del sr_fields["_state"]
+
+    run_tag = f"{run_tag_prefix}_{source_run.language}_{source_run.variant_industry}_{source_run.variant_length}"
+
+    run_key = CourseKey.from_string(source_run.courseware_id)
+    run_key = run_key.replace(org=contract.organization.org_key, run=run_tag)
+
+    return CourseRunFactory.create(
+        **sr_fields,
+        is_source_run=False,
+        courseware_id=str(run_key),
+        run_tag=run_tag_prefix,
+    )
 
 
 @pytest.fixture
