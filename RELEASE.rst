@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.152.1 (Released June 09, 2026)
+---------------
+
+- Add assigned name to serializer (#3651)
+- feat: implement future enrollments migration from edX to MITx Online (#3647)
+
 Version 1.152.0 (Released June 08, 2026)
 ---------------
 
