@@ -32,7 +32,6 @@ from b2b.serializers.v0 import (
 )
 from b2b.serializers.v0.manager import (
     AssignRevokeCodeRequestSerializer,
-    AssignRevokeCodeValidationErrorSerializer,
     BulkAssignRequestSerializer,
     BulkAssignResultSerializer,
     DetailErrorSerializer,
@@ -368,7 +367,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         serializer = AssignRevokeCodeRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
 
         email = serializer.validated_data["email"]
         name = serializer.validated_data.get("name", "")
@@ -401,7 +403,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         request=AssignRevokeCodeRequestSerializer,
         responses={
             200: ManagerEnrollmentCodeSerializer,
-            400: AssignRevokeCodeValidationErrorSerializer,
+            400: DetailErrorSerializer,
             404: DetailErrorSerializer,
         },
         parameters=[
@@ -439,7 +441,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         serializer = AssignRevokeCodeRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
 
         email = serializer.validated_data["email"]
 
@@ -472,7 +477,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         request=AssignRevokeCodeRequestSerializer,
         responses={
             200: ManagerEnrollmentCodeSerializer,
-            400: AssignRevokeCodeValidationErrorSerializer,
+            400: DetailErrorSerializer,
             404: DetailErrorSerializer,
         },
         parameters=[
@@ -501,7 +506,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         serializer = AssignRevokeCodeRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
 
         email = serializer.validated_data["email"]
 
@@ -536,7 +544,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         request=BulkAssignRequestSerializer,
         responses={
             200: BulkAssignResultSerializer,
-            400: AssignRevokeCodeValidationErrorSerializer,
+            400: DetailErrorSerializer,
         },
     )
     @action(detail=True, methods=["post"], url_path="codes/bulk_assign")
@@ -550,7 +558,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         serializer = BulkAssignRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
 
         records = serializer.validated_data
 
