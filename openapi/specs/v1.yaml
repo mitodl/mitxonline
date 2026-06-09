@@ -6908,6 +6908,11 @@ components:
           nullable: true
           description: Return when the invite/assignment was created.
           readOnly: true
+        assigned_name:
+          type: string
+          nullable: true
+          description: Return the name of the user this code is assigned to.
+          readOnly: true
         redeemed_on:
           type: string
           format: date-time
@@ -6926,6 +6931,7 @@ components:
           description: Return when the last reminder email was sent.
           readOnly: true
       required:
+      - assigned_name
       - assigned_on
       - assigned_to
       - code
