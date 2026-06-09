@@ -32,8 +32,10 @@ from b2b.serializers.v0 import (
 )
 from b2b.serializers.v0.manager import (
     AssignRevokeCodeRequestSerializer,
+    AssignRevokeCodeValidationErrorSerializer,
     BulkAssignRequestSerializer,
     BulkAssignResultSerializer,
+    DetailErrorSerializer,
     ManagerContractDetailSerializer,
     ManagerCourseRunSerializer,
     ManagerEnrollmentCodeSerializer,
@@ -328,7 +330,11 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         description="Assign an available enrollment code to an email address and send an invite email.",
         request=AssignRevokeCodeRequestSerializer,
-        responses={200: ManagerEnrollmentCodeSerializer, 400: None, 409: None},
+        responses={
+            200: ManagerEnrollmentCodeSerializer,
+            400: DetailErrorSerializer,
+            409: DetailErrorSerializer,
+        },
         parameters=[
             OpenApiParameter(
                 name="code",
@@ -393,7 +399,11 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         description="Revoke the assignment for a specific enrollment code, returning it to the unassigned pool.",
         request=AssignRevokeCodeRequestSerializer,
-        responses={405: None},
+        responses={
+            200: ManagerEnrollmentCodeSerializer,
+            400: AssignRevokeCodeValidationErrorSerializer,
+            404: DetailErrorSerializer,
+        },
         parameters=[
             OpenApiParameter(
                 name="code",
@@ -459,8 +469,12 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         description="Send a reminder email to the user assigned to a specific enrollment code who has not yet claimed it.",
-        responses={405: None},
         request=AssignRevokeCodeRequestSerializer,
+        responses={
+            200: ManagerEnrollmentCodeSerializer,
+            400: AssignRevokeCodeValidationErrorSerializer,
+            404: DetailErrorSerializer,
+        },
         parameters=[
             OpenApiParameter(
                 name="code",
@@ -520,7 +534,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         "One available code is assigned per record and an invite email is sent to each "
         "successfully assigned address. Returns lists of assigned codes and any errors.",
         request=BulkAssignRequestSerializer,
-        responses={200: BulkAssignResultSerializer, 400: None},
+        responses={
+            200: BulkAssignResultSerializer,
+            400: AssignRevokeCodeValidationErrorSerializer,
+        },
     )
     @action(detail=True, methods=["post"], url_path="codes/bulk_assign")
     def bulk_assign(self, request, **kwargs):  # noqa: ARG002

@@ -102,6 +102,19 @@ class BulkAssignRequestSerializer(serializers.ListSerializer):
     child = AssignRevokeCodeRequestSerializer()
 
 
+class AssignRevokeCodeValidationErrorSerializer(serializers.Serializer):
+    """Serializer for 400 validation error responses from assign/revoke code endpoints."""
+
+    email = serializers.ListField(child=serializers.CharField(), required=False)
+    name = serializers.ListField(child=serializers.CharField(), required=False)
+
+
+class DetailErrorSerializer(serializers.Serializer):
+    """Serializer for generic detail error responses (404, etc.)."""
+
+    detail = serializers.CharField()
+
+
 class BulkAssignResultSerializer(serializers.Serializer):
     """Serializer for the bulk_assign response body."""
 
