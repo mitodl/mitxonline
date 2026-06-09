@@ -43,7 +43,7 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
-        run: uv sync --locked --no-group prod
+        run: uv sync --locked
 
       - name: Create test local state
         run: ./scripts/test/stub-data.sh
