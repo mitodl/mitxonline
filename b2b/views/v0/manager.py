@@ -185,6 +185,13 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         """Use different serializers for list vs detail views."""
         if self.action == "list":
             return BaseContractPageSerializer
+        if self.action in (
+            "assign_code",
+            "revoke_code",
+            "send_reminder_for_code_assignment",
+            "bulk_assign",
+        ):
+            return AssignRevokeCodeRequestSerializer
         return ManagerContractDetailSerializer
 
     @extend_schema(
@@ -324,7 +331,12 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             ),
         ],
     )
-    @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/assign")
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="codes/(?P<code>[^/.]+)/assign",
+        serializer_class=AssignRevokeCodeRequestSerializer,
+    )
     def assign_code(self, request, **kwargs):
         """
         Assign an enrollment code to an email address.
@@ -385,7 +397,12 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             ),
         ],
     )
-    @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/revoke")
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="codes/(?P<code>[^/.]+)/revoke",
+        serializer_class=AssignRevokeCodeRequestSerializer,
+    )
     def revoke_code(self, request, **kwargs):
         """
         Revoke the assignment for a specific enrollment code.
@@ -444,14 +461,18 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             ),
         ],
     )
-    @action(detail=True, methods=["post"], url_path="codes/(?P<code>[^/.]+)/remind")
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="codes/(?P<code>[^/.]+)/remind",
+        serializer_class=AssignRevokeCodeRequestSerializer,
+    )
     def send_reminder_for_code_assignment(self, request, **kwargs):
         """
         Send a reminder email to the assignee of a specific enrollment code.
 
         POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/remind/
         """
-        # Need to decide if we want to keep this a POST or not. It's not a restful DELETE operation, but it might still be less confusing that way
         contract = self.get_object()
         code = kwargs.get("code")
 

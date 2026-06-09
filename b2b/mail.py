@@ -16,13 +16,14 @@ class EnrollmentCodeAssignmentMessage(TemplatedMessage):
 
 def send_enrollment_code_assignment_email(assignment, code):
     """
-    Send an enrollment code assignment invite email.
+    Send an enrollment code assignment invite email. May need to be tasked out at some point.
 
     Args:
         assignment (DiscountContractAttachmentRedemption): The assignment record
             containing the assignee's email, name, and discount code.
         code (str): The code assigned to the redemption.
     """
+    # Should make this a utility function and move the map somewhere more general
     learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
         settings.ENVIRONMENT, "learn.mit.edu"
     )
