@@ -6,9 +6,11 @@ from typing import NamedTuple
 
 import pytest
 from django.contrib.auth import get_user_model
+from faker import Faker
 
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import ContractPage, OrganizationPage
+from courses.constants import COURSE_VARIANT_INDUSTRY, COURSE_VARIANT_LENGTH
 from courses.factories import (
     CourseFactory,
     CourseRunCertificateFactory,
@@ -29,8 +31,16 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
+from variants.models import SupportedVariant
 
 User = get_user_model()
+langopts = [
+    "de_DE",
+    "fr",
+    "ar",
+    "zh_CN",
+]
+fake = Faker()
 
 
 @pytest.fixture
@@ -101,16 +111,51 @@ def course_catalog_data(
 
 def _create_course(idx):
     test_course = CourseFactory.create(title=f"Test Course {idx}")
-    cr1 = CourseRunFactory.create(
-        course=test_course, past_start=True, enrollment_modes=[]
-    )
-    cr2 = CourseRunFactory.create(
-        course=test_course, in_progress=True, enrollment_modes=[]
-    )
-    cr3 = CourseRunFactory.create(
-        course=test_course, in_future=True, enrollment_modes=[]
-    )
-    return test_course, [cr1, cr2, cr3]
+    cr1 = CourseRunFactory.create(course=test_course, past_start=True)
+    cr2 = CourseRunFactory.create(course=test_course, in_progress=True)
+    cr3 = CourseRunFactory.create(course=test_course, in_future=True)
+    crvs = []
+    if idx % 2:
+        # Make some variant runs - by default, half of the courses should get one.
+        # These are for normal, customer-facing courses, so the only variants we'll
+        # configure are translations.
+        language = fake.random_choice(langopts)
+        SupportedVariant.objects.create(variant_object=test_course, language=language)
+        crv1 = CourseRunFactory.create(
+            course=test_course,
+            past_start=True,
+            courseware_id=f"{cr1.courseware_id}_{language}",
+            language=language,
+            is_primary_language=False,
+            run_tag=cr1.run_tag,
+        )
+        crv2 = CourseRunFactory.create(
+            course=test_course,
+            past_start=True,
+            courseware_id=f"{cr2.courseware_id}_{language}",
+            language=language,
+            is_primary_language=False,
+            run_tag=cr2.run_tag,
+        )
+        crv3 = CourseRunFactory.create(
+            course=test_course,
+            past_start=True,
+            courseware_id=f"{cr3.courseware_id}_{language}",
+            language=language,
+            is_primary_language=False,
+            run_tag=cr3.run_tag,
+        )
+        crvs = [
+            crv1,
+            crv2,
+            crv3,
+        ]
+    return test_course, [
+        cr1,
+        cr2,
+        cr3,
+        *crvs,
+    ]
 
 
 def _create_program(programs, courses, fake):
@@ -166,6 +211,88 @@ class B2BCourses(NamedTuple):
     course_runs: list[CourseRun]
     course_runs_by_contract_id: dict[int, list[CourseRun]]
     course_runs_by_org_id: dict[int, list[CourseRun]]
+
+
+def _create_source_variant_runs(course, *, b2b_only=True):
+    """
+    Create source (and source variant) runs for the course.
+
+    The default is "english,," so you always get one of those.
+
+    If the course has variants configured already, it will create source runs
+    accordingly. If it doesn't, you will get 3 with randomly-selected language,
+    industry and length options. They will be B2B only if the `b2b_only` is set.
+    """
+
+    if course.possible_variant_sets.filter(
+        default_variant=False, b2b_only=b2b_only
+    ).exists():
+        variants = [
+            (opt.langauge, opt.industry, opt.length)
+            for opt in course.possible_variant_sets.filter(
+                default_variant=False, b2b_only=b2b_only
+            ).all()
+        ]
+    else:
+        variants = [
+            (
+                fake.random_choice(langopts),
+                fake.random_choice(COURSE_VARIANT_INDUSTRY[1:])[0],
+                fake.random_choice(COURSE_VARIANT_LENGTH[1:])[0],
+            ),
+            (
+                fake.random_choice(langopts),
+                fake.random_choice(COURSE_VARIANT_INDUSTRY[1:])[0],
+                fake.random_choice(COURSE_VARIANT_LENGTH[1:])[0],
+            ),
+            (
+                fake.random_choice(langopts),
+                fake.random_choice(COURSE_VARIANT_INDUSTRY[1:])[0],
+                fake.random_choice(COURSE_VARIANT_LENGTH[1:])[0],
+            ),
+        ]
+
+        for variant in variants:
+            SupportedVariant.objects.create(
+                variant_object=course,
+                language=variant[0],
+                variant_industry=variant[1],
+                variant_length=variant[2],
+                b2b_only=b2b_only,
+            )
+
+    variant_sources = []
+
+    primary_source_run = CourseRunFactory.create(
+        course=course,
+        is_source_run=True,
+        language="en",
+        is_primary_language=True,
+    )
+    variant_sources.append(primary_source_run)
+
+    for variant in variants[1:]:
+        (lang, vind, vlen) = variant
+        source_run = CourseRunFactory.create(
+            course=course,
+            is_source_run=True,
+            run_tag=primary_source_run.run_tag,
+            courseware_id=f"{primary_source_run.courseware_id}_{lang}_{vind}_{vlen}",
+            language=lang,
+            is_primary_language=False,
+            variant_industry=vind,
+            variant_length=vlen,
+            start_date=primary_source_run.start_date,
+            end_date=primary_source_run.end_date,
+            enrollment_start=primary_source_run.enrollment_start,
+            enrollment_end=primary_source_run.enrollment_end,
+            certificate_available_date=primary_source_run.certificate_available_date,
+            expiration_date=primary_source_run.expiration_date,
+            upgrade_deadline=primary_source_run.upgrade_deadline,
+            live=primary_source_run.live,
+            is_self_paced=primary_source_run.is_self_paced,
+        )
+        variant_sources.append(source_run)
 
 
 @pytest.fixture
