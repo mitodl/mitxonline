@@ -416,6 +416,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         """
         # Need to decide if we want to keep this a POST or not. It's not a restful DELETE operation, but it might still be less confusing that way
         # Also decide if we want to take a name and email - we don't need it technically since these should be unique per code.
+
+        # This will probably need revision in the future. Revoking a code doesn't do anything right now, but we might want to
+        # burn a code if it's revoked - this will require product input. This only affects the display on the dash for now.
         contract = self.get_object()
         code = kwargs.get("code")
 
