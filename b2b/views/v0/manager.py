@@ -532,6 +532,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         # Just send the email reminder, no need to do anything else.
         send_enrollment_code_assignment_email(assignment_record, code)
 
+        # Set prefetched_redemptions so the serializer returns the current assignment status.
+        discount.prefetched_redemptions = [assignment_record]
+
         return Response(
             ManagerEnrollmentCodeSerializer(discount).data,
             status=http_status.HTTP_200_OK,

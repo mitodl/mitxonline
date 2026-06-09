@@ -520,3 +520,540 @@ def test_org_contract_codes_redeemed_by_differs_from_assigned_to(
     )
     assert redeemed_code["assigned_to"] == "assignee@example.com"
     assert redeemed_code["redeemed_by"] == "redeemer@example.com"
+
+
+# ---------------------------------------------------------------------------
+# assign_code tests
+# ---------------------------------------------------------------------------
+
+
+def test_assign_code(org_setup, manager_drf_client, mocker):
+    """A manager can assign an unassigned code to an email address."""
+    mock_send_email = mocker.patch(
+        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    )
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    code = discount.discount_code
+
+    assign_url = reverse(
+        "b2b:b2b-manager-org-contract-assign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        assign_url,
+        data={"email": "learner@example.com", "name": "Test Learner"},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    redemption = DiscountContractAttachmentRedemption.objects.get(
+        discount=discount, assigned_email="learner@example.com"
+    )
+    assert redemption.assigned_name == "Test Learner"
+    mock_send_email.assert_called_once_with(redemption, code)
+
+    resp_data = resp.json()
+    assert resp_data["code"] == code
+    assert resp_data["redemption_status"] == REDEMPTION_STATUS_ASSIGNED
+    assert resp_data["assigned_to"] == "learner@example.com"
+    assert resp_data["assigned_name"] == "Test Learner"
+
+
+def test_assign_code_name_defaults_to_empty(org_setup, manager_drf_client, mocker):
+    """Assigning a code without a name stores an empty string for assigned_name."""
+    mocker.patch("b2b.views.v0.manager.send_enrollment_code_assignment_email")
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    assign_url = reverse(
+        "b2b:b2b-manager-org-contract-assign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        assign_url, data={"email": "learner@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert DiscountContractAttachmentRedemption.objects.filter(
+        discount=discount, assigned_email="learner@example.com", assigned_name=""
+    ).exists()
+
+
+def test_assign_code_invalid_request(org_setup, manager_drf_client):
+    """assign_code returns 400 when the request body is missing the required email field."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    assign_url = reverse(
+        "b2b:b2b-manager-org-contract-assign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(assign_url, data={"name": "No Email"}, format="json")
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_assign_code_not_found(org_setup, manager_drf_client):
+    """assign_code returns 404 when the code does not belong to the contract."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    assign_url = reverse(
+        "b2b:b2b-manager-org-contract-assign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": "nonexistent-code",
+        },
+    )
+
+    resp = manager_drf_client.post(
+        assign_url, data={"email": "learner@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_assign_code_already_assigned(org_setup, manager_drf_client, mocker):
+    """assign_code returns 409 when the code already has a redemption record."""
+    mocker.patch("b2b.views.v0.manager.send_enrollment_code_assignment_email")
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="existing@example.com",
+    )
+
+    assign_url = reverse(
+        "b2b:b2b-manager-org-contract-assign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        assign_url, data={"email": "new@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_409_CONFLICT
+
+
+def test_assign_code_forbidden(org_setup, manager_drf_client):
+    """A manager cannot assign codes in a contract belonging to an org they don't manage."""
+    _, _, *_, (contract_3, *_) = org_setup
+
+    discount = contract_3.get_discounts().order_by("id").first()
+
+    assign_url = reverse(
+        "b2b:b2b-manager-org-contract-assign-code",
+        kwargs={
+            "parent_lookup_organization": contract_3.organization.id,
+            "pk": contract_3.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        assign_url, data={"email": "learner@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+# ---------------------------------------------------------------------------
+# revoke_code tests
+# ---------------------------------------------------------------------------
+
+
+def test_revoke_code(org_setup, manager_drf_client):
+    """A manager can revoke an assigned code, deleting its redemption record."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="assignee@example.com",
+        assigned_name="Assignee",
+    )
+
+    revoke_url = reverse(
+        "b2b:b2b-manager-org-contract-revoke-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        revoke_url, data={"email": "assignee@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert not DiscountContractAttachmentRedemption.objects.filter(
+        discount=discount, assigned_email="assignee@example.com"
+    ).exists()
+
+    resp_data = resp.json()
+    assert resp_data["code"] == discount.discount_code
+    assert resp_data["redemption_status"] == REDEMPTION_STATUS_UNASSIGNED
+
+
+def test_revoke_code_invalid_request(org_setup, manager_drf_client):
+    """revoke_code returns 400 when the request body is missing the required email field."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    revoke_url = reverse(
+        "b2b:b2b-manager-org-contract-revoke-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(revoke_url, data={"name": "No Email"}, format="json")
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_revoke_code_not_found(org_setup, manager_drf_client):
+    """revoke_code returns 404 when the code does not belong to the contract."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    revoke_url = reverse(
+        "b2b:b2b-manager-org-contract-revoke-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": "nonexistent-code",
+        },
+    )
+
+    resp = manager_drf_client.post(
+        revoke_url, data={"email": "learner@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_revoke_code_assignment_not_found(org_setup, manager_drf_client):
+    """revoke_code returns 404 when no assignment exists for the supplied email."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    revoke_url = reverse(
+        "b2b:b2b-manager-org-contract-revoke-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        revoke_url, data={"email": "nobody@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_revoke_code_forbidden(org_setup, manager_drf_client):
+    """A manager cannot revoke codes in a contract belonging to an org they don't manage."""
+    _, _, *_, (contract_3, *_) = org_setup
+
+    discount = contract_3.get_discounts().order_by("id").first()
+
+    revoke_url = reverse(
+        "b2b:b2b-manager-org-contract-revoke-code",
+        kwargs={
+            "parent_lookup_organization": contract_3.organization.id,
+            "pk": contract_3.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        revoke_url, data={"email": "learner@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+# ---------------------------------------------------------------------------
+# send_reminder_for_code_assignment tests
+# ---------------------------------------------------------------------------
+
+
+def test_send_reminder_for_code_assignment(org_setup, manager_drf_client, mocker):
+    """A manager can send a reminder email for an assigned but unclaimed code."""
+    mock_send_email = mocker.patch(
+        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    )
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    redemption = DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="assignee@example.com",
+    )
+
+    remind_url = reverse(
+        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        remind_url, data={"email": "assignee@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    mock_send_email.assert_called_once_with(redemption, discount.discount_code)
+
+    resp_data = resp.json()
+    assert resp_data["code"] == discount.discount_code
+    assert resp_data["redemption_status"] == REDEMPTION_STATUS_ASSIGNED
+
+
+def test_send_reminder_invalid_request(org_setup, manager_drf_client):
+    """send_reminder returns 400 when the request body is missing the required email field."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    remind_url = reverse(
+        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(remind_url, data={}, format="json")
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_send_reminder_code_not_found(org_setup, manager_drf_client):
+    """send_reminder returns 404 when the code does not belong to the contract."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    remind_url = reverse(
+        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": "nonexistent-code",
+        },
+    )
+
+    resp = manager_drf_client.post(
+        remind_url, data={"email": "assignee@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_send_reminder_assignment_not_found(org_setup, manager_drf_client):
+    """send_reminder returns 404 when no assignment exists for the supplied email."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    remind_url = reverse(
+        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        remind_url, data={"email": "nobody@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_send_reminder_forbidden(org_setup, manager_drf_client):
+    """A manager cannot send reminders for codes in contracts they don't manage."""
+    _, _, *_, (contract_3, *_) = org_setup
+
+    discount = contract_3.get_discounts().order_by("id").first()
+
+    remind_url = reverse(
+        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
+        kwargs={
+            "parent_lookup_organization": contract_3.organization.id,
+            "pk": contract_3.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        remind_url, data={"email": "assignee@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+# ---------------------------------------------------------------------------
+# bulk_assign tests
+# ---------------------------------------------------------------------------
+
+
+def test_bulk_assign(org_setup, manager_drf_client, mocker):
+    """A manager can bulk-assign codes, getting one code per submitted record."""
+    mock_send_email = mocker.patch(
+        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    )
+    _, _, (contract_1, *_), *_ = org_setup
+
+    records = [
+        {"email": "learner1@example.com", "name": "Learner One"},
+        {"email": "learner2@example.com", "name": "Learner Two"},
+        {"email": "learner3@example.com", "name": "Learner Three"},
+    ]
+
+    bulk_assign_url = reverse(
+        "b2b:b2b-manager-org-contract-bulk-assign",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    resp = manager_drf_client.post(bulk_assign_url, data=records, format="json")
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_data = resp.json()
+    assert len(resp_data["assigned"]) == 3
+    assert len(resp_data["errors"]) == 0
+    assert mock_send_email.call_count == 3
+
+    assigned_emails = {code["assigned_to"] for code in resp_data["assigned"]}
+    assert assigned_emails == {
+        "learner1@example.com",
+        "learner2@example.com",
+        "learner3@example.com",
+    }
+
+    assert (
+        DiscountContractAttachmentRedemption.objects.filter(
+            contract=contract_1,
+            assigned_email__in=[
+                "learner1@example.com",
+                "learner2@example.com",
+                "learner3@example.com",
+            ],
+        ).count()
+        == 3
+    )
+
+
+def test_bulk_assign_insufficient_codes(org_setup, manager_drf_client, mocker):
+    """bulk_assign reports errors for records that exceed the number of available codes."""
+    mocker.patch("b2b.views.v0.manager.send_enrollment_code_assignment_email")
+    _, _, _, (contract_2, *_), *_ = org_setup
+
+    available_count = (
+        contract_2.get_discounts().filter(contract_redemptions__isnull=True).count()
+    )
+
+    # Request two more than are available so we get predictable errors.
+    records = [{"email": f"learner{i}@example.com"} for i in range(available_count + 2)]
+
+    bulk_assign_url = reverse(
+        "b2b:b2b-manager-org-contract-bulk-assign",
+        kwargs={
+            "parent_lookup_organization": contract_2.organization.id,
+            "pk": contract_2.id,
+        },
+    )
+
+    resp = manager_drf_client.post(bulk_assign_url, data=records, format="json")
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_data = resp.json()
+    assert len(resp_data["assigned"]) == available_count
+    assert len(resp_data["errors"]) == 2
+    assert all("No available code." in err["detail"] for err in resp_data["errors"])
+
+
+def test_bulk_assign_invalid_request(org_setup, manager_drf_client):
+    """bulk_assign returns 400 when the request body is not a list."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    bulk_assign_url = reverse(
+        "b2b:b2b-manager-org-contract-bulk-assign",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    # Send a dict instead of a list — should fail ListSerializer validation.
+    resp = manager_drf_client.post(
+        bulk_assign_url,
+        data={"email": "notalist@example.com"},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_bulk_assign_forbidden(org_setup, manager_drf_client):
+    """A manager cannot bulk-assign codes for a contract they don't manage."""
+    _, _, *_, (contract_3, *_) = org_setup
+
+    bulk_assign_url = reverse(
+        "b2b:b2b-manager-org-contract-bulk-assign",
+        kwargs={
+            "parent_lookup_organization": contract_3.organization.id,
+            "pk": contract_3.id,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        bulk_assign_url,
+        data=[{"email": "learner@example.com"}],
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
