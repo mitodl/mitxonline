@@ -384,9 +384,17 @@ paths:
                 $ref: '#/components/schemas/ManagerEnrollmentCode'
           description: ''
         '400':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
         '409':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/:
     post:
       operationId: b2b_manager_organizations_contracts_codes_remind_create
@@ -426,8 +434,24 @@ paths:
               $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
         required: true
       responses:
-        '405':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagerEnrollmentCode'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/:
     post:
       operationId: b2b_manager_organizations_contracts_codes_revoke_create
@@ -467,8 +491,24 @@ paths:
               $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
         required: true
       responses:
-        '405':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagerEnrollmentCode'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/:
     post:
       operationId: b2b_manager_organizations_contracts_codes_bulk_assign_create
@@ -516,7 +556,11 @@ paths:
                 $ref: '#/components/schemas/BulkAssignResult'
           description: ''
         '400':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/:
     get:
       operationId: b2b_manager_organizations_contracts_course_runs_list
@@ -6123,6 +6167,14 @@ components:
       - name
       - program_ids
       - slug
+    DetailError:
+      type: object
+      description: Serializer for generic detail error responses (404, etc.).
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     Discount:
       type: object
       properties:
