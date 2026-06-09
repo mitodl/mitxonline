@@ -66,6 +66,9 @@ def assign_codes_and_send_emails(
         )
 
         send_enrollment_code_assignment_email(redemption, assignment.code)
+        # Set the prefetched_redemptions attribute on the discount so that serializers
+        # can return the updated redemption info without needing an extra query.
+        assignment.discount.prefetched_redemptions = [redemption]
 
 
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -335,7 +338,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         detail=True,
         methods=["post"],
         url_path="codes/(?P<code>[^/.]+)/assign",
-        serializer_class=AssignRevokeCodeRequestSerializer,
     )
     def assign_code(self, request, **kwargs):
         """
@@ -401,7 +403,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         detail=True,
         methods=["post"],
         url_path="codes/(?P<code>[^/.]+)/revoke",
-        serializer_class=AssignRevokeCodeRequestSerializer,
     )
     def revoke_code(self, request, **kwargs):
         """
@@ -414,6 +415,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             This endpoint removes the DiscountContractAttachmentRedemption record for the specified code and email address.
         """
         # Need to decide if we want to keep this a POST or not. It's not a restful DELETE operation, but it might still be less confusing that way
+        # Also decide if we want to take a name and email - we don't need it technically since these should be unique per code.
         contract = self.get_object()
         code = kwargs.get("code")
 
@@ -465,7 +467,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         detail=True,
         methods=["post"],
         url_path="codes/(?P<code>[^/.]+)/remind",
-        serializer_class=AssignRevokeCodeRequestSerializer,
     )
     def send_reminder_for_code_assignment(self, request, **kwargs):
         """
