@@ -1,7 +1,10 @@
 import logging
 
+from django.conf import settings
 from mitol.mail.api import get_message_sender
 from mitol.mail.messages import TemplatedMessage
+
+from courses.api import ENV_TO_LEARN_HOSTNAME_MAP
 
 log = logging.getLogger()
 
@@ -20,6 +23,12 @@ def send_enrollment_code_assignment_email(assignment, code):
             containing the assignee's email, name, and discount code.
         code (str): The code assigned to the redemption.
     """
+    learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
+        settings.ENVIRONMENT, "learn.mit.edu"
+    )
+    code_url = f"https://{learn_hostname}/enrollmentcode/{code}"
+    organization_name = assignment.contract.organization.name
+
     try:
         with get_message_sender(EnrollmentCodeAssignmentMessage) as sender:
             sender.build_and_send_message(
@@ -27,8 +36,8 @@ def send_enrollment_code_assignment_email(assignment, code):
                 {
                     "assignment": assignment,
                     "code": code,
-                    "code_url": "",
-                    "organization_name": "",
+                    "code_url": code_url,
+                    "organization_name": organization_name,
                 },
             )
     except:  # pylint: disable=bare-except  # noqa: E722

@@ -1637,8 +1637,8 @@ ACHIEVEMENT_TYPE_MAP = {
 # This is ugly, if anyone has other suggestions I'm all ears.
 ENV_TO_LEARN_HOSTNAME_MAP = {
     "production": "learn.mit.edu",
-    "rc": "learn.rc.mit.edu",
-    "ci": "learn.ci.mit.edu",
+    "rc": "rc.learn.mit.edu",
+    "ci": "ci.learn.mit.edu",
 }
 
 
