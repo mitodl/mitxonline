@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.152.1
+Version 1.152.1 (Released June 09, 2026)
 ---------------
 
 - Add assigned name to serializer (#3651)
