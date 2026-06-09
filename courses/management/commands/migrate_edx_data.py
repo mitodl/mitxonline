@@ -21,7 +21,7 @@ from courses.models import (
 )
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import ZERO_PAYMENT_DATA
-from ecommerce.models import PendingOrder, Product
+from ecommerce.models import Discount, PendingOrder, Product
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
@@ -448,7 +448,8 @@ class Command(BaseCommand):
 
         query = (
             "SELECT * FROM edxorg_to_mitxonline_enrollments "
-            "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL"
+            "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL "
+            "AND courseruncertificate_created_on IS NOT NULL"
         )
         if courserun_readable_ids:
             placeholders = [
@@ -571,7 +572,8 @@ class Command(BaseCommand):
 
         query = (
             "SELECT * FROM edxorg_to_mitxonline_program_certificates "
-            "WHERE user_mitxonline_id IS NOT NULL AND program_id IS NOT NULL"
+            "WHERE user_mitxonline_id IS NOT NULL AND program_id IS NOT NULL "
+            "AND certificate_page_revision_id IS NOT NULL "
         )
 
         if limit is not None:
@@ -712,6 +714,173 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"Created {created_orders} Orders"))
 
+    @staticmethod
+    def _upgrade_enrollment_modes(verified_rows, existing_enrollments):
+        """
+        Upgrade enrollment mode to verified for any existing enrollments whose
+        current mode differs. Scoped only to verified rows to avoid downgrading
+        enrollments not covered by this migration.
+        """
+        upgrade_q = Q()
+        for row in verified_rows:
+            existing_mode = existing_enrollments.get(
+                (row["user_mitxonline_id"], row["courserun_id"])
+            )
+            if (
+                existing_mode is not None
+                and existing_mode != EDX_ENROLLMENT_VERIFIED_MODE
+            ):
+                upgrade_q |= Q(
+                    user_id=row["user_mitxonline_id"],
+                    run_id=row["courserun_id"],
+                )
+        if upgrade_q:
+            CourseRunEnrollment.all_objects.filter(upgrade_q).update(
+                enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+            )
+
+    def _migrate_enrollments(self, conn, options):
+        """
+        Migrate the edX future enrollments from edX to MITx Online. Create Orders for the verified enrollments.
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
+
+        cur = conn.cursor()
+
+        query = (
+            "SELECT * FROM edxorg_to_mitxonline_enrollments "
+            "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL "
+            "AND courseruncertificate_created_on IS NULL"
+        )
+        if limit is not None:
+            query += f" LIMIT {int(limit)}"
+
+        cur.execute(query)
+        columns = [desc[0] for desc in cur.description]
+
+        total_enrollments = 0
+        total_orders = 0
+
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            rows = [dict(zip(columns, r)) for r in results]
+
+            verified_rows = [
+                row
+                for row in rows
+                if row.get("courserunenrollment_enrollment_mode")
+                == EDX_ENROLLMENT_VERIFIED_MODE
+            ]
+
+            if dry_run:
+                total_enrollments += len(rows)
+                total_orders += len(verified_rows)
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"[DRY RUN] Would create "
+                        f"{total_enrollments} enrollments, "
+                        f"{total_orders} verified orders"
+                    )
+                )
+                continue
+
+            user_ids = {row["user_mitxonline_id"] for row in verified_rows}
+            existing_enrollments = {
+                (uid, rid): mode
+                for uid, rid, mode in CourseRunEnrollment.all_objects.filter(
+                    user_id__in=user_ids,
+                    run_id__in={row["courserun_id"] for row in verified_rows},
+                ).values_list("user_id", "run_id", "enrollment_mode")
+            }
+
+            self._upgrade_enrollment_modes(verified_rows, existing_enrollments)
+            total_enrollments += self._bulk_create_enrollments(rows, batch_size)
+
+            product_version_ids = {
+                row["product_version_id"]
+                for row in verified_rows
+                if row.get("product_version_id")
+            }
+            discount_ids = {
+                row["discount_id"] for row in verified_rows if row.get("discount_id")
+            }
+
+            users = {u.id: u for u in User.objects.filter(id__in=user_ids)}
+            product_versions = {
+                v.id: v for v in Version.objects.filter(id__in=product_version_ids)
+            }
+            discounts = {d.id: d for d in Discount.objects.filter(id__in=discount_ids)}
+
+            for row in verified_rows:
+                try:
+                    if (
+                        existing_enrollments.get(
+                            (row["user_mitxonline_id"], row["courserun_id"])
+                        )
+                        == EDX_ENROLLMENT_VERIFIED_MODE
+                    ):
+                        continue
+
+                    user = users.get(row["user_mitxonline_id"])
+                    product_version = product_versions.get(
+                        row.get("product_version_id")
+                    )
+                    product = (
+                        Product.all_objects.filter(
+                            id=product_version.field_dict.get("id")
+                        ).first()
+                        if product_version
+                        else None
+                    )
+                    discount = discounts.get(row.get("discount_id"))
+
+                    if not all([user, product_version, product]):
+                        missing = [
+                            name
+                            for name, val in [
+                                ("user", user),
+                                ("product_version", product_version),
+                                ("product", product),
+                            ]
+                            if not val
+                        ]
+                        self.stdout.write(
+                            self.style.ERROR(
+                                f"Missing objects {missing} for row: {row}"
+                            )
+                        )
+                        continue
+
+                    with transaction.atomic():
+                        order = PendingOrder.create_from_product(
+                            product, user, discount=discount
+                        )
+                        fulfill_completed_order(
+                            order,
+                            payment_data=ZERO_PAYMENT_DATA,
+                            already_enrolled=True,
+                        )
+                        total_orders += 1
+
+                except Exception as e:  # noqa: BLE001
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Failed to create order for enrollment row: {row} error: {e}"
+                        )
+                    )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Enrollment migration complete: "
+                f"{total_enrollments} enrollments, {total_orders} orders"
+            )
+        )
+
     def add_arguments(self, parser) -> None:
         parser.add_argument(
             "--use-default-signatory",
@@ -737,9 +906,10 @@ class Command(BaseCommand):
                 "course_certificates",
                 "program_certificates",
                 "entitlements",
+                "future_enrollments",
             ],
             default="course_runs",
-            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements (default: course_runs)",
+            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements, future_enrollments (default: course_runs)",
         )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
@@ -778,3 +948,7 @@ class Command(BaseCommand):
                 "Migrating the edX entitlements to program orders and enrollments ..."
             )
             self._migrate_entitlements(conn, options)
+
+        if migrate_type == "future_enrollments":
+            self.stdout.write("Migrating the edX future enrollments  ...")
+            self._migrate_enrollments(conn, options)
