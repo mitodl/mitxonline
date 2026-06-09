@@ -96,6 +96,16 @@ class AssignRevokeCodeRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, default="", allow_blank=True)
 
 
+class BulkAssignResultSerializer(serializers.Serializer):
+    """Serializer for the bulk_assign response body."""
+
+    assigned = serializers.ListField(help_text="Successfully assigned codes.")
+    errors = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="Records that could not be assigned, with a 'detail' explanation.",
+    )
+
+
 class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     """Serializer for enrollment codes available to a contract."""
 

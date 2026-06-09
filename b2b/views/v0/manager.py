@@ -32,6 +32,7 @@ from b2b.serializers.v0 import (
 )
 from b2b.serializers.v0.manager import (
     AssignRevokeCodeRequestSerializer,
+    BulkAssignResultSerializer,
     ManagerContractDetailSerializer,
     ManagerCourseRunSerializer,
     ManagerEnrollmentCodeSerializer,
@@ -485,10 +486,11 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         )
 
     @extend_schema(
-        description="Bulk-assign enrollment codes from a CSV or plain-text file. "
-        "Each row should contain an email address and an optional name. "
-        "An invite email is sent to each successfully assigned address.",
-        responses={405: None},
+        description="Bulk-assign enrollment codes from a list of (email, name) records. "
+        "One available code is assigned per record and an invite email is sent to each "
+        "successfully assigned address. Returns lists of assigned codes and any errors.",
+        request=AssignRevokeCodeRequestSerializer(many=True),
+        responses={200: BulkAssignResultSerializer, 400: None},
     )
     @action(detail=True, methods=["post"], url_path="codes/bulk_assign")
     def bulk_assign(self, request, **kwargs):  # noqa: ARG002
@@ -497,4 +499,51 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/bulk_assign/
         """
-        return Response(status=http_status.HTTP_405_METHOD_NOT_ALLOWED)
+        contract = self.get_object()
+
+        serializer = AssignRevokeCodeRequestSerializer(data=request.data, many=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+
+        records = serializer.validated_data
+
+        available_discounts = list(
+            contract.get_discounts()
+            .filter(contract_redemptions__isnull=True)
+            .order_by("id")[: len(records)]
+        )
+
+        assignments = []
+        errors = []
+
+        for i, record in enumerate(records):
+            email = record["email"]
+            name = record.get("name", "")
+
+            if i < len(available_discounts):
+                discount = available_discounts[i]
+                assignments.append(
+                    CodeAssignment(
+                        code=discount.discount_code,
+                        contract=contract,
+                        discount=discount,
+                        email=email,
+                        name=name,
+                    )
+                )
+            else:
+                errors.append(
+                    {"email": email, "name": name, "detail": "No available code."}
+                )
+
+        assign_codes_and_send_emails(assignments, request.user)
+
+        return Response(
+            {
+                "assigned": ManagerEnrollmentCodeSerializer(
+                    [a.discount for a in assignments], many=True
+                ).data,
+                "errors": errors,
+            },
+            status=http_status.HTTP_200_OK,
+        )
