@@ -32,6 +32,7 @@ from b2b.serializers.v0 import (
 )
 from b2b.serializers.v0.manager import (
     AssignRevokeCodeRequestSerializer,
+    BulkAssignRequestSerializer,
     BulkAssignResultSerializer,
     ManagerContractDetailSerializer,
     ManagerCourseRunSerializer,
@@ -188,13 +189,17 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         """Use different serializers for list vs detail views."""
         if self.action == "list":
             return BaseContractPageSerializer
+
+        # This is ugly and I'm not a fan. We might want to break the assign/revoke/remind/bulk_assign into their
+        # own viewset as long as we can keep the URL structure the same.
         if self.action in (
             "assign_code",
             "revoke_code",
             "send_reminder_for_code_assignment",
-            "bulk_assign",
         ):
             return AssignRevokeCodeRequestSerializer
+        if self.action == "bulk_assign":
+            return BulkAssignRequestSerializer
         return ManagerContractDetailSerializer
 
     @extend_schema(
@@ -514,7 +519,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         description="Bulk-assign enrollment codes from a list of (email, name) records. "
         "One available code is assigned per record and an invite email is sent to each "
         "successfully assigned address. Returns lists of assigned codes and any errors.",
-        request=AssignRevokeCodeRequestSerializer(many=True),
+        request=BulkAssignRequestSerializer,
         responses={200: BulkAssignResultSerializer, 400: None},
     )
     @action(detail=True, methods=["post"], url_path="codes/bulk_assign")
@@ -526,7 +531,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         """
         contract = self.get_object()
 
-        serializer = AssignRevokeCodeRequestSerializer(data=request.data, many=True)
+        serializer = BulkAssignRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
 

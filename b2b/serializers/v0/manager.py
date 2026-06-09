@@ -96,6 +96,12 @@ class AssignRevokeCodeRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, default="", allow_blank=True)
 
 
+class BulkAssignRequestSerializer(serializers.ListSerializer):
+    """Serializer for the bulk_assign request body — a list of (email, name) records."""
+
+    child = AssignRevokeCodeRequestSerializer()
+
+
 class BulkAssignResultSerializer(serializers.Serializer):
     """Serializer for the bulk_assign response body."""
 
