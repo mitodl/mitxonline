@@ -1,9 +1,8 @@
 """B2B model admin. Only for convenience; you should use the Wagtail interface instead."""
 
-from collections.abc import Sequence
-
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
+from django.db.models import Count
 
 from b2b.models import (
     ContractPage,
@@ -13,9 +12,10 @@ from b2b.models import (
     UserOrganization,
 )
 from courses.models import CourseRun
+from main.admin import DisplayOnlyAdminMixin, ReadOnlyModelAdmin
 
 
-class UserOrganizationAdminInline(admin.TabularInline):
+class UserOrganizationAdminInline(DisplayOnlyAdminMixin, admin.TabularInline):
     """Inline that filters to just show organization admins"""
 
     model = UserOrganization
@@ -42,21 +42,6 @@ class UserOrganizationAdminInline(admin.TabularInline):
             .filter(is_manager=True)
         )
 
-    def has_add_permission(self, request, obj):  # noqa: ARG002
-        """Determine if the user can add new ones from here (no, they cannot)"""
-
-        return False
-
-    def has_change_permission(self, request, obj=None):  # noqa: ARG002
-        """Determine if the user can add new ones from here (no, they cannot)"""
-
-        return False
-
-    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
-        """Determine if the user can add new ones from here (no, they cannot)"""
-
-        return False
-
     @admin.display(description="User Email")
     def user_email(self, obj):
         """Return the user's email address."""
@@ -73,29 +58,69 @@ class ContractPagePossibleVariantInline(GenericTabularInline):
     extra = 0
 
 
-class ReadOnlyModelAdmin(admin.ModelAdmin):
-    """Read-only admin for models."""
+class OrganizationContractsInline(DisplayOnlyAdminMixin, admin.TabularInline):
+    """Inline to display the contracts for the selected org"""
 
-    fields: Sequence[str] = []
+    model = ContractPage
+    extra = 0
+    fk_name = "organization"
 
-    def __init__(self, *args, **kwargs):
-        """Set the readonly_fields to the fields if we can."""
+    fields = [
+        "title_linked",
+        "slug",
+        "membership_type",
+        "max_learners",
+        "active",
+        "contract_start",
+        "contract_end",
+    ]
+    readonly_fields = [
+        "title_linked",
+        "slug",
+        "membership_type",
+        "max_learners",
+        "active",
+        "contract_start",
+        "contract_end",
+    ]
 
-        self.readonly_fields = self.fields or [
-            field.name
-            for field in self.model._meta.fields  # noqa: SLF001
-        ]
-        super().__init__(*args, **kwargs)
 
-    def has_add_permission(self, request):  # noqa: ARG002
-        """Disable create."""
+class ContractPageProgramInline(DisplayOnlyAdminMixin, admin.TabularInline):
+    """Inline to display programs for contract pages."""
 
-        return False
+    model = ContractProgramItem
+    extra = 0
+    verbose_name = "Contract Program"
+    verbose_name_plural = "Contract Programs"
+    fields = ["program", "sort_order"]
+    readonly_fields = ["program", "sort_order"]
 
-    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
-        """Disable deletions."""
 
-        return False
+class ContractPageCourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
+    """Inline to display course runs for contract pages."""
+
+    model = CourseRun
+    fk_name = "b2b_contract"
+    extra = 0
+    fields = [
+        "title_linked",
+        "title",
+        "run_tag",
+        "language",
+        "variant_length",
+        "variant_industry",
+    ]
+    readonly_fields = [
+        "title_linked",
+        "title",
+        "run_tag",
+        "language",
+        "variant_length",
+        "variant_industry",
+    ]
+
+    verbose_name = "Contract Course Run"
+    verbose_name_plural = "Contract Course Runs"
 
 
 @admin.register(DiscountContractAttachmentRedemption)
@@ -128,61 +153,6 @@ class DiscountContractAttachmentRedemptionAdmin(ReadOnlyModelAdmin):
     ]
 
 
-class ContractPageProgramInline(admin.TabularInline):
-    """Inline to display programs for contract pages."""
-
-    model = ContractProgramItem
-    extra = 0
-    verbose_name = "Contract Program"
-    verbose_name_plural = "Contract Programs"
-    fields = ["program", "sort_order"]
-    readonly_fields = ["program", "sort_order"]
-
-    def has_add_permission(self, request, obj):  # noqa: ARG002
-        """Turn off add permission. These admins are supposed to be read-only."""
-
-        return False
-
-    def has_delete_permission(self, request, obj):  # noqa: ARG002
-        """Turn off delete permission. These admins are supposed to be read-only."""
-
-        return False
-
-    def has_change_permission(self, request, obj):  # noqa: ARG002
-        """Turn off change permission. These admins are supposed to be read-only."""
-
-        return False
-
-
-class ContractPageCourseRunInline(admin.TabularInline):
-    """Inline to display course runs for contract pages."""
-
-    model = CourseRun
-    fk_name = "b2b_contract"
-    extra = 0
-    fields = [
-        "courseware_id",
-        "title",
-    ]
-    verbose_name = "Contract Course Run"
-    verbose_name_plural = "Contract Course Runs"
-
-    def has_add_permission(self, request, obj):  # noqa: ARG002
-        """Turn off add permission. These admins are supposed to be read-only."""
-
-        return False
-
-    def has_delete_permission(self, request, obj):  # noqa: ARG002
-        """Turn off delete permission. These admins are supposed to be read-only."""
-
-        return False
-
-    def has_change_permission(self, request, obj):  # noqa: ARG002
-        """Turn off change permission. These admins are supposed to be read-only."""
-
-        return False
-
-
 @admin.register(ContractPage)
 class ContractPageAdmin(ReadOnlyModelAdmin):
     """Admin for contract pages."""
@@ -193,6 +163,7 @@ class ContractPageAdmin(ReadOnlyModelAdmin):
         "title",
         "organization",
         "integration_type",
+        "max_learners",
         "contract_start",
         "contract_end",
     ]
@@ -229,6 +200,7 @@ class OrganizationPageAdmin(ReadOnlyModelAdmin):
         "name",
         "org_key",
         "sso_organization_id",
+        "contract_count",
     ]
     fields = [
         "id",
@@ -242,7 +214,18 @@ class OrganizationPageAdmin(ReadOnlyModelAdmin):
 
     inlines = [
         UserOrganizationAdminInline,
+        OrganizationContractsInline,
     ]
+
+    def contract_count(self, obj):
+        """Pull the contract count for the org."""
+
+        return obj.contract_count if hasattr(obj, "contract_count") else "-"
+
+    def get_queryset(self, request):
+        """Add an annotation so we can have contract counts."""
+
+        return super().get_queryset(request).annotate(contract_count=Count("contracts"))
 
 
 @admin.register(UserOrganization)

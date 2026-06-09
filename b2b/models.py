@@ -4,12 +4,15 @@ import logging
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.http import Http404
+from django.urls import reverse
 from django.utils.functional import cached_property
+from django.utils.html import format_html
 from django.utils.text import slugify
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
@@ -208,6 +211,23 @@ class OrganizationPage(Page):
             self._active_contracts
             if hasattr(self, "_active_contracts")
             else self.contracts.filter(active=True).all()
+        )
+
+    @property
+    @admin.display(description="Title")
+    def title_linked(self):
+        """Return the title with a link to the page"""
+
+        dj_change_url = reverse("admin:b2b_organizationpage_change", args=(self.id,))
+        wagtail_url = reverse(
+            "wagtailadmin_explore",
+            kwargs={
+                "parent_page_id": self.id,
+            },
+        )
+
+        return format_html(
+            f'{self.title} <a href="{dj_change_url}">Admin</a> | <a href="{wagtail_url}">Wagtail</a>'
         )
 
     class Meta:
@@ -685,6 +705,23 @@ class ContractPage(Page, ClusterableModel):
             item.save(skip_run_creation=True)
 
         return (managed, no_source)
+
+    @property
+    @admin.display(description="Title")
+    def title_linked(self):
+        """Return the title with a link to the page"""
+
+        dj_change_url = reverse("admin:b2b_contractpage_change", args=(self.id,))
+        wagtail_url = reverse(
+            "wagtailadmin_explore",
+            kwargs={
+                "parent_page_id": self.id,
+            },
+        )
+
+        return format_html(
+            f'{self.title} <a href="{dj_change_url}">Admin</a> | <a href="{wagtail_url}">Wagtail</a>'
+        )
 
     class Meta:
         """Meta options for the ContractPage."""

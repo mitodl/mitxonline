@@ -37,7 +37,11 @@ from courses.models import (
     RelatedProgram,
     VerifiableCredential,
 )
-from main.admin import AuditableModelAdmin, ModelAdminRunActionsForAllMixin
+from main.admin import (
+    AuditableModelAdmin,
+    DisplayOnlyAdminMixin,
+    ModelAdminRunActionsForAllMixin,
+)
 from main.utils import get_field_names
 from openedx.tasks import retry_failed_edx_enrollments
 
@@ -81,7 +85,7 @@ class CoursePossibleVariantInline(GenericTabularInline):
     extra = 0
 
 
-class CourseRunInline(admin.TabularInline):
+class CourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
     """Inline for course runs for a given course"""
 
     model = CourseRun
@@ -89,7 +93,7 @@ class CourseRunInline(admin.TabularInline):
     fields = (
         "id",
         "title",
-        "courseware_id",
+        "title_linked",
         "run_tag",
         "language",
         "is_primary_language",
@@ -100,16 +104,20 @@ class CourseRunInline(admin.TabularInline):
         "enrollment_start",
         "upgrade_deadline",
     )
-    show_change_link = True
-
-    def has_add_permission(self, *args, **kwargs):  # noqa: ARG002
-        return False
-
-    def has_change_permission(self, *args, **kwargs):  # noqa: ARG002
-        return False
-
-    def has_delete_permission(self, *args, **kwargs):  # noqa: ARG002
-        return False
+    readonly_fields = (
+        "id",
+        "title",
+        "title_linked",
+        "run_tag",
+        "language",
+        "is_primary_language",
+        "is_source_run",
+        "b2b_contract",
+        "start_date",
+        "end_date",
+        "enrollment_start",
+        "upgrade_deadline",
+    )
 
 
 @admin.register(Program)

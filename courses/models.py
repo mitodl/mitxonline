@@ -7,6 +7,7 @@ import logging
 import uuid
 from decimal import ROUND_HALF_EVEN, Decimal
 
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -15,8 +16,10 @@ from django.core.validators import MaxValueValidator, MinValueValidator, RegexVa
 from django.db import models
 from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.db.models.constraints import CheckConstraint, UniqueConstraint
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.utils.html import format_html
 from django.utils.text import slugify
 from django_countries.fields import CountryField
 from lru_method_cache import lru_method_cache
@@ -1384,6 +1387,15 @@ class CourseRun(TimestampedModel, VariantOptionsModel):
             "run by creation date is treated as primary."
         ),
     )
+
+    @property
+    @admin.display(description="Courseware ID")
+    def title_linked(self):
+        """Return the title with a link to the page"""
+
+        dj_change_url = reverse("admin:courses_courserun_change", args=(self.id,))
+
+        return format_html(f'{self.courseware_id} <a href="{dj_change_url}">Admin</a>')
 
     class Meta:
         unique_together = ("course", "courseware_id", "run_tag")
