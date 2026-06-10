@@ -101,6 +101,21 @@ class BulkAssignRequestSerializer(serializers.ListSerializer):
 
     child = AssignRevokeCodeRequestSerializer()
 
+    def to_internal_value(self, data):
+        """De-duplicate records by email, keeping the first occurrence."""
+        validated = super().to_internal_value(data)
+
+        seen_emails = set()
+        deduped = []
+        for record in validated:
+            email = record["email"].lower()
+            if email in seen_emails:
+                continue
+            seen_emails.add(email)
+            deduped.append(record)
+
+        return deduped
+
 
 class DetailErrorSerializer(serializers.Serializer):
     """Serializer for generic detail error responses (404, etc.)."""

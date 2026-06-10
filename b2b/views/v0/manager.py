@@ -549,6 +549,35 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         email_assignees = serializer.validated_data
 
+        # Emails that have already been assigned a code or have redeemed one for
+        # this contract should not receive another assignment.
+        taken_emails = set()
+        for (
+            assigned_email,
+            user_email,
+        ) in DiscountContractAttachmentRedemption.objects.filter(
+            contract=contract
+        ).values_list("assigned_email", "user__email"):
+            if assigned_email:
+                taken_emails.add(assigned_email.lower())
+            if user_email:
+                taken_emails.add(user_email.lower())
+
+        errors = [
+            {
+                "email": record["email"],
+                "name": record.get("name", ""),
+                "detail": "Email has already been assigned or has redeemed a code.",
+            }
+            for record in email_assignees
+            if record["email"].lower() in taken_emails
+        ]
+        email_assignees = [
+            record
+            for record in email_assignees
+            if record["email"].lower() not in taken_emails
+        ]
+
         available_discounts = list(
             contract.get_discounts()
             .filter(contract_redemptions__isnull=True)
@@ -556,7 +585,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         )
 
         assignments = []
-        errors = []
 
         for i, record in enumerate(email_assignees):
             email = record["email"]

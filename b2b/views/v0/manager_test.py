@@ -988,6 +988,108 @@ def test_bulk_assign_insufficient_codes(org_setup, manager_drf_client, mocker):
     assert all("No available code." in err["detail"] for err in resp_data["errors"])
 
 
+def test_bulk_assign_skips_already_assigned_or_redeemed(
+    org_setup, manager_drf_client, mocker
+):
+    """bulk_assign skips emails already assigned to or redeemed for the contract."""
+    mock_send_email = mocker.patch(
+        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    )
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:2])
+
+    # An email that has already been assigned a code.
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[0],
+        contract=contract_1,
+        assigned_email="assigned@example.com",
+    )
+    # An email belonging to a user who has redeemed a code.
+    redeemer = UserFactory.create(email="redeemed@example.com")
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[1],
+        contract=contract_1,
+        user=redeemer,
+    )
+
+    records = [
+        {"email": "assigned@example.com", "name": "Already Assigned"},
+        {"email": "REDEEMED@example.com", "name": "Already Redeemed"},
+        {"email": "fresh@example.com", "name": "Fresh Learner"},
+    ]
+
+    bulk_assign_url = reverse(
+        "b2b:b2b-manager-org-contract-bulk-assign",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    resp = manager_drf_client.post(bulk_assign_url, data=records, format="json")
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_data = resp.json()
+    assert len(resp_data["assigned"]) == 1
+    assert resp_data["assigned"][0]["assigned_to"] == "fresh@example.com"
+
+    error_emails = {err["email"] for err in resp_data["errors"]}
+    assert error_emails == {"assigned@example.com", "REDEEMED@example.com"}
+    assert all(
+        "already been assigned or has redeemed" in err["detail"]
+        for err in resp_data["errors"]
+    )
+
+    # Only the fresh learner triggers an invite email.
+    assert mock_send_email.call_count == 1
+    assert (
+        not DiscountContractAttachmentRedemption.objects.filter(
+            contract=contract_1, assigned_email="assigned@example.com"
+        )
+        .exclude(discount=discounts[0])
+        .exists()
+    )
+
+
+def test_bulk_assign_deduplicates_emails(org_setup, manager_drf_client, mocker):
+    """bulk_assign keeps only the first record for each duplicated email."""
+    mock_send_email = mocker.patch(
+        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    )
+    _, _, (contract_1, *_), *_ = org_setup
+
+    records = [
+        {"email": "dup@example.com", "name": "First"},
+        {"email": "DUP@example.com", "name": "Second"},
+        {"email": "other@example.com", "name": "Other"},
+    ]
+
+    bulk_assign_url = reverse(
+        "b2b:b2b-manager-org-contract-bulk-assign",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    resp = manager_drf_client.post(bulk_assign_url, data=records, format="json")
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_data = resp.json()
+    assert len(resp_data["assigned"]) == 2
+    assert len(resp_data["errors"]) == 0
+    assert mock_send_email.call_count == 2
+
+    assigned = DiscountContractAttachmentRedemption.objects.filter(
+        contract=contract_1, assigned_email="dup@example.com"
+    )
+    assert assigned.count() == 1
+    assert assigned.first().assigned_name == "First"
+
+
 def test_bulk_assign_invalid_request(org_setup, manager_drf_client):
     """bulk_assign returns 400 when the request body is not a list."""
     _, _, (contract_1, *_), *_ = org_setup
