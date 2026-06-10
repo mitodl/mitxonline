@@ -116,3 +116,13 @@ Error: in API GET /api/v2/programs/{id}/ the `programs/items/readable_id` respon
 Error: in API GET /api/v2/programs/{id}/ the `programs/items/title` response property's maxLength was unset from `255` for the response status `200`
 Error: in API POST /api/v2/verified_program_enrollments/{courserun_id}/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `201`
 Error: in API POST /api/v2/verified_program_enrollments/{courserun_id}/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/title` response property's maxLength was unset from `255` for the response status `201`
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/ the request's body type/format changed from `object`/`` to `array`/`` (media type: application/json)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/ the request's body type/format changed from `object`/`` to `array`/`` (media type: application/x-www-form-urlencoded)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/ the request's body type/format changed from `object`/`` to `array`/`` (media type: multipart/form-data)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/ added the new required request property `email` (media type: application/json)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/ added the new required request property `email` (media type: multipart/form-data)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/ added the new required request property `email` (media type: application/x-www-form-urlencoded)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: application/x-www-form-urlencoded)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: multipart/form-data)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: application/json)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ api removed without deprecation
