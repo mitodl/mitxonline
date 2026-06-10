@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.153.0
+Version 1.153.0 (Released June 10, 2026)
 ---------------
 
 - fix: create program enrollment when B2B user enrolls in a course run (#3650)
