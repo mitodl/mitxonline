@@ -190,6 +190,7 @@ class TestImportCourserunCommand:
             "courses.api.get_edx_api_course_detail_client",
             return_value=mock_edx_api_client,
         )
+        mocker.patch("courses.api.get_edx_course_modes", return_value=[])
         std_out = StringIO()
         std_err = StringIO()
 
@@ -228,6 +229,7 @@ class TestImportCourserunCommand:
             "courses.api.get_edx_api_course_detail_client",
             return_value=mock_edx_api_client,
         )
+        mocker.patch("courses.api.get_edx_course_modes", return_value=[])
 
         if valid_variant:
             course = CourseFactory.create(readable_id="course-v1:MITx+6.00x")
