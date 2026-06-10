@@ -2887,7 +2887,9 @@ def test_import_courserun_from_edx_pulls_enrollment_modes(settings):
             departments=[department],
         )
 
-    assert courserun.enrollment_modes.filter(mode_slug=EDX_ENROLLMENT_AUDIT_MODE).exists()
+    assert courserun.enrollment_modes.filter(
+        mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+    ).exists()
     assert courserun.enrollment_modes.filter(
         mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
     ).exists()
