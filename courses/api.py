@@ -1576,6 +1576,8 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         variant_length=variant_length,
     )
 
+    pull_course_modes(new_run)
+
     course_page = None
     if create_cms_page and not use_specific_course:
         course_page = create_default_courseware_page(

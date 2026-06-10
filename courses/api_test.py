@@ -2685,20 +2685,38 @@ def _run_test_import_courserun_from_edx(  # noqa: PLR0913
         status=status.HTTP_200_OK,
     )
 
-    (courserun, page, product) = import_courserun_from_edx(
-        course_key=test_course_run_key,
-        live=live,
-        use_specific_course=use_specific_course,
-        create_depts=create_depts,
-        block_countries=block_countries,
-        price=price,
-        create_cms_page=create_cms_page,
-        publish_cms_page=publish_cms_page,
-        include_in_learn_catalog=include_in_learn_catalog,
-        ingest_content_files_for_ai=ingest_content_files_for_ai,
-        is_source_run=is_source_run,
-        departments=[department],
-    )  # pyright: ignore[reportGeneralTypeIssues]
+    pulled_modes = [
+        CourseMode(
+            {
+                "course_id": test_course_run_key,
+                "mode_slug": EDX_ENROLLMENT_AUDIT_MODE,
+                "mode_display_name": "Audit",
+            }
+        ),
+        CourseMode(
+            {
+                "course_id": test_course_run_key,
+                "mode_slug": EDX_ENROLLMENT_VERIFIED_MODE,
+                "mode_display_name": "Verified",
+            }
+        ),
+    ]
+
+    with patch("courses.api.get_edx_course_modes", return_value=pulled_modes):
+        (courserun, page, product) = import_courserun_from_edx(
+            course_key=test_course_run_key,
+            live=live,
+            use_specific_course=use_specific_course,
+            create_depts=create_depts,
+            block_countries=block_countries,
+            price=price,
+            create_cms_page=create_cms_page,
+            publish_cms_page=publish_cms_page,
+            include_in_learn_catalog=include_in_learn_catalog,
+            ingest_content_files_for_ai=ingest_content_files_for_ai,
+            is_source_run=is_source_run,
+            departments=[department],
+        )  # pyright: ignore[reportGeneralTypeIssues]
 
     assert courserun.courseware_id == test_course_run_key
     assert (
@@ -2823,6 +2841,89 @@ def test_import_courserun_from_edx_specific_course_pages(  # noqa: PLR0913
         ingest_content_files_for_ai=ingest_content_files_for_ai,
         is_source_run=False,
     )
+
+
+@responses.activate
+def test_import_courserun_from_edx_pulls_enrollment_modes(settings):
+    """Imported course runs should store enrollment modes from edX."""
+    test_course_key = "course-v1:MITxT+123.45"
+    test_course_run_key = f"{test_course_key}+2T2022"
+    mocked_detail = _mock_edx_course_detail(test_course_run_key, settings)
+    department = DepartmentFactory.create()
+
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}/",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+
+    audit_mode = CourseMode(
+        {
+            "course_id": test_course_run_key,
+            "mode_slug": "audit",
+            "mode_display_name": "Audit",
+        }
+    )
+    verified_mode = CourseMode(
+        {
+            "course_id": test_course_run_key,
+            "mode_slug": "verified",
+            "mode_display_name": "Verified",
+        }
+    )
+
+    with patch(
+        "courses.api.get_edx_course_modes", return_value=[audit_mode, verified_mode]
+    ):
+        courserun, _page, _product = import_courserun_from_edx(
+            course_key=test_course_run_key,
+            live=True,
+            create_depts=False,
+            departments=[department],
+        )
+
+    assert courserun.enrollment_modes.filter(mode_slug=EDX_ENROLLMENT_AUDIT_MODE).exists()
+    assert courserun.enrollment_modes.filter(
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
+    ).exists()
+
+
+@responses.activate
+def test_import_courserun_from_edx_calls_pull_course_modes(settings, mocker):
+    """Import should invoke enrollment mode sync for the new course run."""
+    test_course_key = "course-v1:MITxT+123.45"
+    test_course_run_key = f"{test_course_key}+2T2022"
+    mocked_detail = _mock_edx_course_detail(test_course_run_key, settings)
+    department = DepartmentFactory.create()
+
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}/",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+    responses.get(
+        url=f"{settings.OPENEDX_API_BASE_URL}/api/courses/v1/courses/{test_course_run_key}",
+        json=mocked_detail,
+        status=status.HTTP_200_OK,
+    )
+
+    mocked_pull_course_modes = mocker.patch(
+        "courses.api.pull_course_modes", return_value=([], 0)
+    )
+
+    courserun, _page, _product = import_courserun_from_edx(
+        course_key=test_course_run_key,
+        live=True,
+        create_depts=False,
+        departments=[department],
+    )
+
+    mocked_pull_course_modes.assert_called_once_with(courserun)
 
 
 @pytest.mark.parametrize(
