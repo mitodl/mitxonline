@@ -27,6 +27,7 @@ from b2b.models import (
     OrganizationPage,
 )
 from b2b.serializers.v0 import (
+    B2BEnrollRequestSerializer,
     ContractPageSerializer,
     CreateB2BEnrollmentSerializer,
     OrganizationPageSerializer,
@@ -147,7 +148,7 @@ class Enroll(APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        request=None,
+        request=B2BEnrollRequestSerializer,
         responses=CreateB2BEnrollmentSerializer,
     )
     @csrf_exempt
@@ -162,7 +163,12 @@ class Enroll(APIView):
             content_type=course_run_content_type, object_id=courserun.id
         ).get()
 
-        response = create_b2b_enrollment(request, product)
+        # Parse optional program_id from request body
+        request_serializer = B2BEnrollRequestSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        program_id = request_serializer.validated_data.get("program_id")
+
+        response = create_b2b_enrollment(request, product, program_id=program_id)
 
         return Response(
             CreateB2BEnrollmentSerializer(response).data,

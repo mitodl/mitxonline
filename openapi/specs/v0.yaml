@@ -221,6 +221,17 @@ paths:
         required: true
       tags:
       - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/B2BEnrollRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/B2BEnrollRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/B2BEnrollRequestRequest'
       responses:
         '200':
           content:
@@ -3882,6 +3893,17 @@ components:
       x-enum-descriptions:
       - anytime
       - dated
+    B2BEnrollRequestRequest:
+      type: object
+      description: |-
+        Serializer for the B2B enrollment request body.
+
+        Accepts an optional program_id so the user can be enrolled in the
+        appropriate program alongside the course run enrollment.
+      properties:
+        program_id:
+          type: string
+          description: The readable_id of the program to enroll the user in.
     BaseContractPage:
       type: object
       description: Simplified serializer for the ContractPage model.

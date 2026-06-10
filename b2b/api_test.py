@@ -19,6 +19,7 @@ from opaque_keys.edx.keys import CourseKey
 from b2b import factories
 from b2b.api import (
     _apply_available_discount,
+    _enroll_in_program_for_b2b,
     _get_source_runs_for_course,
     _handle_extra_enrollment_codes,
     _validate_b2b_enrollment_prerequisites,
@@ -46,15 +47,21 @@ from b2b.constants import (
 )
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
-from b2b.models import OrganizationIndexPage, OrganizationPage, UserOrganization
+from b2b.models import (
+    ContractProgramItem,
+    OrganizationIndexPage,
+    OrganizationPage,
+    UserOrganization,
+)
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     DepartmentFactory,
+    ProgramFactory,
 )
-from courses.models import CourseRunEnrollment
+from courses.models import CourseRunEnrollment, ProgramEnrollment
 from ecommerce.api_test import create_basket
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, REDEMPTION_TYPE_UNLIMITED
 from ecommerce.factories import (
@@ -530,6 +537,47 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
         assert my_run.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     else:
         assert result["result"] == USER_MSG_TYPE_B2B_DISALLOWED
+
+
+@pytest.mark.parametrize(
+    ("program_in_contract", "program_exists"),
+    [
+        (True, True),
+        (False, True),
+        (True, False),
+    ],
+)
+def test_enroll_in_program_for_b2b(program_in_contract, program_exists):
+    """
+    Test _enroll_in_program_for_b2b creates a ProgramEnrollment when valid.
+
+    Should create a ProgramEnrollment only when the program exists and belongs
+    to the same contract as the course run. Should skip gracefully otherwise.
+    """
+    contract = factories.ContractPageFactory.create(
+        integration_type=CONTRACT_MEMBERSHIP_SSO,
+        membership_type=CONTRACT_MEMBERSHIP_SSO,
+    )
+    program = ProgramFactory.create() if program_exists else None
+    program_id = program.readable_id if program else "nonexistent-program"
+
+    if program_in_contract and program_exists:
+        ContractProgramItem.objects.create(
+            contract=contract, program=program, sort_order=0
+        )
+
+    user = UserFactory.create()
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course, b2b_contract=contract)
+
+    product = ProductFactory.create(purchasable_object=run)
+
+    _enroll_in_program_for_b2b(user, product, program_id)
+
+    if program_in_contract and program_exists:
+        assert ProgramEnrollment.objects.filter(user=user, program=program).exists()
+    else:
+        assert ProgramEnrollment.objects.filter(user=user).count() == 0
 
 
 @pytest.mark.parametrize(

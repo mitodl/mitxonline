@@ -1292,7 +1292,7 @@ def _apply_available_discount(request, product: Product, basket: Basket) -> None
     basket_discount.save()
 
 
-def create_b2b_enrollment(request, product: Product):
+def create_b2b_enrollment(request, product: Product, program_id: str | None = None):
     """
     Create a B2B enrollment for the given product for the current user.
 
@@ -1316,6 +1316,7 @@ def create_b2b_enrollment(request, product: Product):
     Args:
     - request: The HTTP request object containing the user and basket data.
     - product: The Product object representing the B2B product to enroll in.
+    - program_id: Optional readable_id of the program to enroll the user in.
     Returns: a dict containing
     - "result": the result of the attempt; one of the USER_MSG_TYPE_B2B constants.
     - "order": the order ID if the enrollment was successful and no checkout is needed.
@@ -1343,6 +1344,10 @@ def create_b2b_enrollment(request, product: Product):
         response = generate_checkout_payload(request)
 
         if "no_checkout" in response:
+            # Course run enrollment succeeded - now handle program enrollment
+            if program_id:
+                _enroll_in_program_for_b2b(request.user, product, program_id)
+
             return {
                 "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
                 "order": response["order_id"],
@@ -1358,6 +1363,55 @@ def create_b2b_enrollment(request, product: Product):
         "result": main_constants.USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
         "price": basket_price,
     }
+
+
+def _enroll_in_program_for_b2b(user, product: Product, program_id: str):
+    """
+    Enroll the user in the specified program as part of a B2B course enrollment.
+
+    Validates that the program belongs to the same contract as the course run
+    being enrolled in, then creates a ProgramEnrollment if one doesn't exist.
+
+    Args:
+    - user: The user to enroll.
+    - product: The Product for the course run being enrolled in.
+    - program_id: The readable_id of the program to enroll in.
+    """
+    from courses.api import create_program_enrollments  # noqa: PLC0415
+    from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE  # noqa: PLC0415
+
+    purchasable_object = product.purchasable_object
+    contract = purchasable_object.b2b_contract
+
+    try:
+        program = Program.objects.get(readable_id=program_id)
+    except Program.DoesNotExist:
+        log.warning(
+            "B2B enroll: program %s not found, skipping program enrollment",
+            program_id,
+        )
+        return
+
+    # Validate the program belongs to the same contract as the course run
+    if not ContractProgramItem.objects.filter(
+        contract=contract, program=program
+    ).exists():
+        log.warning(
+            "B2B enroll: program %s is not in contract %s, skipping program enrollment",
+            program_id,
+            contract,
+        )
+        return
+
+    create_program_enrollments(
+        user, [program], enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    log.info(
+        "B2B enroll: created program enrollment for user %s in program %s",
+        user,
+        program_id,
+    )
 
 
 def reconcile_user_orgs(user, organizations):

@@ -140,6 +140,21 @@ class GenerateCheckoutPayloadSerializer(serializers.Serializer):
     )
 
 
+class B2BEnrollRequestSerializer(serializers.Serializer):
+    """
+    Serializer for the B2B enrollment request body.
+
+    Accepts an optional program_id so the user can be enrolled in the
+    appropriate program alongside the course run enrollment.
+    """
+
+    program_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="The readable_id of the program to enroll the user in.",
+    )
+
+
 class CreateB2BEnrollmentSerializer(serializers.Serializer):
     """
     Serializer for the result from create_b2b_enrollment.
