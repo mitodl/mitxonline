@@ -217,6 +217,32 @@ class CourseRunFactory(DjangoModelFactory):
             start_date=factory.Faker("future_datetime", tzinfo=ZoneInfo("UTC")),
             end_date=None,
         )
+        completed = factory.Trait(
+            start_date=factory.Faker(
+                "date_time_between",
+                start_date="-3m",
+                end_date="-2m",
+                tzinfo=ZoneInfo("UTC"),
+            ),
+            end_date=factory.Faker(
+                "date_time_between",
+                start_date="-1m",
+                end_date="now",
+                tzinfo=ZoneInfo("UTC"),
+            ),
+            enrollment_start=factory.Faker(
+                "date_time_between",
+                start_date="-4m",
+                end_date="-3m",
+                tzinfo=ZoneInfo("UTC"),
+            ),
+            enrollment_end=factory.Faker(
+                "date_time_between",
+                start_date="-1m",
+                end_date="-10d",
+                tzinfo=ZoneInfo("UTC"),
+            ),
+        )
 
 
 NODE_TYPES = [x[0] for x in ProgramRequirementNodeType.choices]

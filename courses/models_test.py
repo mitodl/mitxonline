@@ -1664,3 +1664,18 @@ def test_run_language_constraints_regular_languages(set_language_field, set_prim
             ).count()
             == 4
         )
+
+
+def test_nonvariant_filter():
+    """Test that the nonvariant filter in CourseRunQuerySet works as expected."""
+
+    cr1 = CourseRunFactory.create()
+    CourseRunFactory.create(course=cr1.course, variant_industry="HC")
+    CourseRunFactory.create(course=cr1.course, variant_length="S")
+    CourseRunFactory.create(course=cr1.course, language="fr")
+    CourseRunFactory.create(course=cr1.course, language="pt", variant_industry="HC")
+
+    assert CourseRun.objects.filter(course=cr1.course).count() == 5
+    assert CourseRun.objects.filter(course=cr1.course).nonvariant().count() == 2
+    assert CourseRun.all_objects.filter(course=cr1.course).count() == 5
+    assert CourseRun.all_objects.filter(course=cr1.course).nonvariant().count() == 2
