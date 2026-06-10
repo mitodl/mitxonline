@@ -271,27 +271,19 @@ def _create_source_variant_runs(course, *, b2b_only=True):
         is_primary_language=True,
     )
     variant_sources.append(primary_source_run)
+    psr_fields = primary_source_run.__dict__
+    del psr_fields["_state"]
 
     for variant in variants[1:]:
         (lang, vind, vlen) = variant
+
         source_run = CourseRunFactory.create(
-            course=course,
-            is_source_run=True,
-            run_tag=primary_source_run.run_tag,
+            **psr_fields,
             courseware_id=f"{primary_source_run.courseware_id}_{lang}_{vind}_{vlen}",
             language=lang,
             is_primary_language=False,
             variant_industry=vind,
             variant_length=vlen,
-            start_date=primary_source_run.start_date,
-            end_date=primary_source_run.end_date,
-            enrollment_start=primary_source_run.enrollment_start,
-            enrollment_end=primary_source_run.enrollment_end,
-            certificate_available_date=primary_source_run.certificate_available_date,
-            expiration_date=primary_source_run.expiration_date,
-            upgrade_deadline=primary_source_run.upgrade_deadline,
-            live=primary_source_run.live,
-            is_self_paced=primary_source_run.is_self_paced,
         )
         variant_sources.append(source_run)
 
@@ -320,7 +312,7 @@ def _create_b2b_run_from_source(contract, source_run, run_tag_prefix):
 @pytest.fixture
 def b2b_courses(fake, course_catalog_data):
     """Configure some of the courses as b2b"""
-    _, _, runs = course_catalog_data
+    courses, _, runs = course_catalog_data
     organizations = OrganizationPageFactory.create_batch(3)
     contracts = []
     contracts_by_org_id = {}
@@ -332,6 +324,8 @@ def b2b_courses(fake, course_catalog_data):
         org_contracts = ContractPageFactory.create_batch(3)
         contracts_by_org_id[org.id] = org_contracts
         contracts.extend(org_contracts)
+
+    [_create_source_variant_runs(course) for course in courses]
 
     for run in fake.random_sample(runs, length=ceil(len(runs) * 0.5)):
         contract = fake.random_element(elements=contracts)
