@@ -529,8 +529,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        # Just send the email reminder, no need to do anything else.
+        # Just send the email reminder and update the last sent timestamp
         send_enrollment_code_assignment_email(assignment_record, code)
+        assignment_record.last_reminder_sent_on = now_in_utc()
+        assignment_record.save()
 
         # Set prefetched_redemptions so the serializer returns the current assignment status.
         discount.prefetched_redemptions = [assignment_record]
