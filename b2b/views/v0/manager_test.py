@@ -709,9 +709,7 @@ def test_revoke_code(org_setup, manager_drf_client):
         },
     )
 
-    resp = manager_drf_client.post(
-        revoke_url, data={"email": "assignee@example.com"}, format="json"
-    )
+    resp = manager_drf_client.delete(revoke_url)
 
     assert resp.status_code == status.HTTP_200_OK
     assert not DiscountContractAttachmentRedemption.objects.filter(
@@ -721,26 +719,6 @@ def test_revoke_code(org_setup, manager_drf_client):
     resp_data = resp.json()
     assert resp_data["code"] == discount.discount_code
     assert resp_data["redemption_status"] == REDEMPTION_STATUS_UNASSIGNED
-
-
-def test_revoke_code_invalid_request(org_setup, manager_drf_client):
-    """revoke_code returns 400 when the request body is missing the required email field."""
-    _, _, (contract_1, *_), *_ = org_setup
-
-    discount = contract_1.get_discounts().order_by("id").first()
-
-    revoke_url = reverse(
-        "b2b:b2b-manager-org-contract-revoke-code",
-        kwargs={
-            "parent_lookup_organization": contract_1.organization.id,
-            "pk": contract_1.id,
-            "code": discount.discount_code,
-        },
-    )
-
-    resp = manager_drf_client.post(revoke_url, data={"name": "No Email"}, format="json")
-
-    assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_revoke_code_not_found(org_setup, manager_drf_client):
@@ -756,15 +734,13 @@ def test_revoke_code_not_found(org_setup, manager_drf_client):
         },
     )
 
-    resp = manager_drf_client.post(
-        revoke_url, data={"email": "learner@example.com"}, format="json"
-    )
+    resp = manager_drf_client.delete(revoke_url)
 
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_revoke_code_assignment_not_found(org_setup, manager_drf_client):
-    """revoke_code returns 404 when no assignment exists for the supplied email."""
+    """revoke_code returns 404 when the code has no assignment."""
     _, _, (contract_1, *_), *_ = org_setup
 
     discount = contract_1.get_discounts().order_by("id").first()
@@ -778,9 +754,7 @@ def test_revoke_code_assignment_not_found(org_setup, manager_drf_client):
         },
     )
 
-    resp = manager_drf_client.post(
-        revoke_url, data={"email": "nobody@example.com"}, format="json"
-    )
+    resp = manager_drf_client.delete(revoke_url)
 
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
@@ -800,9 +774,7 @@ def test_revoke_code_forbidden(org_setup, manager_drf_client):
         },
     )
 
-    resp = manager_drf_client.post(
-        revoke_url, data={"email": "learner@example.com"}, format="json"
-    )
+    resp = manager_drf_client.delete(revoke_url)
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
 

@@ -195,7 +195,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         # own viewset as long as we can keep the URL structure the same.
         if self.action in (
             "assign_code",
-            "revoke_code",
             "send_reminder_for_code_assignment",
         ):
             return AssignRevokeCodeRequestSerializer
@@ -400,10 +399,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         description="Revoke the assignment for a specific enrollment code, returning it to the unassigned pool.",
-        request=AssignRevokeCodeRequestSerializer,
+        request=None,
         responses={
             200: ManagerEnrollmentCodeSerializer,
-            400: DetailErrorSerializer,
             404: DetailErrorSerializer,
         },
         parameters=[
@@ -418,35 +416,19 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     )
     @action(
         detail=True,
-        methods=["post"],
+        methods=["delete"],
         url_path="codes/(?P<code>[^/.]+)/revoke",
     )
-    def revoke_code(self, request, **kwargs):
+    def revoke_code(self, request, **kwargs):  # noqa: ARG002
         """
         Revoke the assignment for a specific enrollment code.
 
-        POST /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/revoke/
-        """
+        DELETE /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/revoke/
 
+        Removes the DiscountContractAttachmentRedemption record for the specified code.
         """
-            This endpoint removes the DiscountContractAttachmentRedemption record for the specified code and email address.
-        """
-        # Need to decide if we want to keep this a POST or not. It's not a restful DELETE operation, but it might still be less confusing that way
-        # Also decide if we want to take a name and email - we don't need it technically since these should be unique per code.
-
-        # This will probably need revision in the future. Revoking a code doesn't do anything right now, but we might want to
-        # burn a code if it's revoked - this will require product input. This only affects the display on the dash for now.
         contract = self.get_object()
         code = kwargs.get("code")
-
-        serializer = AssignRevokeCodeRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(
-                {"detail": "Invalid request data."},
-                status=http_status.HTTP_400_BAD_REQUEST,
-            )
-
-        email = serializer.validated_data["email"]
 
         discount = contract.get_discounts().filter(discount_code=code).first()
         if not discount:
@@ -455,16 +437,13 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        assignment_record = discount.contract_redemptions.filter(
-            assigned_email=email
-        ).first()
+        assignment_record = discount.contract_redemptions.first()
         if not assignment_record:
             return Response(
-                {"detail": "Assignment for email does not exist"},
+                {"detail": "No assignment exists for this code."},
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        # Need to determine if we need to do other cleanup here.
         assignment_record.delete()
 
         return Response(
