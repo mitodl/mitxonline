@@ -23,7 +23,6 @@
   "courses/serializers/v2/courses.py:398:18:ORM001",
   "courses/serializers/v2/departments.py:35:40:ORM002",
   "courses/serializers/v2/departments.py:49:42:ORM002",
-  "courses/serializers/v2/programs.py:324:36:ORM002",
   "courses/serializers/v2/programs.py:344:20:ORM002",
   "courses/serializers/v2/programs.py:476:53:ORM002",
   "courses/serializers/v2/programs.py:480:53:ORM002",
