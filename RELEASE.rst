@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.153.0
+---------------
+
+- fix: create program enrollment when B2B user enrolls in a course run (#3650)
+- Validate MIN_NUMBER_OF operator values (#3531)
+- Removes ORM warning in the program serializer (#3642)
+- Increase QoL for some B2B things (#3653)
+
 Version 1.152.1 (Released June 09, 2026)
 ---------------
 
