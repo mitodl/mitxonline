@@ -566,18 +566,18 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
-        records = serializer.validated_data
+        email_assignees = serializer.validated_data
 
         available_discounts = list(
             contract.get_discounts()
             .filter(contract_redemptions__isnull=True)
-            .order_by("id")[: len(records)]
+            .order_by("id")[: len(email_assignees)]
         )
 
         assignments = []
         errors = []
 
-        for i, record in enumerate(records):
+        for i, record in enumerate(email_assignees):
             email = record["email"]
             name = record.get("name", "")
 
