@@ -45,26 +45,25 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Filter to organizations where the user is a manager."""
 
-        org_qset = OrganizationPage.objects.prefetch_related(
-            Prefetch(
-                "contracts",
-                queryset=ContractPage.objects.prefetch_related(
-                    Prefetch(
-                        "contract_programs",
-                        queryset=ContractProgramItem.objects.order_by("sort_order"),
-                        to_attr="contract_program_ids",
-                    )
-                ).filter(active=True),
-                to_attr="_active_contracts",
-            ),
-        )
         return (
-            org_qset.distinct()
-            if self.request.user and self.request.user.is_superuser
-            else org_qset.filter(
+            OrganizationPage.objects.prefetch_related(
+                Prefetch(
+                    "contracts",
+                    queryset=ContractPage.objects.prefetch_related(
+                        Prefetch(
+                            "contract_programs",
+                            queryset=ContractProgramItem.objects.order_by("sort_order"),
+                            to_attr="contract_program_ids",
+                        )
+                    ).filter(active=True),
+                    to_attr="_active_contracts",
+                ),
+            )
+            .filter(
                 organization_users__user=self.request.user,
                 organization_users__is_manager=True,
-            ).distinct()
+            )
+            .distinct()
         )
 
     @extend_schema(
