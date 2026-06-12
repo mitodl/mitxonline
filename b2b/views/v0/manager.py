@@ -19,7 +19,6 @@ from rest_framework.response import Response
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
-from b2b.mail import send_enrollment_code_assignment_email
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
@@ -41,6 +40,7 @@ from b2b.serializers.v0.manager import (
     ManagerEnrollmentCodeSerializer,
     ManagerEnrollmentSerializer,
 )
+from b2b.tasks import queue_send_enrollment_code_assignment_email
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
 
@@ -66,7 +66,7 @@ def assign_codes_and_send_emails(
         # There aren't any meaningful database constraints that would bite us.
         # We may need to reevaluate that as the feature set around these records grows.
         now = now_in_utc()
-        assignment_record = DiscountContractAttachmentRedemption.objects.create(
+        assignment_record = DiscountContractAttachmentRedemption(
             discount=assignment.discount,
             contract=assignment.contract,
             assigned_email=assignment.email,
@@ -87,9 +87,9 @@ def assign_codes_and_send_emails(
         log.exception("Error creating code assignments")
         return False
 
-    for assignment in assignments:
-        assignment_record = assignment.discount.prefetched_redemptions
-        send_enrollment_code_assignment_email(assignment_record, assignment.code)
+    queue_send_enrollment_code_assignment_email.delay(
+        [record.id for record in assignment_records]
+    )
 
     return True
 
@@ -531,7 +531,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
 
         # Just send the email reminder and update the last sent timestamp
-        send_enrollment_code_assignment_email(assignment_record, code)
+        queue_send_enrollment_code_assignment_email([assignment_record.id]).delay()
         assignment_record.last_reminder_sent_on = now_in_utc()
         assignment_record.save()
 
