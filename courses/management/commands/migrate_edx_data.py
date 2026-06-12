@@ -304,7 +304,9 @@ class Command(BaseCommand):
             )
 
     @staticmethod
-    def _bulk_create_user_profiles(created_users, row_lookup_by_id, batch_size, gender_map):
+    def _bulk_create_user_profiles(
+        created_users, row_lookup_by_id, batch_size, gender_map
+    ):
         """
         Create user profiles in bulk for the given users.
 
