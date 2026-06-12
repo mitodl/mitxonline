@@ -205,59 +205,6 @@ class ProgramSerializer(serializers.ModelSerializer):
                         "required": {
                             "type": "array",
                             "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of required course IDs",
-                        },
-                        "electives": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of elective course IDs",
-                        },
-                    },
-                },
-                "programs": {
-                    "type": "object",
-                    "properties": {
-                        "required": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of required program IDs",
-                        },
-                        "electives": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of elective program IDs",
-                        },
-                    },
-                },
-            },
-        }
-    )
-    @extend_schema_field(
-        {
-            "type": "object",
-            "properties": {
-                "courses": {
-                    "type": "object",
-                    "properties": {
-                        "required": {
-                            "type": "array",
-                            "items": {
                                 "type": "object",
                                 "properties": {
                                     "id": {"type": "integer"},
