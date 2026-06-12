@@ -820,7 +820,11 @@ class Command(BaseCommand):
                 )
                 continue
 
-            all_user_ids = {row["user_mitxonline_id"] for row in rows if row.get("user_mitxonline_id")}
+            all_user_ids = {
+                row["user_mitxonline_id"]
+                for row in rows
+                if row.get("user_mitxonline_id")
+            }
             verified_user_ids = {row["user_mitxonline_id"] for row in verified_rows}
             existing_enrollments = {
                 (uid, rid): mode
