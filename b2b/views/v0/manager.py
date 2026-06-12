@@ -482,7 +482,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         request=None,
         responses={
             200: ManagerEnrollmentCodeSerializer,
-            400: DetailErrorSerializer,
             404: DetailErrorSerializer,
         },
         parameters=[
@@ -524,7 +523,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
 
         # Just send the email reminder and update the last sent timestamp
-        queue_send_enrollment_code_assignment_email([assignment_record.id]).delay()
+        queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
         assignment_record.last_reminder_sent_on = now_in_utc()
         assignment_record.save()
 

@@ -529,8 +529,8 @@ def test_org_contract_codes_redeemed_by_differs_from_assigned_to(
 
 def test_assign_code(org_setup, manager_drf_client, mocker):
     """A manager can assign an unassigned code to an email address."""
-    mock_send_email = mocker.patch(
-        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    mock_task = mocker.patch(
+        "b2b.views.v0.manager.queue_send_enrollment_code_assignment_email"
     )
     _, _, (contract_1, *_), *_ = org_setup
 
@@ -558,7 +558,7 @@ def test_assign_code(org_setup, manager_drf_client, mocker):
         discount=discount, assigned_email="learner@example.com"
     )
     assert redemption.assigned_name == "Test Learner"
-    mock_send_email.assert_called_once_with(redemption, code)
+    mock_task.delay.assert_called_once_with([redemption.id])
 
     resp_data = resp.json()
     assert resp_data["code"] == code
@@ -569,7 +569,7 @@ def test_assign_code(org_setup, manager_drf_client, mocker):
 
 def test_assign_code_name_defaults_to_empty(org_setup, manager_drf_client, mocker):
     """Assigning a code without a name stores an empty string for assigned_name."""
-    mocker.patch("b2b.views.v0.manager.send_enrollment_code_assignment_email")
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
     _, _, (contract_1, *_), *_ = org_setup
 
     discount = contract_1.get_discounts().order_by("id").first()
@@ -633,9 +633,8 @@ def test_assign_code_not_found(org_setup, manager_drf_client):
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
 
-def test_assign_code_already_assigned(org_setup, manager_drf_client, mocker):
+def test_assign_code_already_assigned(org_setup, manager_drf_client):
     """assign_code returns 409 when the code already has a redemption record."""
-    mocker.patch("b2b.views.v0.manager.send_enrollment_code_assignment_email")
     _, _, (contract_1, *_), *_ = org_setup
 
     discount = contract_1.get_discounts().order_by("id").first()
@@ -681,6 +680,33 @@ def test_assign_code_forbidden(org_setup, manager_drf_client):
     )
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_assign_code_internal_error(org_setup, manager_drf_client, mocker):
+    """assign_code returns 500 when the assignment DB operation fails."""
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
+    mocker.patch(
+        "b2b.views.v0.manager.assign_codes_and_send_emails", return_value=False
+    )
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    assign_url = reverse(
+        "b2b:b2b-manager-org-contract-assign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        assign_url, data={"email": "learner@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert "detail" in resp.json()
 
 
 # ---------------------------------------------------------------------------
@@ -759,6 +785,37 @@ def test_revoke_code_assignment_not_found(org_setup, manager_drf_client):
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
 
+def test_revoke_code_already_redeemed(org_setup, manager_drf_client):
+    """revoke_code returns 409 when the code has already been redeemed by a user."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    redeemer = UserFactory.create()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="assignee@example.com",
+        user=redeemer,
+    )
+
+    revoke_url = reverse(
+        "b2b:b2b-manager-org-contract-revoke-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.delete(revoke_url)
+
+    assert resp.status_code == status.HTTP_409_CONFLICT
+    assert "detail" in resp.json()
+    assert DiscountContractAttachmentRedemption.objects.filter(
+        discount=discount, user=redeemer
+    ).exists()
+
+
 def test_revoke_code_forbidden(org_setup, manager_drf_client):
     """A manager cannot revoke codes in a contract belonging to an org they don't manage."""
     _, _, *_, (contract_3, *_) = org_setup
@@ -786,8 +843,8 @@ def test_revoke_code_forbidden(org_setup, manager_drf_client):
 
 def test_send_reminder_for_code_assignment(org_setup, manager_drf_client, mocker):
     """A manager can send a reminder email for an assigned but unclaimed code."""
-    mock_send_email = mocker.patch(
-        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    mock_task = mocker.patch(
+        "b2b.views.v0.manager.queue_send_enrollment_code_assignment_email"
     )
     _, _, (contract_1, *_), *_ = org_setup
 
@@ -807,36 +864,14 @@ def test_send_reminder_for_code_assignment(org_setup, manager_drf_client, mocker
         },
     )
 
-    resp = manager_drf_client.post(
-        remind_url, data={"email": "assignee@example.com"}, format="json"
-    )
+    resp = manager_drf_client.post(remind_url, format="json")
 
     assert resp.status_code == status.HTTP_200_OK
-    mock_send_email.assert_called_once_with(redemption, discount.discount_code)
+    mock_task.delay.assert_called_once_with([redemption.id])
 
     resp_data = resp.json()
     assert resp_data["code"] == discount.discount_code
     assert resp_data["redemption_status"] == REDEMPTION_STATUS_ASSIGNED
-
-
-def test_send_reminder_invalid_request(org_setup, manager_drf_client):
-    """send_reminder returns 400 when the request body is missing the required email field."""
-    _, _, (contract_1, *_), *_ = org_setup
-
-    discount = contract_1.get_discounts().order_by("id").first()
-
-    remind_url = reverse(
-        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
-        kwargs={
-            "parent_lookup_organization": contract_1.organization.id,
-            "pk": contract_1.id,
-            "code": discount.discount_code,
-        },
-    )
-
-    resp = manager_drf_client.post(remind_url, data={}, format="json")
-
-    assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_send_reminder_code_not_found(org_setup, manager_drf_client):
@@ -910,8 +945,8 @@ def test_send_reminder_forbidden(org_setup, manager_drf_client):
 
 def test_bulk_assign(org_setup, manager_drf_client, mocker):
     """A manager can bulk-assign codes, getting one code per submitted record."""
-    mock_send_email = mocker.patch(
-        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    mock_task = mocker.patch(
+        "b2b.views.v0.manager.queue_send_enrollment_code_assignment_email"
     )
     _, _, (contract_1, *_), *_ = org_setup
 
@@ -936,7 +971,7 @@ def test_bulk_assign(org_setup, manager_drf_client, mocker):
     resp_data = resp.json()
     assert len(resp_data["assigned"]) == 3
     assert len(resp_data["errors"]) == 0
-    assert mock_send_email.call_count == 3
+    mock_task.delay.assert_called_once()
 
     assigned_emails = {code["assigned_to"] for code in resp_data["assigned"]}
     assert assigned_emails == {
@@ -960,7 +995,7 @@ def test_bulk_assign(org_setup, manager_drf_client, mocker):
 
 def test_bulk_assign_insufficient_codes(org_setup, manager_drf_client, mocker):
     """bulk_assign reports errors for records that exceed the number of available codes."""
-    mocker.patch("b2b.views.v0.manager.send_enrollment_code_assignment_email")
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
     _, _, _, (contract_2, *_), *_ = org_setup
 
     available_count = (
@@ -992,8 +1027,8 @@ def test_bulk_assign_skips_already_assigned_or_redeemed(
     org_setup, manager_drf_client, mocker
 ):
     """bulk_assign skips emails already assigned to or redeemed for the contract."""
-    mock_send_email = mocker.patch(
-        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    mock_task = mocker.patch(
+        "b2b.views.v0.manager.queue_send_enrollment_code_assignment_email"
     )
     _, _, (contract_1, *_), *_ = org_setup
 
@@ -1043,7 +1078,7 @@ def test_bulk_assign_skips_already_assigned_or_redeemed(
     )
 
     # Only the fresh learner triggers an invite email.
-    assert mock_send_email.call_count == 1
+    mock_task.delay.assert_called_once()
     assert (
         not DiscountContractAttachmentRedemption.objects.filter(
             contract=contract_1, assigned_email="assigned@example.com"
@@ -1055,8 +1090,8 @@ def test_bulk_assign_skips_already_assigned_or_redeemed(
 
 def test_bulk_assign_deduplicates_emails(org_setup, manager_drf_client, mocker):
     """bulk_assign keeps only the first record for each duplicated email."""
-    mock_send_email = mocker.patch(
-        "b2b.views.v0.manager.send_enrollment_code_assignment_email"
+    mock_task = mocker.patch(
+        "b2b.views.v0.manager.queue_send_enrollment_code_assignment_email"
     )
     _, _, (contract_1, *_), *_ = org_setup
 
@@ -1081,7 +1116,7 @@ def test_bulk_assign_deduplicates_emails(org_setup, manager_drf_client, mocker):
     resp_data = resp.json()
     assert len(resp_data["assigned"]) == 2
     assert len(resp_data["errors"]) == 0
-    assert mock_send_email.call_count == 2
+    mock_task.delay.assert_called_once()
 
     assigned = DiscountContractAttachmentRedemption.objects.filter(
         contract=contract_1, assigned_email="dup@example.com"
@@ -1131,3 +1166,29 @@ def test_bulk_assign_forbidden(org_setup, manager_drf_client):
     )
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_bulk_assign_internal_error(org_setup, manager_drf_client, mocker):
+    """bulk_assign returns 500 when the assignment DB operation fails."""
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
+    mocker.patch(
+        "b2b.views.v0.manager.assign_codes_and_send_emails", return_value=False
+    )
+    _, _, (contract_1, *_), *_ = org_setup
+
+    bulk_assign_url = reverse(
+        "b2b:b2b-manager-org-contract-bulk-assign",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    resp = manager_drf_client.post(
+        bulk_assign_url,
+        data=[{"email": "learner@example.com"}],
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert "detail" in resp.json()
