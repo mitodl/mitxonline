@@ -248,15 +248,6 @@ class ProgramSerializer(serializers.ModelSerializer):
             },
         }
     )
-    def _is_requirement_elective(self, requirement):
-        """Check if a requirement is elective based on its flag or parent flag"""
-        if requirement.elective_flag:
-            return True
-        try:
-            parent = requirement.get_parent()
-            return parent and bool(parent.elective_flag)
-        except AttributeError:
-            return False
 
     @extend_schema_field(
         {
