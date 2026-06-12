@@ -417,6 +417,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         Removes the DiscountContractAttachmentRedemption record for the specified code.
         """
+
+        # Note that revoke is subject to change. See the following for more details.
+        # https://github.com/mitodl/hq/issues/11375#issuecomment-4673754197
         contract = self.get_object()
         code = kwargs.get("code")
 
@@ -434,6 +437,11 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
+        if assignment_record.user or assignment_record.redeemed_on:
+            return Response(
+                {"detail": "Cannot revoke a code that has already been redeemed."},
+                status=http_status.HTTP_409_CONFLICT,
+            )
         assignment_record.delete()
 
         return Response(
