@@ -248,7 +248,6 @@ class ProgramSerializer(serializers.ModelSerializer):
             },
         }
     )
-
     @extend_schema_field(
         {
             "type": "object",
