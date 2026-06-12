@@ -309,6 +309,7 @@ class Command(BaseCommand):
         Create user profiles in bulk for the given users.
 
         Only creates records for users that do not already have a UserProfile.
+        Uses blank gender and year_of_birth when none is provided in the row data.
         """
         user_profiles = []
         user_ids = [user.id for user in created_users]
@@ -328,8 +329,6 @@ class Command(BaseCommand):
                 continue
             gender = user_data.get("user_gender")
             birth_year = user_data.get("user_birth_year")
-            if not gender and not birth_year:
-                continue
             user_profiles.append(
                 UserProfile(
                     user=user, year_of_birth=birth_year, gender=gender_map.get(gender)
