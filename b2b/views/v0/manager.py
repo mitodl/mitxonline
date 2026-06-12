@@ -190,16 +190,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         """Use different serializers for list vs detail views."""
         if self.action == "list":
             return BaseContractPageSerializer
-
-        # This is ugly and I'm not a fan. We might want to break the assign/revoke/remind/bulk_assign into their
-        # own viewset as long as we can keep the URL structure the same.
-        if self.action in (
-            "assign_code",
-            "send_reminder_for_code_assignment",
-        ):
-            return AssignRevokeCodeRequestSerializer
-        if self.action == "bulk_assign":
-            return BulkAssignRequestSerializer
         return ManagerContractDetailSerializer
 
     @extend_schema(
