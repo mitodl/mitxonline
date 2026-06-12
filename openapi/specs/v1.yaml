@@ -4363,19 +4363,32 @@ components:
     BlankEnum:
       enum:
       - ''
+    BulkAssignError:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        detail:
+          type: string
+      required:
+      - detail
+      - email
+      - name
     BulkAssignResult:
       type: object
       description: Serializer for the bulk_assign response body.
       properties:
         assigned:
           type: array
-          items: {}
+          items:
+            $ref: '#/components/schemas/ManagerEnrollmentCode'
           description: Successfully assigned codes.
         errors:
           type: array
           items:
-            type: object
-            additionalProperties: {}
+            $ref: '#/components/schemas/BulkAssignError'
           description: Records that could not be assigned, with a 'detail' explanation.
       required:
       - assigned

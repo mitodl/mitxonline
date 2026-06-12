@@ -123,16 +123,6 @@ class DetailErrorSerializer(serializers.Serializer):
     detail = serializers.CharField()
 
 
-class BulkAssignResultSerializer(serializers.Serializer):
-    """Serializer for the bulk_assign response body."""
-
-    assigned = serializers.ListField(help_text="Successfully assigned codes.")
-    errors = serializers.ListField(
-        child=serializers.DictField(),
-        help_text="Records that could not be assigned, with a 'detail' explanation.",
-    )
-
-
 class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     """Serializer for enrollment codes available to a contract."""
 
@@ -213,3 +203,22 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         """Return when the last reminder email was sent."""
         redemption = self._get_redemption(obj)
         return redemption.last_reminder_sent_on if redemption else None
+
+
+class BulkAssignErrorSerializer(serializers.Serializer):
+    email = serializers.CharField()
+    name = serializers.CharField()
+    detail = serializers.CharField()
+
+
+class BulkAssignResultSerializer(serializers.Serializer):
+    """Serializer for the bulk_assign response body."""
+
+    assigned = serializers.ListField(
+        help_text="Successfully assigned codes.",
+        child=ManagerEnrollmentCodeSerializer(),
+    )
+    errors = serializers.ListField(
+        child=BulkAssignErrorSerializer(),
+        help_text="Records that could not be assigned, with a 'detail' explanation.",
+    )
