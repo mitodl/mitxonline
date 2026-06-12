@@ -1,5 +1,6 @@
 """B2B manager dashboard views."""
 
+import logging
 from dataclasses import dataclass
 
 from django.contrib.contenttypes.models import ContentType
@@ -43,6 +44,8 @@ from b2b.serializers.v0.manager import (
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
 
+log = logging.getLogger(__name__)
+
 
 @dataclass
 class CodeAssignment:
@@ -55,22 +58,40 @@ class CodeAssignment:
 
 def assign_codes_and_send_emails(
     assignments: list[CodeAssignment], assigning_user
-) -> None:
-    # Use bulk_create for this
+) -> bool:
+    assignment_records = []
     for assignment in assignments:
-        redemption = DiscountContractAttachmentRedemption.objects.create(
+        # For bulk_create, we have to set the auto timestamps manually.
+        # We're unlikely to have integrity errors here at the moment - while the APIs do some precondition checking
+        # There aren't any meaningful database constraints that would bite us.
+        # We may need to reevaluate that as the feature set around these records grows.
+        now = now_in_utc()
+        assignment_record = DiscountContractAttachmentRedemption.objects.create(
             discount=assignment.discount,
             contract=assignment.contract,
             assigned_email=assignment.email,
             assigned_name=assignment.name,
             assigned_by=assigning_user,
-            last_reminder_sent_on=now_in_utc(),
+            last_reminder_sent_on=now,
+            created_on=now,
+            updated_on=now,
         )
-
-        send_enrollment_code_assignment_email(redemption, assignment.code)
         # Set the prefetched_redemptions attribute on the discount so that serializers
         # can return the updated redemption info without needing an extra query.
-        assignment.discount.prefetched_redemptions = [redemption]
+        assignment.discount.prefetched_redemptions = [assignment_record]
+        assignment_records.append(assignment_record)
+
+    try:
+        DiscountContractAttachmentRedemption.objects.bulk_create(assignment_records)
+    except Exception:
+        log.exception("Error creating code assignments")
+        return False
+
+    for assignment in assignments:
+        assignment_record = assignment.discount.prefetched_redemptions
+        send_enrollment_code_assignment_email(assignment_record, assignment.code)
+
+    return True
 
 
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -322,6 +343,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             200: ManagerEnrollmentCodeSerializer,
             400: DetailErrorSerializer,
             409: DetailErrorSerializer,
+            500: DetailErrorSerializer,
         },
         parameters=[
             OpenApiParameter(
@@ -380,7 +402,13 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         assignment = CodeAssignment(
             code=code, contract=contract, discount=discount, email=email, name=name
         )
-        assign_codes_and_send_emails([assignment], request.user)
+
+        success = assign_codes_and_send_emails([assignment], request.user)
+        if not success:
+            return Response(
+                {"detail": "Error assigning codes."},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         return Response(
             ManagerEnrollmentCodeSerializer(discount).data,
@@ -523,6 +551,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         responses={
             200: BulkAssignResultSerializer,
             400: DetailErrorSerializer,
+            500: DetailErrorSerializer,
         },
     )
     @action(detail=True, methods=["post"], url_path="codes/bulk_assign")
@@ -600,7 +629,12 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     {"email": email, "name": name, "detail": "No available code."}
                 )
 
-        assign_codes_and_send_emails(assignments, request.user)
+        success = assign_codes_and_send_emails(assignments, request.user)
+        if not success:
+            return Response(
+                {"detail": "Error assigning codes."},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         return Response(
             {
