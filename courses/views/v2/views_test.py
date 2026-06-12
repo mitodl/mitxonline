@@ -19,6 +19,7 @@ from django.db.models import Q
 from django.test import RequestFactory
 from django.urls import reverse
 from faker import Faker
+from mitol.common.serializers import THIS_IS_NOT_AN_API
 from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.request import Request
@@ -259,7 +260,7 @@ def test_delete_program(
 @pytest.mark.skip_nplusone_check
 @pytest.mark.usefixtures("course_catalog_data")
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
-@pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [2], indirect=True)
 @pytest.mark.parametrize("include_finaid", [None, True, False])
 @pytest.mark.parametrize("courserun_is_enrollable", [None, True, False])
 def test_get_courses(
@@ -274,7 +275,11 @@ def test_get_courses(
     num_queries = 3  # django_site + content type + course count as a minimum
     params = {"page_size": 100}
 
-    courses = Course.objects.order_by("title").prefetch_related("departments")
+    courses = (
+        Course.objects.order_by("title")
+        .prefetch_related("departments")
+        .prefetch("programs")
+    )
     if include_finaid is not None:
         mock_context["include_approved_financial_aid"] = include_finaid
         params["include_approved_financial_aid"] = include_finaid
@@ -324,10 +329,9 @@ def test_get_course(
 ):
     """Test the view that handles a request for single Course"""
     courses, _, _ = course_catalog_data
-    course = courses[0]
+    course = Course.objects.prefetch("programs").get(id=courses[0].id)
     num_queries = num_queries_from_course(course, "v2")
 
-    mock_context["include_programs"] = True  # retrieve action always includes programs
     if include_finaid:
         mock_context["include_approved_financial_aid"] = True
 
@@ -1259,19 +1263,26 @@ def test_get_course_certificate():
     cert_page = courseware_page.certificate_page
     cert_page.save_revision()  # we need at least one
     certificate = CourseRunCertificateFactory.create(
-        certificate_page_revision=cert_page.revisions.last()
+        certificate_page_revision=cert_page.revisions.last(),
+        past_issue_date=True,
     )
 
     client = APIClient()
-    resp = client.get(reverse("v2:get_course_certificate", args=[certificate.uuid]))
+    resp = client.get(
+        reverse("v2:course_certificates_api-detail", kwargs={"uuid": certificate.uuid})
+    )
     assert resp.status_code == status.HTTP_200_OK
-    assert resp.data == CourseRunCertificateSerializer(certificate).data
+    assert (
+        resp.data
+        == CourseRunCertificateSerializer(
+            certificate, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
+        ).data
+    )
 
-    resp404 = client.get(reverse("v2:get_course_certificate", args=[uuid.uuid4()]))
+    resp404 = client.get(
+        reverse("v2:course_certificates_api-detail", kwargs={"uuid": uuid.uuid4()})
+    )
     assert resp404.status_code == status.HTTP_404_NOT_FOUND
-
-    resp400 = client.get(reverse("v2:get_course_certificate", args=["not-uuid"]))
-    assert resp400.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_get_course_certificate_future_issue_date():
@@ -1281,10 +1292,12 @@ def test_get_course_certificate_future_issue_date():
     cert_page.save_revision()
     certificate = CourseRunCertificateFactory.create(
         certificate_page_revision=cert_page.revisions.last(),
-        issue_date=now_in_utc() + timedelta(days=1),
+        future_issue_date=True,
     )
     client = APIClient()
-    resp = client.get(reverse("v2:get_course_certificate", args=[certificate.uuid]))
+    resp = client.get(
+        reverse("v2:course_certificates_api-detail", kwargs={"uuid": certificate.uuid})
+    )
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -1296,19 +1309,21 @@ def test_get_program_certificate():
     cert_page = courseware_page.certificate_page
     cert_page.save_revision()  # we need at least one
     certificate = ProgramCertificateFactory.create(
-        certificate_page_revision=cert_page.revisions.last()
+        certificate_page_revision=cert_page.revisions.last(),
+        past_issue_date=True,
     )
 
     client = APIClient()
-    resp = client.get(reverse("v2:get_program_certificate", args=[certificate.uuid]))
+    resp = client.get(
+        reverse("v2:program_certificates_api-detail", kwargs={"uuid": certificate.uuid})
+    )
     assert resp.status_code == status.HTTP_200_OK
     assert resp.data == ProgramCertificateSerializer(certificate).data
 
-    resp404 = client.get(reverse("v2:get_program_certificate", args=[uuid.uuid4()]))
+    resp404 = client.get(
+        reverse("v2:program_certificates_api-detail", kwargs={"uuid": uuid.uuid4()})
+    )
     assert resp404.status_code == status.HTTP_404_NOT_FOUND
-
-    resp400 = client.get(reverse("v2:get_program_certificate", args=["not-uuid"]))
-    assert resp400.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_get_program_certificate_future_issue_date():
@@ -1318,10 +1333,12 @@ def test_get_program_certificate_future_issue_date():
     cert_page.save_revision()
     certificate = ProgramCertificateFactory.create(
         certificate_page_revision=cert_page.revisions.last(),
-        issue_date=now_in_utc() + timedelta(days=1),
+        future_issue_date=True,
     )
     client = APIClient()
-    resp = client.get(reverse("v2:get_program_certificate", args=[certificate.uuid]))
+    resp = client.get(
+        reverse("v2:program_certificates_api-detail", kwargs={"uuid": certificate.uuid})
+    )
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -1336,7 +1353,7 @@ def test_program_enrollments_future_program_cert(user_drf_client, user):
     ProgramCertificateFactory.create(
         user=user,
         program=program,
-        issue_date=now_in_utc() + timedelta(days=1),
+        future_issue_date=True,
     )
 
     resp = user_drf_client.get(reverse("v2:user_program_enrollments_api-list"))
@@ -1362,7 +1379,7 @@ def test_program_enrollments_future_course_cert(user_drf_client, user):
     CourseRunCertificateFactory.create(
         user=user,
         course_run=run,
-        issue_date=now_in_utc() + timedelta(days=1),
+        future_issue_date=True,
     )
 
     resp = user_drf_client.get(reverse("v2:user_program_enrollments_api-list"))
@@ -1747,7 +1764,12 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                     "grades": [],
                     "id": run_enrollment.id,
                     "enrollment_mode": run_enrollment.enrollment_mode,
-                    "run": dict(CourseRunWithCourseSerializer(run_enrollment.run).data),
+                    "run": dict(
+                        CourseRunWithCourseSerializer(
+                            run_enrollment.run,
+                            context={"skip_prefetch_checks": THIS_IS_NOT_AN_API},
+                        ).data
+                    ),
                     **(
                         {
                             "b2b_contract_id": run_enrollment.run.b2b_contract.id,

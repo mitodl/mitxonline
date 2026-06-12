@@ -2848,13 +2848,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/V1Program'
           description: ''
-  /api/v2/course_certificates/{cert_uuid}/:
+  /api/v2/course_certificates/{uuid}/:
     get:
       operationId: course_certificates_retrieve
-      description: Get a course certificate by UUID.
+      description: Viewset to read a single course certificate
       parameters:
       - in: path
-        name: cert_uuid
+        name: uuid
         schema:
           type: string
           format: uuid
@@ -3341,13 +3341,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2ProgramCollection'
           description: ''
-  /api/v2/program_certificates/{cert_uuid}/:
+  /api/v2/program_certificates/{uuid}/:
     get:
       operationId: program_certificates_retrieve
-      description: Get a program certificate by UUID.
+      description: Viewset to read a single course certificate
       parameters:
       - in: path
-        name: cert_uuid
+        name: uuid
         schema:
           type: string
           format: uuid
@@ -4188,11 +4188,10 @@ components:
       properties:
         title:
           type: string
-          maxLength: 255
+          readOnly: true
         readable_id:
           type: string
-          pattern: ^[\w\-+:\.]+$
-          maxLength: 255
+          readOnly: true
         id:
           type: integer
           readOnly: true
@@ -4200,6 +4199,7 @@ components:
           type: string
           readOnly: true
         display_mode:
+          readOnly: true
           nullable: true
           description: |-
             Set to 'course' to treat this program as a course in APIs.
@@ -4207,9 +4207,9 @@ components:
             * `course` - course
           oneOf:
           - $ref: '#/components/schemas/DisplayModeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
           - $ref: '#/components/schemas/NullEnum'
       required:
+      - display_mode
       - id
       - readable_id
       - title
@@ -5835,7 +5835,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BaseProgram'
-          nullable: true
           readOnly: true
         topics:
           type: array
@@ -9766,7 +9765,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BaseProgram'
-          nullable: true
           readOnly: true
         topics:
           type: array
