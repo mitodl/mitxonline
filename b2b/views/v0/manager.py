@@ -443,7 +443,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         description="Send a reminder email to the user assigned to a specific enrollment code who has not yet claimed it.",
-        request=AssignRevokeCodeRequestSerializer,
+        request=None,
         responses={
             200: ManagerEnrollmentCodeSerializer,
             400: DetailErrorSerializer,
@@ -480,8 +480,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
-        email = serializer.validated_data["email"]
-
         discount = contract.get_discounts().filter(discount_code=code).first()
         if not discount:
             return Response(
@@ -489,9 +487,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        assignment_record = discount.contract_redemptions.filter(
-            assigned_email=email
-        ).first()
+        assignment_record = discount.contract_redemptions.first()
         if not assignment_record:
             return Response(
                 {"detail": "Assignment for email does not exist"},

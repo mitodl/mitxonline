@@ -421,18 +421,6 @@ paths:
         required: true
       tags:
       - b2b
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
-        required: true
       responses:
         '200':
           content:
