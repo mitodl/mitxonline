@@ -500,7 +500,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         methods=["post"],
         url_path="codes/(?P<code>[^/.]+)/remind",
     )
-    def send_reminder_for_code_assignment(self, request, **kwargs):
+    def send_reminder_for_code_assignment(self, request, **kwargs):  # noqa: ARG002
         """
         Send a reminder email to the assignee of a specific enrollment code.
 
@@ -508,13 +508,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         """
         contract = self.get_object()
         code = kwargs.get("code")
-
-        serializer = AssignRevokeCodeRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(
-                {"detail": "Invalid request data."},
-                status=http_status.HTTP_400_BAD_REQUEST,
-            )
 
         discount = contract.get_discounts().filter(discount_code=code).first()
         if not discount:
