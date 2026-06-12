@@ -222,11 +222,11 @@ def test_serialize_program_uses_collection_membership_prefetch_cache(
     assert data["collections"] == [included_collection.id]
 
 
-def test_serialize_program_topics_use_prefetched_all_requirements(
+def test_serialize_program_topics_use_all_requirements_prefetch_cache(
     mock_context,
     program_with_requirements,  # noqa: F811
 ):
-    """ProgramSerializer should use one bulk topic query with prefetched requirements."""
+    """ProgramSerializer should use one bulk topic query with cached all_requirements."""
     program = program_with_requirements.program
     course1, course2 = program_with_requirements.required_courses[:2]
 
@@ -252,6 +252,45 @@ def test_serialize_program_topics_use_prefetched_all_requirements(
 
     assert len(context) == 1
     assert topics_data == [{"name": topic.name} for topic in topics]
+
+
+def test_serialize_program_requirements_use_all_requirements_prefetch_cache(
+    mock_context,
+    program_with_requirements,  # noqa: F811
+):
+    """ProgramSerializer should reuse cached all_requirements for requirements."""
+    program = program_with_requirements.program
+    prefetched_program = Program.objects.prefetch_related(
+        Prefetch(
+            "all_requirements",
+            queryset=ProgramRequirement.objects.select_related(
+                "course", "required_program"
+            ).order_by("path"),
+        )
+    ).get(pk=program.pk)
+
+    serializer = ProgramSerializer(context=mock_context)
+
+    with CaptureQueriesContext(connection) as context:
+        requirements_data = serializer.get_requirements(prefetched_program)
+
+    assert len(context) == 0
+    assert requirements_data == {
+        "courses": {
+            "required": [
+                {"id": course.id, "readable_id": course.readable_id}
+                for course in program_with_requirements.required_courses
+            ],
+            "electives": [
+                {"id": course.id, "readable_id": course.readable_id}
+                for course in (
+                    program_with_requirements.elective_courses
+                    + program_with_requirements.mut_exclusive_courses
+                )
+            ],
+        },
+        "programs": {"required": [], "electives": []},
+    }
 
 
 @pytest.mark.parametrize(
