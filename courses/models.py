@@ -179,6 +179,10 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
         """Filter for source runs"""
         return self.filter(Q(is_source_run=True) | Q(run_tag="SOURCE"))
 
+    def nonvariant(self):
+        """Filter for non-variant - languages OK, industry/length not OK"""
+        return self.filter(variant_industry="", variant_length="")
+
 
 class UsableCourseRunManager(models.Manager):
     """Simple manager to filter out source runs."""

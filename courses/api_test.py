@@ -61,6 +61,8 @@ from courses.api import (
 )
 from courses.constants import (
     ALL_ENROLL_CHANGE_STATUSES,
+    COURSE_VARIANT_INDUSTRY,
+    COURSE_VARIANT_LENGTH,
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
@@ -1219,6 +1221,15 @@ def test_generate_course_certificates_no_valid_course_run(settings, courses_api_
         certificate_available_date=now_in_utc()
         - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS + 1),
     )
+    # Expand the batch to include variants - expecting this to fail, so variants
+    # are industry/length variants. (These would be OK for certs otherwise.)
+    CourseRunFactory.create_batch(
+        2,
+        completed=True,
+        certificate_available_date=now_in_utc(),
+        variant_industry=FAKE.random_element(COURSE_VARIANT_INDUSTRY[1:])[0],
+        variant_length=FAKE.random_element(COURSE_VARIANT_LENGTH[1:])[0],
+    )
     generate_course_run_certificates()
     assert (
         "No course runs matched the certificates generation criteria"
@@ -1305,17 +1316,27 @@ def test_course_certificates_with_course_end_date_self_paced_combination(  # noq
     )
 
 
+@pytest.mark.parametrize(
+    "is_translation",
+    [
+        True,
+        False,
+    ],
+)
 @patch("courses.signals.upsert_custom_properties")
-def test_generate_course_certificates_with_course_end_date(
+def test_generate_course_certificates_with_course_end_date(  # noqa: PLR0913
     mock_upsert_custom_properties,
     mocker,
     courses_api_logs,
     passed_grade_with_enrollment,
     settings,
+    is_translation,
 ):
     """Test that certificates are generated for passed grades when there are valid course runs for certificates"""
     course_run = passed_grade_with_enrollment.course_run
     course_run.certificate_available_date = now_in_utc()
+    course_run.language = "fr" if is_translation else "en"
+    course_run.is_primary_language = not is_translation
     course_run.save()
 
     user = passed_grade_with_enrollment.user

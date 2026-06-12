@@ -931,12 +931,18 @@ def get_certificate_grade_eligible_runs(now):
     # Get all the course runs eligible for certificates generation
     # For a valid run it would be live, certificate_available_date would be in future or within a month of passing
     # the certificate_available_date.
+    # Changes for variants: if the run is a variant for anything _other_ than a
+    # language, make it ineligible for a certificate.
 
-    course_runs = CourseRun.objects.live(include_b2b=True).filter(
-        Q(certificate_available_date__isnull=True)
-        | Q(
-            certificate_available_date__gt=now
-            - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS)
+    course_runs = (
+        CourseRun.objects.live(include_b2b=True)
+        .nonvariant()
+        .filter(
+            Q(certificate_available_date__isnull=True)
+            | Q(
+                certificate_available_date__gt=now
+                - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS)
+            )
         )
     )
     return course_runs  # noqa: RET504
@@ -1128,11 +1134,15 @@ def _has_earned_program_cert(user, program):
               for a given program else False
     """
 
-    user_courseruns = CourseRun.objects.filter(
-        enrollments__user=user,
-        enrollments__active=True,
-        enrollments__change_status__isnull=True,
-    ).filter(course__in=program.courses_qset)
+    user_courseruns = (
+        CourseRun.objects.filter(
+            enrollments__user=user,
+            enrollments__active=True,
+            enrollments__change_status__isnull=True,
+        )
+        .nonvariant()
+        .filter(course__in=program.courses_qset)
+    )
 
     cert_courses = Course.objects.filter(
         courseruns__in=user_courseruns,
