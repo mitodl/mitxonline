@@ -626,9 +626,6 @@ def _get_program_collection_ids(instance: Program) -> list[int]:
 
 def _get_all_program_requirements(instance: Program) -> list[ProgramRequirement]:
     """Return all requirements using prefetched data when available."""
-    prefetched_requirements = getattr(instance, "prefetched_all_requirements", None)
-    if prefetched_requirements is not None:
-        return list(prefetched_requirements)
 
     cached_requirements = getattr(instance, "_prefetched_objects_cache", {}).get(
         "all_requirements"
