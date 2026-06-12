@@ -434,12 +434,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ManagerEnrollmentCode'
           description: ''
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetailError'
-          description: ''
         '404':
           content:
             application/json:
