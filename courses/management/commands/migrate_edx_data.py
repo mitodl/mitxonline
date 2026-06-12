@@ -820,11 +820,12 @@ class Command(BaseCommand):
                 )
                 continue
 
-            user_ids = {row["user_mitxonline_id"] for row in verified_rows}
+            all_user_ids = {row["user_mitxonline_id"] for row in rows if row.get("user_mitxonline_id")}
+            verified_user_ids = {row["user_mitxonline_id"] for row in verified_rows}
             existing_enrollments = {
                 (uid, rid): mode
                 for uid, rid, mode in CourseRunEnrollment.all_objects.filter(
-                    user_id__in=user_ids,
+                    user_id__in=verified_user_ids,
                     run_id__in={row["courserun_id"] for row in verified_rows},
                 ).values_list("user_id", "run_id", "enrollment_mode")
             }
@@ -845,7 +846,8 @@ class Command(BaseCommand):
                 row["discount_id"] for row in verified_rows if row.get("discount_id")
             }
 
-            users = {u.id: u for u in User.objects.filter(id__in=user_ids)}
+            users = {u.id: u for u in User.objects.filter(id__in=verified_user_ids)}
+            all_users = {u.id: u for u in User.objects.filter(id__in=all_user_ids)}
             product_versions = {
                 v.id: v for v in Version.objects.filter(id__in=product_version_ids)
             }
@@ -857,10 +859,10 @@ class Command(BaseCommand):
                 if row.get("user_mitxonline_id")
             }
             self._bulk_create_legal_addresses(
-                list(users.values()), id_row_lookup, batch_size
+                list(all_users.values()), id_row_lookup, batch_size
             )
             self._bulk_create_user_profiles(
-                list(users.values()), id_row_lookup, batch_size, GENDER_MAP
+                list(all_users.values()), id_row_lookup, batch_size, GENDER_MAP
             )
 
             for row in verified_rows:
