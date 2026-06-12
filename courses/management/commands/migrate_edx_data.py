@@ -902,7 +902,14 @@ class Command(BaseCommand):
                         )
                         continue
 
-                    repair_faulty_edx_user(user)
+                    try:
+                        repair_faulty_edx_user(user)
+                    except Exception as e:  # noqa: BLE001
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"repair_faulty_edx_user failed for user {user.id}, continuing: {e}"
+                            )
+                        )
 
                     with transaction.atomic():
                         order = PendingOrder.create_from_product(
