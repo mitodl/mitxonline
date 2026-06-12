@@ -22,6 +22,7 @@ from courses.models import (
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import ZERO_PAYMENT_DATA
 from ecommerce.models import Discount, PendingOrder, Product
+from openedx.api import repair_faulty_edx_user
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
@@ -272,39 +273,57 @@ class Command(BaseCommand):
         )
 
     @staticmethod
-    def _bulk_create_legal_addresses(created_users, row_lookup, batch_size):
+    def _bulk_create_legal_addresses(created_users, row_lookup_by_id, batch_size):
         """
-        Create legal addresses in bulk for the created users.
+        Create legal addresses in bulk for the given users.
+
+        Only creates records for users that do not already have a LegalAddress.
+        Uses a blank country when none is provided in the row data.
         """
         legal_addresses = []
-        # ensure all users are properly saved
         user_ids = [user.id for user in created_users]
         saved_users = User.objects.filter(id__in=user_ids)
 
+        existing_user_ids = set(
+            LegalAddress.objects.filter(user_id__in=user_ids).values_list(
+                "user_id", flat=True
+            )
+        )
+
         for user in saved_users:
-            user_data = row_lookup.get(user.email)
+            if user.id in existing_user_ids:
+                continue
+            user_data = row_lookup_by_id.get(user.id)
             if not user_data:
                 continue
-            country = user_data.get("user_address_country")
-            if not country:
-                continue
+            country = user_data.get("user_address_country") or ""
             legal_addresses.append(LegalAddress(user=user, country=country))
         if legal_addresses:
-            LegalAddress.objects.bulk_create(legal_addresses, batch_size=batch_size)
+            LegalAddress.objects.bulk_create(
+                legal_addresses, batch_size=batch_size, ignore_conflicts=True
+            )
 
     @staticmethod
-    def _bulk_create_user_profiles(created_users, row_lookup, batch_size, gender_map):
+    def _bulk_create_user_profiles(created_users, row_lookup_by_id, batch_size, gender_map):
         """
-        Create user profiles in bulk for the created users.
-        """
+        Create user profiles in bulk for the given users.
 
+        Only creates records for users that do not already have a UserProfile.
+        """
         user_profiles = []
-        # ensure all users are properly saved
         user_ids = [user.id for user in created_users]
         saved_users = User.objects.filter(id__in=user_ids)
 
+        existing_user_ids = set(
+            UserProfile.objects.filter(user_id__in=user_ids).values_list(
+                "user_id", flat=True
+            )
+        )
+
         for user in saved_users:
-            user_data = row_lookup.get(user.email)
+            if user.id in existing_user_ids:
+                continue
+            user_data = row_lookup_by_id.get(user.id)
             if not user_data:
                 continue
             gender = user_data.get("user_gender")
@@ -317,7 +336,9 @@ class Command(BaseCommand):
                 )
             )
         if user_profiles:
-            UserProfile.objects.bulk_create(user_profiles, batch_size=batch_size)
+            UserProfile.objects.bulk_create(
+                user_profiles, batch_size=batch_size, ignore_conflicts=True
+            )
 
     def _migrate_users(self, conn, options):
         """
@@ -359,21 +380,30 @@ class Command(BaseCommand):
             created_users = self._bulk_create_users(rows, existing_emails, batch_size)
             user_creation_count += len(created_users)
 
-            self._bulk_create_legal_addresses(created_users, row_lookup, batch_size)
+            id_row_lookup = {
+                user.id: row_lookup[user.email]
+                for user in created_users
+                if user.email in row_lookup
+            }
+            self._bulk_create_legal_addresses(created_users, id_row_lookup, batch_size)
             self._bulk_create_user_profiles(
-                created_users, row_lookup, batch_size, GENDER_MAP
+                created_users, id_row_lookup, batch_size, GENDER_MAP
             )
 
         self.stdout.write(self.style.SUCCESS(f"{user_creation_count} users created"))
 
     @staticmethod
-    def _bulk_create_enrollments(rows, batch_size):
+    def _bulk_create_enrollments(
+        rows,
+        batch_size,
+        edx_enrolled=True,  # noqa: FBT002
+    ):
         new_enrollment_objects = [
             CourseRunEnrollment(
                 user_id=row["user_mitxonline_id"],
                 run_id=row["courserun_id"],
                 enrollment_mode=row["courserunenrollment_enrollment_mode"],
-                edx_enrolled=True,
+                edx_enrolled=edx_enrolled,
                 edx_emails_subscription=False,
                 active=True,
             )
@@ -385,9 +415,7 @@ class Command(BaseCommand):
         CourseRunEnrollment.objects.bulk_create(
             new_enrollment_objects,
             batch_size=batch_size,
-            update_conflicts=True,
-            update_fields=["edx_enrolled", "edx_emails_subscription"],
-            unique_fields=["user_id", "run_id"],
+            ignore_conflicts=True,
         )
         return len(new_enrollment_objects)
 
@@ -739,7 +767,7 @@ class Command(BaseCommand):
                 enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
             )
 
-    def _migrate_enrollments(self, conn, options):
+    def _migrate_enrollments(self, conn, options):  # noqa: PLR0915
         """
         Migrate the edX future enrollments from edX to MITx Online. Create Orders for the verified enrollments.
         """
@@ -762,6 +790,8 @@ class Command(BaseCommand):
 
         total_enrollments = 0
         total_orders = 0
+
+        GENDER_MAP = {label: code for code, label in GENDER_CHOICES}
 
         while True:
             results = cur.fetchmany(batch_size)
@@ -799,7 +829,11 @@ class Command(BaseCommand):
             }
 
             self._upgrade_enrollment_modes(verified_rows, existing_enrollments)
-            total_enrollments += self._bulk_create_enrollments(rows, batch_size)
+            total_enrollments += self._bulk_create_enrollments(
+                rows,
+                batch_size,
+                edx_enrolled=False,
+            )
 
             product_version_ids = {
                 row["product_version_id"]
@@ -815,6 +849,18 @@ class Command(BaseCommand):
                 v.id: v for v in Version.objects.filter(id__in=product_version_ids)
             }
             discounts = {d.id: d for d in Discount.objects.filter(id__in=discount_ids)}
+
+            id_row_lookup = {
+                row["user_mitxonline_id"]: row
+                for row in rows
+                if row.get("user_mitxonline_id")
+            }
+            self._bulk_create_legal_addresses(
+                list(users.values()), id_row_lookup, batch_size
+            )
+            self._bulk_create_user_profiles(
+                list(users.values()), id_row_lookup, batch_size, GENDER_MAP
+            )
 
             for row in verified_rows:
                 try:
@@ -855,6 +901,8 @@ class Command(BaseCommand):
                             )
                         )
                         continue
+
+                    repair_faulty_edx_user(user)
 
                     with transaction.atomic():
                         order = PendingOrder.create_from_product(
