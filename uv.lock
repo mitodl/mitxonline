@@ -2001,7 +2001,7 @@ wheels = [
 
 [[package]]
 name = "mitxonline"
-version = "1.153.0"
+version = "1.155.0"
 source = { virtual = "." }
 dependencies = [
     { name = "authlib" },

@@ -136,6 +136,7 @@ class UserAdmin(DjangoObjectActions, ContribUserAdmin, TimestampedModelAdmin):
                     "is_active",
                     "is_staff",
                     "is_superuser",
+                    "is_etl",
                     "groups",
                     "user_permissions",
                 ),
