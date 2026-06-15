@@ -2,11 +2,13 @@
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Prefetch, Q
+from prefetch import PrefetchOption
 from rest_framework import viewsets
 
 from courses.models import (
     Course,
     CourseRun,
+    Program,
 )
 from courses.permissions import IsEtlUser
 from courses.serializers.internal import IngestibleCourseWithCourseRunsSerializer
@@ -81,6 +83,15 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
                 filter=Q(
                     courseruns__enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
                 ),
+            )
+        )
+        queryset = queryset.prefetch(
+            PrefetchOption(
+                "programs",
+                queryset=Program.objects.filter(
+                    live=True,
+                    page__live=True,
+                ).only("id", "readable_id", "title", "display_mode"),
             )
         )
 
