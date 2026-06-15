@@ -60,8 +60,16 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
             ),
             to_attr="prefetched_courseruns",
         )
+        dated_runs_prefetch = Prefetch(
+            "courseruns",
+            queryset=CourseRun.all_objects.enrollable().filter(is_self_paced=False),
+            to_attr="prefetched_dated_courseruns",
+        )
         queryset = queryset.prefetch_related(
-            "departments", "in_programs", course_runs_prefetch
+            "departments",
+            "in_programs",
+            course_runs_prefetch,
+            dated_runs_prefetch,
         )
         queryset = queryset.annotate(
             count_b2b_courseruns=Count("courseruns__b2b_contract__id")
