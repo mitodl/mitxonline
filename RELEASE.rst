@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.154.0
+Version 1.154.0 (Released June 15, 2026)
 ---------------
 
 - Fix migrate edx data future enrollment (#3663)
