@@ -115,13 +115,19 @@ def course_catalog_data(
     return CourseCatalogData(courses, programs, course_runs)
 
 
-def _create_course(idx):
+def _create_course(idx, *, include_variants: bool = True):
     test_course = CourseFactory.create(title=f"Test Course {idx}")
-    cr1 = CourseRunFactory.create(course=test_course, past_start=True)
-    cr2 = CourseRunFactory.create(course=test_course, in_progress=True)
-    cr3 = CourseRunFactory.create(course=test_course, in_future=True)
+    cr1 = CourseRunFactory.create(
+        course=test_course, past_start=True, enrollment_modes=[]
+    )
+    cr2 = CourseRunFactory.create(
+        course=test_course, in_progress=True, enrollment_modes=[]
+    )
+    cr3 = CourseRunFactory.create(
+        course=test_course, in_future=True, enrollment_modes=[]
+    )
     crvs = []
-    if idx % 2:
+    if include_variants and idx % 2:
         # Make some variant runs - by default, half of the courses should get one.
         # These are for normal, customer-facing courses, so the only variants we'll
         # configure are translations.
@@ -134,6 +140,7 @@ def _create_course(idx):
             language=language,
             is_primary_language=False,
             run_tag=cr1.run_tag,
+            enrollment_modes=[],
         )
         crv2 = CourseRunFactory.create(
             course=test_course,
@@ -142,6 +149,7 @@ def _create_course(idx):
             language=language,
             is_primary_language=False,
             run_tag=cr2.run_tag,
+            enrollment_modes=[],
         )
         crv3 = CourseRunFactory.create(
             course=test_course,
@@ -150,6 +158,7 @@ def _create_course(idx):
             language=language,
             is_primary_language=False,
             run_tag=cr3.run_tag,
+            enrollment_modes=[],
         )
         crvs = [
             crv1,
@@ -359,7 +368,9 @@ def _process_variants_and_runs(contract, course):
 
     return [
         _create_b2b_run_from_source(
-            contract, sr, f"{run_tag_prefix_semester}T{run_tag_prefix_year}"
+            contract,
+            sr,
+            f"{run_tag_prefix_semester}C{contract.id}T{run_tag_prefix_year}",
         )
         for sr in course.courseruns.filter(is_source_run=True).all()
     ]
