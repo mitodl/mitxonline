@@ -3,6 +3,7 @@ Course API Views version 2
 """
 
 import logging
+from functools import cached_property
 
 import django_filters
 from django.conf import settings
@@ -11,10 +12,13 @@ from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from django_qp import QueryParamsMixinView
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.olposthog.features import is_enabled
-from rest_framework import mixins, serializers, status, viewsets
+from prefetch import PrefetchOption
+from pydantic import BaseModel
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import (
     api_view,
     permission_classes,
@@ -147,7 +151,7 @@ class ProgramFilterSet(django_filters.FilterSet):
     def qs(self):
         """Return the filtered queryset for Programs.
 
-        - Always de-duplicate results to avoid duplicate Programs when joins
+        - Always de-duplicate results to avoid duplivalidated_params_modelcate Programs when joins
           (e.g., contract memberships) introduce multiple rows per Program.
         - If the request isn't explicitly filtering on org_id or contract_id,
           exclude B2B-only programs by default.
@@ -379,19 +383,55 @@ class CourseFilterSet(django_filters.FilterSet):
         )
 
 
-class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
+class CourseParams(BaseModel):
+    """Types for Course APi querystring"""
+
+    org_id: int | None = None
+    contract_id: int | None = None
+    courserun_is_enrollable: bool | None = None
+    include_approved_financial_aid: bool = False
+
+    @cached_property
+    def has_org_or_contract_id(self) -> bool:
+        """Return True if either org or contract id specified"""
+        return any((self.org_id, self.contract_id))
+
+
+class CourseViewSet(
+    QueryParamsMixinView[CourseParams],
+    ReadableIdLookupMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
     """API view set for Courses"""
 
+    validated_params = CourseParams()  # for drf_spectacular
     pagination_class = Pagination
     permission_classes = []
     filter_backends = [DjangoFilterBackend]
     serializer_class = CourseWithCourseRunsSerializer
     filterset_class = CourseFilterSet
     lookup_value_regex = "[^/]+"  # Accept any non-slash character
+    validated_params_model = CourseParams
+
+    def get_program_filters(self) -> Q:
+        """Get filters for course programs"""
+        params = self.validated_params
+        program_filters = Q()
+
+        if params.org_id is not None:
+            program_filters &= Q(
+                contract_memberships__contract__organization__pk=params.org_id
+            )
+        elif params.contract_id is not None:
+            program_filters &= Q(contract_memberships__contract__pk=params.contract_id)
+
+        else:
+            program_filters &= Q(b2b_only=False)
+
+        return program_filters
 
     def get_queryset(self):
         """Get the queryset for the viewset."""
-
         queryset = Course.objects.select_related("page")
         # Use Prefetch for reverse GenericRelation (products on CourseRun)
         # 1. Get the ContentType object for the CourseRun model
@@ -432,36 +472,38 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                 ),
             )
         )
-
-        # Prefetch the variant sets but filter B2B according to the query params.
-        qp = self.request.query_params
-        variant_b2b_enabled = "org_id" in qp or "contract_id" in qp
-
         queryset = queryset.prefetch_related(
             Prefetch(
                 "possible_variant_sets",
                 queryset=SupportedVariant.objects.filter(active=True).filter(
-                    Q(b2b_only=variant_b2b_enabled) | Q(default_variant=True)
+                    Q(b2b_only=self.validated_params.has_org_or_contract_id)
+                    | Q(default_variant=True)
                 ),
+            )
+        )
+        queryset = queryset.prefetch(
+            PrefetchOption(
+                "programs",
+                queryset=Program.objects.filter(self.get_program_filters())
+                .filter(
+                    live=True,
+                    page__live=True,
+                )
+                .only("id", "readable_id", "title", "display_mode"),
             )
         )
 
         return queryset.order_by("title").distinct()
 
     def get_serializer_context(self):
-        added_context = {}
-        qp = self.request.query_params
-        # Include programs for single-object retrieval or when readable_id query param is present
-        if self.action == "retrieve" or qp.get("readable_id"):
-            added_context["include_programs"] = True
-        if qp.get("include_approved_financial_aid"):
-            added_context["include_approved_financial_aid"] = True
-        if qp.get("courserun_is_enrollable") is not None:
-            # Add courserun_is_enrollable to context if present in query params
+        added_context = {
+            "include_approved_financial_aid": self.validated_params.include_approved_financial_aid,
+        }
+        if self.validated_params.courserun_is_enrollable is not None:
             added_context["courserun_is_enrollable"] = (
-                qp.get("courserun_is_enrollable", "").lower() == "true"
+                self.validated_params.courserun_is_enrollable
             )
-        if qp.get("org_id") or qp.get("contract_id"):
+        if self.validated_params.has_org_or_contract_id:
             # If an org or contract is specified, we extract the user's contracts
             # according to those params, so filtering on some course run data is
             # correct (notably next_run_id).
@@ -469,8 +511,8 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
             added_context["user_contracts"] = []
 
             user = self.request.user
-            if qp.get("org_id"):
-                added_context["org_id"] = int(qp.get("org_id"))
+            if self.validated_params.org_id:
+                added_context["org_id"] = self.validated_params.org_id
                 added_context["user_contracts"] = (
                     (
                         user.b2b_contracts.filter(
@@ -482,8 +524,8 @@ class CourseViewSet(ReadableIdLookupMixin, viewsets.ReadOnlyModelViewSet):
                     if hasattr(user, "b2b_contracts")
                     else []
                 )
-            if qp.get("contract_id"):
-                added_context["contract_id"] = int(qp.get("contract_id"))
+            if self.validated_params.contract_id:
+                added_context["contract_id"] = self.validated_params.contract_id
                 # make sure we filter this - user should be in the contract we're
                 # filtering against
                 added_context["user_contracts"] = (
@@ -634,7 +676,13 @@ class UserEnrollmentsApiViewSet(
             "run__course__page",
             Prefetch("run__enrollment_modes", to_attr="prefetched_enrollment_modes"),
         )
-        .prefetch("certificate", "grades")
+        .prefetch(
+            "certificate",
+            "grades",
+            PrefetchOption(
+                "run__course__programs", queryset=Program.objects.filter(b2b_only=False)
+            ),
+        )
     )
 
     @extend_schema_get_queryset(CourseRunEnrollment.objects.none())
@@ -917,44 +965,36 @@ def add_verified_program_course_enrollment(request, courserun_id: str):
     )
 
 
-@extend_schema(
-    parameters=[
-        OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),
-    ],
-    responses=CourseRunCertificateSerializer,
-)
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def get_course_certificate(request, cert_uuid):
-    """Get a course certificate by UUID."""
+class _BaseCertificateRetrieveViewSet(
+    mixins.RetrieveModelMixin, viewsets.GenericViewSet
+):
+    """Base class for certificate viewsets"""
 
-    cert_uuid = serializers.UUIDField().to_internal_value(cert_uuid)
+    permission_classes = [AllowAny]
+    lookup_field = "uuid"
+    lookup_value_converter = "uuid"
 
-    cert = get_object_or_404(CourseRunCertificate, is_revoked=False, uuid=cert_uuid)
-
-    return Response(
-        CourseRunCertificateSerializer(cert, context={"request": request}).data
-    )
+    def get_serializer_context(self):
+        return {"request": self.request}
 
 
-@extend_schema(
-    parameters=[
-        OpenApiParameter("cert_uuid", OpenApiTypes.UUID, OpenApiParameter.PATH),
-    ],
-    responses=ProgramCertificateSerializer,
-)
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def get_program_certificate(request, cert_uuid):
-    """Get a program certificate by UUID."""
+class CourseCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
+    """Viewset to read a single course certificate"""
 
-    cert_uuid = serializers.UUIDField().to_internal_value(cert_uuid)
+    serializer_class = CourseRunCertificateSerializer
+    queryset = CourseRunCertificate.objects.prefetch(
+        PrefetchOption(
+            "course_run__course__programs",
+            queryset=Program.objects.filter(b2b_only=False),
+        )
+    ).prefetch_related("user")
 
-    cert = get_object_or_404(ProgramCertificate, is_revoked=False, uuid=cert_uuid)
 
-    return Response(
-        ProgramCertificateSerializer(cert, context={"request": request}).data
-    )
+class ProgramCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
+    """Viewset to read a single course certificate"""
+
+    serializer_class = ProgramCertificateSerializer
+    queryset = ProgramCertificate.objects.prefetch_related("user")
 
 
 class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
@@ -1003,6 +1043,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
                     .select_related("run__course__page", "run__b2b_contract")
+                    .prefetch("run__course__programs")
                     .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),

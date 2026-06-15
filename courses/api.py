@@ -1586,6 +1586,8 @@ def import_courserun_from_edx(  # noqa: C901, PLR0913
         variant_length=variant_length,
     )
 
+    pull_course_modes(new_run)
+
     course_page = None
     if create_cms_page and not use_specific_course:
         course_page = create_default_courseware_page(
@@ -1637,8 +1639,8 @@ ACHIEVEMENT_TYPE_MAP = {
 # This is ugly, if anyone has other suggestions I'm all ears.
 ENV_TO_LEARN_HOSTNAME_MAP = {
     "production": "learn.mit.edu",
-    "rc": "learn.rc.mit.edu",
-    "ci": "learn.ci.mit.edu",
+    "rc": "rc.learn.mit.edu",
+    "ci": "ci.learn.mit.edu",
 }
 
 

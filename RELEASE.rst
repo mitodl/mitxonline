@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 1.155.0 (Released June 15, 2026)
+---------------
+
+- Assign, revoke, remind and bulk_assign b2b enrollment code endpoints (#3646)
+
+Version 1.154.0 (Released June 15, 2026)
+---------------
+
+- Fix migrate edx data future enrollment (#3663)
+- Fix some N+1 errors around programs on courses API (#3615)
+- Removing n+1 warning from programs serializer (#3656)
+- Exclude variant runs from course and program certificate considerations (#3659)
+- Change filtering behavior for b2b manager org endpoint (#3661)
+- Fix pyproject version to match settings.py (#3660)
+- Configure bumpver for Concourse release pipeline (#3498)
+
 Version 1.153.0 (Released June 10, 2026)
 ---------------
 

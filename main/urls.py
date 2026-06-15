@@ -62,6 +62,7 @@ urlpatterns = [
     path("", include("mitol.google_sheets.urls")),
     path("", include("b2b.urls")),
     path("", include("mitol.scim.urls")),
+    path("", include("mitol.mail.urls")),
     re_path(r"^dashboard/", dashboard, name="user-dashboard"),
     # Staff dashboard authentication redirect
     path(

@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.153.0"
+VERSION = "1.155.0"
 
 log = logging.getLogger()
 
@@ -534,6 +534,11 @@ INTERNAL_IPS = (
 )
 
 # Configure e-mail settings
+MITOL_MAIL_CONNECTION_BACKEND = get_string(
+    name="MITOL_MAIL_CONNECTION_BACKEND",
+    default="anymail.backends.mailgun.EmailBackend",
+    description="The default email backend to use for outgoing email. This is used for anything that uses mitol.mail and should only be overridden for testing",
+)
 EMAIL_BACKEND = get_string(
     name="MITX_ONLINE_EMAIL_BACKEND",
     default="django.core.mail.backends.smtp.EmailBackend",

@@ -32,7 +32,7 @@ def anon_drf_client():
         False,
     ],
 )
-def test_serialize_certificate(is_program):
+def test_serialize_certificate(is_program, mock_context):
     """Test that the certificate serializes properly."""
 
     if is_program:
@@ -47,12 +47,16 @@ def test_serialize_certificate(is_program):
         certificate = ProgramCertificateFactory.create(
             certificate_page_revision=cert_page.revisions.last()
         )
-        serialized_data = ProgramCertificateSerializer(certificate).data
+        serialized_data = ProgramCertificateSerializer(
+            certificate, context=mock_context
+        ).data
     else:
         certificate = CourseRunCertificateFactory.create(
             certificate_page_revision=cert_page.revisions.last()
         )
-        serialized_data = CourseRunCertificateSerializer(certificate).data
+        serialized_data = CourseRunCertificateSerializer(
+            certificate, context=mock_context
+        ).data
 
     expected_data = {
         "user": PublicUserSerializer(certificate.user).data,

@@ -368,17 +368,39 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
         required: true
       responses:
-        '405':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagerEnrollmentCode'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/:
     post:
       operationId: b2b_manager_organizations_contracts_codes_remind_create
@@ -405,24 +427,22 @@ paths:
         required: true
       tags:
       - b2b
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
-        required: true
       responses:
-        '405':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagerEnrollmentCode'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/:
-    post:
-      operationId: b2b_manager_organizations_contracts_codes_revoke_create
+    delete:
+      operationId: b2b_manager_organizations_contracts_codes_revoke_destroy
       description: Revoke the assignment for a specific enrollment code, returning
         it to the unassigned pool.
       parameters:
@@ -446,27 +466,25 @@ paths:
         required: true
       tags:
       - b2b
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
-        required: true
       responses:
-        '405':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagerEnrollmentCode'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/:
     post:
       operationId: b2b_manager_organizations_contracts_codes_bulk_assign_create
-      description: Bulk-assign enrollment codes from a CSV or plain-text file. Each
-        row should contain an email address and an optional name. An invite email
-        is sent to each successfully assigned address.
+      description: Bulk-assign enrollment codes from a list of (email, name) records.
+        One available code is assigned per record and an invite email is sent to each
+        successfully assigned address. Returns lists of assigned codes and any errors.
       parameters:
       - in: path
         name: id
@@ -486,17 +504,39 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              type: array
+              items:
+                $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              type: array
+              items:
+                $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ManagerContractDetailRequest'
+              type: array
+              items:
+                $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
         required: true
       responses:
-        '405':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkAssignResult'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/:
     get:
       operationId: b2b_manager_organizations_contracts_course_runs_list
@@ -2848,13 +2888,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/V1Program'
           description: ''
-  /api/v2/course_certificates/{cert_uuid}/:
+  /api/v2/course_certificates/{uuid}/:
     get:
       operationId: course_certificates_retrieve
-      description: Get a course certificate by UUID.
+      description: Viewset to read a single course certificate
       parameters:
       - in: path
-        name: cert_uuid
+        name: uuid
         schema:
           type: string
           format: uuid
@@ -3341,13 +3381,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/V2ProgramCollection'
           description: ''
-  /api/v2/program_certificates/{cert_uuid}/:
+  /api/v2/program_certificates/{uuid}/:
     get:
       operationId: program_certificates_retrieve
-      description: Get a program certificate by UUID.
+      description: Viewset to read a single course certificate
       parameters:
       - in: path
-        name: cert_uuid
+        name: uuid
         schema:
           type: string
           format: uuid
@@ -3882,6 +3922,20 @@ paths:
           description: No response body
 components:
   schemas:
+    AssignRevokeCodeRequestRequest:
+      type: object
+      description: Serializer for the assign_code request body.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        name:
+          type: string
+          default: ''
+          maxLength: 255
+      required:
+      - email
     AvailabilityEnum:
       enum:
       - anytime
@@ -4188,11 +4242,10 @@ components:
       properties:
         title:
           type: string
-          maxLength: 255
+          readOnly: true
         readable_id:
           type: string
-          pattern: ^[\w\-+:\.]+$
-          maxLength: 255
+          readOnly: true
         id:
           type: integer
           readOnly: true
@@ -4200,6 +4253,7 @@ components:
           type: string
           readOnly: true
         display_mode:
+          readOnly: true
           nullable: true
           description: |-
             Set to 'course' to treat this program as a course in APIs.
@@ -4207,9 +4261,9 @@ components:
             * `course` - course
           oneOf:
           - $ref: '#/components/schemas/DisplayModeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
           - $ref: '#/components/schemas/NullEnum'
       required:
+      - display_mode
       - id
       - readable_id
       - title
@@ -4315,6 +4369,36 @@ components:
     BlankEnum:
       enum:
       - ''
+    BulkAssignError:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        detail:
+          type: string
+      required:
+      - detail
+      - email
+      - name
+    BulkAssignResult:
+      type: object
+      description: Serializer for the bulk_assign response body.
+      properties:
+        assigned:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagerEnrollmentCode'
+          description: Successfully assigned codes.
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkAssignError'
+          description: Records that could not be assigned, with a 'detail' explanation.
+      required:
+      - assigned
+      - errors
     CertificatePage:
       type: object
       description: Serializer for certificate pages, including overrides and signatory
@@ -5835,7 +5919,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BaseProgram'
-          nullable: true
           readOnly: true
         topics:
           type: array
@@ -6073,6 +6156,14 @@ components:
       - name
       - program_ids
       - slug
+    DetailError:
+      type: object
+      description: Serializer for generic detail error responses (404, etc.).
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     Discount:
       type: object
       properties:
@@ -6820,15 +6911,6 @@ components:
       - variant_options
       - welcome_message
       - welcome_message_extra
-    ManagerContractDetailRequest:
-      type: object
-      description: Serializer for detailed contract view with statistics.
-      properties:
-        membership_type:
-          type: string
-          minLength: 1
-      required:
-      - membership_type
     ManagerCourseRun:
       type: object
       description: Serializer for course runs in a contract.
@@ -9766,7 +9848,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BaseProgram'
-          nullable: true
           readOnly: true
         topics:
           type: array

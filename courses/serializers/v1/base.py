@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from drf_spectacular.utils import extend_schema_field
+from mitol.common.serializers import BaseSerializer
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer
@@ -26,8 +27,10 @@ class EnrollmentModeSerializer(serializers.ModelSerializer):
         ]
 
 
-class BaseCourseSerializer(serializers.ModelSerializer):
+class BaseCourseSerializer(BaseSerializer):
     """Basic course model serializer"""
+
+    required_prefetches = []
 
     type = serializers.SerializerMethodField(read_only=True)
 
@@ -138,6 +141,7 @@ class BaseProgramSerializer(serializers.ModelSerializer):
             "type",
             "display_mode",
         ]
+        read_only_fields = ["title", "readable_id", "display_mode"]
 
 
 class CourseRunCertificateSerializer(serializers.ModelSerializer):

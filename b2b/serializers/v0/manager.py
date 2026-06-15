@@ -89,6 +89,40 @@ class ManagerEnrollmentSerializer(serializers.ModelSerializer):
         ]
 
 
+class AssignRevokeCodeRequestSerializer(serializers.Serializer):
+    """Serializer for the assign_code request body."""
+
+    email = serializers.EmailField()
+    name = serializers.CharField(max_length=255, default="", allow_blank=True)
+
+
+class BulkAssignRequestSerializer(serializers.ListSerializer):
+    """Serializer for the bulk_assign request body — a list of (email, name) records."""
+
+    child = AssignRevokeCodeRequestSerializer()
+
+    def to_internal_value(self, data):
+        """De-duplicate records by email, keeping the first occurrence."""
+        validated = super().to_internal_value(data)
+
+        seen_emails = set()
+        deduped = []
+        for record in validated:
+            email = record["email"].lower()
+            if email in seen_emails:
+                continue
+            seen_emails.add(email)
+            deduped.append(record)
+
+        return deduped
+
+
+class DetailErrorSerializer(serializers.Serializer):
+    """Serializer for generic detail error responses (404, etc.)."""
+
+    detail = serializers.CharField()
+
+
 class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     """Serializer for enrollment codes available to a contract."""
 
@@ -169,3 +203,22 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         """Return when the last reminder email was sent."""
         redemption = self._get_redemption(obj)
         return redemption.last_reminder_sent_on if redemption else None
+
+
+class BulkAssignErrorSerializer(serializers.Serializer):
+    email = serializers.CharField()
+    name = serializers.CharField()
+    detail = serializers.CharField()
+
+
+class BulkAssignResultSerializer(serializers.Serializer):
+    """Serializer for the bulk_assign response body."""
+
+    assigned = serializers.ListField(
+        help_text="Successfully assigned codes.",
+        child=ManagerEnrollmentCodeSerializer(),
+    )
+    errors = serializers.ListField(
+        child=BulkAssignErrorSerializer(),
+        help_text="Records that could not be assigned, with a 'detail' explanation.",
+    )

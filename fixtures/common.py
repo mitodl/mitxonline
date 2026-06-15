@@ -6,6 +6,7 @@ import os
 import pytest
 import responses
 from django.test import Client
+from mitol.common.serializers import THIS_IS_NOT_AN_API
 from rest_framework.test import APIClient
 from zeal import zeal_ignore
 
@@ -81,7 +82,10 @@ def mocked_responses():
 @pytest.fixture
 def mock_context(mocker, user):
     """Mocked context for serializers"""
-    return {"request": mocker.Mock(user=user)}
+    return {
+        "request": mocker.Mock(user=user),
+        "skip_prefetch_checks": THIS_IS_NOT_AN_API,
+    }
 
 
 @pytest.fixture

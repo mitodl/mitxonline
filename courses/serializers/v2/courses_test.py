@@ -31,7 +31,6 @@ pytestmark = [pytest.mark.django_db]
 
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
-@pytest.mark.parametrize("include_programs", [True, False])
 @pytest.mark.parametrize(
     "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
 )
@@ -42,11 +41,9 @@ pytestmark = [pytest.mark.django_db]
         False,
     ],
 )
-def test_serialize_course(  # noqa: PLR0913
-    mocker,
+def test_serialize_course(
     mock_context,
     is_anonymous,
-    include_programs,
     certificate_type,
     cert_available,
 ):
@@ -71,8 +68,6 @@ def test_serialize_course(  # noqa: PLR0913
 
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
-    if include_programs:
-        mock_context["include_programs"] = True
     user = mock_context["request"].user
     course = courseRun1.course
     topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
@@ -124,11 +119,7 @@ def test_serialize_course(  # noqa: PLR0913
             "min_price": course.page.min_price,
             "max_price": course.page.max_price,
             "time_commitment": course.page.effort,
-            "programs": (
-                BaseProgramSerializer(course.programs, many=True).data
-                if include_programs
-                else None
-            ),
+            "programs": BaseProgramSerializer(course.programs, many=True).data,
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
             "possible_variant_sets": [
@@ -179,7 +170,7 @@ def test_serialize_course_required_prerequisites(
             "min_price": course.page.min_price,
             "max_price": course.page.max_price,
             "time_commitment": course.page.effort,
-            "programs": None,
+            "programs": BaseProgramSerializer(course.programs, many=True).data,
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
             "possible_variant_sets": [
@@ -188,37 +179,6 @@ def test_serialize_course_required_prerequisites(
             ],
         },
     )
-
-
-@pytest.mark.parametrize(
-    ("program_live", "page_live", "expected_in_programs"),
-    [
-        (True, True, True),
-        (False, True, False),
-        (True, False, False),
-        (False, False, False),
-    ],
-)
-def test_serialize_course_programs_excludes_non_live(
-    mock_context,
-    program_live,
-    page_live,
-    expected_in_programs,
-):
-    """Test that get_programs excludes programs where live=False or page.live=False"""
-    mock_context["include_programs"] = True
-    course = CourseFactory.create()
-    program = ProgramFactory.create(live=program_live)
-    program.page.live = page_live
-    program.page.save()
-    program.add_requirement(course)
-
-    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
-
-    if expected_in_programs:
-        assert len(data["programs"]) == 1
-    else:
-        assert data["programs"] == []
 
 
 def test_serialize_course_with_no_page(mock_context):
@@ -347,7 +307,7 @@ class TestUserEnrollmentFiltering:
 # ---- Language / titles serializer tests ----
 
 
-def test_course_serializer_canonical_run_per_tag():
+def test_course_serializer_canonical_run_per_tag(mock_context):
     """get_courseruns returns one canonical run per tag (the primary-language one)."""
     course = CourseFactory.create()
     run_en = CourseRunFactory.create(
@@ -366,12 +326,12 @@ def test_course_serializer_canonical_run_per_tag():
         courseware_id="course-v1:T+C+1T2026-zh",
         b2b_contract=None,
     )
-    serializer = CourseWithCourseRunsSerializer(course)
+    serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
     assert serializer.data["courseruns"][0]["courseware_id"] == run_en.courseware_id
 
 
-def test_course_serializer_canonical_run_fallback_to_oldest():
+def test_course_serializer_canonical_run_fallback_to_oldest(mock_context):
     """When no run has is_primary_language=True, the oldest run is canonical."""
     course = CourseFactory.create()
     run_first = CourseRunFactory.create(
@@ -390,6 +350,6 @@ def test_course_serializer_canonical_run_fallback_to_oldest():
         courseware_id="course-v1:T+C+1T2026-zh",
         b2b_contract=None,
     )
-    serializer = CourseWithCourseRunsSerializer(course)
+    serializer = CourseWithCourseRunsSerializer(course, context=mock_context)
     assert len(serializer.data["courseruns"]) == 1
     assert serializer.data["courseruns"][0]["courseware_id"] == run_first.courseware_id

@@ -12,6 +12,7 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramCollection,
+    ProgramRequirement,
     ProgramRequirementNodeType,
 )
 from courses.serializers.base import BaseProgramRequirementTreeSerializer
@@ -204,69 +205,6 @@ class ProgramSerializer(serializers.ModelSerializer):
                         "required": {
                             "type": "array",
                             "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of required course IDs",
-                        },
-                        "electives": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of elective course IDs",
-                        },
-                    },
-                },
-                "programs": {
-                    "type": "object",
-                    "properties": {
-                        "required": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of required program IDs",
-                        },
-                        "electives": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    {"type": "integer"},
-                                ]
-                            },
-                            "description": "List of elective program IDs",
-                        },
-                    },
-                },
-            },
-        }
-    )
-    def _is_requirement_elective(self, requirement):
-        """Check if a requirement is elective based on its flag or parent flag"""
-        if requirement.elective_flag:
-            return True
-        try:
-            parent = requirement.get_parent()
-            return parent and bool(parent.elective_flag)
-        except AttributeError:
-            return False
-
-    @extend_schema_field(
-        {
-            "type": "object",
-            "properties": {
-                "courses": {
-                    "type": "object",
-                    "properties": {
-                        "required": {
-                            "type": "array",
-                            "items": {
                                 "type": "object",
                                 "properties": {
                                     "id": {"type": "integer"},
@@ -319,39 +257,14 @@ class ProgramSerializer(serializers.ModelSerializer):
         }
     )
     def get_requirements(self, instance):
-        """Get program requirements using prefetched data when available"""
-        if hasattr(instance, "all_requirements"):
-            all_requirements = list(instance.all_requirements.all())
-            required_courses, elective_courses = (
-                self._process_course_requirements_from_all(all_requirements)
-            )
-            required_programs, elective_programs = (
-                self._process_program_requirements_from_all(all_requirements)
-            )
-        else:
-            # Fallback to using model properties
-            return {
-                "courses": {
-                    "required": [
-                        {"id": course.id, "readable_id": course.readable_id}
-                        for course in instance.required_courses
-                    ],
-                    "electives": [
-                        {"id": course.id, "readable_id": course.readable_id}
-                        for course in instance.elective_courses
-                    ],
-                },
-                "programs": {
-                    "required": [
-                        {"id": program.id, "readable_id": program.readable_id}
-                        for program in instance.required_programs
-                    ],
-                    "electives": [
-                        {"id": program.id, "readable_id": program.readable_id}
-                        for program in instance.elective_programs
-                    ],
-                },
-            }
+        """Get program requirements using prefetched data when available."""
+        all_requirements = _get_all_program_requirements(instance)
+        required_courses, elective_courses = self._process_course_requirements_from_all(
+            instance, all_requirements
+        )
+        required_programs, elective_programs = (
+            self._process_program_requirements_from_all(all_requirements)
+        )
 
         return {
             "courses": {
@@ -364,27 +277,27 @@ class ProgramSerializer(serializers.ModelSerializer):
             },
         }
 
-    def _process_course_requirements_from_all(self, requirements):
-        """Process course requirements and return dicts with id and readable_id"""
-        required_courses = []
-        elective_courses = []
-        for req in requirements:
-            # Check node_type and course first to avoid unnecessary queries
-            if req.node_type == ProgramRequirementNodeType.COURSE and req.course:
-                course_data = {
-                    "id": req.course.id,
-                    "readable_id": req.course.readable_id,
-                }
-                if self._is_requirement_elective(req):
-                    elective_courses.append(course_data)
-                else:
-                    required_courses.append(course_data)
-        return required_courses, elective_courses
+    def _process_course_requirements_from_all(self, instance, requirements):
+        """Process course requirements and return dicts with id and readable_id."""
+        requirements_data = instance.get_courses_with_requirements_data(requirements)
+
+        return (
+            [
+                {"id": course.id, "readable_id": course.readable_id}
+                for course in requirements_data["required_courses"]
+            ],
+            [
+                {"id": course.id, "readable_id": course.readable_id}
+                for course in requirements_data["elective_courses"]
+            ],
+        )
 
     def _process_program_requirements_from_all(self, requirements):
-        """Process program requirements and return dicts with id and readable_id"""
+        """Process program requirements and return dicts with id and readable_id."""
         required_programs = []
         elective_programs = []
+        elective_operator_paths = _get_elective_operator_paths(requirements)
+
         for req in requirements:
             # Check node_type and required_program first to avoid unnecessary queries
             if (
@@ -395,7 +308,9 @@ class ProgramSerializer(serializers.ModelSerializer):
                     "id": req.required_program.id,
                     "readable_id": req.required_program.readable_id,
                 }
-                if self._is_requirement_elective(req):
+                if _is_requirement_under_elective_operator(
+                    req, elective_operator_paths
+                ):
                     elective_programs.append(program_data)
                 else:
                     required_programs.append(program_data)
@@ -643,6 +558,42 @@ def _get_program_collection_ids(instance: Program) -> list[int]:
         ProgramCollection.objects.filter(collection_items__program_id=instance.id)
         .values_list("id", flat=True)
         .order_by("collection_items__sort_order", "id")
+    )
+
+
+def _get_all_program_requirements(instance: Program) -> list[ProgramRequirement]:
+    """Return all requirements using prefetched data when available."""
+
+    cached_requirements = getattr(instance, "_prefetched_objects_cache", {}).get(
+        "all_requirements"
+    )
+    if cached_requirements is not None:
+        return list(cached_requirements)
+
+    return list(
+        ProgramRequirement.objects.select_related("course", "required_program")
+        .filter(program_id=instance.id)
+        .order_by("path")
+    )
+
+
+def _get_elective_operator_paths(requirements: list[ProgramRequirement]) -> set[str]:
+    """Return the set of operator paths that mark descendants as elective."""
+    return {
+        requirement.path
+        for requirement in requirements
+        if requirement.node_type == ProgramRequirementNodeType.OPERATOR
+        and requirement.elective_flag
+    }
+
+
+def _is_requirement_under_elective_operator(
+    requirement: ProgramRequirement, elective_operator_paths: set[str]
+) -> bool:
+    """Return True if a requirement is elective by itself or by ancestry."""
+    return bool(requirement.elective_flag) or any(
+        requirement.path.startswith(operator_path)
+        for operator_path in elective_operator_paths
     )
 
 
