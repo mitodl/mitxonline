@@ -293,7 +293,7 @@ def _create_source_variant_runs(course, *, b2b_only=True):
         for k in primary_source_run.__dict__.keys() - exclude_keys
     }
 
-    for variant in variants[1:]:
+    for variant in variants:
         (lang, vind, vlen) = variant
 
         source_run = CourseRunFactory.create(
@@ -376,7 +376,7 @@ def b2b_courses(fake, course_catalog_data):
     course_runs_by_org_id = defaultdict(list)
 
     for org in organizations:
-        org_contracts = ContractPageFactory.create_batch(3)
+        org_contracts = ContractPageFactory.create_batch(3, organization=org)
         contracts_by_org_id[org.id] = org_contracts
         contracts.extend(org_contracts)
 
@@ -389,7 +389,7 @@ def b2b_courses(fake, course_catalog_data):
 
         course_runs.extend(contract_runs)
         course_runs_by_contract_id[contract.id] = contract_runs
-        course_runs_by_org_id[contract.organization_id].extend(contract_runs)
+        course_runs_by_org_id[contract.organization.id].extend(contract_runs)
 
     return B2BCourses(
         organizations=organizations,
