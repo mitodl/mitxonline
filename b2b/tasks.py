@@ -6,6 +6,7 @@ import logging
 from django.core.cache import cache
 from django.db.models import Q
 
+from b2b.mail import send_enrollment_code_assignment_email
 from main.celery import app
 
 log = logging.getLogger(__name__)
@@ -204,3 +205,8 @@ def queue_update_all_contract_enrollment_sheets():
 
     for contract in updateable_contracts:
         queue_contract_sheet_update_post_save.delay(contract.id, only_update=True)
+
+
+@app.task()
+def queue_send_enrollment_code_assignment_email(assignment_record_ids: list[int]):
+    send_enrollment_code_assignment_email(assignment_record_ids)

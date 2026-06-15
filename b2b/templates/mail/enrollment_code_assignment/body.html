@@ -1,0 +1,38 @@
+{% extends "email_base.html" %}
+
+{% block content %}
+<!-- 1 Column Text + Button : BEGIN -->
+  <tr>
+      <td style="background-color: #ffffff;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+              <tr>
+                  <td style="padding: 20px; font-family: sans-serif; font-size: 15px; line-height: 20px; color: #555555;">
+                      <p style="margin: 0 0 10px;">Dear {{ assignment.assigned_name }},</p>
+                      <p style="margin: 0 0 10px;">You have been invited to join {{ organization_name }}. Please click the button below to accept.</p>
+                  </td>
+              </tr>
+              <tr>
+                  <td style="padding: 0 20px 20px;">
+                      <!-- Button : BEGIN -->
+                      <table align="left" role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: auto;">
+                          <tr>
+                              <td class="button-td button-td-primary" style="border-radius: 4px; background: #a31f34;">
+                                   <a class="button-a button-a-primary" href="{{code_url}}" style="background: #ffffff; border: 1px solid #a31f34; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #a31f34; display: block; border-radius: 4px;">Join Organization</a>
+                              </td>
+                          </tr>
+                      </table>
+                      <!-- Button : END -->
+                  </td>
+              </tr>
+              <tr>
+                <td style="padding: 0 20px 20px;">
+                    <p>If the button doesn't work, copy and paste this link into your web browser:</p>
+                    {{code_url}}
+                </td>
+            </tr>
+
+          </table>
+      </td>
+  </tr>
+<!-- 1 Column Text + Button : END -->
+{% endblock %}
