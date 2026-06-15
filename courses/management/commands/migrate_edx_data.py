@@ -791,6 +791,7 @@ class Command(BaseCommand):
 
         total_enrollments = 0
         total_orders = 0
+        repaired_user_ids = set()
 
         GENDER_MAP = {label: code for code, label in GENDER_CHOICES}
 
@@ -850,7 +851,6 @@ class Command(BaseCommand):
                 row["discount_id"] for row in verified_rows if row.get("discount_id")
             }
 
-            users = {u.id: u for u in User.objects.filter(id__in=verified_user_ids)}
             all_users = {u.id: u for u in User.objects.filter(id__in=all_user_ids)}
             product_versions = {
                 v.id: v for v in Version.objects.filter(id__in=product_version_ids)
@@ -869,6 +869,19 @@ class Command(BaseCommand):
                 list(all_users.values()), id_row_lookup, batch_size, GENDER_MAP
             )
 
+            for user in all_users.values():
+                if user.id in repaired_user_ids:
+                    continue
+                try:
+                    repair_faulty_edx_user(user)
+                    repaired_user_ids.add(user.id)
+                except Exception as e:  # noqa: BLE001
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"repair_faulty_edx_user failed for user {user.id}, continuing: {e}"
+                        )
+                    )
+
             for row in verified_rows:
                 try:
                     if (
@@ -879,7 +892,7 @@ class Command(BaseCommand):
                     ):
                         continue
 
-                    user = users.get(row["user_mitxonline_id"])
+                    user = all_users.get(row["user_mitxonline_id"])
                     product_version = product_versions.get(
                         row.get("product_version_id")
                     )
@@ -908,15 +921,6 @@ class Command(BaseCommand):
                             )
                         )
                         continue
-
-                    try:
-                        repair_faulty_edx_user(user)
-                    except Exception as e:  # noqa: BLE001
-                        self.stdout.write(
-                            self.style.WARNING(
-                                f"repair_faulty_edx_user failed for user {user.id}, continuing: {e}"
-                            )
-                        )
 
                     with transaction.atomic():
                         order = PendingOrder.create_from_product(
