@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.155.0 (Released June 15, 2026)
+---------------
+
+- Assign, revoke, remind and bulk_assign b2b enrollment code endpoints (#3646)
+
 Version 1.154.0 (Released June 15, 2026)
 ---------------
 
