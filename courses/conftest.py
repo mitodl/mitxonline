@@ -6,6 +6,7 @@ from typing import NamedTuple
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from faker import Faker
 from opaque_keys.edx.keys import CourseKey
 
@@ -42,6 +43,10 @@ langopts = [
     "zh_CN",
 ]
 fake = Faker()
+COURSERUN_EXCLUDE_KEYS = [
+    "_state",
+    "id",
+]
 
 
 @pytest.fixture
@@ -120,7 +125,7 @@ def _create_course(idx):
         # Make some variant runs - by default, half of the courses should get one.
         # These are for normal, customer-facing courses, so the only variants we'll
         # configure are translations.
-        language = fake.random_choice(langopts)
+        language = fake.random_element(langopts)
         SupportedVariant.objects.create(variant_object=test_course, language=language)
         crv1 = CourseRunFactory.create(
             course=test_course,
@@ -235,21 +240,23 @@ def _create_source_variant_runs(course, *, b2b_only=True):
             ).all()
         ]
     else:
+        # as long as the language is unique, the other two can repeat
+        random_langs = fake.random_sample(langopts, length=3)
         variants = [
             (
-                fake.random_choice(langopts),
-                fake.random_choice(COURSE_VARIANT_INDUSTRY[1:])[0],
-                fake.random_choice(COURSE_VARIANT_LENGTH[1:])[0],
+                random_langs[0],
+                fake.random_element(COURSE_VARIANT_INDUSTRY[1:])[0],
+                fake.random_element(COURSE_VARIANT_LENGTH[1:])[0],
             ),
             (
-                fake.random_choice(langopts),
-                fake.random_choice(COURSE_VARIANT_INDUSTRY[1:])[0],
-                fake.random_choice(COURSE_VARIANT_LENGTH[1:])[0],
+                random_langs[1],
+                fake.random_element(COURSE_VARIANT_INDUSTRY[1:])[0],
+                fake.random_element(COURSE_VARIANT_LENGTH[1:])[0],
             ),
             (
-                fake.random_choice(langopts),
-                fake.random_choice(COURSE_VARIANT_INDUSTRY[1:])[0],
-                fake.random_choice(COURSE_VARIANT_LENGTH[1:])[0],
+                random_langs[2],
+                fake.random_element(COURSE_VARIANT_INDUSTRY[1:])[0],
+                fake.random_element(COURSE_VARIANT_LENGTH[1:])[0],
             ),
         ]
 
@@ -271,8 +278,20 @@ def _create_source_variant_runs(course, *, b2b_only=True):
         is_primary_language=True,
     )
     variant_sources.append(primary_source_run)
-    psr_fields = primary_source_run.__dict__
-    del psr_fields["_state"]
+
+    exclude_keys = [
+        *COURSERUN_EXCLUDE_KEYS,
+        "courseware_id",
+        "language",
+        "is_primary_language",
+        "variant_industry",
+        "variant_length",
+    ]
+
+    psr_fields = {
+        k: getattr(primary_source_run, k)
+        for k in primary_source_run.__dict__.keys() - exclude_keys
+    }
 
     for variant in variants[1:]:
         (lang, vind, vlen) = variant
@@ -293,8 +312,17 @@ def _create_source_variant_runs(course, *, b2b_only=True):
 def _create_b2b_run_from_source(contract, source_run, run_tag_prefix):
     """Create a B2B run for the specified contract and source run"""
 
-    sr_fields = source_run.__dict__
-    del sr_fields["_state"]
+    exclude_keys = [
+        *COURSERUN_EXCLUDE_KEYS,
+        "is_source_run",
+        "courseware_id",
+        "run_tag",
+        "b2b_contract_id",
+    ]
+
+    sr_fields = {
+        k: getattr(source_run, k) for k in source_run.__dict__.keys() - exclude_keys
+    }
 
     run_tag = f"{run_tag_prefix}_{source_run.language}_{source_run.variant_industry}_{source_run.variant_length}"
 
@@ -306,17 +334,44 @@ def _create_b2b_run_from_source(contract, source_run, run_tag_prefix):
         is_source_run=False,
         courseware_id=str(run_key),
         run_tag=run_tag_prefix,
+        b2b_contract=contract,
     )
+
+
+def _process_variants_and_runs(contract, course):
+    """Make sure the contract supports the course variants, add contract runs"""
+
+    run_tag_prefix_semester = fake.random_digit_not_null()
+    run_tag_prefix_year = fake.future_date(end_date="+3y").year
+    contract_content_type = ContentType.objects.get_for_model(contract)
+
+    [
+        SupportedVariant.objects.update_or_create(
+            object_id=contract.id,
+            content_type=contract_content_type,
+            language=cv.language,
+            variant_industry=cv.variant_industry,
+            variant_length=cv.variant_length,
+            default_variant=cv.default_variant,
+        )
+        for cv in course.possible_variant_sets.all()
+    ]
+
+    return [
+        _create_b2b_run_from_source(
+            contract, sr, f"{run_tag_prefix_semester}T{run_tag_prefix_year}"
+        )
+        for sr in course.courseruns.filter(is_source_run=True).all()
+    ]
 
 
 @pytest.fixture
 def b2b_courses(fake, course_catalog_data):
     """Configure some of the courses as b2b"""
-    courses, _, runs = course_catalog_data
+    courses, _, course_runs = course_catalog_data
     organizations = OrganizationPageFactory.create_batch(3)
     contracts = []
     contracts_by_org_id = {}
-    course_runs = []
     course_runs_by_contract_id = defaultdict(list)
     course_runs_by_org_id = defaultdict(list)
 
@@ -327,15 +382,14 @@ def b2b_courses(fake, course_catalog_data):
 
     [_create_source_variant_runs(course) for course in courses]
 
-    for run in fake.random_sample(runs, length=ceil(len(runs) * 0.5)):
-        contract = fake.random_element(elements=contracts)
+    for contract in contracts:
+        contract_runs = []
+        for course in fake.random_sample(courses, length=ceil(len(courses) * 0.5)):
+            contract_runs.extend(_process_variants_and_runs(contract, course))
 
-        run.b2b_contract = contract
-        run.save()
-
-        course_runs.append(run)
-        course_runs_by_contract_id[contract.id].append(run)
-        course_runs_by_org_id[contract.organization_id].append(run)
+        course_runs.extend(contract_runs)
+        course_runs_by_contract_id[contract.id] = contract_runs
+        course_runs_by_org_id[contract.organization_id].extend(contract_runs)
 
     return B2BCourses(
         organizations=organizations,
