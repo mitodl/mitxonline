@@ -793,15 +793,9 @@ class Command(BaseCommand):
         cur = conn.cursor()
 
         query = (
-            "SELECT user_mitxonline_id, courserun_id, courserunenrollment_enrollment_mode, "
-            " product_version_id, discount_id, "
-            " user_address_country, user_gender, user_birth_year "
-            "FROM ("
-            "  VALUES "
-            "    (1, 2, 'audit', NULL, NULL, 'US','Female', NULL),"
-            "    (2, 3, 'audit', NULL, NULL, NULL, NULL, NULL)"
-            ") AS t(user_mitxonline_id, courserun_id, courserunenrollment_enrollment_mode, "
-            "product_version_id, discount_id, user_address_country, user_gender, user_birth_year)"
+            "SELECT * FROM edxorg_to_mitxonline_enrollments "
+            "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL "
+            "AND courseruncertificate_created_on IS NULL"
         )
         if limit is not None:
             query += f" LIMIT {int(limit)}"
