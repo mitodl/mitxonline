@@ -768,6 +768,20 @@ class Command(BaseCommand):
                 enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
             )
 
+    def _repair_user(self, user, repaired_user_ids):
+        """Attempt to repair a faulty edX user, skipping if already repaired."""
+        if user.id in repaired_user_ids:
+            return
+        try:
+            repair_faulty_edx_user(user)
+            repaired_user_ids.add(user.id)
+        except Exception as e:  # noqa: BLE001
+            self.stdout.write(
+                self.style.WARNING(
+                    f"repair_faulty_edx_user failed for user {user.id}, continuing: {e}"
+                )
+            )
+
     def _migrate_enrollments(self, conn, options):  # noqa: PLR0915
         """
         Migrate the edX future enrollments from edX to MITx Online. Create Orders for the verified enrollments.
@@ -779,9 +793,15 @@ class Command(BaseCommand):
         cur = conn.cursor()
 
         query = (
-            "SELECT * FROM edxorg_to_mitxonline_enrollments "
-            "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL "
-            "AND courseruncertificate_created_on IS NULL"
+            "SELECT user_mitxonline_id, courserun_id, courserunenrollment_enrollment_mode, "
+            " product_version_id, discount_id, "
+            " user_address_country, user_gender, user_birth_year "
+            "FROM ("
+            "  VALUES "
+            "    (1, 2, 'audit', NULL, NULL, 'US','Female', NULL),"
+            "    (2, 3, 'audit', NULL, NULL, NULL, NULL, NULL)"
+            ") AS t(user_mitxonline_id, courserun_id, courserunenrollment_enrollment_mode, "
+            "product_version_id, discount_id, user_address_country, user_gender, user_birth_year)"
         )
         if limit is not None:
             query += f" LIMIT {int(limit)}"
@@ -870,17 +890,7 @@ class Command(BaseCommand):
             )
 
             for user in all_users.values():
-                if user.id in repaired_user_ids:
-                    continue
-                try:
-                    repair_faulty_edx_user(user)
-                    repaired_user_ids.add(user.id)
-                except Exception as e:  # noqa: BLE001
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"repair_faulty_edx_user failed for user {user.id}, continuing: {e}"
-                        )
-                    )
+                self._repair_user(user, repaired_user_ids)
 
             for row in verified_rows:
                 try:
