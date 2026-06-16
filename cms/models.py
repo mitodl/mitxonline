@@ -21,7 +21,6 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.functional import cached_property
 from django.utils.text import slugify
-from mitol.common.serializers import THIS_IS_NOT_AN_API
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
@@ -1545,10 +1544,13 @@ class CoursePage(ProductPage):
     def course_details(self):
         from courses.serializers.v2.courses import CourseSerializer  # noqa: PLC0415
 
-        # Note: this IS an API, but it's untested so hacking this in for now
-        return CourseSerializer(
-            self.course, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
-        ).data
+        # check on course_id so we don't fetch
+        if self.course_id is None:
+            return None
+
+        course = Course.objects.prefetch("programs").get(id=self.course_id)
+
+        return CourseSerializer(course).data
 
 
 class ProgramPage(ProductPage):
