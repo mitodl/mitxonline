@@ -457,6 +457,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/DetailError'
           description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/:
     post:
       operationId: b2b_manager_organizations_contracts_codes_remind_create
