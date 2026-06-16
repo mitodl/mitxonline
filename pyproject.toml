@@ -40,7 +40,7 @@ dependencies = [
     "ipython>=9.13,<10",
     "mitol-django-apigateway==2026.4.29",
     "mitol-django-authentication==2026.4.29",
-    "mitol-django-common==2026.6.10",
+    "mitol-django-common==2026.6.16.4",
     "mitol-django-hubspot-api==2026.4.29",
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
