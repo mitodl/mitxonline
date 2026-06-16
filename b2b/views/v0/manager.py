@@ -671,14 +671,14 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     )
     @action(
         detail=True,
-        methods=["delete"],
+        methods=["put"],
         url_path="codes/(?P<code>[^/.]+)/reassign",
     )
     def reassign_code(self, request, **kwargs):
         """
         Reassign specific enrollment code to a new email address.
 
-        PATCH /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/reassign/
+        PUT /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/reassign/
 
         Removes the DiscountContractAttachmentRedemption record for the specified code and reassigns it to a new email address.
         """
