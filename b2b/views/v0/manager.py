@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
@@ -92,6 +93,66 @@ def assign_codes_and_send_emails(
     )
 
     return True
+
+
+def revoke(contract: ContractPage, code: str):
+    discount = contract.get_discounts().filter(discount_code=code).first()
+    if not discount:
+        return Response(
+            {"detail": "Code not found for this contract."},
+            status=http_status.HTTP_404_NOT_FOUND,
+        )
+
+    assignment_record = discount.contract_redemptions.first()
+    if not assignment_record:
+        return Response(
+            {"detail": "No assignment exists for this code."},
+            status=http_status.HTTP_404_NOT_FOUND,
+        )
+
+    if assignment_record.user or assignment_record.redeemed_on:
+        return Response(
+            {"detail": "Cannot revoke a code that has already been redeemed."},
+            status=http_status.HTTP_409_CONFLICT,
+        )
+    assignment_record.delete()
+
+    return Response(
+        ManagerEnrollmentCodeSerializer(discount).data,
+        status=http_status.HTTP_200_OK,
+    )
+
+
+def assign(
+    request, contract: ContractPage, code: str, email: str, name: str | None = None
+):
+    discount = contract.get_discounts().filter(discount_code=code).first()
+    if not discount:
+        return Response(
+            {"detail": "Code not found for this contract."},
+            status=http_status.HTTP_404_NOT_FOUND,
+        )
+    if discount.contract_redemptions.exists():
+        return Response(
+            {"detail": "Code has already been assigned or redeemed."},
+            status=http_status.HTTP_409_CONFLICT,
+        )
+
+    assignment = CodeAssignment(
+        code=code, contract=contract, discount=discount, email=email, name=name
+    )
+
+    success = assign_codes_and_send_emails([assignment], request.user)
+    if not success:
+        return Response(
+            {"detail": "Error assigning codes."},
+            status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    return Response(
+        ManagerEnrollmentCodeSerializer(discount).data,
+        status=http_status.HTTP_200_OK,
+    )
 
 
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -342,6 +403,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         responses={
             200: ManagerEnrollmentCodeSerializer,
             400: DetailErrorSerializer,
+            404: DetailErrorSerializer,
             409: DetailErrorSerializer,
             500: DetailErrorSerializer,
         },
@@ -386,34 +448,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         email = serializer.validated_data["email"]
         name = serializer.validated_data.get("name", "")
 
-        discount = contract.get_discounts().filter(discount_code=code).first()
-        if not discount:
-            return Response(
-                {"detail": "Code not found for this contract."},
-                status=http_status.HTTP_404_NOT_FOUND,
-            )
-
-        if discount.contract_redemptions.exists():
-            return Response(
-                {"detail": "Code has already been assigned or redeemed."},
-                status=http_status.HTTP_409_CONFLICT,
-            )
-
-        assignment = CodeAssignment(
-            code=code, contract=contract, discount=discount, email=email, name=name
-        )
-
-        success = assign_codes_and_send_emails([assignment], request.user)
-        if not success:
-            return Response(
-                {"detail": "Error assigning codes."},
-                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        return Response(
-            ManagerEnrollmentCodeSerializer(discount).data,
-            status=http_status.HTTP_200_OK,
-        )
+        return assign(request, contract, code, email, name=name)
 
     @extend_schema(
         description="Revoke the assignment for a specific enrollment code, returning it to the unassigned pool.",
@@ -451,31 +486,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         contract = self.get_object()
         code = kwargs.get("code")
 
-        discount = contract.get_discounts().filter(discount_code=code).first()
-        if not discount:
-            return Response(
-                {"detail": "Code not found for this contract."},
-                status=http_status.HTTP_404_NOT_FOUND,
-            )
-
-        assignment_record = discount.contract_redemptions.first()
-        if not assignment_record:
-            return Response(
-                {"detail": "No assignment exists for this code."},
-                status=http_status.HTTP_404_NOT_FOUND,
-            )
-
-        if assignment_record.user or assignment_record.redeemed_on:
-            return Response(
-                {"detail": "Cannot revoke a code that has already been redeemed."},
-                status=http_status.HTTP_409_CONFLICT,
-            )
-        assignment_record.delete()
-
-        return Response(
-            ManagerEnrollmentCodeSerializer(discount).data,
-            status=http_status.HTTP_200_OK,
-        )
+        return revoke(contract, code)
 
     @extend_schema(
         description="Send a reminder email to the user assigned to a specific enrollment code who has not yet claimed it.",
@@ -637,3 +648,56 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             },
             status=http_status.HTTP_200_OK,
         )
+
+    @extend_schema(
+        description="Reassign the assignment for a specific enrollment code",
+        request=AssignRevokeCodeRequestSerializer,
+        responses={
+            200: ManagerEnrollmentCodeSerializer,
+            400: DetailErrorSerializer,
+            404: DetailErrorSerializer,
+            409: DetailErrorSerializer,
+            500: DetailErrorSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to reassign.",
+                required=True,
+            ),
+        ],
+    )
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path="codes/(?P<code>[^/.]+)/reassign",
+    )
+    def reassign_code(self, request, **kwargs):
+        """
+        Reassign specific enrollment code to a new email address.
+
+        PATCH /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/reassign/
+
+        Removes the DiscountContractAttachmentRedemption record for the specified code and reassigns it to a new email address.
+        """
+
+        contract = self.get_object()
+        code = kwargs.get("code")
+        serializer = AssignRevokeCodeRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"]
+        name = serializer.validated_data.get("name", "")
+
+        with transaction.atomic():
+            revoke_response = revoke(contract, code)
+            # If we failed to revoke the code, bail entirely.
+            if revoke_response.status_code != http_status.HTTP_200_OK:
+                return revoke_response
+            return assign(request, contract, code, email=email, name=name)
