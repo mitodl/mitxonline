@@ -698,7 +698,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
 
         assignment_record.assigned_email = email
-        assignment_record.name = name
+        assignment_record.assigned_name = name
         assignment_record.assigned_by = request.user
         assignment_record.last_reminder_sent_on = now_in_utc()
         assignment_record.save()

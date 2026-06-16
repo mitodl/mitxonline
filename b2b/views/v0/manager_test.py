@@ -1192,3 +1192,211 @@ def test_bulk_assign_internal_error(org_setup, manager_drf_client, mocker):
 
     assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert "detail" in resp.json()
+
+
+# ---------------------------------------------------------------------------
+# reassign_code tests
+# ---------------------------------------------------------------------------
+
+
+def test_reassign_code(org_setup, manager_drf_client, mocker):
+    """A manager can reassign an assigned code to a new email address."""
+    mock_task = mocker.patch(
+        "b2b.views.v0.manager.queue_send_enrollment_code_assignment_email"
+    )
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    redemption = DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="original@example.com",
+        assigned_name="Original Name",
+    )
+
+    reassign_url = reverse(
+        "b2b:b2b-manager-org-contract-reassign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.put(
+        reassign_url,
+        data={"email": "new@example.com", "name": "New Name"},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    redemption.refresh_from_db()
+    assert redemption.assigned_email == "new@example.com"
+    mock_task.delay.assert_called_once_with([redemption.id])
+
+    resp_data = resp.json()
+    assert resp_data["code"] == discount.discount_code
+    assert resp_data["redemption_status"] == REDEMPTION_STATUS_ASSIGNED
+    assert resp_data["assigned_to"] == "new@example.com"
+
+
+def test_reassign_code_updates_assigned_by(org_setup, manager_drf_client, mocker):
+    """reassign_code stamps the requesting manager as assigned_by."""
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    redemption = DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="original@example.com",
+    )
+
+    reassign_url = reverse(
+        "b2b:b2b-manager-org-contract-reassign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    manager_drf_client.put(
+        reassign_url,
+        data={"email": "new@example.com"},
+        format="json",
+    )
+
+    redemption.refresh_from_db()
+    assert redemption.assigned_by == manager_user
+
+
+def test_reassign_code_name_defaults_to_empty(org_setup, manager_drf_client, mocker):
+    """Reassigning a code without a name stores an empty string for assigned_name."""
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="original@example.com",
+        assigned_name="Old Name",
+    )
+
+    reassign_url = reverse(
+        "b2b:b2b-manager-org-contract-reassign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.put(
+        reassign_url,
+        data={"email": "new@example.com"},
+        format="json",
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["assigned_name"] == ""
+
+
+def test_reassign_code_invalid_request(org_setup, manager_drf_client):
+    """reassign_code returns 400 when the request body is missing the required email field."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="original@example.com",
+    )
+
+    reassign_url = reverse(
+        "b2b:b2b-manager-org-contract-reassign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.put(
+        reassign_url, data={"name": "No Email"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_reassign_code_not_found(org_setup, manager_drf_client):
+    """reassign_code returns 404 when the code does not belong to the contract."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    reassign_url = reverse(
+        "b2b:b2b-manager-org-contract-reassign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": "nonexistent-code",
+        },
+    )
+
+    resp = manager_drf_client.put(
+        reassign_url, data={"email": "new@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+    assert "detail" in resp.json()
+
+
+def test_reassign_code_no_assignment(org_setup, manager_drf_client):
+    """reassign_code returns 404 when no assignment exists for the code."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+
+    reassign_url = reverse(
+        "b2b:b2b-manager-org-contract-reassign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.put(
+        reassign_url, data={"email": "new@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+    assert "detail" in resp.json()
+
+
+def test_reassign_code_forbidden(org_setup, manager_drf_client):
+    """A manager cannot reassign codes for a contract belonging to an org they don't manage."""
+    _, _, *_, (contract_3, *_) = org_setup
+
+    discount = contract_3.get_discounts().order_by("id").first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_3,
+        assigned_email="original@example.com",
+    )
+
+    reassign_url = reverse(
+        "b2b:b2b-manager-org-contract-reassign-code",
+        kwargs={
+            "parent_lookup_organization": contract_3.organization.id,
+            "pk": contract_3.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.put(
+        reassign_url, data={"email": "new@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
