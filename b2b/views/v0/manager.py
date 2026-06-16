@@ -646,6 +646,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             200: ManagerEnrollmentCodeSerializer,
             400: DetailErrorSerializer,
             404: DetailErrorSerializer,
+            409: DetailErrorSerializer,
         },
         parameters=[
             OpenApiParameter(
@@ -695,6 +696,11 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             return Response(
                 {"detail": "No assignment exists for this code."},
                 status=http_status.HTTP_404_NOT_FOUND,
+            )
+        if assignment_record.user or assignment_record.redeemed_on:
+            return Response(
+                {"detail": "Cannot reassign a code that has already been redeemed."},
+                status=http_status.HTTP_409_CONFLICT,
             )
 
         assignment_record.assigned_email = email

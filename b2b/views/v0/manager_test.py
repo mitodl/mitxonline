@@ -1375,6 +1375,36 @@ def test_reassign_code_no_assignment(org_setup, manager_drf_client):
     assert "detail" in resp.json()
 
 
+def test_reassign_code_already_redeemed(org_setup, manager_drf_client):
+    """reassign_code returns 409 when the code has already been redeemed by a user."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    redeemer = UserFactory.create()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="assignee@example.com",
+        user=redeemer,
+    )
+
+    reassign_url = reverse(
+        "b2b:b2b-manager-org-contract-reassign-code",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.put(
+        reassign_url, data={"email": "new@example.com"}, format="json"
+    )
+
+    assert resp.status_code == status.HTTP_409_CONFLICT
+    assert "detail" in resp.json()
+
+
 def test_reassign_code_forbidden(org_setup, manager_drf_client):
     """A manager cannot reassign codes for a contract belonging to an org they don't manage."""
     _, _, *_, (contract_3, *_) = org_setup
