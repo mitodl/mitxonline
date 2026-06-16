@@ -332,6 +332,27 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
         return obj.b2b_contract.name if obj.b2b_contract else ""
 
 
+class ProgramEnrollmentAuditInline(admin.TabularInline):
+    """Inline editor for ProgramEnrollmentAudit"""
+
+    model = ProgramEnrollmentAudit
+    readonly_fields = [
+        "enrollment_id",
+        "created_on",
+        "acting_user",
+        "call_stack",
+        "data_before",
+        "data_after",
+    ]
+    min_num = 0
+    extra = 0
+    can_delete = False
+    can_add = False
+
+    def has_add_permission(self, request, obj=None):  # noqa: ARG002
+        return False
+
+
 @admin.register(ProgramEnrollment)
 class ProgramEnrollmentAdmin(AuditableModelAdmin):
     """Admin for ProgramEnrollment"""
@@ -350,11 +371,15 @@ class ProgramEnrollmentAdmin(AuditableModelAdmin):
         "get_program_readable_id",
         "enrollment_mode",
         "change_status",
+        "created_on",
+        "updated_on",
     )
     raw_id_fields = (
         "user",
         "program",
     )
+    readonly_fields = ("created_on", "updated_on")
+    inlines = [ProgramEnrollmentAuditInline]
 
     def get_queryset(self, request):
         """
@@ -465,6 +490,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
     inlines = [
         CourseRunEnrollmentAuditInline,
     ]
+    readonly_fields = ("created_on", "updated_on")
     actions = ["retry_all_failed_edx_enrollment", "downgrade_enrollment"]
     run_for_all_actions = ["retry_all_failed_edx_enrollment"]
 
@@ -558,11 +584,33 @@ class CourseRunEnrollmentAuditAdmin(TimestampedModelAdmin):
         return False
 
 
+class CourseRunGradeAuditInline(admin.TabularInline):
+    """Inline editor for CourseRunGradeAudit"""
+
+    model = CourseRunGradeAudit
+    readonly_fields = [
+        "course_run_grade_id",
+        "created_on",
+        "acting_user",
+        "call_stack",
+        "data_before",
+        "data_after",
+    ]
+    min_num = 0
+    extra = 0
+    can_delete = False
+    can_add = False
+
+    def has_add_permission(self, request, obj=None):  # noqa: ARG002
+        return False
+
+
 @admin.register(CourseRunGrade)
-class CourseRunGradeAdmin(admin.ModelAdmin):
+class CourseRunGradeAdmin(TimestampedModelAdmin):
     """Admin for CourseRunGrade"""
 
     model = CourseRunGrade
+    include_timestamps_in_list = True
     list_display = [
         "id",
         "get_user_email",
@@ -576,6 +624,7 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
         "course_run",
     )
     search_fields = ["user__email", "user__username"]
+    inlines = [CourseRunGradeAuditInline]
 
     def get_queryset(self, request):  # noqa: ARG002
         return self.model.objects.get_queryset().select_related("user", "course_run")
@@ -666,6 +715,7 @@ class PaidCourseRunAdmin(TimestampedModelAdmin):
     """Admin for PaidCourseRun"""
 
     model = PaidCourseRun
+    include_timestamps_in_list = True
     list_display = [
         "id",
         "get_user_email",
@@ -697,6 +747,7 @@ class PaidProgramAdmin(TimestampedModelAdmin):
     """Admin for PaidProgram"""
 
     model = PaidProgram
+    include_timestamps_in_list = True
     list_display = [
         "id",
         "get_user_email",
@@ -898,6 +949,7 @@ class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
     """Admin for LearnerProgramRecordShare"""
 
     model = LearnerProgramRecordShare
+    include_timestamps_in_list = True
     list_display = ["share_uuid", "user", "partner_school", "is_active"]
     search_fields = ["share_uuid"]
     readonly_fields = [

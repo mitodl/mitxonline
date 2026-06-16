@@ -38,10 +38,32 @@ from ecommerce.models import (
 
 @admin.register(Transaction)
 class TransactionAdmin(VersionAdmin):
-    """Admin for Product"""
+    """Admin for Transaction"""
 
     model = Transaction
+    list_display = (
+        "id",
+        "transaction_id",
+        "order",
+        "amount",
+        "transaction_type",
+        "created_on",
+        "updated_on",
+    )
+    readonly_fields = (
+        "transaction_id",
+        "order",
+        "amount",
+        "data",
+        "transaction_type",
+        "reason",
+        "created_on",
+        "updated_on",
+    )
     raw_id_fields = ("order",)
+
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
+        return False
 
 
 @admin.register(Product)
@@ -231,6 +253,7 @@ class OrderTransactionInline(admin.TabularInline):
 class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
     """Base admin for Order"""
 
+    include_timestamps_in_list = True
     search_fields = [
         "id",
         "purchaser__email",
@@ -300,6 +323,7 @@ class CanceledOrderAdmin(BaseOrderAdmin):
 class FulfilledOrderAdmin(TimestampedModelAdmin):
     """Admin for FulfilledOrder"""
 
+    include_timestamps_in_list = True
     readonly_fields = ["reference_number"]
     search_fields = [
         "id",
