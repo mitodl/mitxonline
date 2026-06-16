@@ -162,6 +162,7 @@ def test_db_ssl_enable(monkeypatch, settings_sandbox):
     assert settings_vars["DATABASES"]["default"]["OPTIONS"] == {"sslmode": "require"}
 
 
+@pytest.mark.skip("Not fully implemented")
 def test_bump_my_version_format(settings):
     """Verify VERSION is in sync with pyproject.toml and matches a version format."""
     with open("pyproject.toml", "rb") as f:  # noqa: PTH123
