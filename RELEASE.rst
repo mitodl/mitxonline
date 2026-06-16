@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.155.1
+Version 1.155.1 (Released June 16, 2026)
 ---------------
 
 - Fix rogue serializer call that isn't prefetching (#3669)
