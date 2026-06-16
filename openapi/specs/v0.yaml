@@ -401,6 +401,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/DetailError'
           description: ''
+  /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/reassign/:
+    put:
+      operationId: b2b_manager_organizations_contracts_codes_reassign_update
+      description: Reassign the assignment for a specific enrollment code
+      parameters:
+      - in: path
+        name: code
+        schema:
+          type: string
+        description: The discount code to reassign.
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the contract
+        required: true
+      - in: path
+        name: parent_lookup_organization
+        schema:
+          type: integer
+        description: ID of the parent organization
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssignRevokeCodeRequestRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagerEnrollmentCode'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/:
     post:
       operationId: b2b_manager_organizations_contracts_codes_remind_create
@@ -474,6 +530,12 @@ paths:
                 $ref: '#/components/schemas/ManagerEnrollmentCode'
           description: ''
         '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
+        '409':
           content:
             application/json:
               schema:
