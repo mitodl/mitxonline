@@ -62,12 +62,6 @@ class TransactionAdmin(VersionAdmin):
     )
     raw_id_fields = ("order",)
 
-    def has_add_permission(self, request):  # noqa: ARG002
-        return False
-
-    def has_change_permission(self, request, obj=None):  # noqa: ARG002
-        return False
-
     def has_delete_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
