@@ -2970,6 +2970,7 @@ paths:
           - uz
           - vi
           - zh_CN
+          - zh_HANS
           - zh_HK
         description: |-
           ISO 639-1 language code for this run (e.g. 'en', 'zh', 'fr'). Leave blank for unspecified.
@@ -3014,6 +3015,7 @@ paths:
           * `uz` - uz
           * `vi` - vi
           * `zh_CN` - zh_CN
+          * `zh_HANS` - zh_HANS
           * `zh_HK` - zh_HK
       - in: query
         name: courseruns__variant_industry
@@ -4166,6 +4168,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
           oneOf:
           - $ref: '#/components/schemas/LanguageEnum'
@@ -5401,6 +5404,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
           oneOf:
           - $ref: '#/components/schemas/LanguageEnum'
@@ -5602,6 +5606,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
           oneOf:
           - $ref: '#/components/schemas/LanguageEnum'
@@ -5784,6 +5789,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
           oneOf:
           - $ref: '#/components/schemas/LanguageEnum'
@@ -6605,6 +6611,7 @@ components:
       - uz
       - vi
       - zh_CN
+      - zh_HANS
       - zh_HK
       type: string
       description: |-
@@ -6648,6 +6655,7 @@ components:
         * `uz` - uz
         * `vi` - vi
         * `zh_CN` - zh_CN
+        * `zh_HANS` - zh_HANS
         * `zh_HK` - zh_HK
       x-enum-descriptions:
       - af_ZA
@@ -6690,6 +6698,7 @@ components:
       - uz
       - vi
       - zh_CN
+      - zh_HANS
       - zh_HK
     LearnerProgramRecordShare:
       type: object
@@ -8597,6 +8606,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
         variant_length:
           readOnly: true
@@ -9226,6 +9236,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
           oneOf:
           - $ref: '#/components/schemas/LanguageEnum'
@@ -9425,6 +9436,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
           oneOf:
           - $ref: '#/components/schemas/LanguageEnum'
@@ -9602,6 +9614,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
           oneOf:
           - $ref: '#/components/schemas/LanguageEnum'
@@ -10148,6 +10161,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
           oneOf:
           - $ref: '#/components/schemas/LanguageEnum'
@@ -10326,6 +10340,7 @@ components:
             * `uz` - uz
             * `vi` - vi
             * `zh_CN` - zh_CN
+            * `zh_HANS` - zh_HANS
             * `zh_HK` - zh_HK
           oneOf:
           - $ref: '#/components/schemas/LanguageEnum'

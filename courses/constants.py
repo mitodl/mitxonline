@@ -213,6 +213,10 @@ COURSE_VARIANT_LANGUAGE = [
         "vi",
     ),
     ("zh_CN", "zh_CN"),
+    (
+        "zh_HANS",
+        "zh_HANS",
+    ),
     ("zh_HK", "zh_HK"),
 ]
 
@@ -229,6 +233,7 @@ COURSE_VARIANT_LANGUAGE_OVERRIDE = {
     "pt_BR": "Portugese - Brazil",
     "pt_PT": "Portugese - Portugal",
     "tr_TR": "Turkish - Türkiye",
-    "zh_CN": "Chinese - China",
+    "zh_CN": "Chinese",
+    "zh_HANS": "Chinese - Simplified",
     "zh_HK": "Chinese - Hong Kong",
 }
