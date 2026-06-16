@@ -773,8 +773,13 @@ class Command(BaseCommand):
         if user.id in repaired_user_ids:
             return
         try:
-            repair_faulty_edx_user(user)
+            created_user, created_auth_token = repair_faulty_edx_user(user)
             repaired_user_ids.add(user.id)
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Repaired user {user.id}: created_user={created_user}, created_auth_token={created_auth_token}"
+                )
+            )
         except Exception as e:  # noqa: BLE001
             self.stdout.write(
                 self.style.WARNING(
