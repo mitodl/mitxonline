@@ -7,12 +7,15 @@ from datetime import timedelta
 import pytest
 from django.db.models import Q
 from django.urls import reverse
+from faker import Faker
 from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from courses.conftest import B2BCourses, UserWithEnrollmentsAndCerts
-from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_UNENROLLED,
+)
 from courses.factories import (
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
@@ -38,6 +41,7 @@ pytestmark = [
     pytest.mark.parametrize("course_catalog_program_count", [20], indirect=True),
     pytest.mark.usefixtures("b2b_courses", "course_catalog_data"),
 ]
+fake = Faker()
 
 
 def test_user_enrollments_detail(

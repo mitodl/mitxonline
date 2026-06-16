@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.155.1 (Released June 16, 2026)
+---------------
+
+- Fix rogue serializer call that isn't prefetching (#3669)
+- Add ETL-specific version of the course data endpoint (#3632)
+- Add enrollment modes to import_courserun (#3658)
+
 Version 1.155.0 (Released June 15, 2026)
 ---------------
 

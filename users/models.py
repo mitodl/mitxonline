@@ -281,6 +281,9 @@ class User(
     is_staff = models.BooleanField(
         default=False, help_text="The user can access the admin site"
     )
+    is_etl = models.BooleanField(
+        default=False, help_text="The user is used by the Learn ETL process"
+    )
     # When we have deprecated direct login, default the is_active flag to True
     # and remove the related code in authentication/pipeline/user.py.
     is_active = models.BooleanField(
