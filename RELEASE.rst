@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 1.156.0 (Released June 17, 2026)
+---------------
+
+- Reassign endpoint, without fully deleting row (#3675)
+- Add zh_HANS to the language list (#3671)
+- 10726 update django admin admins to add date fields fix minor issues (#3667)
+- Add missing CMS API view tests (#3673)
+- Skip a failing test for the new release process (#3672)
+- Update migrate_edx_data to call repair_faulty_edx_user for all users during future enrollments migration (#3668)
+
 Version 1.155.1 (Released June 16, 2026)
 ---------------
 
