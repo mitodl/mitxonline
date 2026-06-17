@@ -148,20 +148,20 @@ class CourseRunFactory(DjangoModelFactory):
     )
     run_tag = factory.Sequence("R{0}".format)
     start_date = factory.Faker(
-        "date_time_this_month", before_now=True, after_now=False, tzinfo=ZoneInfo("UTC")
+        "date_time_between", start_date="-30d", end_date="-1d", tzinfo=ZoneInfo("UTC")
     )
     end_date = factory.Faker(
-        "date_time_this_year", before_now=False, after_now=True, tzinfo=ZoneInfo("UTC")
+        "date_time_between", start_date="+1d", end_date="+1y", tzinfo=ZoneInfo("UTC")
     )
     certificate_available_date = factory.Faker(
-        "date_time_this_year", before_now=False, after_now=True, tzinfo=ZoneInfo("UTC")
+        "date_time_between", start_date="+1d", end_date="+30d", tzinfo=ZoneInfo("UTC")
     )
 
     enrollment_start = factory.Faker(
-        "date_time_this_month", before_now=True, after_now=False, tzinfo=ZoneInfo("UTC")
+        "date_time_between", start_date="-30d", end_date="-1d", tzinfo=ZoneInfo("UTC")
     )
     enrollment_end = factory.Faker(
-        "date_time_this_month", before_now=False, after_now=True, tzinfo=ZoneInfo("UTC")
+        "date_time_between", start_date="+1d", end_date="+30d", tzinfo=ZoneInfo("UTC")
     )
     expiration_date = factory.Faker(
         "date_time_between", start_date="+1y", end_date="+2y", tzinfo=ZoneInfo("UTC")
