@@ -421,6 +421,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         responses={
             200: ManagerEnrollmentCodeSerializer,
             404: DetailErrorSerializer,
+            409: DetailErrorSerializer,
         },
         parameters=[
             OpenApiParameter(
@@ -635,5 +636,82 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 ).data,
                 "errors": errors,
             },
+            status=http_status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        description="Reassign the assignment for a specific enrollment code",
+        request=AssignRevokeCodeRequestSerializer,
+        responses={
+            200: ManagerEnrollmentCodeSerializer,
+            400: DetailErrorSerializer,
+            404: DetailErrorSerializer,
+            409: DetailErrorSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                name="code",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="The discount code to reassign.",
+                required=True,
+            ),
+        ],
+    )
+    @action(
+        detail=True,
+        methods=["put"],
+        url_path="codes/(?P<code>[^/.]+)/reassign",
+    )
+    def reassign_code(self, request, **kwargs):
+        """
+        Reassign specific enrollment code to a new email address.
+
+        PUT /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/{code}/reassign/
+
+        Removes the DiscountContractAttachmentRedemption record for the specified code and reassigns it to a new email address.
+        """
+
+        contract = self.get_object()
+        code = kwargs.get("code")
+        serializer = AssignRevokeCodeRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"]
+        name = serializer.validated_data.get("name", "")
+
+        discount = contract.get_discounts().filter(discount_code=code).first()
+        if not discount:
+            return Response(
+                {"detail": "Code not found for this contract."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+        assignment_record = discount.contract_redemptions.first()
+        if not assignment_record:
+            # May not be worth throwing out this error - we could just create the record and move on with our lives
+            return Response(
+                {"detail": "No assignment exists for this code."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+        if assignment_record.user or assignment_record.redeemed_on:
+            return Response(
+                {"detail": "Cannot reassign a code that has already been redeemed."},
+                status=http_status.HTTP_409_CONFLICT,
+            )
+
+        assignment_record.assigned_email = email
+        assignment_record.assigned_name = name
+        assignment_record.assigned_by = request.user
+        assignment_record.last_reminder_sent_on = now_in_utc()
+        assignment_record.save()
+        queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
+        discount.prefetched_redemptions = [assignment_record]
+
+        return Response(
+            ManagerEnrollmentCodeSerializer(discount).data,
             status=http_status.HTTP_200_OK,
         )
