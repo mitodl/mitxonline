@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.157.0
+---------------
+
+- Fix assign + redeem flow (#3681)
+- Fix the datetimes we generate for course test data (#3680)
+- Add the prefetch to the CMS course_detail object (#3676)
+- Update to pick up fixes in mitol-django-common (#3677)
+
 Version 1.156.0 (Released June 17, 2026)
 ---------------
 
