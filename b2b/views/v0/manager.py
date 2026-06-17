@@ -1,6 +1,7 @@
 """B2B manager dashboard views."""
 
 import logging
+import uuid
 from dataclasses import dataclass
 
 from django.contrib.contenttypes.models import ContentType
@@ -472,6 +473,8 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_409_CONFLICT,
             )
         assignment_record.delete()
+        discount.discount_code = str(uuid.uuid4())
+        discount.save()
 
         return Response(
             ManagerEnrollmentCodeSerializer(discount).data,
@@ -702,7 +705,8 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 {"detail": "Cannot reassign a code that has already been redeemed."},
                 status=http_status.HTTP_409_CONFLICT,
             )
-
+        discount.discount_code = str(uuid.uuid4())
+        discount.save()
         assignment_record.assigned_email = email
         assignment_record.assigned_name = name
         assignment_record.assigned_by = request.user
