@@ -227,7 +227,7 @@ def test_org_contract_lists(org_setup, manager_drf_client):
     resp = manager_drf_client.get(manager_contract_list)
 
     assert resp.status_code == status.HTTP_200_OK
-    resp_json = resp.json()
+    resp_json = resp.json()["results"]
 
     assert len(resp_json) == 2
     assert_drf_json_equal(
@@ -266,9 +266,9 @@ def test_org_contract_run_list(org_setup, manager_drf_client):
     resp = manager_drf_client.get(manager_contract_run_list)
     assert resp.status_code == status.HTTP_200_OK
 
-    assert len(resp.json()) == 2
+    assert len(resp.json()["results"]) == 2
     assert sorted([run.readable_id for run in runs]) == sorted(
-        [run["readable_id"] for run in resp.json()]
+        [run["readable_id"] for run in resp.json()["results"]]
     )
 
     contract, *_ = contract_3
@@ -335,9 +335,9 @@ def test_org_contract_run_enrollments(org_setup, manager_drf_client):
         resp = manager_drf_client.get(manager_contract_enrol_list)
         assert resp.status_code == status.HTTP_200_OK
 
-        assert len(resp.json()) == len(run_enrollments[idx])
+        assert len(resp.json()["results"]) == len(run_enrollments[idx])
         assert_drf_json_equal(
-            resp.json(),
+            resp.json()["results"],
             ManagerEnrollmentSerializer(run_enrollments[idx], many=True).data,
             ignore_order=True,
         )

@@ -49,6 +49,12 @@ from ecommerce.models import Discount
 log = logging.getLogger(__name__)
 
 
+class ManagerContractPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 @dataclass
 class CodeAssignment:
     contract: ContractPage
@@ -182,6 +188,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """List an organization's contracts."""
 
     permission_classes = [IsAuthenticated, IsOrganizationManager]
+    # While we define this at the class level, we pretty much have to do the pagination manually in view defintions for anything that matters
+    # The queryset we return is for ContractPages - course_run_enrollments and codes lookups are performed almost entirely in view
+    # The result is that we need to call paginate_queryset and get_paginated_response manually since DRF doesn't know how to do it.
+    pagination_class = ManagerContractPagination
 
     def get_queryset(self):
         """Get the queryset; add some annotations/etc for computed fields"""
@@ -233,9 +243,12 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         GET /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/course_runs/
         """
         contract = self.get_object()
-        course_runs = contract.get_course_runs()
-        serializer = ManagerCourseRunSerializer(course_runs, many=True)
-        return Response(serializer.data)
+        course_runs = contract.get_course_runs().order_by("id")
+        return self.get_paginated_response(
+            ManagerCourseRunSerializer(
+                self.paginate_queryset(course_runs), many=True
+            ).data
+        )
 
     @extend_schema(
         responses=ManagerEnrollmentSerializer(many=True),
@@ -271,8 +284,11 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             .order_by("-created_on")
         )
 
-        serializer = ManagerEnrollmentSerializer(enrollments, many=True)
-        return Response(serializer.data)
+        return self.get_paginated_response(
+            ManagerEnrollmentSerializer(
+                self.paginate_queryset(enrollments), many=True
+            ).data
+        )
 
     @extend_schema(
         responses=ManagerEnrollmentCodeSerializer(many=True),
@@ -335,17 +351,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     # We have seats available, so grab some more codes.
                     codes_for_output = list(discounts.all()[: contract.max_learners])
 
-        paginator = PageNumberPagination()
-        paginator.page_size = 25
-        paginator.page_size_query_param = "page_size"
-        paginator.max_page_size = 100
-        page = paginator.paginate_queryset(codes_for_output, request, view=self)
-        if page is not None:
-            return paginator.get_paginated_response(
-                ManagerEnrollmentCodeSerializer(page, many=True).data
-            )
-        return Response(
-            ManagerEnrollmentCodeSerializer(codes_for_output, many=True).data
+        return self.get_paginated_response(
+            ManagerEnrollmentCodeSerializer(
+                self.paginate_queryset(codes_for_output), many=True
+            ).data
         )
 
     @extend_schema(
