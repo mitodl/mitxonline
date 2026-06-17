@@ -32,6 +32,7 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     get_contract_products_with_bad_pricing,
     get_contract_runs_without_products,
+    get_user_b2b_organizations,
     import_and_create_contract_run,
     process_add_org_membership,
     process_remove_org_membership,
@@ -48,6 +49,7 @@ from b2b.constants import (
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import (
+    ContractPage,
     ContractProgramItem,
     OrganizationIndexPage,
     OrganizationPage,
@@ -2108,3 +2110,159 @@ def test_get_source_course_runs_with_variants_lang_filter(filter_type):
         assert returned_run.id == main_source_course.id
     else:
         assert returned_run.id == variant_2.id
+
+
+# Tests for get_user_b2b_organizations
+
+
+def test_get_user_b2b_organizations_no_orgs():
+    """Returns an empty queryset when the user has no organization memberships."""
+    user = UserFactory.create()
+
+    result = get_user_b2b_organizations(user)
+
+    assert result.count() == 0
+
+
+def test_get_user_b2b_organizations_returns_user_org():
+    """Returns the organization the user belongs to."""
+    user = UserFactory.create()
+    user_org = factories.UserOrganizationFactory.create(user=user)
+
+    result = get_user_b2b_organizations(user)
+
+    assert result.count() == 1
+    assert result.first() == user_org.organization
+
+
+def test_get_user_b2b_organizations_excludes_other_users_orgs():
+    """Does not return organizations the user is not a member of."""
+    user = UserFactory.create()
+    other_user = UserFactory.create()
+    factories.UserOrganizationFactory.create(user=other_user)
+
+    result = get_user_b2b_organizations(user)
+
+    assert result.count() == 0
+
+
+def test_get_user_b2b_organizations_multiple_orgs():
+    """Returns all organizations the user belongs to."""
+    user = UserFactory.create()
+    user_org_1 = factories.UserOrganizationFactory.create(user=user)
+    user_org_2 = factories.UserOrganizationFactory.create(user=user)
+
+    result = get_user_b2b_organizations(user)
+
+    assert result.count() == 2
+    assert set(result.values_list("id", flat=True)) == {
+        user_org_1.organization.id,
+        user_org_2.organization.id,
+    }
+
+
+def test_get_user_b2b_organizations_prefetches_active_contracts():
+    """Active contracts the user belongs to are available on _user_active_contracts."""
+    user = UserFactory.create()
+    user_org = factories.UserOrganizationFactory.create(user=user)
+    contract = ContractPageFactory.create(
+        organization=user_org.organization,
+        parent=user_org.organization,
+        active=True,
+    )
+    user.b2b_contracts.add(contract)
+
+    result = get_user_b2b_organizations(user)
+    org = result.first()
+
+    assert hasattr(org, "_user_active_contracts")
+    assert len(org._user_active_contracts) == 1
+    assert org._user_active_contracts[0] == contract
+
+
+def test_get_user_b2b_organizations_excludes_inactive_contracts():
+    """Inactive contracts are excluded from _user_active_contracts."""
+    user = UserFactory.create()
+    user_org = factories.UserOrganizationFactory.create(user=user)
+    contract = ContractPageFactory.create(
+        organization=user_org.organization,
+        parent=user_org.organization,
+    )
+    # Use .objects (Wagtail's unfiltered manager) to avoid DoesNotExist from
+    # ContractPage._default_manager (ActiveContractManager) filtering active=False.
+    ContractPage.objects.filter(id=contract.id).update(active=False)
+    user.b2b_contracts.add(contract)
+
+    result = get_user_b2b_organizations(user)
+    org = result.first()
+
+    assert hasattr(org, "_user_active_contracts")
+    assert len(org._user_active_contracts) == 0
+
+
+def test_get_user_b2b_organizations_excludes_contracts_user_not_in():
+    """Contracts on the org that the user is not a member of are excluded from _user_active_contracts."""
+    user = UserFactory.create()
+    other_user = UserFactory.create()
+    user_org = factories.UserOrganizationFactory.create(user=user)
+    contract = ContractPageFactory.create(
+        organization=user_org.organization,
+        parent=user_org.organization,
+        active=True,
+    )
+    other_user.b2b_contracts.add(contract)
+
+    result = get_user_b2b_organizations(user)
+    org = result.first()
+
+    assert hasattr(org, "_user_active_contracts")
+    assert len(org._user_active_contracts) == 0
+
+
+def test_get_user_b2b_organizations_mixed_contracts():
+    """Only active contracts the user belongs to appear in _user_active_contracts."""
+    user = UserFactory.create()
+    user_org = factories.UserOrganizationFactory.create(user=user)
+    active_contract = ContractPageFactory.create(
+        organization=user_org.organization,
+        parent=user_org.organization,
+    )
+    inactive_contract = ContractPageFactory.create(
+        organization=user_org.organization,
+        parent=user_org.organization,
+    )
+    ContractPage.objects.filter(id=inactive_contract.id).update(active=False)
+    user.b2b_contracts.add(active_contract, inactive_contract)
+
+    result = get_user_b2b_organizations(user)
+    org = result.first()
+
+    assert len(org._user_active_contracts) == 1
+    assert org._user_active_contracts[0] == active_contract
+
+
+def test_get_user_b2b_organizations_prefetches_contract_program_items():
+    """ContractProgramItems are prefetched in sort order on _contract_program_ids."""
+    user = UserFactory.create()
+    user_org = factories.UserOrganizationFactory.create(user=user)
+    contract = ContractPageFactory.create(
+        organization=user_org.organization,
+        parent=user_org.organization,
+        active=True,
+    )
+    user.b2b_contracts.add(contract)
+    program_1 = ProgramFactory.create()
+    program_2 = ProgramFactory.create()
+    item_1 = ContractProgramItem.objects.create(
+        contract=contract, program=program_1, sort_order=1
+    )
+    item_2 = ContractProgramItem.objects.create(
+        contract=contract, program=program_2, sort_order=2
+    )
+
+    result = get_user_b2b_organizations(user)
+    org = result.first()
+    fetched_contract = org._user_active_contracts[0]
+
+    assert hasattr(fetched_contract, "_contract_program_ids")
+    assert list(fetched_contract._contract_program_ids) == [item_1, item_2]
