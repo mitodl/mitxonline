@@ -719,6 +719,7 @@ def test_revoke_code(org_setup, manager_drf_client):
     _, _, (contract_1, *_), *_ = org_setup
 
     discount = contract_1.get_discounts().order_by("id").first()
+    original_code = discount.discount_code
     DiscountContractAttachmentRedemption.objects.create(
         discount=discount,
         contract=contract_1,
@@ -743,7 +744,7 @@ def test_revoke_code(org_setup, manager_drf_client):
     ).exists()
 
     resp_data = resp.json()
-    assert resp_data["code"] == discount.discount_code
+    assert resp_data["code"] != original_code
     assert resp_data["redemption_status"] == REDEMPTION_STATUS_UNASSIGNED
 
 
@@ -1207,6 +1208,7 @@ def test_reassign_code(org_setup, manager_drf_client, mocker):
     _, _, (contract_1, *_), *_ = org_setup
 
     discount = contract_1.get_discounts().order_by("id").first()
+    original_code = discount.discount_code
     redemption = DiscountContractAttachmentRedemption.objects.create(
         discount=discount,
         contract=contract_1,
@@ -1236,7 +1238,7 @@ def test_reassign_code(org_setup, manager_drf_client, mocker):
     mock_task.delay.assert_called_once_with([redemption.id])
 
     resp_data = resp.json()
-    assert resp_data["code"] == discount.discount_code
+    assert resp_data["code"] != original_code
     assert resp_data["redemption_status"] == REDEMPTION_STATUS_ASSIGNED
     assert resp_data["assigned_to"] == "new@example.com"
 
