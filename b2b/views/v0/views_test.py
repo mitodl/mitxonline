@@ -5,15 +5,20 @@ Tests for B2B views.
 from datetime import timedelta
 
 import pytest
+import reversion
 from django.urls import reverse
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
 from rest_framework.test import APIClient
 
 from b2b.api import create_contract_run, ensure_enrollment_codes_exist
-from b2b.constants import CONTRACT_MEMBERSHIP_NONSSO, CONTRACT_MEMBERSHIP_SSO
+from b2b.constants import (
+    CONTRACT_MEMBERSHIP_CODE,
+    CONTRACT_MEMBERSHIP_NONSSO,
+    CONTRACT_MEMBERSHIP_SSO,
+)
 from b2b.factories import ContractPageFactory
-from b2b.models import DiscountContractAttachmentRedemption
+from b2b.models import DiscountContractAttachmentRedemption, UserOrganization
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
 from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
@@ -533,3 +538,77 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913
     del user.openedx_user
     assert user.edx_username
     assert CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
+
+
+def test_preassigned_code_can_be_redeemed(mocker):
+    """A code pre-assigned by a manager should be redeemable by the intended learner.
+
+    Regression test: assign_code creates a DiscountContractAttachmentRedemption record
+    (the pre-assignment). AttachContractApi._get_valid_discount filters out discounts
+    whose contract_redemptions count >= 1, so the pre-assignment record causes the
+    discount to be rejected as "already redeemed" and the learner gets a 404 instead
+    of 201.
+    """
+    mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
+
+    manager = UserFactory.create()
+    learner = UserFactory.create()
+
+    contract = ContractPageFactory.create(
+        integration_type=CONTRACT_MEMBERSHIP_CODE,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
+        max_learners=20,
+    )
+    UserOrganization.objects.create(
+        user=manager,
+        organization=contract.organization,
+        keep_until_seen=True,
+        is_manager=True,
+    )
+
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=courserun)
+
+    ensure_enrollment_codes_exist(contract)
+    discount = contract.get_discounts().order_by("id").first()
+    code = discount.discount_code
+
+    # Manager pre-assigns the code to the learner's email address.
+    manager_client = APIClient()
+    manager_client.force_login(manager)
+    assign_url = reverse(
+        "b2b:b2b-manager-org-contract-assign-code",
+        kwargs={
+            "parent_lookup_organization": contract.organization.id,
+            "pk": contract.id,
+            "code": code,
+        },
+    )
+    assign_resp = manager_client.post(
+        assign_url,
+        data={"email": learner.email, "name": "Test Learner"},
+        format="json",
+    )
+    assert assign_resp.status_code == 200
+
+    # The pre-assignment record exists but is not yet redeemed.
+    assert DiscountContractAttachmentRedemption.objects.filter(
+        discount=discount,
+        assigned_email=learner.email,
+        redeemed_on__isnull=True,
+        user__isnull=True,
+    ).exists()
+
+    # Learner redeems the assigned code — should succeed with 201.
+    # Bug: _get_valid_discount counts the pre-assignment record as a redemption
+    # (contract_redemptions__count >= 1) and returns 404 instead.
+    learner_client = APIClient()
+    learner_client.force_login(learner)
+    attach_url = reverse("b2b:attach-user", kwargs={"enrollment_code": code})
+    redeem_resp = learner_client.post(attach_url)
+
+    assert redeem_resp.status_code == 201
+    learner.refresh_from_db()
+    assert learner.b2b_contracts.filter(pk=contract.id).exists()

@@ -315,12 +315,17 @@ class AttachContractApi(APIView):
     def _get_valid_discount(self, enrollment_code, now):
         """Return a valid discount for the given enrollment code and time."""
         return (
-            Discount.objects.annotate(Count("contract_redemptions"))
+            Discount.objects.annotate(
+                actual_redemptions=Count(
+                    "contract_redemptions",
+                    filter=Q(contract_redemptions__user__isnull=False),
+                )
+            )
             .filter(Q(activation_date__isnull=True) | Q(activation_date__lte=now))
             .filter(Q(expiration_date__isnull=True) | Q(expiration_date__gte=now))
             .filter(
                 Q(redemption_type=REDEMPTION_TYPE_UNLIMITED)
-                | Q(contract_redemptions__count__lt=1)
+                | Q(actual_redemptions__lt=1)
             )
             .get(discount_code=enrollment_code)
         )
