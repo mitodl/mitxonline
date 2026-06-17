@@ -43,6 +43,7 @@ from b2b.serializers.v0.manager import (
 from b2b.tasks import queue_send_enrollment_code_assignment_email
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
+from main.authentication import CsrfExemptSessionAuthentication
 
 log = logging.getLogger(__name__)
 
@@ -99,6 +100,9 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 
     permission_classes = [IsAuthenticated]
     serializer_class = OrganizationPageSerializer
+    authentication_classes = [
+        CsrfExemptSessionAuthentication,
+    ]
 
     def get_queryset(self):
         """Filter to organizations where the user is a manager."""
