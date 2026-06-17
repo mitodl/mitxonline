@@ -100,9 +100,6 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 
     permission_classes = [IsAuthenticated]
     serializer_class = OrganizationPageSerializer
-    authentication_classes = [
-        CsrfExemptSessionAuthentication,
-    ]
 
     def get_queryset(self):
         """Filter to organizations where the user is a manager."""
@@ -178,6 +175,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """List an organization's contracts."""
 
     permission_classes = [IsAuthenticated, IsOrganizationManager]
+    authentication_classes = [
+        CsrfExemptSessionAuthentication,
+    ]
 
     def get_queryset(self):
         """Get the queryset; add some annotations/etc for computed fields"""
