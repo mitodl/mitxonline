@@ -220,25 +220,25 @@ class CourseRunFactory(DjangoModelFactory):
         completed = factory.Trait(
             start_date=factory.Faker(
                 "date_time_between",
-                start_date="-3m",
-                end_date="-2m",
+                start_date="-3M",
+                end_date="-2M",
                 tzinfo=ZoneInfo("UTC"),
             ),
             end_date=factory.Faker(
                 "date_time_between",
-                start_date="-1m",
+                start_date="-5d",
                 end_date="now",
                 tzinfo=ZoneInfo("UTC"),
             ),
             enrollment_start=factory.Faker(
                 "date_time_between",
-                start_date="-4m",
-                end_date="-3m",
+                start_date="-4M",
+                end_date="-3M",
                 tzinfo=ZoneInfo("UTC"),
             ),
             enrollment_end=factory.Faker(
                 "date_time_between",
-                start_date="-1m",
+                start_date="-1M",
                 end_date="-10d",
                 tzinfo=ZoneInfo("UTC"),
             ),
