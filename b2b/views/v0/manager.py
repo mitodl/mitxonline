@@ -15,6 +15,7 @@ from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status as http_status
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_extensions.mixins import NestedViewSetMixin
@@ -299,49 +300,53 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         # Skip if contract has auto membership type (no codes needed)
         if contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS:
-            return Response([])
-
-        discounts = contract.get_discounts().prefetch_related(
-            Prefetch(
-                "contract_redemptions",
-                queryset=DiscountContractAttachmentRedemption.objects.select_related(
-                    "user"
-                ).order_by("-created_on")[:1],
-                to_attr="prefetched_redemptions",
-            )
-        )
-
-        if not contract.max_learners:
-            # No learner limit - show first code only, if there is one
-            return Response(
-                ManagerEnrollmentCodeSerializer(
-                    [discounts.order_by("id").first()],
-                    many=True,
-                ).data
-            )
-
+            codes_for_output = []
         else:
-            # Has learner limit - show redeemed codes + enough unused codes to fill remaining seats
-            discounts = discounts.annotate(
-                num_redemptions=Count("contract_redemptions")
-            ).order_by("-num_redemptions", "id")
-
-            codes_for_output = discounts.filter(num_redemptions__gt=0).all()
-
-            # The point of this is to ensure we always get _all_ the redeemed
-            # codes, and then some unredeemed ones if there's space allowed.
-            # I didn't want to just call all() and grab a slice because we might
-            # have _more_ redemptions that we technically allow (if, say, we
-            # adjust the limit down or manually create some redemptions or
-            # something).
-
-            if codes_for_output.count() < contract.max_learners:
-                # We have seats available, so grab some more codes.
-                codes_for_output = discounts.all()[: contract.max_learners]
-
-            return Response(
-                ManagerEnrollmentCodeSerializer(codes_for_output, many=True).data
+            discounts = contract.get_discounts().prefetch_related(
+                Prefetch(
+                    "contract_redemptions",
+                    queryset=DiscountContractAttachmentRedemption.objects.select_related(
+                        "user"
+                    ).order_by("-created_on")[:1],
+                    to_attr="prefetched_redemptions",
+                )
             )
+
+            if not contract.max_learners:
+                # No learner limit - show first code only, if there is one
+                first = discounts.order_by("id").first()
+                codes_for_output = [first] if first is not None else []
+            else:
+                # Has learner limit - show redeemed codes + enough unused codes to fill remaining seats
+                discounts = discounts.annotate(
+                    num_redemptions=Count("contract_redemptions")
+                ).order_by("-num_redemptions", "id")
+
+                codes_for_output = discounts.filter(num_redemptions__gt=0).all()
+
+                # The point of this is to ensure we always get _all_ the redeemed
+                # codes, and then some unredeemed ones if there's space allowed.
+                # I didn't want to just call all() and grab a slice because we might
+                # have _more_ redemptions that we technically allow (if, say, we
+                # adjust the limit down or manually create some redemptions or
+                # something).
+
+                if codes_for_output.count() < contract.max_learners:
+                    # We have seats available, so grab some more codes.
+                    codes_for_output = list(discounts.all()[: contract.max_learners])
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 25
+        paginator.page_size_query_param = "page_size"
+        paginator.max_page_size = 100
+        page = paginator.paginate_queryset(codes_for_output, request, view=self)
+        if page is not None:
+            return paginator.get_paginated_response(
+                ManagerEnrollmentCodeSerializer(page, many=True).data
+            )
+        return Response(
+            ManagerEnrollmentCodeSerializer(codes_for_output, many=True).data
+        )
 
     @extend_schema(
         description="Assign an available enrollment code to an email address and send an invite email.",

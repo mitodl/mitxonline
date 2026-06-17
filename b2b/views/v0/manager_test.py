@@ -392,7 +392,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         resp = manager_drf_client.get(manager_contract_code_list)
         assert resp.status_code == status.HTTP_200_OK
 
-        resp_codes = [resp_code["code"] for resp_code in resp.json()]
+        resp_codes = [resp_code["code"] for resp_code in resp.json()["results"]]
         assert len(resp_codes) == expected_code_count
 
         assert contract_codes == resp_codes
@@ -403,7 +403,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         resp = manager_drf_client.get(manager_contract_code_list)
         assert resp.status_code == status.HTTP_200_OK
 
-        resp_codes = [resp_code["code"] for resp_code in resp.json()]
+        resp_codes = [resp_code["code"] for resp_code in resp.json()["results"]]
 
         assert len(resp_codes) == expected_code_count
         assert contract_codes == resp_codes
@@ -437,7 +437,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         resp = manager_drf_client.get(manager_contract_code_list)
         assert resp.status_code == status.HTTP_200_OK
 
-        resp_codes = [resp_code["code"] for resp_code in resp.json()]
+        resp_codes = [resp_code["code"] for resp_code in resp.json()["results"]]
 
         if contract.max_learners > 1:
             assert len(resp_codes) == expected_code_count
@@ -449,7 +449,9 @@ def test_org_contract_codes(org_setup, manager_drf_client):
             assert assigned_discount.discount_code in resp_codes
 
             # Verify all three redemption statuses are represented in the response.
-            response_statuses = {code["redemption_status"] for code in resp.json()}
+            response_statuses = {
+                code["redemption_status"] for code in resp.json()["results"]
+            }
             assert REDEMPTION_STATUS_REDEEMED in response_statuses
             assert REDEMPTION_STATUS_ASSIGNED in response_statuses
             assert REDEMPTION_STATUS_UNASSIGNED in response_statuses
@@ -517,7 +519,9 @@ def test_org_contract_codes_redeemed_by_differs_from_assigned_to(
     assert resp.status_code == status.HTTP_200_OK
 
     redeemed_code = next(
-        code for code in resp.json() if code["code"] == discount.discount_code
+        code
+        for code in resp.json()["results"]
+        if code["code"] == discount.discount_code
     )
     assert redeemed_code["assigned_to"] == "assignee@example.com"
     assert redeemed_code["redeemed_by"] == "redeemer@example.com"
