@@ -358,8 +358,11 @@ class AttachContractApi(APIView):
                 user, contract.organization, keep_until_seen=True
             )
             user.b2b_contracts.add(contract)
-            DiscountContractAttachmentRedemption.objects.create(
-                user=user, discount=code, contract=contract, redeemed_on=now_in_utc()
+            DiscountContractAttachmentRedemption.objects.update_or_create(
+                discount=code,
+                contract=contract,
+                user=None,
+                defaults={"user": user, "redeemed_on": now_in_utc()},
             )
             contracts_attached = True
 

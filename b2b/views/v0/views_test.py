@@ -541,13 +541,8 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913
 
 
 def test_preassigned_code_can_be_redeemed(mocker):
-    """A code pre-assigned by a manager should be redeemable by the intended learner.
-
-    Regression test: assign_code creates a DiscountContractAttachmentRedemption record
-    (the pre-assignment). AttachContractApi._get_valid_discount filters out discounts
-    whose contract_redemptions count >= 1, so the pre-assignment record causes the
-    discount to be rejected as "already redeemed" and the learner gets a 404 instead
-    of 201.
+    """
+    A code pre-assigned by a manager should be redeemable by the intended learner.
     """
     mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
     mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
@@ -602,8 +597,6 @@ def test_preassigned_code_can_be_redeemed(mocker):
     ).exists()
 
     # Learner redeems the assigned code — should succeed with 201.
-    # Bug: _get_valid_discount counts the pre-assignment record as a redemption
-    # (contract_redemptions__count >= 1) and returns 404 instead.
     learner_client = APIClient()
     learner_client.force_login(learner)
     attach_url = reverse("b2b:attach-user", kwargs={"enrollment_code": code})
@@ -612,3 +605,14 @@ def test_preassigned_code_can_be_redeemed(mocker):
     assert redeem_resp.status_code == 201
     learner.refresh_from_db()
     assert learner.b2b_contracts.filter(pk=contract.id).exists()
+
+    # Exactly one record should exist — the pre-assignment row updated in place,
+    # not a second record created alongside it.
+    records = DiscountContractAttachmentRedemption.objects.filter(
+        discount=discount, contract=contract
+    )
+    assert records.count() == 1
+    record = records.get()
+    assert record.user == learner
+    assert record.redeemed_on is not None
+    assert record.assigned_email == learner.email
