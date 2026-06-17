@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.157.0
+Version 1.157.0 (Released June 17, 2026)
 ---------------
 
 - Fix assign + redeem flow (#3681)
