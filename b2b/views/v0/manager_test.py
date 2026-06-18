@@ -3,6 +3,7 @@
 import pytest
 import reversion
 from django.urls import reverse
+from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -937,6 +938,88 @@ def test_send_reminder_forbidden(org_setup, manager_drf_client):
     )
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_send_reminder_already_redeemed(org_setup, manager_drf_client):
+    """send_reminder returns 409 when the assignment has already been redeemed."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    user = UserFactory.create()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email=user.email,
+        user=user,
+    )
+
+    remind_url = reverse(
+        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(remind_url, format="json")
+
+    assert resp.status_code == status.HTTP_409_CONFLICT
+    assert "already claimed" in resp.json()["detail"]
+
+
+def test_send_reminder_redeemed_on_set(org_setup, manager_drf_client):
+    """send_reminder returns 409 when redeemed_on is set even without a linked user."""
+
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="assignee@example.com",
+        redeemed_on=now_in_utc(),
+    )
+
+    remind_url = reverse(
+        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(remind_url, format="json")
+
+    assert resp.status_code == status.HTTP_409_CONFLICT
+    assert "already claimed" in resp.json()["detail"]
+
+
+def test_send_reminder_no_assigned_email(org_setup, manager_drf_client):
+    """send_reminder returns 409 when the assignment record has no assigned email."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract_1,
+        assigned_email="",
+    )
+
+    remind_url = reverse(
+        "b2b:b2b-manager-org-contract-send-reminder-for-code-assignment",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+            "code": discount.discount_code,
+        },
+    )
+
+    resp = manager_drf_client.post(remind_url, format="json")
+
+    assert resp.status_code == status.HTTP_409_CONFLICT
+    assert "no assigned email" in resp.json()["detail"]
 
 
 # ---------------------------------------------------------------------------
