@@ -555,7 +555,11 @@ class Command(BaseCommand):
         if output_path:
             with open(output_path, "w") as f:  # noqa: PTH123
                 f.write(output)
-            self.stderr.write(f"Contract '{contract.slug}' exported to {output_path}")
+            self.stderr.write(
+                self.style.SUCCESS(
+                    f"Contract '{contract.slug}' exported to {output_path}"
+                )
+            )
         else:
             self.stdout.write(output)
 
@@ -596,7 +600,7 @@ class Command(BaseCommand):
         """Get or create the OrganizationPage from exported org data."""
         org = OrganizationPage.objects.filter(org_key=org_data["org_key"]).first()
         if org:
-            self.stderr.write(f"  Organization exists: {org.org_key}")
+            self.stdout.write(f"  Organization exists: {org.org_key}")
             return org
 
         org = OrganizationPage(
@@ -608,14 +612,14 @@ class Command(BaseCommand):
             org.sso_organization_id = org_data["sso_organization_id"]
         org_index.add_child(instance=org)
         org.save()
-        self.stderr.write(f"  Created organization: {org.org_key}")
+        self.stdout.write(self.style.SUCCESS(f"  Created organization: {org.org_key}"))
         return org
 
     def _import_contract(self, org, contract_data, slug):
         """Get or create the ContractPage from exported contract data."""
         contract = ContractPage.objects.filter(slug=slug).first()
         if contract:
-            self.stderr.write(f"  Contract exists: {slug}")
+            self.stdout.write(f"  Contract exists: {slug}")
             return contract
 
         fixed_price = (
@@ -644,7 +648,7 @@ class Command(BaseCommand):
         )
         org.add_child(instance=contract)
         contract.save()
-        self.stderr.write(f"  Created contract: {slug}")
+        self.stdout.write(self.style.SUCCESS(f"  Created contract: {slug}"))
         return contract
 
     def _upsert_variant_options(self, obj, variants_data):
@@ -727,9 +731,11 @@ class Command(BaseCommand):
             defaults={"title": course_data["title"], "live": True},
         )
         if was_created:
-            self.stderr.write(f"    Created course: {course_data['readable_id']}")
+            self.stdout.write(
+                self.style.SUCCESS(f"    Created course: {course_data['readable_id']}")
+            )
         else:
-            self.stderr.write(f"    Course exists: {course_data['readable_id']}")
+            self.stdout.write(f"    Course exists: {course_data['readable_id']}")
 
         for dept_name in course_data.get("departments", []):
             dept, _ = Department.objects.get_or_create(name=dept_name)
@@ -741,11 +747,11 @@ class Command(BaseCommand):
             course, course_data.get("source_runs", [])
         )
         if runs_created:
-            self.stderr.write(f"      Created {runs_created} source run(s)")
+            self.stdout.write(f"      Created {runs_created} source run(s)")
         elif course_data.get("source_runs"):
-            self.stderr.write("      Source runs already exist")
+            self.stdout.write("      Source runs already exist")
         else:
-            self.stderr.write(
+            self.stdout.write(
                 self.style.WARNING(
                     f"      No source runs for {course_data['readable_id']} — "
                     "contract runs cannot be created for this course"
@@ -756,7 +762,7 @@ class Command(BaseCommand):
             course, course_data.get("variant_options", [])
         )
         if variants_created:
-            self.stderr.write(f"      Created {variants_created} variant option(s)")
+            self.stdout.write(f"      Created {variants_created} variant option(s)")
 
         return course
 
@@ -767,9 +773,11 @@ class Command(BaseCommand):
             defaults={"title": prog_data["title"], "live": True},
         )
         if was_created:
-            self.stderr.write(f"  Created program: {prog_data['readable_id']}")
+            self.stdout.write(
+                self.style.SUCCESS(f"  Created program: {prog_data['readable_id']}")
+            )
         else:
-            self.stderr.write(f"  Program exists: {prog_data['readable_id']}")
+            self.stdout.write(f"  Program exists: {prog_data['readable_id']}")
 
         for dept_name in prog_data.get("departments", []):
             dept, _ = Department.objects.get_or_create(name=dept_name)
@@ -801,27 +809,27 @@ class Command(BaseCommand):
 
         Returns the ContractPage that was created or found.
         """
-        self.stderr.write("\nStep 0: CMS infrastructure")
+        self.stdout.write("\nStep 0: CMS infrastructure")
         org_index = self._ensure_cms_infrastructure()
 
-        self.stderr.write("\nStep 1: Organization")
+        self.stdout.write("\nStep 1: Organization")
         org = self._import_organization(org_index, data["organization"])
 
-        self.stderr.write("\nStep 2: Programs and courses")
+        self.stdout.write("\nStep 2: Programs and courses")
         programs_with_order = []
         for prog_data in data["programs"]:
             program = self._import_program(prog_data)
             programs_with_order.append((program, prog_data["sort_order"]))
 
-        self.stderr.write("\nStep 3: Contract")
+        self.stdout.write("\nStep 3: Contract")
         slug = slug_override or data["contract"]["slug"]
         contract = self._import_contract(org, data["contract"], slug)
 
-        self.stderr.write("\nStep 4: Contract variant options")
+        self.stdout.write("\nStep 4: Contract variant options")
         n = self._upsert_variant_options(
             contract, data["contract"].get("variant_options", [])
         )
-        self.stderr.write(f"  {n} variant option(s) created")
+        self.stdout.write(f"  {n} variant option(s) created")
 
         if skip_runs:
             self._link_programs_skip_runs(contract, programs_with_order)
@@ -832,7 +840,7 @@ class Command(BaseCommand):
 
     def _link_programs_skip_runs(self, contract, programs_with_order):
         """Link programs to the contract without creating any contract runs."""
-        self.stderr.write("\nStep 5: Linking programs (--skip-runs set)")
+        self.stdout.write("\nStep 5: Linking programs (--skip-runs set)")
         for program, sort_order in programs_with_order:
             exists = ContractProgramItem.objects.filter(
                 contract=contract, program=program
@@ -843,11 +851,11 @@ class Command(BaseCommand):
                     program=program,
                     sort_order=sort_order,
                 ).save(skip_run_creation=True)
-                self.stderr.write(f"  Linked {program.readable_id}")
+                self.stdout.write(f"  Linked {program.readable_id}")
 
     def _create_contract_runs(self, contract, programs_with_order):
         """Call add_program_courses for each program, generating contract runs."""
-        self.stderr.write("\nStep 5: Contract runs")
+        self.stdout.write("\nStep 5: Contract runs")
         # Reload so cached_property fields see the variant records we just created.
         contract.refresh_from_db()
         filter_variants = list(contract.variant_options.all())
@@ -855,7 +863,7 @@ class Command(BaseCommand):
         total_no_source = 0
 
         for program, sort_order in programs_with_order:
-            self.stderr.write(f"  Program: {program.readable_id}")
+            self.stdout.write(f"  Program: {program.readable_id}")
             try:
                 created, no_source = contract.add_program_courses(
                     program,
@@ -865,7 +873,7 @@ class Command(BaseCommand):
                     filter_variants=filter_variants,
                 )
             except SourceCourseIncompleteError as exc:
-                self.stderr.write(
+                self.stdout.write(
                     self.style.WARNING(f"    Skipped (no source run): {exc}")
                 )
                 # Still attach the program so the contract structure is complete.
@@ -883,13 +891,13 @@ class Command(BaseCommand):
             total_created += created
             total_no_source += no_source
             if no_source:
-                self.stderr.write(
+                self.stdout.write(
                     self.style.WARNING(
                         f"    {no_source} course(s) had no source run and were skipped"
                     )
                 )
 
-        self.stderr.write(
+        self.stdout.write(
             self.style.SUCCESS(
                 f"  Created {total_created} contract run(s), "
                 f"{total_no_source} course(s) without source runs skipped"
@@ -919,7 +927,7 @@ class Command(BaseCommand):
             msg = f"Unsupported export format version {data.get('version')!r}, expected 1."
             raise CommandError(msg)
 
-        self.stderr.write(
+        self.stdout.write(
             f"Importing contract '{data.get('source_contract_slug', '<unknown>')}' "
             f"(exported {data.get('exported_at', 'unknown date')})"
             + (" [DRY RUN]" if dry_run else "")
@@ -928,7 +936,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             contract = self._run_import_transaction(data, slug_override, skip_runs)
             if dry_run:
-                self.stderr.write(
+                self.stdout.write(
                     self.style.WARNING(
                         "\nDry run — rolling back. Pass --commit to apply changes."
                     )
@@ -936,7 +944,7 @@ class Command(BaseCommand):
                 transaction.set_rollback(True)
                 return
 
-        self.stderr.write(
+        self.stdout.write(
             self.style.SUCCESS(
                 f"\nImport complete. Contract slug: {contract.slug} (id={contract.id})"
             )
