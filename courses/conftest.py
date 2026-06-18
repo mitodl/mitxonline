@@ -6,6 +6,7 @@ from typing import NamedTuple
 
 import pytest
 from django.contrib.auth import get_user_model
+from faker import Faker
 
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
 from b2b.models import ContractPage, OrganizationPage
@@ -29,8 +30,20 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
+from variants.models import SupportedVariant
 
 User = get_user_model()
+fake = Faker()
+langopts = [
+    "de_DE",
+    "fr",
+    "ar",
+    "zh_CN",
+]
+COURSERUN_EXCLUDE_KEYS = [
+    "_state",
+    "id",
+]
 
 
 @pytest.fixture
@@ -110,7 +123,51 @@ def _create_course(idx):
     cr3 = CourseRunFactory.create(
         course=test_course, in_future=True, enrollment_modes=[]
     )
-    return test_course, [cr1, cr2, cr3]
+    crvs = []
+    if idx % 2:
+        # Make some variant runs - by default, half of the courses should get one.
+        # These are for normal, customer-facing courses, so the only variants we'll
+        # configure are translations.
+        language = fake.random_element(langopts)
+        SupportedVariant.objects.create(variant_object=test_course, language=language)
+        crv1 = CourseRunFactory.create(
+            course=test_course,
+            past_start=True,
+            courseware_id=f"{cr1.courseware_id}_{language}",
+            language=language,
+            is_primary_language=False,
+            run_tag=cr1.run_tag,
+            enrollment_modes=[],
+        )
+        crv2 = CourseRunFactory.create(
+            course=test_course,
+            past_start=True,
+            courseware_id=f"{cr2.courseware_id}_{language}",
+            language=language,
+            is_primary_language=False,
+            run_tag=cr2.run_tag,
+            enrollment_modes=[],
+        )
+        crv3 = CourseRunFactory.create(
+            course=test_course,
+            past_start=True,
+            courseware_id=f"{cr3.courseware_id}_{language}",
+            language=language,
+            is_primary_language=False,
+            run_tag=cr3.run_tag,
+            enrollment_modes=[],
+        )
+        crvs = [
+            crv1,
+            crv2,
+            crv3,
+        ]
+    return test_course, [
+        cr1,
+        cr2,
+        cr3,
+        *crvs,
+    ]
 
 
 def _create_program(programs, courses, fake):
