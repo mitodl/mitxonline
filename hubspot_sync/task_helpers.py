@@ -7,6 +7,7 @@ from django.conf import settings
 from courses.utils import is_uai_order
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
+from hubspot_sync.api import _resolve_hubspot_token
 from users.models import User
 
 # pylint:disable-bare-except
@@ -62,18 +63,7 @@ def sync_hubspot_deal(order: Order):
     if order.lines.first() is not None:
         is_uai = is_uai_order(order)
 
-        # Check if appropriate token exists
-        if is_uai:
-            token_exists = bool(
-                getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
-                or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
-            )
-        else:
-            token_exists = bool(
-                getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
-            )
-
-        if token_exists:
+        if _resolve_hubspot_token(is_uai=is_uai):
             try:
                 tasks.sync_deal_with_hubspot_targeted.apply_async(
                     args=(order.id,), kwargs={"is_uai": is_uai}, countdown=10
