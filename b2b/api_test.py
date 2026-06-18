@@ -2176,8 +2176,8 @@ def test_get_user_b2b_organizations_prefetches_active_contracts():
     org = result.first()
 
     assert hasattr(org, "_user_active_contracts")
-    assert len(org._user_active_contracts) == 1
-    assert org._user_active_contracts[0] == contract
+    assert len(org._user_active_contracts) == 1  # noqa: SLF001
+    assert org._user_active_contracts[0] == contract  # noqa: SLF001
 
 
 def test_get_user_b2b_organizations_excludes_inactive_contracts():
@@ -2197,7 +2197,7 @@ def test_get_user_b2b_organizations_excludes_inactive_contracts():
     org = result.first()
 
     assert hasattr(org, "_user_active_contracts")
-    assert len(org._user_active_contracts) == 0
+    assert len(org._user_active_contracts) == 0  # noqa: SLF001
 
 
 def test_get_user_b2b_organizations_excludes_contracts_user_not_in():
@@ -2216,7 +2216,7 @@ def test_get_user_b2b_organizations_excludes_contracts_user_not_in():
     org = result.first()
 
     assert hasattr(org, "_user_active_contracts")
-    assert len(org._user_active_contracts) == 0
+    assert len(org._user_active_contracts) == 0  # noqa: SLF001
 
 
 def test_get_user_b2b_organizations_mixed_contracts():
@@ -2237,8 +2237,8 @@ def test_get_user_b2b_organizations_mixed_contracts():
     result = get_user_b2b_organizations(user)
     org = result.first()
 
-    assert len(org._user_active_contracts) == 1
-    assert org._user_active_contracts[0] == active_contract
+    assert len(org._user_active_contracts) == 1  # noqa: SLF001
+    assert org._user_active_contracts[0] == active_contract  # noqa: SLF001
 
 
 def test_get_user_b2b_organizations_prefetches_contract_program_items():
@@ -2262,7 +2262,7 @@ def test_get_user_b2b_organizations_prefetches_contract_program_items():
 
     result = get_user_b2b_organizations(user)
     org = result.first()
-    fetched_contract = org._user_active_contracts[0]
+    fetched_contract = org._user_active_contracts[0]  # noqa: SLF001
 
     assert hasattr(fetched_contract, "_contract_program_ids")
-    assert list(fetched_contract._contract_program_ids) == [item_1, item_2]
+    assert list(fetched_contract._contract_program_ids) == [item_1, item_2]  # noqa: SLF001
