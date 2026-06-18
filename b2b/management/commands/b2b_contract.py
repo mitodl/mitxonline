@@ -244,9 +244,11 @@ class Command(BaseCommand):
             help="Path to the JSON export file, or '-' to read from stdin.",
         )
         import_parser.add_argument(
-            "--dry-run",
-            action="store_true",
-            help="Show what would be created without committing anything.",
+            "--commit",
+            action="store_false",
+            default=True,
+            dest="dry_run",
+            help="Actually import the contract. (Default is a dry run.)",
         )
         import_parser.add_argument(
             "--slug",
@@ -903,7 +905,7 @@ class Command(BaseCommand):
         machinery as production.  edX is never contacted during import.
         """
         input_path = kwargs.pop("input")
-        dry_run = kwargs.pop("dry_run", False)
+        dry_run = kwargs.pop("dry_run", True)
         slug_override = kwargs.pop("slug", None)
         skip_runs = kwargs.pop("skip_runs", False)
 
@@ -920,12 +922,17 @@ class Command(BaseCommand):
         self.stderr.write(
             f"Importing contract '{data.get('source_contract_slug', '<unknown>')}' "
             f"(exported {data.get('exported_at', 'unknown date')})"
+            + (" [DRY RUN]" if dry_run else "")
         )
 
         with transaction.atomic():
             contract = self._run_import_transaction(data, slug_override, skip_runs)
             if dry_run:
-                self.stderr.write(self.style.WARNING("\nDry run — rolling back."))
+                self.stderr.write(
+                    self.style.WARNING(
+                        "\nDry run — rolling back. Pass --commit to apply changes."
+                    )
+                )
                 transaction.set_rollback(True)
                 return
 
