@@ -11,6 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
+from mitol.common.utils import now_in_utc
 from rich.console import Console
 from rich.table import Table
 
@@ -247,7 +248,7 @@ class Command(BaseCommand):
 
         return codes
 
-    def handle_output(self, **kwargs):
+    def handle_output(self, **kwargs):  # noqa: C901
         """Output code information."""
 
         contracts = self._get_contract_list(allow_everything=True, **kwargs)
@@ -601,7 +602,7 @@ class Command(BaseCommand):
 
         [self.stdout.write(",".join(code)) for code in removed_codes]
 
-    def handle_assign(self, **kwargs):
+    def handle_assign(self, **kwargs):  # noqa: C901, PLR0915
         """Handle assignments for the specified contract."""
 
         if kwargs.get("all", False):
@@ -678,8 +679,6 @@ class Command(BaseCommand):
 
             return
 
-        assignables = []
-
         for contract in contracts:
             self.stdout.write(f"Processing assignments for {contract.title}...")
 
@@ -699,9 +698,51 @@ class Command(BaseCommand):
                 )
                 continue
 
-            assigned_codes = contract.discounts_qs.filter()
+            already_assigned = list(
+                contract.discounts_qs.filter(
+                    contract_redemptions__assigned_email__in=[a[0] for a in assignees]
+                ).values_list("contract_redemptions__assigned_email", flat=True)
+            )
 
-            # if len(assignees) >
+            if len(already_assigned) > 0:
+                already_done = " ".join(already_assigned)
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"{len(already_assigned)} codes already assigned to these users: {already_done}"
+                    )
+                )
+
+            unused_codes = contract.get_unused_discounts().exclude(
+                pk__in=contract.get_assignments().values_list("discount_id", flat=True)
+            )
+
+            if unused_codes.count() < len(assignees) - len(already_assigned):
+                self.stderr.write(
+                    f"Not enough free codes for {len(assignees)} new assignee(s) in contract {contract.title} ({unused_codes.count()}), skipping"
+                )
+                continue
+
+            now = now_in_utc()
+
+            code_assignments = [
+                DiscountContractAttachmentRedemption(
+                    contract=contract,
+                    assigned_name=a[1],
+                    assigned_email=a[0],
+                    created_on=now,
+                )
+                for a in assignees
+                if a[0] not in already_assigned
+            ]
+
+            if not dry_run:
+                with transaction.atomic():
+                    self.stdout.write(
+                        f"Committing {len(code_assignments)} new assignments for {contract.title}"
+                    )
+                    DiscountContractAttachmentRedemption.objects.bulk_create(
+                        code_assignments
+                    )
 
     def add_arguments(self, parser):
         """Add arguments to the command."""
@@ -810,12 +851,12 @@ class Command(BaseCommand):
         )
         assign_parser.add_argument(
             "--revoke",
-            type="store_true",
+            action="store_true",
             help="Revoke the user(s). This will regenerate the code as well.",
         )
         assign_parser.add_argument(
             "--commit",
-            type="store_true",
+            action="store_true",
             help="Commit the requested changes. Otherwise, this will be a dry run.",
         )
 
