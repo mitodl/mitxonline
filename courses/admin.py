@@ -96,12 +96,14 @@ class CourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "title_linked",
         "run_tag",
         "language",
-        "is_primary_language",
-        "is_source_run",
+        "variant_length",
+        "variant_industry",
         "b2b_contract",
+        "live",
         "start_date",
         "end_date",
         "enrollment_start",
+        "enrollment_end",
         "upgrade_deadline",
     )
     readonly_fields = (
@@ -110,14 +112,41 @@ class CourseRunInline(DisplayOnlyAdminMixin, admin.TabularInline):
         "title_linked",
         "run_tag",
         "language",
-        "is_primary_language",
-        "is_source_run",
+        "variant_length",
+        "variant_industry",
         "b2b_contract",
+        "live",
         "start_date",
         "end_date",
         "enrollment_start",
+        "enrollment_end",
         "upgrade_deadline",
     )
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """Use the all_objects manager."""
+
+        return self.model.all_objects
+
+
+class SourceCourseRunInline(CourseRunInline):
+    """CourseRunInline, but just source runs."""
+
+    verbose_name = "Source Course Run"
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """Filter the course runs to just include source course runs."""
+
+        return self.model.all_objects.filter(is_source_run=True)
+
+
+class EnrollableCourseRunInline(CourseRunInline):
+    """CourseRunInline, but just enrollable runs."""
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """Filter the course runs to exclude source courses."""
+
+        return self.model.all_objects.filter(is_source_run=False)
 
 
 @admin.register(Program)
@@ -178,7 +207,11 @@ class CourseAdmin(admin.ModelAdmin):
         "readable_id",
     )
     list_filter = ["live", "departments"]
-    inlines = [CourseRunInline, CoursePossibleVariantInline]
+    inlines = [
+        SourceCourseRunInline,
+        EnrollableCourseRunInline,
+        CoursePossibleVariantInline,
+    ]
 
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}

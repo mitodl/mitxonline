@@ -587,6 +587,13 @@ class ContractPage(Page, ClusterableModel):
 
         return run_qs.filter(run_qs_filter).all()
 
+    def get_assignments(self):
+        """Get assignments for the contract."""
+
+        return self.code_redemptions.filter(user__isnull=True).exclude(
+            assigned_email=""
+        )
+
     def get_enrollments(self):
         """Get the enrollments for the contract's runs"""
 
