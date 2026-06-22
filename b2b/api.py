@@ -1154,7 +1154,7 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     return (total_created, total_updated, total_errors)
 
 
-def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict, None]:
+def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict, None]:  # noqa: PLR0911
     """
     Validate prerequisites for B2B enrollment.
 
@@ -1203,6 +1203,20 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
             purchasable_object.b2b_contract,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    if CourseRun.enrollments.filter(
+        user=user,
+        change_status="",
+        active=True,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    ).exists():
+        log.error(
+            "B2B enroll: attempted to use %s but %s already enrolled in %s",
+            product,
+            user,
+            CourseRun.courseware_id,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
 
     return None
 
@@ -1327,6 +1341,21 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
 
     # Validate prerequisites for B2B enrollment
     validation_error = _validate_b2b_enrollment_prerequisites(request.user, product)
+
+    if validation_error and validation_error.get(
+        "result", main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED
+    ):
+        # User has a verified enrollment in the run already - try to find the
+        # order number and return that, so the frontend can redirect them to the
+        # course. (There may not be one if we created this enrollment administratively.)
+        order = request.user.orders.filter(
+            line__product_version__object_id=product.id
+        ).first()
+        return {
+            "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+            "order": order.id if order else "",
+        }
+
     if validation_error:
         return validation_error
 
