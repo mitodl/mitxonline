@@ -355,6 +355,12 @@ paths:
           type: integer
         description: ID of the parent organization
         required: true
+      - in: query
+        name: search_term
+        schema:
+          type: string
+        description: Filter codes by assigned email, user email, user name, or assigned
+          name.
       tags:
       - b2b
       responses:
