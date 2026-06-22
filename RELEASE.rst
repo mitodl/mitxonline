@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.158.1
+Version 1.158.1 (Released June 22, 2026)
 ---------------
 
 - add import and export to b2b_contract (#3686)
