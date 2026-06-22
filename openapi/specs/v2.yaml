@@ -8517,6 +8517,7 @@ components:
     ResultEnum:
       enum:
       - b2b-disallowed
+      - b2b-error-already-enrolled
       - b2b-error-no-contract
       - b2b-error-no-product
       - b2b-error-missing-enrollment-code
@@ -8527,6 +8528,7 @@ components:
       type: string
       description: |-
         * `b2b-disallowed` - b2b-disallowed
+        * `b2b-error-already-enrolled` - b2b-error-already-enrolled
         * `b2b-error-no-contract` - b2b-error-no-contract
         * `b2b-error-no-product` - b2b-error-no-product
         * `b2b-error-missing-enrollment-code` - b2b-error-missing-enrollment-code
@@ -8536,6 +8538,7 @@ components:
         * `b2b-enroll-success` - b2b-enroll-success
       x-enum-descriptions:
       - b2b-disallowed
+      - b2b-error-already-enrolled
       - b2b-error-no-contract
       - b2b-error-no-product
       - b2b-error-missing-enrollment-code
