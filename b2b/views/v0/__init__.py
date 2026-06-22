@@ -174,7 +174,7 @@ class Enroll(APIView):
             CreateB2BEnrollmentSerializer(response).data,
             status=status.HTTP_201_CREATED
             if response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
-            else status.HTTP_406_NOT_ACCEPTABLE,
+            else status.HTTP_400_BAD_REQUEST,
         )
 
 
