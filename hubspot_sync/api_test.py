@@ -1196,7 +1196,9 @@ def test_normalize_deal_properties_for_target_account_falls_back_to_default_pipe
     assert deal_input.properties["dealstage"] == "checkout_pending"
 
 
-def test_normalize_deal_properties_preserves_numeric_stage_already_valid(mocker, settings):
+def test_normalize_deal_properties_preserves_numeric_stage_already_valid(
+    mocker, settings
+):
     """Numeric legacy stage IDs already valid in the target account should not be remapped."""
     settings.HUBSPOT_PIPELINE_ID = "default"
     mock_client = mocker.Mock()

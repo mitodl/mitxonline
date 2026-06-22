@@ -1939,9 +1939,9 @@ def sync_contact_with_hubspot(user: User):
 def _resolve_hubspot_token(*, is_uai: bool) -> str | None:
     """Resolve HubSpot API token, routing UAI orders to the UAI account when configured."""
     if is_uai:
-        return getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None) or getattr(
-            settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
-        )
+        return getattr(
+            settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
+        ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
     return getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
 
 
@@ -2089,7 +2089,9 @@ def _normalize_deal_properties_for_target_account(  # noqa: C901
 
     current_stage = deal_properties.get("dealstage")
     mapped_legacy_stage = legacy_stage_map.get(str(current_stage))
-    if mapped_legacy_stage and (not allowed_stages or current_stage not in allowed_stages):
+    if mapped_legacy_stage and (
+        not allowed_stages or current_stage not in allowed_stages
+    ):
         deal_properties["dealstage"] = mapped_legacy_stage
         current_stage = mapped_legacy_stage
 
