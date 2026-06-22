@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.158.0
+---------------
+
+- get_user_b2b_organizations unit tests (#3687)
+- Add check for redeemed code or assignments without assigned email and indicate errors if either case is detected in remind endpoint (#3688)
+- Update course test fixtures for variants and B2B (#3666)
+- Change UUID if revoking or reassigning code (#3679)
+- Increase test samples and use months (#3683)
+
 Version 1.157.0 (Released June 17, 2026)
 ---------------
 
