@@ -127,3 +127,7 @@ POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{i
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: application/json)
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ api removed without deprecation
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ removed the request body
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
