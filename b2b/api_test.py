@@ -2112,9 +2112,6 @@ def test_get_source_course_runs_with_variants_lang_filter(filter_type):
         assert returned_run.id == variant_2.id
 
 
-# Tests for get_user_b2b_organizations
-
-
 def test_get_user_b2b_organizations_no_orgs():
     """Returns an empty queryset when the user has no organization memberships."""
     user = UserFactory.create()
