@@ -623,8 +623,10 @@ class Command(BaseCommand):
 
         if file:
             with Path.open(file) as csvfile:
-                email, name, *_ = csv.reader(csvfile)
-                assignees.append([email, name])
+                csvreader = csv.reader(csvfile)
+                for email, name, *_ in csvreader:
+                    self.stdout.write(f"Found {email} - {name}")
+                    assignees.append([email, name])
         else:
             assignees.append(
                 [kwargs.pop("assigned_email", False), kwargs.pop("assigned_name", "")]
@@ -663,19 +665,14 @@ class Command(BaseCommand):
                 for revocatable in revocatables:
                     revocatable.assigned_email = ""
                     revocatable.assigned_name = ""
-                    revocatable.discount_code = uuid.uuid4()
+                    revocatable.discount.discount_code = uuid.uuid4()
 
-                if not dry_run:
-                    updated_count = (
-                        DiscountContractAttachmentRedemption.objects.bulk_update(
-                            revocatables,
-                            ["assigned_email", "assigned_name", "discount_code"],
-                        )
-                    )
+                    if not dry_run:
+                        revocatable.save()
 
-                    self.stdout.write(
-                        self.style.SUCCESS(f"Cleared {updated_count} assignments.")
-                    )
+                self.stdout.write(
+                    self.style.SUCCESS(f"Cleared {len(revocatables)} assignments.")
+                )
 
             return
 
@@ -722,6 +719,8 @@ class Command(BaseCommand):
                 )
                 continue
 
+            unused_codes = list(unused_codes)
+
             now = now_in_utc()
 
             code_assignments = [
@@ -730,6 +729,7 @@ class Command(BaseCommand):
                     assigned_name=a[1],
                     assigned_email=a[0],
                     created_on=now,
+                    discount=unused_codes.pop(),
                 )
                 for a in assignees
                 if a[0] not in already_assigned
@@ -743,6 +743,12 @@ class Command(BaseCommand):
                     DiscountContractAttachmentRedemption.objects.bulk_create(
                         code_assignments
                     )
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Processed {len(code_assignments)} assignments for {contract}."
+                )
+            )
 
     def add_arguments(self, parser):
         """Add arguments to the command."""
