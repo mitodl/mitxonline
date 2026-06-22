@@ -293,6 +293,15 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         responses=ManagerEnrollmentCodeSerializer(many=True),
         description="List enrollment codes for a contract. Only shows codes for contracts that require them (non-auto membership types). Logic varies based on whether contract has learner limits.",
+        parameters=[
+            OpenApiParameter(
+                name="search_term",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter codes by assigned email, user email, user name, or assigned name.",
+                required=False,
+            ),
+        ],
     )
     @action(detail=True, methods=["get"])
     def codes(self, request, **kwargs):  # noqa: ARG002
@@ -304,6 +313,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         """
         contract = self.get_object()
+        search_term = request.query_params.get("search_term", "").strip()
 
         """
         There are three main cases:
@@ -327,6 +337,16 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     to_attr="prefetched_redemptions",
                 )
             )
+
+            if search_term:
+                # It might not make much sense to allow filtering for the no-learner-limit case.
+                # We should decide during code review what is gonna be least confusing for callers.
+                discounts = discounts.filter(
+                    Q(contract_redemptions__assigned_email__icontains=search_term)
+                    | Q(contract_redemptions__user__email__icontains=search_term)
+                    | Q(contract_redemptions__user__name__icontains=search_term)
+                    | Q(contract_redemptions__assigned_name__icontains=search_term)
+                ).distinct()
 
             if not contract.max_learners:
                 # No learner limit - show first code only, if there is one

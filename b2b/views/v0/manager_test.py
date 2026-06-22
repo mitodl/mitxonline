@@ -528,6 +528,89 @@ def test_org_contract_codes_redeemed_by_differs_from_assigned_to(
 
 
 # ---------------------------------------------------------------------------
+# codes search_term tests
+# ---------------------------------------------------------------------------
+
+
+def _get_codes_for_search(client, url, search):
+    resp = client.get(url, {"search_term": search})
+    assert resp.status_code == status.HTTP_200_OK
+    return {r["code"] for r in resp.json()["results"]}
+
+
+def test_org_contract_codes_search_term(org_setup, manager_drf_client):
+    """search_term filters codes by assigned_email, user email, user name, and assigned_name."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:4])
+
+    user_a = UserFactory.create(email="alice@example.com", name="Alice Smith")
+    user_b = UserFactory.create(email="bob@example.com", name="Bob Jones")
+
+    # assigned_email only (not yet redeemed)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[0],
+        assigned_email="carol@example.com",
+        assigned_name="Carol White",
+        contract=contract_1,
+    )
+    # redeemed by user_a (search via user email and name)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[1],
+        user=user_a,
+        contract=contract_1,
+    )
+    # redeemed by user_b (search via assigned_name on a redeemed code)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[2],
+        user=user_b,
+        assigned_name="Bobby Jones",
+        contract=contract_1,
+    )
+
+    url = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    # Match by assigned_email
+    assert _get_codes_for_search(manager_drf_client, url, "carol") == {
+        discounts[0].discount_code
+    }
+
+    # Match by assigned_name
+    assert _get_codes_for_search(manager_drf_client, url, "Carol White") == {
+        discounts[0].discount_code
+    }
+
+    # Match by user email
+    assert _get_codes_for_search(manager_drf_client, url, "alice") == {
+        discounts[1].discount_code
+    }
+
+    # Match by user name
+    assert _get_codes_for_search(manager_drf_client, url, "Alice Smith") == {
+        discounts[1].discount_code
+    }
+
+    # Match by assigned_name on a redeemed code
+    assert _get_codes_for_search(manager_drf_client, url, "Bobby") == {
+        discounts[2].discount_code
+    }
+
+    # No match returns empty
+    assert _get_codes_for_search(manager_drf_client, url, "zzznomatch") == set()
+
+    # No search_term returns all codes (up to max_learners)
+    resp = manager_drf_client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()["results"]) == contract_1.max_learners
+
+
+# ---------------------------------------------------------------------------
 # assign_code tests
 # ---------------------------------------------------------------------------
 
