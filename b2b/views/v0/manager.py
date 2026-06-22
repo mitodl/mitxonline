@@ -57,6 +57,12 @@ class CodeAssignment:
     code: str
 
 
+def is_redeemed_attachment_record(
+    assignment_record: DiscountContractAttachmentRedemption,
+) -> bool:
+    return assignment_record.user or assignment_record.redeemed_on
+
+
 def assign_codes_and_send_emails(
     assignments: list[CodeAssignment], assigning_user
 ) -> bool:
@@ -467,7 +473,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        if assignment_record.user or assignment_record.redeemed_on:
+        if is_redeemed_attachment_record(assignment_record):
             return Response(
                 {"detail": "Cannot revoke a code that has already been redeemed."},
                 status=http_status.HTTP_409_CONFLICT,
@@ -487,6 +493,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         responses={
             200: ManagerEnrollmentCodeSerializer,
             404: DetailErrorSerializer,
+            409: DetailErrorSerializer,
         },
         parameters=[
             OpenApiParameter(
@@ -524,6 +531,22 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             return Response(
                 {"detail": "Assignment for email does not exist"},
                 status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        if is_redeemed_attachment_record(assignment_record):
+            return Response(
+                {
+                    "detail": "Cannot send a reminder email to an already claimed assignment."
+                },
+                status=http_status.HTTP_409_CONFLICT,
+            )
+
+        if not assignment_record.assigned_email:
+            return Response(
+                {
+                    "detail": "Cannot send a reminder email for an assignment with no assigned email."
+                },
+                status=http_status.HTTP_409_CONFLICT,
             )
 
         # Just send the email reminder and update the last sent timestamp
@@ -700,7 +723,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 {"detail": "No assignment exists for this code."},
                 status=http_status.HTTP_404_NOT_FOUND,
             )
-        if assignment_record.user or assignment_record.redeemed_on:
+        if is_redeemed_attachment_record(assignment_record):
             return Response(
                 {"detail": "Cannot reassign a code that has already been redeemed."},
                 status=http_status.HTTP_409_CONFLICT,
