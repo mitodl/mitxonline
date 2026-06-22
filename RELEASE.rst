@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.158.0
+Version 1.158.0 (Released June 22, 2026)
 ---------------
 
 - get_user_b2b_organizations unit tests (#3687)
