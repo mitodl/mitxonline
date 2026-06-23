@@ -329,25 +329,47 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         if contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS:
             codes_for_output = []
         else:
-            discounts = contract.get_discounts().prefetch_related(
-                Prefetch(
-                    "contract_redemptions",
-                    queryset=DiscountContractAttachmentRedemption.objects.select_related(
-                        "user"
-                    ).order_by("-created_on")[:1],
-                    to_attr="prefetched_redemptions",
-                )
+            prefetch = Prefetch(
+                "contract_redemptions",
+                queryset=DiscountContractAttachmentRedemption.objects.select_related(
+                    "user"
+                ).order_by("-created_on")[:1],
+                to_attr="prefetched_redemptions",
             )
 
             if search_term:
-                # It might not make much sense to allow filtering for the no-learner-limit case.
-                # We should decide during code review what is gonna be least confusing for callers.
-                discounts = discounts.filter(
-                    Q(contract_redemptions__assigned_email__icontains=search_term)
-                    | Q(contract_redemptions__user__email__icontains=search_term)
-                    | Q(contract_redemptions__user__name__icontains=search_term)
-                    | Q(contract_redemptions__assigned_name__icontains=search_term)
-                ).distinct()
+                # This filter is slightly complicated because we only want to filter on the latest redemption per discount
+                # In practice, we only expect 1 redemption per code for well-formed contracts,
+                # but that's not enforced at the DB so we need to be a bit clever.
+                latest_redemption_ids = (
+                    DiscountContractAttachmentRedemption.objects.order_by(
+                        "discount_id", "-created_on"
+                    )
+                    .distinct("discount_id")
+                    .values("pk")
+                )
+                discounts = (
+                    contract.get_discounts()
+                    .filter(
+                        Q(contract_redemptions__pk__in=latest_redemption_ids)
+                        & (
+                            Q(
+                                contract_redemptions__assigned_email__icontains=search_term
+                            )
+                            | Q(
+                                contract_redemptions__user__email__icontains=search_term
+                            )
+                            | Q(contract_redemptions__user__name__icontains=search_term)
+                            | Q(
+                                contract_redemptions__assigned_name__icontains=search_term
+                            )
+                        )
+                    )
+                    .distinct()
+                    .prefetch_related(prefetch)
+                )
+            else:
+                discounts = contract.get_discounts().prefetch_related(prefetch)
 
             if not contract.max_learners:
                 # No learner limit - show first code only, if there is one
