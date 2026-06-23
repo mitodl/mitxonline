@@ -618,6 +618,19 @@ def test_certificate_for_program_page():
         assert signatory.value.signature_image.title == "Image"
 
 
+def test_certificate_page_product_name_field_labels():
+    """
+    product_name is surfaced in the CMS as "Certificate Title" and its help text
+    tells admins the value is what appears on the learner's certificate.
+    """
+    field = CertificatePage._meta.get_field("product_name")  # noqa: SLF001
+    assert field.verbose_name == "Certificate Title"
+    assert field.help_text == (
+        "Specify the course/program name. "
+        "Note: This is what will appear on the learner's certificate."
+    )
+
+
 def test_signatory_page_requires_signature_image():
     """
     SignatoryPage.signature_image is now required (null=False, blank=False).
