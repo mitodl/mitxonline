@@ -149,7 +149,10 @@ class Enroll(APIView):
 
     @extend_schema(
         request=B2BEnrollRequestSerializer,
-        responses=CreateB2BEnrollmentSerializer,
+        responses={
+            201: CreateB2BEnrollmentSerializer,
+            400: CreateB2BEnrollmentSerializer,
+        },
     )
     @csrf_exempt
     def post(self, request, readable_id: str, format=None):  # noqa: A002, ARG002
