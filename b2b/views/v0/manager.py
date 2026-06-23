@@ -49,7 +49,7 @@ from ecommerce.models import Discount
 log = logging.getLogger(__name__)
 
 
-class ManagerContractPagination(PageNumberPagination):
+class ManagerContractOrgPagination(PageNumberPagination):
     page_size = 25
     page_size_query_param = "page_size"
     max_page_size = 100
@@ -113,6 +113,7 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 
     permission_classes = [IsAuthenticated]
     serializer_class = OrganizationPageSerializer
+    pagination_class = ManagerContractOrgPagination
 
     def get_queryset(self):
         """Filter to organizations where the user is a manager."""
@@ -191,7 +192,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     # While we define this at the class level, we pretty much have to do the pagination manually in view defintions for anything that matters
     # The queryset we return is for ContractPages - course_run_enrollments and codes lookups are performed almost entirely in view
     # The result is that we need to call paginate_queryset and get_paginated_response manually since DRF doesn't know how to do it.
-    pagination_class = ManagerContractPagination
+    pagination_class = ManagerContractOrgPagination
 
     def get_queryset(self):
         """Get the queryset; add some annotations/etc for computed fields"""

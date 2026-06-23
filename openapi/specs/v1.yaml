@@ -249,6 +249,19 @@ paths:
     get:
       operationId: b2b_manager_organizations_list
       description: List managed organizations
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - b2b
       responses:
@@ -256,9 +269,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OrganizationPage'
+                $ref: '#/components/schemas/PaginatedOrganizationPageList'
           description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/:
     get:
@@ -7830,6 +7841,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderHistory'
+    PaginatedOrganizationPageList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationPage'
     PaginatedProductList:
       type: object
       required:
