@@ -34,7 +34,7 @@ from b2b.models import (
 )
 from b2b.tasks import queue_contract_sheet_update_post_save, queue_enrollment_code_check
 from cms.api import get_home_page
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES, UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun, Department, EnrollmentMode, Program
 from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce.constants import (
@@ -1209,10 +1209,13 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
         isinstance(purchasable_object, CourseRun)
         and purchasable_object.enrollments.filter(
             user=user,
-            change_status="",
             active=True,
             enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        ).exists()
+        )
+        .exclude(
+            change_status__in=ALL_ENROLL_CHANGE_STATUSES,
+        )
+        .exists()
     ):
         log.error(
             "B2B enroll: attempted to use %s but %s already enrolled in %s",
