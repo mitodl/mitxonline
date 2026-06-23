@@ -1782,12 +1782,8 @@ def sync_deal_with_hubspot_targeted(  # noqa: C901
         )
 
     # Ensure contact exists and is associated
-    # For targeted sync, we need to determine if this is for a UAI course to skip certificates
-    is_uai_account = token == getattr(
-        settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", ""
-    )
     contact_id = _ensure_hubspot_contact_for_user(
-        order.purchaser, hubspot_client, skip_certificates=is_uai_account
+        order.purchaser, hubspot_client, skip_certificates=_is_uai_token(token)
     )
 
     if not contact_id:
@@ -1940,13 +1936,19 @@ def sync_contact_with_hubspot(user: User):
     return result
 
 
-def _get_cart_add_token(*, is_uai_course: bool) -> str:
-    """Resolve HubSpot token for cart-add deal tracking."""
-    if is_uai_course:
-        return getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", "") or getattr(
-            settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", ""
-        )
-    return getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", "")
+def _resolve_hubspot_token(*, is_uai: bool) -> str | None:
+    """Resolve HubSpot API token, routing UAI orders to the UAI account when configured."""
+    if is_uai:
+        return getattr(
+            settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
+        ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+    return getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+
+
+def _is_uai_token(token: str) -> bool:
+    """Return True if the token belongs to the UAI HubSpot account."""
+    uai_token = getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+    return bool(uai_token) and token == uai_token
 
 
 def _find_hubspot_contact_id_by_email(
@@ -2087,7 +2089,7 @@ def _normalize_deal_properties_for_target_account(  # noqa: C901
 
     current_stage = deal_properties.get("dealstage")
     mapped_legacy_stage = legacy_stage_map.get(str(current_stage))
-    if mapped_legacy_stage:
+    if mapped_legacy_stage and (current_stage not in allowed_stages):
         deal_properties["dealstage"] = mapped_legacy_stage
         current_stage = mapped_legacy_stage
 
@@ -2632,24 +2634,18 @@ def track_cart_add_with_hubspot(
     Returns:
         bool: True if synced successfully, False otherwise.
     """
-    token = _get_cart_add_token(is_uai_course=is_uai_course)
+    token = _resolve_hubspot_token(is_uai=is_uai_course)
     if not token:
         return False
 
     try:
         hubspot_client = HubspotApi(access_token=token)
-
-        # Determine which account is actually being used for the API call
-        # This ensures skip_certificates reflects the actual HubSpot account, not just course type
-        is_uai_account = token == getattr(
-            settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", ""
-        )
+        is_uai_account = _is_uai_token(token)
 
         _ensure_target_hubspot_contact_properties(
             hubspot_client, skip_certificates=is_uai_account
         )
 
-        # UAI deals must have a contact in the same HubSpot account.
         contact_id = _ensure_hubspot_contact_for_user(
             user, hubspot_client, skip_certificates=is_uai_account
         )

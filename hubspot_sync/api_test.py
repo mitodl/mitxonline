@@ -1196,6 +1196,37 @@ def test_normalize_deal_properties_for_target_account_falls_back_to_default_pipe
     assert deal_input.properties["dealstage"] == "checkout_pending"
 
 
+def test_normalize_deal_properties_preserves_numeric_stage_already_valid(
+    mocker, settings
+):
+    """Numeric legacy stage IDs already valid in the target account should not be remapped."""
+    settings.HUBSPOT_PIPELINE_ID = "default"
+    mock_client = mocker.Mock()
+    mocker.patch(
+        "hubspot_sync.api._get_target_pipeline_stage_map",
+        return_value={
+            "default": ["48288379", "48288388", "48288389", "48288390"],
+        },
+    )
+    mocker.patch(
+        "hubspot_sync.api._get_target_property_options",
+        return_value=["created", "fulfilled", "failed", "refunded"],
+    )
+
+    deal_input = SimplePublicObjectInput(
+        properties={
+            "pipeline": "default",
+            "dealstage": "48288390",
+            "status": "fulfilled",
+        }
+    )
+
+    api._normalize_deal_properties_for_target_account(mock_client, deal_input)  # noqa: SLF001
+
+    assert deal_input.properties["pipeline"] == "default"
+    assert deal_input.properties["dealstage"] == "48288390"
+
+
 def test_build_target_line_item_message_uses_target_product_id_from_search(
     mocker, hubspot_order
 ):
