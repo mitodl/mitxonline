@@ -2090,7 +2090,7 @@ def _normalize_deal_properties_for_target_account(  # noqa: C901
     current_stage = deal_properties.get("dealstage")
     mapped_legacy_stage = legacy_stage_map.get(str(current_stage))
     if mapped_legacy_stage and (
-        not allowed_stages or current_stage not in allowed_stages
+        current_stage not in allowed_stages
     ):
         deal_properties["dealstage"] = mapped_legacy_stage
         current_stage = mapped_legacy_stage
