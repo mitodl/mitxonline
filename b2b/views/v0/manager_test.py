@@ -216,8 +216,8 @@ def test_org_contract_lists(org_setup, manager_drf_client):
     resp = manager_drf_client.get(manager_org_list)
 
     assert resp.status_code == status.HTTP_200_OK
-    assert len(resp.json()) == 1
-    assert resp.json()[0]["id"] == orgs[0].id
+    assert len(resp.json()["results"]) == 1
+    assert resp.json()["results"][0]["id"] == orgs[0].id
 
     manager_contract_list = reverse(
         "b2b:b2b-manager-org-contract-list",
