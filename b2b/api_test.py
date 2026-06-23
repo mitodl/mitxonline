@@ -55,7 +55,7 @@ from b2b.models import (
     OrganizationPage,
     UserOrganization,
 )
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED, UAI_COURSEWARE_ID_PREFIX
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -84,6 +84,7 @@ from ecommerce.models import (
 from main.constants import (
     USER_MSG_TYPE_B2B_DISALLOWED,
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+    USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NO_PRODUCT,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
@@ -2263,3 +2264,34 @@ def test_get_user_b2b_organizations_prefetches_contract_program_items():
 
     assert hasattr(fetched_contract, "_contract_program_ids")
     assert list(fetched_contract._contract_program_ids) == [item_1, item_2]  # noqa: SLF001
+
+
+@pytest.mark.parametrize("change_status", [None, "", ENROLL_CHANGE_STATUS_UNENROLLED])
+def test_enroll_prereqs_existing_enrollment(mocker, change_status):
+    """
+    Test that _validate_b2b_enrollment_prerequisites returns correctly if the
+    user is already enrolled in the desired course.
+    """
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(b2b_contract=contract)
+    product = ProductFactory.create(purchasable_object=run)
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    CourseRunEnrollmentFactory.create(
+        run=run,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        change_status=change_status,
+        active=(change_status != ENROLL_CHANGE_STATUS_UNENROLLED),
+    )
+
+    result = _validate_b2b_enrollment_prerequisites(user, product)
+
+    if change_status == ENROLL_CHANGE_STATUS_UNENROLLED:
+        assert not result
+    else:
+        assert result
+        assert "result" in result
+        assert result["result"] == USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED

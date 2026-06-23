@@ -512,17 +512,17 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913
     resp = client.post(url)
 
     if not run_is_enrollable:
-        assert resp.status_code == 406
+        assert resp.status_code == 400
         assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE
         return
 
     if contract_active in ["date", "flag"]:
-        assert resp.status_code == 406
+        assert resp.status_code == 400
         assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT
         return
 
     if has_price:
-        assert resp.status_code == 406
+        assert resp.status_code == 400
         assert resp.json()["result"] == USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT
         return
 

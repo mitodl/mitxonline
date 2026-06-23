@@ -149,7 +149,10 @@ class Enroll(APIView):
 
     @extend_schema(
         request=B2BEnrollRequestSerializer,
-        responses=CreateB2BEnrollmentSerializer,
+        responses={
+            201: CreateB2BEnrollmentSerializer,
+            400: CreateB2BEnrollmentSerializer,
+        },
     )
     @csrf_exempt
     def post(self, request, readable_id: str, format=None):  # noqa: A002, ARG002
@@ -174,7 +177,7 @@ class Enroll(APIView):
             CreateB2BEnrollmentSerializer(response).data,
             status=status.HTTP_201_CREATED
             if response["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
-            else status.HTTP_406_NOT_ACCEPTABLE,
+            else status.HTTP_400_BAD_REQUEST,
         )
 
 

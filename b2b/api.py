@@ -34,7 +34,7 @@ from b2b.models import (
 )
 from b2b.tasks import queue_contract_sheet_update_post_save, queue_enrollment_code_check
 from cms.api import get_home_page
-from courses.constants import UAI_COURSEWARE_ID_PREFIX
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES, UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun, Department, EnrollmentMode, Program
 from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce.constants import (
@@ -49,6 +49,7 @@ from ecommerce.models import (
     BasketItem,
     Discount,
     DiscountProduct,
+    Order,
     Product,
 )
 from hubspot_sync.task_helpers import sync_hubspot_cart_add
@@ -1154,7 +1155,7 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     return (total_created, total_updated, total_errors)
 
 
-def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict, None]:
+def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict, None]:  # noqa: PLR0911
     """
     Validate prerequisites for B2B enrollment.
 
@@ -1203,6 +1204,26 @@ def _validate_b2b_enrollment_prerequisites(user, product: Product) -> Union[dict
             purchasable_object.b2b_contract,
         )
         return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT}
+
+    if (
+        isinstance(purchasable_object, CourseRun)
+        and purchasable_object.enrollments.filter(
+            user=user,
+            active=True,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        .exclude(
+            change_status__in=ALL_ENROLL_CHANGE_STATUSES,
+        )
+        .exists()
+    ):
+        log.error(
+            "B2B enroll: attempted to use %s but %s already enrolled in %s",
+            product,
+            user,
+            CourseRun.courseware_id,
+        )
+        return {"result": main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED}
 
     return None
 
@@ -1327,6 +1348,27 @@ def create_b2b_enrollment(request, product: Product, program_id: str | None = No
 
     # Validate prerequisites for B2B enrollment
     validation_error = _validate_b2b_enrollment_prerequisites(request.user, product)
+
+    if (
+        validation_error
+        and validation_error.get("result", None)
+        == main_constants.USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED
+    ):
+        # User has a verified enrollment in the run already - try to find the
+        # order number and return that, so the frontend can redirect them to the
+        # course. (There may not be one if we created this enrollment administratively.)
+        order = (
+            Order.objects.filter(
+                purchaser=request.user, lines__product_version__object_id=product.id
+            ).first()
+            if request.user.is_authenticated
+            else ""
+        )
+        return {
+            "result": main_constants.USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+            "order": order.id if order else "",
+        }
+
     if validation_error:
         return validation_error
 
