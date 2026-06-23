@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.158.2
+---------------
+
+- Update b2b_codes to work better with assignments; minor QoL fixes (#3689)
+- Fix return issues with the B2B one-click enroll api (#3693)
+- Hubspot deal stage fix and refactor (#3692)
+- Relabel certificate "Product name" field to "Certificate Title" (#3695)
+
 Version 1.158.1 (Released June 22, 2026)
 ---------------
 
