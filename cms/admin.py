@@ -52,7 +52,7 @@ class RevisionAdmin(admin.ModelAdmin):
                 return page.product_name
             return "N/A"
 
-    get_page_product_name.short_description = "Product Name"
+    get_page_product_name.short_description = "Certificate Title"
 
     def __str__(self):
         """Custom string representation for better display in autocomplete"""

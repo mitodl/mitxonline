@@ -342,7 +342,11 @@ class CertificatePage(CourseProgramChildPage):
         max_length=250,
         null=False,
         blank=False,
-        help_text="Specify the course/program name.",
+        verbose_name="Certificate Title",
+        help_text=(
+            "Specify the course/program name. "
+            "Note: This is what will appear on the learner's certificate."
+        ),
     )
 
     CEUs = models.CharField(  # noqa: DJ001
