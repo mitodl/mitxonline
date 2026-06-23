@@ -48,6 +48,7 @@ def send_enrollment_code_assignment_email(assignment_record_ids):
                         "code": code,
                         "code_url": code_url,
                         "organization_name": organization_name,
+                        "contract_name": assignment.contract.name,
                     },
                 )
         except:  # pylint: disable=bare-except  # noqa: E722
