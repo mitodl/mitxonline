@@ -370,7 +370,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
                 if codes_for_output.count() < contract.max_learners:
                     # We have seats available, so grab some more codes.
-                    codes_for_output = list(discounts.all()[: contract.max_learners])
+                    codes_for_output = discounts.all()[: contract.max_learners]
 
         return self.get_paginated_response(
             ManagerEnrollmentCodeSerializer(
