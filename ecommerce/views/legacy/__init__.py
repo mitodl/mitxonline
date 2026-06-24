@@ -691,18 +691,7 @@ class CheckoutApiViewSet(ViewSet):
                 user=self.request.user
             )
 
-            # Check if multiple cart items feature is enabled
-            allow_multiple_items = getattr(
-                settings, "ENABLE_MULTIPLE_CART_ITEMS", False
-            )
-
-            if not allow_multiple_items:
-                # Legacy behavior: clear existing items and discounts
-                basket.basket_items.all().delete()
-                BasketDiscount.objects.filter(redeemed_basket=basket).delete()
-            else:
-                # New behavior: only clear discounts, keep existing items
-                BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
             product_id = request.data["product_id"]
 
@@ -714,27 +703,7 @@ class CheckoutApiViewSet(ViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
             message = "Product already in cart"
-            if allow_multiple_items:
-                # Check if product already exists in basket
-                if not basket.basket_items.filter(product=product).exists():
-                    # Add new item to basket
-                    BasketItem.objects.create(basket=basket, product=product)
-                    message = "Product added to cart"
-
-                    sync_hubspot_cart_add(
-                        self.request.user,
-                        product,
-                        is_uai=(
-                            is_product_courserun(product)
-                            and is_uai_course_run(product.purchasable_object)
-                        )
-                        or (
-                            is_product_program(product)
-                            and is_uai_program(product.purchasable_object)
-                        ),
-                    )
-            else:
-                # Legacy behavior: add single item
+            if not basket.basket_items.filter(product=product).exists():
                 BasketItem.objects.create(basket=basket, product=product)
                 message = "Product added to cart"
 

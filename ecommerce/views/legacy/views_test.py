@@ -33,6 +33,7 @@ from ecommerce.factories import (
 )
 from ecommerce.models import (
     Basket,
+    BasketDiscount,
     BasketItem,
     Discount,
     DiscountProduct,
@@ -902,18 +903,11 @@ def test_checkout_product_with_program_id(user, user_client):
     assert [item.product for item in basket.basket_items.all()] == [product]
 
 
-@pytest.mark.parametrize("multiple_cart_enabled", [True, False])
-def test_add_to_cart_api_with_feature_flag(
-    user_drf_client, user, multiple_cart_enabled, settings
-):
-    """Test add_to_cart API behavior with and without multiple cart items feature"""
-    settings.ENABLE_MULTIPLE_CART_ITEMS = multiple_cart_enabled
-
-    # Create products
+def test_add_to_cart_api_keeps_existing_items(user_drf_client, user):
+    """Adding a product should preserve existing basket items."""
     product1 = ProductFactory.create()
     product2 = ProductFactory.create()
 
-    # Add first product
     resp = user_drf_client.post(
         reverse("checkout_api-add_to_cart"),
         data={"product_id": product1.id},
@@ -931,22 +925,83 @@ def test_add_to_cart_api_with_feature_flag(
     assert resp.status_code == 200
 
     basket.refresh_from_db()
-    if multiple_cart_enabled:
-        # Should have both products
-        assert basket.basket_items.count() == 2
-        products_in_basket = {item.product for item in basket.basket_items.all()}
-        assert products_in_basket == {product1, product2}
-    else:
-        # Should only have the second product (legacy behavior)
-        assert basket.basket_items.count() == 1
-        assert basket.basket_items.first().product == product2
+    assert basket.basket_items.count() == 2
+    products_in_basket = {item.product for item in basket.basket_items.all()}
+    assert products_in_basket == {product1, product2}
+
+
+def test_add_to_cart_api_clears_discounts_but_keeps_existing_items(user_drf_client, user):
+    """Adding a product should remove stale basket discounts without clearing items."""
+    existing_product = ProductFactory.create(price=50)
+    new_product = ProductFactory.create(price=75)
+    discount = DiscountFactory.create()
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=existing_product)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=discount,
+        redeemed_basket=basket,
+    )
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": new_product.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    basket.refresh_from_db()
+    assert basket.basket_items.count() == 2
+    assert BasketDiscount.objects.filter(redeemed_basket=basket).count() == 0
+
+
+def test_add_to_cart_api_nonexistent_product(user_drf_client):
+    """Adding a non-existent product should return a 404."""
+    response = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"),
+        data={"product_id": 99999},
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.data["message"] == "Product not found"
+
+
+def test_checkout_cart_with_multiple_items_pricing(user_drf_client, user):
+    """Cart totals should include all basket items."""
+    product1 = ProductFactory.create(price=50.00)
+    product2 = ProductFactory.create(price=30.00)
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product1, quantity=2)
+    BasketItemFactory.create(basket=basket, product=product2, quantity=1)
+
+    response = user_drf_client.get(reverse("checkout_api-cart"))
+
+    assert response.status_code == status.HTTP_200_OK
+    cart_data = response.data
+    assert float(cart_data["total_price"]) == 130.00
+    assert len(cart_data["basket_items"]) == 2
+
+
+def test_basket_items_count_endpoint(user_drf_client, user):
+    """Basket item count should reflect distinct cart items."""
+    product1 = ProductFactory.create()
+    product2 = ProductFactory.create()
+
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket, product=product1, quantity=2)
+    BasketItemFactory.create(basket=basket, product=product2, quantity=1)
+
+    response = user_drf_client.get(reverse("checkout_api-basket_items_count"))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data == 2
 
 
 def test_add_to_cart_triggers_hubspot_cart_add_for_uai_course(
-    user_drf_client, user, settings, mocker
+    user_drf_client, user, mocker
 ):
     """Adding a UAI course run product should trigger UAI-routed HubSpot cart-add tracking."""
-    settings.ENABLE_MULTIPLE_CART_ITEMS = True
     mock_sync = mocker.patch("ecommerce.views.legacy.sync_hubspot_cart_add")
 
     course_run = CourseRunFactory.create(courseware_id="course-v1:UAI_MIT+1.001x+2026")
@@ -966,10 +1021,9 @@ def test_add_to_cart_triggers_hubspot_cart_add_for_uai_course(
 
 
 def test_add_to_cart_does_not_trigger_hubspot_for_duplicate_product(
-    user_drf_client, user, settings, mocker
+    user_drf_client, user, mocker
 ):
-    """When multiple cart items are enabled, duplicate adds should not emit a second tracking event."""
-    settings.ENABLE_MULTIPLE_CART_ITEMS = True
+    """Duplicate adds should not emit a second tracking event."""
     mock_sync = mocker.patch("ecommerce.views.legacy.sync_hubspot_cart_add")
 
     product = ProductFactory.create()
