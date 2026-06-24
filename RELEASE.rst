@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.158.2
+Version 1.158.2 (Released June 24, 2026)
 ---------------
 
 - Update b2b_codes to work better with assignments; minor QoL fixes (#3689)
