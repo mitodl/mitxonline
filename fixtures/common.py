@@ -10,26 +10,30 @@ from mitol.common.serializers import THIS_IS_NOT_AN_API
 from rest_framework.test import APIClient
 from zeal import zeal_ignore
 
-from users.factories import UserFactory
-
 pytestmark = [pytest.mark.usefixtures("urllib3_mock")]
 
 
 @pytest.fixture
 def user(db):  # noqa: ARG001
     """Creates a user"""
+    from users.factories import UserFactory  # noqa: PLC0415
+
     return UserFactory.create()
 
 
 @pytest.fixture
 def staff_user(db):  # noqa: ARG001
     """Staff user fixture"""
+    from users.factories import UserFactory  # noqa: PLC0415
+
     return UserFactory.create(is_staff=True)
 
 
 @pytest.fixture
 def admin_user(db):  # noqa: ARG001
     """Admin user fixture"""
+    from users.factories import UserFactory  # noqa: PLC0415
+
     return UserFactory.create(is_superuser=True, is_staff=True)
 
 
