@@ -113,4 +113,3 @@ def test_clone_courserun_logs_exception_after_retry_exhaustion(mocker, settings)
 
     mock_retry.assert_not_called()
     mock_log_exception.assert_called_once()
-

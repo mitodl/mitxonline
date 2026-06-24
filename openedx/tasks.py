@@ -4,8 +4,8 @@ import logging
 import random
 
 import celery
-from edx_api.course_runs.exceptions import CourseRunAPIError
 from django.conf import settings
+from edx_api.course_runs.exceptions import CourseRunAPIError
 from mitol.common.utils.collections import chunks
 from requests.exceptions import HTTPError, RequestException
 
