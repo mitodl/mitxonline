@@ -6,7 +6,10 @@ import logging
 from django.core.cache import cache
 from django.db.models import Q
 
-from b2b.mail import send_enrollment_code_assignment_email
+from b2b.mail import (
+    send_enrollment_code_assignment_email,
+    send_test_enrollment_code_assignment_email,
+)
 from main.celery import app
 
 log = logging.getLogger(__name__)
@@ -210,3 +213,10 @@ def queue_update_all_contract_enrollment_sheets():
 @app.task()
 def queue_send_enrollment_code_assignment_email(assignment_record_ids: list[int]):
     send_enrollment_code_assignment_email(assignment_record_ids)
+
+
+@app.task()
+def queue_send_test_enrollment_code_assignment_email(
+    email: str, contract_record_id: int
+):
+    send_test_enrollment_code_assignment_email(email, contract_record_id)
