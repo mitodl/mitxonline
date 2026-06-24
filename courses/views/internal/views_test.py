@@ -4,6 +4,7 @@ import pytest
 from django.urls import reverse
 from faker import Faker
 from rest_framework.test import APIClient
+from rest_framework_api_key.models import APIKey
 
 from courses.constants import (
     COURSE_VARIANT_INDUSTRY,
@@ -50,13 +51,26 @@ def test_is_etl_permission(rf, is_etl, is_superuser):
     assert perm.has_permission(request, {}) == (is_etl or is_superuser)
 
 
+@pytest.mark.parametrize(
+    "use_api_key",
+    [
+        True,
+        False,
+    ],
+)
 @pytest.mark.skip_nplusone_check
-def test_get_ingestible_courses(b2b_courses):
+def test_get_ingestible_courses(b2b_courses, use_api_key):
     """Test that the ingestible courses endpoint returns data as expected."""
 
-    user = UserFactory.create(is_etl=True)
     api_client = APIClient()
-    api_client.force_authenticate(user)
+    headers = {}
+
+    if use_api_key:
+        _, key = APIKey.objects.create_key(name=str(fake.words(3)))
+        headers["Authorization"] = f"Api-Key {key}"
+    else:
+        user = UserFactory.create(is_etl=True)
+        api_client.force_authenticate(user)
 
     _, contracts_by_org_id, _, runs_by_contract, _ = b2b_courses
 
@@ -160,7 +174,9 @@ def test_get_ingestible_courses(b2b_courses):
         )
 
     params = {"page_size": 100}
-    resp = api_client.get(reverse("internal_ingestible_courses-list"), params)
+    resp = api_client.get(
+        reverse("internal_ingestible_courses-list"), params, headers=headers
+    )
 
     assert resp.status_code == 200
 

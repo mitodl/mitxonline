@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Prefetch, Q
 from prefetch import PrefetchOption
 from rest_framework import viewsets
+from rest_framework_api_key.permissions import HasAPIKey
 
 from courses.models import (
     Course,
@@ -29,7 +30,7 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
 
     pagination_class = Pagination
     permission_classes = [
-        IsEtlUser,
+        HasAPIKey | IsEtlUser,
     ]
     serializer_class = IngestibleCourseWithCourseRunsSerializer
 
