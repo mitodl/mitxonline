@@ -83,8 +83,13 @@ class Command(BaseCommand):
                         )
                         continue
                     if commit:
-                        revision.content["product_name"] = title
-                        revision.save()
+                        # Reassign rather than mutate in place so the change is
+                        # always picked up regardless of save()/update_fields or
+                        # any dirty-tracking behavior on the model.
+                        content = revision.content
+                        content["product_name"] = title
+                        revision.content = content
+                        revision.save(update_fields=["content"])
                         status = "changed"
                     else:
                         status = "would-change"
