@@ -1,17 +1,31 @@
 """Courseware tasks"""
 
 import logging
+import random
 
 import celery
+from edx_api.course_runs.exceptions import CourseRunAPIError
 from django.conf import settings
 from mitol.common.utils.collections import chunks
+from requests.exceptions import HTTPError, RequestException
 
 from main.celery import app
 from openedx import api
+from openedx.exceptions import OpenEdXOAuth2Error
 from users.api import get_user_by_id
 from users.models import User
 
 log = logging.getLogger()
+
+
+def _get_clone_courserun_retry_countdown(current_retry: int) -> int:
+    """Return the countdown in seconds for the next clone retry attempt."""
+
+    attempt_number = current_retry + 1
+    base_delay = settings.OPENEDX_COURSE_CLONE_RETRY_DELAY * attempt_number
+    jitter = random.randint(0, settings.OPENEDX_COURSE_CLONE_RETRY_JITTER)
+
+    return base_delay + jitter
 
 
 @app.task(acks_late=True)
@@ -103,12 +117,49 @@ def update_edx_user_profile(user_id):
     api.update_edx_user_profile(user)
 
 
-@app.task
-def clone_courserun(target_id: int, base_key: str):
+@app.task(
+    bind=True,
+    acks_late=True,
+    max_retries=settings.OPENEDX_COURSE_CLONE_MAX_RETRIES,
+)
+def clone_courserun(self, target_id: int, base_key: str):
     """Queue call to clone an existing course run."""
 
     from courses.models import CourseRun  # noqa: PLC0415
 
     target_course = CourseRun.all_objects.get(pk=target_id)
 
-    api.process_course_run_clone(target_course, base_key)
+    try:
+        api.process_course_run_clone(target_course, base_key)
+    except (
+        CourseRunAPIError,
+        HTTPError,
+        OpenEdXOAuth2Error,
+        RequestException,
+    ) as exc:
+        retry_count = getattr(self.request, "retries", 0)
+        attempt_number = retry_count + 1
+
+        if retry_count >= self.max_retries:
+            log.exception(
+                "clone_courserun exhausted retries for target=%s base=%s after "
+                "%s attempts",
+                target_course.readable_id,
+                base_key,
+                attempt_number,
+            )
+            raise
+
+        countdown = _get_clone_courserun_retry_countdown(retry_count)
+
+        log.warning(
+            "Retrying clone_courserun for target=%s base=%s after %s seconds "
+            "because the Open edX clone request failed on attempt %s/%s: %s",
+            target_course.readable_id,
+            base_key,
+            countdown,
+            attempt_number,
+            self.max_retries + 1,
+            exc,
+        )
+        raise self.retry(exc=exc, countdown=countdown) from exc
