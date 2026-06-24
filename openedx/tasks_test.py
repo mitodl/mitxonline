@@ -53,8 +53,8 @@ def test_get_clone_courserun_retry_countdown(mocker, settings):
     settings.OPENEDX_COURSE_CLONE_RETRY_DELAY = 300
     settings.OPENEDX_COURSE_CLONE_RETRY_JITTER = 60
 
-    assert tasks._get_clone_courserun_retry_countdown(0) == 317
-    assert tasks._get_clone_courserun_retry_countdown(2) == 917
+    assert tasks.get_clone_courserun_retry_countdown(0) == 317
+    assert tasks.get_clone_courserun_retry_countdown(2) == 917
 
 
 @pytest.mark.parametrize(

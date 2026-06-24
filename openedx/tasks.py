@@ -18,12 +18,12 @@ from users.models import User
 log = logging.getLogger()
 
 
-def _get_clone_courserun_retry_countdown(current_retry: int) -> int:
+def get_clone_courserun_retry_countdown(current_retry: int) -> int:
     """Return the countdown in seconds for the next clone retry attempt."""
 
     attempt_number = current_retry + 1
     base_delay = settings.OPENEDX_COURSE_CLONE_RETRY_DELAY * attempt_number
-    jitter = random.randint(0, settings.OPENEDX_COURSE_CLONE_RETRY_JITTER)
+    jitter = random.randint(0, settings.OPENEDX_COURSE_CLONE_RETRY_JITTER)  # noqa: S311
 
     return base_delay + jitter
 
@@ -150,7 +150,7 @@ def clone_courserun(self, target_id: int, base_key: str):
             )
             raise
 
-        countdown = _get_clone_courserun_retry_countdown(retry_count)
+        countdown = get_clone_courserun_retry_countdown(retry_count)
 
         log.warning(
             "Retrying clone_courserun for target=%s base=%s after %s seconds "
