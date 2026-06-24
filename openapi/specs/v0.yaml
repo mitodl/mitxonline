@@ -652,6 +652,12 @@ paths:
       responses:
         '200':
           description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailError'
+          description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/:
     get:
       operationId: b2b_manager_organizations_contracts_course_runs_list

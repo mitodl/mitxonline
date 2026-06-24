@@ -750,7 +750,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         description="Send test assignment email to specified email address. This does not include an enrollment code.",
         request=SendTestEmailSerializer,
-        responses={200: None},
+        responses={200: None, 400: DetailErrorSerializer},
     )
     @action(
         detail=True,
