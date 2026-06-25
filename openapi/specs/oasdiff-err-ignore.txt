@@ -127,26 +127,26 @@ POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{i
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: application/json)
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ api removed without deprecation
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ removed the request body
-POST /api/v0/b2b/attach/{enrollment_code}/ removed the required property 'items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/b2b/contracts/ removed the required property 'items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/b2b/contracts/{contract_slug}/ removed the required property 'integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/b2b/manager/organizations/ removed the required property 'items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/b2b/manager/organizations/{id}/ removed the required property 'contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ removed the required property 'integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/b2b/organizations/ removed the required property 'items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/b2b/organizations/{organization_slug}/ removed the required property 'contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/discounts/{parent_lookup_discount}/assignees/ removed the required property 'results/items/user/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-POST /api/v0/discounts/{parent_lookup_discount}/assignees/ removed the required property 'user/b2b_organizations/items/contracts/items/integration_type' from the response with the '201' status [response-required-property-removed].
-GET /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property 'user/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-PATCH /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property 'user/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-PUT /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property 'user/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ removed the required property 'results/items/redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ removed the required property 'redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '201' status [response-required-property-removed].
-GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property 'redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property 'redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property 'redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/userinfo/ removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/users/current_user/ removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-PATCH /api/v0/users/current_user/ removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-GET /api/v0/users/me removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
-PATCH /api/v0/users/me removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+Error: in API POST /api/v0/b2b/attach/{enrollment_code}/ removed the required property `items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/contracts/ removed the required property `items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/contracts/{contract_slug}/ removed the required property `integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/manager/organizations/ removed the required property `items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/manager/organizations/{id}/ removed the required property `contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ removed the required property `integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/organizations/ removed the required property `items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/organizations/{organization_slug}/ removed the required property `contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/discounts/{parent_lookup_discount}/assignees/ removed the required property `results/items/user/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API POST /api/v0/discounts/{parent_lookup_discount}/assignees/ removed the required property `user/b2b_organizations/items/contracts/items/integration_type` from the response with the `201` status
+Error: in API GET /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property `user/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PATCH /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property `user/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PUT /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property `user/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ removed the required property `results/items/redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ removed the required property `redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `201` status
+Error: in API GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property `redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property `redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property `redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/userinfo/ removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/users/current_user/ removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PATCH /api/v0/users/current_user/ removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/users/me removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PATCH /api/v0/users/me removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
