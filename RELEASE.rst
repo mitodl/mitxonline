@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.158.3
+---------------
+
+- Set up ETL view to take an API key or use an ETL-tagged user (#3702)
+
 Version 1.158.2 (Released June 24, 2026)
 ---------------
 
