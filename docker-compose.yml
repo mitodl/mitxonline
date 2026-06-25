@@ -67,7 +67,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: django-server
+      target: development
     command: ["/bin/bash", "./scripts/run-django-dev.sh"]
     stdin_open: true
     tty: true
@@ -119,7 +119,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: django-server
+      target: development
     environment: *py-environment
     env_file: .env
     command: >

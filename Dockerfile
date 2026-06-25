@@ -31,15 +31,14 @@ RUN update-ca-certificates
 
 # Install Python dependencies before copying source.
 # mitol_*.gz are local wheels that uv resolves from the lock file.
-COPY pyproject.toml uv.lock /src/
-COPY mitol_*.gz /src/
-RUN chown -R mitodl:mitodl /src
+COPY --chown=mitodl:mitodl pyproject.toml uv.lock /src/
+COPY --chown=mitodl:mitodl mitol_*.gz /src/
 
 USER mitodl
 WORKDIR /src
 # BuildKit cache mount keeps the uv download cache across builds.
 RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
-    uv sync --frozen --no-install-project
+    uv sync --frozen --no-install-project --no-dev
 
 FROM deps AS code
 
@@ -76,3 +75,9 @@ FROM code AS jupyter-notebook
 RUN uv pip install --force-reinstall jupyter
 
 USER mitodl
+
+# ─── Development target ───────────────────────────────────────────────────────
+FROM django-server AS development
+
+RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project
