@@ -40,8 +40,12 @@ from b2b.serializers.v0.manager import (
     ManagerCourseRunSerializer,
     ManagerEnrollmentCodeSerializer,
     ManagerEnrollmentSerializer,
+    SendTestEmailSerializer,
 )
-from b2b.tasks import queue_send_enrollment_code_assignment_email
+from b2b.tasks import (
+    queue_send_enrollment_code_assignment_email,
+    queue_send_test_enrollment_code_assignment_email,
+)
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
 
@@ -742,3 +746,33 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             ManagerEnrollmentCodeSerializer(discount).data,
             status=http_status.HTTP_200_OK,
         )
+
+    @extend_schema(
+        description="Send test assignment email to specified email address. This does not include an enrollment code.",
+        request=SendTestEmailSerializer,
+        responses={200: None, 400: DetailErrorSerializer},
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="codes/send_test_email",
+    )
+    def send_test_email(self, request, **kwargs):  # noqa: ARG002
+        """
+        Send test assignment email to specified email address. The email will contain placeholder values for the code, but representative data for all other content.
+
+        PUT /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/codes/send_test_email/
+        """
+
+        contract = self.get_object()
+        serializer = SendTestEmailSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"detail": "Invalid request data."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"]
+        queue_send_test_enrollment_code_assignment_email.delay(email, contract.id)
+
+        return Response(status=http_status.HTTP_200_OK)
