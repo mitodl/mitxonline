@@ -4,8 +4,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 
-from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -195,23 +194,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Get the queryset; add some annotations/etc for computed fields"""
-        courserun_content_type = ContentType.objects.get_for_model(CourseRun)
-        return (
+        qs = (
             ContractPage.objects.select_related("organization")
             .prefetch_related("users")
-            .annotate(
-                discount_count=Count(
-                    Subquery(
-                        Discount.objects.filter(
-                            products__product__is_active=True,
-                            products__product__content_type=courserun_content_type,
-                            products__product__object_id__in=CourseRun.objects.filter(
-                                b2b_contract=OuterRef("pk")
-                            ).all(),
-                        ).values("id")
-                    )
-                )
-            )
             .annotate(
                 enrollment_count=Count(
                     "course_runs__enrollments",
@@ -224,6 +209,17 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 organization__organization_users__is_manager=True,
             )
         )
+        if self.action == "retrieve":
+            qs = qs.prefetch_related(
+                Prefetch(
+                    "code_redemptions",
+                    queryset=DiscountContractAttachmentRedemption.objects.only(
+                        "id", "contract_id", "redeemed_on", "user_id"
+                    ),
+                    to_attr="prefetched_code_redemptions",
+                )
+            )
+        return qs
 
     def get_serializer_class(self):
         """Use different serializers for list vs detail views."""
@@ -381,17 +377,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 ).order_by("-num_redemptions", "id")
 
                 codes_for_output = discounts.filter(num_redemptions__gt=0).all()
-
-                # The point of this is to ensure we always get _all_ the redeemed
-                # codes, and then some unredeemed ones if there's space allowed.
-                # I didn't want to just call all() and grab a slice because we might
-                # have _more_ redemptions that we technically allow (if, say, we
-                # adjust the limit down or manually create some redemptions or
-                # something).
-
-                if codes_for_output.count() < contract.max_learners:
-                    # We have seats available, so grab some more codes.
-                    codes_for_output = discounts.all()[: contract.max_learners]
 
         return self.get_paginated_response(
             ManagerEnrollmentCodeSerializer(
