@@ -30,7 +30,6 @@ class BaseContractPageSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
-            "integration_type",
             "membership_type",
             "organization",
             "contract_start",
@@ -62,7 +61,6 @@ class ContractPageSerializer(BaseContractPageSerializer):
             *BaseContractPageSerializer.Meta.fields,
             "welcome_message",
             "welcome_message_extra",
-            "integration_type",
             "programs",
             "variant_options",
         ]
@@ -70,7 +68,6 @@ class ContractPageSerializer(BaseContractPageSerializer):
             *BaseContractPageSerializer.Meta.read_only_fields,
             "welcome_message",
             "welcome_message_extra",
-            "integration_type",
             "programs",
             "variant_options",
         ]

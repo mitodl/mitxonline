@@ -71,12 +71,10 @@ def org_setup():
     # Contract/org creation
 
     contract_1 = ContractPageFactory.create(
-        integration_type=CONTRACT_MEMBERSHIP_CODE,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=20,
     )
     contract_2 = ContractPageFactory.create(
-        integration_type=CONTRACT_MEMBERSHIP_CODE,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=0,
         organization=contract_1.organization,
@@ -89,7 +87,6 @@ def org_setup():
     )
 
     contract_3 = ContractPageFactory.create(
-        integration_type=CONTRACT_MEMBERSHIP_CODE,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=20,
     )

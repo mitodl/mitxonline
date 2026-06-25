@@ -1095,7 +1095,7 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     """
     Ensure that enrollment codes exist for the given contract.
 
-    If the contract is non-SSO or if it specifies a price, we need to create
+    If the contract is code managed or if it specifies a price, we need to create
     enrollment codes so the learners can enroll in the attached resources.
 
     Enrollment codes are discounts. When the contract is seat-limited, we create
@@ -1108,11 +1108,11 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     - If there are discounts, make sure they apply to all the products that
       we've created, and create new ones if necessary.
     - If there are too many discounts, log a warning message.
-    - If the contract is SSO and unlimited, but there are discounts for the
+    - If the contract is SSO managed and unlimited, but there are discounts for the
       products, clear those products out. (Also remove the discounts if there
       was only one product in the discount.)
 
-    Note about SSO contracts: if there's no price, we don't create enrollment
+    Note about SSO managed contracts: if there's no price, we don't create enrollment
     codes regardless of whether there's a learner cap or not. We'll limit the
     attachment when we log the user in.
 
@@ -1123,9 +1123,9 @@ def ensure_enrollment_codes_exist(contract: ContractPage):
     log.info("Checking enrollment codes for contract %s", contract)
 
     if (
-        contract.integration_type in CONTRACT_MEMBERSHIP_AUTOS
-        or contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
-    ) and not contract.enrollment_fixed_price:
+        contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS
+        and not contract.enrollment_fixed_price
+    ):
         # SSO contracts w/out price don't need discounts.
         return _handle_sso_free_contract(contract)
 

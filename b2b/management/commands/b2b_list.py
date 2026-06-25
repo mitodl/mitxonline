@@ -239,7 +239,7 @@ class Command(BaseCommand):
         contract_table.add_column("Name", justify="left")
         contract_table.add_column("Slug", justify="left")
         contract_table.add_column("Org Name", justify="left")
-        contract_table.add_column("Integration", justify="left")
+        contract_table.add_column("Membership", justify="left")
         contract_table.add_column("Start", justify="left")
         contract_table.add_column("End", justify="left")
         contract_table.add_column("Active", justify="left")
@@ -252,7 +252,7 @@ class Command(BaseCommand):
                 contract.name,
                 contract.slug,
                 contract.organization.name,
-                contract.integration_type,
+                contract.membership_type,
                 contract.contract_start.strftime("%Y-%m-%d\n%H:%M")
                 if contract.contract_start
                 else "",
