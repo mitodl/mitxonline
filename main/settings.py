@@ -1257,6 +1257,24 @@ EDX_API_CLIENT_TIMEOUT = get_int(
     description="Timeout (in seconds) for requests made via the edX API client",
 )
 
+OPENEDX_COURSE_CLONE_MAX_RETRIES = get_int(
+    name="OPENEDX_COURSE_CLONE_MAX_RETRIES",
+    default=5,
+    description="Maximum number of retry attempts for transient Open edX course clone failures",
+)
+
+OPENEDX_COURSE_CLONE_RETRY_DELAY = get_int(
+    name="OPENEDX_COURSE_CLONE_RETRY_DELAY",
+    default=300,
+    description="Base retry delay in seconds for Open edX course clone retries; each successive retry multiplies this delay",
+)
+
+OPENEDX_COURSE_CLONE_RETRY_JITTER = get_int(
+    name="OPENEDX_COURSE_CLONE_RETRY_JITTER",
+    default=60,
+    description="Maximum number of randomized jitter seconds to add to Open edX course clone retries",
+)
+
 # django debug toolbar only in debug mode
 if DEBUG:
     INSTALLED_APPS += ("debug_toolbar",)
