@@ -8,7 +8,7 @@ import wagtail_factories
 from factory import Factory, LazyAttribute, LazyFunction, SubFactory
 from factory.django import DjangoModelFactory
 
-from b2b.constants import CONTRACT_MEMBERSHIP_NONSSO, CONTRACT_MEMBERSHIP_SSO
+from b2b.constants import CONTRACT_MEMBERSHIP_CODE, CONTRACT_MEMBERSHIP_MANAGED
 from b2b.keycloak_admin_dataclasses import (
     OrganizationRepresentation,
     RealmRepresentation,
@@ -68,12 +68,11 @@ class ContractPageFactory(wagtail_factories.PageFactory):
     description = LazyAttribute(lambda _: FAKE.unique.text())
     organization = SubFactory(OrganizationPageFactory)
     parent = LazyAttribute(lambda o: o.organization)
-    integration_type = LazyFunction(
+    membership_type = LazyFunction(
         lambda: (
-            CONTRACT_MEMBERSHIP_NONSSO if FAKE.boolean() else CONTRACT_MEMBERSHIP_SSO
+            CONTRACT_MEMBERSHIP_CODE if FAKE.boolean() else CONTRACT_MEMBERSHIP_MANAGED
         )
     )
-    membership_type = LazyAttribute(lambda o: o.integration_type)
     slug = LazyAttribute(lambda _: FAKE.unique.slug())
 
     @factory.post_generation

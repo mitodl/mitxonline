@@ -43,8 +43,8 @@ from b2b.api import (
 )
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
-    CONTRACT_MEMBERSHIP_NONSSO,
-    CONTRACT_MEMBERSHIP_SSO,
+    CONTRACT_MEMBERSHIP_CODE,
+    CONTRACT_MEMBERSHIP_MANAGED,
 )
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
@@ -309,12 +309,9 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
     assert_price = price if price else Decimal(0)
 
     contract = factories.ContractPageFactory(
-        integration_type=CONTRACT_MEMBERSHIP_SSO
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED
         if is_sso
-        else CONTRACT_MEMBERSHIP_NONSSO,
-        membership_type=CONTRACT_MEMBERSHIP_SSO
-        if is_sso
-        else CONTRACT_MEMBERSHIP_NONSSO,
+        else CONTRACT_MEMBERSHIP_CODE,
         enrollment_fixed_price=price,
         max_learners=max_learners,
     )
@@ -356,11 +353,8 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
         if update_no_price:
             contract.enrolment_fixed_price = None
         if update_sso:
-            contract.integration_type = (
-                CONTRACT_MEMBERSHIP_NONSSO if is_sso else CONTRACT_MEMBERSHIP_SSO
-            )
             contract.membership_type = (
-                CONTRACT_MEMBERSHIP_NONSSO if is_sso else CONTRACT_MEMBERSHIP_SSO
+                CONTRACT_MEMBERSHIP_CODE if is_sso else CONTRACT_MEMBERSHIP_MANAGED
             )
 
         contract.save()
@@ -383,8 +377,7 @@ def test_ensure_enrollment_codes_clears_extras():
 
     contract = ContractPageFactory.create(
         max_learners=10,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
     run = CourseRunFactory.create(b2b_contract=contract)
     product = ProductFactory.create(purchasable_object=run)
@@ -448,8 +441,7 @@ def test_create_b2b_enrollment(  # noqa: PLR0913, C901, PLR0915
     settings.OPENEDX_SERVICE_WORKER_USERNAME = "a username"
 
     contract = factories.ContractPageFactory.create(
-        integration_type=CONTRACT_MEMBERSHIP_SSO,
-        membership_type=CONTRACT_MEMBERSHIP_SSO,
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=Decimal(0)
         if price_is_zero
         else FAKE.pydecimal(left_digits=2, right_digits=2, positive=True),
@@ -558,8 +550,7 @@ def test_enroll_in_program_for_b2b(program_in_contract, program_exists):
     to the same contract as the course run. Should skip gracefully otherwise.
     """
     contract = factories.ContractPageFactory.create(
-        integration_type=CONTRACT_MEMBERSHIP_SSO,
-        membership_type=CONTRACT_MEMBERSHIP_SSO,
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
     )
     program = ProgramFactory.create() if program_exists else None
     program_id = program.readable_id if program else "nonexistent-program"
@@ -1045,63 +1036,43 @@ def test_user_add_b2b_org(mocked_b2b_org_attach):
     contract_auto = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="auto",
-        integration_type="auto",
         title="Contract Auto",
         name="Contract Auto",
     )
     contract_managed = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="managed",
-        integration_type="managed",
         title="Contract Managed",
         name="Contract Managed",
     )
     contract_code = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="code",
-        integration_type="code",
         title="Contract Enrollment Code",
         name="Contract Enrollment Code",
-    )
-    # Legacy ones - these will migrate to "managed" and "code"
-    contract_sso = ContractPageFactory.create(
-        organization=orgs[0],
-        membership_type="sso",
-        integration_type="sso",
-        title="Contract SSO",
-        name="Contract SSO",
-    )
-    contract_non_sso = ContractPageFactory.create(
-        organization=orgs[0],
-        membership_type="non-sso",
-        integration_type="non-sso",
-        title="Contract NonSSO",
-        name="Contract NonSSO",
     )
 
     process_add_org_membership(user, orgs[0])
 
-    # We should now be in the SSO, auto, and managed contracts
-    # but not the other two.
+    # We should now be in the auto and managed contracts
+    # but not the other one.
 
     user.refresh_from_db()
-    assert user.b2b_contracts.count() == 3
+    assert user.b2b_contracts.count() == 2
     assert user.b2b_organizations.filter(pk=orgs[0].id).exists()
     assert (
         user.b2b_contracts.filter(
             pk__in=[
                 contract_auto.id,
-                contract_sso.id,
                 contract_managed.id,
             ]
         ).count()
-        == 3
+        == 2
     )
     assert (
         user.b2b_contracts.filter(
             pk__in=[
                 contract_code.id,
-                contract_non_sso.id,
             ]
         ).count()
         == 0
@@ -1119,55 +1090,34 @@ def test_user_remove_b2b_org(mocked_b2b_org_attach):
     contract_auto = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="auto",
-        integration_type="auto",
         title="Contract Auto",
         name="Contract Auto",
     )
     contract_managed = ContractPageFactory.create(
         organization=orgs[0],
         membership_type="managed",
-        integration_type="managed",
         title="Contract Managed",
         name="Contract Managed",
     )
     contract_code = ContractPageFactory.create(
         organization=orgs[1],
         membership_type="code",
-        integration_type="code",
         title="Contract Enrollment Code",
         name="Contract Enrollment Code",
-    )
-    # Legacy ones - these will migrate to "managed" and "code"
-    contract_sso = ContractPageFactory.create(
-        organization=orgs[0],
-        membership_type="sso",
-        integration_type="sso",
-        title="Contract SSO",
-        name="Contract SSO",
-    )
-    contract_non_sso = ContractPageFactory.create(
-        organization=orgs[1],
-        membership_type="non-sso",
-        integration_type="non-sso",
-        title="Contract NonSSO",
-        name="Contract NonSSO",
     )
 
     managed_ids = [
         contract_auto.id,
         contract_managed.id,
-        contract_sso.id,
     ]
     unmanaged_ids = [
         contract_code.id,
-        contract_non_sso.id,
     ]
 
     process_add_org_membership(user, orgs[0])
     process_add_org_membership(user, orgs[1])
 
     user.b2b_contracts.add(contract_code)
-    user.b2b_contracts.add(contract_non_sso)
     user.save()
 
     user.refresh_from_db()
@@ -1195,7 +1145,6 @@ def test_b2b_contract_removal_keeps_enrollments(mocked_b2b_org_attach):
     contract_auto = ContractPageFactory.create(
         organization=org,
         membership_type="auto",
-        integration_type="auto",
         title="Contract Auto",
         name="Contract Auto",
     )
@@ -1503,8 +1452,7 @@ def test_remove_extra_codes():
     """
 
     contract = ContractPageFactory.create(
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=5,
     )
     run = CourseRunFactory.create(b2b_contract=contract)
@@ -1642,8 +1590,7 @@ def test_apply_available_discount_seat_limit():
 
     contract = factories.ContractPageFactory.create(
         max_learners=2,
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
     CourseRunFactory.create_batch(2, b2b_contract=contract)
     user_orgs = factories.UserOrganizationFactory.create_batch(
@@ -1722,8 +1669,7 @@ def test_apply_available_discount_unlimited_seats(existing_discounts):
 
     contract = factories.ContractPageFactory.create(
         max_learners=0,
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
     CourseRunFactory.create_batch(2, b2b_contract=contract)
     user_orgs = factories.UserOrganizationFactory.create_batch(
