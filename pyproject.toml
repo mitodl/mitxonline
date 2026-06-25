@@ -66,7 +66,7 @@ dependencies = [
     "wagtail==7.3.2",
     "wagtail-metadata>=5.0.0,<6",
     "djangorestframework-api-key>=3.1.0,<4",
-    "setuptools<80.11",
+    "setuptools<82.1",
     "mitol-django-google-sheets>=2025.6.13,<2026",
     "mitol-django-google-sheets-deferrals>=2025.3.17,<2026",
     "mitol-django-google-sheets-refunds>=2025.6.13,<2026",
