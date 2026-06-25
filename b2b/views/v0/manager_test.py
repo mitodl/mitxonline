@@ -370,7 +370,8 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         discount_count = contract.get_discounts().count()
         assert discount_count > contract.max_learners
 
-        expected_code_count = contract.max_learners if contract.max_learners > 0 else 1
+        # We don't expect to get anything back if max_learners is > 0 because we have no redeemed or assigned codes
+        expected_code_count = 0 if contract.max_learners > 0 else 1
         contract_codes = [
             discount.discount_code
             for discount in contract.get_discounts()
@@ -378,8 +379,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
             .all()[:expected_code_count]
         ]
 
-        # Pull the codes - we should get max_learner codes back and they should
-        # match the sorting order above.
+        # Pull the codes - we should get 0 codes back for a contract w/ max learners since we have no redemptions
 
         manager_contract_code_list = reverse(
             "b2b:b2b-manager-org-contract-codes",
@@ -414,6 +414,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         # the subset of discounts hasn't changed.
 
         if contract.max_learners > 1:
+            redeemed_and_assigned_count = 1 + len(some_users)
             discounts_to_use = contract.get_discounts().order_by("-id")[:3]
 
             # Create one "assigned" redemption (pre-assigned but not yet claimed)
@@ -428,6 +429,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
             # This is the unlimited seat one, so just use the same discount 3 times.
             discount_to_use = contract.get_discounts().order_by("id").last()
             discounts_to_use = [discount_to_use, discount_to_use, discount_to_use]
+            redeemed_and_assigned_count = len(some_users)
 
         for idx, user in enumerate(some_users):
             DiscountContractAttachmentRedemption.objects.create(
@@ -440,21 +442,20 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         resp_codes = [resp_code["code"] for resp_code in resp.json()["results"]]
 
         if contract.max_learners > 1:
-            assert len(resp_codes) == expected_code_count
+            assert len(resp_codes) == redeemed_and_assigned_count
 
             # All codes with redemptions (redeemed and assigned) must appear in
-            # the response; the remaining slots are filled with unassigned codes.
+            # the response.
             used_codes = {discount.discount_code for discount in discounts_to_use}
             assert used_codes.issubset(set(resp_codes))
             assert assigned_discount.discount_code in resp_codes
 
-            # Verify all three redemption statuses are represented in the response.
+            # Verify all non-unassigned redemption statuses are represented in the response.
             response_statuses = {
                 code["redemption_status"] for code in resp.json()["results"]
             }
             assert REDEMPTION_STATUS_REDEEMED in response_statuses
             assert REDEMPTION_STATUS_ASSIGNED in response_statuses
-            assert REDEMPTION_STATUS_UNASSIGNED in response_statuses
         else:
             # For the unlimited seat one, we only get back the single code.
 
@@ -607,7 +608,7 @@ def test_org_contract_codes_search_term(org_setup, manager_drf_client):
     # No search_term returns all codes (up to max_learners)
     resp = manager_drf_client.get(url)
     assert resp.status_code == status.HTTP_200_OK
-    assert len(resp.json()["results"]) == contract_1.max_learners
+    assert len(resp.json()["results"]) == 3
 
 
 # ---------------------------------------------------------------------------
