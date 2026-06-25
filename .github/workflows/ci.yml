@@ -6,7 +6,7 @@ jobs:
 
     services:
       db:
-        image: postgres:15.16
+        image: postgres:15.16@sha256:2bc89eed5490967e6b1fa5175d84cb45d65f19fbb8973c7b23450dea785b9505
         # Health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
