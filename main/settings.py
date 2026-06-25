@@ -1129,7 +1129,7 @@ MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"
 # mitol-django-mail
 MITOL_MAIL_FROM_EMAIL = MAILGUN_FROM_EMAIL
 MITOL_MAIL_REPLY_TO_ADDRESS = MITX_ONLINE_REPLY_TO_ADDRESS
-MITOL_MAIL_MESSAGE_CLASSES = []
+MITOL_MAIL_MESSAGE_CLASSES = ["b2b.mail.EnrollmentCodeAssignmentMessage"]
 MITOL_MAIL_RECIPIENT_OVERRIDE = MAILGUN_RECIPIENT_OVERRIDE
 MITOL_MAIL_FORMAT_RECIPIENT_FUNC = "users.utils.format_recipient"
 MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the legacy mail debugger defined in this project
