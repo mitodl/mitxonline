@@ -8,3 +8,155 @@ POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{i
 PUT /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/reassign/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
 DELETE /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+# Spec corrections: these endpoints already returned null for `page` in practice.
+# The spec was updated to reflect actual behavior, not a behavioral breaking change.
+GET /api/v2/course_certificates/{cert_uuid}/ the response property `course_run/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+GET /api/v2/courses/ the response property `results/items/page` became nullable for the status `200`
+GET /api/v2/courses/{id}/ the response property `page` became nullable for the status `200`
+GET /api/v2/enrollments/ the response property `items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+POST /api/v2/enrollments/ the response property `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `201`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the response property `items/items/course_details/page` became nullable for the status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the response property `items/items/program_details/page` became nullable for the status `200`
+GET /api/v2/pages/{id}/ the response property `oneOf[#/components/schemas/CoursePageItem]/course_details/page` became nullable for the status `200`
+GET /api/v2/pages/{id}/ the response property `oneOf[#/components/schemas/ProgramPageItem]/program_details/page` became nullable for the status `200`
+GET /api/v2/program_certificates/{cert_uuid}/ the response property `program/page` became nullable for the status `200`
+GET /api/v2/program_enrollments/ the response property `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+GET /api/v2/program_enrollments/ the response property `items/program/page` became nullable for the status `200`
+DELETE /api/v2/program_enrollments/{id}/ the response property `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+DELETE /api/v2/program_enrollments/{id}/ the response property `items/program/page` became nullable for the status `200`
+GET /api/v2/program_enrollments/{id}/ the response property `enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
+GET /api/v2/program_enrollments/{id}/ the response property `program/page` became nullable for the status `200`
+GET /api/v2/programs/ the response property `results/items/page` became nullable for the status `200`
+GET /api/v2/programs/{id}/ the response property `page` became nullable for the status `200`
+POST /api/v2/verified_program_enrollments/{courserun_id}/ the response property `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `201`
+GET /api/records/program/{id}/ removed the required property `partner_schools/items/created_on` from the response with the `200` status
+GET /api/records/program/{id}/ removed the required property `partner_schools/items/email` from the response with the `200` status
+GET /api/records/program/{id}/ removed the required property `partner_schools/items/updated_on` from the response with the `200` status
+POST /api/records/program/{id}/revoke/ removed the required property `partner_schools/items/created_on` from the response with the `200` status
+POST /api/records/program/{id}/revoke/ removed the required property `partner_schools/items/email` from the response with the `200` status
+POST /api/records/program/{id}/revoke/ removed the required property `partner_schools/items/updated_on` from the response with the `200` status
+POST /api/records/program/{id}/share/ removed the required property `partner_schools/items/created_on` from the response with the `200` status
+POST /api/records/program/{id}/share/ removed the required property `partner_schools/items/email` from the response with the `200` status
+POST /api/records/program/{id}/share/ removed the required property `partner_schools/items/updated_on` from the response with the `200` status
+GET /api/records/shared/{uuid}/ removed the required property `partner_schools/items/created_on` from the response with the `200` status
+GET /api/records/shared/{uuid}/ removed the required property `partner_schools/items/email` from the response with the `200` status
+GET /api/records/shared/{uuid}/ removed the required property `partner_schools/items/updated_on` from the response with the `200` status
+GET /api/v2/course_certificates/{cert_uuid}/ the `course_run/course/allOf[#/components/schemas/V2Course]/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/course_certificates/{cert_uuid}/ the `course_run/course/allOf[#/components/schemas/V2Course]/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/courses/ the `results/items/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/courses/ the `results/items/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/courses/{id}/ the `max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/courses/{id}/ the `min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/enrollments/ the `items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/enrollments/ the `items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+POST /api/v2/enrollments/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `201`
+POST /api/v2/enrollments/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `201`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/course_details/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/course_details/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/max_price` response's property type/format changed from `integer`/`` to `string`/`decimal` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/min_price` response's property type/format changed from `integer`/`` to `string`/`decimal` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/max_price` response's property type/format changed from `integer`/`` to `string`/`decimal` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/min_price` response's property type/format changed from `integer`/`` to `string`/`decimal` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/program_details/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/program_details/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/course_details/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/course_details/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/max_price` response's property type/format changed from `integer`/`` to `string`/`decimal` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/min_price` response's property type/format changed from `integer`/`` to `string`/`decimal` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/max_price` response's property type/format changed from `integer`/`` to `string`/`decimal` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/min_price` response's property type/format changed from `integer`/`` to `string`/`decimal` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/program_details/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/program_details/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_certificates/{cert_uuid}/ the `program/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_certificates/{cert_uuid}/ the `program/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_enrollments/ the `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_enrollments/ the `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_enrollments/ the `items/program/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_enrollments/ the `items/program/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+DELETE /api/v2/program_enrollments/{id}/ the `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+DELETE /api/v2/program_enrollments/{id}/ the `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+DELETE /api/v2/program_enrollments/{id}/ the `items/program/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+DELETE /api/v2/program_enrollments/{id}/ the `items/program/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_enrollments/{id}/ the `enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_enrollments/{id}/ the `enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_enrollments/{id}/ the `program/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/program_enrollments/{id}/ the `program/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/programs/ the `results/items/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/programs/ the `results/items/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/programs/{id}/ the `max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+GET /api/v2/programs/{id}/ the `min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `200`
+POST /api/v2/verified_program_enrollments/{courserun_id}/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/max_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `201`
+POST /api/v2/verified_program_enrollments/{courserun_id}/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/min_price` response's property type/format changed from `integer`/`` to `number`/`double` for status `201`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/ removed the required property `items/is_redeemed` from the response with the `200` status
+Error: in API GET /api/v2/course_certificates/{cert_uuid}/ the `course_run/course/allOf[#/components/schemas/V2Course]/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/course_certificates/{cert_uuid}/ the `course_run/course/allOf[#/components/schemas/V2Course]/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/courses/ the `results/items/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/courses/ the `results/items/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/courses/{id}/ the `programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/courses/{id}/ the `programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/enrollments/ the `items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/enrollments/ the `items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API POST /api/v2/enrollments/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `201`
+Error: in API POST /api/v2/enrollments/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/title` response property's maxLength was unset from `255` for the response status `201`
+Error: in API GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/course_details/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/course_details/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/program_details/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/program_details/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/course_details/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/course_details/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/program_details/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/program_details/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_certificates/{cert_uuid}/ the `program/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_certificates/{cert_uuid}/ the `program/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_enrollments/ the `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_enrollments/ the `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_enrollments/ the `items/program/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_enrollments/ the `items/program/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API DELETE /api/v2/program_enrollments/{id}/ the `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API DELETE /api/v2/program_enrollments/{id}/ the `items/enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API DELETE /api/v2/program_enrollments/{id}/ the `items/program/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API DELETE /api/v2/program_enrollments/{id}/ the `items/program/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_enrollments/{id}/ the `enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_enrollments/{id}/ the `enrollments/items/run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_enrollments/{id}/ the `program/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/program_enrollments/{id}/ the `program/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/programs/ the `results/items/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/programs/ the `results/items/programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/programs/{id}/ the `programs/items/readable_id` response property's maxLength was unset from `255` for the response status `200`
+Error: in API GET /api/v2/programs/{id}/ the `programs/items/title` response property's maxLength was unset from `255` for the response status `200`
+Error: in API POST /api/v2/verified_program_enrollments/{courserun_id}/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/readable_id` response property's maxLength was unset from `255` for the response status `201`
+Error: in API POST /api/v2/verified_program_enrollments/{courserun_id}/ the `run/allOf[#/components/schemas/V2CourseRunWithCourse]/course/allOf[#/components/schemas/V2Course]/programs/items/title` response property's maxLength was unset from `255` for the response status `201`
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/ the request's body type/format changed from `object`/`` to `array`/`` (media type: application/json)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/ the request's body type/format changed from `object`/`` to `array`/`` (media type: application/x-www-form-urlencoded)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/ the request's body type/format changed from `object`/`` to `array`/`` (media type: multipart/form-data)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/ added the new required request property `email` (media type: application/json)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/ added the new required request property `email` (media type: multipart/form-data)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/ added the new required request property `email` (media type: application/x-www-form-urlencoded)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: application/x-www-form-urlencoded)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: multipart/form-data)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: application/json)
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ api removed without deprecation
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ removed the request body
+POST /api/v0/b2b/attach/{enrollment_code}/ removed the required property 'items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/b2b/contracts/ removed the required property 'items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/b2b/contracts/{contract_slug}/ removed the required property 'integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/b2b/manager/organizations/ removed the required property 'items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/b2b/manager/organizations/{id}/ removed the required property 'contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ removed the required property 'integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/b2b/organizations/ removed the required property 'items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/b2b/organizations/{organization_slug}/ removed the required property 'contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/ removed the required property 'results/items/user/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+POST /api/v0/discounts/{parent_lookup_discount}/assignees/ removed the required property 'user/b2b_organizations/items/contracts/items/integration_type' from the response with the '201' status [response-required-property-removed].
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property 'user/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+PATCH /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property 'user/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+PUT /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property 'user/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ removed the required property 'results/items/redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ removed the required property 'redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '201' status [response-required-property-removed].
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property 'redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property 'redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property 'redeemed_by/b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/userinfo/ removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/users/current_user/ removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+PATCH /api/v0/users/current_user/ removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+GET /api/v0/users/me removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
+PATCH /api/v0/users/me removed the required property 'b2b_organizations/items/contracts/items/integration_type' from the response with the '200' status [response-required-property-removed].
