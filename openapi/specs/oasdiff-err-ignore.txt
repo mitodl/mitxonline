@@ -127,3 +127,13 @@ POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{i
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: application/json)
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ api removed without deprecation
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ removed the request body
+# Spec correction: `redemption_status` became a proper enum (RedemptionStatusEnum).
+# oasdiff reports a response property type change because the inline `type: string`
+# moved onto the referenced enum schema, but the set of values the API returns is
+# unchanged. This is a spec correction, not a behavioral breaking change.
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/ the `items/redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/ the `assigned/items/redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+PUT /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/reassign/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+DELETE /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`

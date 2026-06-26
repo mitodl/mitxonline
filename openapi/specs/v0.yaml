@@ -7123,13 +7123,8 @@ components:
         code:
           type: string
         redemption_status:
-          type: string
-          description: |-
-            Return the redemption status of this code.
-
-            - "unassigned": no DiscountContractAttachmentRedemption record exists
-            - "assigned": a record exists but the code has not been claimed yet
-            - "redeemed": the code has been claimed
+          allOf:
+          - $ref: '#/components/schemas/RedemptionStatusEnum'
           readOnly: true
         assigned_to:
           type: string
@@ -8547,6 +8542,20 @@ components:
           readOnly: true
       required:
       - redeemed_discount
+    RedemptionStatusEnum:
+      enum:
+      - unassigned
+      - assigned
+      - redeemed
+      type: string
+      description: |-
+        * `unassigned` - unassigned
+        * `assigned` - assigned
+        * `redeemed` - redeemed
+      x-enum-descriptions:
+      - unassigned
+      - assigned
+      - redeemed
     RedemptionTypeEnum:
       enum:
       - one-time
