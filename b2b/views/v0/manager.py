@@ -21,6 +21,8 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
+    REDEMPTION_STATUS_ASSIGNED,
+    REDEMPTION_STATUS_REDEEMED,
     ContractPage,
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
@@ -292,6 +294,14 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 description="Filter codes by assigned email, user email, user name, or assigned name.",
                 required=False,
             ),
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter codes by status. Supported values are assigned and redeemed.",
+                required=False,
+                enum=[REDEMPTION_STATUS_ASSIGNED, REDEMPTION_STATUS_REDEEMED],
+            ),
         ],
     )
     @action(detail=True, methods=["get"])
@@ -305,6 +315,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         """
         contract = self.get_object()
         search_term = request.query_params.get("search_term", "").strip()
+        status_filter = request.query_params.get("status", "").strip()
 
         """
         There are three main cases:
@@ -327,7 +338,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 to_attr="prefetched_redemptions",
             )
 
-            if search_term:
+            if search_term or status_filter:
                 # This filter is slightly complicated because we only want to filter on the latest redemption per discount
                 # In practice, we only expect 1 redemption per code for well-formed contracts,
                 # but that's not enforced at the DB so we need to be a bit clever.
@@ -338,23 +349,25 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     .distinct("discount_id")
                     .values("pk")
                 )
+                filter_q = Q(contract_redemptions__pk__in=latest_redemption_ids)
+                if search_term:
+                    filter_q &= (
+                        Q(contract_redemptions__assigned_email__icontains=search_term)
+                        | Q(contract_redemptions__user__email__icontains=search_term)
+                        | Q(contract_redemptions__user__name__icontains=search_term)
+                        | Q(contract_redemptions__assigned_name__icontains=search_term)
+                    )
+                if status_filter == REDEMPTION_STATUS_REDEEMED:
+                    filter_q &= Q(contract_redemptions__user__isnull=False) | Q(
+                        contract_redemptions__redeemed_on__isnull=False
+                    )
+                elif status_filter == REDEMPTION_STATUS_ASSIGNED:
+                    filter_q &= Q(contract_redemptions__user__isnull=True) & Q(
+                        contract_redemptions__redeemed_on__isnull=True
+                    )
                 discounts = (
                     contract.get_discounts()
-                    .filter(
-                        Q(contract_redemptions__pk__in=latest_redemption_ids)
-                        & (
-                            Q(
-                                contract_redemptions__assigned_email__icontains=search_term
-                            )
-                            | Q(
-                                contract_redemptions__user__email__icontains=search_term
-                            )
-                            | Q(contract_redemptions__user__name__icontains=search_term)
-                            | Q(
-                                contract_redemptions__assigned_name__icontains=search_term
-                            )
-                        )
-                    )
+                    .filter(filter_q)
                     .distinct()
                     .prefetch_related(prefetch)
                 )

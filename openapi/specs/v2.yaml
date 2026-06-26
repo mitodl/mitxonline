@@ -372,6 +372,14 @@ paths:
           type: string
         description: Filter codes by assigned email, user email, user name, or assigned
           name.
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - assigned
+          - redeemed
+        description: Filter codes by status. Supported values are assigned and redeemed.
       tags:
       - b2b
       responses:

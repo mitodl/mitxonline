@@ -612,6 +612,115 @@ def test_org_contract_codes_search_term(org_setup, manager_drf_client):
 
 
 # ---------------------------------------------------------------------------
+# codes status filter tests
+# ---------------------------------------------------------------------------
+
+
+def _get_codes_for_status(client, url, status_value):
+    resp = client.get(url, {"status": status_value})
+    assert resp.status_code == status.HTTP_200_OK
+    return {r["code"] for r in resp.json()["results"]}
+
+
+def test_org_contract_codes_status_filter(org_setup, manager_drf_client):
+    """Status filter returns only codes matching the requested redemption status."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:3])
+
+    user_a = UserFactory.create(email="alice@example.com")
+
+    # assigned only (no user, no redeemed_on)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[0],
+        assigned_email="carol@example.com",
+        contract=contract_1,
+    )
+    # redeemed (has user)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[1],
+        user=user_a,
+        contract=contract_1,
+    )
+    # redeemed (has redeemed_on but no user, e.g. user deleted)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[2],
+        redeemed_on=now_in_utc(),
+        contract=contract_1,
+    )
+
+    url = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    assert _get_codes_for_status(
+        manager_drf_client, url, REDEMPTION_STATUS_ASSIGNED
+    ) == {discounts[0].discount_code}
+
+    assert _get_codes_for_status(
+        manager_drf_client, url, REDEMPTION_STATUS_REDEEMED
+    ) == {
+        discounts[1].discount_code,
+        discounts[2].discount_code,
+    }
+
+
+def test_org_contract_codes_status_and_search_combined(org_setup, manager_drf_client):
+    """Status and search_term filters can be combined."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:3])
+
+    user_a = UserFactory.create(email="alice@example.com", name="Alice Smith")
+    user_b = UserFactory.create(email="bob@example.com", name="Bob Jones")
+
+    # assigned to alice email but not redeemed
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[0],
+        assigned_email="alice@example.com",
+        contract=contract_1,
+    )
+    # redeemed by user_a
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[1],
+        user=user_a,
+        contract=contract_1,
+    )
+    # redeemed by user_b
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[2],
+        user=user_b,
+        contract=contract_1,
+    )
+
+    url = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    # assigned + search matching alice: only the unredemed code
+    resp = manager_drf_client.get(
+        url, {"status": REDEMPTION_STATUS_ASSIGNED, "search_term": "alice"}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert {r["code"] for r in resp.json()["results"]} == {discounts[0].discount_code}
+
+    # redeemed + search matching alice: only user_a's redeemed code
+    resp = manager_drf_client.get(
+        url, {"status": REDEMPTION_STATUS_REDEEMED, "search_term": "alice"}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert {r["code"] for r in resp.json()["results"]} == {discounts[1].discount_code}
+
+
+# ---------------------------------------------------------------------------
 # assign_code tests
 # ---------------------------------------------------------------------------
 
