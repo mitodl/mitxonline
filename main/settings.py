@@ -265,7 +265,7 @@ INSTALLED_APPS = (
     "cms.apps.CustomWagtailUsersAppConfig",
     "cms",
     "sheets",
-    # "compliance",
+    "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
     "ecommerce",
@@ -1193,6 +1193,27 @@ OPENEDX_BASE_REDIRECT_URL = get_string(
     name="OPENEDX_BASE_REDIRECT_URL",
     default=OPENEDX_API_BASE_URL,
     description="The base redirect URL for an OAuth Application for the Open edX API",
+)
+
+CYBERSOURCE_WSDL_URL = get_string(
+    name="CYBERSOURCE_WSDL_URL",
+    default="",
+    description="CyberSource SOAP WSDL URL for export compliance checks",
+)
+CYBERSOURCE_MERCHANT_ID = get_string(
+    name="CYBERSOURCE_MERCHANT_ID",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID,
+    description="CyberSource merchant ID for export compliance checks",
+)
+CYBERSOURCE_TRANSACTION_KEY = get_string(
+    name="CYBERSOURCE_TRANSACTION_KEY",
+    default="",
+    description="CyberSource SOAP transaction key for export compliance checks",
+)
+CYBERSOURCE_EXPORT_SERVICE_RUN = get_bool(
+    name="CYBERSOURCE_EXPORT_SERVICE_RUN",
+    default=True,
+    description="Whether CyberSource exportService requests should be marked runnable",
 )
 OPENEDX_TOKEN_EXPIRES_HOURS = get_int(
     name="OPENEDX_TOKEN_EXPIRES_HOURS",
