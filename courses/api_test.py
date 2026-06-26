@@ -14,7 +14,6 @@ import faker
 import pytest
 import responses
 import reversion
-from compliance.api import ExportComplianceResult
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import connection
@@ -36,6 +35,7 @@ from b2b.factories import (
     OrganizationPageFactory,
 )
 from cms.factories import CourseIndexPageFactory
+from compliance.api import ExportComplianceResult
 from courses.api import (
     check_course_modes,
     create_local_enrollment,

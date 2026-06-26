@@ -79,7 +79,9 @@ def _build_export_payload(user) -> dict[str, Any]:
         "exportService": {
             "run": "true" if settings.CYBERSOURCE_EXPORT_SERVICE_RUN else "false"
         },
-        "billTo": {key: value for key, value in bill_to.items() if value not in [None, ""]},
+        "billTo": {
+            key: value for key, value in bill_to.items() if value not in [None, ""]
+        },
     }
 
 
@@ -117,4 +119,3 @@ def verify_user_with_exports(user) -> ExportComplianceResult:
         request_id=getattr(response, "requestID", None),
         raw=response,
     )
-
