@@ -26,6 +26,7 @@ from django_countries.fields import CountryField
 from lru_method_cache import lru_method_cache
 from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
+from mitol.common.utils.queryset import is_prefetched
 from mitol.openedx.utils import get_course_number
 from modelcluster.fields import ParentalKey
 from prefetch import Prefetcher, PrefetchManagerMixin, PrefetchQuerySet
@@ -54,66 +55,6 @@ from variants.models import SupportedVariant, VariantOptionsModel
 User = get_user_model()
 
 log = logging.getLogger(__name__)
-
-
-class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
-    def live(self):
-        """Applies a filter for Programs with live=True"""
-        return self.filter(live=True)
-
-    def with_text_id(self, text_id):
-        """Applies a filter for the Program's readable_id"""
-        return self.filter(readable_id=text_id)
-
-
-class CourseQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: disable=missing-docstring
-    def live(self):
-        """Applies a filter for Courses with live=True"""
-        return self.filter(live=True)
-
-    def courses_in_program(self, program):
-        """Return a list of courses that are required by a given program"""
-        return self.filter(in_programs__program=program)
-
-
-class CoursesTopicQuerySet(models.QuerySet):
-    """
-    Custom QuerySet for `CoursesTopic`
-    """
-
-    def parent_topics(self):
-        """
-        Applies a filter for course topics with parent=None
-        """
-        return self.filter(parent__isnull=True).order_by("name")
-
-    def parent_topic_names(self):
-        """
-        Returns a list of all parent topic names.
-        """
-        return list(self.parent_topics().values_list("name", flat=True))
-
-
-class EnrollmentQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):
-    """QuerySet for Enrollment models"""
-
-
-class EnrollmentManager(
-    models.Manager.from_queryset(EnrollmentQuerySet), PrefetchManagerMixin
-):
-    """Base manager class for enrollments"""
-
-    @classmethod
-    def get_queryset_class(cls):
-        return EnrollmentQuerySet
-
-
-class ActiveEnrollmentManager(EnrollmentManager):
-    """Query manager for active enrollment model objects"""
-
-    def get_queryset(self):
-        """Manager queryset"""
-        return super().get_queryset().filter(active=True)
 
 
 detail_path_char_pattern = r"\w\-+:\."
@@ -188,6 +129,16 @@ class EnrollmentMode(models.Model):
             self.mode_display_name = self.mode_slug
 
         super().save(*args, **kwargs)
+
+
+class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
+    def live(self):
+        """Applies a filter for Programs with live=True"""
+        return self.filter(live=True)
+
+    def with_text_id(self, text_id):
+        """Applies a filter for the Program's readable_id"""
+        return self.filter(readable_id=text_id)
 
 
 class Program(TimestampedModel, ValidateOnSaveMixin):
@@ -877,6 +828,24 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
         return f"{self.program.readable_id} | {self.program.title}"
 
 
+class CoursesTopicQuerySet(models.QuerySet):
+    """
+    Custom QuerySet for `CoursesTopic`
+    """
+
+    def parent_topics(self):
+        """
+        Applies a filter for course topics with parent=None
+        """
+        return self.filter(parent__isnull=True).order_by("name")
+
+    def parent_topic_names(self):
+        """
+        Returns a list of all parent topic names.
+        """
+        return list(self.parent_topics().values_list("name", flat=True))
+
+
 class CoursesTopic(TimestampedModel):
     """
     Topics for all courses (e.g. "History")
@@ -902,10 +871,20 @@ class CoursesTopic(TimestampedModel):
         return self.name
 
 
+class CourseQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: disable=missing-docstring
+    def live(self):
+        """Applies a filter for Courses with live=True"""
+        return self.filter(live=True)
+
+    def courses_in_program(self, program):
+        """Return a list of courses that are required by a given program"""
+        return self.filter(in_programs__program=program)
+
+
 class CourseProgramPrefetcher(Prefetcher):
     """Prefetcher for Course programs."""
 
-    queryset: CourseQuerySet
+    queryset: ProgramQuerySet
 
     def __init__(self, *args, **kwargs):
         self.queryset = kwargs.pop(  # safest default is non-b2b
@@ -939,6 +918,44 @@ class CourseProgramPrefetcher(Prefetcher):
     @staticmethod
     def decorator(course, programs=None):
         course.programs = programs or []
+
+
+class CourseTopicsPrefetcher(Prefetcher):
+    """Prefetcher for Course topics."""
+
+    queryset: CoursesTopicQuerySet
+
+    def __init__(self, *args, **kwargs):
+        self.queryset = kwargs.pop("queryset", CoursesTopic.objects.all())
+        self.max_depth = kwargs.pop("max_depth", 1)
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def mapper(course):
+        """Map each course to Course.page.id"""
+        return course.page.id if hasattr(course, "page") else None
+
+    def filter(self, page_ids):
+        if not page_ids:
+            return self.queryset.none()
+
+        return (
+            self.queryset.select_related("parent")
+            .filter(page__id__in=page_ids)
+            .annotate(
+                page_ids=ArrayAgg(
+                    "page__id", disinct=True, filter=Q(page__id__in=page_ids)
+                )
+            )
+        )
+
+    @staticmethod
+    def reverse_mapper(topic):
+        return topic.page_ids
+
+    @staticmethod
+    def decorator(course, topics=None):
+        course.topics = topics or []
 
 
 class CourseManager(models.Manager.from_queryset(CourseQuerySet), PrefetchManagerMixin):
@@ -1010,7 +1027,51 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return list(relevant_run.products.filter(is_active=True).all())
 
     @cached_property
-    def first_unexpired_run(self):
+    def all_unexpired_runs(self) -> list["CourseRun"]:
+        """Get all the enrollable runs"""
+        now = now_in_utc()
+        if is_prefetched(self, "courseruns"):
+            runs = [
+                run
+                for run in self.courseruns.all()
+                if (
+                    run.is_enrollable
+                    and (run.end_date is None or run.end_date > now)
+                    and (run.is_primary_language or run.language in ["", "en"])
+                )
+            ]
+
+            return sorted(
+                runs, key=lambda run: (run.start_date, not run.is_primary_language)
+            )
+        else:
+            return list(
+                self.courseruns.enrollable()
+                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
+                .order_by("start_date", "-is_primary_language")
+            )
+
+    def get_unexpired_noncontract_runs(self) -> list["CourseRun"]:
+        """Get all the enrollable runs that don't have a b2b contract"""
+
+        return [
+            run
+            for run in self.all_unexpired_runs
+            if (getattr(run, "b2b_contract", None) is None)
+        ]
+
+    def get_unexpired_contract_runs(
+        self, user_contract_ids: list[int]
+    ) -> list["CourseRun"]:
+        """Get all the enrollable runs that match the user contracts"""
+        return [
+            run
+            for run in self.all_unexpired_runs
+            if (getattr(run, "b2b_contract_id", None) in user_contract_ids)
+        ]
+
+    @cached_property
+    def first_unexpired_run(self) -> "CourseRun | None":
         """
         Gets the first unexpired/enrollable CourseRun associated with this Course. Giving preference to
         non-archived courses
@@ -1018,28 +1079,16 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
+        runs = self.get_unexpired_noncontract_runs()
+        now = now_in_utc()
+
         # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__isnull=True)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-            .order_by("start_date", "-is_primary_language")
-            .first()
-        )
+        for run in runs:
+            if run.end_date is not None and run.end_date > now:
+                return run
 
         # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__isnull=True)
-                .enrollable()
-                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-                .order_by("start_date", "-is_primary_language")
-                .first()
-            )
-
-        return best_run
+        return runs[0] if runs else None
 
     @cached_property
     def include_in_learn_catalog(self) -> bool:
@@ -1073,7 +1122,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             default_variant=True,
         ).first()
 
-    def get_first_unexpired_b2b_run(self, user_contracts):
+    def get_first_unexpired_b2b_run(
+        self, user_contract_ids: list[int]
+    ) -> "CourseRun | None":
         """
         Gets the first unexpired/enrollable CourseRun associated with both this
         Course and the user's specified contracts.
@@ -1081,33 +1132,21 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         First means in start date order ascending.
 
         Args:
-        - user_contracts (list of int): the current user's contracts
+        - user_contract_ids (list of int): the current user's contracts
 
         Returns:
             CourseRun or None: An unexpired/enrollable course run
         """
-        # Use the CourseRunQuerySet.enrollable() method to eliminate code duplication
+        runs = self.get_unexpired_contract_runs(user_contract_ids)
+        now = now_in_utc()
+
         # First try to find non-past enrollable runs (end_date is None or in the future)
-        best_run = (
-            self.courseruns.filter(b2b_contract__in=user_contracts)
-            .enrollable()
-            .filter(Q(end_date__isnull=True) | Q(end_date__gt=now_in_utc()))
-            .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-            .order_by("start_date", "-is_primary_language")
-            .first()
-        )
+        for run in runs:
+            if run.end_date is not None and run.end_date > now:
+                return run
 
         # If no non-past runs found, look for any enrollable runs (including archived)
-        if best_run is None:
-            best_run = (
-                self.courseruns.filter(b2b_contract__in=user_contracts)
-                .enrollable()
-                .filter(Q(is_primary_language=True) | Q(language__in=["", "en"]))
-                .order_by("start_date", "-is_primary_language")
-                .first()
-            )
-
-        return best_run
+        return runs[0] if runs else None
 
     @cached_property
     def programs(self) -> list[Program]:
@@ -1153,6 +1192,19 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             .distinct("language")
             .values("language", "title")
         )
+
+    @cached_property
+    def topics(self) -> list[CoursesTopic]:
+        """
+        Get the list of direct topics
+
+        Returns:
+            List of CoursesTopic
+        """
+        if getattr(self, "page", None) is None:
+            return []
+
+        return self.page.topics.select_related("parent")
 
     @property
     def is_program(self):
@@ -1964,6 +2016,28 @@ class BlockedCountry(TimestampedModel):
 
     def __str__(self):
         return f"course='{self.course.title}'; country='{self.country.name}'"
+
+
+class EnrollmentQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):
+    """QuerySet for Enrollment models"""
+
+
+class EnrollmentManager(
+    models.Manager.from_queryset(EnrollmentQuerySet), PrefetchManagerMixin
+):
+    """Base manager class for enrollments"""
+
+    @classmethod
+    def get_queryset_class(cls):
+        return EnrollmentQuerySet
+
+
+class ActiveEnrollmentManager(EnrollmentManager):
+    """Query manager for active enrollment model objects"""
+
+    def get_queryset(self):
+        """Manager queryset"""
+        return super().get_queryset().filter(active=True)
 
 
 class EnrollmentModel(TimestampedModel, AuditableModel):

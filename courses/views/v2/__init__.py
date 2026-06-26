@@ -8,7 +8,7 @@ from functools import cached_property
 import django_filters
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Prefetch, Q, prefetch_related_objects
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -458,7 +458,13 @@ class CourseViewSet(
             .prefetch_related(modes_prefetch, products_prefetch),
         )
         queryset = queryset.prefetch_related(
-            "departments", "in_programs", course_runs_prefetch
+            "page__feature_image",
+            "page__linked_instructors",
+            "page__linked_instructors__linked_instructor_page",
+            "page__topics",
+            "departments",
+            "in_programs",
+            course_runs_prefetch,
         )
         queryset = queryset.annotate(
             count_b2b_courseruns=Count("courseruns__b2b_contract__id")
@@ -792,6 +798,9 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
         )
         if len(enrollments) == 0:
             raise EnrollmentCreationFailedError
+        prefetch_related_objects(
+            enrollments, "run__course__page__linked_instructors__linked_instructor_page"
+        )
         return Response(
             CourseRunEnrollmentSerializer(enrollments[0]).data,
             status=status.HTTP_201_CREATED,
