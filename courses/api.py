@@ -31,6 +31,7 @@ from rest_framework.status import HTTP_404_NOT_FOUND
 
 from b2b.api import process_add_org_membership
 from cms.api import create_default_courseware_page
+from compliance.api import verify_user_with_exports
 from courses import mail_api
 from courses.constants import (
     COURSE_KEY_PATTERN,
@@ -202,6 +203,8 @@ def create_run_enrollments(  # noqa: C901
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
+    _verify_exports_compliance_for_enrollment(user, enrollment_mode=mode)
+
     if keep_failed_enrollments is None:
         keep_failed_enrollments = settings.FEATURES.get(
             features.IGNORE_EDX_FAILURES, False
@@ -318,6 +321,8 @@ def create_program_enrollments(
     Returns:
         list of ProgramEnrollment: A list of enrollment objects that were successfully created
     """
+    _verify_exports_compliance_for_enrollment(user, enrollment_mode=enrollment_mode)
+
     successful_enrollments = []
     for program in programs:
         try:
@@ -348,6 +353,23 @@ def create_program_enrollments(
         else:
             successful_enrollments.append(enrollment)
     return successful_enrollments
+
+
+def _verify_exports_compliance_for_enrollment(user, *, enrollment_mode: str) -> None:
+    """Verify users with CyberSource before creating verified enrollments."""
+    if enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE:
+        return
+
+    result = verify_user_with_exports(user)
+    if result.accepted:
+        return
+
+    message = (
+        "Export compliance check did not accept verified enrollment for "
+        f"user={user.id}: decision={result.decision!r}, reason_code={result.reason_code!r}"
+    )
+    log.warning(message)
+    raise ValidationError(message)
 
 
 def downgrade_learner(enrollment):
