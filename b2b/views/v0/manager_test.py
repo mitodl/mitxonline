@@ -216,8 +216,8 @@ def test_org_contract_lists(org_setup, manager_drf_client):
     resp = manager_drf_client.get(manager_org_list)
 
     assert resp.status_code == status.HTTP_200_OK
-    assert len(resp.json()) == 1
-    assert resp.json()[0]["id"] == orgs[0].id
+    assert len(resp.json()["results"]) == 1
+    assert resp.json()["results"][0]["id"] == orgs[0].id
 
     manager_contract_list = reverse(
         "b2b:b2b-manager-org-contract-list",
@@ -227,7 +227,7 @@ def test_org_contract_lists(org_setup, manager_drf_client):
     resp = manager_drf_client.get(manager_contract_list)
 
     assert resp.status_code == status.HTTP_200_OK
-    resp_json = resp.json()
+    resp_json = resp.json()["results"]
 
     assert len(resp_json) == 2
     assert_drf_json_equal(
@@ -266,9 +266,9 @@ def test_org_contract_run_list(org_setup, manager_drf_client):
     resp = manager_drf_client.get(manager_contract_run_list)
     assert resp.status_code == status.HTTP_200_OK
 
-    assert len(resp.json()) == 2
+    assert len(resp.json()["results"]) == 2
     assert sorted([run.readable_id for run in runs]) == sorted(
-        [run["readable_id"] for run in resp.json()]
+        [run["readable_id"] for run in resp.json()["results"]]
     )
 
     contract, *_ = contract_3
@@ -335,9 +335,9 @@ def test_org_contract_run_enrollments(org_setup, manager_drf_client):
         resp = manager_drf_client.get(manager_contract_enrol_list)
         assert resp.status_code == status.HTTP_200_OK
 
-        assert len(resp.json()) == len(run_enrollments[idx])
+        assert len(resp.json()["results"]) == len(run_enrollments[idx])
         assert_drf_json_equal(
-            resp.json(),
+            resp.json()["results"],
             ManagerEnrollmentSerializer(run_enrollments[idx], many=True).data,
             ignore_order=True,
         )
@@ -370,7 +370,8 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         discount_count = contract.get_discounts().count()
         assert discount_count > contract.max_learners
 
-        expected_code_count = contract.max_learners if contract.max_learners > 0 else 1
+        # We don't expect to get anything back if max_learners is > 0 because we have no redeemed or assigned codes
+        expected_code_count = 0 if contract.max_learners > 0 else 1
         contract_codes = [
             discount.discount_code
             for discount in contract.get_discounts()
@@ -378,8 +379,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
             .all()[:expected_code_count]
         ]
 
-        # Pull the codes - we should get max_learner codes back and they should
-        # match the sorting order above.
+        # Pull the codes - we should get 0 codes back for a contract w/ max learners since we have no redemptions
 
         manager_contract_code_list = reverse(
             "b2b:b2b-manager-org-contract-codes",
@@ -392,7 +392,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         resp = manager_drf_client.get(manager_contract_code_list)
         assert resp.status_code == status.HTTP_200_OK
 
-        resp_codes = [resp_code["code"] for resp_code in resp.json()]
+        resp_codes = [resp_code["code"] for resp_code in resp.json()["results"]]
         assert len(resp_codes) == expected_code_count
 
         assert contract_codes == resp_codes
@@ -403,7 +403,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         resp = manager_drf_client.get(manager_contract_code_list)
         assert resp.status_code == status.HTTP_200_OK
 
-        resp_codes = [resp_code["code"] for resp_code in resp.json()]
+        resp_codes = [resp_code["code"] for resp_code in resp.json()["results"]]
 
         assert len(resp_codes) == expected_code_count
         assert contract_codes == resp_codes
@@ -414,6 +414,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         # the subset of discounts hasn't changed.
 
         if contract.max_learners > 1:
+            redeemed_and_assigned_count = 1 + len(some_users)
             discounts_to_use = contract.get_discounts().order_by("-id")[:3]
 
             # Create one "assigned" redemption (pre-assigned but not yet claimed)
@@ -428,6 +429,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
             # This is the unlimited seat one, so just use the same discount 3 times.
             discount_to_use = contract.get_discounts().order_by("id").last()
             discounts_to_use = [discount_to_use, discount_to_use, discount_to_use]
+            redeemed_and_assigned_count = len(some_users)
 
         for idx, user in enumerate(some_users):
             DiscountContractAttachmentRedemption.objects.create(
@@ -437,22 +439,23 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         resp = manager_drf_client.get(manager_contract_code_list)
         assert resp.status_code == status.HTTP_200_OK
 
-        resp_codes = [resp_code["code"] for resp_code in resp.json()]
+        resp_codes = [resp_code["code"] for resp_code in resp.json()["results"]]
 
         if contract.max_learners > 1:
-            assert len(resp_codes) == expected_code_count
+            assert len(resp_codes) == redeemed_and_assigned_count
 
             # All codes with redemptions (redeemed and assigned) must appear in
-            # the response; the remaining slots are filled with unassigned codes.
+            # the response.
             used_codes = {discount.discount_code for discount in discounts_to_use}
             assert used_codes.issubset(set(resp_codes))
             assert assigned_discount.discount_code in resp_codes
 
-            # Verify all three redemption statuses are represented in the response.
-            response_statuses = {code["redemption_status"] for code in resp.json()}
+            # Verify all non-unassigned redemption statuses are represented in the response.
+            response_statuses = {
+                code["redemption_status"] for code in resp.json()["results"]
+            }
             assert REDEMPTION_STATUS_REDEEMED in response_statuses
             assert REDEMPTION_STATUS_ASSIGNED in response_statuses
-            assert REDEMPTION_STATUS_UNASSIGNED in response_statuses
         else:
             # For the unlimited seat one, we only get back the single code.
 
@@ -517,10 +520,204 @@ def test_org_contract_codes_redeemed_by_differs_from_assigned_to(
     assert resp.status_code == status.HTTP_200_OK
 
     redeemed_code = next(
-        code for code in resp.json() if code["code"] == discount.discount_code
+        code
+        for code in resp.json()["results"]
+        if code["code"] == discount.discount_code
     )
     assert redeemed_code["assigned_to"] == "assignee@example.com"
     assert redeemed_code["redeemed_by"] == "redeemer@example.com"
+
+
+# ---------------------------------------------------------------------------
+# codes search_term tests
+# ---------------------------------------------------------------------------
+
+
+def _get_codes_for_search(client, url, search):
+    resp = client.get(url, {"search_term": search})
+    assert resp.status_code == status.HTTP_200_OK
+    return {r["code"] for r in resp.json()["results"]}
+
+
+def test_org_contract_codes_search_term(org_setup, manager_drf_client):
+    """search_term filters codes by assigned_email, user email, user name, and assigned_name."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:4])
+
+    user_a = UserFactory.create(email="alice@example.com", name="Alice Smith")
+    user_b = UserFactory.create(email="bob@example.com", name="Bob Jones")
+
+    # assigned_email only (not yet redeemed)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[0],
+        assigned_email="carol@example.com",
+        assigned_name="Carol White",
+        contract=contract_1,
+    )
+    # redeemed by user_a (search via user email and name)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[1],
+        user=user_a,
+        contract=contract_1,
+    )
+    # redeemed by user_b (search via assigned_name on a redeemed code)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[2],
+        user=user_b,
+        assigned_name="Bobby Jones",
+        contract=contract_1,
+    )
+
+    url = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    # Match by assigned_email
+    assert _get_codes_for_search(manager_drf_client, url, "carol") == {
+        discounts[0].discount_code
+    }
+
+    # Match by assigned_name
+    assert _get_codes_for_search(manager_drf_client, url, "Carol White") == {
+        discounts[0].discount_code
+    }
+
+    # Match by user email
+    assert _get_codes_for_search(manager_drf_client, url, "alice") == {
+        discounts[1].discount_code
+    }
+
+    # Match by user name
+    assert _get_codes_for_search(manager_drf_client, url, "Alice Smith") == {
+        discounts[1].discount_code
+    }
+
+    # Match by assigned_name on a redeemed code
+    assert _get_codes_for_search(manager_drf_client, url, "Bobby") == {
+        discounts[2].discount_code
+    }
+
+    # No match returns empty
+    assert _get_codes_for_search(manager_drf_client, url, "zzznomatch") == set()
+
+    # No search_term returns all codes (up to max_learners)
+    resp = manager_drf_client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    assert len(resp.json()["results"]) == 3
+
+
+# ---------------------------------------------------------------------------
+# codes status filter tests
+# ---------------------------------------------------------------------------
+
+
+def _get_codes_for_status(client, url, status_value):
+    resp = client.get(url, {"status": status_value})
+    assert resp.status_code == status.HTTP_200_OK
+    return {r["code"] for r in resp.json()["results"]}
+
+
+def test_org_contract_codes_status_filter(org_setup, manager_drf_client):
+    """Status filter returns only codes matching the requested redemption status."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:3])
+
+    user_a = UserFactory.create(email="alice@example.com")
+
+    # assigned only (no user, no redeemed_on)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[0],
+        assigned_email="carol@example.com",
+        contract=contract_1,
+    )
+    # redeemed (has user)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[1],
+        user=user_a,
+        contract=contract_1,
+    )
+    # redeemed (has redeemed_on but no user, e.g. user deleted)
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[2],
+        redeemed_on=now_in_utc(),
+        contract=contract_1,
+    )
+
+    url = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    assert _get_codes_for_status(
+        manager_drf_client, url, REDEMPTION_STATUS_ASSIGNED
+    ) == {discounts[0].discount_code}
+
+    assert _get_codes_for_status(
+        manager_drf_client, url, REDEMPTION_STATUS_REDEEMED
+    ) == {
+        discounts[1].discount_code,
+        discounts[2].discount_code,
+    }
+
+
+def test_org_contract_codes_status_and_search_combined(org_setup, manager_drf_client):
+    """Status and search_term filters can be combined."""
+    _, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:3])
+
+    user_a = UserFactory.create(email="alice@example.com", name="Alice Smith")
+    user_b = UserFactory.create(email="bob@example.com", name="Bob Jones")
+
+    # assigned to alice email but not redeemed
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[0],
+        assigned_email="alice@example.com",
+        contract=contract_1,
+    )
+    # redeemed by user_a
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[1],
+        user=user_a,
+        contract=contract_1,
+    )
+    # redeemed by user_b
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discounts[2],
+        user=user_b,
+        contract=contract_1,
+    )
+
+    url = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
+        },
+    )
+
+    # assigned + search matching alice: only the unredemed code
+    resp = manager_drf_client.get(
+        url, {"status": REDEMPTION_STATUS_ASSIGNED, "search_term": "alice"}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert {r["code"] for r in resp.json()["results"]} == {discounts[0].discount_code}
+
+    # redeemed + search matching alice: only user_a's redeemed code
+    resp = manager_drf_client.get(
+        url, {"status": REDEMPTION_STATUS_REDEEMED, "search_term": "alice"}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert {r["code"] for r in resp.json()["results"]} == {discounts[1].discount_code}
 
 
 # ---------------------------------------------------------------------------

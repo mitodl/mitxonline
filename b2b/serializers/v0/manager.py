@@ -4,8 +4,14 @@ from datetime import datetime
 
 from rest_framework import serializers
 
-from b2b.models import REDEMPTION_STATUS_UNASSIGNED, ContractPage
+from b2b.models import (
+    REDEMPTION_STATUS_ASSIGNED,
+    REDEMPTION_STATUS_REDEEMED,
+    REDEMPTION_STATUS_UNASSIGNED,
+    ContractPage,
+)
 from b2b.serializers.v0 import ContractPageSerializer
+from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
 
@@ -16,6 +22,9 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
     attachment_percentage = serializers.SerializerMethodField()
     total_enrollments = serializers.SerializerMethodField()
     total_codes = serializers.SerializerMethodField()
+    assigned_codes = serializers.SerializerMethodField()
+    unassigned_codes = serializers.SerializerMethodField()
+    redeemed_codes = serializers.SerializerMethodField()
 
     class Meta:
         model = ContractPage
@@ -24,13 +33,34 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
             "attachment_percentage",
             "total_enrollments",
             "total_codes",
+            "assigned_codes",
+            "unassigned_codes",
+            "redeemed_codes",
         ]
         read_only_fields = [
             *ContractPageSerializer.Meta.read_only_fields,
             "attachment_percentage",
             "total_enrollments",
             "total_codes",
+            "assigned_codes",
+            "unassigned_codes",
+            "redeemed_codes",
         ]
+
+    def _get_codes_breakdown(self, obj) -> dict:
+
+        if not hasattr(obj, "_codes_breakdown_cache"):
+            redemptions = obj.prefetched_code_redemptions
+            redeemed = sum(1 for r in redemptions if is_redeemed_attachment_record(r))
+            assigned = len(redemptions) - redeemed
+            total = obj.max_learners
+            obj._codes_breakdown_cache = {  # noqa: SLF001
+                "total": total,
+                REDEMPTION_STATUS_ASSIGNED: assigned,
+                REDEMPTION_STATUS_UNASSIGNED: total - assigned - redeemed,
+                REDEMPTION_STATUS_REDEEMED: redeemed,
+            }
+        return obj._codes_breakdown_cache  # noqa: SLF001
 
     def get_attachment_percentage(self, obj) -> float | None:
         """Calculate attachment percentage if seat-limited."""
@@ -45,8 +75,16 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
         return obj.enrollment_count
 
     def get_total_codes(self, obj) -> int:
-        """Get total number of discount codes for this contract."""
-        return obj.discount_count
+        return self._get_codes_breakdown(obj)["total"]
+
+    def get_assigned_codes(self, obj) -> int:
+        return self._get_codes_breakdown(obj)[REDEMPTION_STATUS_ASSIGNED]
+
+    def get_unassigned_codes(self, obj) -> int:
+        return self._get_codes_breakdown(obj)[REDEMPTION_STATUS_UNASSIGNED]
+
+    def get_redeemed_codes(self, obj) -> int:
+        return self._get_codes_breakdown(obj)[REDEMPTION_STATUS_REDEEMED]
 
 
 class ManagerCourseRunSerializer(serializers.ModelSerializer):
