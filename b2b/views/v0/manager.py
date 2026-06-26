@@ -48,7 +48,6 @@ from b2b.tasks import (
     queue_send_enrollment_code_assignment_email,
     queue_send_test_enrollment_code_assignment_email,
 )
-from b2b.tasks import queue_send_enrollment_code_assignment_email
 from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
