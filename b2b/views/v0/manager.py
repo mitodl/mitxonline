@@ -42,6 +42,7 @@ from b2b.serializers.v0.manager import (
     ManagerEnrollmentSerializer,
 )
 from b2b.tasks import queue_send_enrollment_code_assignment_email
+from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
 
@@ -60,12 +61,6 @@ class CodeAssignment:
     email: str
     name: str
     code: str
-
-
-def is_redeemed_attachment_record(
-    assignment_record: DiscountContractAttachmentRedemption,
-) -> bool:
-    return assignment_record.user or assignment_record.redeemed_on
 
 
 def assign_codes_and_send_emails(

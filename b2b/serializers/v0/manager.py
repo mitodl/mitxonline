@@ -11,6 +11,7 @@ from b2b.models import (
     ContractPage,
 )
 from b2b.serializers.v0 import ContractPageSerializer
+from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
 
@@ -47,7 +48,6 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
         ]
 
     def _get_codes_breakdown(self, obj) -> dict:
-        from b2b.views.v0.manager import is_redeemed_attachment_record  # noqa: PLC0415
 
         if not hasattr(obj, "_codes_breakdown_cache"):
             redemptions = obj.prefetched_code_redemptions
