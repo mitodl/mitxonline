@@ -53,7 +53,7 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
             redemptions = obj.prefetched_code_redemptions
             redeemed = sum(1 for r in redemptions if is_redeemed_attachment_record(r))
             assigned = len(redemptions) - redeemed
-            total = obj.get_discounts().distinct()[: obj.max_learners].count()
+            total = obj.max_learners
             obj._codes_breakdown_cache = {  # noqa: SLF001
                 "total": total,
                 REDEMPTION_STATUS_ASSIGNED: assigned,
