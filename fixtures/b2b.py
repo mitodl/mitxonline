@@ -3,12 +3,11 @@
 import pytest
 from opaque_keys.edx.keys import CourseKey
 
-from courses.factories import CourseFactory, CourseRunFactory
-
 
 @pytest.fixture
 def make_contract_ready_course():
     """Return a function that can be used to generate a contract-ready course"""
+    from courses.factories import CourseFactory, CourseRunFactory  # noqa: PLC0415
 
     def _contract_ready_course():
         """

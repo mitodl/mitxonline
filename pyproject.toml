@@ -324,6 +324,7 @@ markers = [
   "dont_mock_enrollments",
   "skip_nplusone_check"
 ]
+pythonpath = ["."]
 
 [tool.bumpversion]
 commit = false
