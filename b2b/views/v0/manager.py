@@ -4,8 +4,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 
-from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -22,6 +21,8 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
+    REDEMPTION_STATUS_ASSIGNED,
+    REDEMPTION_STATUS_REDEEMED,
     ContractPage,
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
@@ -43,6 +44,7 @@ from b2b.serializers.v0.manager import (
     ManagerEnrollmentSerializer,
 )
 from b2b.tasks import queue_send_enrollment_code_assignment_email
+from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
 
@@ -61,12 +63,6 @@ class CodeAssignment:
     email: str
     name: str
     code: str
-
-
-def is_redeemed_attachment_record(
-    assignment_record: DiscountContractAttachmentRedemption,
-) -> bool:
-    return assignment_record.user or assignment_record.redeemed_on
 
 
 def assign_codes_and_send_emails(
@@ -195,23 +191,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Get the queryset; add some annotations/etc for computed fields"""
-        courserun_content_type = ContentType.objects.get_for_model(CourseRun)
-        return (
+        qs = (
             ContractPage.objects.select_related("organization")
             .prefetch_related("users")
-            .annotate(
-                discount_count=Count(
-                    Subquery(
-                        Discount.objects.filter(
-                            products__product__is_active=True,
-                            products__product__content_type=courserun_content_type,
-                            products__product__object_id__in=CourseRun.objects.filter(
-                                b2b_contract=OuterRef("pk")
-                            ).all(),
-                        ).values("id")
-                    )
-                )
-            )
             .annotate(
                 enrollment_count=Count(
                     "course_runs__enrollments",
@@ -224,6 +206,17 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 organization__organization_users__is_manager=True,
             )
         )
+        if self.action == "retrieve":
+            qs = qs.prefetch_related(
+                Prefetch(
+                    "code_redemptions",
+                    queryset=DiscountContractAttachmentRedemption.objects.only(
+                        "id", "contract_id", "redeemed_on", "user_id"
+                    ),
+                    to_attr="prefetched_code_redemptions",
+                )
+            )
+        return qs
 
     def get_serializer_class(self):
         """Use different serializers for list vs detail views."""
@@ -301,6 +294,14 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 description="Filter codes by assigned email, user email, user name, or assigned name.",
                 required=False,
             ),
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter codes by status. Supported values are assigned and redeemed.",
+                required=False,
+                enum=[REDEMPTION_STATUS_ASSIGNED, REDEMPTION_STATUS_REDEEMED],
+            ),
         ],
     )
     @action(detail=True, methods=["get"])
@@ -314,6 +315,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         """
         contract = self.get_object()
         search_term = request.query_params.get("search_term", "").strip()
+        status_filter = request.query_params.get("status", "").strip()
 
         """
         There are three main cases:
@@ -336,7 +338,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 to_attr="prefetched_redemptions",
             )
 
-            if search_term:
+            if search_term or status_filter:
                 # This filter is slightly complicated because we only want to filter on the latest redemption per discount
                 # In practice, we only expect 1 redemption per code for well-formed contracts,
                 # but that's not enforced at the DB so we need to be a bit clever.
@@ -347,23 +349,25 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     .distinct("discount_id")
                     .values("pk")
                 )
+                filter_q = Q(contract_redemptions__pk__in=latest_redemption_ids)
+                if search_term:
+                    filter_q &= (
+                        Q(contract_redemptions__assigned_email__icontains=search_term)
+                        | Q(contract_redemptions__user__email__icontains=search_term)
+                        | Q(contract_redemptions__user__name__icontains=search_term)
+                        | Q(contract_redemptions__assigned_name__icontains=search_term)
+                    )
+                if status_filter == REDEMPTION_STATUS_REDEEMED:
+                    filter_q &= Q(contract_redemptions__user__isnull=False) | Q(
+                        contract_redemptions__redeemed_on__isnull=False
+                    )
+                elif status_filter == REDEMPTION_STATUS_ASSIGNED:
+                    filter_q &= Q(contract_redemptions__user__isnull=True) & Q(
+                        contract_redemptions__redeemed_on__isnull=True
+                    )
                 discounts = (
                     contract.get_discounts()
-                    .filter(
-                        Q(contract_redemptions__pk__in=latest_redemption_ids)
-                        & (
-                            Q(
-                                contract_redemptions__assigned_email__icontains=search_term
-                            )
-                            | Q(
-                                contract_redemptions__user__email__icontains=search_term
-                            )
-                            | Q(contract_redemptions__user__name__icontains=search_term)
-                            | Q(
-                                contract_redemptions__assigned_name__icontains=search_term
-                            )
-                        )
-                    )
+                    .filter(filter_q)
                     .distinct()
                     .prefetch_related(prefetch)
                 )
@@ -381,17 +385,6 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 ).order_by("-num_redemptions", "id")
 
                 codes_for_output = discounts.filter(num_redemptions__gt=0).all()
-
-                # The point of this is to ensure we always get _all_ the redeemed
-                # codes, and then some unredeemed ones if there's space allowed.
-                # I didn't want to just call all() and grab a slice because we might
-                # have _more_ redemptions that we technically allow (if, say, we
-                # adjust the limit down or manually create some redemptions or
-                # something).
-
-                if codes_for_output.count() < contract.max_learners:
-                    # We have seats available, so grab some more codes.
-                    codes_for_output = discounts.all()[: contract.max_learners]
 
         return self.get_paginated_response(
             ManagerEnrollmentCodeSerializer(
