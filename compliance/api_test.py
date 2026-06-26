@@ -1,7 +1,10 @@
 """Tests for compliance API helpers."""
+
 from types import SimpleNamespace
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+
 from compliance.api import (
     ExportComplianceResult,
     _build_export_payload,
@@ -9,7 +12,10 @@ from compliance.api import (
     verify_user_with_exports,
 )
 from users.factories import UserFactory
+
 pytestmark = [pytest.mark.django_db]
+
+
 @pytest.fixture
 def export_settings(settings):
     settings.CYBERSOURCE_WSDL_URL = "https://example.com/cybersource?wsdl"
@@ -17,6 +23,8 @@ def export_settings(settings):
     settings.CYBERSOURCE_TRANSACTION_KEY = "transaction-key"
     settings.CYBERSOURCE_EXPORT_SERVICE_RUN = True
     return settings
+
+
 def test_build_export_payload_uses_user_and_legal_address(export_settings):
     """Payload should include user identifying fields and address values."""
     user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
@@ -33,6 +41,8 @@ def test_build_export_payload_uses_user_and_legal_address(export_settings):
         "country": "US",
         "administrativeArea": "US-MA",
     }
+
+
 def test_get_cybersource_client_requires_configuration(settings):
     """Client creation should fail if required settings are missing."""
     settings.CYBERSOURCE_WSDL_URL = ""
@@ -40,16 +50,22 @@ def test_get_cybersource_client_requires_configuration(settings):
     settings.CYBERSOURCE_TRANSACTION_KEY = ""
     with pytest.raises(ImproperlyConfigured):
         get_cybersource_client()
+
+
 def test_get_cybersource_client_requires_zeep(mocker, export_settings):
     """Client creation should surface a clear error if zeep is unavailable."""
     real_import = __import__
+
     def mocked_import(name, *args, **kwargs):
         if name == "zeep" or name.startswith("zeep."):
             raise ModuleNotFoundError(name)
         return real_import(name, *args, **kwargs)
+
     mocker.patch("builtins.__import__", side_effect=mocked_import)
     with pytest.raises(ImproperlyConfigured, match="zeep must be installed"):
         get_cybersource_client()
+
+
 def test_verify_user_with_exports_calls_run_transaction(mocker, export_settings):
     """Verification should call CyberSource and normalize the response."""
     user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
