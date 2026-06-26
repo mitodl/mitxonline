@@ -56,66 +56,6 @@ User = get_user_model()
 log = logging.getLogger(__name__)
 
 
-class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
-    def live(self):
-        """Applies a filter for Programs with live=True"""
-        return self.filter(live=True)
-
-    def with_text_id(self, text_id):
-        """Applies a filter for the Program's readable_id"""
-        return self.filter(readable_id=text_id)
-
-
-class CourseQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: disable=missing-docstring
-    def live(self):
-        """Applies a filter for Courses with live=True"""
-        return self.filter(live=True)
-
-    def courses_in_program(self, program):
-        """Return a list of courses that are required by a given program"""
-        return self.filter(in_programs__program=program)
-
-
-class CoursesTopicQuerySet(models.QuerySet):
-    """
-    Custom QuerySet for `CoursesTopic`
-    """
-
-    def parent_topics(self):
-        """
-        Applies a filter for course topics with parent=None
-        """
-        return self.filter(parent__isnull=True).order_by("name")
-
-    def parent_topic_names(self):
-        """
-        Returns a list of all parent topic names.
-        """
-        return list(self.parent_topics().values_list("name", flat=True))
-
-
-class EnrollmentQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):
-    """QuerySet for Enrollment models"""
-
-
-class EnrollmentManager(
-    models.Manager.from_queryset(EnrollmentQuerySet), PrefetchManagerMixin
-):
-    """Base manager class for enrollments"""
-
-    @classmethod
-    def get_queryset_class(cls):
-        return EnrollmentQuerySet
-
-
-class ActiveEnrollmentManager(EnrollmentManager):
-    """Query manager for active enrollment model objects"""
-
-    def get_queryset(self):
-        """Manager queryset"""
-        return super().get_queryset().filter(active=True)
-
-
 detail_path_char_pattern = r"\w\-+:\."
 validate_url_path_field = RegexValidator(
     rf"^[{detail_path_char_pattern}]+$",
@@ -188,6 +128,16 @@ class EnrollmentMode(models.Model):
             self.mode_display_name = self.mode_slug
 
         super().save(*args, **kwargs)
+
+
+class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
+    def live(self):
+        """Applies a filter for Programs with live=True"""
+        return self.filter(live=True)
+
+    def with_text_id(self, text_id):
+        """Applies a filter for the Program's readable_id"""
+        return self.filter(readable_id=text_id)
 
 
 class Program(TimestampedModel, ValidateOnSaveMixin):
@@ -877,6 +827,24 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
         return f"{self.program.readable_id} | {self.program.title}"
 
 
+class CoursesTopicQuerySet(models.QuerySet):
+    """
+    Custom QuerySet for `CoursesTopic`
+    """
+
+    def parent_topics(self):
+        """
+        Applies a filter for course topics with parent=None
+        """
+        return self.filter(parent__isnull=True).order_by("name")
+
+    def parent_topic_names(self):
+        """
+        Returns a list of all parent topic names.
+        """
+        return list(self.parent_topics().values_list("name", flat=True))
+
+
 class CoursesTopic(TimestampedModel):
     """
     Topics for all courses (e.g. "History")
@@ -900,6 +868,16 @@ class CoursesTopic(TimestampedModel):
         if self.parent:
             return f"{self.parent.name} -> {self.name}"
         return self.name
+
+
+class CourseQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):  # pylint: disable=missing-docstring
+    def live(self):
+        """Applies a filter for Courses with live=True"""
+        return self.filter(live=True)
+
+    def courses_in_program(self, program):
+        """Return a list of courses that are required by a given program"""
+        return self.filter(in_programs__program=program)
 
 
 class CourseProgramPrefetcher(Prefetcher):
@@ -1964,6 +1942,28 @@ class BlockedCountry(TimestampedModel):
 
     def __str__(self):
         return f"course='{self.course.title}'; country='{self.country.name}'"
+
+
+class EnrollmentQuerySet(TimestampedModelQuerySet, PrefetchQuerySet):
+    """QuerySet for Enrollment models"""
+
+
+class EnrollmentManager(
+    models.Manager.from_queryset(EnrollmentQuerySet), PrefetchManagerMixin
+):
+    """Base manager class for enrollments"""
+
+    @classmethod
+    def get_queryset_class(cls):
+        return EnrollmentQuerySet
+
+
+class ActiveEnrollmentManager(EnrollmentManager):
+    """Query manager for active enrollment model objects"""
+
+    def get_queryset(self):
+        """Manager queryset"""
+        return super().get_queryset().filter(active=True)
 
 
 class EnrollmentModel(TimestampedModel, AuditableModel):
