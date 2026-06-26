@@ -13,7 +13,7 @@ from django.db.models import Q
 from mitol.common.utils import now_in_utc
 
 from b2b.constants import (
-    CONTRACT_MEMBERSHIP_CHOICES,
+    CONTRACT_MEMBERSHIP_TYPE_CHOICES,
 )
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.models import (
@@ -114,7 +114,7 @@ class Command(BaseCommand):
             "membership_type",
             type=str,
             help="The membership type for this contract.",
-            choices=[value[0] for value in CONTRACT_MEMBERSHIP_CHOICES],
+            choices=[value[0] for value in CONTRACT_MEMBERSHIP_TYPE_CHOICES],
         )
         create_parser.add_argument(
             "--description",
