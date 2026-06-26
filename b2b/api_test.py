@@ -237,12 +237,12 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
 
 @pytest.mark.parametrize(
     (
-        "is_sso",
+        "is_managed",
         "has_price",
         "has_learner_cap",
         "update_change_price",
         "update_no_price",
-        "update_sso",
+        "update_membership",
     ),
     [
         (False, False, False, False, False, False),
@@ -274,12 +274,12 @@ def test_b2b_basket_validation(user, run_contract, apply_code):
 def test_ensure_enrollment_codes(  # noqa: PLR0913
     mocker,
     contract_ready_course,
-    is_sso,
+    is_managed,
     has_price,
     has_learner_cap,
     update_change_price,
     update_no_price,
-    update_sso,
+    update_membership,
 ):
     """
     Test that the enrollment codes are created correctly for a contract.
@@ -310,7 +310,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 
     contract = factories.ContractPageFactory(
         membership_type=CONTRACT_MEMBERSHIP_MANAGED
-        if is_sso
+        if is_managed
         else CONTRACT_MEMBERSHIP_CODE,
         enrollment_fixed_price=price,
         max_learners=max_learners,
@@ -324,7 +324,7 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
 
     ensure_enrollment_codes_exist(contract)
 
-    if is_sso and not has_price:
+    if is_managed and not has_price:
         assert contract.get_discounts().count() == 0
     else:
         assert (
@@ -345,22 +345,22 @@ def test_ensure_enrollment_codes(  # noqa: PLR0913
     # - If we've removed the price, the discounts should be set to 0.
     # - If we've set the price to zero and changed to SSO integration, we should
     #   no longer have discounts.
-    if update_no_price or update_sso or update_change_price:
+    if update_no_price or update_membership or update_change_price:
         if update_change_price:
             price = FAKE.random_int(min=1, max=100)
             assert_price = price if price else Decimal(0)
             contract.enrollment_fixed_price = price
         if update_no_price:
             contract.enrolment_fixed_price = None
-        if update_sso:
+        if update_membership:
             contract.membership_type = (
-                CONTRACT_MEMBERSHIP_CODE if is_sso else CONTRACT_MEMBERSHIP_MANAGED
+                CONTRACT_MEMBERSHIP_CODE if is_managed else CONTRACT_MEMBERSHIP_MANAGED
             )
 
         contract.save()
         ensure_enrollment_codes_exist(contract)
 
-        if update_no_price and update_sso and not is_sso:
+        if update_no_price and update_membership and not is_managed:
             # This is the last case, so we shouldn't have discounts now.
             # Test on our flags, not the contract, so we can make sure the contract
             # is also correct.
