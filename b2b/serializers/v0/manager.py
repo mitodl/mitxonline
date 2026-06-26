@@ -260,3 +260,9 @@ class BulkAssignResultSerializer(serializers.Serializer):
         child=BulkAssignErrorSerializer(),
         help_text="Records that could not be assigned, with a 'detail' explanation.",
     )
+
+
+class SendTestEmailSerializer(serializers.Serializer):
+    """Serializer for the send_test_email request body."""
+
+    email = serializers.EmailField()

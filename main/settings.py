@@ -37,7 +37,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.158.1"
+VERSION = "1.158.3"
 
 log = logging.getLogger()
 
@@ -1129,7 +1129,7 @@ MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"
 # mitol-django-mail
 MITOL_MAIL_FROM_EMAIL = MAILGUN_FROM_EMAIL
 MITOL_MAIL_REPLY_TO_ADDRESS = MITX_ONLINE_REPLY_TO_ADDRESS
-MITOL_MAIL_MESSAGE_CLASSES = []
+MITOL_MAIL_MESSAGE_CLASSES = ["b2b.mail.EnrollmentCodeAssignmentMessage"]
 MITOL_MAIL_RECIPIENT_OVERRIDE = MAILGUN_RECIPIENT_OVERRIDE
 MITOL_MAIL_FORMAT_RECIPIENT_FUNC = "users.utils.format_recipient"
 MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the legacy mail debugger defined in this project
@@ -1255,6 +1255,24 @@ EDX_API_CLIENT_TIMEOUT = get_int(
     name="EDX_API_CLIENT_TIMEOUT",
     default=60,
     description="Timeout (in seconds) for requests made via the edX API client",
+)
+
+OPENEDX_COURSE_CLONE_MAX_RETRIES = get_int(
+    name="OPENEDX_COURSE_CLONE_MAX_RETRIES",
+    default=5,
+    description="Maximum number of retry attempts for transient Open edX course clone failures",
+)
+
+OPENEDX_COURSE_CLONE_RETRY_DELAY = get_int(
+    name="OPENEDX_COURSE_CLONE_RETRY_DELAY",
+    default=300,
+    description="Base retry delay in seconds for Open edX course clone retries; each successive retry multiplies this delay",
+)
+
+OPENEDX_COURSE_CLONE_RETRY_JITTER = get_int(
+    name="OPENEDX_COURSE_CLONE_RETRY_JITTER",
+    default=60,
+    description="Maximum number of randomized jitter seconds to add to Open edX course clone retries",
 )
 
 # django debug toolbar only in debug mode
