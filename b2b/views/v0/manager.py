@@ -326,8 +326,8 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         - If the contract has an auto membership type, no codes are needed, so we return an empty list.
         - If the contract does not have a learner limit, we show the first code only.
           We don't show individual redemptions because this case is unlikely to be a useful setup for contracts
-        - If the contract has a learner limit, we show all redeemed and assigned codes, plus enough unredeemed codes to fill the remaining seats.
-          This ensures that managers can see all the codes that are currently in use, while also seeing some of the unused codes that are available to be redeemed.
+        - If the contract has a learner limit, we show all redeemed and assigned codes.
+          This ensures that managers can see all the codes that are currently in use.
         """
 
         # Skip if contract has auto membership type (no codes needed)
