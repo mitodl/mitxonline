@@ -66,10 +66,11 @@ def send_enrollment_code_assignment_email(assignment_record_ids):
 
 def send_test_enrollment_code_assignment_email(email, contract_record_id):
     contract = ContractPage.objects.get(pk=contract_record_id)
+    learn_hostname = get_learn_hostname()
     send_email_helper(
         email,
         "PLACEHOLDER_CODE",
-        "PLACEHOLDER_URL",
+        f"https://{learn_hostname}/enrollmentcode/PLACEHOLDER_CODE",
         contract.organization.name,
         contract.name,
     )
