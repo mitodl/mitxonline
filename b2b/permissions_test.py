@@ -1,9 +1,10 @@
 """Tests for b2b permissions."""
 
+from unittest.mock import MagicMock
+
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
-from unittest.mock import MagicMock
 
 from b2b.factories import OrganizationPageFactory, UserOrganizationFactory
 from b2b.permissions import IsOrganizationManager
