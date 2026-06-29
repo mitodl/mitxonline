@@ -83,7 +83,6 @@ dependencies = [
     "django-prefetch>=1.2.3,<2",
     "lru-method-cache>=0.2.0",
     "django-qp[drf]>=0.2.0",
-    "zeep>=4.3.1,<5",
 ]
 
 [dependency-groups]
