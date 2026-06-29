@@ -892,17 +892,25 @@ def test_create_run_enrollments_verifies_exports_for_verified_mode(
     assert len(successful_enrollments) == 1
 
 
-def test_create_run_enrollments_skips_exports_for_audit_mode(mocker, user):
-    """Audit course enrollments should not call export compliance."""
+def test_create_run_enrollments_verifies_exports_for_audit_mode(mocker, user):
+    """Audit course enrollments should also require an accepted export check."""
     run = CourseRunFactory.create()
-    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="ACCEPT",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
     patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
     mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
     create_run_enrollments(user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE)
 
-    patched_verify.assert_not_called()
+    patched_verify.assert_called_once_with(user)
     patched_edx_enroll.assert_called_once()
 
 
@@ -945,6 +953,29 @@ def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, u
         user,
         [program],
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
+    patched_verify.assert_called_once_with(user)
+    assert len(successful_enrollments) == 1
+    assert successful_enrollments[0].program == program
+
+
+def test_create_program_enrollments_verifies_exports_for_default_mode(mocker, user):
+    """Default program enrollments should also require an accepted export check."""
+    program = ProgramFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="ACCEPT",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    successful_enrollments = create_program_enrollments(
+        user,
+        [program],
     )
 
     patched_verify.assert_called_once_with(user)

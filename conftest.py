@@ -44,10 +44,14 @@ def payment_gateway_settings(settings):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
-    settings.CYBERSOURCE_WSDL_URL = "https://example.com/cybersource?wsdl"
-    settings.CYBERSOURCE_MERCHANT_ID = "merchant-id"
-    settings.CYBERSOURCE_TRANSACTION_KEY = "transaction-key"
-    settings.CYBERSOURCE_EXPORT_SERVICE_RUN = True
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID = "merchant-id"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID = (
+        "merchant-secret-key-id"
+    )
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET = "merchant-secret"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT = (
+        "apitest.cybersource.com"
+    )
 
 
 @pytest.fixture(autouse=True)

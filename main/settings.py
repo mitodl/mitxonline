@@ -1195,25 +1195,25 @@ OPENEDX_BASE_REDIRECT_URL = get_string(
     description="The base redirect URL for an OAuth Application for the Open edX API",
 )
 
-CYBERSOURCE_WSDL_URL = get_string(
-    name="CYBERSOURCE_WSDL_URL",
-    default="",
-    description="CyberSource SOAP WSDL URL for export compliance checks",
-)
 CYBERSOURCE_MERCHANT_ID = get_string(
     name="CYBERSOURCE_MERCHANT_ID",
     default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID,
     description="CyberSource merchant ID for export compliance checks",
 )
-CYBERSOURCE_TRANSACTION_KEY = get_string(
-    name="CYBERSOURCE_TRANSACTION_KEY",
-    default="",
-    description="CyberSource SOAP transaction key for export compliance checks",
+CYBERSOURCE_MERCHANT_SECRET_KEY_ID = get_string(
+    name="CYBERSOURCE_MERCHANT_SECRET_KEY_ID",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID,
+    description="CyberSource REST merchant secret key ID for export compliance checks",
 )
-CYBERSOURCE_EXPORT_SERVICE_RUN = get_bool(
-    name="CYBERSOURCE_EXPORT_SERVICE_RUN",
-    default=True,
-    description="Whether CyberSource exportService requests should be marked runnable",
+CYBERSOURCE_MERCHANT_SECRET = get_string(
+    name="CYBERSOURCE_MERCHANT_SECRET",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET,
+    description="CyberSource REST merchant secret for export compliance checks",
+)
+CYBERSOURCE_REST_API_ENVIRONMENT = get_string(
+    name="CYBERSOURCE_REST_API_ENVIRONMENT",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT,
+    description="CyberSource REST API environment for export compliance checks",
 )
 OPENEDX_TOKEN_EXPIRES_HOURS = get_int(
     name="OPENEDX_TOKEN_EXPIRES_HOURS",

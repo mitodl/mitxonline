@@ -401,17 +401,15 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     return upgraded_enrollments
 
 def _verify_exports_compliance_for_enrollment(user, *, enrollment_mode: str) -> None:
-    """Verify users with CyberSource before creating verified enrollments."""
-    if enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE:
-        return
-
+    """Verify users with CyberSource before creating enrollments."""
     result = verify_user_with_exports(user)
     if result.accepted:
         return
 
     message = (
-        "Export compliance check did not accept verified enrollment for "
-        f"user={user.id}: decision={result.decision!r}, reason_code={result.reason_code!r}"
+        "Export compliance check did not accept enrollment for "
+        f"user={user.id}, mode={enrollment_mode!r}: "
+        f"decision={result.decision!r}, reason_code={result.reason_code!r}"
     )
     log.warning(message)
     raise ValidationError(message)

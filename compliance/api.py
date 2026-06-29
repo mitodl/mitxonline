@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 from uuid import uuid4
 
@@ -25,15 +26,75 @@ class ExportComplianceResult:
     @property
     def accepted(self) -> bool:
         """Return True when CyberSource accepted the export check."""
-        return self.decision == "ACCEPT"
+        return self.decision in {"ACCEPT", "COMPLETED"}
+
+
+@dataclass(frozen=True)
+class _CyberSourceSdk:
+    """Official CyberSource REST SDK classes used for export compliance."""
+
+    verification_api_class: Any
+    order_information_class: Any
+    bill_to_class: Any
+    client_reference_information_class: Any
+    validate_export_compliance_request_class: Any
 
 
 def _require_setting(name: str) -> str:
     """Return a non-empty setting value or raise an error."""
     value = getattr(settings, name, None)
     if not value:
-        raise ImproperlyConfigured(f"{name} must be configured for export checks")
+        message = f"{name} must be configured for export checks"
+        raise ImproperlyConfigured(message)
     return value
+
+
+@lru_cache(maxsize=1)
+def _load_cybersource_sdk() -> _CyberSourceSdk:
+    """Load the official CyberSource REST SDK classes used by this module."""
+    try:
+        from CyberSource.api.verification_api import VerificationApi
+        from CyberSource.models.riskv1exportcomplianceinquiries_order_information import (
+            Riskv1exportcomplianceinquiriesOrderInformation,
+        )
+        from CyberSource.models.riskv1exportcomplianceinquiries_order_information_bill_to import (
+            Riskv1exportcomplianceinquiriesOrderInformationBillTo,
+        )
+        from CyberSource.models.riskv1liststypeentries_client_reference_information import (
+            Riskv1liststypeentriesClientReferenceInformation,
+        )
+        from CyberSource.models.validate_export_compliance_request import (
+            ValidateExportComplianceRequest,
+        )
+    except ModuleNotFoundError as exc:
+        message = "CyberSource SDK must be installed to use export compliance checks"
+        raise ImproperlyConfigured(message) from exc
+
+    return _CyberSourceSdk(
+        verification_api_class=VerificationApi,
+        order_information_class=Riskv1exportcomplianceinquiriesOrderInformation,
+        bill_to_class=Riskv1exportcomplianceinquiriesOrderInformationBillTo,
+        client_reference_information_class=Riskv1liststypeentriesClientReferenceInformation,
+        validate_export_compliance_request_class=ValidateExportComplianceRequest,
+    )
+
+
+def _get_cybersource_configuration() -> dict[str, str | int]:
+    """Return REST client configuration for CyberSource export checks."""
+    return {
+        "authentication_type": "HTTP_SIGNATURE",
+        "merchantid": _require_setting("MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID"),
+        "merchant_keyid": _require_setting(
+            "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID"
+        ),
+        "merchant_secretkey": _require_setting(
+            "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET"
+        ),
+        "run_environment": _require_setting(
+            "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT"
+        ),
+        "timeout": 1000,
+    }
 
 
 def _get_user_legal_address(user):
@@ -57,52 +118,56 @@ def _split_user_name(user) -> tuple[str, str]:
     return (name_parts[0], name_parts[1])
 
 
-def _build_export_payload(user) -> dict[str, Any]:
-    """Build the CyberSource export compliance request payload."""
+def _build_export_payload(user) -> Any:
+    """Build the CyberSource export compliance REST request payload."""
+    sdk = _load_cybersource_sdk()
+
     legal_address = _get_user_legal_address(user)
     first_name, last_name = _split_user_name(user)
 
     bill_to = {
-        "firstName": first_name,
-        "lastName": last_name,
+        "first_name": first_name,
+        "last_name": last_name,
         "email": user.email,
     }
 
     if legal_address and legal_address.country:
         bill_to["country"] = legal_address.country
     if legal_address and legal_address.state:
-        bill_to["administrativeArea"] = legal_address.state
+        bill_to["administrative_area"] = legal_address.state
 
-    return {
-        "merchantID": settings.CYBERSOURCE_MERCHANT_ID,
-        "merchantReferenceCode": str(uuid4()),
-        "exportService": {
-            "run": "true" if settings.CYBERSOURCE_EXPORT_SERVICE_RUN else "false"
-        },
-        "billTo": {
-            key: value for key, value in bill_to.items() if value not in [None, ""]
-        },
-    }
+    return sdk.validate_export_compliance_request_class(
+        client_reference_information=sdk.client_reference_information_class(
+            code=str(uuid4())
+        ),
+        order_information=sdk.order_information_class(
+            bill_to=sdk.bill_to_class(
+                **{
+                    key: value
+                    for key, value in bill_to.items()
+                    if value not in [None, ""]
+                }
+            )
+        ),
+    )
 
 
 def get_cybersource_client():
-    """Create an authenticated SOAP client for CyberSource export checks."""
-    wsdl_url = _require_setting("CYBERSOURCE_WSDL_URL")
-    merchant_id = _require_setting("CYBERSOURCE_MERCHANT_ID")
-    transaction_key = _require_setting("CYBERSOURCE_TRANSACTION_KEY")
+    """Create an authenticated REST client for CyberSource export checks."""
+    sdk = _load_cybersource_sdk()
 
-    try:
-        from zeep import Client
-        from zeep.wsse.username import UsernameToken
-    except ModuleNotFoundError as exc:
-        raise ImproperlyConfigured(
-            "zeep must be installed to use CyberSource export compliance checks"
-        ) from exc
+    return sdk.verification_api_class(_get_cybersource_configuration())
 
-    return Client(
-        wsdl=wsdl_url,
-        wsse=UsernameToken(merchant_id, transaction_key),
-    )
+
+def _get_reason_code(response) -> str | None:
+    """Extract the most useful reason code from a REST response."""
+    export_info = getattr(response, "export_compliance_information", None)
+    info_codes = getattr(export_info, "info_codes", None) or []
+    if info_codes:
+        return ",".join(info_codes)
+
+    error_info = getattr(response, "error_information", None)
+    return getattr(error_info, "reason", None) or getattr(response, "message", None)
 
 
 def verify_user_with_exports(user) -> ExportComplianceResult:
@@ -111,11 +176,11 @@ def verify_user_with_exports(user) -> ExportComplianceResult:
     payload = _build_export_payload(user)
 
     log.info("Running CyberSource export compliance check for user=%s", user.id)
-    response = client.service.runTransaction(**payload)
+    response = client.validate_export_compliance(payload)
 
     return ExportComplianceResult(
-        decision=getattr(response, "decision", None),
-        reason_code=getattr(response, "reasonCode", None),
-        request_id=getattr(response, "requestID", None),
+        decision=getattr(response, "status", None),
+        reason_code=_get_reason_code(response),
+        request_id=getattr(response, "id", None),
         raw=response,
     )
