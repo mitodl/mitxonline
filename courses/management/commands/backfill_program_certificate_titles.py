@@ -34,7 +34,8 @@ class Command(BaseCommand):
         banner = "COMMIT" if commit else "DRY RUN"
         self.stdout.write(self.style.WARNING(f"=== {banner} ==="))
 
-        programs_processed = 0
+        programs_will_change = 0
+        programs_already_correct = 0
         programs_skipped = 0
         revisions_changed = 0
         certs_affected = 0
@@ -42,20 +43,22 @@ class Command(BaseCommand):
         for readable_id, program in self._target_programs(programs, all_programs):
             if program is None:
                 programs_skipped += 1
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"{readable_id}: skipping — no program with that readable_id."
-                    )
+                self._write_block(
+                    readable_id,
+                    program_title="—",
+                    new_title="—",
+                    reason="no program with that readable_id",
                 )
                 continue
 
             certificate_page = self._certificate_page(program)
             if certificate_page is None:
                 programs_skipped += 1
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"{readable_id}: skipping — no certificate page."
-                    )
+                self._write_block(
+                    readable_id,
+                    program_title=program.title,
+                    new_title="—",
+                    reason="no certificate page",
                 )
                 continue
 
@@ -63,53 +66,93 @@ class Command(BaseCommand):
 
             if not title or title.startswith("PLACEHOLDER - "):
                 programs_skipped += 1
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"{readable_id}: skipping — live Certificate Title is "
-                        f'empty or a placeholder ("{title}"). Fix the CMS page first.'
-                    )
+                self._write_block(
+                    readable_id,
+                    program_title=program.title,
+                    new_title=title or "—",
+                    reason=(
+                        f"live Certificate Title is empty or a placeholder "
+                        f'("{title}") — fix the CMS page first'
+                    ),
                 )
                 continue
 
-            programs_processed += 1
-            self.stdout.write(f'{readable_id}: target Certificate Title "{title}"')
+            changed, n_revisions, n_certs = self._process_program(
+                readable_id, program, title, commit=commit
+            )
+            revisions_changed += n_revisions
+            certs_affected += n_certs
+            if changed:
+                programs_will_change += 1
+            else:
+                programs_already_correct += 1
 
-            with transaction.atomic():
-                for revision, certs in self._distinct_revisions(program):
-                    old = revision.content.get("product_name")
-                    if old == title:
-                        self.stdout.write(
-                            f'  {revision.id}  ({len(certs)} certs)  "{old}"  [skipped]'
-                        )
-                        continue
-                    if commit:
-                        # Reassign rather than mutate in place so the change is
-                        # always picked up regardless of save()/update_fields or
-                        # any dirty-tracking behavior on the model.
-                        content = revision.content
-                        content["product_name"] = title
-                        revision.content = content
-                        revision.save(update_fields=["content"])
-                        status = "changed"
-                    else:
-                        status = "would-change"
-                    revisions_changed += 1
-                    certs_affected += len(certs)
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"  {revision.id}  ({len(certs)} certs)  "
-                            f'"{old}" -> "{title}"  [{status}]'
-                        )
-                    )
-
+        total = programs_will_change + programs_already_correct + programs_skipped
+        self.stdout.write("")
         self.stdout.write(
             self.style.SUCCESS(
-                f"Summary: {programs_processed} program(s) processed, "
-                f"{programs_skipped} skipped, "
-                f"{revisions_changed} revision(s) changed, "
-                f"{certs_affected} cert(s) affected."
+                f"Summary: {total} program(s), "
+                f"{programs_will_change} will change, "
+                f"{programs_already_correct} already correct, "
+                f"{programs_skipped} skipped "
+                f"({revisions_changed} revision(s), {certs_affected} cert(s) affected)."
             )
         )
+
+    def _write_block(self, readable_id, *, program_title, new_title, reason):
+        """Print a full per-program block for a program that is being skipped."""
+        self.stdout.write("")
+        self.stdout.write(readable_id)
+        self.stdout.write(f"  Program Title    : {program_title}")
+        self.stdout.write("  Cert Title (now) : —")
+        self.stdout.write(f"  Cert Title (new) : {new_title}")
+        self.stdout.write(
+            self.style.WARNING(f"  Will change      : SKIPPED — {reason}")
+        )
+
+    def _process_program(self, readable_id, program, title, *, commit):
+        """Print a valid program's block and (when committing) rewrite revisions.
+
+        Returns ``(changed, revisions_changed, certs_affected)``.
+        """
+        # Print the header (program title + target title) once, then a
+        # (now / will change) pairing for each distinct frozen revision.
+        self.stdout.write("")
+        self.stdout.write(readable_id)
+        self.stdout.write(f"  Program Title    : {program.title}")
+        self.stdout.write(f"  Cert Title (new) : {title}")
+
+        revisions = self._distinct_revisions(program)
+        if not revisions:
+            self.stdout.write("  Cert Title (now) : —  (no issued certificates)")
+            self.stdout.write("  Will change      : NO")
+            return False, 0, 0
+
+        changed = False
+        revisions_changed = 0
+        certs_affected = 0
+        with transaction.atomic():
+            for revision, certs in revisions:
+                old = revision.content.get("product_name")
+                label = f"{len(certs)} cert(s), revision {revision.id}"
+                self.stdout.write(f"  Cert Title (now) : {old}  ({label})")
+                if old == title:
+                    self.stdout.write("  Will change      : NO")
+                    continue
+                if commit:
+                    # Reassign rather than mutate in place so the change is
+                    # always picked up regardless of save()/update_fields or
+                    # any dirty-tracking behavior on the model.
+                    content = revision.content
+                    content["product_name"] = title
+                    revision.content = content
+                    revision.save(update_fields=["content"])
+                changed = True
+                revisions_changed += 1
+                certs_affected += len(certs)
+                self.stdout.write(self.style.SUCCESS("  Will change      : YES"))
+
+        return changed, revisions_changed, certs_affected
 
     @staticmethod
     def _target_programs(programs, all_programs):

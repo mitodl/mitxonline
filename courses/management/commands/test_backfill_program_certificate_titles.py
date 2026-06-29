@@ -74,7 +74,9 @@ def test_dry_run_by_default_makes_no_db_changes():
 
 
 def test_dry_run_output_reports_planned_change():
-    """Dry-run output names the program, the old and new titles, and the mode."""
+    """Dry-run output is an admin-readable block: readable_id, program title,
+    current and target certificate titles, and a YES/NO change flag.
+    """
     program, _ = _program_with_issued_cert(
         frozen_title="OLD Title", live_title="NEW Title"
     )
@@ -83,8 +85,10 @@ def test_dry_run_output_reports_planned_change():
 
     assert "DRY RUN" in output
     assert program.readable_id in output
-    assert "OLD Title" in output
-    assert "NEW Title" in output
+    assert f"Program Title    : {program.title}" in output
+    assert "Cert Title (now) : OLD Title" in output
+    assert "Cert Title (new) : NEW Title" in output
+    assert "Will change      : YES" in output
 
 
 def test_commit_is_idempotent():
@@ -97,9 +101,9 @@ def test_commit_is_idempotent():
     output = _run("--program", program.readable_id, "--commit")
 
     assert _frozen_title(certificate) == "NEW Title"
-    assert "skipped" in output
-    assert "[changed]" not in output
-    assert "0 revision(s) changed" in output
+    assert "Will change      : NO" in output
+    assert "Will change      : YES" not in output
+    assert "0 revision(s)" in output
 
 
 def test_null_revision_cert_is_skipped_without_error():
@@ -142,7 +146,7 @@ def test_shared_revision_updated_once_for_all_certs():
 
     assert _frozen_title(cert_a) == "NEW Title"
     assert _frozen_title(cert_b) == "NEW Title"
-    assert "(2 certs)" in output
+    assert "2 cert(s)" in output
 
 
 def test_placeholder_live_title_skips_program_without_writing():
