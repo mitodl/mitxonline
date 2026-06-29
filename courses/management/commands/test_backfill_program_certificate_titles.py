@@ -5,6 +5,8 @@ from io import StringIO
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import DatabaseError
+from wagtail.models import Revision
 
 from cms.factories import ProgramPageFactory
 from cms.models import CertificatePage
@@ -147,6 +149,60 @@ def test_shared_revision_updated_once_for_all_certs():
     assert _frozen_title(cert_a) == "NEW Title"
     assert _frozen_title(cert_b) == "NEW Title"
     assert "2 cert(s)" in output
+
+
+def test_commit_rollback_emits_no_misleading_success_output(mocker):
+    """If a revision save fails mid-commit, the per-program transaction rolls
+    back and NO output claims a change succeeded — the report block is flushed
+    only after the writes commit, so a rollback leaves nothing behind.
+    """
+    program_page = ProgramPageFactory.create()
+    cert_page = program_page.certificate_page
+    cert_page.product_name = "OLD Title"
+    cert_page.save()
+    cert_page.save_revision()
+    rev_a = cert_page.revisions.last()
+    cert_a = ProgramCertificateFactory.create(
+        program=program_page.program, certificate_page_revision=rev_a
+    )
+    cert_page.save_revision()
+    rev_b = cert_page.revisions.last()
+    cert_b = ProgramCertificateFactory.create(
+        program=program_page.program, certificate_page_revision=rev_b
+    )
+
+    cert_page.product_name = "NEW Title"
+    cert_page.save()
+
+    # Fail the second revision save so the atomic block rolls the first one back.
+    original_save = Revision.save
+    state = {"calls": 0}
+
+    def flaky_save(self, *args, **kwargs):
+        state["calls"] += 1
+        if state["calls"] >= 2:
+            msg = "simulated DB failure"
+            raise DatabaseError(msg)
+        return original_save(self, *args, **kwargs)
+
+    mocker.patch.object(Revision, "save", autospec=True, side_effect=flaky_save)
+
+    out = StringIO()
+    with pytest.raises(DatabaseError):
+        call_command(
+            "backfill_program_certificate_titles",
+            "--program",
+            program_page.program.readable_id,
+            "--commit",
+            stdout=out,
+            stderr=out,
+        )
+
+    output = out.getvalue()
+    # No success line, and both frozen titles are unchanged (fully rolled back).
+    assert "Will change      : YES" not in output
+    assert _frozen_title(cert_a) == "OLD Title"
+    assert _frozen_title(cert_b) == "OLD Title"
 
 
 def test_placeholder_live_title_skips_program_without_writing():

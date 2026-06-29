@@ -115,31 +115,44 @@ class Command(BaseCommand):
 
         Returns ``(changed, revisions_changed, certs_affected)``.
         """
-        # Print the header (program title + target title) once, then a
-        # (now / will change) pairing for each distinct frozen revision.
-        self.stdout.write("")
-        self.stdout.write(readable_id)
-        self.stdout.write(f"  Program Title    : {program.title}")
-        self.stdout.write(f"  Cert Title (new) : {title}")
+        # Build the whole report block in memory and decide which revisions to
+        # rewrite, but do NOT print anything yet. The writes happen first, inside
+        # transaction.atomic(); only once they commit do we flush the block. That
+        # way a rollback (e.g. a save() error on a later revision) can never leave
+        # behind output claiming a change that was undone — on failure the
+        # exception propagates before any line is written.
+        lines = [
+            "",
+            readable_id,
+            f"  Program Title    : {program.title}",
+            f"  Cert Title (new) : {title}",
+        ]
 
         revisions = self._distinct_revisions(program)
         if not revisions:
-            self.stdout.write("  Cert Title (now) : —  (no issued certificates)")
-            self.stdout.write("  Will change      : NO")
+            lines.append("  Cert Title (now) : —  (no issued certificates)")
+            lines.append("  Will change      : NO")
+            self._flush(lines)
             return False, 0, 0
 
-        changed = False
+        to_change = []
         revisions_changed = 0
         certs_affected = 0
-        with transaction.atomic():
-            for revision, certs in revisions:
-                old = revision.content.get("product_name")
-                label = f"{len(certs)} cert(s), revision {revision.id}"
-                self.stdout.write(f"  Cert Title (now) : {old}  ({label})")
-                if old == title:
-                    self.stdout.write("  Will change      : NO")
-                    continue
-                if commit:
+        for revision, certs in revisions:
+            old = revision.content.get("product_name")
+            label = f"{len(certs)} cert(s), revision {revision.id}"
+            lines.append(f"  Cert Title (now) : {old}  ({label})")
+            if old == title:
+                lines.append("  Will change      : NO")
+                continue
+            to_change.append(revision)
+            revisions_changed += 1
+            certs_affected += len(certs)
+            lines.append(self.style.SUCCESS("  Will change      : YES"))
+
+        if commit and to_change:
+            with transaction.atomic():
+                for revision in to_change:
                     # Reassign rather than mutate in place so the change is
                     # always picked up regardless of save()/update_fields or
                     # any dirty-tracking behavior on the model.
@@ -147,12 +160,14 @@ class Command(BaseCommand):
                     content["product_name"] = title
                     revision.content = content
                     revision.save(update_fields=["content"])
-                changed = True
-                revisions_changed += 1
-                certs_affected += len(certs)
-                self.stdout.write(self.style.SUCCESS("  Will change      : YES"))
 
-        return changed, revisions_changed, certs_affected
+        self._flush(lines)
+        return bool(to_change), revisions_changed, certs_affected
+
+    def _flush(self, lines):
+        """Write the collected report lines for one program to stdout."""
+        for line in lines:
+            self.stdout.write(line)
 
     @staticmethod
     def _target_programs(programs, all_programs):
