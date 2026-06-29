@@ -13,7 +13,7 @@ from django.db.models import Q
 from mitol.common.utils import now_in_utc
 
 from b2b.constants import (
-    CONTRACT_MEMBERSHIP_CHOICES,
+    CONTRACT_MEMBERSHIP_TYPE_CHOICES,
 )
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.models import (
@@ -111,10 +111,10 @@ class Command(BaseCommand):
             help="The name of the contract.",
         )
         create_parser.add_argument(
-            "integration_type",
+            "membership_type",
             type=str,
             help="The membership type for this contract.",
-            choices=[value[0] for value in CONTRACT_MEMBERSHIP_CHOICES],
+            choices=[value[0] for value in CONTRACT_MEMBERSHIP_TYPE_CHOICES],
         )
         create_parser.add_argument(
             "--description",
@@ -268,7 +268,7 @@ class Command(BaseCommand):
         """Handle the create subcommand."""
         organization_name = kwargs.pop("organization")
         contract_name = kwargs.pop("contract_name")
-        integration_type = kwargs.pop("integration_type")
+        membership_type = kwargs.pop("membership_type")
         description = kwargs.pop("description")
         start_date = kwargs.pop("start")
         end_date = kwargs.pop("end")
@@ -306,8 +306,7 @@ class Command(BaseCommand):
         contract = ContractPage(
             name=contract_name,
             description=description or "",
-            integration_type=integration_type,
-            membership_type=integration_type,
+            membership_type=membership_type,
             organization=org,
             contract_start=start_date,
             contract_end=end_date,
@@ -528,7 +527,6 @@ class Command(BaseCommand):
                 "description": contract.description,
                 "welcome_message": contract.welcome_message,
                 "welcome_message_extra": contract.welcome_message_extra,
-                "integration_type": contract.integration_type,
                 "membership_type": contract.membership_type,
                 "contract_start": _serialize_date(contract.contract_start),
                 "contract_end": _serialize_date(contract.contract_end),
@@ -633,7 +631,6 @@ class Command(BaseCommand):
             description=contract_data.get("description", ""),
             welcome_message=contract_data.get("welcome_message", ""),
             welcome_message_extra=contract_data.get("welcome_message_extra", ""),
-            integration_type=contract_data["integration_type"],
             membership_type=contract_data["membership_type"],
             organization=org,
             contract_start=contract_data.get("contract_start"),

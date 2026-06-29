@@ -48,7 +48,6 @@ def contract_with_sheet():
 
     return factories.ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_CODE,
-        integration_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=FAKE.random_int(10, 20),
         google_sheet_target=FAKE.url(),
         google_sheet_target_tab="Sheet1",
@@ -104,9 +103,6 @@ def test_handler_init(mocked_pygsheets, valid_sheet, valid_contract):
 
     test_contract = factories.ContractPageFactory.create(
         membership_type=CONTRACT_MEMBERSHIP_CODE
-        if valid_contract
-        else CONTRACT_MEMBERSHIP_MANAGED,
-        integration_type=CONTRACT_MEMBERSHIP_CODE
         if valid_contract
         else CONTRACT_MEMBERSHIP_MANAGED,
     )

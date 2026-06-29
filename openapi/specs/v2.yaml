@@ -4762,18 +4762,6 @@ components:
           type: string
           readOnly: true
           description: Additional welcome message content for learners.
-        integration_type:
-          allOf:
-          - $ref: '#/components/schemas/IntegrationTypeEnum'
-          readOnly: true
-          description: |-
-            The type of integration for this contract.
-
-            * `sso` - SSO
-            * `non-sso` - Non-SSO
-            * `managed` - Managed
-            * `code` - Enrollment Code
-            * `auto` - Auto Enrollment
         programs:
           type: array
           items:
@@ -4789,7 +4777,6 @@ components:
       - contract_start
       - description
       - id
-      - integration_type
       - membership_type
       - name
       - organization
@@ -6670,26 +6657,6 @@ components:
       - key
       - text
       - title
-    IntegrationTypeEnum:
-      enum:
-      - sso
-      - non-sso
-      - managed
-      - code
-      - auto
-      type: string
-      description: |-
-        * `sso` - SSO
-        * `non-sso` - Non-SSO
-        * `managed` - Managed
-        * `code` - Enrollment Code
-        * `auto` - Auto Enrollment
-      x-enum-descriptions:
-      - SSO
-      - Non-SSO
-      - Managed
-      - Enrollment Code
-      - Auto Enrollment
     LanguageEnum:
       enum:
       - af_ZA
@@ -6987,18 +6954,6 @@ components:
           type: string
           readOnly: true
           description: Additional welcome message content for learners.
-        integration_type:
-          allOf:
-          - $ref: '#/components/schemas/IntegrationTypeEnum'
-          readOnly: true
-          description: |-
-            The type of integration for this contract.
-
-            * `sso` - SSO
-            * `non-sso` - Non-SSO
-            * `managed` - Managed
-            * `code` - Enrollment Code
-            * `auto` - Auto Enrollment
         programs:
           type: array
           items:
@@ -7030,7 +6985,6 @@ components:
       - contract_start
       - description
       - id
-      - integration_type
       - membership_type
       - name
       - organization
