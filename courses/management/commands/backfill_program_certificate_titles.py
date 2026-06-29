@@ -115,12 +115,8 @@ class Command(BaseCommand):
 
         Returns ``(changed, revisions_changed, certs_affected)``.
         """
-        # Build the whole report block in memory and decide which revisions to
-        # rewrite, but do NOT print anything yet. The writes happen first, inside
-        # transaction.atomic(); only once they commit do we flush the block. That
-        # way a rollback (e.g. a save() error on a later revision) can never leave
-        # behind output claiming a change that was undone — on failure the
-        # exception propagates before any line is written.
+        # Build the block in memory and flush it only after the writes commit, so
+        # a rollback never leaves behind output claiming a change that was undone.
         lines = [
             "",
             readable_id,
@@ -153,9 +149,8 @@ class Command(BaseCommand):
         if commit and to_change:
             with transaction.atomic():
                 for revision in to_change:
-                    # Reassign rather than mutate in place so the change is
-                    # always picked up regardless of save()/update_fields or
-                    # any dirty-tracking behavior on the model.
+                    # Reassign (don't mutate in place) so save(update_fields=...)
+                    # reliably detects the JSONField change.
                     content = revision.content
                     content["product_name"] = title
                     revision.content = content
