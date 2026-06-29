@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from mitol.common.serializers import THIS_IS_NOT_AN_API
 from mitol.common.utils import now_in_utc
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -95,7 +96,10 @@ class ProgramSerializer(serializers.ModelSerializer):
         return CourseWithCourseRunsSerializer(
             [course[0] for course in instance.courses if course[0].live],
             many=True,
-            context={"include_page_fields": True},
+            context={
+                "include_page_fields": True,
+                "skip_prefetch_checks": THIS_IS_NOT_AN_API,
+            },
         ).data
 
     @extend_schema_field(

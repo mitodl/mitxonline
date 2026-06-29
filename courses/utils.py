@@ -87,15 +87,19 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         return None
 
 
-def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
+def get_enrollable_courseruns_qs(
+    *, queryset=None, enrollment_end_date=None, valid_courses=None
+):
     """
     Returns all course runs that are open for enrollment.
 
     args:
+        queryset: Optional base queryset to use
         enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
         valid_courses: Queryset of Course objects, to filter the course runs by if needed
     """
-    queryset = CourseRun.objects.enrollable(enrollment_end_date)
+    queryset = CourseRun.objects.all() if queryset is None else queryset
+    queryset = queryset.enrollable(enrollment_end_date)
 
     if valid_courses:
         queryset = queryset.filter(course__in=valid_courses)

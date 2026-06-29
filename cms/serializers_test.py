@@ -53,7 +53,11 @@ def test_serialize_course_page(
     )
 
     data = CoursePageSerializer(
-        instance=course_page, context=course_page.get_context(request)
+        instance=course_page,
+        context={
+            **mock_context,
+            **course_page.get_context(request),
+        },
     ).data
     assert_drf_json_equal(
         data,
@@ -96,7 +100,11 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
     request.user = staff_user
 
     data = CoursePageSerializer(
-        instance=course_page, context=course_page.get_context(request)
+        instance=course_page,
+        context={
+            **mock_context,
+            **course_page.get_context(request),
+        },
     ).data
     assert_drf_json_equal(
         data,
@@ -138,7 +146,11 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
     request.user = staff_user
 
     data = CoursePageSerializer(
-        instance=course_page, context=course_page.get_context(request)
+        instance=course_page,
+        context={
+            **mock_context,
+            **course_page.get_context(request),
+        },
     ).data
     assert_drf_json_equal(
         data,
@@ -180,7 +192,11 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
         program_page.get_children().type(FlexiblePricingRequestForm).live().first()
     )
     data = CoursePageSerializer(
-        instance=course_page, context=program_page.get_context(request)
+        instance=course_page,
+        context={
+            **mock_context,
+            **course_page.get_context(request),
+        },
     ).data
     assert_drf_json_equal(
         data,
@@ -219,7 +235,11 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
     request.user = staff_user
 
     data = CoursePageSerializer(
-        instance=course_page, context=course_page.get_context(request)
+        instance=course_page,
+        context={
+            **mock_context,
+            **course_page.get_context(request),
+        },
     ).data
     assert_drf_json_equal(
         data,
@@ -248,7 +268,7 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
     ],
 )
 def test_serialized_course_finaid_form_url(
-    own_program_has_form, related_program, related_program_has_form
+    own_program_has_form, related_program, related_program_has_form, mock_context
 ):
     """
     Tests a few scenarios for financial assistance form URL retrieval to ensure
@@ -285,11 +305,15 @@ def test_serialized_course_finaid_form_url(
             parent=program1.page, selected_program=program1
         )
 
-        serialized_output = CoursePageSerializer(course1.page).data
+        serialized_output = CoursePageSerializer(
+            course1.page, context=mock_context
+        ).data
 
         assert own_fa_page.slug in serialized_output["financial_assistance_form_url"]
     else:
-        serialized_output = CoursePageSerializer(course1.page).data
+        serialized_output = CoursePageSerializer(
+            course1.page, context=mock_context
+        ).data
 
         assert serialized_output["financial_assistance_form_url"] == ""
 
@@ -298,7 +322,9 @@ def test_serialized_course_finaid_form_url(
             parent=program2.page, selected_program=program2
         )
 
-        serialized_output = CoursePageSerializer(course1.page).data
+        serialized_output = CoursePageSerializer(
+            course1.page, context=mock_context
+        ).data
 
         if own_program_has_form:
             assert (
@@ -321,7 +347,7 @@ def test_serialized_course_finaid_form_url(
     ],
 )
 def test_serialized_course_finaid_form_url_publishing_states(
-    own_form_published, related_form_published
+    own_form_published, related_form_published, mock_context
 ):
     """
     Test a few scenarios where financial aid forms exist but are not yet published.
@@ -343,7 +369,7 @@ def test_serialized_course_finaid_form_url_publishing_states(
         parent=program2.page, selected_program=program2, live=related_form_published
     )
 
-    serialized_output = CoursePageSerializer(course1.page).data
+    serialized_output = CoursePageSerializer(course1.page, context=mock_context).data
 
     if own_form_published:
         assert own_fa_page.slug in serialized_output["financial_assistance_form_url"]

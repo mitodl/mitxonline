@@ -1801,7 +1801,7 @@ wheels = [
 [[package]]
 name = "mitol-django-common"
 version = "2026.6.16.4"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fcommon&branch=nl%2Fprefetch_serializer_path#0b72f449a0ebc7cee4448df47b8208eb5b4ad19c" }
 dependencies = [
     { name = "django" },
     { name = "django-redis" },
@@ -1809,11 +1809,8 @@ dependencies = [
     { name = "django-webpack-loader" },
     { name = "pytz" },
     { name = "requests" },
+    { name = "structlog" },
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/c8/bfddaffd14e2f0233e0be31ea83a82865579f9eb1ecc9514cf14edd5d574/mitol_django_common-2026.6.16.4.tar.gz", hash = "sha256:f06dee7575c4c1cfefef016459ed8c673482511b9b0f8387fc2e056844ca6a8c", size = 24357, upload-time = "2026-06-16T19:21:07.244Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/d2/db0dd231888821180997dd1a0c35fcd3d7999567596d27604bcb939d0ee6/mitol_django_common-2026.6.16.4-py3-none-any.whl", hash = "sha256:3506d91de35e91bc17e65eee73fe68cfa0b73254edb66d9a59d6e9cee870580b", size = 35258, upload-time = "2026-06-16T19:21:06.429Z" },
 ]
 
 [[package]]
@@ -2156,7 +2153,7 @@ requires-dist = [
     { name = "lru-method-cache", specifier = ">=0.2.0" },
     { name = "mitol-django-apigateway", specifier = "==2026.4.29" },
     { name = "mitol-django-authentication", specifier = "==2026.4.29" },
-    { name = "mitol-django-common", specifier = "==2026.6.16.4" },
+    { name = "mitol-django-common", git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fcommon&branch=nl%2Fprefetch_serializer_path" },
     { name = "mitol-django-google-sheets", specifier = ">=2025.6.13,<2026" },
     { name = "mitol-django-google-sheets-deferrals", specifier = ">=2025.3.17,<2026" },
     { name = "mitol-django-google-sheets-refunds", specifier = ">=2025.6.13,<2026" },

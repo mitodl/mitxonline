@@ -1552,7 +1552,13 @@ class CoursePage(ProductPage):
         if self.course_id is None:
             return None
 
-        course = Course.objects.prefetch("programs").get(id=self.course_id)
+        course = (
+            Course.objects.prefetch_related(
+                "linked_instructors", "linked_instructors__linked_instructor_page"
+            )
+            .prefetch("programs")
+            .get(id=self.course_id)
+        )
 
         return CourseSerializer(course).data
 

@@ -498,7 +498,9 @@ def create_featured_items():
         id__in=valid_course_ids, live=True
     )
     enrollable_courseruns = (
-        get_enrollable_courseruns_qs(end_of_day, enrollable_courses_qs)
+        get_enrollable_courseruns_qs(
+            enrollment_end_date=end_of_day, valid_courses=enrollable_courses_qs
+        )
         .select_related("course")
         .prefetch_related("course__page")
     )

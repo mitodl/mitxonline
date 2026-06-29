@@ -120,6 +120,9 @@ dev = [
 package = false
 default-groups = "all"
 
+[tool.uv.sources]
+mitol-django-common = { git = "https://github.com/mitodl/ol-django", branch="nl/prefetch_serializer_path", subdirectory="src/common"}
+
 [tool.uv.build-backend]
 module-root = ""
 

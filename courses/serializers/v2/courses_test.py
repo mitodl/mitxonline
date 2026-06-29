@@ -12,6 +12,7 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    CoursesTopicFactory,
     EnrollmentModeFactory,
     ProgramFactory,
 )
@@ -20,6 +21,7 @@ from courses.serializers.v1.base import BaseProgramSerializer
 from courses.serializers.v2.courses import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
+    CoursesTopicSerializer,
     CourseWithCourseRunsSerializer,
 )
 from courses.views.v2 import UserEnrollmentFilterSet
@@ -28,6 +30,24 @@ from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from variants.serializers import SupportedVariantSerializer
 
 pytestmark = [pytest.mark.django_db]
+
+
+def test_serialize_courses_topics():
+    """Test that the topic serializer works correctly"""
+
+    child_topics = [
+        *CoursesTopicFactory.create_batch(3, with_parent=True),
+        *CoursesTopicFactory.create_batch(3),
+    ]
+    parent_topics = [child.parent for child in child_topics if child.parent]
+
+    assert CoursesTopicSerializer(instance=child_topics[0]).data == {
+        "name": child_topics[0].name
+    }
+
+    assert CoursesTopicSerializer(child_topics, many=True).data == [
+        {"name": topic.name} for topic in [*child_topics, *parent_topics]
+    ]
 
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
@@ -71,7 +91,7 @@ def test_serialize_course(
     user = mock_context["request"].user
     course = courseRun1.course
     topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
-    course.page.topics.set([topics[0], topics[1], topics[2]])
+    course.page.topics.set(topics)
     department = "a course departments"
     course.departments.set([Department.objects.create(name=department)])
     program = ProgramFactory.create(program_type="Series")
@@ -91,6 +111,8 @@ def test_serialize_course(
         enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
     ).count()
 
+    course.refresh_from_db()
+
     data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 
     assert_drf_json_equal(
@@ -100,18 +122,20 @@ def test_serialize_course(
             "readable_id": course.readable_id,
             "id": course.id,
             "courseruns": [
-                CourseRunSerializer(run).data
+                CourseRunSerializer(run, context=mock_context).data
                 for run in sorted([courseRun1, courseRun2], key=lambda run: run.id)
             ],
             "next_run_id": course.first_unexpired_run.id,
             "max_weekly_hours": course.page.max_weekly_hours,
             "min_weekly_hours": course.page.min_weekly_hours,
             "departments": [{"name": department}],
-            "page": CoursePageSerializer(course.page).data,
+            "page": CoursePageSerializer(course.page, context=mock_context).data,
             "certificate_type": certificate_type,
             "certificate_available": cert_available,
             "availability": "dated",
-            "topics": [{"name": topic.name} for topic in topics],
+            "topics": CoursesTopicSerializer(
+                topics, context=mock_context, many=True
+            ).data,
             "required_prerequisites": True,
             "duration": course.page.length,
             "max_weeks": course.page.max_weeks,
@@ -158,7 +182,7 @@ def test_serialize_course_required_prerequisites(
             "max_weekly_hours": course.page.max_weekly_hours,
             "min_weekly_hours": course.page.min_weekly_hours,
             "departments": [],
-            "page": CoursePageSerializer(course.page).data,
+            "page": CoursePageSerializer(course.page, context=mock_context).data,
             "certificate_type": "Certificate of Completion",
             "certificate_available": False,
             "topics": [],
@@ -170,11 +194,13 @@ def test_serialize_course_required_prerequisites(
             "min_price": course.page.min_price,
             "max_price": course.page.max_price,
             "time_commitment": course.page.effort,
-            "programs": BaseProgramSerializer(course.programs, many=True).data,
+            "programs": BaseProgramSerializer(
+                course.programs, many=True, context=mock_context
+            ).data,
             "include_in_learn_catalog": course.page.include_in_learn_catalog,
             "ingest_content_files_for_ai": course.page.ingest_content_files_for_ai,
             "possible_variant_sets": [
-                SupportedVariantSerializer(vs).data
+                SupportedVariantSerializer(vs, context=mock_context).data
                 for vs in course.possible_variant_sets.all()
             ],
         },
@@ -194,17 +220,19 @@ def test_serialize_course_with_no_page(mock_context):
 class TestCourseRunEnrollmentSerializerV2:
     """Test the v2 CourseRunEnrollmentSerializer."""
 
-    def test_serializer_without_b2b_contract(self):
+    def test_serializer_without_b2b_contract(self, mock_context):
         """Test serialization without B2B contract."""
         enrollment = CourseRunEnrollmentFactory.create()
-        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+        serialized_data = CourseRunEnrollmentSerializer(
+            enrollment, context=mock_context
+        ).data
 
         assert "b2b_organization_id" in serialized_data
         assert "b2b_contract_id" in serialized_data
         assert serialized_data["b2b_organization_id"] is None
         assert serialized_data["b2b_contract_id"] is None
 
-    def test_serializer_with_b2b_contract(self):
+    def test_serializer_with_b2b_contract(self, mock_context):
         """Test serialization with B2B contract."""
         org = OrganizationPageFactory.create()
         contract = ContractPageFactory.create(organization=org)
@@ -213,14 +241,18 @@ class TestCourseRunEnrollmentSerializerV2:
         enrollment.run.b2b_contract = contract
         enrollment.run.save()
 
-        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+        serialized_data = CourseRunEnrollmentSerializer(
+            enrollment, context=mock_context
+        ).data
         assert serialized_data["b2b_organization_id"] == org.id
         assert serialized_data["b2b_contract_id"] == contract.id
 
-    def test_serializer_fields(self):
+    def test_serializer_fields(self, mock_context):
         """Test that all expected fields are present."""
         enrollment = CourseRunEnrollmentFactory.create()
-        serialized_data = CourseRunEnrollmentSerializer(enrollment).data
+        serialized_data = CourseRunEnrollmentSerializer(
+            enrollment, context=mock_context
+        ).data
 
         expected_fields = {
             "run",

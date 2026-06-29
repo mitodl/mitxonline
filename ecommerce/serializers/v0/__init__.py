@@ -132,13 +132,8 @@ class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
         ]
 
 
-class CoursePageObjectField(serializers.RelatedField):
-    def to_representation(self, value):
-        return CoursePageSerializer(instance=value).data
-
-
 class CourseProductPurchasableObjectSerializer(serializers.ModelSerializer):
-    page = CoursePageObjectField(read_only=True)
+    page = CoursePageSerializer(read_only=True)
 
     class Meta:
         model = Course
@@ -165,13 +160,8 @@ class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
         ]
 
 
-class ProgramPageObjectField(serializers.RelatedField):
-    def to_representation(self, value):
-        return ProgramPageSerializer(instance=value).data
-
-
 class ProgramProductPurchasableObjectSerializer(serializers.ModelSerializer):
-    page = ProgramPageObjectField(read_only=True)
+    page = ProgramPageSerializer(read_only=True)
 
     class Meta:
         model = Program
@@ -233,17 +223,23 @@ class ProductPurchasableObjectField(serializers.RelatedField):
 
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
+        serializer = None
         if isinstance(value, ProgramRun):
-            return ProgramRunProductPurchasableObjectSerializer(instance=value).data
+            serializer = ProgramRunProductPurchasableObjectSerializer(instance=value)
         elif isinstance(value, CourseRun):
-            return CourseRunProductPurchasableObjectSerializer(instance=value).data
+            serializer = CourseRunProductPurchasableObjectSerializer(instance=value)
         elif isinstance(value, Program):
-            return ProgramProductPurchasableObjectSerializer(instance=value).data
+            serializer = ProgramProductPurchasableObjectSerializer(instance=value)
 
-        error_message = (
-            f"Unexpected type for Product.purchasable_object: {value.__class__}"
-        )
-        raise InvalidPurchasableObjectTypeError(error_message)
+        if serializer is None:
+            error_message = (
+                f"Unexpected type for Product.purchasable_object: {value.__class__}"
+            )
+            raise InvalidPurchasableObjectTypeError(error_message)
+
+        serializer.bind(field_name=self.field_name, parent=self.parent)
+
+        return serializer.data
 
 
 class BaseProductSerializer(serializers.ModelSerializer):
@@ -294,15 +290,7 @@ class BasketItemSerializer(serializers.ModelSerializer):
 class BasketSerializer(serializers.ModelSerializer):
     """Basket model serializer"""
 
-    basket_items = serializers.SerializerMethodField()
-
-    @extend_schema_field(BasketItemSerializer(many=True))
-    def get_basket_items(self, instance):
-        """Get items in the basket"""
-        return [
-            BasketItemSerializer(instance=basket, context=self.context).data
-            for basket in instance.basket_items.select_related("product")
-        ]
+    basket_items = BasketItemSerializer()
 
     class Meta:
         fields = [
@@ -336,10 +324,7 @@ class RedeemedDiscountSerializer(serializers.ModelSerializer):
 
 
 class BasketItemWithProductSerializer(serializers.ModelSerializer):
-    product = serializers.SerializerMethodField()
-
-    def get_product(self, instance):
-        return ProductSerializer(instance=instance.product, context=self.context).data
+    product = ProductSerializer(read_only=True)
 
     class Meta:
         model = models.BasketItem
@@ -350,56 +335,16 @@ class BasketItemWithProductSerializer(serializers.ModelSerializer):
 class BasketWithProductSerializer(serializers.ModelSerializer):
     """Serializer for Basket model with product details"""
 
-    basket_items = serializers.SerializerMethodField()
+    basket_items = BasketItemWithProductSerializer()
     total_price = serializers.SerializerMethodField()
     discounted_price = serializers.SerializerMethodField()
     discounts = serializers.SerializerMethodField()
-
-    @extend_schema_field(
-        {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "basket": {"type": "integer"},
-                    "product": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "integer"},
-                            "price": {"type": "number"},
-                            "description": {"type": "string"},
-                            "is_active": {"type": "boolean"},
-                            "purchasable_object": {"type": "object"},
-                        },
-                    },
-                    "id": {"type": "integer"},
-                },
-            },
-        }
-    )
-    def get_basket_items(self, instance) -> list[BasketItemWithProductSerializer]:
-        """
-        Get items in the basket with their associated product details
-
-        Args:
-            instance: Basket model instance
-
-        Returns:
-            List of serialized basket items with product details
-        """
-        return [
-            BasketItemWithProductSerializer(instance=basket, context=self.context).data
-            for basket in instance.basket_items.select_related("product")
-        ]
 
     @extend_schema_field(Decimal)
     def get_total_price(self, instance) -> Decimal:
         """Get total price of all items in basket before discounts"""
         return Decimal(
-            sum(
-                basket_item.base_price
-                for basket_item in instance.basket_items.select_related("product")
-            )
+            sum(basket_item.base_price for basket_item in instance.basket_items.all())
         )
 
     @extend_schema_field(Decimal)
@@ -411,7 +356,7 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         return Decimal(
             sum(
                 basket_item.discounted_price
-                for basket_item in instance.basket_items.select_related("product")
+                for basket_item in instance.basket_items.all()
             )
         )
 
