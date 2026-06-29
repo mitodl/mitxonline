@@ -2476,7 +2476,7 @@ def test_course_run_and_product_prefetch_optimized(
     product_queries = [
         q for q in queries_after if 'FROM "ecommerce_product"' in q.get("sql", "")
     ]
-    assert len(product_queries) == 2, (
+    assert len(product_queries) == 1, (
         f"Expected 1 product query, got {len(product_queries)}: {[q['sql'] for q in product_queries]}"
     )
 

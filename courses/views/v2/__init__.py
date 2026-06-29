@@ -679,7 +679,15 @@ class UserEnrollmentsApiViewSet(
         )
         .prefetch_related(
             "run__b2b_contract__organization",
-            "run__course__page",
+            Prefetch(
+                "run__course__page",
+                queryset=CoursePage.objects.prefetch_related(
+                    "topics",
+                    "topics__parent",
+                    "linked_instructors",
+                    "linked_instructors__linked_instructor_page",
+                ),
+            ),
             Prefetch("run__enrollment_modes", to_attr="prefetched_enrollment_modes"),
         )
         .prefetch(
@@ -996,7 +1004,18 @@ class CourseCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
             "course_run__course__programs",
             queryset=Program.objects.filter(b2b_only=False),
         )
-    ).prefetch_related("user")
+    ).prefetch_related(
+        "user",
+        Prefetch(
+            "course_run__course__page",
+            queryset=CoursePage.objects.prefetch_related(
+                "topics",
+                "topics__parent",
+                "linked_instructors",
+                "linked_instructors__linked_instructor_page",
+            ),
+        ),
+    )
 
 
 class ProgramCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
@@ -1051,8 +1070,19 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                         user=request.user, run__course__in=courses
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-                    .select_related("run__course__page", "run__b2b_contract")
+                    .select_related("run__course", "run__b2b_contract")
                     .prefetch("run__course__programs")
+                    .prefetch_related(
+                        Prefetch(
+                            "run__course__page",
+                            queryset=CoursePage.objects.prefetch_related(
+                                "topics",
+                                "topics__parent",
+                                "linked_instructors",
+                                "linked_instructors__linked_instructor_page",
+                            ),
+                        )
+                    )
                     .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
