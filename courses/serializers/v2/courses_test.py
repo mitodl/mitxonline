@@ -35,17 +35,18 @@ pytestmark = [pytest.mark.django_db]
 def test_serialize_courses_topics():
     """Test that the topic serializer works correctly"""
 
-    parent_topics = CoursesTopicFactory.create_batch(3)
     child_topics = [
-        CoursesTopicFactory.create(parent=parent) for parent in parent_topics
+        *CoursesTopicFactory.create_batch(3, with_parent=True),
+        *CoursesTopicFactory.create_batch(3),
     ]
+    parent_topics = [child.parent for child in child_topics if child.parent]
 
     assert CoursesTopicSerializer(instance=child_topics[0]).data == {
         "name": child_topics[0].name
     }
 
     assert CoursesTopicSerializer(child_topics, many=True).data == [
-        {"name": topic.name} for topic in (child_topics + parent_topics)
+        {"name": topic.name} for topic in [*child_topics, *parent_topics]
     ]
 
 
@@ -90,7 +91,7 @@ def test_serialize_course(
     user = mock_context["request"].user
     course = courseRun1.course
     topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
-    course.page.topics.set([topics[0], topics[1], topics[2]])
+    course.page.topics.set(topics)
     department = "a course departments"
     course.departments.set([Department.objects.create(name=department)])
     program = ProgramFactory.create(program_type="Series")
@@ -109,6 +110,8 @@ def test_serialize_course(
     course.verified_courserun_count = course.courseruns.filter(
         enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE
     ).count()
+
+    course.refresh_from_db()
 
     data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 
@@ -130,7 +133,9 @@ def test_serialize_course(
             "certificate_type": certificate_type,
             "certificate_available": cert_available,
             "availability": "dated",
-            "topics": CoursesTopicSerializer(topics, many=True).data,
+            "topics": CoursesTopicSerializer(
+                topics, context=mock_context, many=True
+            ).data,
             "required_prerequisites": True,
             "duration": course.page.length,
             "max_weeks": course.page.max_weeks,

@@ -27,6 +27,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from reversion.models import Version
 
+from cms.models import CoursePage
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -240,9 +241,15 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
             CourseRun.objects.select_related("course")
             .prefetch_related(
                 "course__departments",
-                "course__page",
-                "course__page__linked_instructors",
-                "course__page__linked_instructors__linked_instructor_page",
+                Prefetch(
+                    "course__page",
+                    queryset=CoursePage.objects.prefetch_related(
+                        "topics",
+                        "topics__parent",
+                        "linked_instructors",
+                        "linked_instructors__linked_instructor_page",
+                    ),
+                ),
                 Prefetch("enrollment_modes", to_attr="prefetched_enrollment_modes"),
             )
             .filter(live=True)
@@ -559,7 +566,17 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                         user=request.user, run__course__in=courses
                     )
                     .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
-                    .select_related("run__course__page")
+                    .prefetch_related(
+                        Prefetch(
+                            "run__course__page",
+                            queryset=CoursePage.objects.prefetch_related(
+                                "topics",
+                                "topics__parent",
+                                "linked_instructors",
+                                "linked_instructors__linked_instructor_page",
+                            ),
+                        )
+                    )
                     .order_by("-id"),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),

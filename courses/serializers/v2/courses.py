@@ -64,7 +64,7 @@ class CoursesTopicFlattenedListSerializer(serializers.ListSerializer):
         return super().to_representation(
             [
                 *data,
-                *[topic.parent for topic in data],
+                *[topic.parent for topic in data if topic.parent is not None],
             ]
         )
 
@@ -92,7 +92,7 @@ class CourseSerializer(BaseCourseSerializer):
     next_run_id = serializers.SerializerMethodField()
     page = CoursePageSerializer(read_only=True, allow_null=True)
     programs = BaseProgramSerializer(many=True, read_only=True)
-    topics = CoursesTopicSerializer(source="page__topics", many=True, read_only=True)
+    topics = CoursesTopicSerializer(many=True, read_only=True)
     certificate_type = serializers.SerializerMethodField()
     certificate_available = serializers.SerializerMethodField()
     availability = serializers.SerializerMethodField()
