@@ -236,36 +236,35 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ["id", "live"]
 
     def get_queryset(self):
+        queryset = (
+            CourseRun.objects.select_related("course")
+            .prefetch_related(
+                "course__departments",
+                "course__page",
+                "course__page__linked_instructors",
+                "course__page__linked_instructors__linked_instructor_page",
+                Prefetch("enrollment_modes", to_attr="prefetched_enrollment_modes"),
+            )
+            .filter(live=True)
+        )
         relevant_to = self.request.query_params.get("relevant_to", None)
         if relevant_to:
             course = Course.objects.filter(readable_id=relevant_to).first()
             if course:
-                runs_qset = get_relevant_course_run_qset(course)
+                queryset = get_relevant_course_run_qset(
+                    queryset=queryset, course=course
+                )
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
-                runs_qset = (
-                    get_user_relevant_program_course_run_qset(program)
+                queryset = (
+                    get_user_relevant_program_course_run_qset(
+                        queryset=queryset, program=program
+                    )
                     if program
                     else CourseRun.objects.none()
                 )
-            return runs_qset.prefetch_related(
-                Prefetch(
-                    "enrollment_modes",
-                    to_attr="prefetched_enrollment_modes",
-                )
-            )
-        else:
-            return (
-                CourseRun.objects.select_related("course")
-                .prefetch_related(
-                    "course__departments",
-                    "course__page",
-                    "course__page__linked_instructors",
-                    "course__page__linked_instructors__linked_instructor_page",
-                    Prefetch("enrollment_modes", to_attr="prefetched_enrollment_modes"),
-                )
-                .filter(live=True)
-            )
+
+        return queryset
 
     def get_serializer_context(self):
         added_context = {}
