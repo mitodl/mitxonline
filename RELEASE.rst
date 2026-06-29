@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 1.158.4
+---------------
+
+- Expose redemption_status as an enum in the OpenAPI spec (#3708)
+- Move custom querysets/managers to be near model (#3707)
+- Fix pytest config so you can run 'pytest -h' (#3699)
+- Add test send email endpoint, refactor email sending task slightly (#3701)
+- Finalize Email Template for Code assignment (#3694)
+- Add clone_courserun retry for failed edx courserun creation (#3700)
+
 Version 1.158.3 (Released June 25, 2026)
 ---------------
 
