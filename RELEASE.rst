@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.158.4
+Version 1.158.4 (Released June 29, 2026)
 ---------------
 
 - Expose redemption_status as an enum in the OpenAPI spec (#3708)
