@@ -34,6 +34,7 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
+from cms.models import CoursePage
 from courses.models import (
     Course,
     CourseRun,
@@ -280,15 +281,24 @@ def _create_basket_from_product(
         return redirect("checkout_interstitial_page")
 
     basket = Basket.objects.prefetch_related(
+        "basket_items__product",
         GenericPrefetch(
-            "basket_items__product",
+            "basket_items__product__purchasable_object",
             [
+                ProgramRun.objects.all(),
                 CourseRun.objects.prefetch_related(
-                    "course__page__linked_instructors",
-                    "course__page__linked_instructors__linked_instructor_page",
+                    Prefetch(
+                        "course__page",
+                        queryset=CoursePage.objects.prefetch_related(
+                            "topics",
+                            "topics__parent",
+                            "linked_instructors",
+                            "linked_instructors__linked_instructor_page",
+                        ),
+                    )
                 ),
             ],
-        )
+        ),
     ).get(id=basket.id)
 
     return Response(
