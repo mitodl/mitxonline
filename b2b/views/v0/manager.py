@@ -4,8 +4,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 
-from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -15,12 +14,15 @@ from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status as http_status
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
+    REDEMPTION_STATUS_ASSIGNED,
+    REDEMPTION_STATUS_REDEEMED,
     ContractPage,
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
@@ -46,10 +48,16 @@ from b2b.tasks import (
     queue_send_enrollment_code_assignment_email,
     queue_send_test_enrollment_code_assignment_email,
 )
+from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Discount
 
 log = logging.getLogger(__name__)
+
+
+class ManagerContractOrgPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
 
 
 @dataclass
@@ -59,12 +67,6 @@ class CodeAssignment:
     email: str
     name: str
     code: str
-
-
-def is_redeemed_attachment_record(
-    assignment_record: DiscountContractAttachmentRedemption,
-) -> bool:
-    return assignment_record.user or assignment_record.redeemed_on
 
 
 def assign_codes_and_send_emails(
@@ -110,6 +112,7 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
 
     permission_classes = [IsAuthenticated]
     serializer_class = OrganizationPageSerializer
+    pagination_class = ManagerContractOrgPagination
 
     def get_queryset(self):
         """Filter to organizations where the user is a manager."""
@@ -185,26 +188,16 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """List an organization's contracts."""
 
     permission_classes = [IsAuthenticated, IsOrganizationManager]
+    # While we define this at the class level, we pretty much have to do the pagination manually in view defintions for anything that matters
+    # The queryset we return is for ContractPages - course_run_enrollments and codes lookups are performed almost entirely in view
+    # The result is that we need to call paginate_queryset and get_paginated_response manually since DRF doesn't know how to do it.
+    pagination_class = ManagerContractOrgPagination
 
     def get_queryset(self):
         """Get the queryset; add some annotations/etc for computed fields"""
-        courserun_content_type = ContentType.objects.get_for_model(CourseRun)
-        return (
+        qs = (
             ContractPage.objects.select_related("organization")
             .prefetch_related("users")
-            .annotate(
-                discount_count=Count(
-                    Subquery(
-                        Discount.objects.filter(
-                            products__product__is_active=True,
-                            products__product__content_type=courserun_content_type,
-                            products__product__object_id__in=CourseRun.objects.filter(
-                                b2b_contract=OuterRef("pk")
-                            ).all(),
-                        ).values("id")
-                    )
-                )
-            )
             .annotate(
                 enrollment_count=Count(
                     "course_runs__enrollments",
@@ -217,6 +210,17 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 organization__organization_users__is_manager=True,
             )
         )
+        if self.action == "retrieve":
+            qs = qs.prefetch_related(
+                Prefetch(
+                    "code_redemptions",
+                    queryset=DiscountContractAttachmentRedemption.objects.only(
+                        "id", "contract_id", "redeemed_on", "user_id"
+                    ),
+                    to_attr="prefetched_code_redemptions",
+                )
+            )
+        return qs
 
     def get_serializer_class(self):
         """Use different serializers for list vs detail views."""
@@ -236,9 +240,12 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         GET /api/v0/b2b/orgs/{org_id}/manager/contracts/{contract_id}/course_runs/
         """
         contract = self.get_object()
-        course_runs = contract.get_course_runs()
-        serializer = ManagerCourseRunSerializer(course_runs, many=True)
-        return Response(serializer.data)
+        course_runs = contract.get_course_runs().order_by("id")
+        return self.get_paginated_response(
+            ManagerCourseRunSerializer(
+                self.paginate_queryset(course_runs), many=True
+            ).data
+        )
 
     @extend_schema(
         responses=ManagerEnrollmentSerializer(many=True),
@@ -274,12 +281,32 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             .order_by("-created_on")
         )
 
-        serializer = ManagerEnrollmentSerializer(enrollments, many=True)
-        return Response(serializer.data)
+        return self.get_paginated_response(
+            ManagerEnrollmentSerializer(
+                self.paginate_queryset(enrollments), many=True
+            ).data
+        )
 
     @extend_schema(
         responses=ManagerEnrollmentCodeSerializer(many=True),
         description="List enrollment codes for a contract. Only shows codes for contracts that require them (non-auto membership types). Logic varies based on whether contract has learner limits.",
+        parameters=[
+            OpenApiParameter(
+                name="search_term",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter codes by assigned email, user email, user name, or assigned name.",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter codes by status. Supported values are assigned and redeemed.",
+                required=False,
+                enum=[REDEMPTION_STATUS_ASSIGNED, REDEMPTION_STATUS_REDEEMED],
+            ),
+        ],
     )
     @action(detail=True, methods=["get"])
     def codes(self, request, **kwargs):  # noqa: ARG002
@@ -291,61 +318,83 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         """
         contract = self.get_object()
+        search_term = request.query_params.get("search_term", "").strip()
+        status_filter = request.query_params.get("status", "").strip()
 
         """
         There are three main cases:
         - If the contract has an auto membership type, no codes are needed, so we return an empty list.
         - If the contract does not have a learner limit, we show the first code only.
           We don't show individual redemptions because this case is unlikely to be a useful setup for contracts
-        - If the contract has a learner limit, we show all redeemed and assigned codes, plus enough unredeemed codes to fill the remaining seats.
-          This ensures that managers can see all the codes that are currently in use, while also seeing some of the unused codes that are available to be redeemed.
+        - If the contract has a learner limit, we show all redeemed and assigned codes.
+          This ensures that managers can see all the codes that are currently in use.
         """
 
         # Skip if contract has auto membership type (no codes needed)
         if contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS:
-            return Response([])
-
-        discounts = contract.get_discounts().prefetch_related(
-            Prefetch(
+            codes_for_output = []
+        else:
+            prefetch = Prefetch(
                 "contract_redemptions",
                 queryset=DiscountContractAttachmentRedemption.objects.select_related(
                     "user"
                 ).order_by("-created_on")[:1],
                 to_attr="prefetched_redemptions",
             )
+
+            if search_term or status_filter:
+                # This filter is slightly complicated because we only want to filter on the latest redemption per discount
+                # In practice, we only expect 1 redemption per code for well-formed contracts,
+                # but that's not enforced at the DB so we need to be a bit clever.
+                latest_redemption_ids = (
+                    DiscountContractAttachmentRedemption.objects.order_by(
+                        "discount_id", "-created_on"
+                    )
+                    .distinct("discount_id")
+                    .values("pk")
+                )
+                filter_q = Q(contract_redemptions__pk__in=latest_redemption_ids)
+                if search_term:
+                    filter_q &= (
+                        Q(contract_redemptions__assigned_email__icontains=search_term)
+                        | Q(contract_redemptions__user__email__icontains=search_term)
+                        | Q(contract_redemptions__user__name__icontains=search_term)
+                        | Q(contract_redemptions__assigned_name__icontains=search_term)
+                    )
+                if status_filter == REDEMPTION_STATUS_REDEEMED:
+                    filter_q &= Q(contract_redemptions__user__isnull=False) | Q(
+                        contract_redemptions__redeemed_on__isnull=False
+                    )
+                elif status_filter == REDEMPTION_STATUS_ASSIGNED:
+                    filter_q &= Q(contract_redemptions__user__isnull=True) & Q(
+                        contract_redemptions__redeemed_on__isnull=True
+                    )
+                discounts = (
+                    contract.get_discounts()
+                    .filter(filter_q)
+                    .distinct()
+                    .prefetch_related(prefetch)
+                )
+            else:
+                discounts = contract.get_discounts().prefetch_related(prefetch)
+
+            if not contract.max_learners:
+                # No learner limit - show first code only, if there is one
+                first = discounts.order_by("id").first()
+                codes_for_output = [first] if first is not None else []
+            else:
+                # Has learner limit - show redeemed codes + enough unused codes to fill remaining seats
+                discounts = discounts.annotate(
+                    num_redemptions=Count("contract_redemptions")
+                ).order_by("-num_redemptions", "id")
+
+                codes_for_output = discounts.filter(num_redemptions__gt=0).all()
+
+        return self.get_paginated_response(
+            ManagerEnrollmentCodeSerializer(
+                self.paginate_queryset(codes_for_output), many=True
+            ).data
         )
-
-        if not contract.max_learners:
-            # No learner limit - show first code only, if there is one
-            return Response(
-                ManagerEnrollmentCodeSerializer(
-                    [discounts.order_by("id").first()],
-                    many=True,
-                ).data
-            )
-
-        else:
-            # Has learner limit - show redeemed codes + enough unused codes to fill remaining seats
-            discounts = discounts.annotate(
-                num_redemptions=Count("contract_redemptions")
-            ).order_by("-num_redemptions", "id")
-
-            codes_for_output = discounts.filter(num_redemptions__gt=0).all()
-
-            # The point of this is to ensure we always get _all_ the redeemed
-            # codes, and then some unredeemed ones if there's space allowed.
-            # I didn't want to just call all() and grab a slice because we might
-            # have _more_ redemptions that we technically allow (if, say, we
-            # adjust the limit down or manually create some redemptions or
-            # something).
-
-            if codes_for_output.count() < contract.max_learners:
-                # We have seats available, so grab some more codes.
-                codes_for_output = discounts.all()[: contract.max_learners]
-
-            return Response(
-                ManagerEnrollmentCodeSerializer(codes_for_output, many=True).data
-            )
 
     @extend_schema(
         description="Assign an available enrollment code to an email address and send an invite email.",

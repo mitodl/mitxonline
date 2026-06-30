@@ -137,6 +137,11 @@ POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{i
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ added the new required request property `email` (media type: application/json)
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ api removed without deprecation
 POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ removed the request body
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
+GET /api/v0/b2b/manager/organizations/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
 Error: in API POST /api/v0/b2b/attach/{enrollment_code}/ removed the required property `items/integration_type` from the response with the `200` status
 Error: in API GET /api/v0/b2b/contracts/ removed the required property `items/integration_type` from the response with the `200` status
 Error: in API GET /api/v0/b2b/contracts/{contract_slug}/ removed the required property `integration_type` from the response with the `200` status
@@ -160,3 +165,8 @@ Error: in API GET /api/v0/users/current_user/ removed the required property `b2b
 Error: in API PATCH /api/v0/users/current_user/ removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
 Error: in API GET /api/v0/users/me removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
 Error: in API PATCH /api/v0/users/me removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+GET /api/v0/b2b/manager/organizations/ the response's body `type` changed from `array<object>` to `object` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/ the response's body `type` changed from `array<object>` to `object` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/ the response's body `type` changed from `array<object>` to `object` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/ the response's body `type` changed from `array<object>` to `object` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body `type` changed from `array<object>` to `object` for status `200`
