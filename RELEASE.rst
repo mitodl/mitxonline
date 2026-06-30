@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.158.6
+Version 1.158.6 (Released June 30, 2026)
 ---------------
 
 - Fix typo in migration that removes the non-sso type (#3715)
