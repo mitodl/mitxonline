@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.158.5
+---------------
+
+- Remove integration-specific options from contracts (#3704)
+- Use more realistic URL in test send email task (#3710)
+
 Version 1.158.4 (Released June 29, 2026)
 ---------------
 
