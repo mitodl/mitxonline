@@ -3326,12 +3326,13 @@ def test_program_certificate_verifiable_credentials_signing_payload(
     assert payload == expected_payload
 
 
+@pytest.mark.parametrize("product_name", ["", "   "])
 @patch("courses.api.ProgramEnrollment.all_objects.get")
 @patch("courses.api.get_thumbnail_url")
 def test_program_verifiable_credential_name_falls_back_to_program_title(
-    mock_get_thumbnail_url, mock_enrollment_get, settings, mocker
+    mock_get_thumbnail_url, mock_enrollment_get, product_name, settings, mocker
 ):
-    """The VC name falls back to the program title when product_name is empty."""
+    """The VC name falls back to the program title when product_name is blank."""
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
     mocker.patch("hubspot_sync.api.upsert_custom_properties")
 
@@ -3350,7 +3351,7 @@ def test_program_verifiable_credential_name_falls_back_to_program_title(
 
     mock_certificate_page = Mock()
     mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
-    mock_certificate_page.product_name = ""
+    mock_certificate_page.product_name = product_name
 
     payload = get_verifiable_credentials_payload(program_cert, mock_certificate_page)
 
