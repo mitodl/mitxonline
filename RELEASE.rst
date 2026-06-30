@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.158.7
+Version 1.158.7 (Released June 30, 2026)
 ---------------
 
 - Paginate /codes endpoint (#3685)
