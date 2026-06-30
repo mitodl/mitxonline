@@ -1676,10 +1676,6 @@ def get_verifiable_credentials_payload(
         program = certificate.program
         program_page = program.page
         url = f"https://{learn_hostname}/programs/{program.readable_id}"
-        # Prefer the CMS "Certificate Title" (product_name) so the verifiable
-        # credential carries the same name shown on the certificate, falling back
-        # to the program title when it is blank. Trim so it matches the frontend
-        # (getCertificateTitle), which also falls back on whitespace-only titles.
         certificate_name = (
             certificate_page.product_name or ""
         ).strip() or certificate.program.title
