@@ -1,20 +1,25 @@
 """Project conftest"""
 
 import uuid
+from pathlib import Path
 
 import pytest
 from faker import Faker
 from hubspot.crm.objects import SimplePublicObject
 
-from fixtures.b2b import *  # noqa: F403
-from fixtures.common import *  # noqa: F403
-from hubspot_sync.conftest import FAKE_HUBSPOT_ID
-from main import features
+# auto load in fixtures
+pytest_plugins = [
+    str(fixture).replace("/", ".").replace(".py", "")
+    for fixture in Path().glob("fixtures/*.py")
+    if fixture.name != "__init__.py"
+]
 
 
 @pytest.fixture(autouse=True)
 def default_settings(monkeypatch, settings):
     """Set default settings for all tests"""
+    from main import features  # noqa: PLC0415
+
     monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "main.settings")
 
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
@@ -43,6 +48,8 @@ def payment_gateway_settings(settings):
 @pytest.fixture(autouse=True)
 def mock_hubspot_api(mocker):
     """Mock the Hubspot CRM API"""
+    from hubspot_sync.conftest import FAKE_HUBSPOT_ID  # noqa: PLC0415
+
     mock_api = mocker.patch("mitol.hubspot_api.api.HubspotApi")
     mock_api.return_value.crm.objects.basic_api.create.return_value = (
         SimplePublicObject(id=FAKE_HUBSPOT_ID)

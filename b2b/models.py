@@ -24,7 +24,6 @@ from wagtail.models import ClusterableModel, Orderable, Page
 
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_AUTOS,
-    CONTRACT_MEMBERSHIP_CHOICES,
     CONTRACT_MEMBERSHIP_MANAGED,
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
     ORG_INDEX_SLUG,
@@ -38,6 +37,11 @@ log = logging.getLogger(__name__)
 REDEMPTION_STATUS_UNASSIGNED = "unassigned"
 REDEMPTION_STATUS_ASSIGNED = "assigned"
 REDEMPTION_STATUS_REDEEMED = "redeemed"
+REDEMPTION_STATUSES = (
+    REDEMPTION_STATUS_UNASSIGNED,
+    REDEMPTION_STATUS_ASSIGNED,
+    REDEMPTION_STATUS_REDEEMED,
+)
 
 
 class OrganizationObjectIndexPage(Page):
@@ -173,7 +177,7 @@ class OrganizationPage(Page):
         """
 
         contracts_qs = self.contracts.filter(
-            integration_type__in=CONTRACT_MEMBERSHIP_AUTOS, active=True
+            membership_type__in=CONTRACT_MEMBERSHIP_AUTOS, active=True
         )
 
         for contract in contracts_qs.all():
@@ -194,7 +198,7 @@ class OrganizationPage(Page):
         return user.b2b_contracts.through.objects.filter(
             user_id=user.id,
             contractpage_id__in=self.contracts.filter(
-                integration_type__in=CONTRACT_MEMBERSHIP_AUTOS
+                membership_type__in=CONTRACT_MEMBERSHIP_AUTOS
             ).values_list("id", flat=True),
         ).delete()
 
@@ -324,13 +328,6 @@ class ContractPage(Page, ClusterableModel):
     welcome_message_extra = RichTextField(
         blank=True, help_text="Additional welcome message content for learners."
     )
-    integration_type = models.CharField(
-        max_length=255,
-        choices=CONTRACT_MEMBERSHIP_CHOICES,
-        help_text="The type of integration for this contract.",
-    )
-    # This doesn't have a choices setting because you can't re-use a constant.
-    #
     membership_type = models.CharField(
         max_length=255,
         choices=CONTRACT_MEMBERSHIP_TYPE_CHOICES,
@@ -428,7 +425,6 @@ class ContractPage(Page, ClusterableModel):
         ),
         MultiFieldPanel(
             [
-                FieldPanel("integration_type"),
                 FieldPanel("membership_type"),
                 FieldPanel("max_learners"),
                 FieldPanel("enrollment_fixed_price"),
@@ -476,10 +472,6 @@ class ContractPage(Page, ClusterableModel):
         """Save the page, and update the slug and title appropriately."""
 
         self.title = str(self.name)
-
-        # This should be removed once we're done migrating orgs into Keycloak.
-        # The integration type field should also be removed at that time.
-        self.membership_type = self.integration_type
 
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
 

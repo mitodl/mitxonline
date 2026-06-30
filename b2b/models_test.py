@@ -116,12 +116,10 @@ def test_remove_user_contracts_only_affects_specified_user():
     contract1 = ContractPageFactory.create(
         organization=organization,
         membership_type="auto",
-        integration_type="auto",
     )
     contract2 = ContractPageFactory.create(
         organization=organization,
         membership_type="managed",
-        integration_type="managed",
     )
 
     # Create two users and add them both to the contracts
@@ -159,32 +157,23 @@ def test_remove_user_contracts_only_removes_managed_contracts():
     auto_contract = ContractPageFactory.create(
         organization=organization,
         membership_type="auto",
-        integration_type="auto",
     )
     managed_contract = ContractPageFactory.create(
         organization=organization,
         membership_type="managed",
-        integration_type="managed",
     )
-    sso_contract = ContractPageFactory.create(
-        organization=organization,
-        membership_type="sso",
-        integration_type="sso",
-    )
-
     # Non-managed contract (should NOT be removed)
     code_contract = ContractPageFactory.create(
         organization=organization,
         membership_type="code",
-        integration_type="code",
     )
 
     # Create a user and add all contracts
     user = UserFactory.create()
-    user.b2b_contracts.add(auto_contract, managed_contract, sso_contract, code_contract)
+    user.b2b_contracts.add(auto_contract, managed_contract, code_contract)
 
     # Verify user has all 4 contracts
-    assert user.b2b_contracts.count() == 4
+    assert user.b2b_contracts.count() == 3
 
     # Remove managed contracts from user
     organization.remove_user_contracts(user)
@@ -194,7 +183,6 @@ def test_remove_user_contracts_only_removes_managed_contracts():
     assert user.b2b_contracts.count() == 1
     assert not user.b2b_contracts.filter(id=auto_contract.id).exists()
     assert not user.b2b_contracts.filter(id=managed_contract.id).exists()
-    assert not user.b2b_contracts.filter(id=sso_contract.id).exists()
     assert user.b2b_contracts.filter(id=code_contract.id).exists()
 
 
@@ -202,7 +190,6 @@ def test_get_unused_discounts(user):
     """Test that get_unused_discounts doesn't include invalid discounts"""
 
     contract = ContractPageFactory.create(
-        integration_type=CONTRACT_MEMBERSHIP_CODE,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=10,
     )

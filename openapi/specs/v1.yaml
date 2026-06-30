@@ -4827,18 +4827,6 @@ components:
           type: string
           readOnly: true
           description: Additional welcome message content for learners.
-        integration_type:
-          allOf:
-          - $ref: '#/components/schemas/IntegrationTypeEnum'
-          readOnly: true
-          description: |-
-            The type of integration for this contract.
-
-            * `sso` - SSO
-            * `non-sso` - Non-SSO
-            * `managed` - Managed
-            * `code` - Enrollment Code
-            * `auto` - Auto Enrollment
         programs:
           type: array
           items:
@@ -4854,7 +4842,6 @@ components:
       - contract_start
       - description
       - id
-      - integration_type
       - membership_type
       - name
       - organization
@@ -6735,26 +6722,6 @@ components:
       - key
       - text
       - title
-    IntegrationTypeEnum:
-      enum:
-      - sso
-      - non-sso
-      - managed
-      - code
-      - auto
-      type: string
-      description: |-
-        * `sso` - SSO
-        * `non-sso` - Non-SSO
-        * `managed` - Managed
-        * `code` - Enrollment Code
-        * `auto` - Auto Enrollment
-      x-enum-descriptions:
-      - SSO
-      - Non-SSO
-      - Managed
-      - Enrollment Code
-      - Auto Enrollment
     LanguageEnum:
       enum:
       - af_ZA
@@ -7052,18 +7019,6 @@ components:
           type: string
           readOnly: true
           description: Additional welcome message content for learners.
-        integration_type:
-          allOf:
-          - $ref: '#/components/schemas/IntegrationTypeEnum'
-          readOnly: true
-          description: |-
-            The type of integration for this contract.
-
-            * `sso` - SSO
-            * `non-sso` - Non-SSO
-            * `managed` - Managed
-            * `code` - Enrollment Code
-            * `auto` - Auto Enrollment
         programs:
           type: array
           items:
@@ -7104,7 +7059,6 @@ components:
       - contract_start
       - description
       - id
-      - integration_type
       - membership_type
       - name
       - organization
@@ -7199,13 +7153,8 @@ components:
         code:
           type: string
         redemption_status:
-          type: string
-          description: |-
-            Return the redemption status of this code.
-
-            - "unassigned": no DiscountContractAttachmentRedemption record exists
-            - "assigned": a record exists but the code has not been claimed yet
-            - "redeemed": the code has been claimed
+          allOf:
+          - $ref: '#/components/schemas/RedemptionStatusEnum'
           readOnly: true
         assigned_to:
           type: string
@@ -8738,6 +8687,20 @@ components:
           readOnly: true
       required:
       - redeemed_discount
+    RedemptionStatusEnum:
+      enum:
+      - unassigned
+      - assigned
+      - redeemed
+      type: string
+      description: |-
+        * `unassigned` - unassigned
+        * `assigned` - assigned
+        * `redeemed` - redeemed
+      x-enum-descriptions:
+      - unassigned
+      - assigned
+      - redeemed
     RedemptionTypeEnum:
       enum:
       - one-time

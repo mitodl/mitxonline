@@ -14,8 +14,7 @@ from rest_framework.test import APIClient
 from b2b.api import create_contract_run, ensure_enrollment_codes_exist
 from b2b.constants import (
     CONTRACT_MEMBERSHIP_CODE,
-    CONTRACT_MEMBERSHIP_NONSSO,
-    CONTRACT_MEMBERSHIP_SSO,
+    CONTRACT_MEMBERSHIP_MANAGED,
 )
 from b2b.factories import ContractPageFactory
 from b2b.models import DiscountContractAttachmentRedemption, UserOrganization
@@ -94,8 +93,7 @@ def test_b2b_contract_attachment(mocker, max_learners, code_used, contract_activ
     user = UserFactory.create()
 
     contract = ContractPageFactory.create(
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=max_learners,
     )
 
@@ -168,8 +166,7 @@ def test_b2b_contract_attachment_response_excludes_unrelated_contracts(mocker):
     user.b2b_contracts.add(unrelated_contract)
 
     contract = ContractPageFactory.create(
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
     courserun = CourseRunFactory.create(b2b_contract=contract)
     ProductFactory.create(purchasable_object=courserun)
@@ -203,8 +200,7 @@ def test_b2b_contract_attachment_returns_matching_contract_when_already_attached
     user.b2b_contracts.add(unrelated_contract)
 
     contract = ContractPageFactory.create(
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
     )
     courserun = CourseRunFactory.create(b2b_contract=contract)
     ProductFactory.create(purchasable_object=courserun)
@@ -238,8 +234,7 @@ def test_b2b_contract_attachment_invalid_code_dates(user, bad_start_or_end):
     """Test that the attachment fails properly if the code has invalid dates."""
 
     contract = ContractPageFactory.create(
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=1,
     )
 
@@ -294,8 +289,7 @@ def test_b2b_contract_attachment_invalid_contract_dates(user, bad_start_or_end):
     """Test that the attachment fails properly if the contract has invalid dates."""
 
     contract = ContractPageFactory.create(
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=1,
     )
 
@@ -347,8 +341,7 @@ def test_b2b_contract_attachment_full_contract(mocker):
     )
 
     contract = ContractPageFactory.create(
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=1,
     )
 
@@ -396,8 +389,7 @@ def test_b2b_contract_attachment_full_contract_with_used_code(mocker):
     )
 
     contract = ContractPageFactory.create(
-        membership_type=CONTRACT_MEMBERSHIP_NONSSO,
-        integration_type=CONTRACT_MEMBERSHIP_NONSSO,
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=1,
     )
 
@@ -465,8 +457,7 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
 
     contract = ContractPageFactory.create(
-        membership_type=CONTRACT_MEMBERSHIP_SSO,
-        integration_type=CONTRACT_MEMBERSHIP_SSO,
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
         enrollment_fixed_price=100 if has_price else 0,
     )
     source_courserun = CourseRunFactory.create(
@@ -551,7 +542,6 @@ def test_preassigned_code_can_be_redeemed(mocker):
     learner = UserFactory.create()
 
     contract = ContractPageFactory.create(
-        integration_type=CONTRACT_MEMBERSHIP_CODE,
         membership_type=CONTRACT_MEMBERSHIP_CODE,
         max_learners=20,
     )

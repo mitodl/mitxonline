@@ -1,3 +1,13 @@
+# Spec correction: `redemption_status` became a proper enum (RedemptionStatusEnum).
+# oasdiff reports a response property type change because the inline `type: string`
+# moved onto the referenced enum schema, but the set of values the API returns is
+# unchanged. This is a spec correction, not a behavioral breaking change.
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/ the `items/redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/bulk_assign/ the `assigned/items/redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+PUT /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/reassign/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+POST /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/remind/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
+DELETE /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/revoke/ the `redemption_status` response's property type/format changed from `string`/`` to ``/`` for status `200`
 # Spec corrections: these endpoints already returned null for `page` in practice.
 # The spec was updated to reflect actual behavior, not a behavioral breaking change.
 GET /api/v2/course_certificates/{cert_uuid}/ the response property `course_run/course/allOf[#/components/schemas/V2Course]/page` became nullable for the status `200`
@@ -132,3 +142,26 @@ GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
 GET /api/v0/b2b/manager/organizations/ the response's body type/format changed from `array`/`` to `object`/`` for status `200`
+Error: in API POST /api/v0/b2b/attach/{enrollment_code}/ removed the required property `items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/contracts/ removed the required property `items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/contracts/{contract_slug}/ removed the required property `integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/manager/organizations/ removed the required property `items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/manager/organizations/{id}/ removed the required property `contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ removed the required property `integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/organizations/ removed the required property `items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/b2b/organizations/{organization_slug}/ removed the required property `contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/discounts/{parent_lookup_discount}/assignees/ removed the required property `results/items/user/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API POST /api/v0/discounts/{parent_lookup_discount}/assignees/ removed the required property `user/b2b_organizations/items/contracts/items/integration_type` from the response with the `201` status
+Error: in API GET /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property `user/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PATCH /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property `user/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PUT /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ removed the required property `user/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ removed the required property `results/items/redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ removed the required property `redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `201` status
+Error: in API GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property `redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property `redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ removed the required property `redeemed_by/b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/userinfo/ removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/users/current_user/ removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PATCH /api/v0/users/current_user/ removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API GET /api/v0/users/me removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status
+Error: in API PATCH /api/v0/users/me removed the required property `b2b_organizations/items/contracts/items/integration_type` from the response with the `200` status

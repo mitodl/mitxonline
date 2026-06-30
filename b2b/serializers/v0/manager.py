@@ -2,12 +2,14 @@
 
 from datetime import datetime
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from b2b.models import (
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
     REDEMPTION_STATUS_UNASSIGNED,
+    REDEMPTION_STATUSES,
     ContractPage,
 )
 from b2b.serializers.v0 import ContractPageSerializer
@@ -195,6 +197,7 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         redemptions = getattr(obj, "prefetched_redemptions", None)
         return redemptions[0] if redemptions else None
 
+    @extend_schema_field(serializers.ChoiceField(choices=REDEMPTION_STATUSES))
     def get_redemption_status(self, obj) -> str:
         """
         Return the redemption status of this code.

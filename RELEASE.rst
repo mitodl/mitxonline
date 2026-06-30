@@ -1,6 +1,23 @@
 Release Notes
 =============
 
+Version 1.158.6 (Released June 30, 2026)
+---------------
+
+- Fix typo in migration that removes the non-sso type (#3715)
+- Remove integration-specific options from contracts (#3704)
+- Use more realistic URL in test send email task (#3710)
+
+Version 1.158.4 (Released June 29, 2026)
+---------------
+
+- Expose redemption_status as an enum in the OpenAPI spec (#3708)
+- Move custom querysets/managers to be near model (#3707)
+- Fix pytest config so you can run 'pytest -h' (#3699)
+- Add test send email endpoint, refactor email sending task slightly (#3701)
+- Finalize Email Template for Code assignment (#3694)
+- Add clone_courserun retry for failed edx courserun creation (#3700)
+
 Version 1.158.3 (Released June 25, 2026)
 ---------------
 
