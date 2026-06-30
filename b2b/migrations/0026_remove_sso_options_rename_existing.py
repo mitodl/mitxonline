@@ -26,7 +26,7 @@ def reverse_func(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("b2b", "0024_discountcontractattachmentredemption_assigned_by_and_more"),
+        ("b2b", "0025_make_integration_type_nullable"),
     ]
 
     operations = [
