@@ -1781,8 +1781,11 @@ def get_verifiable_credentials_payload(
         url = get_learn_product_url("programs", program.readable_id)
         # Prefer the CMS "Certificate Title" (product_name) so the verifiable
         # credential carries the same name shown on the certificate, falling back
-        # to the program title when it is unset.
-        certificate_name = certificate_page.product_name or certificate.program.title
+        # to the program title when it is blank. Trim so it matches the frontend
+        # (getCertificateTitle), which also falls back on whitespace-only titles.
+        certificate_name = (
+            certificate_page.product_name or ""
+        ).strip() or certificate.program.title
         activity_start_date = ProgramEnrollment.all_objects.get(
             user_id=certificate.user_id, program=program
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
