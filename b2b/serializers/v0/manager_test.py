@@ -178,9 +178,7 @@ class TestManagerEnrollmentCodeSerializerRedeemed:
         data = _serialize(discount, [redemption])
         assert data["redemption_status"] == REDEMPTION_STATUS_REDEEMED
 
-    def test_redemption_status_redeemed_when_redeemed_on_set(
-        self, discount, contract
-    ):
+    def test_redemption_status_redeemed_when_redeemed_on_set(self, discount, contract):
         redemption = DiscountContractAttachmentRedemption.objects.create(
             discount=discount,
             contract=contract,
