@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.158.6 (Released June 30, 2026)
+---------------
+
+- Fix typo in migration that removes the non-sso type (#3715)
+- Remove integration-specific options from contracts (#3704)
+- Use more realistic URL in test send email task (#3710)
+
 Version 1.158.4 (Released June 29, 2026)
 ---------------
 

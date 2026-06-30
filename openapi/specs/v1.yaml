@@ -249,6 +249,19 @@ paths:
     get:
       operationId: b2b_manager_organizations_list
       description: List managed organizations
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - b2b
       responses:
@@ -256,9 +269,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OrganizationPage'
+                $ref: '#/components/schemas/PaginatedOrganizationPageList'
           description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/:
     get:
@@ -271,6 +282,18 @@ paths:
           type: integer
         description: ID of the contract
         required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - in: path
         name: parent_lookup_organization
         schema:
@@ -284,9 +307,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/BaseContractPage'
+                $ref: '#/components/schemas/PaginatedBaseContractPageList'
           description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/:
     get:
@@ -327,12 +348,38 @@ paths:
           type: integer
         description: ID of the contract
         required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - in: path
         name: parent_lookup_organization
         schema:
           type: integer
         description: ID of the parent organization
         required: true
+      - in: query
+        name: search_term
+        schema:
+          type: string
+        description: Filter codes by assigned email, user email, user name, or assigned
+          name.
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - assigned
+          - redeemed
+        description: Filter codes by status. Supported values are assigned and redeemed.
       tags:
       - b2b
       responses:
@@ -340,9 +387,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ManagerEnrollmentCode'
+                $ref: '#/components/schemas/PaginatedManagerEnrollmentCodeList'
           description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/{code}/assign/:
     post:
@@ -669,6 +714,18 @@ paths:
           type: integer
         description: ID of the contract
         required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - in: path
         name: parent_lookup_organization
         schema:
@@ -682,9 +739,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ManagerCourseRun'
+                $ref: '#/components/schemas/PaginatedManagerCourseRunList'
           description: ''
   /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/:
     get:
@@ -703,6 +758,18 @@ paths:
           type: integer
         description: ID of the contract
         required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - in: path
         name: parent_lookup_organization
         schema:
@@ -716,9 +783,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ManagerEnrollment'
+                $ref: '#/components/schemas/PaginatedManagerEnrollmentList'
           description: ''
   /api/v0/b2b/manager/organizations/{id}/:
     get:
@@ -6977,9 +7042,18 @@ components:
           readOnly: true
         total_codes:
           type: integer
-          description: Get total number of discount codes for this contract.
+          readOnly: true
+        assigned_codes:
+          type: integer
+          readOnly: true
+        unassigned_codes:
+          type: integer
+          readOnly: true
+        redeemed_codes:
+          type: integer
           readOnly: true
       required:
+      - assigned_codes
       - attachment_percentage
       - contract_end
       - contract_start
@@ -6989,9 +7063,11 @@ components:
       - name
       - organization
       - programs
+      - redeemed_codes
       - slug
       - total_codes
       - total_enrollments
+      - unassigned_codes
       - variant_options
       - welcome_message
       - welcome_message_extra
@@ -7567,6 +7643,29 @@ components:
       - show_in_menus
       - slug
       - type
+    PaginatedBaseContractPageList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BaseContractPage'
     PaginatedCourseWithCourseRunsSerializerV2List:
       type: object
       required:
@@ -7659,6 +7758,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FlexiblePriceTier'
+    PaginatedManagerCourseRunList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagerCourseRun'
+    PaginatedManagerEnrollmentCodeList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagerEnrollmentCode'
+    PaginatedManagerEnrollmentList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagerEnrollment'
     PaginatedOrderHistoryList:
       type: object
       required:
@@ -7682,6 +7850,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderHistory'
+    PaginatedOrganizationPageList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationPage'
     PaginatedProductList:
       type: object
       required:

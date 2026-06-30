@@ -12,7 +12,7 @@ def forwards_func(apps, schema_editor):
         models.Q(integration_type="sso") | models.Q(membership_type="sso")
     ).update(membership_type="managed")
     ContractPage.objects.filter(
-        models.Q(integration_type="nonsso") | models.Q(membership_type="nonsso")
+        models.Q(integration_type="non-sso") | models.Q(membership_type="non-sso")
     ).update(membership_type="code")
 
 
@@ -26,7 +26,7 @@ def reverse_func(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("b2b", "0024_discountcontractattachmentredemption_assigned_by_and_more"),
+        ("b2b", "0025_make_integration_type_nullable"),
     ]
 
     operations = [
