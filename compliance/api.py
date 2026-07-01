@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -135,6 +136,24 @@ def _build_export_payload(user) -> Any:
     )
 
 
+def _remove_none_values(value: Any) -> Any:
+    """Recursively remove None values from SDK payload data."""
+    if isinstance(value, dict):
+        return {
+            key: _remove_none_values(item)
+            for key, item in value.items()
+            if item is not None
+        }
+    if isinstance(value, list):
+        return [_remove_none_values(item) for item in value if item is not None]
+    return value
+
+
+def _serialize_export_payload(payload: Any) -> str:
+    """Serialize a CyberSource payload to the JSON string expected by this SDK build."""
+    return json.dumps(_remove_none_values(payload.to_dict()))
+
+
 def get_cybersource_client():
     """Create an authenticated REST client for CyberSource export checks."""
     _require_cybersource_sdk()
@@ -155,7 +174,7 @@ def _get_reason_code(response) -> str | None:
 def verify_user_with_exports(user) -> ExportComplianceResult:
     """Verify a user against CyberSource export compliance services."""
     client = get_cybersource_client()
-    payload = _build_export_payload(user)
+    payload = _serialize_export_payload(_build_export_payload(user))
 
     log.info("Running CyberSource export compliance check for user=%s", user.id)
     response = client.validate_export_compliance(payload)

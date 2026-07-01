@@ -1,5 +1,6 @@
 """Tests for compliance API helpers."""
 
+import json
 import uuid
 from types import SimpleNamespace
 
@@ -110,3 +111,7 @@ def test_verify_user_with_exports_calls_validate_export_compliance(
     assert result.reason_code == "MATCH-BCO"
     assert result.request_id == "abc123"
     mock_client.validate_export_compliance.assert_called_once()
+    payload = json.loads(mock_client.validate_export_compliance.call_args.args[0])
+    assert payload["order_information"]["bill_to"]["email"] == "ada@example.com"
+    assert payload["order_information"]["bill_to"]["country"] == "US"
+    assert payload["client_reference_information"].get("partner") is None
