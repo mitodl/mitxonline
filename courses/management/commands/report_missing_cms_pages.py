@@ -20,16 +20,19 @@ class Command(BaseCommand):
         parser.add_argument(
             "--live",
             action="store_true",
+            default=False,
             help="Only include live courses/programs in the report.",
         )
         parser.add_argument(
             "--details",
             action="store_true",
+            default=False,
             help="Print detailed rows for each missing item.",
         )
         parser.add_argument(
             "--eligible-users-only",
             action="store_true",
+            default=False,
             help=(
                 "Only include courses/programs where at least one user is eligible "
                 "for certificates."
