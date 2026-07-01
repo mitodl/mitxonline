@@ -11,6 +11,30 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 
+try:
+    from CyberSource.api.verification_api import VerificationApi
+    from CyberSource.models.riskv1exportcomplianceinquiries_order_information import (
+        Riskv1exportcomplianceinquiriesOrderInformation,
+    )
+    from CyberSource.models.riskv1exportcomplianceinquiries_order_information_bill_to import (
+        Riskv1exportcomplianceinquiriesOrderInformationBillTo,
+    )
+    from CyberSource.models.riskv1liststypeentries_client_reference_information import (
+        Riskv1liststypeentriesClientReferenceInformation,
+    )
+    from CyberSource.models.validate_export_compliance_request import (
+        ValidateExportComplianceRequest,
+    )
+except ModuleNotFoundError as exc:
+    VerificationApi = None
+    Riskv1exportcomplianceinquiriesOrderInformation = None
+    Riskv1exportcomplianceinquiriesOrderInformationBillTo = None
+    Riskv1liststypeentriesClientReferenceInformation = None
+    ValidateExportComplianceRequest = None
+    _CYBERSOURCE_IMPORT_ERROR = exc
+else:
+    _CYBERSOURCE_IMPORT_ERROR = None
+
 log = logging.getLogger(__name__)
 
 
@@ -52,23 +76,9 @@ def _require_setting(name: str) -> str:
 @lru_cache(maxsize=1)
 def _load_cybersource_sdk() -> _CyberSourceSdk:
     """Load the official CyberSource REST SDK classes used by this module."""
-    try:
-        from CyberSource.api.verification_api import VerificationApi
-        from CyberSource.models.riskv1exportcomplianceinquiries_order_information import (
-            Riskv1exportcomplianceinquiriesOrderInformation,
-        )
-        from CyberSource.models.riskv1exportcomplianceinquiries_order_information_bill_to import (
-            Riskv1exportcomplianceinquiriesOrderInformationBillTo,
-        )
-        from CyberSource.models.riskv1liststypeentries_client_reference_information import (
-            Riskv1liststypeentriesClientReferenceInformation,
-        )
-        from CyberSource.models.validate_export_compliance_request import (
-            ValidateExportComplianceRequest,
-        )
-    except ModuleNotFoundError as exc:
+    if _CYBERSOURCE_IMPORT_ERROR is not None:
         message = "CyberSource SDK must be installed to use export compliance checks"
-        raise ImproperlyConfigured(message) from exc
+        raise ImproperlyConfigured(message) from _CYBERSOURCE_IMPORT_ERROR
 
     return _CyberSourceSdk(
         verification_api_class=VerificationApi,
