@@ -2,40 +2,33 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Any
 from uuid import uuid4
 
+from CyberSource.api.verification_api import VerificationApi
+from CyberSource.models.riskv1exportcomplianceinquiries_order_information import (
+    Riskv1exportcomplianceinquiriesOrderInformation,
+)
+from CyberSource.models.riskv1exportcomplianceinquiries_order_information_bill_to import (
+    Riskv1exportcomplianceinquiriesOrderInformationBillTo,
+)
+from CyberSource.models.riskv1liststypeentries_client_reference_information import (
+    Riskv1liststypeentriesClientReferenceInformation,
+)
+from CyberSource.models.validate_export_compliance_request import (
+    ValidateExportComplianceRequest,
+)
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 
-try:
-    from CyberSource.api.verification_api import VerificationApi
-    from CyberSource.models.riskv1exportcomplianceinquiries_order_information import (
-        Riskv1exportcomplianceinquiriesOrderInformation,
-    )
-    from CyberSource.models.riskv1exportcomplianceinquiries_order_information_bill_to import (
-        Riskv1exportcomplianceinquiriesOrderInformationBillTo,
-    )
-    from CyberSource.models.riskv1liststypeentries_client_reference_information import (
-        Riskv1liststypeentriesClientReferenceInformation,
-    )
-    from CyberSource.models.validate_export_compliance_request import (
-        ValidateExportComplianceRequest,
-    )
-except ModuleNotFoundError as exc:
-    VerificationApi = None
-    Riskv1exportcomplianceinquiriesOrderInformation = None
-    Riskv1exportcomplianceinquiriesOrderInformationBillTo = None
-    Riskv1liststypeentriesClientReferenceInformation = None
-    ValidateExportComplianceRequest = None
-    _CYBERSOURCE_IMPORT_ERROR = exc
-else:
-    _CYBERSOURCE_IMPORT_ERROR = None
+from compliance.exceptions import ExportComplianceDataError
 
 log = logging.getLogger(__name__)
+
+ISO_3166_2_PART_COUNT = 2
 
 
 @dataclass(frozen=True)
@@ -53,17 +46,6 @@ class ExportComplianceResult:
         return self.decision in {"ACCEPT", "COMPLETED"}
 
 
-@dataclass(frozen=True)
-class _CyberSourceSdk:
-    """Official CyberSource REST SDK classes used for export compliance."""
-
-    verification_api_class: Any
-    order_information_class: Any
-    bill_to_class: Any
-    client_reference_information_class: Any
-    validate_export_compliance_request_class: Any
-
-
 def _require_setting(name: str) -> str:
     """Return a non-empty setting value or raise an error."""
     value = getattr(settings, name, None)
@@ -71,22 +53,6 @@ def _require_setting(name: str) -> str:
         message = f"{name} must be configured for export checks"
         raise ImproperlyConfigured(message)
     return value
-
-
-@lru_cache(maxsize=1)
-def _load_cybersource_sdk() -> _CyberSourceSdk:
-    """Load the official CyberSource REST SDK classes used by this module."""
-    if _CYBERSOURCE_IMPORT_ERROR is not None:
-        message = "CyberSource SDK must be installed to use export compliance checks"
-        raise ImproperlyConfigured(message) from _CYBERSOURCE_IMPORT_ERROR
-
-    return _CyberSourceSdk(
-        verification_api_class=VerificationApi,
-        order_information_class=Riskv1exportcomplianceinquiriesOrderInformation,
-        bill_to_class=Riskv1exportcomplianceinquiriesOrderInformationBillTo,
-        client_reference_information_class=Riskv1liststypeentriesClientReferenceInformation,
-        validate_export_compliance_request_class=ValidateExportComplianceRequest,
-    )
 
 
 def _get_cybersource_configuration() -> dict[str, str | int]:
@@ -107,14 +73,6 @@ def _get_cybersource_configuration() -> dict[str, str | int]:
     }
 
 
-def _get_user_legal_address(user):
-    """Return the user's legal address if one exists."""
-    try:
-        return user.legal_address
-    except ObjectDoesNotExist:
-        return None
-
-
 def _split_user_name(user) -> tuple[str, str]:
     """Split a user's display name into first/last values."""
     full_name = (user.name or "").strip()
@@ -128,11 +86,53 @@ def _split_user_name(user) -> tuple[str, str]:
     return (name_parts[0], name_parts[1])
 
 
+def _normalize_administrative_area(
+    country: str | None, state: str | None
+) -> str | None:
+    """Normalize ISO-3166-2 style subdivision values for CyberSource bill-to data."""
+    if not state:
+        return None
+
+    normalized_country = (country or "").strip().upper()
+    normalized_state = state.strip()
+    subdivision_parts = normalized_state.split("-", maxsplit=1)
+
+    if (
+        normalized_country
+        and len(subdivision_parts) == ISO_3166_2_PART_COUNT
+        and subdivision_parts[0].upper() == normalized_country
+        and subdivision_parts[1]
+    ):
+        return subdivision_parts[1]
+
+    return normalized_state
+
+
+def _validate_bill_to_fields(user, bill_to: dict[str, str]) -> None:
+    """Raise a clear error when required CyberSource bill-to fields are missing."""
+    missing_fields = []
+
+    if not bill_to.get("first_name"):
+        missing_fields.append("first_name")
+    if not bill_to.get("last_name"):
+        missing_fields.append("last_name")
+
+    required_fields = ["address1", "locality", "country", "email"]
+    if bill_to.get("country") in {"US", "CA"}:
+        required_fields.extend(["administrative_area", "postal_code"])
+
+    missing_fields.extend(field for field in required_fields if not bill_to.get(field))
+
+    if missing_fields:
+        raise ExportComplianceDataError(user, missing_fields)
+
+
 def _build_export_payload(user) -> Any:
     """Build the CyberSource export compliance REST request payload."""
-    sdk = _load_cybersource_sdk()
-
-    legal_address = _get_user_legal_address(user)
+    try:
+        legal_address = user.legal_address
+    except ObjectDoesNotExist:
+        legal_address = None
     first_name, last_name = _split_user_name(user)
 
     bill_to = {
@@ -143,15 +143,28 @@ def _build_export_payload(user) -> Any:
 
     if legal_address and legal_address.country:
         bill_to["country"] = legal_address.country
+    if legal_address and legal_address.street_address_1:
+        bill_to["address1"] = legal_address.street_address_1
+    if legal_address and legal_address.street_address_2:
+        bill_to["address2"] = legal_address.street_address_2
+    if legal_address and legal_address.city:
+        bill_to["locality"] = legal_address.city
     if legal_address and legal_address.state:
-        bill_to["administrative_area"] = legal_address.state
+        bill_to["administrative_area"] = _normalize_administrative_area(
+            legal_address.country,
+            legal_address.state,
+        )
+    if legal_address and legal_address.postal_code:
+        bill_to["postal_code"] = legal_address.postal_code
 
-    return sdk.validate_export_compliance_request_class(
-        client_reference_information=sdk.client_reference_information_class(
+    _validate_bill_to_fields(user, bill_to)
+
+    return ValidateExportComplianceRequest(
+        client_reference_information=Riskv1liststypeentriesClientReferenceInformation(
             code=str(uuid4())
         ),
-        order_information=sdk.order_information_class(
-            bill_to=sdk.bill_to_class(
+        order_information=Riskv1exportcomplianceinquiriesOrderInformation(
+            bill_to=Riskv1exportcomplianceinquiriesOrderInformationBillTo(
                 **{
                     key: value
                     for key, value in bill_to.items()
@@ -162,35 +175,82 @@ def _build_export_payload(user) -> Any:
     )
 
 
+def _remove_none_values(value: Any) -> Any:
+    """Recursively remove None values from SDK payload data."""
+    if isinstance(value, dict):
+        return {
+            key: _remove_none_values(item)
+            for key, item in value.items()
+            if item is not None
+        }
+    if isinstance(value, list):
+        return [_remove_none_values(item) for item in value if item is not None]
+    return value
+
+
+def _serialize_export_payload(payload: Any) -> str:
+    """Serialize a CyberSource payload to the JSON string expected by this SDK build."""
+    return json.dumps(_remove_none_values(payload.to_dict()))
+
+
+def _get_response_payload(response: Any) -> Any:
+    """Return the response body object from SDK return values."""
+    if isinstance(response, tuple) and response:
+        return response[0]
+    return response
+
+
+def _get_response_value(response: Any, *names: str) -> Any:
+    """Read a value from an SDK response object or dict using any provided name."""
+    payload = _get_response_payload(response)
+
+    if isinstance(payload, dict):
+        for name in names:
+            if name in payload:
+                return payload[name]
+        return None
+
+    for name in names:
+        value = getattr(payload, name, None)
+        if value is not None:
+            return value
+
+    return None
+
+
 def get_cybersource_client():
     """Create an authenticated REST client for CyberSource export checks."""
-    sdk = _load_cybersource_sdk()
-
-    return sdk.verification_api_class(_get_cybersource_configuration())
+    return VerificationApi(_get_cybersource_configuration())
 
 
 def _get_reason_code(response) -> str | None:
     """Extract the most useful reason code from a REST response."""
-    export_info = getattr(response, "export_compliance_information", None)
-    info_codes = getattr(export_info, "info_codes", None) or []
+    export_info = _get_response_value(
+        response,
+        "export_compliance_information",
+        "exportComplianceInformation",
+    )
+    info_codes = _get_response_value(export_info, "info_codes", "infoCodes") or []
     if info_codes:
         return ",".join(info_codes)
 
-    error_info = getattr(response, "error_information", None)
-    return getattr(error_info, "reason", None) or getattr(response, "message", None)
+    error_info = _get_response_value(response, "error_information", "errorInformation")
+    return _get_response_value(error_info, "reason") or _get_response_value(
+        response, "message"
+    )
 
 
 def verify_user_with_exports(user) -> ExportComplianceResult:
     """Verify a user against CyberSource export compliance services."""
     client = get_cybersource_client()
-    payload = _build_export_payload(user)
+    payload = _serialize_export_payload(_build_export_payload(user))
 
     log.info("Running CyberSource export compliance check for user=%s", user.id)
     response = client.validate_export_compliance(payload)
 
     return ExportComplianceResult(
-        decision=getattr(response, "status", None),
+        decision=_get_response_value(response, "status"),
         reason_code=_get_reason_code(response),
-        request_id=getattr(response, "id", None),
+        request_id=_get_response_value(response, "id"),
         raw=response,
     )

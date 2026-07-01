@@ -25,6 +25,7 @@ def default_settings(monkeypatch, settings):
 
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = False
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
 
 
 @pytest.fixture(autouse=True)
@@ -41,14 +42,13 @@ def mocked_flexibleprice_signal(mocker):
 
 @pytest.fixture(autouse=True)
 def payment_gateway_settings(settings):
+    """Set default CyberSource settings for tests."""
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID = "merchant-id"
-    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID = (
-        "merchant-secret-key-id"
-    )
-    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET = "merchant-secret"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID = uuid.uuid4().hex
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET = uuid.uuid4().hex
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT = (
         "apitest.cybersource.com"
     )
