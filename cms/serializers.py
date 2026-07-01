@@ -17,6 +17,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
+    about = serializers.SerializerMethodField()
     effort = serializers.SerializerMethodField()
     length = serializers.SerializerMethodField()
 
@@ -36,6 +37,15 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
     def get_description(self, instance):
         """Get cleaned description text."""
         return bleach.clean(instance.description, tags={}, strip=True)
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_about(self, instance):
+        """Get cleaned about text."""
+        return (
+            bleach.clean(instance.about, tags={}, strip=True)
+            if instance.about
+            else None
+        )
 
     def get_effort(self, instance) -> str | None:
         """Get cleaned effort text."""
@@ -60,6 +70,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
             "feature_image_src",
             "page_url",
             "description",
+            "about",
             "live",
             "length",
             "effort",
@@ -264,6 +275,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     list_price = serializers.SerializerMethodField()
     financial_assistance_form_url = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
+    about = serializers.SerializerMethodField()
 
     def _get_financial_assistance_url(self, page, slug):
         """Helper method to construct financial assistance URL"""
@@ -287,6 +299,15 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         if instance.description:
             return bleach.clean(instance.description, tags={}, strip=True)
         return ""
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_about(self, instance):
+        """Get cleaned about text."""
+        return (
+            bleach.clean(instance.about, tags={}, strip=True)
+            if instance.about
+            else None
+        )
 
     @extend_schema_field(str)
     def get_price(self, instance):
@@ -385,6 +406,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "page_url",
             "financial_assistance_form_url",
             "description",
+            "about",
             "live",
             "include_in_learn_catalog",
             "length",
