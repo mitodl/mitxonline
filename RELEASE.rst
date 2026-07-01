@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.158.8
+---------------
+
+- feat: adopt mitodl/ol-python-base:3.11, BuildKit cache mounts, granian (#3655)
+- Update the Keycloak admin dataclasses (#3711)
+- Add tests for B2B manager permissions (#3712)
+
 Version 1.158.7 (Released June 30, 2026)
 ---------------
 
