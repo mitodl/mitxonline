@@ -64,6 +64,7 @@ def test_serialize_course_page(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -107,6 +108,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -149,6 +151,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -191,6 +194,7 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -230,6 +234,7 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": course_page.length,
             "effort": course_page.effort,
@@ -408,6 +413,7 @@ def test_serialize_program_page(
             "page_url": program_page.url,
             "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
@@ -460,6 +466,7 @@ def test_serialize_program_page__form_child_of_course_with_program_fk(
             "page_url": program_page.url,
             "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
@@ -500,6 +507,7 @@ def test_serialize_program_page__with_related_financial_form(
             "page_url": program_page.url,
             "financial_assistance_form_url": f"{other_program_page.get_url()}{financial_assistance_form.slug}/",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
@@ -534,6 +542,7 @@ def test_serialize_program_page__no_financial_form(
             "page_url": program_page.url,
             "financial_assistance_form_url": "",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
@@ -571,6 +580,7 @@ def test_serialize_program_page__with_related_program_no_financial_form(
             "page_url": program_page.url,
             "financial_assistance_form_url": "",
             "description": bleach.clean(program_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "length": program_page.length,
             "effort": program_page.effort,
@@ -775,3 +785,41 @@ def test_get_current_price_mixed_zero_and_positive_prices(
     result = serializer.get_current_price(course_page)
 
     assert result == Decimal("50.00")
+
+
+def test_serialize_course_page_about(fully_configured_wagtail):
+    """The course page serializer should return the about text with HTML stripped."""
+    course_page = CoursePageFactory(about="<p>About <strong>this</strong> course</p>")
+
+    data = CoursePageSerializer(course_page).data
+
+    assert data["about"] == "About this course"
+
+
+def test_serialize_course_page_about_none(fully_configured_wagtail):
+    """The course page serializer should return None when about is not set."""
+    course_page = CoursePageFactory(about=None)
+
+    data = CoursePageSerializer(course_page).data
+
+    assert data["about"] is None
+
+
+def test_serialize_program_page_about(fully_configured_wagtail):
+    """The program page serializer should return the about text with HTML stripped."""
+    program_page = ProgramPageFactory(
+        about="<p>About <strong>this</strong> program</p>"
+    )
+
+    data = ProgramPageSerializer(program_page).data
+
+    assert data["about"] == "About this program"
+
+
+def test_serialize_program_page_about_none(fully_configured_wagtail):
+    """The program page serializer should return None when about is not set."""
+    program_page = ProgramPageFactory(about=None)
+
+    data = ProgramPageSerializer(program_page).data
+
+    assert data["about"] is None
