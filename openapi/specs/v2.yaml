@@ -5015,6 +5015,10 @@ components:
           type: string
           description: Get cleaned description text.
           readOnly: true
+        about:
+          type: string
+          nullable: true
+          readOnly: true
         live:
           type: boolean
           readOnly: true
@@ -5042,6 +5046,7 @@ components:
           description: Get instructor information
           readOnly: true
       required:
+      - about
       - current_price
       - description
       - effort
@@ -8466,6 +8471,10 @@ components:
           type: string
           description: The description shown on the home page and product page.
           readOnly: true
+        about:
+          type: string
+          nullable: true
+          readOnly: true
         live:
           type: boolean
           readOnly: true
@@ -8494,6 +8503,7 @@ components:
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           readOnly: true
       required:
+      - about
       - description
       - feature_image_src
       - financial_assistance_form_url
