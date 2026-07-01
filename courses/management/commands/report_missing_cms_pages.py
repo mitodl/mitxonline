@@ -20,19 +20,16 @@ class Command(BaseCommand):
         parser.add_argument(
             "--live",
             action="store_true",
-            default=False,
             help="Only include live courses/programs in the report.",
         )
         parser.add_argument(
             "--details",
             action="store_true",
-            default=False,
             help="Print detailed rows for each missing item.",
         )
         parser.add_argument(
             "--eligible-users-only",
             action="store_true",
-            default=False,
             help=(
                 "Only include courses/programs where at least one user is eligible "
                 "for certificates."
@@ -40,9 +37,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):  # noqa: ARG002
-        live_only = options["live"]
-        show_details = options["details"]
-        eligible_users_only = options["eligible_users_only"]
+        live_only = options.get("live", False)
+        show_details = options.get("details", False)
+        eligible_users_only = options.get("eligible_users_only", False)
 
         courses_qs = Course.objects.all()
         programs_qs = Program.objects.all()
