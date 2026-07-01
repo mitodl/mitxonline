@@ -3055,6 +3055,7 @@ def test_program_certificate_verifiable_credentials(
     mock_certificate_page = Mock()
     mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
     mock_certificate_page.should_provision_verifiable_credential = True
+    mock_certificate_page.product_name = "Test Program Certificate"
     mocker.patch("courses.api.get_certificate_page", return_value=mock_certificate_page)
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
@@ -3266,6 +3267,9 @@ def test_program_certificate_verifiable_credentials_signing_payload(
 
     mock_certificate_page = Mock()
     mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    # The verifiable credential name should come from the CMS "Certificate Title"
+    # (product_name), not the program title.
+    mock_certificate_page.product_name = "Universal AI"
     payload = get_verifiable_credentials_payload(program_cert, mock_certificate_page)
 
     # Assert the expected payload structure
@@ -3308,8 +3312,8 @@ def test_program_certificate_verifiable_credentials_signing_payload(
                 "criteria": {
                     "narrative": mock_certificate_page.verifiable_credential_criteria
                 },
-                "description": "Jane Smith has successfully completed all modules and earned a Program Certificate in Data Science MicroMasters.",
-                "name": "Data Science MicroMasters",
+                "description": "Jane Smith has successfully completed all modules and earned a Program Certificate in Universal AI.",
+                "name": "Universal AI",
                 "image": {
                     "id": "https://example.com/program-thumbnail.jpg",
                     "type": "Image",
@@ -3320,6 +3324,40 @@ def test_program_certificate_verifiable_credentials_signing_payload(
     }
 
     assert payload == expected_payload
+
+
+@pytest.mark.parametrize("product_name", ["", "   "])
+@patch("courses.api.ProgramEnrollment.all_objects.get")
+@patch("courses.api.get_thumbnail_url")
+def test_program_verifiable_credential_name_falls_back_to_program_title(
+    mock_get_thumbnail_url, mock_enrollment_get, product_name, settings, mocker
+):
+    """The VC name falls back to the program title when product_name is blank."""
+    mocker.patch("hubspot_sync.task_helpers.sync_hubspot_user")
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+
+    mock_enrollment = Mock()
+    mock_enrollment.created_on = datetime(
+        2024, 2, 20, 14, 45, 0, tzinfo=ZoneInfo("UTC")
+    )
+    mock_enrollment_get.return_value = mock_enrollment
+    mock_get_thumbnail_url.return_value = ""
+
+    settings.ENVIRONMENT = "production"
+
+    program_cert = ProgramCertificateFactory.create()
+    program_cert.program.title = "Data Science MicroMasters"
+    program_cert.program.save()
+
+    mock_certificate_page = Mock()
+    mock_certificate_page.verifiable_credential_criteria = "mock_credential_data"
+    mock_certificate_page.product_name = product_name
+
+    payload = get_verifiable_credentials_payload(program_cert, mock_certificate_page)
+
+    achievement = payload["credentialSubject"]["achievement"]
+    assert achievement["name"] == "Data Science MicroMasters"
+    assert "Data Science MicroMasters" in achievement["description"]
 
 
 @pytest.mark.parametrize(
