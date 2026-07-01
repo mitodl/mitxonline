@@ -55,11 +55,17 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
             redemptions = obj.prefetched_code_redemptions
             redeemed = sum(1 for r in redemptions if is_redeemed_attachment_record(r))
             assigned = len(redemptions) - redeemed
-            total = obj.max_learners
+            total = obj.max_learners if obj.max_learners else 0
+            # Unclear if this is proper treatment for no max_learners
+            # If max_learners == None, right now, this will show:
+            # total == 0, assigned == # of assigned codes, unassigned == 0, redeemed == # of redeemed codes
+            # Meanwhile /codes will show the first code, if it exists.
             obj._codes_breakdown_cache = {  # noqa: SLF001
                 "total": total,
                 REDEMPTION_STATUS_ASSIGNED: assigned,
-                REDEMPTION_STATUS_UNASSIGNED: total - assigned - redeemed,
+                REDEMPTION_STATUS_UNASSIGNED: (total - assigned - redeemed)
+                if obj.max_learners
+                else 0,
                 REDEMPTION_STATUS_REDEEMED: redeemed,
             }
         return obj._codes_breakdown_cache  # noqa: SLF001
