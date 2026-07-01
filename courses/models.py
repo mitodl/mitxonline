@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.db.models import Exists, OuterRef, Prefetch, Q
@@ -1820,11 +1820,12 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
 
     def save(self, *args, **kwargs):  # noqa: DJ012
         if not self.certificate_page_revision:
-            certificate_page = (
-                self.course_run.course.page.certificate_page
-                if self.course_run.course.page
-                else None
-            )
+            try:
+                course_page = self.course_run.course.page
+            except ObjectDoesNotExist:
+                course_page = None
+
+            certificate_page = course_page.certificate_page if course_page else None
             if certificate_page:
                 self.certificate_page_revision = certificate_page.get_latest_revision()
 

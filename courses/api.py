@@ -15,7 +15,7 @@ import requests
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Prefetch, Q
 from django_countries import countries
@@ -913,6 +913,22 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
             certificate, created = CourseRunCertificate.objects.get_or_create(
                 user=user, course_run=course_run
             )
+            if not certificate.certificate_page_revision:
+                try:
+                    course_page = course_run.course.page
+                except ObjectDoesNotExist:
+                    log.warning(
+                        "Skipping certificate page revision for user=%s run=%s because course page is missing",
+                        user.id,
+                        course_run.courseware_id,
+                    )
+                else:
+                    if not course_page.certificate_page:
+                        log.warning(
+                            "Skipping certificate page revision for user=%s run=%s because certificate page is missing",
+                            user.id,
+                            course_run.courseware_id,
+                        )
             sync_hubspot_user(user)
             if not certificate.verifiable_credential_id:
                 create_verifiable_credential(certificate)
@@ -920,6 +936,12 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         except IntegrityError:
             log.warning(
                 f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."  # noqa: G004
+            )
+        except Exception:
+            log.exception(
+                "Error processing certificate for user=%s and course_run=%s",
+                user.id,
+                course_run.courseware_id,
             )
     return None, False, False
 
@@ -987,11 +1009,7 @@ def generate_course_run_certificates(  # noqa: C901
         edx_grade_user_iter = exception_logging_generator(
             get_edx_grades_with_users(run, user=user)
         )
-        created_grades_count, updated_grades_count, generated_certificates_count = (
-            0,
-            0,
-            0,
-        )
+        stats = Counter()
         for edx_grade, run_user in edx_grade_user_iter:
             try:
                 course_run_grade, created, updated = ensure_course_run_grade(
@@ -1006,9 +1024,9 @@ def generate_course_run_certificates(  # noqa: C901
                 continue
 
             if created:
-                created_grades_count += 1
+                stats["created_grades"] += 1
             elif updated:
-                updated_grades_count += 1
+                stats["updated_grades"] += 1
 
             # Check certificate generation eligibility
             # When force is True: bypass checks (e.g. webhook path where edX already
@@ -1026,9 +1044,18 @@ def generate_course_run_certificates(  # noqa: C901
                     and run.certificate_available_date <= now
                 )
             ):
-                _, created, deleted = process_course_run_grade_certificate(
-                    course_run_grade=course_run_grade
-                )
+                try:
+                    _, created, deleted = process_course_run_grade_certificate(
+                        course_run_grade=course_run_grade
+                    )
+                except Exception:
+                    stats["failed_certificates"] += 1
+                    log.exception(
+                        "Error creating certificate for user=%s and course_run=%s",
+                        run_user.id,
+                        run.courseware_id,
+                    )
+                    continue
 
                 if deleted:
                     log.warning(
@@ -1042,10 +1069,10 @@ def generate_course_run_certificates(  # noqa: C901
                         run_user,
                         run,
                     )
-                    generated_certificates_count += 1
+                    stats["generated_certificates"] += 1
 
         log.info(
-            f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"  # noqa: G004
+            f"Finished processing course run {run}: created grades for {stats['created_grades']} users, updated grades for {stats['updated_grades']} users, generated certificates for {stats['generated_certificates']} users, failed certificates for {stats['failed_certificates']} users"  # noqa: G004
         )
 
 
@@ -1214,27 +1241,46 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             False,
         )
 
-    existing_cert_queryset = ProgramCertificate.all_objects.filter(
+    existing_cert = ProgramCertificate.all_objects.filter(
         user=user, program=program
-    )
-    if existing_cert_queryset.exists():
-        return existing_cert_queryset.first(), False
+    ).first()
+    if existing_cert:
+        return existing_cert, False
 
     if not force_create and not _has_earned_program_cert(user, program):
         return None, False
 
-    program_cert = ProgramCertificate.objects.create(user=user, program=program)
-    if program_cert:
+    program_cert, created = ProgramCertificate.all_objects.get_or_create(
+        user=user,
+        program=program,
+    )
+    if created:
         log.info(
             "Program certificate for [%s] in program [%s] is created.",
             user.edx_username,
             program.title,
         )
+        if not program_cert.certificate_page_revision:
+            try:
+                program_page = program.page
+            except ObjectDoesNotExist:
+                log.warning(
+                    "Skipping program certificate page revision for user=%s program=%s because program page is missing",
+                    user.id,
+                    program.readable_id,
+                )
+            else:
+                if not program_page.certificate_page:
+                    log.warning(
+                        "Skipping program certificate page revision for user=%s program=%s because certificate page is missing",
+                        user.id,
+                        program.readable_id,
+                    )
         sync_hubspot_user(user)
         if not program_cert.verifiable_credential_id:
             create_verifiable_credential(program_cert)
 
-    return program_cert, True
+    return program_cert, created
 
 
 def generate_multiple_programs_certificate(user, programs):
