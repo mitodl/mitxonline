@@ -1,62 +1,53 @@
-FROM python:3.11-slim AS base
+# syntax=docker/dockerfile:1
+# hadolint global ignore=DL3008
 
+FROM mitodl/ol-python-base:3.11 AS base
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
-# Add package files, install updated node and pip
-WORKDIR /tmp
+# App-specific apt extras; common-core packages are in mitodl/ol-python-base:3.11.
+# Operator tooling (htop, ngrep, screen, etc.) is also kept here for parity
+# with the production image; trim this list if the production image diverges.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      dnsutils \
+      htop \
+      iputils-ping \
+      less \
+      libcairo2-dev \
+      lsof \
+      nano \
+      ngrep \
+      procps \
+      screen \
+      wget
 
-# Install packages and add repo needed for postgres 9.6
-COPY apt.txt /tmp/apt.txt
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y $(grep -vE "^\s*#" apt.txt  | tr "\n" " ") && \
-    apt-get clean && \
-    apt-get purge -y && \
-    rm -rf /var/lib/apt-lists/*
+FROM base AS deps
 
-FROM base AS system
-
-# Add, and run as, non-root user.
-RUN mkdir /src && \
-    adduser --disabled-password --gecos "" mitodl && \
-    mkdir /var/media && chown -R mitodl:mitodl /var/media
-
-FROM system AS uv
-
-# copy in trusted certs
-COPY --chmod=644 certs/*.crt /usr/local/share/ca-certificates/
+# Trusted certs (org PKI + local-dev mkcert root injected at deploy time).
+COPY --chmod=644 certs/ /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
-# uv env configuration
-ENV  \
-  PYTHONUNBUFFERED=1 \
-  PYTHONDONTWRITEBYTECODE=1 \
-  UV_PROJECT_ENVIRONMENT="/opt/venv"
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
-
-COPY pyproject.toml /src
-COPY uv.lock /src
-COPY mitol_*.gz /src
-
-RUN chown -R mitodl:mitodl /src && \
-    mkdir -p /opt/venv && \
-    chown -R mitodl:mitodl /opt/venv
+# Install Python dependencies before copying source.
+# mitol_*.gz are local wheels that uv resolves from the lock file.
+COPY --chown=mitodl:mitodl pyproject.toml uv.lock /src/
+COPY --chown=mitodl:mitodl mitol_*.gz /src/
 
 USER mitodl
 WORKDIR /src
-RUN uv sync --frozen --no-install-project --group prod
+# BuildKit cache mount keeps the uv download cache across builds.
+RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project --no-dev
 
-
-FROM uv AS code
+FROM deps AS code
 
 COPY . /src
 WORKDIR /src
 
-# Set pip cache folder, as it is breaking pip when it is on a shared volume
 ENV XDG_CACHE_HOME=/tmp/.cache
 
+# ─── Node / frontend asset build ─────────────────────────────────────────────
 FROM node:17.9 AS node
 
 COPY --from=code /src /src
@@ -68,11 +59,12 @@ RUN yarn workspace mitx-online-public install --immutable && \
     yarn workspace mitx-online-staff-dashboard install --immutable && \
     yarn workspace mitx-online-staff-dashboard run build
 
+# ─── Runtime targets ─────────────────────────────────────────────────────────
 FROM code AS django-server
 
 EXPOSE 8013
 ENV PORT=8013
-CMD ["uwsgi", "uwsgi.ini"]
+CMD ["sh", "-c", "exec granian --interface wsgi --host 0.0.0.0 --port ${PORT:-8013} --workers 2 main.wsgi:application"]
 
 FROM django-server AS production
 
@@ -83,3 +75,9 @@ FROM code AS jupyter-notebook
 RUN uv pip install --force-reinstall jupyter
 
 USER mitodl
+
+# ─── Development target ───────────────────────────────────────────────────────
+FROM django-server AS development
+
+RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project

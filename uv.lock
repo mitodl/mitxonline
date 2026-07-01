@@ -2108,10 +2108,6 @@ dev = [
     { name = "semantic-version" },
     { name = "wagtail-factories" },
 ]
-prod = [
-    { name = "uwsgi" },
-    { name = "uwsgitop" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -2218,10 +2214,6 @@ dev = [
     { name = "ruff", specifier = ">=0.15,<0.16" },
     { name = "semantic-version", specifier = ">=2.10.0,<3" },
     { name = "wagtail-factories", specifier = ">=4.2,<4.3" },
-]
-prod = [
-    { name = "uwsgi", specifier = ">=2.0.19,<3" },
-    { name = "uwsgitop", specifier = ">=0.12,<0.13" },
 ]
 
 [[package]]
@@ -3771,18 +3763,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/bc/18/a251704c5c3ed28f0
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5b/1d/38ccf86ffe62fc05ab4aa361efba47f84c9bde316dc1b28c5ba5abb429ed/user_util-0.1.5-py2.py3-none-any.whl", hash = "sha256:9a75a3fae1d0a44d240b4c5e33a071270c6f9f81e18962a6118b4de4af2c1d16", size = 4015, upload-time = "2018-08-08T14:42:56.253Z" },
 ]
-
-[[package]]
-name = "uwsgi"
-version = "2.0.31"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9f/49/2f57640e889ba509fd1fae10cccec1b58972a07c2724486efba94c5ea448/uwsgi-2.0.31.tar.gz", hash = "sha256:e8f8b350ccc106ff93a65247b9136f529c14bf96b936ac5b264c6ff9d0c76257", size = 822796, upload-time = "2025-10-11T19:17:28.794Z" }
-
-[[package]]
-name = "uwsgitop"
-version = "0.12"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5f/3b/02f373bc88978e8f1f33f5afe625ad28def59b6cfbf93424030754dbd5a5/uwsgitop-0.12.tar.gz", hash = "sha256:4f9330951f0fb9633226de36cf0c28c04dcf323efab608834aa81f638b6019b2", size = 6574, upload-time = "2024-04-01T13:43:52.735Z" }
 
 [[package]]
 name = "vine"

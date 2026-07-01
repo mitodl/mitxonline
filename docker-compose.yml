@@ -57,7 +57,7 @@ services:
     environment:
       NGINX_WORKERS: 1
       PORT: 8013
-      NGINX_UWSGI_PASS: "web:8011"
+      NGINX_UPSTREAM: "web:8011"
     networks:
       default:
         aliases:
@@ -67,7 +67,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: django-server
+      target: development
     command: ["/bin/bash", "./scripts/run-django-dev.sh"]
     stdin_open: true
     tty: true
@@ -119,7 +119,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: django-server
+      target: development
     environment: *py-environment
     env_file: .env
     command: >

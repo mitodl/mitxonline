@@ -24,4 +24,4 @@ for url in "${health_urls[@]}"; do
 	fi
 done
 
-uwsgi uwsgi.ini --honour-stdin
+exec granian --interface wsgi --host 0.0.0.0 --port "${PORT:-8013}" --workers 2 main.wsgi:application
