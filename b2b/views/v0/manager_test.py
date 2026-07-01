@@ -525,6 +525,81 @@ def test_org_contract_codes_redeemed_by_differs_from_assigned_to(
     assert redeemed_code["redeemed_by"] == "redeemer@example.com"
 
 
+def test_org_contract_detail_no_max_learners(org_setup, manager_drf_client):
+    """
+    The detail endpoint should not error when max_learners is None, and
+    should treat the contract as having zero total/unassigned codes
+    regardless of how many codes have been assigned or redeemed.
+    """
+    _, _, (contract_1, *_), *_ = org_setup
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
+        max_learners=None,
+        organization=contract_1.organization,
+    )
+    run = CourseRunFactory.create(b2b_contract=contract)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=run)
+
+    created, updated, errored = ensure_enrollment_codes_exist(contract)
+    assert created == 1
+    assert updated == 0
+    assert errored == 0
+
+    detail_url = reverse(
+        "b2b:b2b-manager-org-contract-detail",
+        kwargs={
+            "parent_lookup_organization": contract.organization.id,
+            "pk": contract.id,
+        },
+    )
+
+    resp = manager_drf_client.get(detail_url)
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_data = resp.json()
+    assert resp_data["total_codes"] == 0
+    assert resp_data["assigned_codes"] == 0
+    assert resp_data["unassigned_codes"] == 0
+    assert resp_data["redeemed_codes"] == 0
+
+    # Redeem the one code that exists, and confirm the breakdown still makes
+    # sense (and doesn't error) with a real redemption in play.
+    discount = contract.get_discounts().order_by("id").first()
+    redeemer = UserFactory.create()
+    DiscountContractAttachmentRedemption.objects.create(
+        discount=discount,
+        contract=contract,
+        user=redeemer,
+    )
+
+    resp = manager_drf_client.get(detail_url)
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_data = resp.json()
+    assert resp_data["total_codes"] == 0
+    assert resp_data["assigned_codes"] == 0
+    assert resp_data["unassigned_codes"] == 0
+    assert resp_data["redeemed_codes"] == 1
+
+    # /codes should show the single code that exists for this contract.
+    codes_url = reverse(
+        "b2b:b2b-manager-org-contract-codes",
+        kwargs={
+            "parent_lookup_organization": contract.organization.id,
+            "pk": contract.id,
+        },
+    )
+
+    resp = manager_drf_client.get(codes_url)
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_results = resp.json()["results"]
+    assert len(resp_results) == 1
+    assert resp_results[0]["code"] == discount.discount_code
+
+
 # ---------------------------------------------------------------------------
 # codes search_term tests
 # ---------------------------------------------------------------------------
