@@ -1,12 +1,12 @@
 """Tests for compliance API helpers."""
 
-import builtins
 import uuid
 from types import SimpleNamespace
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+import compliance.api as compliance_api
 from compliance.api import (
     ExportComplianceResult,
     _build_export_payload,
@@ -73,15 +73,12 @@ def test_get_cybersource_client_uses_official_rest_sdk_configuration(export_sett
 
 def test_get_cybersource_client_requires_cybersource_sdk(mocker, export_settings):
     """Client creation should surface a clear error if the CyberSource SDK is unavailable."""
-    real_import = builtins.__import__
-
-    def mocked_import(name, *args, **kwargs):
-        if name == "CyberSource" or name.startswith("CyberSource."):
-            raise ModuleNotFoundError(name)
-        return real_import(name, *args, **kwargs)
-
     _load_cybersource_sdk.cache_clear()
-    mocker.patch("builtins.__import__", side_effect=mocked_import)
+    mocker.patch.object(
+        compliance_api,
+        "_CYBERSOURCE_IMPORT_ERROR",
+        ModuleNotFoundError("CyberSource"),
+    )
     with pytest.raises(
         ImproperlyConfigured,
         match="CyberSource SDK must be installed",
