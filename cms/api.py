@@ -336,7 +336,9 @@ def create_default_certificate_page(
     from cms.models import CertificatePage  # noqa: PLC0415
 
     cert_page = CertificatePage(
-        product_name=f"PLACEHOLDER - {courseware.title} Certificate",
+        # Default to the courseware title so new certificate pages are
+        # display-ready; admins can still overwrite the "Certificate Title".
+        product_name=courseware.title,
         CEUs=f"PLACEHOLDER - {courseware.title} CEUs",
     )
     courseware_page = courseware.page

@@ -12,6 +12,7 @@ from wagtail_factories import PageFactory
 
 from cms.api import (
     RESOURCE_PAGE_TITLES,
+    create_default_certificate_page,
     create_default_courseware_page,
     create_featured_items,
     ensure_home_page_and_site,
@@ -288,6 +289,22 @@ def test_create_courseware_page():
 
     with pytest.raises(ValidationError):
         resulting_page = create_default_courseware_page(course.programs[0])
+
+
+@pytest.mark.django_db
+def test_create_default_certificate_page_defaults_to_title():
+    """New certificate pages default the title to the courseware title, not a placeholder."""
+    ensure_home_page_and_site()
+    ensure_product_index()
+    ensure_program_product_index()
+
+    course = CourseFactory.create(page=None)
+    create_default_courseware_page(course)
+
+    cert_page = create_default_certificate_page(course)
+
+    assert cert_page.product_name == course.title
+    assert "PLACEHOLDER" not in cert_page.product_name
 
 
 @pytest.mark.django_db
