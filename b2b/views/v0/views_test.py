@@ -23,6 +23,7 @@ from courses.models import CourseRunEnrollment
 from ecommerce.factories import ProductFactory, UnlimitedUseDiscountFactory
 from main.constants import (
     USER_MSG_TYPE_B2B_ENROLL_SUCCESS,
+    USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
     USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
@@ -606,3 +607,175 @@ def test_preassigned_code_can_be_redeemed(mocker):
     assert record.user == learner
     assert record.redeemed_on is not None
     assert record.assigned_email == learner.email
+
+
+def test_enroll_requires_authentication():
+    """Unauthenticated requests to the enroll endpoint should return 401."""
+    client = APIClient()
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": "course-v1:MITx+Test+2024"})
+    resp = client.post(url)
+    assert resp.status_code == 401
+
+
+def test_enroll_courserun_not_found(mocker):
+    """A readable_id with no matching B2B course run should raise a 500 (DoesNotExist propagates)."""
+    mocker.patch("b2b.views.v0.create_b2b_enrollment")
+    user = UserFactory.create()
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse(
+        "b2b:enroll-user", kwargs={"readable_id": "course-v1:MITx+DoesNotExist+2024"}
+    )
+    with pytest.raises(Exception):  # noqa: B017
+        client.post(url)
+
+
+def test_enroll_product_not_found(mocker):
+    """A course run with no associated product should raise DoesNotExist."""
+    mocker.patch("b2b.views.v0.create_b2b_enrollment")
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=0,
+    )
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    # Intentionally do not create a Product for courserun
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    with pytest.raises(Exception):  # noqa: B017
+        client.post(url)
+
+
+def test_enroll_success(mocker):
+    """A valid request with a free B2B course run returns 201 on success."""
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=0,
+    )
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=courserun)
+
+    mocker.patch(
+        "b2b.views.v0.create_b2b_enrollment",
+        return_value={"result": USER_MSG_TYPE_B2B_ENROLL_SUCCESS},
+    )
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    resp = client.post(url)
+
+    assert resp.status_code == 201
+    assert resp.json()["result"] == USER_MSG_TYPE_B2B_ENROLL_SUCCESS
+
+
+@pytest.mark.parametrize(
+    "error_result",
+    [
+        USER_MSG_TYPE_B2B_ERROR_NO_CONTRACT,
+        USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
+        USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
+        USER_MSG_TYPE_B2B_ERROR_ALREADY_ENROLLED,
+    ],
+)
+def test_enroll_failure_returns_400(mocker, error_result):
+    """Any non-success result from create_b2b_enrollment should return 400."""
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=0,
+    )
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=courserun)
+
+    mocker.patch(
+        "b2b.views.v0.create_b2b_enrollment",
+        return_value={"result": error_result},
+    )
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    resp = client.post(url)
+
+    assert resp.status_code == 400
+    assert resp.json()["result"] == error_result
+
+
+def test_enroll_passes_program_id_to_api(mocker):
+    """The program_id from the request body should be forwarded to create_b2b_enrollment."""
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=0,
+    )
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=courserun)
+
+    mocked_enroll = mocker.patch(
+        "b2b.views.v0.create_b2b_enrollment",
+        return_value={"result": USER_MSG_TYPE_B2B_ENROLL_SUCCESS},
+    )
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    resp = client.post(url, data={"program_id": "program-v1:MITx+TestProg"}, format="json")
+
+    assert resp.status_code == 201
+    _, kwargs = mocked_enroll.call_args
+    assert kwargs["program_id"] == "program-v1:MITx+TestProg"
+
+
+def test_enroll_omits_program_id_when_not_provided(mocker):
+    """When program_id is absent from the request, it should be passed as None."""
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+        enrollment_fixed_price=0,
+    )
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=courserun)
+
+    mocked_enroll = mocker.patch(
+        "b2b.views.v0.create_b2b_enrollment",
+        return_value={"result": USER_MSG_TYPE_B2B_ENROLL_SUCCESS},
+    )
+
+    user = UserFactory.create()
+    user.b2b_contracts.add(contract)
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    resp = client.post(url)
+
+    assert resp.status_code == 201
+    _, kwargs = mocked_enroll.call_args
+    assert kwargs["program_id"] is None
+
+
+def test_enroll_courserun_without_b2b_contract_not_found(mocker):
+    """A course run that exists but has no b2b_contract should not be matched."""
+    mocker.patch("b2b.views.v0.create_b2b_enrollment")
+    courserun = CourseRunFactory.create(b2b_contract=None)
+    ProductFactory.create(purchasable_object=courserun)
+
+    user = UserFactory.create()
+    client = APIClient()
+    client.force_login(user)
+
+    url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
+    with pytest.raises(Exception):  # noqa: B017
+        client.post(url)
