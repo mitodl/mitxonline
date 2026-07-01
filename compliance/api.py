@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Any
 from uuid import uuid4
 
@@ -53,17 +52,6 @@ class ExportComplianceResult:
         return self.decision in {"ACCEPT", "COMPLETED"}
 
 
-@dataclass(frozen=True)
-class _CyberSourceSdk:
-    """Official CyberSource REST SDK classes used for export compliance."""
-
-    verification_api_class: Any
-    order_information_class: Any
-    bill_to_class: Any
-    client_reference_information_class: Any
-    validate_export_compliance_request_class: Any
-
-
 def _require_setting(name: str) -> str:
     """Return a non-empty setting value or raise an error."""
     value = getattr(settings, name, None)
@@ -73,20 +61,11 @@ def _require_setting(name: str) -> str:
     return value
 
 
-@lru_cache(maxsize=1)
-def _load_cybersource_sdk() -> _CyberSourceSdk:
-    """Load the official CyberSource REST SDK classes used by this module."""
+def _require_cybersource_sdk() -> None:
+    """Ensure the CyberSource REST SDK is available before using it."""
     if _CYBERSOURCE_IMPORT_ERROR is not None:
         message = "CyberSource SDK must be installed to use export compliance checks"
         raise ImproperlyConfigured(message) from _CYBERSOURCE_IMPORT_ERROR
-
-    return _CyberSourceSdk(
-        verification_api_class=VerificationApi,
-        order_information_class=Riskv1exportcomplianceinquiriesOrderInformation,
-        bill_to_class=Riskv1exportcomplianceinquiriesOrderInformationBillTo,
-        client_reference_information_class=Riskv1liststypeentriesClientReferenceInformation,
-        validate_export_compliance_request_class=ValidateExportComplianceRequest,
-    )
 
 
 def _get_cybersource_configuration() -> dict[str, str | int]:
@@ -106,15 +85,6 @@ def _get_cybersource_configuration() -> dict[str, str | int]:
         "timeout": 1000,
     }
 
-
-def _get_user_legal_address(user):
-    """Return the user's legal address if one exists."""
-    try:
-        return user.legal_address
-    except ObjectDoesNotExist:
-        return None
-
-
 def _split_user_name(user) -> tuple[str, str]:
     """Split a user's display name into first/last values."""
     full_name = (user.name or "").strip()
@@ -130,9 +100,12 @@ def _split_user_name(user) -> tuple[str, str]:
 
 def _build_export_payload(user) -> Any:
     """Build the CyberSource export compliance REST request payload."""
-    sdk = _load_cybersource_sdk()
+    _require_cybersource_sdk()
 
-    legal_address = _get_user_legal_address(user)
+    try:
+        legal_address = user.legal_address
+    except ObjectDoesNotExist:
+        legal_address = None
     first_name, last_name = _split_user_name(user)
 
     bill_to = {
@@ -146,12 +119,12 @@ def _build_export_payload(user) -> Any:
     if legal_address and legal_address.state:
         bill_to["administrative_area"] = legal_address.state
 
-    return sdk.validate_export_compliance_request_class(
-        client_reference_information=sdk.client_reference_information_class(
+    return ValidateExportComplianceRequest(
+        client_reference_information=Riskv1liststypeentriesClientReferenceInformation(
             code=str(uuid4())
         ),
-        order_information=sdk.order_information_class(
-            bill_to=sdk.bill_to_class(
+        order_information=Riskv1exportcomplianceinquiriesOrderInformation(
+            bill_to=Riskv1exportcomplianceinquiriesOrderInformationBillTo(
                 **{
                     key: value
                     for key, value in bill_to.items()
@@ -164,9 +137,8 @@ def _build_export_payload(user) -> Any:
 
 def get_cybersource_client():
     """Create an authenticated REST client for CyberSource export checks."""
-    sdk = _load_cybersource_sdk()
-
-    return sdk.verification_api_class(_get_cybersource_configuration())
+    _require_cybersource_sdk()
+    return VerificationApi(_get_cybersource_configuration())
 
 
 def _get_reason_code(response) -> str | None:

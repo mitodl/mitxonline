@@ -10,7 +10,6 @@ import compliance.api as compliance_api
 from compliance.api import (
     ExportComplianceResult,
     _build_export_payload,
-    _load_cybersource_sdk,
     get_cybersource_client,
     verify_user_with_exports,
 )
@@ -62,8 +61,6 @@ def test_get_cybersource_client_requires_configuration(settings):
 
 def test_get_cybersource_client_uses_official_rest_sdk_configuration(export_settings):
     """Client creation should use the official CyberSource REST SDK config keys."""
-    _load_cybersource_sdk.cache_clear()
-
     client = get_cybersource_client()
 
     assert client.api_client.mconfig.authentication_type == "HTTP_SIGNATURE"
@@ -73,7 +70,6 @@ def test_get_cybersource_client_uses_official_rest_sdk_configuration(export_sett
 
 def test_get_cybersource_client_requires_cybersource_sdk(mocker, export_settings):
     """Client creation should surface a clear error if the CyberSource SDK is unavailable."""
-    _load_cybersource_sdk.cache_clear()
     mocker.patch.object(
         compliance_api,
         "_CYBERSOURCE_IMPORT_ERROR",
@@ -84,7 +80,6 @@ def test_get_cybersource_client_requires_cybersource_sdk(mocker, export_settings
         match="CyberSource SDK must be installed",
     ):
         get_cybersource_client()
-    _load_cybersource_sdk.cache_clear()
 
 
 def test_verify_user_with_exports_calls_validate_export_compliance(
