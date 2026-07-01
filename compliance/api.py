@@ -86,6 +86,7 @@ def _get_cybersource_configuration() -> dict[str, str | int]:
         "timeout": 1000,
     }
 
+
 def _split_user_name(user) -> tuple[str, str]:
     """Split a user's display name into first/last values."""
     full_name = (user.name or "").strip()
