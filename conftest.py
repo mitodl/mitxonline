@@ -2,6 +2,7 @@
 
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from faker import Faker
@@ -43,6 +44,28 @@ def payment_gateway_settings(settings):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID = "merchant-id"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID = (
+        "merchant-secret-key-id"
+    )
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET = "merchant-secret"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT = (
+        "apitest.cybersource.com"
+    )
+
+
+@pytest.fixture(autouse=True)
+def mocked_export_compliance(mocker):
+    """Mock export compliance checks in shared enrollment helpers by default."""
+    return mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=SimpleNamespace(
+            accepted=True,
+            decision="ACCEPT",
+            reason_code=100,
+            request_id="test-request-id",
+        ),
+    )
 
 
 @pytest.fixture(autouse=True)

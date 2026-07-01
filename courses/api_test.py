@@ -35,6 +35,7 @@ from b2b.factories import (
     OrganizationPageFactory,
 )
 from cms.factories import CourseIndexPageFactory
+from compliance.api import ExportComplianceResult
 from courses.api import (
     check_course_modes,
     create_local_enrollment,
@@ -652,6 +653,154 @@ def test_create_program_enrollments_creation_fail(mocker, user):
     patched_log_exception.assert_called_once()
     patched_mail_api.send_enrollment_failure_message.assert_called_once()
     assert successful_enrollments == [enrollment]
+
+
+def test_create_run_enrollments_verifies_exports_for_verified_mode(
+    mocker, user, django_capture_on_commit_callbacks
+):
+    """Verified course enrollments should require an accepted export check."""
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="ACCEPT",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user, [run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+
+    patched_verify.assert_called_once_with(user)
+    patched_edx_enroll.assert_called_once_with(
+        user,
+        [run],
+        mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+    assert edx_request_success is True
+    assert len(successful_enrollments) == 1
+
+
+def test_create_run_enrollments_verifies_exports_for_audit_mode(mocker, user):
+    """Audit course enrollments should also require an accepted export check."""
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="ACCEPT",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    create_run_enrollments(user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE)
+
+    patched_verify.assert_called_once_with(user)
+    patched_edx_enroll.assert_called_once()
+
+
+def test_create_run_enrollments_rejects_nonaccepted_exports(mocker, user):
+    """Verified course enrollments should fail closed when exports are not accepted."""
+    run = CourseRunFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="REJECT",
+            reason_code=102,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+    with pytest.raises(ValidationError, match="Export compliance check did not accept"):
+        create_run_enrollments(user, [run], mode=EDX_ENROLLMENT_VERIFIED_MODE)
+
+    patched_verify.assert_called_once_with(user)
+    patched_edx_enroll.assert_not_called()
+    assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
+
+
+def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, user):
+    """Verified program enrollments should require an accepted export check."""
+    program = ProgramFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="ACCEPT",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    successful_enrollments = create_program_enrollments(
+        user,
+        [program],
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
+    patched_verify.assert_called_once_with(user)
+    assert len(successful_enrollments) == 1
+    assert successful_enrollments[0].program == program
+
+
+def test_create_program_enrollments_verifies_exports_for_default_mode(mocker, user):
+    """Default program enrollments should also require an accepted export check."""
+    program = ProgramFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="ACCEPT",
+            reason_code=100,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    successful_enrollments = create_program_enrollments(
+        user,
+        [program],
+    )
+
+    patched_verify.assert_called_once_with(user)
+    assert len(successful_enrollments) == 1
+    assert successful_enrollments[0].program == program
+
+
+def test_create_program_enrollments_rejects_nonaccepted_exports(mocker, user):
+    """Verified program enrollments should fail closed when exports are not accepted."""
+    program = ProgramFactory.create()
+    patched_verify = mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=ExportComplianceResult(
+            decision="REVIEW",
+            reason_code=480,
+            request_id="req-123",
+            raw={},
+        ),
+    )
+
+    with pytest.raises(ValidationError, match="Export compliance check did not accept"):
+        create_program_enrollments(
+            user,
+            [program],
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
+    patched_verify.assert_called_once_with(user)
+    assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
 
 
 class TestDeactivateEnrollments:

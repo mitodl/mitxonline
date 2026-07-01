@@ -265,7 +265,7 @@ INSTALLED_APPS = (
     "cms.apps.CustomWagtailUsersAppConfig",
     "cms",
     "sheets",
-    # "compliance",
+    "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
     "ecommerce",
@@ -1193,6 +1193,27 @@ OPENEDX_BASE_REDIRECT_URL = get_string(
     name="OPENEDX_BASE_REDIRECT_URL",
     default=OPENEDX_API_BASE_URL,
     description="The base redirect URL for an OAuth Application for the Open edX API",
+)
+
+CYBERSOURCE_MERCHANT_ID = get_string(
+    name="CYBERSOURCE_MERCHANT_ID",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID,
+    description="CyberSource merchant ID for export compliance checks",
+)
+CYBERSOURCE_MERCHANT_SECRET_KEY_ID = get_string(
+    name="CYBERSOURCE_MERCHANT_SECRET_KEY_ID",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID,
+    description="CyberSource REST merchant secret key ID for export compliance checks",
+)
+CYBERSOURCE_MERCHANT_SECRET = get_string(
+    name="CYBERSOURCE_MERCHANT_SECRET",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET,
+    description="CyberSource REST merchant secret for export compliance checks",
+)
+CYBERSOURCE_REST_API_ENVIRONMENT = get_string(
+    name="CYBERSOURCE_REST_API_ENVIRONMENT",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT,
+    description="CyberSource REST API environment for export compliance checks",
 )
 OPENEDX_TOKEN_EXPIRES_HOURS = get_int(
     name="OPENEDX_TOKEN_EXPIRES_HOURS",
