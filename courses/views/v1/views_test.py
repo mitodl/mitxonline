@@ -855,6 +855,7 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 "courses": [
                     {
                         "id": course.id,
+                        "about": None,
                         "instructors": [],
                         "departments": [],
                         "next_run_id": getattr(course.first_unexpired_run, "id", None),
