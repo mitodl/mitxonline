@@ -909,6 +909,24 @@ RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY = get_int(
     default=60 * 30,
     description="How many seconds between retrying failed edX enrollments",
 )
+RETRY_FAILED_EDX_ENROLLMENT_BATCH_SIZE = get_int(
+    name="RETRY_FAILED_EDX_ENROLLMENT_BATCH_SIZE",
+    default=30,
+    description=(
+        "Max failed enrollments retried per invocation of "
+        "retry_failed_edx_enrollments. Keeps the task below Open edX's per-user "
+        "enrollment throttle (120/min for staff service workers)."
+    ),
+)
+RETRY_FAILED_EDX_ENROLLMENT_MAX_AGE_DAYS = get_int(
+    name="RETRY_FAILED_EDX_ENROLLMENT_MAX_AGE_DAYS",
+    default=7,
+    description=(
+        "Failed CourseRunEnrollments older than this are no longer retried, so a "
+        "permanently-broken row cannot keep the retry task DoSing the Open edX "
+        "enrollment API forever. Set to 0 to disable the age cap."
+    ),
+)
 REPAIR_OPENEDX_USERS_FREQUENCY = get_int(
     name="REPAIR_OPENEDX_USERS_FREQUENCY",
     default=60 * 30,

@@ -988,46 +988,58 @@ def test_enroll_pro_unknown_fail(settings, mocker, user):
         enroll_in_edx_course_runs(user, [course_run])
 
 
+def _mock_retry_edx_client(mocker, *, is_active=True):
+    """Return a MagicMock edX client wired for the retry-path helper."""
+    client = mocker.MagicMock()
+    client.enrollments.create_student_enrollment = mocker.Mock(
+        return_value=mocker.Mock(is_active=is_active)
+    )
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=client)
+    mocker.patch("openedx.api.repair_faulty_edx_user", return_value=(None, None))
+    return client
+
+
 @pytest.mark.parametrize("exception_raised", [Exception("An error happened"), None])
 def test_retry_failed_edx_enrollments(mocker, exception_raised):
     """
-    Tests that retry_failed_edx_enrollments loops through enrollments that failed in edX
-    and attempts to enroll them again
+    retry_failed_edx_enrollments should POST once per failed enrollment via the
+    service-worker client, mark successes as edx_enrolled=True, and swallow
+    per-row errors so one bad row does not stop the whole pass.
     """
     with freeze_time(now_in_utc() - timedelta(days=1)):
         failed_enrollments = CourseRunEnrollmentFactory.create_batch(
             3, edx_enrolled=False, user__is_active=True
         )
         CourseRunEnrollmentFactory.create(edx_enrolled=False, user__is_active=False)
-    patched_enroll_in_edx = mocker.patch(
-        "openedx.api.enroll_in_edx_course_runs",
-        side_effect=[None, exception_raised or None, None],
+    client = _mock_retry_edx_client(mocker)
+    # oldest-first ordering matches retry_failed_edx_enrollments
+    ordered = sorted(failed_enrollments, key=lambda e: e.created_on)
+    client.enrollments.create_student_enrollment = mocker.Mock(
+        side_effect=[
+            mocker.Mock(is_active=True),
+            exception_raised or mocker.Mock(is_active=True),
+            mocker.Mock(is_active=True),
+        ]
     )
     patched_log_exception = mocker.patch("openedx.api.log.exception")
     successful_enrollments = retry_failed_edx_enrollments()
 
-    assert patched_enroll_in_edx.call_count == len(failed_enrollments)
+    assert client.enrollments.create_student_enrollment.call_count == len(
+        failed_enrollments
+    )
     assert len(successful_enrollments) == (3 if exception_raised is None else 2)
     assert patched_log_exception.called == bool(exception_raised)
     if exception_raised:
-        failed_enroll_user, failed_enroll_runs = patched_enroll_in_edx.call_args_list[
-            1
-        ][0]
-        expected_successful_enrollments = [
-            e
-            for e in failed_enrollments
-            if e.user != failed_enroll_user and e.run != failed_enroll_runs[0]
-        ]
-        assert {e.id for e in successful_enrollments} == {
-            e.id for e in expected_successful_enrollments
-        }
+        expected_successful_ids = {ordered[0].id, ordered[2].id}
+        assert {e.id for e in successful_enrollments} == expected_successful_ids
         for enrollment in successful_enrollments:
             assert enrollment.edx_emails_subscription is True
 
 
 def test_retry_failed_enroll_grace_period(mocker):
     """
-    Tests that retry_failed_edx_enrollments does not attempt to repair any enrollments that were recently created
+    retry_failed_edx_enrollments must skip enrollments still inside
+    OPENEDX_REPAIR_GRACE_PERIOD_MINS.
     """
     now = now_in_utc()
     with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS - 1)):
@@ -1036,13 +1048,93 @@ def test_retry_failed_enroll_grace_period(mocker):
         older_enrollment = CourseRunEnrollmentFactory.create(
             edx_enrolled=False, user__is_active=True
         )
-    patched_enroll_in_edx = mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    client = _mock_retry_edx_client(mocker)
     successful_enrollments = retry_failed_edx_enrollments()
 
     assert successful_enrollments == [older_enrollment]
-    patched_enroll_in_edx.assert_called_once_with(
-        older_enrollment.user, [older_enrollment.run], mode=EDX_ENROLLMENT_AUDIT_MODE
+    client.enrollments.create_student_enrollment.assert_called_once_with(
+        older_enrollment.run.courseware_id,
+        mode=older_enrollment.enrollment_mode,
+        username=older_enrollment.user.edx_username,
+        force_enrollment=True,
     )
+
+
+def test_retry_failed_enroll_age_cap(settings, mocker):
+    """
+    Enrollments older than RETRY_FAILED_EDX_ENROLLMENT_MAX_AGE_DAYS must be
+    skipped so a permanently-broken row cannot keep the retry task hammering
+    the Open edX throttle forever.
+    """
+    settings.RETRY_FAILED_EDX_ENROLLMENT_MAX_AGE_DAYS = 3
+    now = now_in_utc()
+    with freeze_time(now - timedelta(days=10)):
+        stale = CourseRunEnrollmentFactory.create(
+            edx_enrolled=False, user__is_active=True
+        )
+    with freeze_time(now - timedelta(days=1)):
+        fresh = CourseRunEnrollmentFactory.create(
+            edx_enrolled=False, user__is_active=True
+        )
+    client = _mock_retry_edx_client(mocker)
+
+    successful_enrollments = retry_failed_edx_enrollments()
+
+    assert successful_enrollments == [fresh]
+    assert client.enrollments.create_student_enrollment.call_count == 1
+    stale.refresh_from_db()
+    assert stale.edx_enrolled is False
+
+
+def test_retry_failed_enroll_batch_size(settings, mocker):
+    """
+    Only RETRY_FAILED_EDX_ENROLLMENT_BATCH_SIZE rows should be attempted per
+    invocation; the rest wait for the next scheduled pass so we stay under
+    Open edX's per-user enrollment throttle.
+    """
+    settings.RETRY_FAILED_EDX_ENROLLMENT_BATCH_SIZE = 2
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        enrollments = CourseRunEnrollmentFactory.create_batch(
+            5, edx_enrolled=False, user__is_active=True
+        )
+    client = _mock_retry_edx_client(mocker)
+
+    successful = retry_failed_edx_enrollments()
+
+    assert client.enrollments.create_student_enrollment.call_count == 2
+    assert len(successful) == 2
+    # oldest-first ordering: the first two rows created inside the freeze block
+    oldest_two_ids = {e.id for e in sorted(enrollments, key=lambda e: e.created_on)[:2]}
+    assert {e.id for e in successful} == oldest_two_ids
+
+
+def test_retry_failed_enroll_throttled_is_soft_failure(mocker):
+    """
+    A 429 from Open edX must not raise, must not mark the row as enrolled,
+    and must log at info (not exception) so Sentry doesn't drown in throttle
+    noise on every 30-minute pass.
+    """
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        enrollment = CourseRunEnrollmentFactory.create(
+            edx_enrolled=False, user__is_active=True
+        )
+    client = _mock_retry_edx_client(mocker)
+    throttled_response = MockResponse(
+        {"developer_message": "Request was throttled."}, status_code=429
+    )
+    client.enrollments.create_student_enrollment = mocker.Mock(
+        side_effect=HTTPError(response=throttled_response)
+    )
+    patched_log_exception = mocker.patch("openedx.api.log.exception")
+    patched_log_info = mocker.patch("openedx.api.log.info")
+
+    successful = retry_failed_edx_enrollments()
+
+    assert successful == []
+    enrollment.refresh_from_db()
+    assert enrollment.edx_enrolled is False
+    assert patched_log_exception.called is False
+    assert patched_log_info.called is True
 
 
 @pytest.mark.parametrize(

@@ -1223,35 +1223,118 @@ def enroll_in_edx_course_runs(
 
 def retry_failed_edx_enrollments():
     """
-    Gathers all CourseRunEnrollments with edx_enrolled=False and retries them via the edX API
+    Gathers CourseRunEnrollments with edx_enrolled=False and retries them via the
+    edX API.
+
+    Retries are bounded in three ways so a permanently-broken row cannot pin
+    Open edX's per-user enrollment throttle (staff = 120/min):
+
+      * an age cap (settings.RETRY_FAILED_EDX_ENROLLMENT_MAX_AGE_DAYS) drops
+        rows that have failed for so long they are almost certainly unrecoverable;
+      * a batch size (settings.RETRY_FAILED_EDX_ENROLLMENT_BATCH_SIZE) limits
+        how many rows we hit per invocation;
+      * rows are retried with a single POST to the enrollment endpoint
+        (`force_enrollment=True`, which is an upsert server-side) instead of
+        the GET-then-POST dance in `enroll_in_edx_course_runs`, halving the
+        request cost per row.
 
     Returns:
-        list of CourseRunEnrollment: All CourseRunEnrollments that were successfully retried
+        list of CourseRunEnrollment: All CourseRunEnrollments that were
+        successfully retried in this invocation.
     """
     now = now_in_utc()
-    failed_run_enrollments = courses.models.CourseRunEnrollment.objects.select_related(
+    qs = courses.models.CourseRunEnrollment.objects.select_related(
         "user", "run"
     ).filter(
         user__is_active=True,
         edx_enrolled=False,
         created_on__lt=now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS),
     )
+    max_age_days = settings.RETRY_FAILED_EDX_ENROLLMENT_MAX_AGE_DAYS
+    if max_age_days > 0:
+        qs = qs.filter(created_on__gte=now - timedelta(days=max_age_days))
+
+    batch_size = max(1, settings.RETRY_FAILED_EDX_ENROLLMENT_BATCH_SIZE)
+    # `.order_by(...)[:N]` gives us a deterministic slice each pass so we don't
+    # starve rows; oldest-first also matches the intuitive "drain the backlog".
+    batch = list(qs.order_by("created_on")[:batch_size])
+
     succeeded = []
-    for enrollment in failed_run_enrollments:
-        user = enrollment.user
-        course_run = enrollment.run
+    edx_client = get_edx_api_service_client()
+    for enrollment in batch:
         try:
-            enroll_in_edx_course_runs(
-                user, [course_run], mode=enrollment.enrollment_mode
+            _retry_single_enrollment(edx_client, enrollment)
+        except HTTPError as exc:  # noqa: PERF203
+            # 429s are expected under load: log at info level and let the next
+            # scheduled invocation pick this row up. Everything else is a real
+            # error and should surface.
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            if status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+                log.info(
+                    "edX enrollment retry throttled (429) for user %s in %s; "
+                    "will retry on next pass.",
+                    enrollment.user.edx_username,
+                    enrollment.run.courseware_id,
+                )
+            else:
+                log.exception(
+                    "edX enrollment retry failed for user %s in %s",
+                    enrollment.user.edx_username,
+                    enrollment.run.courseware_id,
+                )
+        except Exception:  # pylint: disable=broad-except
+            log.exception(
+                "edX enrollment retry failed for user %s in %s",
+                enrollment.user.edx_username,
+                enrollment.run.courseware_id,
             )
-        except Exception as exc:  # pylint: disable=broad-except
-            log.exception(str(exc))  # noqa: TRY401
         else:
             enrollment.edx_enrolled = True
             enrollment.edx_emails_subscription = True
             enrollment.save_and_log(None)
             succeeded.append(enrollment)
     return succeeded
+
+
+def _retry_single_enrollment(edx_client, enrollment):
+    """
+    POST-only enrollment retry used by `retry_failed_edx_enrollments`.
+
+    Bypasses `existing_edx_enrollment`'s GET to avoid burning a second call
+    against the shared service-worker throttle bucket; Open edX's enrollment
+    endpoint with `force_enrollment=True` is idempotent on the server side.
+    """
+    user = enrollment.user
+    course_run = enrollment.run
+    mode = enrollment.enrollment_mode
+    username = user.edx_username
+
+    try:
+        repair_faulty_edx_user(user)
+    except Exception as exc:
+        msg = f"Failed to verify/create user {username} in OpenEdX"
+        raise OpenEdxUserMissingError(msg) from exc
+
+    if not user.openedx_user_exists:
+        msg = f"User {username} does not exist in OpenEdX and could not be created"
+        raise OpenEdxUserMissingError(msg)
+
+    result = edx_client.enrollments.create_student_enrollment(
+        course_run.courseware_id,
+        mode=mode,
+        username=username,
+        force_enrollment=True,
+    )
+    if not result.is_active:
+        # Mirror the behavior of `enroll_in_edx_course_runs`: a first POST that
+        # returns an inactive enrollment gets one more shot before we give up.
+        result = edx_client.enrollments.create_student_enrollment(
+            course_run.courseware_id,
+            mode=mode,
+            username=username,
+            force_enrollment=True,
+        )
+    return result
 
 
 def unenroll_edx_course_run(run_enrollment):
