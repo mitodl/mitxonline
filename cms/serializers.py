@@ -22,11 +22,12 @@ class RemovableLongFieldsMixin:
     set to a truthy value in the serializer context.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
         if self.context.get("remove_long_page_fields"):
             for field_name in LONG_PAGE_FIELDS:
-                self.fields.pop(field_name, None)
+                data.pop(field_name, None)
+        return data
 
 
 class BaseCoursePageSerializer(RemovableLongFieldsMixin, serializers.ModelSerializer):
