@@ -18,6 +18,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
     page_url = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
     about = serializers.SerializerMethodField()
+    what_you_learn = serializers.SerializerMethodField()
     effort = serializers.SerializerMethodField()
     length = serializers.SerializerMethodField()
 
@@ -47,6 +48,15 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
             else None
         )
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_what_you_learn(self, instance):
+        """Get cleaned what_you_learn text."""
+        return (
+            bleach.clean(instance.what_you_learn, tags={}, strip=True)
+            if instance.what_you_learn
+            else None
+        )
+
     def get_effort(self, instance) -> str | None:
         """Get cleaned effort text."""
         return (
@@ -71,6 +81,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
             "page_url",
             "description",
             "about",
+            "what_you_learn",
             "live",
             "length",
             "effort",
@@ -276,6 +287,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     financial_assistance_form_url = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
     about = serializers.SerializerMethodField()
+    what_you_learn = serializers.SerializerMethodField()
 
     def _get_financial_assistance_url(self, page, slug):
         """Helper method to construct financial assistance URL"""
@@ -306,6 +318,15 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         return (
             bleach.clean(instance.about, tags={}, strip=True)
             if instance.about
+            else None
+        )
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_what_you_learn(self, instance):
+        """Get cleaned what_you_learn text."""
+        return (
+            bleach.clean(instance.what_you_learn, tags={}, strip=True)
+            if instance.what_you_learn
             else None
         )
 
@@ -407,6 +428,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "financial_assistance_form_url",
             "description",
             "about",
+            "what_you_learn",
             "live",
             "include_in_learn_catalog",
             "length",
