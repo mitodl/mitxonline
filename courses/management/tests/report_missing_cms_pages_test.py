@@ -33,14 +33,14 @@ def test_report_missing_cms_pages_all_buckets():
     ProgramFactory.create()
 
     # Missing course page
-    CourseFactory.create(page=None)
+    missing_course_page = CourseFactory.create(page=None)
 
     # Missing course certificate page
     course_missing_cert_page = CourseFactory.create()
     CertificatePage.objects.descendant_of(course_missing_cert_page.page).delete()
 
     # Missing program page
-    ProgramFactory.create(page=None)
+    missing_program_page = ProgramFactory.create(page=None)
 
     # Missing program certificate page
     program_missing_cert_page = ProgramFactory.create()
@@ -52,6 +52,26 @@ def test_report_missing_cms_pages_all_buckets():
     assert "Courses missing CMS certificate page: 1" in output
     assert "Programs missing CMS page: 1" in output
     assert "Programs missing CMS certificate page: 1" in output
+    assert "Course missing page details:" in output
+    assert (
+        f"- id={missing_course_page.id} readable_id={missing_course_page.readable_id} title={missing_course_page.title}"
+        in output
+    )
+    assert "Course missing certificate page details:" in output
+    assert (
+        f"- id={course_missing_cert_page.id} readable_id={course_missing_cert_page.readable_id} title={course_missing_cert_page.title}"
+        in output
+    )
+    assert "Program missing page details:" in output
+    assert (
+        f"- id={missing_program_page.id} readable_id={missing_program_page.readable_id} title={missing_program_page.title}"
+        in output
+    )
+    assert "Program missing certificate page details:" in output
+    assert (
+        f"- id={program_missing_cert_page.id} readable_id={program_missing_cert_page.readable_id} title={program_missing_cert_page.title}"
+        in output
+    )
 
 
 def test_report_missing_cms_pages_live_filter():
@@ -65,6 +85,8 @@ def test_report_missing_cms_pages_live_filter():
 
     assert "Courses missing CMS page: 1" in output
     assert "Programs missing CMS page: 1" in output
+    assert "Course missing page details:" in output
+    assert "Program missing page details:" in output
     assert live_course.live is True
     assert non_live_course.live is False
     assert live_program.live is True
@@ -118,3 +140,7 @@ def test_report_missing_cms_pages_eligible_users_only_filter():
 
     assert "Courses missing CMS page: 1" in output
     assert "Programs missing CMS page: 1" in output
+    assert "Course missing page details:" in output
+    assert f"readable_id={eligible_course.readable_id}" in output
+    assert "Program missing page details:" in output
+    assert f"readable_id={eligible_program.readable_id}" in output

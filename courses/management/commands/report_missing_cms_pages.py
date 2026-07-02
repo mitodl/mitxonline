@@ -23,11 +23,6 @@ class Command(BaseCommand):
             help="Only include live courses/programs in the report.",
         )
         parser.add_argument(
-            "--details",
-            action="store_true",
-            help="Print detailed rows for each missing item.",
-        )
-        parser.add_argument(
             "--eligible-users-only",
             action="store_true",
             help=(
@@ -38,7 +33,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):  # noqa: ARG002
         live_only = options.get("live", False)
-        show_details = options.get("details", False)
         eligible_users_only = options.get("eligible_users_only", False)
 
         courses_qs = Course.objects.all()
@@ -105,15 +99,14 @@ class Command(BaseCommand):
             )
         )
 
-        if show_details:
-            self._print_items("Course missing page", missing_course_pages)
-            self._print_items(
-                "Course missing certificate page", missing_course_certificate_pages
-            )
-            self._print_items("Program missing page", missing_program_pages)
-            self._print_items(
-                "Program missing certificate page", missing_program_certificate_pages
-            )
+        self._print_items("Course missing page", missing_course_pages)
+        self._print_items(
+            "Course missing certificate page", missing_course_certificate_pages
+        )
+        self._print_items("Program missing page", missing_program_pages)
+        self._print_items(
+            "Program missing certificate page", missing_program_certificate_pages
+        )
 
     def _print_items(self, label, items):
         if not items:
