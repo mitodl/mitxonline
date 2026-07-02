@@ -62,6 +62,7 @@ from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
+    OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
@@ -1043,6 +1044,73 @@ def test_retry_failed_enroll_grace_period(mocker):
     patched_enroll_in_edx.assert_called_once_with(
         older_enrollment.user, [older_enrollment.run], mode=EDX_ENROLLMENT_AUDIT_MODE
     )
+
+
+def test_retry_failed_edx_enrollments_increments_retry_count(mocker):
+    """A failed retry attempt should bump edx_enrollment_retry_count by 1"""
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        enrollment = CourseRunEnrollmentFactory.create(
+            edx_enrolled=False, user__is_active=True
+        )
+    mocker.patch(
+        "openedx.api.enroll_in_edx_course_runs",
+        side_effect=Exception("An error happened"),
+    )
+    mocker.patch("openedx.api.log.exception")
+
+    retry_failed_edx_enrollments()
+
+    enrollment.refresh_from_db()
+    assert enrollment.edx_enrollment_retry_count == 1
+
+
+def test_retry_failed_edx_enrollments_excludes_after_max_retries(mocker):
+    """
+    Once an enrollment has failed OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES times
+    it must not be retried again automatically.
+    """
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        exhausted_enrollment = CourseRunEnrollmentFactory.create(
+            edx_enrolled=False,
+            user__is_active=True,
+            edx_enrollment_retry_count=OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
+        )
+    patched_enroll_in_edx = mocker.patch("openedx.api.enroll_in_edx_course_runs")
+
+    successful_enrollments = retry_failed_edx_enrollments()
+
+    patched_enroll_in_edx.assert_not_called()
+    assert successful_enrollments == []
+    exhausted_enrollment.refresh_from_db()
+    assert (
+        exhausted_enrollment.edx_enrollment_retry_count
+        == OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+    )
+
+
+def test_retry_failed_edx_enrollments_dead_letters_at_max_retries(mocker):
+    """Reaching the retry cap should log a distinct give-up message"""
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        enrollment = CourseRunEnrollmentFactory.create(
+            edx_enrolled=False,
+            user__is_active=True,
+            edx_enrollment_retry_count=OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES - 1,
+        )
+    mocker.patch(
+        "openedx.api.enroll_in_edx_course_runs",
+        side_effect=Exception("An error happened"),
+    )
+    mocker.patch("openedx.api.log.exception")
+    patched_log_error = mocker.patch("openedx.api.log.error")
+
+    retry_failed_edx_enrollments()
+
+    enrollment.refresh_from_db()
+    assert (
+        enrollment.edx_enrollment_retry_count == OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+    )
+    patched_log_error.assert_called_once()
+    assert "Giving up" in patched_log_error.call_args[0][0]
 
 
 @pytest.mark.parametrize(

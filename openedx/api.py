@@ -34,6 +34,7 @@ from main import features
 from main.utils import get_partitioned_set_difference, get_redis_lock
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
+    OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
@@ -1223,7 +1224,13 @@ def enroll_in_edx_course_runs(
 
 def retry_failed_edx_enrollments():
     """
-    Gathers all CourseRunEnrollments with edx_enrolled=False and retries them via the edX API
+    Gathers all CourseRunEnrollments with edx_enrolled=False and retries them via the edX API.
+
+    An enrollment that has already failed OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+    times is excluded going forward instead of being retried on every run
+    forever - see MITXONLINE-5ZV, where a handful of permanently-unrecoverable
+    enrollments (expired course mode, deleted course run) generated hundreds
+    of thousands of repeat failures over 6+ months.
 
     Returns:
         list of CourseRunEnrollment: All CourseRunEnrollments that were successfully retried
@@ -1235,6 +1242,7 @@ def retry_failed_edx_enrollments():
         user__is_active=True,
         edx_enrolled=False,
         created_on__lt=now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS),
+        edx_enrollment_retry_count__lt=OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
     )
     succeeded = []
     for enrollment in failed_run_enrollments:
@@ -1246,6 +1254,19 @@ def retry_failed_edx_enrollments():
             )
         except Exception as exc:  # pylint: disable=broad-except
             log.exception(str(exc))  # noqa: TRY401
+            enrollment.edx_enrollment_retry_count += 1
+            enrollment.save(update_fields=["edx_enrollment_retry_count"])
+            if (
+                enrollment.edx_enrollment_retry_count
+                >= OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+            ):
+                log.error(  # noqa: TRY400 - traceback already logged above via log.exception
+                    "Giving up on edX enrollment repair for user %s in course run "
+                    "%s after %d failed attempts - will not be retried automatically",
+                    user.edx_username,
+                    course_run.courseware_id,
+                    enrollment.edx_enrollment_retry_count,
+                )
         else:
             enrollment.edx_enrolled = True
             enrollment.edx_emails_subscription = True

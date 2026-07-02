@@ -18,4 +18,10 @@ PRO_ENROLL_MODE_ERROR_TEXTS = (
 # The amount of minutes after creation that a openedx model record should be eligible for repair
 OPENEDX_REPAIR_GRACE_PERIOD_MINS = 5
 
+# How many times retry_failed_edx_enrollments will retry a single enrollment
+# before giving up on it. Without this, an unrecoverable failure (expired
+# course mode, deleted course run, etc) gets re-attempted on every repair run
+# forever - see MITXONLINE-5ZV.
+OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES = 5
+
 OPENEDX_USERNAME_MAX_LEN = 30
