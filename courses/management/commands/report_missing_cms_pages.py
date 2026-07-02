@@ -133,12 +133,14 @@ class Command(BaseCommand):
             .annotate(has_paid_enrollment=Exists(paid_enrollment))
             .filter(has_paid_enrollment=True)
             .values_list("course_run__course_id", flat=True)
-        )
+        ).distinct()
 
     def _eligible_program_ids(self):
         """
         Return a queryset of program IDs for which at least one user is eligible for a certificate.
         """
-        return get_eligible_program_certificate_candidates().values_list(
-            "program_id", flat=True
+        return (
+            get_eligible_program_certificate_candidates()
+            .values_list("program_id", flat=True)
+            .distinct()
         )
