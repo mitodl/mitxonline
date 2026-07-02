@@ -378,17 +378,11 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             else:
                 discounts = contract.get_discounts().prefetch_related(prefetch)
 
-            if not contract.max_learners:
-                # No learner limit - show first code only, if there is one
-                first = discounts.order_by("id").first()
-                codes_for_output = [first] if first is not None else []
-            else:
-                # Has learner limit - show redeemed codes + enough unused codes to fill remaining seats
-                discounts = discounts.annotate(
-                    num_redemptions=Count("contract_redemptions")
-                ).order_by("-num_redemptions", "id")
+            discounts = discounts.annotate(
+                num_redemptions=Count("contract_redemptions")
+            ).order_by("-num_redemptions", "id")
 
-                codes_for_output = discounts.filter(num_redemptions__gt=0).all()
+            codes_for_output = discounts.filter(num_redemptions__gt=0).all()
 
         return self.get_paginated_response(
             ManagerEnrollmentCodeSerializer(
