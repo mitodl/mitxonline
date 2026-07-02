@@ -1,5 +1,7 @@
 """Tests for report_missing_cms_pages command."""
 
+from io import StringIO
+
 import pytest
 
 from cms.models import CertificatePage
@@ -15,6 +17,13 @@ from courses.management.commands import report_missing_cms_pages
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
+
+
+def _run_command(**kwargs):
+    out = StringIO()
+    command = report_missing_cms_pages.Command(stdout=out)
+    command.handle(**kwargs)
+    return out.getvalue()
 
 
 def test_report_missing_cms_pages_all_buckets():
@@ -37,12 +46,12 @@ def test_report_missing_cms_pages_all_buckets():
     program_missing_cert_page = ProgramFactory.create()
     CertificatePage.objects.descendant_of(program_missing_cert_page.page).delete()
 
-    stats = report_missing_cms_pages.Command().handle()
+    output = _run_command()
 
-    assert stats["missing_course_pages"] == 1
-    assert stats["missing_course_certificate_pages"] == 1
-    assert stats["missing_program_pages"] == 1
-    assert stats["missing_program_certificate_pages"] == 1
+    assert "Courses missing CMS page: 1" in output
+    assert "Courses missing CMS certificate page: 1" in output
+    assert "Programs missing CMS page: 1" in output
+    assert "Programs missing CMS certificate page: 1" in output
 
 
 def test_report_missing_cms_pages_live_filter():
@@ -52,10 +61,10 @@ def test_report_missing_cms_pages_live_filter():
     live_program = ProgramFactory.create(page=None, live=True)
     non_live_program = ProgramFactory.create(page=None, live=False)
 
-    stats = report_missing_cms_pages.Command().handle(live=True)
+    output = _run_command(live=True)
 
-    assert stats["missing_course_pages"] == 1
-    assert stats["missing_program_pages"] == 1
+    assert "Courses missing CMS page: 1" in output
+    assert "Programs missing CMS page: 1" in output
     assert live_course.live is True
     assert non_live_course.live is False
     assert live_program.live is True
@@ -105,7 +114,7 @@ def test_report_missing_cms_pages_eligible_users_only_filter():
         active=True,
     )
 
-    stats = report_missing_cms_pages.Command().handle(eligible_users_only=True)
+    output = _run_command(eligible_users_only=True)
 
-    assert stats["missing_course_pages"] == 1
-    assert stats["missing_program_pages"] == 1
+    assert "Courses missing CMS page: 1" in output
+    assert "Programs missing CMS page: 1" in output

@@ -115,8 +115,6 @@ class Command(BaseCommand):
                 "Program missing certificate page", missing_program_certificate_pages
             )
 
-        return stats
-
     def _print_items(self, label, items):
         if not items:
             return
