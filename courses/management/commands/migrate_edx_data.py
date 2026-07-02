@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.models import Q
@@ -21,7 +22,7 @@ from courses.models import (
 )
 from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import ZERO_PAYMENT_DATA
-from ecommerce.models import Discount, PendingOrder, Product
+from ecommerce.models import Discount, Order, OrderStatus, PendingOrder, Product
 from openedx.api import repair_faulty_edx_user
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
@@ -855,8 +856,19 @@ class Command(BaseCommand):
             }
 
             self._upgrade_enrollment_modes(verified_rows, existing_enrollments)
+            # Only bulk-create non-verified enrollments here. Verified enrollments
+            # are created atomically inside each order's transaction.atomic() block via
+            # fulfill_completed_order → create_run_enrollments. Creating them here
+            # (before the order loop) leads to inconsistent state if the script is
+            # interrupted: the enrollment exists in the DB but no order is ever created.
+            non_verified_rows = [
+                row
+                for row in rows
+                if row.get("courserunenrollment_enrollment_mode")
+                != EDX_ENROLLMENT_VERIFIED_MODE
+            ]
             total_enrollments += self._bulk_create_enrollments(
-                rows,
+                non_verified_rows,
                 batch_size,
                 edx_enrolled=False,
             )
@@ -876,29 +888,42 @@ class Command(BaseCommand):
             }
             discounts = {d.id: d for d in Discount.objects.filter(id__in=discount_ids)}
 
+            verified_courserun_ids = {row["courserun_id"] for row in verified_rows}
+            courserun_ct_id = ContentType.objects.get(
+                app_label="courses", model="courserun"
+            ).pk
+            existing_fulfilled_order_pairs = set(
+                Order.objects.filter(
+                    state=OrderStatus.FULFILLED,
+                    purchaser_id__in=verified_user_ids,
+                    lines__purchased_content_type_id=courserun_ct_id,
+                    lines__purchased_object_id__in=verified_courserun_ids,
+                ).values_list("purchaser_id", "lines__purchased_object_id")
+            )
+
             id_row_lookup = {
                 row["user_mitxonline_id"]: row
                 for row in rows
                 if row.get("user_mitxonline_id")
             }
-            self._bulk_create_legal_addresses(
-                list(all_users.values()), id_row_lookup, batch_size
-            )
+            unsynced_users = [
+                user
+                for user in all_users.values()
+                if not id_row_lookup.get(user.id, {}).get("openedxuser_has_been_synced")
+            ]
+            self._bulk_create_legal_addresses(unsynced_users, id_row_lookup, batch_size)
             self._bulk_create_user_profiles(
-                list(all_users.values()), id_row_lookup, batch_size, GENDER_MAP
+                unsynced_users, id_row_lookup, batch_size, GENDER_MAP
             )
-
-            for user in all_users.values():
+            for user in unsynced_users:
                 self._repair_user(user, repaired_user_ids)
 
             for row in verified_rows:
                 try:
                     if (
-                        existing_enrollments.get(
-                            (row["user_mitxonline_id"], row["courserun_id"])
-                        )
-                        == EDX_ENROLLMENT_VERIFIED_MODE
-                    ):
+                        row["user_mitxonline_id"],
+                        row["courserun_id"],
+                    ) in existing_fulfilled_order_pairs:
                         continue
 
                     user = all_users.get(row["user_mitxonline_id"])
