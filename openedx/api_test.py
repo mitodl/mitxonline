@@ -74,6 +74,7 @@ from openedx.exceptions import (
     EdxApiRegistrationValidationException,
     EdxApiUserUpdateError,
     NoEdxApiAuthError,
+    OpenEdxUserMissingError,
     UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -1066,6 +1067,28 @@ def test_retry_failed_edx_enrollments_increments_retry_count(mocker):
     mocker.patch(
         "openedx.api.enroll_in_edx_course_runs",
         side_effect=_permanent_enroll_error(enrollment.user, enrollment.run),
+    )
+    mocker.patch("openedx.api.log.exception")
+
+    retry_failed_edx_enrollments()
+
+    enrollment.refresh_from_db()
+    assert enrollment.edx_enrollment_retry_count == 1
+
+
+def test_retry_failed_edx_enrollments_counts_missing_openedx_user(mocker):
+    """
+    OpenEdxUserMissingError (repair_faulty_edx_user couldn't create/verify
+    the user in edX) must count toward the retry cap - MITXONLINE-5Q0 shows
+    this doesn't resolve itself on retry over 6+ months of repeated failures.
+    """
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        enrollment = CourseRunEnrollmentFactory.create(
+            edx_enrolled=False, user__is_active=True
+        )
+    mocker.patch(
+        "openedx.api.enroll_in_edx_course_runs",
+        side_effect=OpenEdxUserMissingError("user does not exist in OpenEdX"),
     )
     mocker.patch("openedx.api.log.exception")
 

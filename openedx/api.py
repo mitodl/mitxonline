@@ -1234,6 +1234,12 @@ def _is_permanent_enrollment_failure(exc):
     within a single extended outage window instead of just the handful that
     are actually permanently broken.
     """
+    if isinstance(exc, OpenEdxUserMissingError):
+        # a user edX record that repair_faulty_edx_user can't create is not
+        # a transient blip in practice - see MITXONLINE-5Q0, chronic for 6+
+        # months at 52k+ events with no sign of resolving itself on retry
+        return True
+
     if not isinstance(exc, EdxApiEnrollErrorException):
         # network errors, unexpected exceptions, etc - assume transient
         return False
