@@ -38,7 +38,15 @@ class BaseCourseSerializer(BaseSerializer):
         data = super().to_representation(instance)
         if not self.context.get("include_page_fields") or not hasattr(instance, "page"):
             return data
-        return {**data, **CoursePageSerializer(instance=instance.page).data}
+        page_context = (
+            {"remove_long_page_fields": True}
+            if self.context.get("remove_long_page_fields")
+            else {}
+        )
+        return {
+            **data,
+            **CoursePageSerializer(instance=instance.page, context=page_context).data,
+        }
 
     @staticmethod
     def get_type(obj) -> str:  # noqa: ARG004

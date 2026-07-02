@@ -576,7 +576,11 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
             )
 
         return Response(
-            UserProgramEnrollmentDetailSerializer(program_list, many=True).data
+            UserProgramEnrollmentDetailSerializer(
+                program_list,
+                many=True,
+                context={"remove_long_page_fields": True},
+            ).data
         )
 
     @extend_schema(

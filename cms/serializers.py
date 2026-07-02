@@ -10,8 +10,26 @@ from cms import models
 from cms.api import get_wagtail_img_src
 from cms.models import FlexiblePricingRequestForm, ProgramPage
 
+# Rich-text fields that can be large and are excluded from some endpoints
+# (e.g. the program enrollments listing) to keep the payload small.
+LONG_PAGE_FIELDS = ("about", "what_you_learn")
 
-class BaseCoursePageSerializer(serializers.ModelSerializer):
+
+class RemovableLongFieldsMixin:
+    """
+    Serializer mixin that drops the long rich-text page fields (see
+    ``LONG_PAGE_FIELDS``) from the output when ``remove_long_page_fields`` is
+    set to a truthy value in the serializer context.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.context.get("remove_long_page_fields"):
+            for field_name in LONG_PAGE_FIELDS:
+                self.fields.pop(field_name, None)
+
+
+class BaseCoursePageSerializer(RemovableLongFieldsMixin, serializers.ModelSerializer):
     """Course page model serializer"""
 
     feature_image_src = serializers.SerializerMethodField()
@@ -277,7 +295,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         ]
 
 
-class ProgramPageSerializer(serializers.ModelSerializer):
+class ProgramPageSerializer(RemovableLongFieldsMixin, serializers.ModelSerializer):
     """Program page model serializer"""
 
     feature_image_src = serializers.SerializerMethodField()

@@ -92,10 +92,13 @@ class ProgramSerializer(serializers.ModelSerializer):
     @extend_schema_field(CourseWithCourseRunsSerializer)
     def get_courses(self, instance):
         """Serializer for courses"""
+        context = {"include_page_fields": True}
+        if self.context.get("remove_long_page_fields"):
+            context["remove_long_page_fields"] = True
         return CourseWithCourseRunsSerializer(
             [course[0] for course in instance.courses if course[0].live],
             many=True,
-            context={"include_page_fields": True},
+            context=context,
         ).data
 
     @extend_schema_field(
@@ -141,7 +144,12 @@ class ProgramSerializer(serializers.ModelSerializer):
     @extend_schema_field(ProgramPageSerializer)
     def get_page(self, instance):
         if hasattr(instance, "page"):
-            return ProgramPageSerializer(instance.page).data
+            page_context = (
+                {"remove_long_page_fields": True}
+                if self.context.get("remove_long_page_fields")
+                else {}
+            )
+            return ProgramPageSerializer(instance.page, context=page_context).data
         else:
             return {"feature_image_src": get_thumbnail_url(None)}
 

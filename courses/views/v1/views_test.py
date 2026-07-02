@@ -850,18 +850,24 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                 },
                 "program_type": program_enrollment.program.program_type,
                 "page": dict(
-                    ProgramPageSerializer(program_enrollment.program.page).data
+                    ProgramPageSerializer(
+                        program_enrollment.program.page,
+                        context={"remove_long_page_fields": True},
+                    ).data
                 ),
                 "courses": [
                     {
                         "id": course.id,
-                        "about": None,
-                        "what_you_learn": None,
                         "instructors": [],
                         "departments": [],
                         "next_run_id": getattr(course.first_unexpired_run, "id", None),
                         "current_price": None,
-                        "page": dict(CoursePageSerializer(course.page).data),
+                        "page": dict(
+                            CoursePageSerializer(
+                                course.page,
+                                context={"remove_long_page_fields": True},
+                            ).data
+                        ),
                         "page_url": None,
                         "programs": None,
                         "live": course.live,
@@ -895,7 +901,12 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                     "grades": [],
                     "id": run_enrollment.id,
                     "enrollment_mode": run_enrollment.enrollment_mode,
-                    "run": dict(CourseRunWithCourseSerializer(run_enrollment.run).data),
+                    "run": dict(
+                        CourseRunWithCourseSerializer(
+                            run_enrollment.run,
+                            context={"remove_long_page_fields": True},
+                        ).data
+                    ),
                 }
                 for run_enrollment in run_enrollments_by_program_id[
                     program_enrollment.program_id
