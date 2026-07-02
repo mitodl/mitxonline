@@ -109,6 +109,9 @@ class Command(BaseCommand):
         )
 
     def _print_items(self, label, items):
+        """
+        Print a list of items with their id, readable_id, and title.
+        """
         if not items:
             return
 
@@ -119,6 +122,10 @@ class Command(BaseCommand):
             )
 
     def _eligible_course_ids(self):
+        """
+        Return a queryset of course IDs for which at least one user has passed a
+        course run and has a paid enrollment in that course run.
+        """
         paid_enrollment = CourseRunEnrollment.objects.filter(
             user_id=OuterRef("user_id"),
             run_id=OuterRef("course_run_id"),
@@ -133,6 +140,9 @@ class Command(BaseCommand):
         )
 
     def _eligible_program_ids(self):
+        """
+        Return a queryset of program IDs for which at least one user is eligible for a certificate.
+        """
         return get_eligible_program_certificate_candidates().values_list(
             "program_id", flat=True
         )
