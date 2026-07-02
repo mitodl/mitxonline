@@ -34,20 +34,17 @@ def test_report_missing_cms_pages_all_buckets():
 
     # Missing course page
     missing_course_page = CourseFactory.create(page=None)
-
     # Missing course certificate page
     course_missing_cert_page = CourseFactory.create()
     CertificatePage.objects.descendant_of(course_missing_cert_page.page).delete()
 
     # Missing program page
     missing_program_page = ProgramFactory.create(page=None)
-
     # Missing program certificate page
     program_missing_cert_page = ProgramFactory.create()
     CertificatePage.objects.descendant_of(program_missing_cert_page.page).delete()
 
     output = _run_command()
-
     assert "Courses missing CMS page: 1" in output
     assert "Courses missing CMS certificate page: 1" in output
     assert "Programs missing CMS page: 1" in output
