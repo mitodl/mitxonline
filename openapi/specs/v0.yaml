@@ -5019,6 +5019,10 @@ components:
           type: string
           nullable: true
           readOnly: true
+        what_you_learn:
+          type: string
+          nullable: true
+          readOnly: true
         live:
           type: boolean
           readOnly: true
@@ -5056,6 +5060,7 @@ components:
       - length
       - live
       - page_url
+      - what_you_learn
     CoursePageItem:
       type: object
       description: Serializer for individual course page items, including all relevant
@@ -8475,6 +8480,10 @@ components:
           type: string
           nullable: true
           readOnly: true
+        what_you_learn:
+          type: string
+          nullable: true
+          readOnly: true
         live:
           type: boolean
           readOnly: true
@@ -8511,6 +8520,7 @@ components:
       - live
       - page_url
       - price
+      - what_you_learn
     ProgramPageItem:
       type: object
       description: Serializer for individual program page items, including all relevant
