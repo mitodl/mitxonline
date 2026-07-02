@@ -469,6 +469,7 @@ def test_audit(user, is_program):
         expected["edx_enrolled"] = enrollment.edx_enrolled
         expected["run"] = enrollment.run.id
         expected["edx_emails_subscription"] = True
+        expected["edx_enrollment_retry_count"] = enrollment.edx_enrollment_retry_count
     else:
         expected["program"] = enrollment.program.id
     assert (

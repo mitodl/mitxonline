@@ -1222,15 +1222,47 @@ def enroll_in_edx_course_runs(
     return results
 
 
+def _is_permanent_enrollment_failure(exc):
+    """
+    Whether a failed edX enrollment attempt is unlikely to ever succeed on
+    retry (expired course mode, deleted course run, etc) as opposed to a
+    transient/systemic failure (5xx, rate limiting, network error).
+
+    A systemic edX outage would otherwise cause every affected enrollment to
+    fail on the same run and get counted toward the retry cap together,
+    potentially exhausting all retries for perfectly healthy enrollments
+    within a single extended outage window instead of just the handful that
+    are actually permanently broken.
+    """
+    if not isinstance(exc, EdxApiEnrollErrorException):
+        # network errors, unexpected exceptions, etc - assume transient
+        return False
+
+    response = exc.http_error.response
+    if response is None:
+        return False
+
+    return (
+        status.HTTP_400_BAD_REQUEST
+        <= response.status_code
+        < status.HTTP_500_INTERNAL_SERVER_ERROR
+        and response.status_code != status.HTTP_429_TOO_MANY_REQUESTS
+    )
+
+
 def retry_failed_edx_enrollments():
     """
     Gathers all CourseRunEnrollments with edx_enrolled=False and retries them via the edX API.
 
     An enrollment that has already failed OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
-    times is excluded going forward instead of being retried on every run
-    forever - see MITXONLINE-5ZV, where a handful of permanently-unrecoverable
-    enrollments (expired course mode, deleted course run) generated hundreds
-    of thousands of repeat failures over 6+ months.
+    times with a permanent, per-enrollment error (see
+    _is_permanent_enrollment_failure) is excluded going forward instead of
+    being retried on every run forever - see MITXONLINE-5ZV, where a handful
+    of permanently-unrecoverable enrollments (expired course mode, deleted
+    course run) generated hundreds of thousands of repeat failures over 6+
+    months. Transient/systemic failures (edX downtime, rate limiting) don't
+    count against the cap, so an outage doesn't dead-letter healthy
+    enrollments that just happened to be retried during it.
 
     Returns:
         list of CourseRunEnrollment: All CourseRunEnrollments that were successfully retried
@@ -1254,6 +1286,8 @@ def retry_failed_edx_enrollments():
             )
         except Exception as exc:  # pylint: disable=broad-except
             log.exception(str(exc))  # noqa: TRY401
+            if not _is_permanent_enrollment_failure(exc):
+                continue
             enrollment.edx_enrollment_retry_count += 1
             enrollment.save(update_fields=["edx_enrollment_retry_count"])
             if (

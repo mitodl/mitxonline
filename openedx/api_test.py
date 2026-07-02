@@ -1046,15 +1046,26 @@ def test_retry_failed_enroll_grace_period(mocker):
     )
 
 
+def _permanent_enroll_error(user, course_run, status_code=status.HTTP_400_BAD_REQUEST):
+    """Build an EdxApiEnrollErrorException wrapping the given HTTP status"""
+    return EdxApiEnrollErrorException(
+        user,
+        course_run,
+        HTTPError(
+            response=MockResponse({"message": "no dice"}, status_code=status_code)
+        ),
+    )
+
+
 def test_retry_failed_edx_enrollments_increments_retry_count(mocker):
-    """A failed retry attempt should bump edx_enrollment_retry_count by 1"""
+    """A failed retry attempt from a permanent (4xx) error should bump edx_enrollment_retry_count by 1"""
     with freeze_time(now_in_utc() - timedelta(days=1)):
         enrollment = CourseRunEnrollmentFactory.create(
             edx_enrolled=False, user__is_active=True
         )
     mocker.patch(
         "openedx.api.enroll_in_edx_course_runs",
-        side_effect=Exception("An error happened"),
+        side_effect=_permanent_enroll_error(enrollment.user, enrollment.run),
     )
     mocker.patch("openedx.api.log.exception")
 
@@ -1062,6 +1073,59 @@ def test_retry_failed_edx_enrollments_increments_retry_count(mocker):
 
     enrollment.refresh_from_db()
     assert enrollment.edx_enrollment_retry_count == 1
+
+
+@pytest.mark.parametrize(
+    "exception",
+    [
+        Exception("connection reset"),
+        lambda user, run: EdxApiEnrollErrorException(
+            user,
+            run,
+            HTTPError(
+                response=MockResponse(
+                    {"message": "unavailable"},
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            ),
+        ),
+        lambda user, run: EdxApiEnrollErrorException(
+            user,
+            run,
+            HTTPError(
+                response=MockResponse(
+                    {"message": "too many requests"},
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+            ),
+        ),
+    ],
+)
+def test_retry_failed_edx_enrollments_does_not_count_transient_failures(
+    mocker, exception
+):
+    """
+    Transient/systemic failures (network errors, 5xx, 429 rate limiting) must
+    not count against the retry cap - a single edX outage shouldn't be able
+    to dead-letter every enrollment that gets retried during it.
+    """
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        enrollment = CourseRunEnrollmentFactory.create(
+            edx_enrolled=False, user__is_active=True
+        )
+    side_effect = (
+        exception(enrollment.user, enrollment.run) if callable(exception) else exception
+    )
+    mocker.patch(
+        "openedx.api.enroll_in_edx_course_runs",
+        side_effect=side_effect,
+    )
+    mocker.patch("openedx.api.log.exception")
+
+    retry_failed_edx_enrollments()
+
+    enrollment.refresh_from_db()
+    assert enrollment.edx_enrollment_retry_count == 0
 
 
 def test_retry_failed_edx_enrollments_excludes_after_max_retries(mocker):
@@ -1098,7 +1162,7 @@ def test_retry_failed_edx_enrollments_dead_letters_at_max_retries(mocker):
         )
     mocker.patch(
         "openedx.api.enroll_in_edx_course_runs",
-        side_effect=Exception("An error happened"),
+        side_effect=_permanent_enroll_error(enrollment.user, enrollment.run),
     )
     mocker.patch("openedx.api.log.exception")
     patched_log_error = mocker.patch("openedx.api.log.error")
