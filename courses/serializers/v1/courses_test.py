@@ -119,6 +119,7 @@ def test_serialize_course_with_page_fields(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags={}, strip=True),
+            "about": None,
             "live": True,
             "effort": course_page.effort,
             "length": course_page.length,
