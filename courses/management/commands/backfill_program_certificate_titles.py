@@ -149,11 +149,9 @@ class Command(BaseCommand):
         if commit and to_change:
             with transaction.atomic():
                 for revision in to_change:
-                    # Reassign (don't mutate in place) so save(update_fields=...)
-                    # reliably detects the JSONField change.
-                    content = revision.content
-                    content["product_name"] = title
-                    revision.content = content
+                    # Build a fresh dict rather than mutating revision.content in
+                    # place, so the stored JSONField is replaced cleanly.
+                    revision.content = {**revision.content, "product_name": title}
                     revision.save(update_fields=["content"])
 
         self._flush(lines)
@@ -173,7 +171,7 @@ class Command(BaseCommand):
         yielded (with its own readable_id).
         """
         if all_programs:
-            for program in Program.objects.all():
+            for program in Program.objects.all().order_by("readable_id"):
                 yield program.readable_id, program
             return
         by_readable_id = {
@@ -202,7 +200,10 @@ class Command(BaseCommand):
         by the program's active certificates.
         """
         grouped = {}
-        for cert in ProgramCertificate.objects.filter(program=program):
+        certs = ProgramCertificate.objects.filter(program=program).select_related(
+            "certificate_page_revision"
+        )
+        for cert in certs:
             revision = cert.certificate_page_revision
             if revision is None:
                 continue
