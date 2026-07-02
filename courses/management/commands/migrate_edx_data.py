@@ -711,15 +711,19 @@ class Command(BaseCommand):
                         )
                         continue
 
-                    already_enrolled = ProgramEnrollment.all_objects.filter(
+                    existing_enrollment = ProgramEnrollment.all_objects.filter(
                         user=user,
                         program=program,
-                    ).exists()
-                    if already_enrolled:
+                    ).first()
+                    if (
+                        existing_enrollment
+                        and existing_enrollment.enrollment_mode
+                        == EDX_ENROLLMENT_VERIFIED_MODE
+                    ):
                         self.stdout.write(
                             self.style.WARNING(
                                 f"Skipping order creation: user={user.id} is already enrolled "
-                                f"in program={program.id}"
+                                f"in verified mode for program={program.id}"
                             )
                         )
                         continue
