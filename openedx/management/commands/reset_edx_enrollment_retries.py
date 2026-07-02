@@ -4,7 +4,7 @@ set of enrollments, e.g. after fixing a course misconfiguration that caused
 a wave of enrollments to exhaust their automatic repair retries.
 """
 
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
 
 from courses.models import CourseRunEnrollment
 from openedx.constants import OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
@@ -39,6 +39,16 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--all",
+            action="store_true",
+            help=(
+                "Required in place of --run/uservalues to reset every "
+                "unenrolled CourseRunEnrollment org-wide. This defeats the "
+                "dead-letter cap for anything it touches, so it's opt-in "
+                "rather than the default of an unscoped call."
+            ),
+        )
+        parser.add_argument(
             "uservalues",
             nargs="*",
             type=str,
@@ -50,6 +60,15 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):  # noqa: ARG002
         """Run the command"""
+        if not (options["run"] or options["uservalues"] or options["all"]):
+            msg = (
+                "Refusing to run without --run, at least one user value, or "
+                "--all - an unscoped call would reset the retry count for "
+                "every unenrolled CourseRunEnrollment in the database, "
+                "silently defeating the dead-letter cap."
+            )
+            raise CommandError(msg)
+
         enrollment_filter = {"edx_enrolled": False}
         if options["run"]:
             enrollment_filter["run__courseware_id"] = options["run"]

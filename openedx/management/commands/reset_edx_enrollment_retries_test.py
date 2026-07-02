@@ -1,9 +1,38 @@
 import pytest
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 
 from courses.factories import CourseRunEnrollmentFactory
 
 pytestmark = [pytest.mark.django_db]
+
+
+def test_reset_edx_enrollment_retries_requires_scope():
+    """
+    Refuse to run unscoped - otherwise it would reset every unenrolled
+    CourseRunEnrollment in the database and silently defeat the dead-letter
+    cap this command exists to make reversible.
+    """
+    unrelated = CourseRunEnrollmentFactory.create(
+        edx_enrolled=False, edx_enrollment_retry_count=5
+    )
+
+    with pytest.raises(CommandError):
+        call_command("reset_edx_enrollment_retries")
+
+    unrelated.refresh_from_db()
+    assert unrelated.edx_enrollment_retry_count == 5
+
+
+def test_reset_edx_enrollment_retries_all_flag():
+    """--all is the explicit opt-in for an org-wide reset"""
+    enrollment = CourseRunEnrollmentFactory.create(
+        edx_enrolled=False, edx_enrollment_retry_count=5
+    )
+
+    call_command("reset_edx_enrollment_retries", "--all")
+
+    enrollment.refresh_from_db()
+    assert enrollment.edx_enrollment_retry_count == 0
 
 
 def test_reset_edx_enrollment_retries():
