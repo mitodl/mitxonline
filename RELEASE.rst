@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 1.158.9
+---------------
+
+- Handle no max learners case (#3722)
+
 Version 1.158.8 (Released July 01, 2026)
 ---------------
 
