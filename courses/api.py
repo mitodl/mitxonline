@@ -15,7 +15,7 @@ import requests
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Prefetch, Q
 from django_countries import countries
@@ -914,21 +914,23 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
                 user=user, course_run=course_run
             )
             if not certificate.certificate_page_revision:
-                try:
-                    course_page = course_run.course.page
-                except ObjectDoesNotExist:
+                course = course_run.course
+                if not hasattr(course, "page") or not course.page:
                     log.warning(
                         "Skipping certificate page revision for user=%s run=%s because course page is missing",
                         user.id,
                         course_run.courseware_id,
                     )
-                else:
-                    if not course_page.certificate_page:
-                        log.warning(
-                            "Skipping certificate page revision for user=%s run=%s because certificate page is missing",
-                            user.id,
-                            course_run.courseware_id,
-                        )
+                elif (
+                    hasattr(course, "page")
+                    and course.page
+                    and not course.page.certificate_page
+                ):
+                    log.warning(
+                        "Skipping certificate page revision for user=%s run=%s because certificate page is missing",
+                        user.id,
+                        course_run.courseware_id,
+                    )
             sync_hubspot_user(user)
             if not certificate.verifiable_credential_id:
                 create_verifiable_credential(certificate)
@@ -936,12 +938,6 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         except IntegrityError:
             log.warning(
                 f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."  # noqa: G004
-            )
-        except Exception:
-            log.exception(
-                "Error processing certificate for user=%s and course_run=%s",
-                user.id,
-                course_run.courseware_id,
             )
     return None, False, False
 
@@ -1261,21 +1257,22 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             program.title,
         )
         if not program_cert.certificate_page_revision:
-            try:
-                program_page = program.page
-            except ObjectDoesNotExist:
+            if not hasattr(program, "page") or not program.page:
                 log.warning(
                     "Skipping program certificate page revision for user=%s program=%s because program page is missing",
                     user.id,
                     program.readable_id,
                 )
-            else:
-                if not program_page.certificate_page:
-                    log.warning(
-                        "Skipping program certificate page revision for user=%s program=%s because certificate page is missing",
-                        user.id,
-                        program.readable_id,
-                    )
+            elif (
+                hasattr(program, "page")
+                and program.page
+                and not program.page.certificate_page
+            ):
+                log.warning(
+                    "Skipping program certificate page revision for user=%s program=%s because certificate page is missing",
+                    user.id,
+                    program.readable_id,
+                )
         sync_hubspot_user(user)
         if not program_cert.verifiable_credential_id:
             create_verifiable_credential(program_cert)
