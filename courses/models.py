@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.db.models import Exists, OuterRef, Prefetch, Q
@@ -189,11 +189,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     products = GenericRelation("ecommerce.Product", related_query_name="programs")
 
     @cached_property
-    def page(self):
-        """Gets the associated ProgramPage"""
-        return getattr(self, "programpage", None)
-
-    @cached_property
     def num_courses(self):
         """Gets the number of courses in this program"""
         return len(self.courses)
@@ -307,6 +302,20 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     @cached_property
     def requirements_root(self):
         return self.get_requirements_root()
+
+    @cached_property
+    def program_page(self):
+        """Return this program's related Wagtail page, or ``None``."""
+        try:
+            return self.page
+        except ObjectDoesNotExist:
+            return None
+
+    @cached_property
+    def certificate_page(self):
+        """Return this program's certificate page, or ``None``."""
+        page = self.program_page
+        return page.certificate_page if page else None
 
     def get_requirements_root(self, *, for_update=False):
         """The root of the requirements tree"""
@@ -959,17 +968,26 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     )
 
     @cached_property
+    def course_page(self):
+        """Return this course's related Wagtail page, or ``None``."""
+        try:
+            return self.page
+        except ObjectDoesNotExist:
+            return None
+
+    @cached_property
+    def certificate_page(self):
+        """Return this course's certificate page, or ``None``."""
+        page = self.course_page
+        return page.certificate_page if page else None
+
+    @cached_property
     def course_number(self):
         """
         Returns:
             str: Course number (last part of readable_id, after the final +)
         """
         return self.readable_id.split("+")[-1]
-
-    @cached_property
-    def page(self):
-        """Gets the associated CoursePage"""
-        return getattr(self, "coursepage", None)
 
     @cached_property
     def active_products(self):
@@ -1028,7 +1046,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         to False if there isn't one.
         """
 
-        return getattr(self.page, "include_in_learn_catalog", False)
+        return getattr(self.course_page, "include_in_learn_catalog", False)
 
     @cached_property
     def ingest_content_files_for_ai(self) -> bool:
@@ -1039,7 +1057,11 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         to False if there isn't one.
         """
 
-        return getattr(self.page, "ingest_content_files_for_ai", False)
+        return getattr(
+            self.course_page,
+            "ingest_content_files_for_ai",
+            False,
+        )
 
     @cached_property
     def default_variant_options(self) -> SupportedVariant:
@@ -1820,12 +1842,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
 
     def save(self, *args, **kwargs):  # noqa: DJ012
         if not self.certificate_page_revision:
-            certificate_page = (
-                self.course_run.course.page.certificate_page
-                if hasattr(self.course_run.course, "page")
-                and self.course_run.course.page
-                else None
-            )
+            certificate_page = self.course_run.course.certificate_page
             if certificate_page:
                 self.certificate_page_revision = certificate_page.get_latest_revision()
 
@@ -1918,11 +1935,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
 
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs  # noqa: DJ012
         if not self.certificate_page_revision:
-            certificate_page = (
-                self.program.page.certificate_page
-                if hasattr(self.program, "page") and self.program.page
-                else None
-            )
+            certificate_page = self.program.certificate_page
             if certificate_page:
                 self.certificate_page_revision = certificate_page.get_latest_revision()
 

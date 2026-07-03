@@ -234,7 +234,7 @@ class CourseAdmin(admin.ModelAdmin):
         Adds `check_link` so the configuration check page is reachable from the edit form.
         """
         extra = ("check_link",) if obj else ()
-        if getattr(obj, "page", None):
+        if obj and obj.course_page:
             return self.readonly_fields + extra + ("title",)
         return self.readonly_fields + extra
 
@@ -242,9 +242,10 @@ class CourseAdmin(admin.ModelAdmin):
         """
         Adds help text for `title` field while editing an existing object.
         """
-        if getattr(obj, "page", None):
+        page = obj.course_page if obj else None
+        if page:
             product_page_edit_url = (
-                f"{reverse('wagtailadmin_home').rstrip('/')}/pages/{obj.page.id}/edit"
+                f"{reverse('wagtailadmin_home').rstrip('/')}/pages/{page.id}/edit"
             )
             product_page_edit_link = (
                 f"<a href={product_page_edit_url} target='_blank'>CMS Product Page</a>"

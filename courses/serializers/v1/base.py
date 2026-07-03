@@ -36,9 +36,12 @@ class BaseCourseSerializer(BaseSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        if not self.context.get("include_page_fields") or not hasattr(instance, "page"):
+        if not self.context.get("include_page_fields"):
             return data
-        return {**data, **CoursePageSerializer(instance=instance.page).data}
+        page = instance.course_page
+        if page is None:
+            return data
+        return {**data, **CoursePageSerializer(instance=page).data}
 
     @staticmethod
     def get_type(obj) -> str:  # noqa: ARG004

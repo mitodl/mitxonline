@@ -214,11 +214,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
         certificate_page = (
             certificate.certificate_page_revision.as_object()
             if certificate.certificate_page_revision
-            else (
-                certificate.program.page.certificate_page
-                if hasattr(certificate.program, "page") and certificate.program.page
-                else None
-            )
+            else certificate.program.certificate_page
         )
         if not certificate_page:
             raise Http404()  # noqa: RSE102
@@ -246,11 +242,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
         certificate_page = (
             certificate.certificate_page_revision.as_object()
             if certificate.certificate_page_revision
-            else (
-                certificate.course_run.course.page.certificate_page
-                if certificate.course_run.course.page
-                else None
-            )
+            else certificate.course_run.course.certificate_page
         )
 
         if not certificate_page:
@@ -854,9 +846,11 @@ class HomePage(VideoPlayerConfigMixin):
                 .order_by(ordering)
             )
 
-            featured_products = [
-                course.page for course in featured_courses if course.page is not None
-            ]
+            featured_products = []
+            for course in featured_courses:
+                course_page = course.course_page
+                if course_page is not None:
+                    featured_products.append(course_page)
             featured_product_pages = []
             for page in featured_products:
                 run = page.product.first_unexpired_run

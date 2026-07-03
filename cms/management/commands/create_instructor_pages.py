@@ -124,7 +124,11 @@ class Command(BaseCommand):
         if not courseware_object:
             self.error(f"Could not find course with id {readable_id}")
 
-        page = courseware_object.page
+        page = (
+            courseware_object.course_page
+            if isinstance(courseware_object, Course)
+            else courseware_object.program_page
+        )
         if not page:
             self.error(
                 f"Course {readable_id} does not have a CMS page to link to. Consider creating one with create_courseware_page and rerunning with ./manage.py create_instructor_pages --link-instructor-id='{instructor_page.id}' --readable-id='{readable_id}'."

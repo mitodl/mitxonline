@@ -56,7 +56,8 @@ def get_unique_topics_from_courses(courses) -> list[dict]:
     topics = set()
 
     for course in courses:
-        if hasattr(course, "page") and course.page:
-            topics.update(topic.name for topic in course.page.topics.all())
+        course_page = course.course_page
+        if course_page:
+            topics.update(topic.name for topic in course_page.topics.all())
 
     return [{"name": topic} for topic in sorted(topics)]

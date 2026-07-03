@@ -10854,13 +10854,13 @@ components:
         min_weekly_hours:
           type: string
           nullable: true
-          description: Get the min weekly hours of the course from the course page
+          description: Get the min weekly hours of the program from the program page
             CMS.
           readOnly: true
         max_weekly_hours:
           type: string
           nullable: true
-          description: Get the max weekly hours of the course from the course page
+          description: Get the max weekly hours of the program from the program page
             CMS.
           readOnly: true
         enrollment_modes:
@@ -11158,13 +11158,13 @@ components:
         min_weekly_hours:
           type: string
           nullable: true
-          description: Get the min weekly hours of the course from the course page
+          description: Get the min weekly hours of the program from the program page
             CMS.
           readOnly: true
         max_weekly_hours:
           type: string
           nullable: true
-          description: Get the max weekly hours of the course from the course page
+          description: Get the max weekly hours of the program from the program page
             CMS.
           readOnly: true
         enrollment_modes:

@@ -915,17 +915,14 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
             )
             if not certificate.certificate_page_revision:
                 course = course_run.course
-                if not hasattr(course, "page") or not course.page:
+                course_page = course.course_page
+                if not course_page:
                     log.warning(
                         "Skipping certificate page revision for user=%s run=%s because course page is missing",
                         user.id,
                         course_run.courseware_id,
                     )
-                elif (
-                    hasattr(course, "page")
-                    and course.page
-                    and not course.page.certificate_page
-                ):
+                elif not course_page.certificate_page:
                     log.warning(
                         "Skipping certificate page revision for user=%s run=%s because certificate page is missing",
                         user.id,
@@ -1257,17 +1254,14 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             program.title,
         )
         if not program_cert.certificate_page_revision:
-            if not hasattr(program, "page") or not program.page:
+            program_page = program.program_page
+            if not program_page:
                 log.warning(
                     "Skipping program certificate page revision for user=%s program=%s because program page is missing",
                     user.id,
                     program.readable_id,
                 )
-            elif (
-                hasattr(program, "page")
-                and program.page
-                and not program.page.certificate_page
-            ):
+            elif not program_page.certificate_page:
                 log.warning(
                     "Skipping program certificate page revision for user=%s program=%s because certificate page is missing",
                     user.id,
@@ -1701,7 +1695,7 @@ def get_verifiable_credentials_payload(
         cert_type = "course_run"
         course_run = certificate.course_run
         course = course_run.course
-        course_page = course.page
+        course_page = course.course_page
 
         course_url_id = course.readable_id
         url = f"https://{learn_hostname}/courses/{course_url_id}"
@@ -1710,21 +1704,25 @@ def get_verifiable_credentials_payload(
             user_id=certificate.user_id, run=course_run
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
         achievement_image_url = (
-            get_thumbnail_url(course_page) if course_page.feature_image else ""
+            get_thumbnail_url(course_page)
+            if course_page and course_page.feature_image
+            else ""
         )
         narrative = certificate_page.verifiable_credential_criteria
 
     elif isinstance(certificate, ProgramCertificate):
         cert_type = "program"
         program = certificate.program
-        program_page = program.page
+        program_page = program.program_page
         url = f"https://{learn_hostname}/programs/{program.readable_id}"
         certificate_name = certificate.program.title
         activity_start_date = ProgramEnrollment.all_objects.get(
             user_id=certificate.user_id, program=program
         ).created_on.strftime("%Y-%m-%dT%H:%M:%SZ")
         achievement_image_url = (
-            get_thumbnail_url(program_page) if program_page.feature_image else ""
+            get_thumbnail_url(program_page)
+            if program_page and program_page.feature_image
+            else ""
         )
         narrative = certificate_page.verifiable_credential_criteria
     else:
