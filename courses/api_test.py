@@ -109,6 +109,7 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+from users.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 FAKE = faker.Factory.create()
@@ -1262,7 +1263,7 @@ def test_generate_course_certificates_self_paced_course(
     )
     generate_course_run_certificates()
     assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users, failed certificates for {0} users"
         in courses_api_logs.info.call_args[0][0]
     )
 
@@ -1311,7 +1312,7 @@ def test_course_certificates_with_course_end_date_self_paced_combination(  # noq
 
     generate_course_run_certificates()
     assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1 if end_date else 0} users"
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1 if end_date else 0} users, failed certificates for {0} users"
         in courses_api_logs.info.call_args[0][0]
     )
 
@@ -1353,9 +1354,53 @@ def test_generate_course_certificates_with_course_end_date(  # noqa: PLR0913
     )
     generate_course_run_certificates()
     assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users, failed certificates for {0} users"
         in courses_api_logs.info.call_args[0][0]
     )
+
+
+@patch("courses.signals.upsert_custom_properties")
+def test_generate_course_certificates_failure_isolation(
+    mock_upsert_custom_properties,
+    mocker,
+    courses_api_logs,
+):
+    """A certificate failure for one user should not stop processing for others."""
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    course_run = CourseRunFactory.create(certificate_available_date=now_in_utc())
+
+    run_user_1 = UserFactory.create()
+    run_user_2 = UserFactory.create()
+
+    grade_1 = CourseRunGradeFactory.create(
+        course_run=course_run, user=run_user_1, grade=0.5, passed=True
+    )
+    grade_2 = CourseRunGradeFactory.create(
+        course_run=course_run, user=run_user_2, grade=0.5, passed=True
+    )
+
+    mocker.patch(
+        "courses.api.exception_logging_generator",
+        return_value=[(grade_1, run_user_1), (grade_2, run_user_2)],
+    )
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        side_effect=[
+            (grade_1, True, False),
+            (grade_2, True, False),
+        ],
+    )
+    mock_process = mocker.patch(
+        "courses.api.process_course_run_grade_certificate",
+        side_effect=[RuntimeError("simulated cert failure"), (None, False, False)],
+    )
+
+    generate_course_run_certificates(course_run=course_run, force=True)
+
+    assert mock_process.call_count == 2
+    assert "failed certificates for 1 users" in courses_api_logs.info.call_args[0][0]
 
 
 @pytest.mark.parametrize(
@@ -1941,6 +1986,36 @@ def test_generate_program_certificate_already_exist(
     )
     assert result == (program_certificate, False)
     assert len(ProgramCertificate.objects.all()) == 1
+
+
+def test_generate_program_certificate_existing_revoked_returns_existing(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+):
+    """Existing revoked certificates should be returned instead of re-created."""
+    ProgramEnrollment.objects.create(
+        user=user,
+        program=program_with_empty_requirements,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+    program_certificate = ProgramCertificateFactory.create(
+        program=program_with_empty_requirements,
+        user=user,
+        is_revoked=True,
+    )
+
+    result = generate_program_certificate(
+        user=user, program=program_with_empty_requirements
+    )
+
+    assert result == (program_certificate, False)
+    assert (
+        ProgramCertificate.all_objects.filter(
+            user=user,
+            program=program_with_empty_requirements,
+        ).count()
+        == 1
+    )
 
 
 def test_program_certificates_access():

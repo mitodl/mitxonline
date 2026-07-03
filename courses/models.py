@@ -1822,7 +1822,8 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         if not self.certificate_page_revision:
             certificate_page = (
                 self.course_run.course.page.certificate_page
-                if self.course_run.course.page
+                if hasattr(self.course_run.course, "page")
+                and self.course_run.course.page
                 else None
             )
             if certificate_page:
