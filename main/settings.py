@@ -951,10 +951,7 @@ B2B_GSHEETS_UPDATE_OFFSET = get_int(
 CELERY_BEAT_SCHEDULE = {
     "retry-failed-edx-enrollments": {
         "task": "openedx.tasks.retry_failed_edx_enrollments",
-        # Run at :10 and :40 past each hour to keep a 10-minute gap from the
-        # sync_courseruns_data task (:00), which shares edX's "staff" throttle
-        # bucket via the login_service_user token.
-        "schedule": crontab(minute="10,40"),
+        "schedule": RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY,
     },
     "update-currency-exchange-rates-every-24-hrs": {
         "task": "flexiblepricing.tasks.sync_currency_exchange_rates",
@@ -970,7 +967,7 @@ CELERY_BEAT_SCHEDULE = {
     "sync-courseruns-data": {
         "task": "courses.tasks.sync_courseruns_data",
         "schedule": crontab(
-            minute=0,
+            minute=10,
             hour=CRON_COURSERUN_SYNC_HOURS,
             day_of_week=CRON_COURSERUN_SYNC_DAYS,
             day_of_month="*",
