@@ -3,6 +3,7 @@
 import logging
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
@@ -19,6 +20,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
+from b2b.api import _create_discount_with_product
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
     REDEMPTION_STATUS_ASSIGNED,
@@ -50,6 +52,7 @@ from b2b.tasks import (
 )
 from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
+from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
 from ecommerce.models import Discount
 
 log = logging.getLogger(__name__)
@@ -105,6 +108,22 @@ def assign_codes_and_send_emails(
     )
 
     return True
+
+
+def _create_discount_codes_for_contract(contract: ContractPage) -> list[Discount]:
+    # TODO: I'm going to need to check this behavior. # noqa: TD002, TD003, FIX002
+    # It looks like in trivial cases we'll have a contract with a single product, but that's far from guaranteed
+    # We don't surface the product anywhere in the UI - it's all about codes, which kinda implies that this tool works
+    # sanely only for contracts w/ a single product? Not sure if that's a safe assumption,
+    # but if it isn't we probably need to take a step back and figure out what to do.
+    new_discounts = []
+    for product in contract.get_products():
+        discount = _create_discount_with_product(
+            product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
+        )
+        new_discounts.append(discount)
+
+    return new_discounts
 
 
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -680,6 +699,13 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         )
 
         assignments = []
+        contract_max_learners = contract.max_learners
+        if contract_max_learners is None and len(available_discounts) < len(
+            email_assignees
+        ):
+            # If we are in a contract without a seat limit, provision new discounts for users up to the number required
+            new_discounts = _create_discount_codes_for_contract(contract)
+            available_discounts.extend(new_discounts)
 
         for i, record in enumerate(email_assignees):
             email = record["email"]
