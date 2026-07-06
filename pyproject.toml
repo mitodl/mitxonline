@@ -230,6 +230,7 @@ ignore = [
     "W191"
 ]
 fixable = ["ALL"]
+external = ["ORM001", "ORM002"]
 
 typing-modules = ["colour.hints"]
 
