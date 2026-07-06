@@ -702,9 +702,12 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         )
 
         assignments = []
-        contract_max_learners = contract.max_learners
-        if contract_max_learners is None and len(available_discounts) < len(
-            email_assignees
+        # If we're in a contract type that uses codes, doesnt have a seat limit and we're out of available discounts
+        # Provision enough on the fly to handle the payload
+        if (
+            contract.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
+            and contract.max_learners is None
+            and len(available_discounts) < len(email_assignees)
         ):
             # If we are in a contract without a seat limit, provision new discounts for users up to the number required
             count_to_provision = len(email_assignees) - len(available_discounts)
