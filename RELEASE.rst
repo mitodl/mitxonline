@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.158.9
+Version 1.158.9 (Released July 06, 2026)
 ---------------
 
 - Handle no max learners case (#3722)
