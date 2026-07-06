@@ -23,6 +23,7 @@ from b2b.serializers.v0 import (
 from b2b.serializers.v0.manager import ManagerEnrollmentSerializer
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
+from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
 from ecommerce.factories import ProductFactory
 from main.test_utils import assert_drf_json_equal
 from users.factories import UserFactory
@@ -1374,6 +1375,75 @@ def test_bulk_assign_insufficient_codes(org_setup, manager_drf_client, mocker):
     assert len(resp_data["assigned"]) == available_count
     assert len(resp_data["errors"]) == 2
     assert all("No available code." in err["detail"] for err in resp_data["errors"])
+
+
+def test_bulk_assign_provisions_codes_for_uncapped_contract(
+    org_setup, manager_drf_client, mocker
+):
+    """bulk_assign provisions new one-time codes on the fly for contracts with no max_learners."""
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
+    _, _, (contract_1, *_), *_ = org_setup
+
+    # Build a contract with no seat cap and a single product, in the same org
+    # the manager already has access to, so we get an easy 1:1 relationship
+    # between provisioned discounts and requested assignments.
+    uncapped_contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
+        max_learners=None,
+        organization=contract_1.organization,
+    )
+    course_run = CourseRunFactory.create(b2b_contract=uncapped_contract)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=course_run)
+
+    created, updated, errored = ensure_enrollment_codes_exist(uncapped_contract)
+    assert created == 1
+    assert updated == 0
+    assert errored == 0
+
+    # Only one code exists so far, but we're requesting three assignments.
+    records = [
+        {"email": "learner1@example.com", "name": "Learner One"},
+        {"email": "learner2@example.com", "name": "Learner Two"},
+        {"email": "learner3@example.com", "name": "Learner Three"},
+    ]
+
+    bulk_assign_url = reverse(
+        "b2b:b2b-manager-org-contract-bulk-assign",
+        kwargs={
+            "parent_lookup_organization": uncapped_contract.organization.id,
+            "pk": uncapped_contract.id,
+        },
+    )
+
+    resp = manager_drf_client.post(bulk_assign_url, data=records, format="json")
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_data = resp.json()
+    assert len(resp_data["assigned"]) == 3
+    assert len(resp_data["errors"]) == 0
+
+    assigned_emails = {code["assigned_to"] for code in resp_data["assigned"]}
+    assert assigned_emails == {
+        "learner1@example.com",
+        "learner2@example.com",
+        "learner3@example.com",
+    }
+
+    # The pre-existing code plus two newly provisioned one-time codes should
+    # cover all three assignments.
+    contract_discounts = uncapped_contract.get_discounts()
+    assert contract_discounts.count() == 3
+    assert (
+        contract_discounts.filter(redemption_type=REDEMPTION_TYPE_ONE_TIME).count() == 2
+    )
+    assert (
+        DiscountContractAttachmentRedemption.objects.filter(
+            contract=uncapped_contract
+        ).count()
+        == 3
+    )
 
 
 def test_bulk_assign_skips_already_assigned_or_redeemed(
