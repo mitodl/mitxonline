@@ -1,10 +1,29 @@
-"""Backfill the frozen "Certificate Title" on already-issued program certificates."""
+"""Backfill the frozen "Certificate Title" on issued program certificates."""
+
+from collections import Counter
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from courses.models import Program, ProgramCertificate
+
+# A live Certificate Title still carrying this prefix has never been filled in.
+PLACEHOLDER_PREFIX = "PLACEHOLDER - "
+
+# Report field labels. Kept as constants so the command and its tests stay in
+# sync and the columns line up (the label column is padded to LABEL_WIDTH).
+LABEL_WIDTH = 17
+LABEL_PROGRAM_TITLE = "Program Title"
+LABEL_CERT_OLD = "Cert Title (old)"
+LABEL_CERT_NEW = "Cert Title (new)"
+LABEL_CHANGE_DRY = "Will change"
+LABEL_CHANGE_COMMIT = "Changed"
+
+
+def format_field(label, value):
+    """Format one aligned ``  <label> : <value>`` report line."""
+    return f"  {label:<{LABEL_WIDTH}}: {value}"
 
 
 class Command(BaseCommand):
@@ -23,28 +42,26 @@ class Command(BaseCommand):
         """Backfill frozen program-certificate titles from the live CMS page."""
         programs = options["programs"]
         all_programs = options["all_programs"]
-        if bool(programs) == bool(all_programs):
-            msg = (
-                "Provide exactly one of --program <readable_id> (repeatable) "
-                "or --all-programs."
-            )
+        if not programs and not all_programs:
+            msg = "Provide --program <readable_id> or --all-programs."
+            raise CommandError(msg)
+        if programs and all_programs:
+            msg = "--program and --all-programs are mutually exclusive."
             raise CommandError(msg)
 
         commit = options["commit"]
+        change_label = LABEL_CHANGE_COMMIT if commit else LABEL_CHANGE_DRY
         banner = "COMMIT" if commit else "DRY RUN"
         self.stdout.write(self.style.WARNING(f"=== {banner} ==="))
 
-        programs_will_change = 0
-        programs_already_correct = 0
-        programs_skipped = 0
-        revisions_changed = 0
-        certs_affected = 0
+        tally = Counter()
 
         for readable_id, program in self._target_programs(programs, all_programs):
             if program is None:
-                programs_skipped += 1
+                tally["skipped"] += 1
                 self._write_block(
                     readable_id,
+                    change_label=change_label,
                     program_title="—",
                     new_title="—",
                     reason="no program with that readable_id",
@@ -53,9 +70,10 @@ class Command(BaseCommand):
 
             certificate_page = self._certificate_page(program)
             if certificate_page is None:
-                programs_skipped += 1
+                tally["skipped"] += 1
                 self._write_block(
                     readable_id,
+                    change_label=change_label,
                     program_title=program.title,
                     new_title="—",
                     reason="no certificate page",
@@ -64,10 +82,11 @@ class Command(BaseCommand):
 
             title = certificate_page.product_name
 
-            if not title or title.startswith("PLACEHOLDER - "):
-                programs_skipped += 1
+            if not title or title.startswith(PLACEHOLDER_PREFIX):
+                tally["skipped"] += 1
                 self._write_block(
                     readable_id,
+                    change_label=change_label,
                     program_title=program.title,
                     new_title=title or "—",
                     reason=(
@@ -78,39 +97,40 @@ class Command(BaseCommand):
                 continue
 
             changed, n_revisions, n_certs = self._process_program(
-                readable_id, program, title, commit=commit
+                readable_id, program, title, commit=commit, change_label=change_label
             )
-            revisions_changed += n_revisions
-            certs_affected += n_certs
-            if changed:
-                programs_will_change += 1
-            else:
-                programs_already_correct += 1
+            tally["revisions"] += n_revisions
+            tally["certs"] += n_certs
+            tally["will_change" if changed else "already_correct"] += 1
 
-        total = programs_will_change + programs_already_correct + programs_skipped
+        total = tally["will_change"] + tally["already_correct"] + tally["skipped"]
+        change_word = "changed" if commit else "will change"
         self.stdout.write("")
         self.stdout.write(
             self.style.SUCCESS(
                 f"Summary: {total} program(s), "
-                f"{programs_will_change} will change, "
-                f"{programs_already_correct} already correct, "
-                f"{programs_skipped} skipped "
-                f"({revisions_changed} revision(s), {certs_affected} cert(s) affected)."
+                f"{tally['will_change']} {change_word}, "
+                f"{tally['already_correct']} already correct, "
+                f"{tally['skipped']} skipped "
+                f"({tally['revisions']} revision(s), "
+                f"{tally['certs']} cert(s) affected)."
             )
         )
 
-    def _write_block(self, readable_id, *, program_title, new_title, reason):
+    def _write_block(
+        self, readable_id, *, change_label, program_title, new_title, reason
+    ):
         """Print a full per-program block for a program that is being skipped."""
         self.stdout.write("")
         self.stdout.write(readable_id)
-        self.stdout.write(f"  Program Title    : {program_title}")
-        self.stdout.write("  Cert Title (now) : —")
-        self.stdout.write(f"  Cert Title (new) : {new_title}")
+        self.stdout.write(format_field(LABEL_PROGRAM_TITLE, program_title))
+        self.stdout.write(format_field(LABEL_CERT_OLD, "—"))
+        self.stdout.write(format_field(LABEL_CERT_NEW, new_title))
         self.stdout.write(
-            self.style.WARNING(f"  Will change      : SKIPPED — {reason}")
+            self.style.WARNING(format_field(change_label, f"SKIPPED — {reason}"))
         )
 
-    def _process_program(self, readable_id, program, title, *, commit):
+    def _process_program(self, readable_id, program, title, *, commit, change_label):
         """Print a valid program's block and (when committing) rewrite revisions.
 
         Returns ``(changed, revisions_changed, certs_affected)``.
@@ -120,14 +140,14 @@ class Command(BaseCommand):
         lines = [
             "",
             readable_id,
-            f"  Program Title    : {program.title}",
-            f"  Cert Title (new) : {title}",
+            format_field(LABEL_PROGRAM_TITLE, program.title),
+            format_field(LABEL_CERT_NEW, title),
         ]
 
         revisions = self._distinct_revisions(program)
         if not revisions:
-            lines.append("  Cert Title (now) : —  (no issued certificates)")
-            lines.append("  Will change      : NO")
+            lines.append(format_field(LABEL_CERT_OLD, "—  (no issued certificates)"))
+            lines.append(format_field(change_label, "NO"))
             self._flush(lines)
             return False, 0, 0
 
@@ -136,15 +156,15 @@ class Command(BaseCommand):
         certs_affected = 0
         for revision, certs in revisions:
             old = revision.content.get("product_name")
-            label = f"{len(certs)} cert(s), revision {revision.id}"
-            lines.append(f"  Cert Title (now) : {old}  ({label})")
+            count = f"{len(certs)} cert(s), revision {revision.id}"
+            lines.append(format_field(LABEL_CERT_OLD, f"{old}  ({count})"))
             if old == title:
-                lines.append("  Will change      : NO")
+                lines.append(format_field(change_label, "NO"))
                 continue
             to_change.append(revision)
             revisions_changed += 1
             certs_affected += len(certs)
-            lines.append(self.style.SUCCESS("  Will change      : YES"))
+            lines.append(self.style.SUCCESS(format_field(change_label, "YES")))
 
         if commit and to_change:
             with transaction.atomic():
@@ -196,11 +216,14 @@ class Command(BaseCommand):
 
     @staticmethod
     def _distinct_revisions(program):
-        """Yield ``(revision, certs)`` for each distinct non-null revision shared
-        by the program's active certificates.
+        """Return ``[(revision, certs), ...]`` for each distinct non-null revision
+        shared by the program's certificates.
+
+        Uses ``all_objects`` so revoked (and any future-dated) certificates are
+        included — their frozen titles need backfilling too.
         """
         grouped = {}
-        certs = ProgramCertificate.objects.filter(program=program).select_related(
+        certs = ProgramCertificate.all_objects.filter(program=program).select_related(
             "certificate_page_revision"
         )
         for cert in certs:

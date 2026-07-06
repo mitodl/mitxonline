@@ -11,6 +11,14 @@ from wagtail.models import Revision
 from cms.factories import ProgramPageFactory
 from cms.models import CertificatePage
 from courses.factories import ProgramCertificateFactory
+from courses.management.commands.backfill_program_certificate_titles import (
+    LABEL_CERT_NEW,
+    LABEL_CERT_OLD,
+    LABEL_CHANGE_COMMIT,
+    LABEL_CHANGE_DRY,
+    LABEL_PROGRAM_TITLE,
+    format_field,
+)
 from courses.models import Program, ProgramCertificate
 
 pytestmark = [pytest.mark.django_db]
@@ -42,15 +50,15 @@ def _program_with_issued_cert(frozen_title, live_title):
 
 
 def _run(*args):
-    out = StringIO()
-    call_command("backfill_program_certificate_titles", *args, stdout=out, stderr=out)
+    out, err = StringIO(), StringIO()
+    call_command("backfill_program_certificate_titles", *args, stdout=out, stderr=err)
     return out.getvalue()
 
 
 def _frozen_title(certificate):
     revision = certificate.certificate_page_revision
     revision.refresh_from_db()
-    return revision.as_object().product_name
+    return revision.content["product_name"]
 
 
 def test_commit_updates_frozen_title_to_live_page_value():
@@ -87,10 +95,10 @@ def test_dry_run_output_reports_planned_change():
 
     assert "DRY RUN" in output
     assert program.readable_id in output
-    assert f"Program Title    : {program.title}" in output
-    assert "Cert Title (now) : OLD Title" in output
-    assert "Cert Title (new) : NEW Title" in output
-    assert "Will change      : YES" in output
+    assert format_field(LABEL_PROGRAM_TITLE, program.title) in output
+    assert format_field(LABEL_CERT_OLD, "OLD Title") in output
+    assert format_field(LABEL_CERT_NEW, "NEW Title") in output
+    assert format_field(LABEL_CHANGE_DRY, "YES") in output
 
 
 def test_commit_is_idempotent():
@@ -103,13 +111,13 @@ def test_commit_is_idempotent():
     output = _run("--program", program.readable_id, "--commit")
 
     assert _frozen_title(certificate) == "NEW Title"
-    assert "Will change      : NO" in output
-    assert "Will change      : YES" not in output
+    assert format_field(LABEL_CHANGE_COMMIT, "NO") in output
+    assert format_field(LABEL_CHANGE_COMMIT, "YES") not in output
     assert "0 revision(s)" in output
 
 
 def test_null_revision_cert_is_skipped_without_error():
-    """A certificate with no frozen revision (e.g. revoked) is left untouched."""
+    """A certificate with no frozen revision is left untouched."""
     program, certificate = _program_with_issued_cert(
         frozen_title="OLD Title", live_title="NEW Title"
     )
@@ -121,6 +129,18 @@ def test_null_revision_cert_is_skipped_without_error():
 
     certificate.refresh_from_db()
     assert certificate.certificate_page_revision is None
+
+
+def test_revoked_certificate_is_also_backfilled():
+    """Revoked certs are included (all_objects): their frozen title is fixed too."""
+    program, certificate = _program_with_issued_cert(
+        frozen_title="OLD Title", live_title="NEW Title"
+    )
+    ProgramCertificate.all_objects.filter(pk=certificate.pk).update(is_revoked=True)
+
+    _run("--program", program.readable_id, "--commit")
+
+    assert _frozen_title(certificate) == "NEW Title"
 
 
 def test_shared_revision_updated_once_for_all_certs():
@@ -187,7 +207,7 @@ def test_commit_rollback_emits_no_misleading_success_output(mocker):
 
     mocker.patch.object(Revision, "save", autospec=True, side_effect=flaky_save)
 
-    out = StringIO()
+    out, err = StringIO(), StringIO()
     with pytest.raises(DatabaseError):
         call_command(
             "backfill_program_certificate_titles",
@@ -195,12 +215,12 @@ def test_commit_rollback_emits_no_misleading_success_output(mocker):
             program_page.program.readable_id,
             "--commit",
             stdout=out,
-            stderr=out,
+            stderr=err,
         )
 
     output = out.getvalue()
     # No success line, and both frozen titles are unchanged (fully rolled back).
-    assert "Will change      : YES" not in output
+    assert format_field(LABEL_CHANGE_COMMIT, "YES") not in output
     assert _frozen_title(cert_a) == "OLD Title"
     assert _frozen_title(cert_b) == "OLD Title"
 
