@@ -110,18 +110,21 @@ def assign_codes_and_send_emails(
     return True
 
 
-def _create_discount_codes_for_contract(contract: ContractPage) -> list[Discount]:
+def _create_discount_codes_for_contract(
+    contract: ContractPage, count_to_provision: int
+) -> list[Discount]:
     # TODO: I'm going to need to check this behavior. # noqa: TD002, TD003, FIX002
     # It looks like in trivial cases we'll have a contract with a single product, but that's far from guaranteed
     # We don't surface the product anywhere in the UI - it's all about codes, which kinda implies that this tool works
     # sanely only for contracts w/ a single product? Not sure if that's a safe assumption,
     # but if it isn't we probably need to take a step back and figure out what to do.
     new_discounts = []
-    for product in contract.get_products():
-        discount = _create_discount_with_product(
-            product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
-        )
-        new_discounts.append(discount)
+    for _ in range(count_to_provision):
+        for product in contract.get_products():
+            discount = _create_discount_with_product(
+                product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
+            )
+            new_discounts.append(discount)
 
     return new_discounts
 
@@ -704,7 +707,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             email_assignees
         ):
             # If we are in a contract without a seat limit, provision new discounts for users up to the number required
-            new_discounts = _create_discount_codes_for_contract(contract)
+            count_to_provision = len(email_assignees) - len(available_discounts)
+            new_discounts = _create_discount_codes_for_contract(
+                contract, count_to_provision
+            )
             available_discounts.extend(new_discounts)
 
         for i, record in enumerate(email_assignees):
