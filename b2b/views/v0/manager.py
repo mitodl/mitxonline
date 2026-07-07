@@ -113,18 +113,16 @@ def assign_codes_and_send_emails(
 def _create_discount_codes_for_contract(
     contract: ContractPage, count_to_provision: int
 ) -> list[Discount]:
-    # TODO: I'm going to need to check this behavior. # noqa: TD002, TD003, FIX002
-    # It looks like in trivial cases we'll have a contract with a single product, but that's far from guaranteed
-    # We don't surface the product anywhere in the UI - it's all about codes, which kinda implies that this tool works
-    # sanely only for contracts w/ a single product? Not sure if that's a safe assumption,
-    # but if it isn't we probably need to take a step back and figure out what to do.
     new_discounts = []
+    # Per https://github.com/mitodl/mitxonline/pull/3734#discussion_r3532707128 we expect contracts to have many products
+    # For contract attachment JIT code generation, any product associated w/ the contract should
+    # work for creating the discount code, so we just grab the first one.
+    product = contract.get_products().first()
     for _ in range(count_to_provision):
-        for product in contract.get_products():
-            discount = _create_discount_with_product(
-                product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
-            )
-            new_discounts.append(discount)
+        discount = _create_discount_with_product(
+            product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
+        )
+        new_discounts.append(discount)
 
     return new_discounts
 
