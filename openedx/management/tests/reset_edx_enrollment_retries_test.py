@@ -92,3 +92,17 @@ def test_reset_edx_enrollment_retries_no_matches():
         call_command(
             "reset_edx_enrollment_retries", "--run", "course-v1:nonexistent+id"
         )
+
+
+def test_reset_edx_enrollment_retries_duplicate_uservalues():
+    """Duplicate user values should raise a clean CommandError, not an unhandled ValidationError"""
+    enrollment = CourseRunEnrollmentFactory.create(
+        edx_enrolled=False, edx_enrollment_retry_count=5
+    )
+
+    with pytest.raises(CommandError, match="Duplicate values"):
+        call_command(
+            "reset_edx_enrollment_retries",
+            enrollment.user.email,
+            enrollment.user.email,
+        )

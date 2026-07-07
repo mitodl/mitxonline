@@ -4,6 +4,7 @@ set of enrollments, e.g. after fixing a course misconfiguration that caused
 a wave of enrollments to exhaust their automatic repair retries.
 """
 
+from django.core.exceptions import ValidationError
 from django.core.management import BaseCommand, CommandError
 
 from courses.models import CourseRunEnrollment
@@ -73,7 +74,10 @@ class Command(BaseCommand):
         if options["run"]:
             enrollment_filter["run__courseware_id"] = options["run"]
         if options["uservalues"]:
-            enrollment_filter["user__in"] = fetch_users(options["uservalues"])
+            try:
+                enrollment_filter["user__in"] = fetch_users(options["uservalues"])
+            except ValidationError as exc:
+                raise CommandError("; ".join(exc.messages)) from exc
         if options["only_exhausted"]:
             enrollment_filter["edx_enrollment_retry_count__gte"] = (
                 OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
