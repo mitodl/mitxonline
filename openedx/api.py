@@ -34,6 +34,7 @@ from main import features
 from main.utils import get_partitioned_set_difference, get_redis_lock
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
+    OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
@@ -1221,9 +1222,53 @@ def enroll_in_edx_course_runs(
     return results
 
 
+def _is_permanent_enrollment_failure(exc):
+    """
+    Whether a failed edX enrollment attempt is unlikely to ever succeed on
+    retry (expired course mode, deleted course run, etc) as opposed to a
+    transient/systemic failure (5xx, rate limiting, network error).
+
+    A systemic edX outage would otherwise cause every affected enrollment to
+    fail on the same run and get counted toward the retry cap together,
+    potentially exhausting all retries for perfectly healthy enrollments
+    within a single extended outage window instead of just the handful that
+    are actually permanently broken.
+    """
+    if isinstance(exc, OpenEdxUserMissingError):
+        # a user edX record that repair_faulty_edx_user can't create is not
+        # a transient blip in practice - see MITXONLINE-5Q0, chronic for 6+
+        # months at 52k+ events with no sign of resolving itself on retry
+        return True
+
+    if not isinstance(exc, EdxApiEnrollErrorException):
+        # network errors, unexpected exceptions, etc - assume transient
+        return False
+
+    response = exc.http_error.response
+    if response is None:
+        return False
+
+    return (
+        status.HTTP_400_BAD_REQUEST
+        <= response.status_code
+        < status.HTTP_500_INTERNAL_SERVER_ERROR
+        and response.status_code != status.HTTP_429_TOO_MANY_REQUESTS
+    )
+
+
 def retry_failed_edx_enrollments():
     """
-    Gathers all CourseRunEnrollments with edx_enrolled=False and retries them via the edX API
+    Gathers all CourseRunEnrollments with edx_enrolled=False and retries them via the edX API.
+
+    An enrollment that has already failed OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+    times with a permanent, per-enrollment error (see
+    _is_permanent_enrollment_failure) is excluded going forward instead of
+    being retried on every run forever - see MITXONLINE-5ZV, where a handful
+    of permanently-unrecoverable enrollments (expired course mode, deleted
+    course run) generated hundreds of thousands of repeat failures over 6+
+    months. Transient/systemic failures (edX downtime, rate limiting) don't
+    count against the cap, so an outage doesn't dead-letter healthy
+    enrollments that just happened to be retried during it.
 
     Returns:
         list of CourseRunEnrollment: All CourseRunEnrollments that were successfully retried
@@ -1235,6 +1280,7 @@ def retry_failed_edx_enrollments():
         user__is_active=True,
         edx_enrolled=False,
         created_on__lt=now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS),
+        edx_enrollment_retry_count__lt=OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
     )
     succeeded = []
     for enrollment in failed_run_enrollments:
@@ -1246,6 +1292,21 @@ def retry_failed_edx_enrollments():
             )
         except Exception as exc:  # pylint: disable=broad-except
             log.exception(str(exc))  # noqa: TRY401
+            if not _is_permanent_enrollment_failure(exc):
+                continue
+            enrollment.edx_enrollment_retry_count += 1
+            enrollment.save(update_fields=["edx_enrollment_retry_count"])
+            if (
+                enrollment.edx_enrollment_retry_count
+                >= OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+            ):
+                log.error(  # noqa: TRY400 - traceback already logged above via log.exception
+                    "Giving up on edX enrollment repair for user %s in course run "
+                    "%s after %d failed attempts - will not be retried automatically",
+                    user.edx_username,
+                    course_run.courseware_id,
+                    enrollment.edx_enrollment_retry_count,
+                )
         else:
             enrollment.edx_enrolled = True
             enrollment.edx_emails_subscription = True

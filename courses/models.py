@@ -2116,6 +2116,15 @@ class CourseRunEnrollment(EnrollmentModel):
         help_text="Indicates whether or not the request succeeded to enroll via the edX API",
     )
     edx_emails_subscription = models.BooleanField(default=True)
+    edx_enrollment_retry_count = models.PositiveIntegerField(
+        default=0,
+        help_text=(
+            "How many times retry_failed_edx_enrollments has attempted to "
+            "enroll this record via the edX API. Once this reaches "
+            "OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES the enrollment is no "
+            "longer retried automatically."
+        ),
+    )
 
     objects = ActiveCourseRunEnrollmentManager()
     all_objects = CourseRunEnrollmentManager()

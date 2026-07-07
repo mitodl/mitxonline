@@ -48,7 +48,11 @@ from main.admin import (
 )
 from main.utils import get_field_names
 from openedx.api import get_edx_api_service_client, get_edx_course_modes
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import (
+    EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+    OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES,
+)
 from openedx.tasks import retry_failed_edx_enrollments
 
 
@@ -610,6 +614,30 @@ class CourseRunEnrollmentAuditInline(admin.TabularInline):
         return False
 
 
+class RepairExhaustedFilter(admin.SimpleListFilter):
+    """
+    Filter enrollments by whether automatic edX enrollment repair has given
+    up on them (edx_enrollment_retry_count >= OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES).
+    """
+
+    title = "repair exhausted"
+    parameter_name = "repair_exhausted"
+
+    def lookups(self, request, model_admin):  # noqa: ARG002
+        return (("yes", "Yes"), ("no", "No"))
+
+    def queryset(self, request, queryset):  # noqa: ARG002
+        if self.value() == "yes":
+            return queryset.filter(
+                edx_enrollment_retry_count__gte=OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+            )
+        if self.value() == "no":
+            return queryset.filter(
+                edx_enrollment_retry_count__lt=OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+            )
+        return queryset
+
+
 @admin.register(CourseRunEnrollment)
 class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAdmin):
     """Admin for CourseRunEnrollment"""
@@ -621,7 +649,13 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         "run__courseware_id",
         "run__title",
     ]
-    list_filter = ["active", "change_status", "edx_enrolled", "enrollment_mode"]
+    list_filter = [
+        "active",
+        "change_status",
+        "edx_enrolled",
+        "enrollment_mode",
+        RepairExhaustedFilter,
+    ]
     list_display = (
         "id",
         "get_user_email",
@@ -629,6 +663,8 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         "enrollment_mode",
         "change_status",
         "created_on",
+        "edx_enrollment_retry_count",
+        "repair_exhausted",
     )
     raw_id_fields = (
         "user",
@@ -638,8 +674,28 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         CourseRunEnrollmentAuditInline,
     ]
     readonly_fields = ("created_on", "updated_on")
-    actions = ["retry_all_failed_edx_enrollment", "downgrade_enrollment"]
+    actions = [
+        "retry_all_failed_edx_enrollment",
+        "reset_edx_enrollment_retry_count",
+        "downgrade_enrollment",
+    ]
     run_for_all_actions = ["retry_all_failed_edx_enrollment"]
+
+    @admin.display(
+        description="Repair exhausted",
+        boolean=True,
+        ordering="edx_enrollment_retry_count",
+    )
+    def repair_exhausted(self, obj):
+        """
+        Whether automatic edX enrollment repair has given up on this
+        enrollment (edx_enrolled=False and out of retries). Not otherwise
+        obvious from the raw retry count without knowing the configured max.
+        """
+        return (
+            not obj.edx_enrolled
+            and obj.edx_enrollment_retry_count >= OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
+        )
 
     def get_queryset(self, request):
         """
@@ -675,6 +731,20 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         retry_failed_edx_enrollments.delay()
         self.message_user(
             request, "Retry all failed Open edX enrollments successfully requested."
+        )
+
+    @admin.action(description="Reset edX enrollment repair retry count")
+    def reset_edx_enrollment_retry_count(self, request, queryset):
+        """
+        Admin action to reset the retry counter on the selected enrollments so
+        they're eligible for automatic repair again - for use after a
+        misconfiguration (bad course mode, deleted course run, etc) that was
+        causing a wave of enrollments to exhaust their retries is fixed.
+        """
+        updated = queryset.update(edx_enrollment_retry_count=0)
+        self.message_user(
+            request,
+            f"Reset edX enrollment repair retry count for {updated} enrollment(s).",
         )
 
     @admin.action(description="Downgrade users enrollment")
