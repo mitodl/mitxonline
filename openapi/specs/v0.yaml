@@ -7042,12 +7042,14 @@ components:
           readOnly: true
         total_codes:
           type: integer
+          nullable: true
           readOnly: true
         assigned_codes:
           type: integer
           readOnly: true
         unassigned_codes:
           type: integer
+          nullable: true
           readOnly: true
         redeemed_codes:
           type: integer
