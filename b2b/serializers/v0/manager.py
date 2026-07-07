@@ -55,17 +55,15 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
             redemptions = obj.prefetched_code_redemptions
             redeemed = sum(1 for r in redemptions if is_redeemed_attachment_record(r))
             assigned = len(redemptions) - redeemed
-            total = obj.max_learners if obj.max_learners else 0
-            # Unclear if this is proper treatment for no max_learners
-            # If max_learners == None, right now, this will show:
-            # total == 0, assigned == # of assigned codes, unassigned == 0, redeemed == # of redeemed codes
-            # Meanwhile /codes will show the first code, if it exists.
+            total = obj.max_learners
+            # If max_learners is None, unassigned is not a meaningful metric to expose
+            # Assigned and Redeemed can still be accurate and useful in those cases though
             obj._codes_breakdown_cache = {  # noqa: SLF001
                 "total": total,
                 REDEMPTION_STATUS_ASSIGNED: assigned,
                 REDEMPTION_STATUS_UNASSIGNED: (total - assigned - redeemed)
                 if obj.max_learners
-                else 0,
+                else None,
                 REDEMPTION_STATUS_REDEEMED: redeemed,
             }
         return obj._codes_breakdown_cache  # noqa: SLF001
@@ -82,13 +80,13 @@ class ManagerContractDetailSerializer(ContractPageSerializer):
         """Get total number of enrollments across all contract course runs."""
         return obj.enrollment_count
 
-    def get_total_codes(self, obj) -> int:
+    def get_total_codes(self, obj) -> int | None:
         return self._get_codes_breakdown(obj)["total"]
 
     def get_assigned_codes(self, obj) -> int:
         return self._get_codes_breakdown(obj)[REDEMPTION_STATUS_ASSIGNED]
 
-    def get_unassigned_codes(self, obj) -> int:
+    def get_unassigned_codes(self, obj) -> int | None:
         return self._get_codes_breakdown(obj)[REDEMPTION_STATUS_UNASSIGNED]
 
     def get_redeemed_codes(self, obj) -> int:

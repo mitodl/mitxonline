@@ -1,0 +1,288 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" type="text/css" href="{% static 'admin/css/forms.css' %}">
+  <style>
+    .check-table { border-collapse: collapse; margin-top: 1rem; width: 100%; }
+    .check-table th, .check-table td { padding: 6px 12px; border: 1px solid #ddd; text-align: left; }
+    .check-table th { background: #f8f8f8; font-weight: bold; }
+    .check-ok { color: #28a745; font-weight: bold; }
+    .check-fail { color: #dc3545; font-weight: bold; }
+    .check-section { margin-top: 1.5rem; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <h1>Course Configuration Check</h1>
+
+  <form method="get" style="margin-bottom: 1.5rem;">
+    <label for="course_id"><strong>Select a course:</strong></label>
+    <select name="course_id" id="course_id" style="margin: 0 0.5rem;">
+      <option value="">---------</option>
+      {% for course in courses %}
+        <option value="{{ course.pk }}" {% if selected_course.pk == course.pk %}selected{% endif %}>
+          {{ course.readable_id }} — {{ course.title }}
+        </option>
+      {% endfor %}
+    </select>
+    <input type="submit" value="Check" class="default">
+  </form>
+
+  {% if selected_course %}
+    <h2>{{ selected_course.title }}</h2>
+    <p><code>{{ selected_course.readable_id }}</code></p>
+
+    <div class="check-section">
+      <h3>Course-level checks</h3>
+      <table class="check-table">
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Course is live</td>
+            <td>
+              {% if check_results.course_live %}
+                <span class="check-ok">&#10003; Yes</span>
+              {% else %}
+                <span class="check-fail">&#10007; No</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td>CMS page exists</td>
+            <td>
+              {% if check_results.has_cms_page %}
+                <span class="check-ok">&#10003; Yes</span>
+              {% else %}
+                <span class="check-fail">&#10007; No</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td>CMS page is live</td>
+            <td>
+              {% if check_results.cms_page_live %}
+                <span class="check-ok">&#10003; Yes</span>
+              {% else %}
+                <span class="check-fail">&#10007; No</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td>Has a source run</td>
+            <td>
+              {% if check_results.has_source_run %}
+                <span class="check-ok">&#10003; Yes</span>
+              {% else %}
+                <span class="check-fail">&#10007; No — no course run is marked as source</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td>Multi-language groups have a primary run</td>
+            <td>
+              {% if not check_results.language_group_warnings %}
+                <span class="check-ok">&#10003; Yes</span>
+              {% else %}
+                <span class="check-fail">&#10007; No — run tag group(s) with multiple languages but no primary designated: {{ check_results.language_group_warnings|join:", " }}</span>
+              {% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="check-section">
+      <h3>Source runs</h3>
+      {% if check_results.source_runs %}
+        <table class="check-table">
+          <thead>
+            <tr>
+              <th>Run tag</th>
+              <th>Courseware ID</th>
+              <th>Live</th>
+              <th>Language</th>
+              <th>Has product</th>
+              <th>edX audit mode</th>
+              <th>edX verified mode</th>
+              <th>edX modes / error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for run_info in check_results.source_runs %}
+              <tr>
+                <td>{{ run_info.run.run_tag }}</td>
+                <td><code>{{ run_info.run.courseware_id }}</code></td>
+                <td>
+                  {% if run_info.run.live %}
+                    <span class="check-ok">&#10003;</span>
+                  {% else %}
+                    <span class="check-fail">&#10007;</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if run_info.language %}
+                    {{ run_info.language_label }} <small style="color:#888;">({{ run_info.language }})</small>
+                  {% else %}
+                    <span class="check-fail">&#10007; Not set</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if run_info.has_product %}
+                    <span class="check-ok">&#10003; Yes</span>
+                  {% else %}
+                    <span class="check-fail">&#10007; No</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if run_info.edx_error %}
+                    <span style="color: #888;">—</span>
+                  {% elif run_info.has_audit_mode %}
+                    <span class="check-ok">&#10003; Yes</span>
+                  {% else %}
+                    <span class="check-fail">&#10007; No</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if run_info.edx_error %}
+                    <span style="color: #888;">—</span>
+                  {% elif run_info.has_verified_mode %}
+                    <span class="check-ok">&#10003; Yes</span>
+                  {% else %}
+                    <span class="check-fail">&#10007; No</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if run_info.edx_error %}
+                    <span class="check-fail">Error: {{ run_info.edx_error }}</span>
+                  {% elif run_info.edx_modes %}
+                    {% for mode in run_info.edx_modes %}{{ mode.mode_slug }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                  {% else %}
+                    <em>No modes</em>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>No source runs for this course.</p>
+      {% endif %}
+    </div>
+
+    <div class="check-section">
+      <h3>Course run checks</h3>
+      {% if check_results.course_run_groups %}
+        <table class="check-table">
+          <thead>
+            <tr>
+              <th>Courseware ID</th>
+              <th>Live</th>
+              <th>Source run</th>
+              <th>Language</th>
+              <th>Primary lang</th>
+              <th>Has product</th>
+              <th>edX audit mode</th>
+              <th>edX verified mode</th>
+              <th>edX modes / error</th>
+            </tr>
+          </thead>
+          {% for group in check_results.course_run_groups %}
+            <tbody>
+              <tr>
+                <td colspan="9" style="background:#e8e8e8; font-weight:bold; padding: 4px 12px;">
+                  Run tag: {{ group.run_tag }}
+                  {% if group.has_multiple_runs %}
+                    &mdash;
+                    {% if group.has_primary_language %}
+                      <span class="check-ok" style="font-weight:normal;">&#10003; Primary language designated</span>
+                    {% else %}
+                      <span class="check-fail" style="font-weight:normal;">&#10007; No primary language designated</span>
+                    {% endif %}
+                  {% endif %}
+                </td>
+              </tr>
+              {% for run_info in group.runs %}
+                <tr>
+                  <td><code>{{ run_info.run.courseware_id }}</code></td>
+                  <td>
+                    {% if run_info.run.live %}
+                      <span class="check-ok">&#10003;</span>
+                    {% else %}
+                      <span class="check-fail">&#10007;</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if run_info.is_source_run %}
+                      <span class="check-ok">&#10003; Yes</span>
+                    {% else %}
+                      <span style="color: #888;">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if run_info.language %}
+                      {{ run_info.language_label }} <small style="color:#888;">({{ run_info.language }})</small>
+                    {% else %}
+                      <span class="check-fail">&#10007; Not set</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if run_info.is_primary_language %}
+                      <span class="check-ok">&#10003; Yes</span>
+                    {% else %}
+                      <span style="color: #888;">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if run_info.has_product %}
+                      <span class="check-ok">&#10003; Yes</span>
+                    {% else %}
+                      <span class="check-fail">&#10007; No</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if run_info.edx_error %}
+                      <span style="color: #888;">—</span>
+                    {% elif run_info.has_audit_mode %}
+                      <span class="check-ok">&#10003; Yes</span>
+                    {% else %}
+                      <span class="check-fail">&#10007; No</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if run_info.edx_error %}
+                      <span style="color: #888;">—</span>
+                    {% elif run_info.has_verified_mode %}
+                      <span class="check-ok">&#10003; Yes</span>
+                    {% else %}
+                      <span class="check-fail">&#10007; No</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if run_info.edx_error %}
+                      <span class="check-fail">Error: {{ run_info.edx_error }}</span>
+                    {% elif run_info.edx_modes %}
+                      {% for mode in run_info.edx_modes %}{{ mode.mode_slug }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                    {% else %}
+                      <em>No modes</em>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          {% endfor %}
+        </table>
+      {% else %}
+        <p>No course runs found for this course.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

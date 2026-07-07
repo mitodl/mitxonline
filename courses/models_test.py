@@ -19,6 +19,7 @@ from cms.factories import (
     ProgramPageFactory,
     ResourcePageFactory,
 )
+from cms.models import CertificatePage
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseFactory,
@@ -534,6 +535,35 @@ def test_course_run_certificate_clean_allows_missing_page_revision(mocker):
 
     # Should not raise when revision is intentionally unset.
     certificate.clean()
+
+
+def test_course_run_certificate_save_without_course_page(mocker):
+    """Saving should not fail if the course has no CMS page."""
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    user = UserFactory.create()
+    course = CourseFactory.create(page=None)
+    course_run = CourseRunFactory.create(course=course)
+
+    certificate = CourseRunCertificateFactory.create(user=user, course_run=course_run)
+
+    assert certificate.certificate_page_revision is None
+
+
+def test_course_run_certificate_save_without_certificate_child_page(mocker):
+    """Saving should not fail if the course page has no live certificate child page."""
+    mocker.patch(
+        "hubspot_sync.api.upsert_custom_properties",
+    )
+    certificate = CourseRunCertificateFactory.create()
+    course_page = certificate.course_run.course.page
+    CertificatePage.objects.descendant_of(course_page).delete()
+
+    certificate.certificate_page_revision = None
+    certificate.save()
+
+    assert certificate.certificate_page_revision is None
 
 
 def test_program_certificate_start_end_dates_and_page_revision(user, mocker):

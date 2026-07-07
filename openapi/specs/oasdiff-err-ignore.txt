@@ -170,3 +170,5 @@ GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/ th
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/codes/ the response's body `type` changed from `array<object>` to `object` for status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/ the response's body `type` changed from `array<object>` to `object` for status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body `type` changed from `array<object>` to `object` for status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `total_codes` became nullable for the status `200`
+GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `unassigned_codes` became nullable for the status `200`
