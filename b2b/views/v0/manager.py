@@ -341,74 +341,56 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         search_term = request.query_params.get("search_term", "").strip()
         status_filter = request.query_params.get("status", "").strip()
 
-        """
-        There are three main cases:
-        - If the contract has an auto membership type, no codes are needed, so we return an empty list.
-        - If the contract does not have a learner limit, we show the first code only.
-          We don't show individual redemptions because this case is unlikely to be a useful setup for contracts
-        - If the contract has a learner limit, we show all redeemed and assigned codes.
-          This ensures that managers can see all the codes that are currently in use.
-        """
+        # Default behavior is to return all codes for which we have an assignment or redemption.
+        prefetch = Prefetch(
+            "contract_redemptions",
+            queryset=DiscountContractAttachmentRedemption.objects.select_related(
+                "user"
+            ).order_by("-created_on")[:1],
+            to_attr="prefetched_redemptions",
+        )
 
-        # Skip if contract has auto membership type (no codes needed)
-        if contract.membership_type in CONTRACT_MEMBERSHIP_AUTOS:
-            codes_for_output = []
-        else:
-            prefetch = Prefetch(
-                "contract_redemptions",
-                queryset=DiscountContractAttachmentRedemption.objects.select_related(
-                    "user"
-                ).order_by("-created_on")[:1],
-                to_attr="prefetched_redemptions",
+        if search_term or status_filter:
+            # This filter is slightly complicated because we only want to filter on the latest redemption per discount
+            # In practice, we only expect 1 redemption per code for well-formed contracts,
+            # but that's not enforced at the DB so we need to be a bit clever.
+            latest_redemption_ids = (
+                DiscountContractAttachmentRedemption.objects.order_by(
+                    "discount_id", "-created_on"
+                )
+                .distinct("discount_id")
+                .values("pk")
             )
-
-            if search_term or status_filter:
-                # This filter is slightly complicated because we only want to filter on the latest redemption per discount
-                # In practice, we only expect 1 redemption per code for well-formed contracts,
-                # but that's not enforced at the DB so we need to be a bit clever.
-                latest_redemption_ids = (
-                    DiscountContractAttachmentRedemption.objects.order_by(
-                        "discount_id", "-created_on"
-                    )
-                    .distinct("discount_id")
-                    .values("pk")
+            filter_q = Q(contract_redemptions__pk__in=latest_redemption_ids)
+            if search_term:
+                filter_q &= (
+                    Q(contract_redemptions__assigned_email__icontains=search_term)
+                    | Q(contract_redemptions__user__email__icontains=search_term)
+                    | Q(contract_redemptions__user__name__icontains=search_term)
+                    | Q(contract_redemptions__assigned_name__icontains=search_term)
                 )
-                filter_q = Q(contract_redemptions__pk__in=latest_redemption_ids)
-                if search_term:
-                    filter_q &= (
-                        Q(contract_redemptions__assigned_email__icontains=search_term)
-                        | Q(contract_redemptions__user__email__icontains=search_term)
-                        | Q(contract_redemptions__user__name__icontains=search_term)
-                        | Q(contract_redemptions__assigned_name__icontains=search_term)
-                    )
-                if status_filter == REDEMPTION_STATUS_REDEEMED:
-                    filter_q &= Q(contract_redemptions__user__isnull=False) | Q(
-                        contract_redemptions__redeemed_on__isnull=False
-                    )
-                elif status_filter == REDEMPTION_STATUS_ASSIGNED:
-                    filter_q &= Q(contract_redemptions__user__isnull=True) & Q(
-                        contract_redemptions__redeemed_on__isnull=True
-                    )
-                discounts = (
-                    contract.get_discounts()
-                    .filter(filter_q)
-                    .distinct()
-                    .prefetch_related(prefetch)
+            if status_filter == REDEMPTION_STATUS_REDEEMED:
+                filter_q &= Q(contract_redemptions__user__isnull=False) | Q(
+                    contract_redemptions__redeemed_on__isnull=False
                 )
-            else:
-                discounts = contract.get_discounts().prefetch_related(prefetch)
+            elif status_filter == REDEMPTION_STATUS_ASSIGNED:
+                filter_q &= Q(contract_redemptions__user__isnull=True) & Q(
+                    contract_redemptions__redeemed_on__isnull=True
+                )
+            discounts = (
+                contract.get_discounts()
+                .filter(filter_q)
+                .distinct()
+                .prefetch_related(prefetch)
+            )
+        else:
+            discounts = contract.get_discounts().prefetch_related(prefetch)
 
-            if not contract.max_learners:
-                # No learner limit - show first code only, if there is one
-                first = discounts.order_by("id").first()
-                codes_for_output = [first] if first is not None else []
-            else:
-                # Has learner limit - show redeemed codes + enough unused codes to fill remaining seats
-                discounts = discounts.annotate(
-                    num_redemptions=Count("contract_redemptions")
-                ).order_by("-num_redemptions", "id")
+        discounts = discounts.annotate(
+            num_redemptions=Count("contract_redemptions")
+        ).order_by("-num_redemptions", "id")
 
-                codes_for_output = discounts.filter(num_redemptions__gt=0).all()
+        codes_for_output = discounts.filter(num_redemptions__gt=0).all()
 
         return self.get_paginated_response(
             ManagerEnrollmentCodeSerializer(

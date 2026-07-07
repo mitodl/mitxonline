@@ -368,16 +368,8 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         discount_count = contract.get_discounts().count()
         assert discount_count > contract.max_learners
 
-        # We don't expect to get anything back if max_learners is > 0 because we have no redeemed or assigned codes
-        expected_code_count = 0 if contract.max_learners > 0 else 1
-        contract_codes = [
-            discount.discount_code
-            for discount in contract.get_discounts()
-            .order_by("id")
-            .all()[:expected_code_count]
-        ]
-
-        # Pull the codes - we should get 0 codes back for a contract w/ max learners since we have no redemptions
+        # We don't expect to get anything back since we have no redeemed or
+        # assigned codes yet, regardless of max_learners.
 
         manager_contract_code_list = reverse(
             "b2b:b2b-manager-org-contract-codes",
@@ -391,20 +383,7 @@ def test_org_contract_codes(org_setup, manager_drf_client):
         assert resp.status_code == status.HTTP_200_OK
 
         resp_codes = [resp_code["code"] for resp_code in resp.json()["results"]]
-        assert len(resp_codes) == expected_code_count
-
-        assert contract_codes == resp_codes
-
-        # Do it again - since we're providing a subset of the codes, it should
-        # be the _same_ codes each time.
-
-        resp = manager_drf_client.get(manager_contract_code_list)
-        assert resp.status_code == status.HTTP_200_OK
-
-        resp_codes = [resp_code["code"] for resp_code in resp.json()["results"]]
-
-        assert len(resp_codes) == expected_code_count
-        assert contract_codes == resp_codes
+        assert resp_codes == []
 
         # Create some redemptions. The API/etc only considers attachment
         # redemptions to count; enrollment (order) redemptions don't matter here.
@@ -529,8 +508,9 @@ def test_org_contract_codes_redeemed_by_differs_from_assigned_to(
 def test_org_contract_detail_no_max_learners(org_setup, manager_drf_client):
     """
     The detail endpoint should not error when max_learners is None, and
-    should treat the contract as having zero total/unassigned codes
-    regardless of how many codes have been assigned or redeemed.
+    should report total/unassigned codes as None (not a meaningful metric
+    without a learner cap) regardless of how many codes have been assigned
+    or redeemed.
     """
     _, _, (contract_1, *_), *_ = org_setup
 
@@ -560,9 +540,9 @@ def test_org_contract_detail_no_max_learners(org_setup, manager_drf_client):
     assert resp.status_code == status.HTTP_200_OK
 
     resp_data = resp.json()
-    assert resp_data["total_codes"] == 0
+    assert resp_data["total_codes"] is None
     assert resp_data["assigned_codes"] == 0
-    assert resp_data["unassigned_codes"] == 0
+    assert resp_data["unassigned_codes"] is None
     assert resp_data["redeemed_codes"] == 0
 
     # Redeem the one code that exists, and confirm the breakdown still makes
@@ -579,9 +559,9 @@ def test_org_contract_detail_no_max_learners(org_setup, manager_drf_client):
     assert resp.status_code == status.HTTP_200_OK
 
     resp_data = resp.json()
-    assert resp_data["total_codes"] == 0
+    assert resp_data["total_codes"] is None
     assert resp_data["assigned_codes"] == 0
-    assert resp_data["unassigned_codes"] == 0
+    assert resp_data["unassigned_codes"] is None
     assert resp_data["redeemed_codes"] == 1
 
     # /codes should show the single code that exists for this contract.
