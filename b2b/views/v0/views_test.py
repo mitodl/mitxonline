@@ -552,7 +552,9 @@ def test_b2b_contract_attachment_sets_redeemed_on(mocker):
 
     client = APIClient()
     client.force_login(user)
-    url = reverse("b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code})
+    url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
+    )
     resp = client.post(url)
 
     assert resp.status_code == 201
@@ -575,11 +577,15 @@ def test_b2b_contract_attachment_creates_org_membership_with_keep_until_seen(moc
 
     client = APIClient()
     client.force_login(user)
-    url = reverse("b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code})
+    url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
+    )
     resp = client.post(url)
 
     assert resp.status_code == 201
-    org_membership = UserOrganization.objects.get(user=user, organization=contract.organization)
+    org_membership = UserOrganization.objects.get(
+        user=user, organization=contract.organization
+    )
     assert org_membership.keep_until_seen is True
 
 
