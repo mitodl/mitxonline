@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.158.10
+----------------
+
+- Add backfill_program_certificate_titles management command (#3697)
+- fix: issues with certificate generation (#3719)
+
 Version 1.158.9 (Released July 06, 2026)
 ---------------
 
