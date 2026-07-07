@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.158.10
+Version 1.158.10 (Released July 07, 2026)
 ----------------
 
 - Add backfill_program_certificate_titles management command (#3697)
