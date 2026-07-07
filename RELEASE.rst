@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.158.11
+Version 1.158.11 (Released July 07, 2026)
 ----------------
 
 - Indicate no max_learners total and unassigned in API response (#3725)
