@@ -732,7 +732,9 @@ def test_enroll_passes_program_id_to_api(mocker):
     client.force_login(user)
 
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
-    resp = client.post(url, data={"program_id": "program-v1:MITx+TestProg"}, format="json")
+    resp = client.post(
+        url, data={"program_id": "program-v1:MITx+TestProg"}, format="json"
+    )
 
     assert resp.status_code == 201
     _, kwargs = mocked_enroll.call_args
