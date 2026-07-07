@@ -610,11 +610,11 @@ def test_preassigned_code_can_be_redeemed(mocker):
 
 
 def test_enroll_requires_authentication():
-    """Unauthenticated requests to the enroll endpoint should return 401."""
+    """Unauthenticated requests to the enroll endpoint should return 403."""
     client = APIClient()
     url = reverse("b2b:enroll-user", kwargs={"readable_id": "course-v1:MITx+Test+2024"})
     resp = client.post(url)
-    assert resp.status_code == 401
+    assert resp.status_code == 403
 
 
 def test_enroll_courserun_not_found(mocker):
