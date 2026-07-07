@@ -70,13 +70,26 @@ FROM django-server AS production
 
 COPY --from=node /src /src
 
+# ─── Local-dev target (ol-infrastructure local-dev k8s/Tilt stack) ───────────
+# Runtime user owns /src (live-synced source), plus dev deps (pytest, ipdb, …)
+# and watchfiles for granian --reload.
+FROM production AS local-dev
+
+USER root
+RUN chown -R mitodl:mitodl /src
+USER mitodl
+
+RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project
+RUN uv pip install watchfiles
+
 FROM code AS jupyter-notebook
 
 RUN uv pip install --force-reinstall jupyter
 
 USER mitodl
 
-# ─── Development target ───────────────────────────────────────────────────────
+# ─── Development target (docker compose) ─────────────────────────────────────
 FROM django-server AS development
 
 RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
