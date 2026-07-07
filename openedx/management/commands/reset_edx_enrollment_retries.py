@@ -84,12 +84,8 @@ class Command(BaseCommand):
         )
 
         if updated == 0:
-            self.stderr.write(
-                self.style.ERROR(
-                    f"No course run enrollments found that match the given filters ({enrollment_filter}).\nExiting..."
-                )
-            )
-            return
+            msg = f"No course run enrollments found that match the given filters ({enrollment_filter})."
+            raise CommandError(msg)
 
         self.stdout.write(
             self.style.SUCCESS(

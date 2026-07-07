@@ -1,3 +1,5 @@
+"""Tests for reset_edx_enrollment_retries management command"""
+
 import pytest
 from django.core.management import CommandError, call_command
 
@@ -84,9 +86,9 @@ def test_reset_edx_enrollment_retries_only_exhausted():
     assert not_exhausted.edx_enrollment_retry_count == 2
 
 
-def test_reset_edx_enrollment_retries_no_matches(capsys):
-    """No matching enrollments should be reported as an error, not silently succeed"""
-    call_command("reset_edx_enrollment_retries", "--run", "course-v1:nonexistent+id")
-
-    captured = capsys.readouterr()
-    assert "No course run enrollments found" in captured.err
+def test_reset_edx_enrollment_retries_no_matches():
+    """No matching enrollments should exit nonzero, not silently succeed"""
+    with pytest.raises(CommandError, match="No course run enrollments found"):
+        call_command(
+            "reset_edx_enrollment_retries", "--run", "course-v1:nonexistent+id"
+        )
