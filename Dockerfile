@@ -81,7 +81,6 @@ USER mitodl
 
 RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
     uv sync --frozen --no-install-project
-RUN uv pip install watchfiles
 
 FROM code AS jupyter-notebook
 

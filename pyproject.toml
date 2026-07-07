@@ -110,6 +110,7 @@ dev = [
     "pytest-xdist[psutil]>=3.6.1,<4",
     "mitol-drf-lint>=2025.3.27",
     "pytest-urllib3>=0.2.0",
+    "granian[reload]>=2.5.4,<3",
 ]
 
 [tool.uv]
