@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.159.0
+Version 1.159.0 (Released July 07, 2026)
 ---------------
 
 - Add a page to django-admin to check course configs (#3740)
