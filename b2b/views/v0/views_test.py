@@ -627,7 +627,7 @@ def test_enroll_courserun_not_found(mocker):
     url = reverse(
         "b2b:enroll-user", kwargs={"readable_id": "course-v1:MITx+DoesNotExist+2024"}
     )
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(Exception):  # noqa: B017, PT011
         client.post(url)
 
 
@@ -647,7 +647,7 @@ def test_enroll_product_not_found(mocker):
     client.force_login(user)
 
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(Exception):  # noqa: B017, PT011
         client.post(url)
 
 
@@ -777,5 +777,5 @@ def test_enroll_courserun_without_b2b_contract_not_found(mocker):
     client.force_login(user)
 
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(Exception):  # noqa: B017, PT011
         client.post(url)
