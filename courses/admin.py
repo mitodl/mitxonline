@@ -2,12 +2,16 @@
 Admin site bindings for profiles
 """
 
+import contextlib
+
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db import models
 from django.forms import TextInput
-from django.urls import reverse
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
+from django.utils.html import format_html
 from mitol.common.admin import TimestampedModelAdmin
 
 import cms.admin  # noqa: F401
@@ -43,6 +47,8 @@ from main.admin import (
     ModelAdminRunActionsForAllMixin,
 )
 from main.utils import get_field_names
+from openedx.api import get_edx_api_service_client, get_edx_course_modes
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.tasks import retry_failed_edx_enrollments
 
 
@@ -205,6 +211,7 @@ class CourseAdmin(admin.ModelAdmin):
         "id",
         "title",
         "readable_id",
+        "check_link",
     )
     list_filter = ["live", "departments"]
     inlines = [
@@ -220,10 +227,12 @@ class CourseAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):  # noqa: ARG002
         """
         Adds `title` as readonly field while editing an existing object.
+        Adds `check_link` so the configuration check page is reachable from the edit form.
         """
+        extra = ("check_link",) if obj else ()
         if getattr(obj, "page", None):
-            return self.readonly_fields + ("title",)  # noqa: RUF005
-        return self.readonly_fields
+            return self.readonly_fields + extra + ("title",)
+        return self.readonly_fields + extra
 
     def get_form(self, request, obj=None, change=False, **kwargs):  # noqa: FBT002
         """
@@ -242,6 +251,111 @@ class CourseAdmin(admin.ModelAdmin):
             kwargs.update({"help_texts": help_texts})
 
         return super().get_form(request, obj=obj, change=change, **kwargs)
+
+    def get_urls(self):
+        custom = [
+            path(
+                "check/",
+                self.admin_site.admin_view(self.course_check_view),
+                name="courses_course_check",
+            )
+        ]
+        return custom + super().get_urls()
+
+    @admin.display(description="Tools")
+    def check_link(self, obj):
+        url = reverse("admin:courses_course_check") + f"?course_id={obj.pk}"
+        return format_html('<a href="{}">Check Configuration</a>', url)
+
+    def _get_course_check_results(self, course):
+        page = getattr(course, "page", None)
+        results = {
+            "course_live": course.live,
+            "has_cms_page": page is not None,
+            "cms_page_live": page.live if page else False,
+            "course_run_groups": [],
+        }
+        edx_client = None
+        with contextlib.suppress(Exception):
+            edx_client = get_edx_api_service_client()
+
+        # Build a flat list first, then group by run_tag.
+        all_run_data = []
+        for run in course.courseruns.all().order_by("run_tag", "language"):
+            has_product = run.products.filter(is_active=True).exists()
+            edx_modes = None
+            edx_error = None
+            try:
+                edx_modes = get_edx_course_modes(run.courseware_id, client=edx_client)
+            except Exception as exc:  # noqa: BLE001
+                edx_error = str(exc)
+
+            mode_slugs = {m.mode_slug for m in (edx_modes or [])}
+            all_run_data.append(
+                {
+                    "run": run,
+                    "has_product": has_product,
+                    "edx_modes": edx_modes,
+                    "edx_error": edx_error,
+                    "has_audit_mode": EDX_ENROLLMENT_AUDIT_MODE in mode_slugs,
+                    "has_verified_mode": EDX_ENROLLMENT_VERIFIED_MODE in mode_slugs,
+                    "is_source_run": run.is_source_run,
+                    "language": run.language,
+                    "language_label": run.language_label,
+                    "is_primary_language": run.is_primary_language,
+                }
+            )
+
+        results["has_source_run"] = any(r["is_source_run"] for r in all_run_data)
+        results["source_runs"] = [r for r in all_run_data if r["is_source_run"]]
+
+        # Group non-source runs by run_tag for display.
+        groups: dict[str, list] = {}
+        for run_data in all_run_data:
+            if not run_data["is_source_run"]:
+                tag = run_data["run"].run_tag
+                groups.setdefault(tag, []).append(run_data)
+        results["course_run_groups"] = [
+            {
+                "run_tag": tag,
+                "runs": runs,
+                "has_multiple_runs": len(runs) > 1,
+                "has_primary_language": any(r["is_primary_language"] for r in runs),
+            }
+            for tag, runs in groups.items()
+        ]
+
+        # Flag run_tag groups that have multiple language variants but no primary designated.
+        results["language_group_warnings"] = [
+            tag
+            for tag, runs in groups.items()
+            if len({r["language"] for r in runs}) > 1
+            and not any(r["is_primary_language"] for r in runs)
+        ]
+
+        return results
+
+    def course_check_view(self, request):
+        courses = Course.objects.all().order_by("readable_id")
+        selected_course = None
+        check_results = None
+
+        course_id = request.GET.get("course_id")
+        if course_id:
+            with contextlib.suppress(Course.DoesNotExist, ValueError):
+                selected_course = Course.objects.get(pk=course_id)
+
+        if selected_course:
+            check_results = self._get_course_check_results(selected_course)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Course Configuration Check",
+            "courses": courses,
+            "selected_course": selected_course,
+            "check_results": check_results,
+        }
+        return TemplateResponse(request, "admin/courses/course_check.html", context)
 
 
 @admin.register(CourseRun)
