@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.158.11
+----------------
+
+- Indicate no max_learners total and unassigned in API response (#3725)
+- fix: improve future enrollments and entitlement migration (#3727)
+- Add local-dev Docker target for ol-infrastructure Tilt stack (#3736)
+- ManagerEnrollmentCodeSerializer tests (#3718)
+- chore: adds ORM001 and ORM002 to external rules list (#3733)
+
 Version 1.158.10 (Released July 07, 2026)
 ----------------
 
