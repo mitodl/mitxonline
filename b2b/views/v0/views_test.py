@@ -531,6 +531,64 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913
     assert CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
 
 
+def test_b2b_contract_attachment_requires_authentication():
+    """An unauthenticated request should be rejected before checking the code."""
+    client = APIClient()
+    url = reverse("b2b:attach-user", kwargs={"enrollment_code": "any-code"})
+    resp = client.post(url)
+    assert resp.status_code == 403
+
+
+def test_b2b_contract_attachment_sets_redeemed_on(mocker):
+    """A successful attachment should populate redeemed_on on the redemption record."""
+    mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
+
+    user = UserFactory.create()
+    contract = ContractPageFactory.create(membership_type=CONTRACT_MEMBERSHIP_CODE)
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=courserun)
+    ensure_enrollment_codes_exist(contract)
+    contract_code = contract.get_discounts().first()
+
+    client = APIClient()
+    client.force_login(user)
+    url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
+    )
+    resp = client.post(url)
+
+    assert resp.status_code == 201
+    redemption = DiscountContractAttachmentRedemption.objects.get(
+        discount=contract_code, contract=contract, user=user
+    )
+    assert redemption.redeemed_on is not None
+
+
+def test_b2b_contract_attachment_creates_org_membership_with_keep_until_seen(mocker):
+    """Attaching to a contract should create a UserOrganization with keep_until_seen=True."""
+    mocker.patch("b2b.models.OrganizationPage.attach_user", return_value=True)
+
+    user = UserFactory.create()
+    contract = ContractPageFactory.create(membership_type=CONTRACT_MEMBERSHIP_CODE)
+    courserun = CourseRunFactory.create(b2b_contract=contract)
+    ProductFactory.create(purchasable_object=courserun)
+    ensure_enrollment_codes_exist(contract)
+    contract_code = contract.get_discounts().first()
+
+    client = APIClient()
+    client.force_login(user)
+    url = reverse(
+        "b2b:attach-user", kwargs={"enrollment_code": contract_code.discount_code}
+    )
+    resp = client.post(url)
+
+    assert resp.status_code == 201
+    org_membership = UserOrganization.objects.get(
+        user=user, organization=contract.organization
+    )
+    assert org_membership.keep_until_seen is True
+
+
 def test_preassigned_code_can_be_redeemed(mocker):
     """
     A code pre-assigned by a manager should be redeemable by the intended learner.
