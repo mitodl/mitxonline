@@ -22,7 +22,10 @@ from courses.serializers.v1.base import (
     BaseProgramSerializer,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
-from courses.utils import get_approved_flexible_price_exists, get_dated_courseruns
+from courses.utils import (
+    get_approved_flexible_price_exists,
+    get_dated_courseruns,
+)
 from ecommerce.serializers.v0 import BaseProductSerializer
 from main import features
 from variants.serializers import SupportedVariantSerializer
@@ -95,48 +98,37 @@ class CourseSerializer(BaseCourseSerializer):
         Returns:
             bool: True when the prerequisites field is populated in the course page CMS.  False otherwise.
         """
-        return bool(
-            hasattr(instance, "page")
-            and hasattr(instance.page, "prerequisites")
-            and instance.page.prerequisites != ""
-        )
+        page = instance.course_page
+        return bool(page and page.prerequisites != "")
 
     @extend_schema_field(str)
     def get_duration(self, instance):
         """
         Get the duration of the course from the course page CMS.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "length"):
-            return instance.page.length
-
-        return None
+        page = instance.course_page
+        return page.length if page else None
 
     def get_time_commitment(self, instance) -> str | None:
         """
         Get the time commitment of the course from the course page CMS.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "effort"):
-            return instance.page.effort
-
-        return None
+        page = instance.course_page
+        return page.effort if page else None
 
     def get_min_weekly_hours(self, instance) -> str | None:
         """
         Get the min weekly hours of the course from the course page CMS.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "min_weekly_hours"):
-            return instance.page.min_weekly_hours
-
-        return None
+        page = instance.course_page
+        return page.min_weekly_hours if page else None
 
     def get_max_weekly_hours(self, instance) -> str | None:
         """
         Get the max weekly hours of the course from the course page CMS.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "max_weekly_hours"):
-            return instance.page.max_weekly_hours
-
-        return None
+        page = instance.course_page
+        return page.max_weekly_hours if page else None
 
     def get_next_run_id(self, instance) -> int | None:
         """Get next run id"""
@@ -151,8 +143,9 @@ class CourseSerializer(BaseCourseSerializer):
     @extend_schema_field(list[dict])
     def get_topics(self, instance):
         """List topics of a course"""
-        if hasattr(instance, "page") and instance.page is not None:
-            return get_topics_from_page(instance.page)
+        page = instance.course_page
+        if page is not None:
+            return get_topics_from_page(page)
         return []
 
     @extend_schema_field(str)
@@ -188,35 +181,29 @@ class CourseSerializer(BaseCourseSerializer):
         """
         Get the min weeks of the course from the CMS page.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "min_weeks"):
-            return instance.page.min_weeks
-
-        return None
+        page = instance.course_page
+        return page.min_weeks if page else None
 
     def get_max_weeks(self, instance) -> int | None:
         """
         Get the max weeks of the course from the CMS page.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "max_weeks"):
-            return instance.page.max_weeks
-
-        return None
+        page = instance.course_page
+        return page.max_weeks if page else None
 
     def get_min_price(self, instance) -> Decimal | None:
         """
         Get the min price of the product from the CMS page.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "min_price"):
-            return instance.page.min_price
-        return None
+        page = instance.course_page
+        return page.min_price if page else None
 
     def get_max_price(self, instance) -> Decimal | None:
         """
         Get the max price of the product from the CMS page.
         """
-        if hasattr(instance, "page") and hasattr(instance.page, "max_price"):
-            return instance.page.max_price
-        return None
+        page = instance.course_page
+        return page.max_price if page else None
 
     class Meta:
         model = models.Course

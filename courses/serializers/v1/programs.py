@@ -140,10 +140,10 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(ProgramPageSerializer)
     def get_page(self, instance):
-        if hasattr(instance, "page"):
-            return ProgramPageSerializer(instance.page).data
-        else:
-            return {"feature_image_src": get_thumbnail_url(None)}
+        page = instance.program_page
+        if page:
+            return ProgramPageSerializer(page).data
+        return {"feature_image_src": get_thumbnail_url(None)}
 
     class Meta:
         model = models.Program

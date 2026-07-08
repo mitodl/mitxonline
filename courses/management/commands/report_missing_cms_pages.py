@@ -48,21 +48,23 @@ class Command(BaseCommand):
         missing_course_pages = []
         missing_course_certificate_pages = []
         for course in courses_qs:
-            if not hasattr(course, "page") or not course.page:
+            course_page = course.course_page
+            if not course_page:
                 missing_course_pages.append(course)
                 continue
 
-            if not course.page.certificate_page:
+            if not course_page.certificate_page:
                 missing_course_certificate_pages.append(course)
 
         missing_program_pages = []
         missing_program_certificate_pages = []
         for program in programs_qs:
-            if not hasattr(program, "page") or not program.page:
+            program_page = program.program_page
+            if not program_page:
                 missing_program_pages.append(program)
                 continue
 
-            if not program.page.certificate_page:
+            if not program_page.certificate_page:
                 missing_program_certificate_pages.append(program)
 
         stats = {

@@ -61,23 +61,17 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
     """
     user_id = enrollment.user_id
     if isinstance(enrollment, CourseRunEnrollment):
+        program_page = program.program_page if program else None
         # No need to include a certificate if there is no corresponding wagtail page
         # to support the render
-        if (
-            not hasattr(program, "page")
-            or not program.page
-            or not program.page.certificate_page
-        ):
+        if not program_page or not program_page.certificate_page:
             return None
         program_id = program.id
     else:
+        program_page = enrollment.program.program_page
         # No need to include a certificate if there is no corresponding wagtail page
         # to support the render
-        if (
-            not hasattr(enrollment.program, "page")
-            or not enrollment.program.page
-            or not enrollment.program.page.certificate_page
-        ):
+        if not program_page or not program_page.certificate_page:
             return None
         program_id = enrollment.program_id
     # Using IDs because we don't need the actual record and this avoids redundant queries

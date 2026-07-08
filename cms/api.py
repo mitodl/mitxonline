@@ -297,7 +297,7 @@ def create_default_signatory_page(
     # Import here to avoid circular imports
     from cms.models import SignatoryIndexPage, SignatoryPage  # noqa: PLC0415
 
-    certificate_page = courseware.page.certificate_page
+    certificate_page = courseware.certificate_page
     signatory_page = SignatoryPage(
         name=f"PLACEHOLDER - {courseware.title} Signatory",
         title_1=f"PLACEHOLDER - {courseware.title} Signatory Title 1",
@@ -339,7 +339,11 @@ def create_default_certificate_page(
         product_name=f"PLACEHOLDER - {courseware.title} Certificate",
         CEUs=f"PLACEHOLDER - {courseware.title} CEUs",
     )
-    courseware_page = courseware.page
+    courseware_page = (
+        courseware.course_page
+        if isinstance(courseware, Course)
+        else courseware.program_page
+    )
     courseware_page.add_child(instance=cert_page)
     return cert_page
 

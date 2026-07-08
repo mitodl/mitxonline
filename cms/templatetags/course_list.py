@@ -18,28 +18,25 @@ def course_list(courses):
     cards = []
 
     for course in courses:
-        try:
-            if not course.page.live:
-                continue
+        page = course.course_page
+        if not page or not page.live:
+            continue
 
-            start_descriptor = (
-                f"Starts {format_course_start_time(course.first_unexpired_run.start_date)}"
-                if course.first_unexpired_run and course.first_unexpired_run.start_date
-                else "Start Anytime"
-            )
+        start_descriptor = (
+            f"Starts {format_course_start_time(course.first_unexpired_run.start_date)}"
+            if course.first_unexpired_run and course.first_unexpired_run.start_date
+            else "Start Anytime"
+        )
 
-            featured_image = feature_img_src(course.page.feature_image)
-            page = course.page
+        featured_image = feature_img_src(page.feature_image)
 
-            cards.append(
-                {
-                    "course": course,
-                    "page": page,
-                    "start_descriptor": start_descriptor,
-                    "featured_image": featured_image,
-                }
-            )
-        except Exception:  # noqa: S110, BLE001
-            pass
+        cards.append(
+            {
+                "course": course,
+                "page": page,
+                "start_descriptor": start_descriptor,
+                "featured_image": featured_image,
+            }
+        )
 
     return {"cards": cards}
