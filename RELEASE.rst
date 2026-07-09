@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.159.1
+---------------
+
+- JIT discount provisioning for /bulk_assign (#3734)
+- Add B2B contract attachment API tests (#3739)
+- refactor: rename course.page and program.page property (#3731)
+- refactor: remove unused command (#3732)
+- fix(openedx): dead-letter chronically-failing enrollment repairs (#3726)
+
 Version 1.159.0 (Released July 07, 2026)
 ---------------
 
