@@ -686,7 +686,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         # Provision enough on the fly to handle the payload
         if (
             contract.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
-            and contract.max_learners is None
+            and not contract.max_learners
             and len(available_discounts) < len(email_assignees)
         ):
             # If we are in a contract without a seat limit, provision new discounts for users up to the number required
