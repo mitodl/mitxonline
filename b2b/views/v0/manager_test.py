@@ -1330,10 +1330,12 @@ def test_bulk_assign(org_setup, manager_drf_client, mocker):
 def test_bulk_assign_insufficient_codes(org_setup, manager_drf_client, mocker):
     """bulk_assign reports errors for records that exceed the number of available codes."""
     mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
-    _, _, _, (contract_2, *_), *_ = org_setup
+    # contract_1 has a real (non-zero) max_learners cap, so it never falls
+    # into the on-the-fly provisioning codepath used for uncapped contracts.
+    _, _, (contract_1, *_), *_ = org_setup
 
     available_count = (
-        contract_2.get_discounts().filter(contract_redemptions__isnull=True).count()
+        contract_1.get_discounts().filter(contract_redemptions__isnull=True).count()
     )
 
     # Request two more than are available so we get predictable errors.
@@ -1342,8 +1344,8 @@ def test_bulk_assign_insufficient_codes(org_setup, manager_drf_client, mocker):
     bulk_assign_url = reverse(
         "b2b:b2b-manager-org-contract-bulk-assign",
         kwargs={
-            "parent_lookup_organization": contract_2.organization.id,
-            "pk": contract_2.id,
+            "parent_lookup_organization": contract_1.organization.id,
+            "pk": contract_1.id,
         },
     )
 
