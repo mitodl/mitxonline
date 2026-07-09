@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.159.1
+Version 1.159.1 (Released July 09, 2026)
 ---------------
 
 - JIT discount provisioning for /bulk_assign (#3734)
