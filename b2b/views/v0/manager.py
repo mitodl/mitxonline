@@ -3,6 +3,7 @@
 import logging
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
@@ -19,6 +20,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
+from b2b.api import _create_discount_with_product
+from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
@@ -49,6 +52,7 @@ from b2b.tasks import (
 )
 from b2b.utils import is_redeemed_attachment_record
 from courses.models import CourseRun, CourseRunEnrollment
+from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
 from ecommerce.models import Discount
 
 log = logging.getLogger(__name__)
@@ -104,6 +108,23 @@ def assign_codes_and_send_emails(
     )
 
     return True
+
+
+def _create_discount_codes_for_contract(
+    contract: ContractPage, count_to_provision: int
+) -> list[Discount]:
+    new_discounts = []
+    # Per https://github.com/mitodl/mitxonline/pull/3734#discussion_r3532707128 we expect contracts to have many products
+    # For contract attachment JIT code generation, any product associated w/ the contract should
+    # work for creating the discount code, so we just grab the first one.
+    product = contract.get_products().first()
+    for _ in range(count_to_provision):
+        discount = _create_discount_with_product(
+            product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
+        )
+        new_discounts.append(discount)
+
+    return new_discounts
 
 
 class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -661,6 +682,19 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         )
 
         assignments = []
+        # If we're in a contract type that uses codes, doesnt have a seat limit and we're out of available discounts
+        # Provision enough on the fly to handle the payload
+        if (
+            contract.membership_type not in CONTRACT_MEMBERSHIP_AUTOS
+            and not contract.max_learners
+            and len(available_discounts) < len(email_assignees)
+        ):
+            # If we are in a contract without a seat limit, provision new discounts for users up to the number required
+            count_to_provision = len(email_assignees) - len(available_discounts)
+            new_discounts = _create_discount_codes_for_contract(
+                contract, count_to_provision
+            )
+            available_discounts.extend(new_discounts)
 
         for i, record in enumerate(email_assignees):
             email = record["email"]
