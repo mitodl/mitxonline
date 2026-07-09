@@ -118,6 +118,12 @@ def _create_discount_codes_for_contract(
     # For contract attachment JIT code generation, any product associated w/ the contract should
     # work for creating the discount code, so we just grab the first one.
     product = contract.get_products().first()
+    if not product:
+        log.exception(
+            "Contract %s has no product, cannot provision JIT discount codes", contract
+        )
+        return new_discounts
+
     for _ in range(count_to_provision):
         discount = _create_discount_with_product(
             product, Decimal(0), REDEMPTION_TYPE_ONE_TIME
