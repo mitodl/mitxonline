@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.159.2
+---------------
+
+- Filter active cert issue_date in db query (#3748)
+- Add some viz into misconfigured contracts (#3744)
+- fix: update the beat task timing for retry_failed_edx_enrollments (#3723)
+- Enable live reload for the django app (#3738)
+
 Version 1.159.1 (Released July 09, 2026)
 ---------------
 
