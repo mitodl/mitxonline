@@ -210,7 +210,7 @@ def test_user_enrollments_list(
 
 def test_user_enrollments_exposed_certificates_are_queryable_in_v2(
     user_drf_client,
-    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,  # noqa: ARG001
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
 ):
     """Course certificate UUIDs returned by v3 enrollments should resolve via v2."""
     resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
@@ -541,7 +541,7 @@ def test_program_enrollments(
 
 def test_program_enrollments_exposed_certificates_are_queryable_in_v2(
     user_drf_client,
-    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,  # noqa: ARG001
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,
 ):
     """Program certificate UUIDs returned by v3 enrollments should resolve via v2."""
     resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))

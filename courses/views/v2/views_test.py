@@ -1322,7 +1322,6 @@ def test_program_certificate_viewset_uses_runtime_queryset(mocker):
     api_detail_queryset.assert_called_once_with()
 
 
-
 def test_get_course_certificate_future_issue_date():
     """Test that get_course_certificate returns 404 for certificates with a future issue_date."""
     courseware_page = CoursePageFactory.create()

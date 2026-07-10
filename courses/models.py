@@ -2185,9 +2185,11 @@ class CourseRunEnrollment(EnrollmentModel):
         if hasattr(self, "_certificate"):
             return self._certificate
         else:
-            return CourseRunCertificate.queryable_queryset().filter(
-                course_run_id=self.run_id, user_id=self.user_id
-            ).first()
+            return (
+                CourseRunCertificate.queryable_queryset()
+                .filter(course_run_id=self.run_id, user_id=self.user_id)
+                .first()
+            )
 
     @cached_property
     def grades(self) -> list["CourseRunGrade"]:
@@ -2327,9 +2329,11 @@ class ProgramEnrollment(EnrollmentModel):
         if hasattr(self, "_certificate"):
             return self._certificate
         else:
-            return ProgramCertificate.queryable_queryset().filter(
-                program_id=self.program_id, user_id=self.user_id
-            ).first()
+            return (
+                ProgramCertificate.queryable_queryset()
+                .filter(program_id=self.program_id, user_id=self.user_id)
+                .first()
+            )
 
     def get_run_enrollments(self):
         """
