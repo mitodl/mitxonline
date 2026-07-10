@@ -1291,16 +1291,26 @@ def retry_failed_edx_enrollments():
                 user, [course_run], mode=enrollment.enrollment_mode
             )
         except Exception as exc:  # pylint: disable=broad-except
-            log.exception(str(exc))  # noqa: TRY401
             if not _is_permanent_enrollment_failure(exc):
+                # transient/unexpected - worth a Sentry event since it may
+                # signal a real edX outage or a new failure mode
+                log.exception(str(exc))  # noqa: TRY401
                 continue
+            # permanent, per-enrollment failure that is already tracked via
+            # edx_enrollment_retry_count and visible in the admin - logging
+            # this at ERROR would send a Sentry event on every one of
+            # OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES attempts for every broken
+            # enrollment, which is exactly what buried MITXONLINE-5Q0 in 1.26M+
+            # events. Log it at WARNING (kept in app logs, no Sentry issue)
+            # instead.
+            log.warning(str(exc), exc_info=True)
             enrollment.edx_enrollment_retry_count += 1
             enrollment.save(update_fields=["edx_enrollment_retry_count"])
             if (
                 enrollment.edx_enrollment_retry_count
                 >= OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
             ):
-                log.error(  # noqa: TRY400 - traceback already logged above via log.exception
+                log.warning(
                     "Giving up on edX enrollment repair for user %s in course run "
                     "%s after %d failed attempts - will not be retried automatically",
                     user.edx_username,

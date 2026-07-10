@@ -1187,8 +1187,8 @@ def test_retry_failed_edx_enrollments_dead_letters_at_max_retries(mocker):
         "openedx.api.enroll_in_edx_course_runs",
         side_effect=_permanent_enroll_error(enrollment.user, enrollment.run),
     )
-    mocker.patch("openedx.api.log.exception")
-    patched_log_error = mocker.patch("openedx.api.log.error")
+    patched_log_exception = mocker.patch("openedx.api.log.exception")
+    patched_log_warning = mocker.patch("openedx.api.log.warning")
 
     retry_failed_edx_enrollments()
 
@@ -1196,8 +1196,11 @@ def test_retry_failed_edx_enrollments_dead_letters_at_max_retries(mocker):
     assert (
         enrollment.edx_enrollment_retry_count == OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES
     )
-    patched_log_error.assert_called_once()
-    assert "Giving up" in patched_log_error.call_args[0][0]
+    # permanent failures must not reach Sentry via log.exception - only the
+    # give-up message, at WARNING, so it stays out of Sentry too
+    patched_log_exception.assert_not_called()
+    assert patched_log_warning.call_count == 2
+    assert "Giving up" in patched_log_warning.call_args_list[-1][0][0]
 
 
 @pytest.mark.parametrize(
