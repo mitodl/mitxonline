@@ -208,6 +208,32 @@ def test_user_enrollments_list(
     ]
 
 
+def test_user_enrollments_exposed_certificates_are_queryable_in_v2(
+    user_drf_client,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,  # noqa: ARG001
+):
+    """Course certificate UUIDs returned by v3 enrollments should resolve via v2."""
+    resp = user_drf_client.get(reverse("v3:user_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    client = APIClient()
+    for enrollment_data in resp.json():
+        certificate = enrollment_data["certificate"]
+        if certificate is None:
+            continue
+
+        cert_resp = client.get(
+            reverse(
+                "v2:course_certificates_api-detail",
+                kwargs={"uuid": certificate["uuid"]},
+            )
+        )
+        assert cert_resp.status_code == status.HTTP_200_OK
+        assert cert_resp.json()["uuid"] == certificate["uuid"]
+        assert cert_resp.json()["course_run"]["id"] == enrollment_data["run"]["id"]
+
+
 def test_user_enrollments_list_filter_org_id(
     user_drf_client,
     b2b_courses: B2BCourses,
@@ -511,6 +537,32 @@ def test_program_enrollments(
         }
         for program_enrollment in program_enrollments
     ]
+
+
+def test_program_enrollments_exposed_certificates_are_queryable_in_v2(
+    user_drf_client,
+    user_with_enrollments_and_certificates: UserWithEnrollmentsAndCerts,  # noqa: ARG001
+):
+    """Program certificate UUIDs returned by v3 enrollments should resolve via v2."""
+    resp = user_drf_client.get(reverse("v3:user_program_enrollments_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    client = APIClient()
+    for enrollment_data in resp.json():
+        certificate = enrollment_data["certificate"]
+        if certificate is None:
+            continue
+
+        cert_resp = client.get(
+            reverse(
+                "v2:program_certificates_api-detail",
+                kwargs={"uuid": certificate["uuid"]},
+            )
+        )
+        assert cert_resp.status_code == status.HTTP_200_OK
+        assert cert_resp.json()["uuid"] == certificate["uuid"]
+        assert cert_resp.json()["program"]["id"] == enrollment_data["program"]["id"]
 
 
 def test_program_enrollments_future_program_cert(user_drf_client, user):

@@ -76,7 +76,9 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         program_id = enrollment.program_id
     # Using IDs because we don't need the actual record and this avoids redundant queries
     try:
-        return ProgramCertificate.objects.get(user_id=user_id, program_id=program_id)
+        return ProgramCertificate.queryable_queryset().get(
+            user_id=user_id, program_id=program_id
+        )
     except ProgramCertificate.DoesNotExist:
         return None
 

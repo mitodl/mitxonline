@@ -43,10 +43,12 @@ from courses.factories import (
 )
 from courses.models import (
     Course,
+    CourseRunCertificate,
     CourseRunEnrollment,
     CoursesTopic,
     PaidProgram,
     Program,
+    ProgramCertificate,
     ProgramEnrollment,
 )
 from courses.serializers.v2.certificates import (
@@ -75,7 +77,12 @@ from courses.views.test_utils import (
     num_queries_from_department,
     num_queries_from_programs,
 )
-from courses.views.v2 import Pagination, ProgramFilterSet
+from courses.views.v2 import (
+    CourseCertificateRetrieveViewSet,
+    Pagination,
+    ProgramCertificateRetrieveViewSet,
+    ProgramFilterSet,
+)
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus, Product
 from main import features
@@ -1283,6 +1290,37 @@ def test_get_course_certificate():
         reverse("v2:course_certificates_api-detail", kwargs={"uuid": uuid.uuid4()})
     )
     assert resp404.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_course_certificate_viewset_uses_runtime_queryset(mocker):
+    """Course certificate detail queryset should be rebuilt per request."""
+    queryset = mocker.sentinel.course_queryset
+    api_detail_queryset = mocker.patch.object(
+        CourseRunCertificate,
+        "api_detail_queryset",
+        return_value=queryset,
+    )
+
+    view = CourseCertificateRetrieveViewSet()
+
+    assert view.get_queryset() is queryset
+    api_detail_queryset.assert_called_once_with()
+
+
+def test_program_certificate_viewset_uses_runtime_queryset(mocker):
+    """Program certificate detail queryset should be rebuilt per request."""
+    queryset = mocker.sentinel.program_queryset
+    api_detail_queryset = mocker.patch.object(
+        ProgramCertificate,
+        "api_detail_queryset",
+        return_value=queryset,
+    )
+
+    view = ProgramCertificateRetrieveViewSet()
+
+    assert view.get_queryset() is queryset
+    api_detail_queryset.assert_called_once_with()
+
 
 
 def test_get_course_certificate_future_issue_date():

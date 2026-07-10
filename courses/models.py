@@ -1783,6 +1783,22 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     class Meta:
         unique_together = ("user", "course_run")
 
+    @classmethod
+    def queryable_queryset(cls):
+        """Return certificates that should be exposed by the public APIs."""
+        return cls.all_objects.filter(is_revoked=False, issue_date__lte=now_in_utc())
+
+    @classmethod
+    def api_detail_queryset(cls):
+        """Return the queryset used by the certificate detail API."""
+        return cls.queryable_queryset().prefetch_related(
+            Prefetch(
+                "course_run__course__programs",
+                queryset=Program.objects.filter(b2b_only=False),
+            ),
+            "user",
+        )
+
     def get_certified_object_id(self):
         return self.course_run_id
 
@@ -1868,6 +1884,16 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
 
     class Meta:
         unique_together = ("user", "program")
+
+    @classmethod
+    def queryable_queryset(cls):
+        """Return certificates that should be exposed by the public APIs."""
+        return cls.all_objects.filter(is_revoked=False, issue_date__lte=now_in_utc())
+
+    @classmethod
+    def api_detail_queryset(cls):
+        """Return the queryset used by the certificate detail API."""
+        return cls.queryable_queryset().prefetch_related("user")
 
     def get_certified_object_id(self):
         return self.program_id
@@ -2050,7 +2076,7 @@ class CourseRunEnrollmentCertificatePrefetcher(Prefetcher):
     @staticmethod
     def filter(course_run_and_user_ids):
         if not course_run_and_user_ids:
-            return CourseRunCertificate.objects.none()
+            return CourseRunCertificate.queryable_queryset().none()
 
         id_filters = Q()
 
@@ -2059,7 +2085,7 @@ class CourseRunEnrollmentCertificatePrefetcher(Prefetcher):
         for course_run_id, user_id in course_run_and_user_ids:
             id_filters |= Q(course_run_id=course_run_id, user_id=user_id)
 
-        return CourseRunCertificate.objects.filter(id_filters)
+        return CourseRunCertificate.queryable_queryset().filter(id_filters)
 
     @staticmethod
     def reverse_mapper(certificate):
@@ -2159,7 +2185,7 @@ class CourseRunEnrollment(EnrollmentModel):
         if hasattr(self, "_certificate"):
             return self._certificate
         else:
-            return CourseRunCertificate.objects.filter(
+            return CourseRunCertificate.queryable_queryset().filter(
                 course_run_id=self.run_id, user_id=self.user_id
             ).first()
 
@@ -2236,7 +2262,7 @@ class ProgramEnrollmentCertificatePrefetcher(Prefetcher):
     @staticmethod
     def filter(program_and_user_ids):
         if not program_and_user_ids:
-            return ProgramCertificate.objects.none()
+            return ProgramCertificate.queryable_queryset().none()
 
         id_filters = Q()
 
@@ -2245,7 +2271,7 @@ class ProgramEnrollmentCertificatePrefetcher(Prefetcher):
         for program_id, user_id in program_and_user_ids:
             id_filters |= Q(program_id=program_id, user_id=user_id)
 
-        return ProgramCertificate.objects.filter(id_filters)
+        return ProgramCertificate.queryable_queryset().filter(id_filters)
 
     @staticmethod
     def reverse_mapper(certificate):
@@ -2301,7 +2327,7 @@ class ProgramEnrollment(EnrollmentModel):
         if hasattr(self, "_certificate"):
             return self._certificate
         else:
-            return ProgramCertificate.objects.filter(
+            return ProgramCertificate.queryable_queryset().filter(
                 program_id=self.program_id, user_id=self.user_id
             ).first()
 

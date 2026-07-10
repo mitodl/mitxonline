@@ -982,19 +982,20 @@ class CourseCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
     """Viewset to read a single course certificate"""
 
     serializer_class = CourseRunCertificateSerializer
-    queryset = CourseRunCertificate.objects.prefetch(
-        PrefetchOption(
-            "course_run__course__programs",
-            queryset=Program.objects.filter(b2b_only=False),
-        )
-    ).prefetch_related("user")
+
+    def get_queryset(self):
+        """Return the current queryable course certificate queryset."""
+        return CourseRunCertificate.api_detail_queryset()
 
 
 class ProgramCertificateRetrieveViewSet(_BaseCertificateRetrieveViewSet):
     """Viewset to read a single course certificate"""
 
     serializer_class = ProgramCertificateSerializer
-    queryset = ProgramCertificate.objects.prefetch_related("user")
+
+    def get_queryset(self):
+        """Return the current queryable program certificate queryset."""
+        return ProgramCertificate.api_detail_queryset()
 
 
 class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
