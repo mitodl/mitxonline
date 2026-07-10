@@ -63,10 +63,9 @@ matches are reported and skipped."""
                 self.style.WARNING("Commit flag not set - no changes will be made.")
             )
 
-        enrollments = (
-            CourseRunEnrollment.objects.filter(run__b2b_contract__isnull=False)
-            .select_related("user", "run", "run__course", "run__b2b_contract")
-        )
+        enrollments = CourseRunEnrollment.objects.filter(
+            run__b2b_contract__isnull=False
+        ).select_related("user", "run", "run__course", "run__b2b_contract")
 
         if specific_user:
             enrollments = enrollments.filter(
