@@ -17,6 +17,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, RegexVa
 from django.db import models
 from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.db.models.constraints import CheckConstraint, UniqueConstraint
+from django.db.models.functions import Now
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -1715,11 +1716,7 @@ class ActiveCertificatesManager(CertificatesManager):
         Returns:
             QuerySet: queryset for un-revoked certificates
         """
-        return (
-            super()
-            .get_queryset()
-            .filter(is_revoked=False, issue_date__lte=now_in_utc())
-        )
+        return super().get_queryset().filter(is_revoked=False, issue_date__lte=Now())
 
 
 class BaseCertificate(models.Model):
