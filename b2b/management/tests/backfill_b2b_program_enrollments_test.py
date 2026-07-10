@@ -112,7 +112,7 @@ def test_backfill_skips_ambiguous_course():
 def test_backfill_skips_course_not_in_any_program():
     """A B2B enrollment whose course maps to no contract program is skipped."""
 
-    enrollment, program = _setup_b2b_enrollment(link_contract_program=False)
+    enrollment, _program = _setup_b2b_enrollment(link_contract_program=False)
 
     call_command(COMMAND, "--commit")
 
