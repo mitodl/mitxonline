@@ -1428,6 +1428,51 @@ def test_bulk_assign_provisions_codes_for_uncapped_contract(
     )
 
 
+def test_bulk_assign_no_product_for_uncapped_contract(
+    org_setup, manager_drf_client, mocker, caplog
+):
+    """bulk_assign doesnt attempt JIT code provisioning for a misconfigured contract without a product."""
+    mocker.patch("b2b.views.v0.manager.queue_send_enrollment_code_assignment_email")
+    _, _, (contract_1, *_), *_ = org_setup
+
+    uncapped_contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE,
+        max_learners=None,
+        organization=contract_1.organization,
+    )
+
+    records = [
+        {"email": "learner1@example.com", "name": "Learner One"},
+        {"email": "learner2@example.com", "name": "Learner Two"},
+    ]
+
+    bulk_assign_url = reverse(
+        "b2b:b2b-manager-org-contract-bulk-assign",
+        kwargs={
+            "parent_lookup_organization": uncapped_contract.organization.id,
+            "pk": uncapped_contract.id,
+        },
+    )
+
+    resp = manager_drf_client.post(bulk_assign_url, data=records, format="json")
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_data = resp.json()
+    assert len(resp_data["assigned"]) == 0
+    assert len(resp_data["errors"]) == 2
+    assert all("No available code." in err["detail"] for err in resp_data["errors"])
+
+    assert uncapped_contract.get_discounts().count() == 0
+    assert (
+        DiscountContractAttachmentRedemption.objects.filter(
+            contract=uncapped_contract
+        ).count()
+        == 0
+    )
+    assert "has no product" in caplog.text
+
+
 def test_bulk_assign_skips_already_assigned_or_redeemed(
     org_setup, manager_drf_client, mocker
 ):
