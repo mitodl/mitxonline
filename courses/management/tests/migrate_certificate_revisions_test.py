@@ -163,7 +163,6 @@ def test_migrate_certificate_revisions_certificate_page_has_no_revisions():
 
 
 @pytest.mark.parametrize("kind", ["course", "courserun", "program"])
-
 def test_migrate_certificate_revisions_missing_only(kind):
     """By default, only certificates missing a revision should be updated"""
     certificate_page, cert_with_revision, cert_without_revision, handle_kwargs = (
