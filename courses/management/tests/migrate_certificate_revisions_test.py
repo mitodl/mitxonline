@@ -146,7 +146,24 @@ def test_migrate_certificate_revisions_course_no_certificate_page():
     )
 
 
+def test_migrate_certificate_revisions_certificate_page_has_no_revisions():
+    """Command should fail if the certificate page exists but has no revisions."""
+    course = CourseFactory.create(page__certificate_page__product_name="product")
+    certificate_page = course.certificate_page
+    certificate_page.revisions.all().delete()
+
+    run = CourseRunFactory.create(course=course)
+    CourseRunCertificateFactory.create(course_run=run)
+
+    with pytest.raises(CommandError) as command_error:
+        migrate_certificate_revisions.Command().handle(course=course.readable_id)
+
+    assert f"course {course.readable_id}" in str(command_error.value)
+    assert "has no revisions" in str(command_error.value)
+
+
 @pytest.mark.parametrize("kind", ["course", "courserun", "program"])
+
 def test_migrate_certificate_revisions_missing_only(kind):
     """By default, only certificates missing a revision should be updated"""
     certificate_page, cert_with_revision, cert_without_revision, handle_kwargs = (
