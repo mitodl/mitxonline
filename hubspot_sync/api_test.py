@@ -1002,6 +1002,9 @@ def test_sync_cart_add_deal_with_hubspot_sets_checkout_abandoned_stage(
     mocker.patch(
         "hubspot_sync.api._find_target_deal_id_by_unique_app_id", return_value=None
     )
+    mocker.patch(
+        "hubspot_sync.api._ensure_target_hubspot_product_for_line", return_value=None
+    )
     mock_normalize = mocker.patch(
         "hubspot_sync.api._normalize_deal_properties_for_target_account"
     )
@@ -1045,6 +1048,9 @@ def test_sync_cart_add_deal_with_hubspot_normalizes_stage_after_override(
     mocker.patch("hubspot_sync.api._find_target_deal_id_by_dealname", return_value=None)
     mocker.patch(
         "hubspot_sync.api._find_target_deal_id_by_unique_app_id", return_value=None
+    )
+    mocker.patch(
+        "hubspot_sync.api._ensure_target_hubspot_product_for_line", return_value=None
     )
 
     def _normalize_to_created(_client, deal_input):

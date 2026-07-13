@@ -1668,13 +1668,21 @@ def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
         content_type, HubspotObjectType.LINES.value, object_id=line.id, body=body
     )
     # Associate the parent deal with the line item
-    associate_objects_request(
-        HubspotObjectType.LINES.value,
-        result.id,
-        HubspotObjectType.DEALS.value,
-        get_hubspot_id_for_object(line.order),
-        HubspotAssociationType.LINE_DEAL.value,
-    )
+    deal_hubspot_id = get_hubspot_id_for_object(line.order)
+    if deal_hubspot_id:
+        associate_objects_request(
+            HubspotObjectType.LINES.value,
+            result.id,
+            HubspotObjectType.DEALS.value,
+            deal_hubspot_id,
+            HubspotAssociationType.LINE_DEAL.value,
+        )
+    else:
+        log.warning(
+            "No HubSpot ID found for order %d; skipping line-deal association for line %d",
+            line.order.id,
+            line.id,
+        )
     return result
 
 
@@ -1712,13 +1720,21 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
         content_type, HubspotObjectType.DEALS.value, object_id=order.id, body=body
     )
     # Create association between deal and contact
-    associate_objects_request(
-        HubspotObjectType.DEALS.value,
-        result.id,
-        HubspotObjectType.CONTACTS.value,
-        get_hubspot_id_for_object(order.purchaser),
-        HubspotAssociationType.DEAL_CONTACT.value,
-    )
+    contact_hubspot_id = get_hubspot_id_for_object(order.purchaser)
+    if contact_hubspot_id:
+        associate_objects_request(
+            HubspotObjectType.DEALS.value,
+            result.id,
+            HubspotObjectType.CONTACTS.value,
+            contact_hubspot_id,
+            HubspotAssociationType.DEAL_CONTACT.value,
+        )
+    else:
+        log.warning(
+            "No HubSpot ID found for purchaser %d; skipping deal-contact association for order %d",
+            order.purchaser.id,
+            order.id,
+        )
 
     for line in order.lines.all():
         sync_line_item_with_hubspot(line)
@@ -1755,6 +1771,11 @@ def sync_deal_with_hubspot_targeted(  # noqa: C901
     deal_input = _build_target_deal_message(order, hubspot_client)
     dealname = deal_input.properties.get("dealname")
     unique_app_id = deal_input.properties.get("unique_app_id")
+
+    # Ensure all products for this order's lines exist in the target account before
+    # creating the deal, so that line items can reference valid product IDs.
+    for line in order.lines.all():
+        _ensure_target_hubspot_product_for_line(line, hubspot_client)
 
     # Check if deal already exists by dealname first
     existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
@@ -2564,6 +2585,11 @@ def _sync_cart_add_deal_with_hubspot(
 
     # Extract unique_app_id from deal input to check for existing deals
     unique_app_id = deal_input.properties.get("unique_app_id")
+
+    # Ensure all products for this order's lines exist in the target account before
+    # creating the deal, so that line items can reference valid product IDs.
+    for line in order.lines.all():
+        _ensure_target_hubspot_product_for_line(line, hubspot_client)
 
     # Use the same dual lookup logic as checkout flow to prevent duplicates
     existing_deal_id = _find_target_deal_id_by_dealname(
