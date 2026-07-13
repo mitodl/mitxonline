@@ -139,7 +139,9 @@ class Command(BaseCommand):
 
         latest_revision = certificate_page.get_latest_revision()
         if not latest_revision:
-            message = f"Certificate page {certificate_page} for {courseware_label} has no revisions."
+            message = (
+                f"Certificate page '{certificate_page.title}' (id={certificate_page.pk}) for {courseware_label} has no revisions."
+            )
             raise CommandError(message)
 
         if not update_all:
