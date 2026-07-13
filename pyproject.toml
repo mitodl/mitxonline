@@ -44,7 +44,7 @@ dependencies = [
     "mitol-django-hubspot-api==2026.4.29",
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
-    "mitol-django-payment-gateway==2026.4.29",
+    "mitol-django-payment-gateway",
     "mitol-django-scim==2026.4.29",
     "mitol-django-observability>=2026.1.0",
     "opentelemetry-instrumentation-celery>=0.52b0",
@@ -116,6 +116,9 @@ dev = [
 [tool.uv]
 package = false
 default-groups = "all"
+
+[tool.uv.sources]
+mitol-django-payment_gateway = { git = "https://github.com/mitodl/ol-django", branch = "jkachel/11990-add-stripe-mvp", subdirectory = "src/payment_gateway"}
 
 [tool.uv.build-backend]
 module-root = ""

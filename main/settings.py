@@ -1119,7 +1119,7 @@ PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"  # noqa: S1
 
 import_settings_modules(
     "mitol.authentication.settings.djoser_settings",
-    "mitol.payment_gateway.settings.cybersource",
+    "mitol.payment_gateway.settings",
     "mitol.olposthog.settings.olposthog",
 )
 

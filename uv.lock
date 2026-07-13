@@ -703,15 +703,15 @@ wheels = [
 
 [[package]]
 name = "django-health-check"
-version = "4.4.1"
+version = "4.4.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "dnspython" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d8/c3/99dbf858f939cbf709bf82648daa63632a81484d59b888e92ec687601091/django_health_check-4.4.1.tar.gz", hash = "sha256:2658c21710c09632f75318bb66b5865ff0721f82bab812193d479680773e4c0b", size = 21751, upload-time = "2026-05-15T16:08:37.517Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/9b/1b48973dfeb13fe5bce8669a328a06d31b71e2b9ee28099b5a499ee4d5f3/django_health_check-4.4.3.tar.gz", hash = "sha256:a99fe9f13da26cf055d81e90f237ef3ad40a31f365b280812a590707854b8d2b", size = 21800, upload-time = "2026-06-23T09:42:09.157Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/df/697390fe7bdfefd1e48e29c190ebe255c45db4c1819d58b76fbc826bc5a8/django_health_check-4.4.1-py3-none-any.whl", hash = "sha256:363d94e839c90a75e822694f260ca31bd42978d948ad77ea1df18c7f68ff9021", size = 26877, upload-time = "2026-05-15T16:08:36.192Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/42/0497bb62bb6df5af67ea211a79f8ba158a3b4896b222f747833f5dd0e407/django_health_check-4.4.3-py3-none-any.whl", hash = "sha256:dfbb27e4c63e8e419a4852f0d9c1c49d6de342e1b00438144905761c2a1386a7", size = 26916, upload-time = "2026-06-23T09:42:07.72Z" },
 ]
 
 [package.optional-dependencies]
@@ -1819,7 +1819,7 @@ wheels = [
 [[package]]
 name = "mitol-django-common"
 version = "2026.6.16.4"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fcommon&branch=jkachel%2F11990-add-stripe-mvp#64df6ea160fde9d698b23b75383a865d609621ab" }
 dependencies = [
     { name = "django" },
     { name = "django-redis" },
@@ -1828,10 +1828,6 @@ dependencies = [
     { name = "pytz" },
     { name = "requests" },
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/c8/bfddaffd14e2f0233e0be31ea83a82865579f9eb1ecc9514cf14edd5d574/mitol_django_common-2026.6.16.4.tar.gz", hash = "sha256:f06dee7575c4c1cfefef016459ed8c673482511b9b0f8387fc2e056844ca6a8c", size = 24357, upload-time = "2026-06-16T19:21:07.244Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/d2/db0dd231888821180997dd1a0c35fcd3d7999567596d27604bcb939d0ee6/mitol_django_common-2026.6.16.4-py3-none-any.whl", hash = "sha256:3506d91de35e91bc17e65eee73fe68cfa0b73254edb66d9a59d6e9cee870580b", size = 35258, upload-time = "2026-06-16T19:21:06.429Z" },
 ]
 
 [[package]]
@@ -1974,17 +1970,14 @@ wheels = [
 
 [[package]]
 name = "mitol-django-payment-gateway"
-version = "2026.4.29"
-source = { registry = "https://pypi.org/simple" }
+version = "2026.4.2"
+source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&branch=jkachel%2F11990-add-stripe-mvp#64df6ea160fde9d698b23b75383a865d609621ab" }
 dependencies = [
     { name = "cybersource-rest-client-python" },
     { name = "django" },
     { name = "django-stubs" },
     { name = "mitol-django-common" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/11/98/29f4acde025f25261f3b2ca9b639d9f713ec352b751260dd1f2796912ff7/mitol_django_payment_gateway-2026.4.29.tar.gz", hash = "sha256:de5bdb4476b80e1f4eebd79e08b02771c045968db2db32d960abd84ae9a64712", size = 15331, upload-time = "2026-04-29T21:17:18.586Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/8f/b349f06c5f97bb572011d5ad3a6e78abfb4c1b59ab16805f1303bb2c97ec/mitol_django_payment_gateway-2026.4.29-py3-none-any.whl", hash = "sha256:72c5169e396f1721d0fe8ae5760e500841bbcde37b13f3a352ce622d70c0533e", size = 20828, upload-time = "2026-04-29T21:17:17.629Z" },
+    { name = "stripe" },
 ]
 
 [[package]]
@@ -2180,7 +2173,7 @@ requires-dist = [
     { name = "mitol-django-observability", specifier = ">=2026.1.0" },
     { name = "mitol-django-olposthog", specifier = ">=2026.3.6,<2027" },
     { name = "mitol-django-openedx", specifier = "==2026.4.29" },
-    { name = "mitol-django-payment-gateway", specifier = "==2026.4.29" },
+    { name = "mitol-django-payment-gateway", git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&branch=jkachel%2F11990-add-stripe-mvp" },
     { name = "mitol-django-scim", specifier = "==2026.4.29" },
     { name = "opentelemetry-instrumentation-celery", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-django", specifier = ">=0.52b0" },
@@ -3556,6 +3549,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/85/ad/430fb60d90e1d112a62ff57bdd1f286ec73a2a0331272febfddd21f330e1/StrEnum-0.4.15.tar.gz", hash = "sha256:878fb5ab705442070e4dd1929bb5e2249511c0bcf2b0eeacf3bcd80875c82eff", size = 23384, upload-time = "2023-06-29T22:02:58.399Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/69/297302c5f5f59c862faa31e6cb9a4cd74721cd1e052b38e464c5b402df8b/StrEnum-0.4.15-py3-none-any.whl", hash = "sha256:a30cda4af7cc6b5bf52c8055bc4bf4b2b6b14a93b574626da33df53cf7740659", size = 8851, upload-time = "2023-06-29T22:02:56.947Z" },
+]
+
+[[package]]
+name = "stripe"
+version = "15.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/eb/07/aed5656b3fd89a36e80835fe62c668692ee4ebf3a935095933d03f67a47b/stripe-15.3.0.tar.gz", hash = "sha256:ff05524255f51bf7df0e5bc4a99dbd0f737afd05587b7657c82e0d99c7fc45a4", size = 1514134, upload-time = "2026-06-24T22:49:40.276Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/54/f4/0dcf5bc464941132e3b109d26086a8a0aae7e4ed7e0243a1c47084b4de4b/stripe-15.3.0-py3-none-any.whl", hash = "sha256:99c427d306d9348123e73da3f4f2cae0a5732cac9b703155dba0418e32d3cf1c", size = 2172165, upload-time = "2026-06-24T22:49:38.18Z" },
 ]
 
 [[package]]

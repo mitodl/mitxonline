@@ -18,6 +18,7 @@ from django.db.models import TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
@@ -734,6 +735,12 @@ class Order(TimestampedModel):
         max_digits=20,
     )
     reference_number = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    gateway_type = models.CharField(
+        max_length=32,
+        blank=True,
+        default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+        help_text="The payment gateway used for this order. Must match one of the supported payment gateways in ol-django.",
+    )
 
     def get_object_flow(self):
         """Instantiate the flow without default constructor"""
