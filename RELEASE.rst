@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.159.2
+Version 1.159.2 (Released July 13, 2026)
 ---------------
 
 - Filter active cert issue_date in db query (#3748)
