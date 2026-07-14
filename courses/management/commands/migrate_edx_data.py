@@ -711,6 +711,18 @@ class Command(BaseCommand):
                         )
                         continue
 
+                    if (
+                        product_version.content_type_id != product.content_type_id
+                        or product_version.field_dict.get("id") != product.id
+                    ):
+                        self.stdout.write(
+                            self.style.ERROR(
+                                f"product_version={product_version.id} does not match "
+                                f"product={product.id} for row: {row}"
+                            )
+                        )
+                        continue
+
                     existing_enrollment = ProgramEnrollment.all_objects.filter(
                         user=user,
                         program=program,
@@ -732,6 +744,19 @@ class Command(BaseCommand):
                         order = PendingOrder.create_from_product(
                             product, user, discount=None
                         )
+                        # create_from_product always pins the Line to the product's
+                        # most recent reversion Version. Re-pin it to the historical
+                        # version recorded at the time the entitlement was granted,
+                        # so the order reflects the price that was actually paid.
+                        line = order.lines.get(
+                            purchased_object_id=product.object_id,
+                            purchased_content_type_id=product.content_type_id,
+                        )
+                        if line.product_version_id != product_version.id:
+                            line.product_version = product_version
+                            line.save(update_fields=["product_version"])
+                            order.total_price_paid = line.discounted_price
+                            order.save(update_fields=["total_price_paid"])
                         fulfill_completed_order(
                             order,
                             payment_data=ZERO_PAYMENT_DATA,
