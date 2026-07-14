@@ -640,7 +640,7 @@ class Command(BaseCommand):
             )
         )
 
-    def _migrate_entitlements(self, conn, options):
+    def _migrate_entitlements(self, conn, options):  # noqa: PLR0915
         """
         Migrate entitlement from edX to MITx Online. Create program Order instances.
         """
