@@ -649,6 +649,8 @@ class Command(BaseCommand):
 
         cur = conn.cursor()
 
+        product_content_type_id = ContentType.objects.get_for_model(Product).id
+
         query = (
             "SELECT * FROM edxorg_to_mitxonline_program_entitlements "
             "WHERE order_id IS NULL"
@@ -712,7 +714,7 @@ class Command(BaseCommand):
                         continue
 
                     if (
-                        product_version.content_type_id != product.content_type_id
+                        product_version.content_type_id != product_content_type_id
                         or product_version.field_dict.get("id") != product.id
                     ):
                         self.stdout.write(
