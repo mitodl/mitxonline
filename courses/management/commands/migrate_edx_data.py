@@ -640,7 +640,7 @@ class Command(BaseCommand):
             )
         )
 
-    def _migrate_entitlements(self, conn, options):
+    def _migrate_entitlements(self, conn, options):  # noqa: PLR0915
         """
         Migrate entitlement from edX to MITx Online. Create program Order instances.
         """
@@ -648,6 +648,8 @@ class Command(BaseCommand):
         batch_size = options.get("batch_size", 1000)
 
         cur = conn.cursor()
+
+        product_content_type_id = ContentType.objects.get_for_model(Product).id
 
         query = (
             "SELECT * FROM edxorg_to_mitxonline_program_entitlements "
@@ -711,6 +713,18 @@ class Command(BaseCommand):
                         )
                         continue
 
+                    if (
+                        product_version.content_type_id != product_content_type_id
+                        or product_version.field_dict.get("id") != product.id
+                    ):
+                        self.stdout.write(
+                            self.style.ERROR(
+                                f"product_version={product_version.id} does not match "
+                                f"product={product.id} for row: {row}"
+                            )
+                        )
+                        continue
+
                     existing_enrollment = ProgramEnrollment.all_objects.filter(
                         user=user,
                         program=program,
@@ -732,6 +746,19 @@ class Command(BaseCommand):
                         order = PendingOrder.create_from_product(
                             product, user, discount=None
                         )
+                        # create_from_product always pins the Line to the product's
+                        # most recent reversion Version. Re-pin it to the historical
+                        # version recorded at the time the entitlement was granted,
+                        # so the order reflects the price that was actually paid.
+                        line = order.lines.get(
+                            purchased_object_id=product.object_id,
+                            purchased_content_type_id=product.content_type_id,
+                        )
+                        if line.product_version_id != product_version.id:
+                            line.product_version = product_version
+                            line.save(update_fields=["product_version"])
+                            order.total_price_paid = line.discounted_price
+                            order.save(update_fields=["total_price_paid"])
                         fulfill_completed_order(
                             order,
                             payment_data=ZERO_PAYMENT_DATA,
