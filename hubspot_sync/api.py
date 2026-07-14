@@ -2,6 +2,7 @@
 
 import logging
 import re
+import time
 from decimal import Decimal
 from typing import List  # noqa: UP035
 
@@ -1573,6 +1574,52 @@ def sync_deal_line_hubspot_ids_to_db(order, hubspot_order_id) -> bool:
     return matches == expected_matches
 
 
+_ASSOCIATION_RETRY_DELAYS = (1, 2, 4)  # seconds between attempts (3 total tries)
+
+
+def _associate_objects_with_retry(
+    from_type: str,
+    from_id: str,
+    to_type: str,
+    to_id: str,
+    assoc_type: str,
+) -> None:
+    """Call associate_objects_request with exponential-backoff retry on transient errors.
+
+    Retries up to len(_ASSOCIATION_RETRY_DELAYS) times on ApiException or
+    TooManyRequestsException before re-raising the last exception.
+    """
+    last_exc: Exception | None = None
+    for attempt, delay in enumerate(
+        (None, *_ASSOCIATION_RETRY_DELAYS), start=1
+    ):
+        if delay is not None:
+            log.warning(
+                "Retrying association (%s→%s) attempt %d after %ds",
+                from_type,
+                to_type,
+                attempt,
+                delay,
+            )
+            time.sleep(delay)
+        try:
+            wait_for_hubspot_rate_limit()
+            associate_objects_request(from_type, from_id, to_type, to_id, assoc_type)
+            return
+        except (ApiException, TooManyRequestsException) as exc:
+            last_exc = exc
+            log.warning(
+                "Association (%s %s → %s %s) failed on attempt %d: %s",
+                from_type,
+                from_id,
+                to_type,
+                to_id,
+                attempt,
+                exc,
+            )
+    raise last_exc
+
+
 def get_hubspot_id_for_object(  # noqa: C901
     obj: Order or Product or Line or User,
     raise_error: bool = False,  # noqa: FBT001, FBT002
@@ -1596,6 +1643,7 @@ def get_hubspot_id_for_object(  # noqa: C901
     ).first()
     if hubspot_obj:
         return hubspot_obj.hubspot_id
+    wait_for_hubspot_rate_limit()
     if isinstance(obj, User):
         try:
             hubspot_obj = find_contact(obj.email)
@@ -1669,8 +1717,16 @@ def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
     )
     # Associate the parent deal with the line item
     deal_hubspot_id = get_hubspot_id_for_object(line.order)
+    if not deal_hubspot_id:
+        log.info(
+            "No HubSpot ID found for order %d; syncing deal before associating line %d",
+            line.order.id,
+            line.id,
+        )
+        sync_deal_with_hubspot(line.order)
+        deal_hubspot_id = get_hubspot_id_for_object(line.order)
     if deal_hubspot_id:
-        associate_objects_request(
+        _associate_objects_with_retry(
             HubspotObjectType.LINES.value,
             result.id,
             HubspotObjectType.DEALS.value,
@@ -1679,7 +1735,7 @@ def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
         )
     else:
         log.warning(
-            "No HubSpot ID found for order %d; skipping line-deal association for line %d",
+            "No HubSpot ID found for order %d after sync; skipping line-deal association for line %d",
             line.order.id,
             line.id,
         )
@@ -1721,8 +1777,16 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
     )
     # Create association between deal and contact
     contact_hubspot_id = get_hubspot_id_for_object(order.purchaser)
+    if not contact_hubspot_id:
+        log.info(
+            "No HubSpot ID found for purchaser %d; syncing contact before associating deal %d",
+            order.purchaser.id,
+            order.id,
+        )
+        sync_contact_with_hubspot(order.purchaser)
+        contact_hubspot_id = get_hubspot_id_for_object(order.purchaser)
     if contact_hubspot_id:
-        associate_objects_request(
+        _associate_objects_with_retry(
             HubspotObjectType.DEALS.value,
             result.id,
             HubspotObjectType.CONTACTS.value,
@@ -1731,7 +1795,7 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
         )
     else:
         log.warning(
-            "No HubSpot ID found for purchaser %d; skipping deal-contact association for order %d",
+            "No HubSpot ID found for purchaser %d after sync; skipping deal-contact association for order %d",
             order.purchaser.id,
             order.id,
         )
