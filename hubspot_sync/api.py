@@ -1605,9 +1605,10 @@ def _associate_objects_with_retry(
         try:
             wait_for_hubspot_rate_limit()
             associate_objects_request(from_type, from_id, to_type, to_id, assoc_type)
-            return
         except (ApiException, TooManyRequestsException) as exc:
             last_exc = exc
+        else:
+            return
             log.warning(
                 "Association (%s %s → %s %s) failed on attempt %d: %s",
                 from_type,
