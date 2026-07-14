@@ -1590,9 +1590,7 @@ def _associate_objects_with_retry(
     TooManyRequestsException before re-raising the last exception.
     """
     last_exc: Exception | None = None
-    for attempt, delay in enumerate(
-        (None, *_ASSOCIATION_RETRY_DELAYS), start=1
-    ):
+    for attempt, delay in enumerate((None, *_ASSOCIATION_RETRY_DELAYS), start=1):
         if delay is not None:
             log.warning(
                 "Retrying association (%s→%s) attempt %d after %ds",
