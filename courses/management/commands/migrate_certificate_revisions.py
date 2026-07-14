@@ -147,7 +147,7 @@ class Command(BaseCommand):
         else:
             answer = input(
                 self.style.WARNING(
-                    f"This will update ALL certificates for {courseware_label} to "
+                    f"This will update {len(certificates)} certificates for {courseware_label} to "
                     f"revision {latest_revision.pk}, including ones that already "
                     "have a revision set. Continue? (y/n): "
                 )
