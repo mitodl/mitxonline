@@ -118,7 +118,7 @@ package = false
 default-groups = "all"
 
 [tool.uv.sources]
-mitol-django-payment-gateway = { git = "https://github.com/mitodl/ol-django", subdirectory = "src/payment_gateway", branch = "jkachel/11990-add-stripe-mvp" }
+mitol-django-payment-gateway = { git = "https://github.com/mitodl/ol-django", subdirectory = "src/payment_gateway", rev = "8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef" } # pragma: allowlist secret
 
 [tool.uv.build-backend]
 module-root = ""

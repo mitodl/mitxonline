@@ -1819,7 +1819,7 @@ wheels = [
 [[package]]
 name = "mitol-django-common"
 version = "2026.6.16.4"
-source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fcommon&branch=jkachel%2F11990-add-stripe-mvp#64df6ea160fde9d698b23b75383a865d609621ab" }
+source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fcommon&rev=8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef#8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef" }
 dependencies = [
     { name = "django" },
     { name = "django-redis" },
@@ -1971,7 +1971,7 @@ wheels = [
 [[package]]
 name = "mitol-django-payment-gateway"
 version = "2026.4.2"
-source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&branch=jkachel%2F11990-add-stripe-mvp#64df6ea160fde9d698b23b75383a865d609621ab" }
+source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&rev=8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef#8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef" }
 dependencies = [
     { name = "cybersource-rest-client-python" },
     { name = "django" },
@@ -2173,7 +2173,7 @@ requires-dist = [
     { name = "mitol-django-observability", specifier = ">=2026.1.0" },
     { name = "mitol-django-olposthog", specifier = ">=2026.3.6,<2027" },
     { name = "mitol-django-openedx", specifier = "==2026.4.29" },
-    { name = "mitol-django-payment-gateway", git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&branch=jkachel%2F11990-add-stripe-mvp" },
+    { name = "mitol-django-payment-gateway", git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&rev=8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef" },
     { name = "mitol-django-scim", specifier = "==2026.4.29" },
     { name = "opentelemetry-instrumentation-celery", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-django", specifier = ">=0.52b0" },
