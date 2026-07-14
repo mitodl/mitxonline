@@ -1605,8 +1605,6 @@ def _associate_objects_with_retry(
             associate_objects_request(from_type, from_id, to_type, to_id, assoc_type)
         except (ApiException, TooManyRequestsException) as exc:
             last_exc = exc
-        else:
-            return
             log.warning(
                 "Association (%s %s → %s %s) failed on attempt %d: %s",
                 from_type,
@@ -1616,6 +1614,8 @@ def _associate_objects_with_retry(
                 attempt,
                 exc,
             )
+        else:
+            return
     raise last_exc
 
 
