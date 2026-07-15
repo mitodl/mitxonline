@@ -21,13 +21,13 @@ from b2b.serializers.v0 import (
     BaseContractPageSerializer,
 )
 from b2b.serializers.v0.manager import ManagerEnrollmentSerializer
+from b2b.views.v0.manager import CodeAssignment, assign_codes_and_send_emails
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
 from ecommerce.factories import ProductFactory
 from main.test_utils import assert_drf_json_equal
 from users.factories import UserFactory
-from b2b.views.v0.manager import CodeAssignment, assign_codes_and_send_emails
 
 pytestmark = [pytest.mark.django_db]
 
@@ -1882,6 +1882,7 @@ def test_reassign_code_forbidden(org_setup, manager_drf_client):
     )
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
+
 
 @pytest.fixture
 def mock_email_task(mocker):
