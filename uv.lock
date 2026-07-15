@@ -1819,7 +1819,7 @@ wheels = [
 [[package]]
 name = "mitol-django-common"
 version = "2026.6.16.4"
-source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fcommon&rev=8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef#8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "django-redis" },
@@ -1828,6 +1828,10 @@ dependencies = [
     { name = "pytz" },
     { name = "requests" },
     { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5a/c8/bfddaffd14e2f0233e0be31ea83a82865579f9eb1ecc9514cf14edd5d574/mitol_django_common-2026.6.16.4.tar.gz", hash = "sha256:f06dee7575c4c1cfefef016459ed8c673482511b9b0f8387fc2e056844ca6a8c", size = 24357, upload-time = "2026-06-16T19:21:07.244Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/d2/db0dd231888821180997dd1a0c35fcd3d7999567596d27604bcb939d0ee6/mitol_django_common-2026.6.16.4-py3-none-any.whl", hash = "sha256:3506d91de35e91bc17e65eee73fe68cfa0b73254edb66d9a59d6e9cee870580b", size = 35258, upload-time = "2026-06-16T19:21:06.429Z" },
 ]
 
 [[package]]
@@ -1970,14 +1974,18 @@ wheels = [
 
 [[package]]
 name = "mitol-django-payment-gateway"
-version = "2026.4.2"
-source = { git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&rev=8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef#8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef" }
+version = "2026.7.15"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cybersource-rest-client-python" },
     { name = "django" },
     { name = "django-stubs" },
     { name = "mitol-django-common" },
     { name = "stripe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ad/46/3466166a6e2c669b8b68a21f47f3cf52124fae7497ce24de916489541458/mitol_django_payment_gateway-2026.7.15.tar.gz", hash = "sha256:e60f35d750aa3f545e67af877a47eda408c3dc12084c92d85536fd6b34153687", size = 19856, upload-time = "2026-07-15T19:15:32.283Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/e6/eb31c907bd6a0d71b0b4ab82f33e7d9000deff4850e1d921dc3b78b1fe30/mitol_django_payment_gateway-2026.7.15-py3-none-any.whl", hash = "sha256:816461f4a375ec2d74e2ce3c38dec3d5c541d7a5cbe84c6cae1a334ee685874e", size = 27123, upload-time = "2026-07-15T19:15:31.472Z" },
 ]
 
 [[package]]
@@ -2173,7 +2181,7 @@ requires-dist = [
     { name = "mitol-django-observability", specifier = ">=2026.1.0" },
     { name = "mitol-django-olposthog", specifier = ">=2026.3.6,<2027" },
     { name = "mitol-django-openedx", specifier = "==2026.4.29" },
-    { name = "mitol-django-payment-gateway", git = "https://github.com/mitodl/ol-django?subdirectory=src%2Fpayment_gateway&rev=8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef" },
+    { name = "mitol-django-payment-gateway", specifier = "==2026.7.15" },
     { name = "mitol-django-scim", specifier = "==2026.4.29" },
     { name = "opentelemetry-instrumentation-celery", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-django", specifier = ">=0.52b0" },

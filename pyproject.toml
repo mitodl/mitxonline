@@ -44,7 +44,7 @@ dependencies = [
     "mitol-django-hubspot-api==2026.4.29",
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
-    "mitol-django-payment-gateway",
+    "mitol-django-payment-gateway==2026.7.15",
     "mitol-django-scim==2026.4.29",
     "mitol-django-observability>=2026.1.0",
     "opentelemetry-instrumentation-celery>=0.52b0",
@@ -118,7 +118,6 @@ package = false
 default-groups = "all"
 
 [tool.uv.sources]
-mitol-django-payment-gateway = { git = "https://github.com/mitodl/ol-django", subdirectory = "src/payment_gateway", rev = "8194d8f0b7ce32d61ca4c7f66ac1a35aa3d2f6ef" } # pragma: allowlist secret
 
 [tool.uv.build-backend]
 module-root = ""
