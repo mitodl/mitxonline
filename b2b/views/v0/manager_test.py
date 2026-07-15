@@ -21,6 +21,7 @@ from b2b.serializers.v0 import (
     BaseContractPageSerializer,
 )
 from b2b.serializers.v0.manager import ManagerEnrollmentSerializer
+from b2b.views.v0.manager import CodeAssignment, assign_codes_and_send_emails
 from courses.factories import CourseRunFactory
 from courses.models import CourseRunEnrollment
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
@@ -1881,3 +1882,301 @@ def test_reassign_code_forbidden(org_setup, manager_drf_client):
     )
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+# ---------------------------------------------------------------------------
+# ManagerOrganizationViewSet unit tests
+# ---------------------------------------------------------------------------
+
+
+def test_manager_org_list_unauthenticated():
+    """Unauthenticated requests to the org list are rejected (403 — DRF session auth)."""
+    client = APIClient()
+    url = reverse("b2b:b2b-manager-organization-list")
+    resp = client.get(url)
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_manager_org_retrieve_unauthenticated(org_setup):
+    """Unauthenticated requests to the org detail are rejected (403 — DRF session auth)."""
+    _, orgs, *_ = org_setup
+    client = APIClient()
+    url = reverse("b2b:b2b-manager-organization-detail", kwargs={"pk": orgs[0].id})
+    resp = client.get(url)
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_manager_org_list_non_manager_sees_empty():
+    """An authenticated user with no manager memberships sees an empty list."""
+    non_manager = UserFactory.create()
+    client = APIClient()
+    client.force_login(non_manager)
+    url = reverse("b2b:b2b-manager-organization-list")
+    resp = client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["results"] == []
+
+
+def test_manager_org_list_member_not_manager_sees_empty(org_setup):
+    """A user who is a member of an org but not a manager sees an empty list."""
+    _, orgs, *_ = org_setup
+    member = UserFactory.create()
+    UserOrganization.objects.create(
+        user=member,
+        organization=orgs[0],
+        keep_until_seen=True,
+        is_manager=False,
+    )
+    client = APIClient()
+    client.force_login(member)
+    url = reverse("b2b:b2b-manager-organization-list")
+    resp = client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["results"] == []
+
+
+def test_manager_org_retrieve_success(org_setup, manager_drf_client):
+    """A manager can retrieve their organization by ID."""
+    _, orgs, *_ = org_setup
+    url = reverse("b2b:b2b-manager-organization-detail", kwargs={"pk": orgs[0].id})
+    resp = manager_drf_client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["id"] == orgs[0].id
+    assert "name" in data
+    assert "slug" in data
+    assert "contracts" in data
+
+
+def test_manager_org_retrieve_not_managed_returns_404(org_setup, manager_drf_client):
+    """A manager cannot retrieve an org they don't manage — filtered out as 404."""
+    _, orgs, *_ = org_setup
+    url = reverse("b2b:b2b-manager-organization-detail", kwargs={"pk": orgs[1].id})
+    resp = manager_drf_client.get(url)
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_manager_org_retrieve_nonexistent_returns_404(manager_drf_client):
+    """Retrieving a non-existent org ID returns 404."""
+    url = reverse("b2b:b2b-manager-organization-detail", kwargs={"pk": 999999})
+    resp = manager_drf_client.get(url)
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_manager_org_list_only_active_contracts(org_setup, manager_drf_client):
+    """Inactive contracts are excluded from the org list response."""
+    _, orgs, (contract_1, *_), *_ = org_setup
+    contract_1.active = False
+    contract_1.save()
+
+    url = reverse("b2b:b2b-manager-organization-list")
+    resp = manager_drf_client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    org_data = resp.json()["results"][0]
+    contract_ids = [c["id"] for c in org_data["contracts"]]
+    assert contract_1.id not in contract_ids
+
+
+def test_manager_org_retrieve_only_active_contracts(org_setup, manager_drf_client):
+    """Inactive contracts are excluded from the org retrieve response."""
+    _, orgs, (contract_1, *_), (contract_2, *_), *_ = org_setup
+    contract_1.active = False
+    contract_1.save()
+
+    url = reverse("b2b:b2b-manager-organization-detail", kwargs={"pk": orgs[0].id})
+    resp = manager_drf_client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    contract_ids = [c["id"] for c in resp.json()["contracts"]]
+    assert contract_1.id not in contract_ids
+    assert contract_2.id in contract_ids
+
+
+def test_manager_org_list_write_methods_not_allowed(manager_drf_client):
+    """POST, PUT, PATCH, DELETE are not allowed on the org list endpoint."""
+    url = reverse("b2b:b2b-manager-organization-list")
+    for method in ("post", "put", "patch", "delete"):
+        resp = getattr(manager_drf_client, method)(url)
+        assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED, method
+
+
+def test_manager_org_list_pagination_page_size(org_setup, manager_drf_client):
+    """The page_size query param limits results returned."""
+    url = reverse("b2b:b2b-manager-organization-list")
+    resp = manager_drf_client.get(url, {"page_size": 1})
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert len(data["results"]) == 1
+    assert "count" in data
+    assert "next" in data
+
+
+def test_manager_org_list_multiple_managed_orgs():
+    """A manager attached to multiple orgs sees all of them."""
+    manager = UserFactory.create()
+    org_1 = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE
+    ).organization
+    org_2 = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE
+    ).organization
+    UserOrganization.objects.create(
+        user=manager, organization=org_1, keep_until_seen=True, is_manager=True
+    )
+    UserOrganization.objects.create(
+        user=manager, organization=org_2, keep_until_seen=True, is_manager=True
+    )
+    client = APIClient()
+    client.force_login(manager)
+    url = reverse("b2b:b2b-manager-organization-list")
+    resp = client.get(url)
+    assert resp.status_code == status.HTTP_200_OK
+    result_ids = {r["id"] for r in resp.json()["results"]}
+    assert org_1.id in result_ids
+    assert org_2.id in result_ids
+
+
+# ---------------------------------------------------------------------------
+# assign_codes_and_send_emails unit tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_email_task(mocker):
+    return mocker.patch(
+        "b2b.views.v0.manager.queue_send_enrollment_code_assignment_email"
+    )
+
+
+def test_assign_codes_and_send_emails_creates_records(org_setup, mock_email_task):
+    """Happy path: DB records are created and the email task is queued."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    assignment = CodeAssignment(
+        contract=contract_1,
+        discount=discount,
+        email="learner@example.com",
+        name="Test Learner",
+        code=discount.discount_code,
+    )
+
+    result = assign_codes_and_send_emails([assignment], manager_user)
+
+    assert result is True
+    record = DiscountContractAttachmentRedemption.objects.get(
+        discount=discount, assigned_email="learner@example.com"
+    )
+    assert record.assigned_name == "Test Learner"
+    assert record.assigned_by == manager_user
+    assert record.contract == contract_1
+
+
+def test_assign_codes_and_send_emails_queues_email_with_record_ids(
+    org_setup, mock_email_task
+):
+    """The email task is called with the IDs of the newly created records."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:2])
+    assignments = [
+        CodeAssignment(
+            contract=contract_1,
+            discount=d,
+            email=f"learner{i}@example.com",
+            name=f"Learner {i}",
+            code=d.discount_code,
+        )
+        for i, d in enumerate(discounts)
+    ]
+
+    assign_codes_and_send_emails(assignments, manager_user)
+
+    created_ids = list(
+        DiscountContractAttachmentRedemption.objects.filter(
+            contract=contract_1,
+            assigned_email__in=["learner0@example.com", "learner1@example.com"],
+        ).values_list("id", flat=True)
+    )
+    mock_email_task.delay.assert_called_once_with(created_ids)
+
+
+def test_assign_codes_and_send_emails_sets_prefetched_redemptions(
+    org_setup, mock_email_task
+):
+    """discount.prefetched_redemptions is populated so serializers skip the DB query."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    assignment = CodeAssignment(
+        contract=contract_1,
+        discount=discount,
+        email="learner@example.com",
+        name="Test Learner",
+        code=discount.discount_code,
+    )
+
+    assign_codes_and_send_emails([assignment], manager_user)
+
+    assert hasattr(discount, "prefetched_redemptions")
+    assert len(discount.prefetched_redemptions) == 1
+    assert discount.prefetched_redemptions[0].assigned_email == "learner@example.com"
+
+
+def test_assign_codes_and_send_emails_returns_false_on_db_error(
+    org_setup, mock_email_task, mocker
+):
+    """Returns False and does not queue emails when bulk_create raises."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    mocker.patch(
+        "b2b.views.v0.manager.DiscountContractAttachmentRedemption.objects.bulk_create",
+        side_effect=Exception("db failure"),
+    )
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    assignment = CodeAssignment(
+        contract=contract_1,
+        discount=discount,
+        email="learner@example.com",
+        name="Test Learner",
+        code=discount.discount_code,
+    )
+
+    result = assign_codes_and_send_emails([assignment], manager_user)
+
+    assert result is False
+    mock_email_task.delay.assert_not_called()
+
+
+def test_assign_codes_and_send_emails_empty_list(org_setup, mock_email_task):
+    """An empty assignments list creates no records but still queues the task."""
+    manager_user, *_ = org_setup
+
+    result = assign_codes_and_send_emails([], manager_user)
+
+    assert result is True
+    assert not DiscountContractAttachmentRedemption.objects.exists()
+    mock_email_task.delay.assert_called_once_with([])
+
+
+def test_assign_codes_and_send_emails_timestamps_are_set(org_setup, mock_email_task):
+    """created_on, updated_on, and last_reminder_sent_on are populated."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    assignment = CodeAssignment(
+        contract=contract_1,
+        discount=discount,
+        email="learner@example.com",
+        name="Test Learner",
+        code=discount.discount_code,
+    )
+
+    assign_codes_and_send_emails([assignment], manager_user)
+
+    record = DiscountContractAttachmentRedemption.objects.get(
+        discount=discount, assigned_email="learner@example.com"
+    )
+    assert record.created_on is not None
+    assert record.updated_on is not None
+    assert record.last_reminder_sent_on is not None
