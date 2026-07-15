@@ -1574,7 +1574,8 @@ def sync_deal_line_hubspot_ids_to_db(order, hubspot_order_id) -> bool:
     return matches == expected_matches
 
 
-_ASSOCIATION_RETRY_DELAYS = (1, 2, 4)  # seconds between attempts (3 total tries)
+_ASSOCIATION_MAX_ATTEMPTS = 4  # 1 initial attempt + 3 retries
+_ASSOCIATION_INITIAL_RETRY_DELAY = 1  # seconds; doubles each retry
 
 
 def _associate_objects_with_retry(
@@ -1586,12 +1587,13 @@ def _associate_objects_with_retry(
 ) -> None:
     """Call associate_objects_request with exponential-backoff retry on transient errors.
 
-    Retries up to len(_ASSOCIATION_RETRY_DELAYS) times on ApiException or
+    Retries up to _ASSOCIATION_MAX_ATTEMPTS - 1 times on ApiException or
     TooManyRequestsException before re-raising the last exception.
     """
     last_exc: Exception | None = None
-    for attempt, delay in enumerate((None, *_ASSOCIATION_RETRY_DELAYS), start=1):
-        if delay is not None:
+    for attempt in range(1, _ASSOCIATION_MAX_ATTEMPTS + 1):
+        delay = _ASSOCIATION_INITIAL_RETRY_DELAY * 2 ** (attempt - 2) if attempt > 1 else 0
+        if delay:
             log.warning(
                 "Retrying association (%s→%s) attempt %d after %ds",
                 from_type,
