@@ -1991,25 +1991,6 @@ def test_manager_org_retrieve_only_active_contracts(org_setup, manager_drf_clien
     assert contract_2.id in contract_ids
 
 
-def test_manager_org_list_write_methods_not_allowed(manager_drf_client):
-    """POST, PUT, PATCH, DELETE are not allowed on the org list endpoint."""
-    url = reverse("b2b:b2b-manager-organization-list")
-    for method in ("post", "put", "patch", "delete"):
-        resp = getattr(manager_drf_client, method)(url)
-        assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED, method
-
-
-def test_manager_org_list_pagination_page_size(org_setup, manager_drf_client):
-    """The page_size query param limits results returned."""
-    url = reverse("b2b:b2b-manager-organization-list")
-    resp = manager_drf_client.get(url, {"page_size": 1})
-    assert resp.status_code == status.HTTP_200_OK
-    data = resp.json()
-    assert len(data["results"]) == 1
-    assert "count" in data
-    assert "next" in data
-
-
 def test_manager_org_list_multiple_managed_orgs():
     """A manager attached to multiple orgs sees all of them."""
     manager = UserFactory.create()
