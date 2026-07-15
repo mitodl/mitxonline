@@ -1965,7 +1965,7 @@ def test_manager_org_retrieve_nonexistent_returns_404(manager_drf_client):
 
 def test_manager_org_list_only_active_contracts(org_setup, manager_drf_client):
     """Inactive contracts are excluded from the org list response."""
-    _, orgs, (contract_1, *_), *_ = org_setup
+    _, _orgs, (contract_1, *_), *_ = org_setup
     contract_1.active = False
     contract_1.save()
 
