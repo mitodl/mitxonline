@@ -27,6 +27,7 @@ from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME
 from ecommerce.factories import ProductFactory
 from main.test_utils import assert_drf_json_equal
 from users.factories import UserFactory
+from b2b.views.v0.manager import CodeAssignment, assign_codes_and_send_emails
 
 pytestmark = [pytest.mark.django_db]
 
@@ -1881,3 +1882,84 @@ def test_reassign_code_forbidden(org_setup, manager_drf_client):
     )
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+@pytest.fixture
+def mock_email_task(mocker):
+    return mocker.patch(
+        "b2b.views.v0.manager.queue_send_enrollment_code_assignment_email"
+    )
+
+
+def test_assign_codes_and_send_emails_creates_records(org_setup, mock_email_task):
+    """Happy path: DB records are created and the email task is queued."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    assignment = CodeAssignment(
+        contract=contract_1,
+        discount=discount,
+        email="learner@example.com",
+        name="Test Learner",
+        code=discount.discount_code,
+    )
+
+    result = assign_codes_and_send_emails([assignment], manager_user)
+
+    assert result is True
+    record = DiscountContractAttachmentRedemption.objects.get(
+        discount=discount, assigned_email="learner@example.com"
+    )
+    assert record.assigned_name == "Test Learner"
+    assert record.assigned_by == manager_user
+    assert record.contract == contract_1
+
+
+def test_assign_codes_and_send_emails_queues_email_with_record_ids(
+    org_setup, mock_email_task
+):
+    """The email task is called with the IDs of the newly created records."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    discounts = list(contract_1.get_discounts().order_by("id")[:2])
+    assignments = [
+        CodeAssignment(
+            contract=contract_1,
+            discount=d,
+            email=f"learner{i}@example.com",
+            name=f"Learner {i}",
+            code=d.discount_code,
+        )
+        for i, d in enumerate(discounts)
+    ]
+
+    assign_codes_and_send_emails(assignments, manager_user)
+
+    created_ids = list(
+        DiscountContractAttachmentRedemption.objects.filter(
+            contract=contract_1,
+            assigned_email__in=["learner0@example.com", "learner1@example.com"],
+        ).values_list("id", flat=True)
+    )
+    mock_email_task.delay.assert_called_once_with(created_ids)
+
+
+def test_assign_codes_and_send_emails_sets_prefetched_redemptions(
+    org_setup, mock_email_task
+):
+    """discount.prefetched_redemptions is populated so serializers skip the DB query."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    assignment = CodeAssignment(
+        contract=contract_1,
+        discount=discount,
+        email="learner@example.com",
+        name="Test Learner",
+        code=discount.discount_code,
+    )
+
+    assign_codes_and_send_emails([assignment], manager_user)
+
+    assert hasattr(discount, "prefetched_redemptions")
+    assert len(discount.prefetched_redemptions) == 1
+    assert discount.prefetched_redemptions[0].assigned_email == "learner@example.com"
