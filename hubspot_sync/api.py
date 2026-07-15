@@ -1592,7 +1592,9 @@ def _associate_objects_with_retry(
     """
     last_exc: Exception | None = None
     for attempt in range(1, _ASSOCIATION_MAX_ATTEMPTS + 1):
-        delay = _ASSOCIATION_INITIAL_RETRY_DELAY * 2 ** (attempt - 2) if attempt > 1 else 0
+        delay = (
+            _ASSOCIATION_INITIAL_RETRY_DELAY * 2 ** (attempt - 2) if attempt > 1 else 0
+        )
         if delay:
             log.warning(
                 "Retrying association (%s→%s) attempt %d after %ds",
