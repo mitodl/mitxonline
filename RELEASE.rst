@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.160.0
+Version 1.160.0 (Released July 16, 2026)
 ---------------
 
 - feat: update to latest revision command (#3750)
