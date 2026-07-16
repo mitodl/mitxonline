@@ -489,6 +489,24 @@ def test_sync_deal_with_hubspot(mocker, mock_hubspot_api, hubspot_order):
     )
 
 
+def test_sync_deal_with_hubspot_syncs_contact_when_missing(
+    mocker, mock_hubspot_api, hubspot_order
+):
+    """When no contact HubSpot ID exists, sync_deal_with_hubspot should sync the contact and retry."""
+    mocker.patch("hubspot_sync.api.sync_line_item_with_hubspot", autospec=True)
+    mock_sync_contact = mocker.patch(
+        "hubspot_sync.api.sync_contact_with_hubspot", autospec=True
+    )
+    # Sequence: order lookup (discarded), purchaser first check (None→retry), purchaser after sync
+    mock_get_id = mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
+    mock_get_id.side_effect = [None, None, "contact-hs-id"]
+
+    api.sync_deal_with_hubspot(hubspot_order)
+
+    mock_sync_contact.assert_called_once_with(hubspot_order.purchaser)
+    mock_hubspot_api.return_value.crm.associations.v4.basic_api.create_default.assert_called_once()
+
+
 def test_sync_deal_with_hubspot_skips_b2b_users(mocker, mock_hubspot_api):
     """Test that B2B users are skipped and not synced to HubSpot for deals"""
     order = OrderFactory.create()
@@ -647,6 +665,68 @@ def test_sync_line_item_with_hubspot(
         to_object_type=api.HubspotObjectType.DEALS.value,
         to_object_id=hubspot_order_id,
     )
+
+
+def test_sync_line_item_with_hubspot_syncs_deal_when_missing(
+    mocker, mock_hubspot_api, hubspot_order
+):
+    """When no deal HubSpot ID exists, sync_line_item_with_hubspot should sync the deal and retry."""
+    line = hubspot_order.lines.first()
+    mock_sync_deal = mocker.patch(
+        "hubspot_sync.api.sync_deal_with_hubspot", autospec=True
+    )
+    # Sequence: line lookup (discarded), order first check (None→retry), order after sync
+    mock_get_id = mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
+    mock_get_id.side_effect = [None, None, "deal-hs-id"]
+
+    api.sync_line_item_with_hubspot(line)
+
+    mock_sync_deal.assert_called_once_with(hubspot_order)
+    mock_hubspot_api.return_value.crm.associations.v4.basic_api.create_default.assert_called_once()
+
+
+def test_associate_objects_with_retry_succeeds_on_first_attempt(mocker):
+    """No sleep or extra calls when the association succeeds immediately."""
+    mock_associate = mocker.patch(
+        "hubspot_sync.api.associate_objects_request", return_value=None
+    )
+    mock_sleep = mocker.patch("hubspot_sync.api.time.sleep")
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+
+    api._associate_objects_with_retry("lines", "1", "deals", "2", "line_to_deal")  # noqa: SLF001
+
+    mock_associate.assert_called_once_with("lines", "1", "deals", "2", "line_to_deal")
+    mock_sleep.assert_not_called()
+
+
+def test_associate_objects_with_retry_retries_on_api_exception(mocker):
+    """Should retry on ApiException and succeed if a later attempt works."""
+    exc = ApiException(status=500)
+    mock_associate = mocker.patch(
+        "hubspot_sync.api.associate_objects_request",
+        side_effect=[exc, exc, None],
+    )
+    mock_sleep = mocker.patch("hubspot_sync.api.time.sleep")
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+
+    api._associate_objects_with_retry("lines", "1", "deals", "2", "line_to_deal")  # noqa: SLF001
+
+    assert mock_associate.call_count == 3
+    assert mock_sleep.call_count == 2
+
+
+def test_associate_objects_with_retry_raises_after_exhausting_retries(mocker):
+    """Should raise the last exception once all retry attempts are exhausted."""
+    exc = ApiException(status=500)
+    mocker.patch(
+        "hubspot_sync.api.associate_objects_request",
+        side_effect=exc,
+    )
+    mocker.patch("hubspot_sync.api.time.sleep")
+    mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
+
+    with pytest.raises(ApiException):
+        api._associate_objects_with_retry("lines", "1", "deals", "2", "line_to_deal")  # noqa: SLF001
 
 
 @pytest.mark.parametrize("match_all", [True, False])
@@ -1002,6 +1082,9 @@ def test_sync_cart_add_deal_with_hubspot_sets_checkout_abandoned_stage(
     mocker.patch(
         "hubspot_sync.api._find_target_deal_id_by_unique_app_id", return_value=None
     )
+    mocker.patch(
+        "hubspot_sync.api._ensure_target_hubspot_product_for_line", return_value=None
+    )
     mock_normalize = mocker.patch(
         "hubspot_sync.api._normalize_deal_properties_for_target_account"
     )
@@ -1045,6 +1128,9 @@ def test_sync_cart_add_deal_with_hubspot_normalizes_stage_after_override(
     mocker.patch("hubspot_sync.api._find_target_deal_id_by_dealname", return_value=None)
     mocker.patch(
         "hubspot_sync.api._find_target_deal_id_by_unique_app_id", return_value=None
+    )
+    mocker.patch(
+        "hubspot_sync.api._ensure_target_hubspot_product_for_line", return_value=None
     )
 
     def _normalize_to_created(_client, deal_input):

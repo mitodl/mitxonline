@@ -1883,12 +1883,6 @@ def test_reassign_code_forbidden(org_setup, manager_drf_client):
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-
-# ---------------------------------------------------------------------------
-# ManagerOrganizationViewSet unit tests
-# ---------------------------------------------------------------------------
-
-
 def test_manager_org_list_unauthenticated():
     """Unauthenticated requests to the org list are rejected (403 — DRF session auth)."""
     client = APIClient()
@@ -2103,17 +2097,11 @@ def test_assign_codes_and_send_emails_sets_prefetched_redemptions(
     assert discount.prefetched_redemptions[0].assigned_email == "learner@example.com"
 
 
-def test_assign_codes_and_send_emails_returns_false_on_db_error(
+def test_assign_codes_and_send_emails_bulk_create_failure(
     org_setup, mock_email_task, mocker
 ):
-    """Returns False and does not queue emails when bulk_create raises."""
+    """assign_codes_and_send_emails returns False and skips email when bulk_create raises."""
     manager_user, _, (contract_1, *_), *_ = org_setup
-
-    mocker.patch(
-        "b2b.views.v0.manager.DiscountContractAttachmentRedemption.objects.bulk_create",
-        side_effect=Exception("db failure"),
-    )
-
     discount = contract_1.get_discounts().order_by("id").first()
     assignment = CodeAssignment(
         contract=contract_1,
@@ -2123,10 +2111,22 @@ def test_assign_codes_and_send_emails_returns_false_on_db_error(
         code=discount.discount_code,
     )
 
+    mocker.patch.object(
+        DiscountContractAttachmentRedemption.objects,
+        "bulk_create",
+        side_effect=Exception("DB error"),
+    )
+
     result = assign_codes_and_send_emails([assignment], manager_user)
 
     assert result is False
     mock_email_task.delay.assert_not_called()
+
+    assert result is False
+    mock_email_task.delay.assert_not_called()
+    assert not DiscountContractAttachmentRedemption.objects.filter(
+        discount=discount, assigned_email="learner@example.com"
+    ).exists()
 
 
 def test_assign_codes_and_send_emails_empty_list(org_setup, mock_email_task):
