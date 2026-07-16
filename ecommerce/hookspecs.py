@@ -45,3 +45,18 @@ def process_transaction_line(line):
     Returns:
     - str|None: hook name that completed processing (or None to continue)
     """
+
+
+@hookspec
+def stripe_event(event):
+    """
+    Dispatch an event received from Stripe.
+
+    The event data received includes the type of event that was triggered.
+    Hookimpls should check this and process the event types they know about.
+    This doesn't set firstresult so we can have global handlers and so we can
+    scope the hookimpls to specific tasks.
+
+    Args:
+    event (stripe._event.Event): The Stripe event to process.
+    """
