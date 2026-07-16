@@ -1964,3 +1964,33 @@ def test_assign_codes_and_send_emails_sets_prefetched_redemptions(
     assert hasattr(discount, "prefetched_redemptions")
     assert len(discount.prefetched_redemptions) == 1
     assert discount.prefetched_redemptions[0].assigned_email == "learner@example.com"
+
+
+def test_assign_codes_and_send_emails_bulk_create_failure(
+    org_setup, mock_email_task, mocker
+):
+    """assign_codes_and_send_emails returns False and skips email when bulk_create raises."""
+    manager_user, _, (contract_1, *_), *_ = org_setup
+
+    discount = contract_1.get_discounts().order_by("id").first()
+    assignment = CodeAssignment(
+        contract=contract_1,
+        discount=discount,
+        email="learner@example.com",
+        name="Test Learner",
+        code=discount.discount_code,
+    )
+
+    mocker.patch.object(
+        DiscountContractAttachmentRedemption.objects,
+        "bulk_create",
+        side_effect=Exception("DB error"),
+    )
+
+    result = assign_codes_and_send_emails([assignment], manager_user)
+
+    assert result is False
+    mock_email_task.delay.assert_not_called()
+    assert not DiscountContractAttachmentRedemption.objects.filter(
+        discount=discount, assigned_email="learner@example.com"
+    ).exists()
