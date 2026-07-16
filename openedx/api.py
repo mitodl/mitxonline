@@ -1210,12 +1210,11 @@ def enroll_in_edx_course_runs(
                     )
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
-            log.error(  # noqa: TRY400
-                "Failed to enroll user %s in course run %s with mode %s.",
-                user.edx_username,
-                course_run.courseware_id,
-                mode,
-            )
+            # logging is left to callers, who are best positioned to decide
+            # the right level - retry_failed_edx_enrollments demotes
+            # permanent per-enrollment failures to WARNING to avoid paging
+            # Sentry on every retry (see MITXONLINE-5Q0); an unconditional
+            # log.error here would page Sentry regardless of that decision.
             raise EdxApiEnrollErrorException(user, course_run, exc) from exc
         except Exception as exc:  # pylint: disable=broad-except
             raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
@@ -1303,7 +1302,13 @@ def retry_failed_edx_enrollments():
             # enrollment, which is exactly what buried MITXONLINE-5Q0 in 1.26M+
             # events. Log it at WARNING (kept in app logs, no Sentry issue)
             # instead.
-            log.warning(str(exc), exc_info=True)
+            log.warning(
+                "edX enrollment repair failed permanently for user %s in course run %s (%s)",
+                user.edx_username,
+                course_run.courseware_id,
+                type(exc).__name__,
+                exc_info=True,
+            )
             enrollment.edx_enrollment_retry_count += 1
             enrollment.save(update_fields=["edx_enrollment_retry_count"])
             if (
