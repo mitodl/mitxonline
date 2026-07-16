@@ -2,6 +2,7 @@
 
 import logging
 import re
+import time
 from decimal import Decimal
 from typing import List  # noqa: UP035
 
@@ -1573,6 +1574,55 @@ def sync_deal_line_hubspot_ids_to_db(order, hubspot_order_id) -> bool:
     return matches == expected_matches
 
 
+_ASSOCIATION_MAX_ATTEMPTS = 4  # 1 initial attempt + 3 retries
+_ASSOCIATION_INITIAL_RETRY_DELAY = 1  # seconds; doubles each retry
+
+
+def _associate_objects_with_retry(
+    from_type: str,
+    from_id: str,
+    to_type: str,
+    to_id: str,
+    assoc_type: str,
+) -> None:
+    """Call associate_objects_request with exponential-backoff retry on transient errors.
+
+    Retries up to _ASSOCIATION_MAX_ATTEMPTS - 1 times on ApiException or
+    TooManyRequestsException before re-raising the last exception.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, _ASSOCIATION_MAX_ATTEMPTS + 1):
+        delay = (
+            _ASSOCIATION_INITIAL_RETRY_DELAY * 2 ** (attempt - 2) if attempt > 1 else 0
+        )
+        if delay:
+            log.warning(
+                "Retrying association (%s→%s) attempt %d after %ds",
+                from_type,
+                to_type,
+                attempt,
+                delay,
+            )
+            time.sleep(delay)
+        try:
+            wait_for_hubspot_rate_limit()
+            associate_objects_request(from_type, from_id, to_type, to_id, assoc_type)
+        except (ApiException, TooManyRequestsException) as exc:
+            last_exc = exc
+            log.warning(
+                "Association (%s %s → %s %s) failed on attempt %d: %s",
+                from_type,
+                from_id,
+                to_type,
+                to_id,
+                attempt,
+                exc,
+            )
+        else:
+            return
+    raise last_exc
+
+
 def get_hubspot_id_for_object(  # noqa: C901
     obj: Order or Product or Line or User,
     raise_error: bool = False,  # noqa: FBT001, FBT002
@@ -1596,6 +1646,7 @@ def get_hubspot_id_for_object(  # noqa: C901
     ).first()
     if hubspot_obj:
         return hubspot_obj.hubspot_id
+    wait_for_hubspot_rate_limit()
     if isinstance(obj, User):
         try:
             hubspot_obj = find_contact(obj.email)
@@ -1668,13 +1719,29 @@ def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
         content_type, HubspotObjectType.LINES.value, object_id=line.id, body=body
     )
     # Associate the parent deal with the line item
-    associate_objects_request(
-        HubspotObjectType.LINES.value,
-        result.id,
-        HubspotObjectType.DEALS.value,
-        get_hubspot_id_for_object(line.order),
-        HubspotAssociationType.LINE_DEAL.value,
-    )
+    deal_hubspot_id = get_hubspot_id_for_object(line.order)
+    if not deal_hubspot_id:
+        log.info(
+            "No HubSpot ID found for order %d; syncing deal before associating line %d",
+            line.order.id,
+            line.id,
+        )
+        sync_deal_with_hubspot(line.order)
+        deal_hubspot_id = get_hubspot_id_for_object(line.order)
+    if deal_hubspot_id:
+        _associate_objects_with_retry(
+            HubspotObjectType.LINES.value,
+            result.id,
+            HubspotObjectType.DEALS.value,
+            deal_hubspot_id,
+            HubspotAssociationType.LINE_DEAL.value,
+        )
+    else:
+        log.warning(
+            "No HubSpot ID found for order %d after sync; skipping line-deal association for line %d",
+            line.order.id,
+            line.id,
+        )
     return result
 
 
@@ -1712,13 +1779,29 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject | None:
         content_type, HubspotObjectType.DEALS.value, object_id=order.id, body=body
     )
     # Create association between deal and contact
-    associate_objects_request(
-        HubspotObjectType.DEALS.value,
-        result.id,
-        HubspotObjectType.CONTACTS.value,
-        get_hubspot_id_for_object(order.purchaser),
-        HubspotAssociationType.DEAL_CONTACT.value,
-    )
+    contact_hubspot_id = get_hubspot_id_for_object(order.purchaser)
+    if not contact_hubspot_id:
+        log.info(
+            "No HubSpot ID found for purchaser %d; syncing contact before associating deal %d",
+            order.purchaser.id,
+            order.id,
+        )
+        sync_contact_with_hubspot(order.purchaser)
+        contact_hubspot_id = get_hubspot_id_for_object(order.purchaser)
+    if contact_hubspot_id:
+        _associate_objects_with_retry(
+            HubspotObjectType.DEALS.value,
+            result.id,
+            HubspotObjectType.CONTACTS.value,
+            contact_hubspot_id,
+            HubspotAssociationType.DEAL_CONTACT.value,
+        )
+    else:
+        log.warning(
+            "No HubSpot ID found for purchaser %d after sync; skipping deal-contact association for order %d",
+            order.purchaser.id,
+            order.id,
+        )
 
     for line in order.lines.all():
         sync_line_item_with_hubspot(line)
@@ -1755,6 +1838,11 @@ def sync_deal_with_hubspot_targeted(  # noqa: C901
     deal_input = _build_target_deal_message(order, hubspot_client)
     dealname = deal_input.properties.get("dealname")
     unique_app_id = deal_input.properties.get("unique_app_id")
+
+    # Ensure all products for this order's lines exist in the target account before
+    # creating the deal, so that line items can reference valid product IDs.
+    for line in order.lines.all():
+        _ensure_target_hubspot_product_for_line(line, hubspot_client)
 
     # Check if deal already exists by dealname first
     existing_deal_id = _find_target_deal_id_by_dealname(hubspot_client, dealname)
@@ -2564,6 +2652,11 @@ def _sync_cart_add_deal_with_hubspot(
 
     # Extract unique_app_id from deal input to check for existing deals
     unique_app_id = deal_input.properties.get("unique_app_id")
+
+    # Ensure all products for this order's lines exist in the target account before
+    # creating the deal, so that line items can reference valid product IDs.
+    for line in order.lines.all():
+        _ensure_target_hubspot_product_for_line(line, hubspot_client)
 
     # Use the same dual lookup logic as checkout flow to prevent duplicates
     existing_deal_id = _find_target_deal_id_by_dealname(
