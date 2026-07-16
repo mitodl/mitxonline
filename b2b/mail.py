@@ -8,10 +8,19 @@ from b2b.models import ContractPage, DiscountContractAttachmentRedemption
 
 log = logging.getLogger(__name__)
 
+ENROLLMENT_CODE_ASSINGMENT_TAG = "enrollment-code-assignment"
+
 
 class EnrollmentCodeAssignmentMessage(TemplatedMessage):
     template_name = "mail/enrollment_code_assignment"
     name = "Enrollment Code Assignment"
+
+    @staticmethod
+    def get_default_headers() -> dict:
+        base_headers = TemplatedMessage.get_default_headers()
+        headers = base_headers.copy()
+        headers["X-Mailgun-Tag"] = ENROLLMENT_CODE_ASSINGMENT_TAG
+        return headers
 
 
 def get_learn_hostname():
