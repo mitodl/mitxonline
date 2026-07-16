@@ -21,6 +21,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from main.plugin_manager import get_plugin_manager
+
 log = logging.getLogger(__name__)
 
 
@@ -38,7 +40,9 @@ class StripeWebhookView(APIView):
 
         Webhook hits all have the event data wrapped in a uniform container, and
         Stripe posts a signature along with the data that can be validated. We
-        should be able to validate the signature at this point.
+        should be able to validate the signature at this point. The validation
+        function returns the event payload, so this saves the payload so we don't
+        have to do it again later.
         """
 
         try:
@@ -57,3 +61,19 @@ class StripeWebhookView(APIView):
 
         self.event = stripe_event
         return True
+
+    def post(self, request, *args, **kwargs):  # noqa: ARG002
+        """
+        Process a Stripe webhook event.
+
+        There's a pretty big library of Stripe events, only some of which we need
+        to handle. This uses Pluggy hooks to dispatch handlers for the events
+        we care about, and to do whatever global tasks need to be done for events.
+        """
+
+        pm = get_plugin_manager()
+        result = pm.hook.stripe_event(event=self.event)
+
+        # TODO: do something with the result
+
+        return Response(status=status.HTTP_200_OK)

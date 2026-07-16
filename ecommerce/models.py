@@ -1209,3 +1209,24 @@ class DiscountRedemption(TimestampedModel):
 
     def __str__(self):
         return f"{self.redemption_date}: {self.redeemed_discount}, {self.redeemed_by}"
+
+
+class StripeEventLog(TimestampedModel):
+    """Logs the events that are received by Stripe."""
+
+    event_id = models.CharField(max_length=255)
+    event_data = models.JSONField()
+    related_order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
+
+    def __str__(self):
+        """Return a useful string representation."""
+
+        return f"Event {self.event_id} type {self.event_data.type} received {self.created_on}"
+
+    def save(self, **kwargs):
+        """Only allow future saves to adjust the related_order field."""
+
+        if self._has_pk:
+            kwargs["update_fields"] = ["related_order"]
+
+        super().save(**kwargs)

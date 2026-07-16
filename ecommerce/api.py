@@ -54,6 +54,7 @@ from ecommerce.models import (
     OrderStatus,
     PendingOrder,
     Product,
+    StripeEventLog,
     UserDiscount,
 )
 from ecommerce.tasks import perform_downgrade_from_order
@@ -1111,3 +1112,18 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         raise VerifiedProgramInvalidOrderError
 
     return courserun.enrollments.filter(user=request.user).get()
+
+
+def log_stripe_event(event, *, order: Order | None = None):
+    """Log a Stripe event."""
+
+    return StripeEventLog.objects.create(
+        event_id=event.id, event_data=event.to_dict(for_json=True), related_order=order
+    )
+
+
+def process_stripe_checkout_completed(event):
+    """Process the checkout completed event."""
+
+    msg = "Can't yet process Stripe checkout."
+    raise NotImplementedError(msg)
