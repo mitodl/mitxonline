@@ -1883,6 +1883,7 @@ def test_reassign_code_forbidden(org_setup, manager_drf_client):
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
 
+
 def test_manager_org_list_unauthenticated():
     """Unauthenticated requests to the org list are rejected (403 — DRF session auth)."""
     client = APIClient()
