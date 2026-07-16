@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 1.160.0 (Released July 16, 2026)
+---------------
+
+- feat: update to latest revision command (#3750)
+- fix: pin migrated entitlement orders to $0 product_version to reflect edX payment   (#3753)
+- feat: add backfill_b2b_program_enrollments management command (#3745)
+- Enroll b2b tests (#3741)
+
 Version 1.159.2 (Released July 13, 2026)
 ---------------
 
