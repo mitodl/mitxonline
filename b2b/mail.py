@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from django.conf import settings
 from mitol.mail.api import get_message_sender
@@ -32,7 +33,7 @@ def get_learn_hostname():
 def send_email_helper(email, code, code_url, organization_name, contract_name):
     try:
         with get_message_sender(EnrollmentCodeAssignmentMessage) as sender:
-            sender.build_and_send_message(
+            message = sender.build_message(
                 email,
                 {
                     "code": code,
@@ -41,6 +42,21 @@ def send_email_helper(email, code, code_url, organization_name, contract_name):
                     "contract_name": contract_name,
                 },
             )
+            # send_message swallows exceptions, so we'll favor direct calls to message.send()
+            message.send()
+
+            # The message_id is primarily to be used to tie back to mailgun webhook events unambiguously
+            # In the case of a local SMTP server the message_id will be none so we just generate a UUID
+            if (
+                settings.MITOL_MAIL_CONNECTION_BACKEND
+                == "anymail.backends.mailgun.EmailBackend"
+            ):
+                recipient_status = message.anymail_status.recipients.get(email)
+                message_id = recipient_status.message_id if recipient_status else None
+            else:
+                message_id = str(uuid.uuid4())
+
+            return message_id
     except:  # pylint: disable=bare-except  # noqa: E722
         log.exception("Error sending enrollment code assignment email.")
 
