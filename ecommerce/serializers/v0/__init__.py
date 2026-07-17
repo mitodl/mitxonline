@@ -1010,3 +1010,24 @@ class CheckoutPayloadSerializer(serializers.Serializer):
 
     class Meta:
         fields = ["no_checkout", "url", "method", "payload", "order_id", "error"]
+
+
+class OrderStatusSerializer(serializers.ModelSerializer):
+    """Very simple serializer for order information."""
+
+    class Meta:
+        """Meta opts for the class"""
+
+        model = Order
+        fields = [
+            "id",
+            "reference_number",
+            "total_price_paid",
+            "state",
+        ]
+        read_only_fields = [
+            "id",
+            "reference_number",
+            "total_price_paid",
+            "state",
+        ]
