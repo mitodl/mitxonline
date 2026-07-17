@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 1.160.1
+---------------
+
+- assign_codes_and_send_emails tests (#3755)
+- Guard HubSpot associations against missing IDs (#3752)
+- fix(openedx): stop dead-lettered enrollment failures from paging Sentry (#3746)
+
 Version 1.160.0 (Released July 16, 2026)
 ---------------
 
