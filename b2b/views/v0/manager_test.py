@@ -2132,6 +2132,7 @@ def test_assign_codes_and_send_emails_bulk_create_failure(
 
 def test_assign_codes_and_send_emails_empty_list(org_setup, mock_email_task):
     """An empty assignments list creates no records but still queues the task."""
+    # This functionality should be removed in the future and replaced with an early return.
     manager_user, *_ = org_setup
 
     result = assign_codes_and_send_emails([], manager_user)
