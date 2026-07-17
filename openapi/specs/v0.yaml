@@ -2308,6 +2308,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/Order'
           description: ''
+  /api/v0/orders/status/{order_id}/:
+    get:
+      operationId: orders_status_retrieve
+      description: Pollable interface to determine status of a particular order.
+      parameters:
+      - in: path
+        name: order_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - orders
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+          description: ''
   /api/v0/products/:
     get:
       operationId: products_list
@@ -7437,6 +7456,31 @@ components:
           nullable: true
           maxLength: 255
       required:
+      - state
+      - total_price_paid
+    OrderStatus:
+      type: object
+      description: Very simple serializer for order information.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        reference_number:
+          type: string
+          readOnly: true
+          nullable: true
+        total_price_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+          readOnly: true
+        state:
+          allOf:
+          - $ref: '#/components/schemas/StateEnum'
+          readOnly: true
+      required:
+      - id
+      - reference_number
       - state
       - total_price_paid
     OrganizationPage:

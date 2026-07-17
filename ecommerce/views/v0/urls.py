@@ -20,6 +20,7 @@ from ecommerce.views.v0 import (
     create_basket_from_product,
     create_basket_from_product_with_discount,
     create_basket_with_products,
+    get_order_status,
 )
 from main.routers import SimpleRouterWithNesting
 
@@ -101,6 +102,7 @@ urlpatterns = [
         OrderReceiptView.as_view(),
         name="order_receipt_api",
     ),
+    path("orders/status/<str:order_id>/", get_order_status, name="order_status_api"),
     re_path(
         r"^",
         include(

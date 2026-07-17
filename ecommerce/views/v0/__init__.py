@@ -71,6 +71,7 @@ from ecommerce.serializers.v0 import (
     DiscountRedemptionSerializer,
     OrderHistorySerializer,
     OrderSerializer,
+    OrderStatusSerializer,
     ProductFlexiblePriceSerializer,
     ProductSerializer,
     UserDiscountMetaSerializer,
@@ -976,3 +977,44 @@ class ReceiptByProgramView(LoginRequiredMixin, View):
         if paid_program is None:
             raise Http404
         return redirect(f"/orders/receipt/{paid_program.order_id}/")
+
+
+@extend_schema(
+    description=("Pollable interface to determine status of a particular order."),
+    methods=["GET"],
+    request=None,
+    responses=OrderStatusSerializer,
+    parameters=[
+        OpenApiParameter(
+            "order_id", OpenApiTypes.STR, OpenApiParameter.PATH, required=True
+        ),
+    ],
+)
+@api_view(["GET"])
+@permission_classes(
+    [
+        IsAuthenticated,
+    ]
+)
+def get_order_status(request, order_id: str):
+    """
+    Return the status of the specified order.
+
+    This is to support payment processors that don't necessarily give us an
+    immediate decision on order status - the frontend can poll this to see if
+    the order has gone through or not.
+    """
+
+    order = Order.objects.filter(purchaser=request.user)
+
+    if order_id.isnumeric():
+        order = order.filter(pk=order_id)
+    else:
+        order = order.filter(reference_number=order_id)
+
+    try:
+        order = order.get()
+    except Order.DoesNotExist:
+        return Response({"state": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response(OrderStatusSerializer().data)

@@ -23,6 +23,7 @@ from ecommerce.views.legacy import (
 )
 from ecommerce.views.v0 import ReceiptByProgramView, ReceiptByRunView
 from ecommerce.views.v0.urls import urlpatterns as v0_urls
+from ecommerce.views.webhooks.urls import urlpatterns as webhook_urls
 from main.routers import SimpleRouterWithNesting
 
 router = SimpleRouterWithNesting()
@@ -87,6 +88,7 @@ urlpatterns = [
     ),
     path("api/v0/", include((v0_urls, "v0"))),
     path("api/", include(router.urls)),
+    path("webhook/", include(webhook_urls)),
     re_path(
         "checkout/to_payment",
         CheckoutInterstitialView.as_view(),
