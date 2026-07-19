@@ -1,7 +1,7 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 # hadolint global ignore=DL3008
 
-FROM mitodl/ol-python-base:3.11 AS base
+FROM mitodl/ol-python-base:3.11@sha256:8edd2414e93d8b1b2e67195653e3b17317d2c7508b2a1a2bcc6ff07b5a9804a3 AS base
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
 # App-specific apt extras; common-core packages are in mitodl/ol-python-base:3.11.
