@@ -75,6 +75,12 @@ class CodeAssignment:
 def assign_codes_and_send_emails(
     assignments: list[CodeAssignment], assigning_user
 ) -> bool:
+    # If we're passed an empty list, short circuit and return true
+    # This can happen in bulk_assign if all users in the payload have already
+    # been assigned or redeemed a code for the contract
+    if not assignments:
+        return True
+
     assignment_records = []
     for assignment in assignments:
         # For bulk_create, we have to set the auto timestamps manually.
