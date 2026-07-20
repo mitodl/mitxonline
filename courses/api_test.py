@@ -823,7 +823,12 @@ class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
 
         assert result == []
 
-    def test_mixed_enrollments_upgrades_only_audit(self, mocker, user, program_with_empty_requirements):  # noqa: F811
+    def test_mixed_enrollments_upgrades_only_audit(
+        self,
+        mocker,
+        user,
+        program_with_empty_requirements,  # noqa: F811
+    ):
         """When the user has a mix of audit and verified enrollments, only audit ones are upgraded."""
         program = program_with_empty_requirements
         audit_run = CourseRunFactory.create()
