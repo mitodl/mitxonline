@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.160.2
+---------------
+
+- Tag enrollment code assignment emails via mailgun tag header (#3757)
+- Short circuit empty list (#3760)
+- Update dependency click to v8.3.3 [SECURITY] (#3761)
+- ManagerOrganizationViewSet tests (#3756)
+- Text changes for enrollment code email (#3758)
+
 Version 1.160.1 (Released July 20, 2026)
 ---------------
 
