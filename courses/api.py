@@ -350,6 +350,52 @@ def create_program_enrollments(
     return successful_enrollments
 
 
+def upgrade_audit_run_enrollments_for_program_purchase(user, program):
+    """
+    When a user purchases a program, upgrade any eligible audit-track course run
+    enrollments in the program's courses to verified track.
+
+    A run is eligible if: it is live, supports verified enrollment mode, the
+    upgrade deadline has not passed (or there is no deadline), and the user
+    has an active audit-track enrollment in it.
+
+    Verified-track enrollments are left unchanged. If the user has a mix of
+    verified and audit enrollments, only the audit-track ones are upgraded.
+
+    Args:
+        user (User): The user who purchased the program
+        program (Program): The program that was purchased
+
+    Returns:
+        list of CourseRunEnrollment: Enrollments that were successfully upgraded
+    """
+    now = now_in_utc()
+
+    eligible_runs = list(
+        CourseRun.objects.filter(
+            course__in_programs__program=program,
+            live=True,
+            enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollments__user=user,
+            enrollments__enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            enrollments__active=True,
+        )
+        .filter(Q(upgrade_deadline__isnull=True) | Q(upgrade_deadline__gt=now))
+        .distinct()
+    )
+
+    if not eligible_runs:
+        return []
+
+    upgraded_enrollments, _ = create_run_enrollments(
+        user,
+        eligible_runs,
+        mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        keep_failed_enrollments=True,
+    )
+    return upgraded_enrollments
+
+
 def downgrade_learner(enrollment):
     """
     Downgrades given enrollment from verified to audit.

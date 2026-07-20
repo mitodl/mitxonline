@@ -42,7 +42,10 @@ def _create_courserun_enrollment(line) -> str | None:
 def _create_program_enrollment(line) -> str | None:
     """Create a program enrollment for the line, if we need to."""
 
-    from courses.api import create_program_enrollments  # noqa: PLC0415
+    from courses.api import (  # noqa: PLC0415
+        create_program_enrollments,
+        upgrade_audit_run_enrollments_for_program_purchase,
+    )
 
     if not line.order.is_fulfilled:
         return None
@@ -61,6 +64,10 @@ def _create_program_enrollment(line) -> str | None:
 
     PaidProgram.objects.create(
         user=line.order.purchaser, program=purchased_program, order=line.order
+    )
+
+    upgrade_audit_run_enrollments_for_program_purchase(
+        line.order.purchaser, purchased_program
     )
 
     log.debug("Created program enrollment for %s", purchased_program)
