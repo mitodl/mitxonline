@@ -798,6 +798,9 @@ class CheckoutCallbackView(View):
     Handle a checkout cancellation or receipt
     """
 
+    authentication_classes = []  # disables authentication
+    permission_classes = []  # disables permission
+
     def __init__(self, *args, **kwargs):  # noqa: ARG002
         self.logger = logging.getLogger(__name__)
 
@@ -836,15 +839,10 @@ class CheckoutCallbackView(View):
                 },
             )
         else:
-            if not PaymentGateway.validate_processor_response(
+            processor_response = PaymentGateway.get_formatted_response(
                 settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
-            ):
-                log.info("Could not validate payment response for order")
-            else:
-                processor_response = PaymentGateway.get_formatted_response(
-                    settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
-                )
-            log.error(
+            )
+            self.logger.error(
                 "Checkout callback unknown error for transaction_id %s, state %s, reason_code %s, message %s, and ProcessorResponse %s",
                 processor_response.transaction_id,
                 order_state,
@@ -867,6 +865,23 @@ class CheckoutCallbackView(View):
         clear out the stored basket)
         3. Perform any enrollments, account status changes, etc.
         """
+
+        if not PaymentGateway.validate_processor_response(
+            settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+        ):
+            user_email = (
+                "anonymous"
+                if not request.user or request.user.is_anomymous
+                else request.user.email
+            )
+
+            self.logger.error(
+                "CheckoutCallbackView: unable to validate the processor payload for user %s",
+                user_email,
+            )
+            return Response(
+                "Unable to validate request.", status=status.HTTP_403_UNAUTHORIZED
+            )
 
         with transaction.atomic():
             order = api.get_order_from_cybersource_payment_response(request)
@@ -919,6 +934,16 @@ class BackofficeCallbackView(APIView):
         This endpoint is called by Cybersource as a server-to-server call
         to respond with the payment details.
         """
+        if not PaymentGateway.validate_processor_response(
+            settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+        ):
+            log.error(
+                "BackofficeCallbackView: unable to validate the processor payload from CyberSource"
+            )
+            return Response(
+                "Unable to validate request.", status=status.HTTP_401_UNAUTHORIZED
+            )
+
         with transaction.atomic():
             order = api.get_order_from_cybersource_payment_response(request)
 
