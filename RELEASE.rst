@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.160.2
+Version 1.160.2 (Released July 20, 2026)
 ---------------
 
 - Tag enrollment code assignment emails via mailgun tag header (#3757)
