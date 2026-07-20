@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.160.1
+Version 1.160.1 (Released July 20, 2026)
 ---------------
 
 - assign_codes_and_send_emails tests (#3755)
