@@ -198,6 +198,7 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
             "topic_list",
             "include_in_learn_catalog",
             "ingest_content_files_for_ai",
+            "show_stay_update",
             "how_youll_learn",
         ]
 

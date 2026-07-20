@@ -5172,6 +5172,11 @@ components:
           nullable: true
           description: If true, allow the AI chatbots to ingest the course's content
             files.
+        show_stay_update:
+          type: boolean
+          nullable: true
+          description: If true, show the 'Stay Updated' sign-up form on this course
+            page.
         how_youll_learn:
           type: array
           items:
@@ -5200,6 +5205,7 @@ components:
       - min_weeks
       - prerequisites
       - price
+      - show_stay_update
       - title
       - topic_list
       - video_url
