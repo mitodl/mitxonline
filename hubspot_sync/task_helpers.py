@@ -7,7 +7,7 @@ from django.conf import settings
 from courses.utils import is_uai_order
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
-from hubspot_sync.api import _resolve_hubspot_token
+from hubspot_sync.api import resolve_hubspot_token
 from users.models import User
 
 # pylint:disable-bare-except
@@ -63,7 +63,7 @@ def sync_hubspot_deal(order: Order):
     if order.lines.first() is not None:
         is_uai = is_uai_order(order)
 
-        if _resolve_hubspot_token(is_uai=is_uai):
+        if resolve_hubspot_token():
             try:
                 tasks.sync_deal_with_hubspot_targeted.apply_async(
                     args=(order.id,), kwargs={"is_uai": is_uai}, countdown=10
@@ -108,20 +108,18 @@ def sync_hubspot_product(product: Product):
             )
 
 
-def sync_hubspot_cart_add(user: User, product: Product, *, is_uai: bool):
+def sync_hubspot_cart_add(user: User, product: Product):
     """
     Trigger celery task to track a cart add event in HubSpot.
 
     Args:
         user (User): The user adding the product to cart
         product (Product): The product being added
-        is_uai (bool): Whether the added course is a UAI course
     """
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
             tasks.sync_cart_add_event_with_hubspot.apply_async(
                 args=(user.id, product.id),
-                kwargs={"is_uai_course": is_uai},
                 countdown=5,
             )
         except:  # noqa: E722

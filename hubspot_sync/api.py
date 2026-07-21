@@ -2024,7 +2024,7 @@ def sync_contact_with_hubspot(user: User):
     return result
 
 
-def _resolve_hubspot_token(*, is_uai: bool = False) -> str | None:  # noqa: ARG001
+def resolve_hubspot_token() -> str | None:
     """Resolve HubSpot API token. All orders use the single configured token."""
     return getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
 
@@ -2701,7 +2701,7 @@ def _sync_cart_add_deal_with_hubspot(
 
 
 def track_cart_add_with_hubspot(
-    user: User, product: Product, *, is_uai_course: bool
+    user: User, product: Product,
 ) -> bool:
     """
     Create and sync a dedicated deal that represents a cart-add occurrence.
@@ -2712,12 +2712,11 @@ def track_cart_add_with_hubspot(
     Args:
         user (User): The user adding to cart
         product (Product): Product being added
-        is_uai_course (bool): Whether this is a UAI/Learn course add
 
     Returns:
         bool: True if synced successfully, False otherwise.
     """
-    token = _resolve_hubspot_token(is_uai=is_uai_course)
+    token = resolve_hubspot_token()
     if not token:
         return False
 
