@@ -1740,6 +1740,7 @@ def verify_mailgun_signature(api_key, token, timestamp, signature):
     return signature == expected_signature
 
 
+# We may want to move some of the cheapest checks to the web tier, but the actual queries need to happen in a task.
 def process_mailgun_webhook_for_enrollment_code_emails(payload):
     # Check for the right message tag - if it's not there, do nothing else.
     # We want to throw out unrelated messages as fast as possible
@@ -1752,6 +1753,7 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     token = signature_param["token"]
     timestamp = signature_param["timestamp"]
     signature = signature_param["signature"]
+    # Still need to provision this setting.
     if not verify_mailgun_signature(
         settings.MAILGUN_WEBHOOK_SIGNING_KEY, token, timestamp, signature
     ):
