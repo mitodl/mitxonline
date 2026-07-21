@@ -189,11 +189,11 @@ def test_task_sync_deal_with_hubspot_targeted_api_error(
 
 
 def test_task_sync_deal_with_hubspot_targeted_uai_order(mocker, settings):
-    """sync_deal_with_hubspot_targeted should use UAI token for UAI orders"""
+    """sync_deal_with_hubspot_targeted should use the main token for UAI orders"""
     mock_object = OrderFactory.create()
     mock_result = SimplePublicObjectFactory()
-    uai_token = "uai-token-123"  # noqa: S105
-    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = uai_token
+    test_token = "test-token-123"  # noqa: S105
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
 
     mock_api_call = mocker.patch(
         "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted",
@@ -203,20 +203,18 @@ def test_task_sync_deal_with_hubspot_targeted_uai_order(mocker, settings):
     assert (
         sync_deal_with_hubspot_targeted(mock_object.id, is_uai=True) == mock_result.id
     )
-    mock_api_call.assert_called_once_with(mock_object, uai_token)
+    mock_api_call.assert_called_once_with(mock_object, test_token)
 
 
 def test_task_sync_deal_with_hubspot_targeted_no_token_error(mocker, settings):
-    """sync_deal_with_hubspot_targeted should raise ValueError when no token is available"""
+    """sync_deal_with_hubspot_targeted should raise ValueError when no token is configured"""
     mock_object = OrderFactory.create()
-    # Don't set any tokens in settings
+    # Don't set any token in settings
 
-    with pytest.raises(
-        ValueError, match="No HubSpot token available for standard account"
-    ):
+    with pytest.raises(ValueError, match="No HubSpot token configured"):
         sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False)
 
-    with pytest.raises(ValueError, match="No HubSpot token available for UAI account"):
+    with pytest.raises(ValueError, match="No HubSpot token configured"):
         sync_deal_with_hubspot_targeted(mock_object.id, is_uai=True)
 
 

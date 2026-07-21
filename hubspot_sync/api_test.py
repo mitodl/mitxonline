@@ -935,10 +935,9 @@ def test_get_hubspot_id_raises(mocker, user):
     assert f"Hubspot id could not be found for user for id {user.id}" == str(exc.value)
 
 
-def test_track_cart_add_with_hubspot_uses_uai_account(settings, mocker, user):
-    """UAI course adds should route using UAI HubSpot token when available."""
+def test_track_cart_add_with_hubspot_uses_main_account(settings, mocker, user):
+    """UAI course adds should use the main HubSpot token."""
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "mitx-token"  # noqa: S105
-    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
 
     course_run = CourseRunFactory.create(courseware_id="course-v1:UAI_MIT+1.001x+2026")
     product = ProductFactory.create(purchasable_object=course_run)
@@ -955,14 +954,13 @@ def test_track_cart_add_with_hubspot_uses_uai_account(settings, mocker, user):
     mock_sync_deal = mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
 
     assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
-    mock_client.assert_called_once_with(access_token="uai-token")  # noqa: S106
+    mock_client.assert_called_once_with(access_token="mitx-token")  # noqa: S106
     mock_sync_deal.assert_called_once()
 
 
 def test_track_cart_add_with_hubspot_syncs_missing_contact(settings, mocker, user):
     """Missing contacts should be synced before creating a cart-add deal."""
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "mitx-token"  # noqa: S105
-    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
 
     product = ProductFactory.create()
     with reversion.create_revision():
@@ -979,10 +977,10 @@ def test_track_cart_add_with_hubspot_syncs_missing_contact(settings, mocker, use
 
     assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
     mock_ensure_props.assert_called_once_with(
-        mock_client.return_value, skip_certificates=True
+        mock_client.return_value, skip_certificates=False
     )
     mock_ensure_contact.assert_called_once_with(
-        user, mock_client.return_value, skip_certificates=True
+        user, mock_client.return_value, skip_certificates=False
     )
     mock_sync_deal.assert_called_once()
 
@@ -992,7 +990,6 @@ def test_track_cart_add_with_hubspot_returns_false_when_contact_sync_fails(
 ):
     """Deal sync should be skipped when contact sync in target account fails."""
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "mitx-token"  # noqa: S105
-    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
 
     product = ProductFactory.create()
     with reversion.create_revision():
@@ -1014,47 +1011,9 @@ def test_track_cart_add_with_hubspot_returns_false_when_contact_sync_fails(
 def test_track_cart_add_with_hubspot_returns_false_when_unconfigured(settings, user):
     """Tracking should be skipped when no HubSpot token is configured."""
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = ""
-    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = ""
 
     product = ProductFactory.create()
     assert api.track_cart_add_with_hubspot(user, product, is_uai_course=False) is False
-
-
-def test_track_cart_add_with_hubspot_uai_fallback_to_primary_account(
-    settings, mocker, user
-):
-    """UAI course adds should fallback to primary account when UAI token not configured, and skip_certificates should reflect the actual account used."""
-    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "primary-token"  # noqa: S105
-    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = ""  # UAI token not configured
-
-    course_run = CourseRunFactory.create(courseware_id="course-v1:UAI_MIT+1.001x+2026")
-    product = ProductFactory.create(purchasable_object=course_run)
-    with reversion.create_revision():
-        product.save()
-
-    mock_client = mocker.patch("hubspot_sync.api.HubspotApi")
-    mock_ensure_props = mocker.patch(
-        "hubspot_sync.api._ensure_target_hubspot_contact_properties"
-    )
-    mock_ensure_contact = mocker.patch(
-        "hubspot_sync.api._ensure_hubspot_contact_for_user", return_value="contact-id"
-    )
-    mock_sync_deal = mocker.patch("hubspot_sync.api._sync_cart_add_deal_with_hubspot")
-
-    assert api.track_cart_add_with_hubspot(user, product, is_uai_course=True) is True
-
-    # Should use primary token since UAI token is not configured
-    mock_client.assert_called_once_with(access_token="primary-token")  # noqa: S106
-
-    # skip_certificates should be False because we're actually using the primary account
-    # (even though is_uai_course=True)
-    mock_ensure_props.assert_called_once_with(
-        mock_client.return_value, skip_certificates=False
-    )
-    mock_ensure_contact.assert_called_once_with(
-        user, mock_client.return_value, skip_certificates=False
-    )
-    mock_sync_deal.assert_called_once()
 
 
 def test_sync_cart_add_deal_with_hubspot_sets_checkout_abandoned_stage(

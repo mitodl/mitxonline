@@ -225,11 +225,9 @@ def sync_deal_with_hubspot_targeted(order_id: int, *, is_uai: bool) -> str | Non
     Returns:
         str | None: The hubspot id for the deal, or None if skipped for B2B users
     """
-    token = api._resolve_hubspot_token(is_uai=is_uai)  # noqa: SLF001
+    token = api._resolve_hubspot_token()  # noqa: SLF001
     if not token:
-        account_type = "UAI" if is_uai else "standard"
-        error_message = f"No HubSpot token available for {account_type} account"
-        raise ValueError(error_message)
+        raise ValueError("No HubSpot token configured")
 
     result = api.sync_deal_with_hubspot_targeted(Order.objects.get(id=order_id), token)
     return result.id if result else None

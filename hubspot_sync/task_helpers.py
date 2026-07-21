@@ -117,9 +117,7 @@ def sync_hubspot_cart_add(user: User, product: Product, *, is_uai: bool):
         product (Product): The product being added
         is_uai (bool): Whether the added course is a UAI course
     """
-    if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN or getattr(
-        settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
-    ):
+    if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
             tasks.sync_cart_add_event_with_hubspot.apply_async(
                 args=(user.id, product.id),

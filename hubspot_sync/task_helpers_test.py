@@ -28,7 +28,6 @@ def test_sync_hubspot_deal_uai_order_with_uai_token(
 ):
     """sync_hubspot_deal should use UAI token for UAI orders when available"""
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "regular-token"  # noqa: S105
-    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
 
     mock_sync = mocker.patch(
         "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async",
@@ -56,7 +55,6 @@ def test_sync_hubspot_deal_non_uai_order(
 ):
     """sync_hubspot_deal should use regular token for non-UAI orders"""
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "regular-token"  # noqa: S105
-    settings.UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = "uai-token"  # noqa: S105
 
     mock_sync = mocker.patch(
         "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async",

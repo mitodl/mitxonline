@@ -1871,7 +1871,7 @@ def sync_deal_with_hubspot_targeted(  # noqa: C901
 
     # Ensure contact exists and is associated
     contact_id = _ensure_hubspot_contact_for_user(
-        order.purchaser, hubspot_client, skip_certificates=_is_uai_token(token)
+        order.purchaser, hubspot_client, skip_certificates=False
     )
 
     if not contact_id:
@@ -2024,19 +2024,9 @@ def sync_contact_with_hubspot(user: User):
     return result
 
 
-def _resolve_hubspot_token(*, is_uai: bool) -> str | None:
-    """Resolve HubSpot API token, routing UAI orders to the UAI account when configured."""
-    if is_uai:
-        return getattr(
-            settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None
-        ) or getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
+def _resolve_hubspot_token(*, is_uai: bool = False) -> str | None:  # noqa: ARG001
+    """Resolve HubSpot API token. All orders use the single configured token."""
     return getattr(settings, "MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
-
-
-def _is_uai_token(token: str) -> bool:
-    """Return True if the token belongs to the UAI HubSpot account."""
-    uai_token = getattr(settings, "UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN", None)
-    return bool(uai_token) and token == uai_token
 
 
 def _find_hubspot_contact_id_by_email(
@@ -2733,14 +2723,13 @@ def track_cart_add_with_hubspot(
 
     try:
         hubspot_client = HubspotApi(access_token=token)
-        is_uai_account = _is_uai_token(token)
 
         _ensure_target_hubspot_contact_properties(
-            hubspot_client, skip_certificates=is_uai_account
+            hubspot_client, skip_certificates=False
         )
 
         contact_id = _ensure_hubspot_contact_for_user(
-            user, hubspot_client, skip_certificates=is_uai_account
+            user, hubspot_client, skip_certificates=False
         )
         if not contact_id:
             return False
