@@ -21,6 +21,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ecommerce.models import Order
 from main.plugin_manager import get_plugin_manager
 
 log = logging.getLogger(__name__)
@@ -69,11 +70,23 @@ class StripeWebhookView(APIView):
         There's a pretty big library of Stripe events, only some of which we need
         to handle. This uses Pluggy hooks to dispatch handlers for the events
         we care about, and to do whatever global tasks need to be done for events.
+
+        This is a webhook so returning anything but 200 is not particularly useful.
+        If something fails in the hookimpls, log it there.
         """
 
         pm = get_plugin_manager()
-        result = pm.hook.stripe_event(event=self.event)
+        results = pm.hook.stripe_event(event=self.event)
 
-        # TODO: do something with the result
+        for i, result in enumerate(results):
+            if isinstance(result, Order):
+                log.info(
+                    "StripeWebhookView: step %s: order %s is now %s",
+                    i,
+                    result.id,
+                    result.state,
+                )
+            else:
+                log.debug("StripeWebhookView: step %i: no data returned", i)
 
         return Response(status=status.HTTP_200_OK)
