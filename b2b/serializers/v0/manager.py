@@ -179,7 +179,7 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     redeemed_by = serializers.SerializerMethodField()
     last_sent = serializers.SerializerMethodField()
     email_status = serializers.SerializerMethodField()
-    email_status_event_timestamep = serializers.SerializerMethodField()
+    email_status_event_timestamp = serializers.SerializerMethodField()
 
     class Meta:
         model = Discount
@@ -193,6 +193,8 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
             "redeemed_on",
             "redeemed_by",
             "last_sent",
+            "email_status",
+            "email_status_event_timestamp",
         ]
 
     def _get_redemption(self, obj):
