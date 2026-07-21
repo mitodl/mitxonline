@@ -784,6 +784,7 @@ class DiscountContractAttachmentRedemption(TimestampedModel):
     # Need to verify the format for Mailgun message IDs and map event types to statuses.
     # This is only nullable for one functional reason - we create the DCAR records on assignment and kick a downstream
     # task for email sending. Between creation and task execution, message ID won't exist.
+    # Might be nice to make this unique, but it'll need to be nullable if so.
     email_message_id = models.CharField(
         max_length=255,
         blank=True,
