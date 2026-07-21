@@ -35,6 +35,8 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
+    STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+    STRIPE_PAYMENT_STATUSES_GOOD,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.exceptions import (
@@ -1125,5 +1127,71 @@ def log_stripe_event(event, *, order: Order | None = None):
 def process_stripe_checkout_completed(event):
     """Process the checkout completed event."""
 
-    msg = "Can't yet process Stripe checkout."
-    raise NotImplementedError(msg)
+    checkout_session = event.data.object
+    order_reference_number = checkout_session.client_reference_id
+    session_id = checkout_session.id
+
+    log.debug(
+        "process_stripe_checkout_completed: processing event %s for checkout session %s (order %s)",
+        event.id,
+        session_id,
+        order_reference_number,
+    )
+
+    # Repeating this here as a reminder: if the order includes a grace/trial
+    # period, the payment_status will still be "paid".
+
+    if (
+        checkout_session.status != STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+        or checkout_session.payment_status not in STRIPE_PAYMENT_STATUSES_GOOD
+    ):
+        log.error(
+            "process_stripe_checkout_completed: session %s for order %s ended unsuccessfully: %s - %s",
+            session_id,
+            order_reference_number,
+            checkout_session.status,
+            checkout_session.payment_status,
+        )
+
+        return None
+
+    order = Order.objects.filter(reference_number=order_reference_number).get()
+    basket = Basket.objects.filter(user=order.purchaser).first()
+
+    fulfill_completed_order(order, event.to_dict(for_json=True), basket)
+
+    order.refresh_from_db()
+    return order
+
+
+def process_stripe_checkout_expired(event):
+    """
+    Process the checkout expired event.
+
+    Checkout sessions last for a finite amount of time; if the user doesn't
+    complete checkout in enough time, it will expire and we'll need to cancel
+    the order.
+    """
+
+    checkout_session = event.data.object
+    order_reference_number = checkout_session.client_reference_id
+    session_id = checkout_session.id
+
+    log.debug(
+        "process_stripe_checkout_expired: processing event %s for checkout session %s (order %s)",
+        event.id,
+        session_id,
+        order_reference_number,
+    )
+    log.warning(
+        "process_stripe_checkout_expired: checkout session %s for order %s expired - cancelling the in-flight order",
+        session_id,
+        order_reference_number,
+    )
+
+    order = Order.objects.filter(reference_number=order_reference_number).get()
+
+    order.get_object_flow().cancel(event.to_dict(for_json=True))
+
+    order.refresh_from_db()
+    return order

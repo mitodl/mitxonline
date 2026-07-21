@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -18,7 +17,10 @@ from django.db.models import TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
-from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
@@ -601,8 +603,11 @@ class OrderFlow:
         self.order.save()
 
     @state.transition(source=State.ANY, target=OrderStatus.CANCELED)
-    def cancel(self):
-        """Cancel this order"""
+    def cancel(self, *, api_response_data: dict | None = None):
+        """Cancel this order. Create a transaction if we have data for that."""
+
+        if isinstance(api_response_data, dict):
+            self.create_transaction(api_response_data)
 
     def is_approver(self, user):
         return user.is_staff
@@ -631,7 +636,7 @@ class OrderFlow:
         target=OrderStatus.REFUNDED,
         permission=this.is_approver,
     )
-    def refund(self, *, api_response_data: dict = None, **kwargs):  # noqa: RUF013
+    def refund(self, *, api_response_data: dict | None = None, **kwargs):
         """
         Records the refund, and optionally attempts to unenroll the learner from
         the things they bought.
@@ -669,23 +674,45 @@ class OrderFlow:
         return refund_transaction
 
     def create_transaction(self, payment_data):
-        log = logging.getLogger(__name__)  # noqa: F841
-        transaction_id = payment_data.get("transaction_id")
-        amount = payment_data.get("amount")
-        # There are two use cases:
-        # No payment required - no cybersource involved, so we need to generate UUID as transaction id
-        # Payment STATE_ACCEPTED - there should always be transaction_id in payment data, if not, throw ValidationError
-        if amount == 0 and transaction_id is None:
-            transaction_id = uuid.uuid1()
-        elif transaction_id is None:
-            raise ValidationError(
-                "Failed to record transaction: Missing transaction id from payment API response"  # noqa: EM101
-            )
+        """Create a record of the payment processor transaction."""
+
+        transaction_payload = {
+            "transaction_id": "",
+            "amount": Decimal(0),
+            "data": payment_data,
+        }
+
+        if self.order.total_price_paid == 0:
+            # If the price paid was $0, then we don't necessarily have a payment
+            # processor, so generate the transaction ID.
+            transaction_payload["transaction_id"] = uuid.uuid4()
+        elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE:
+            transaction_payload["transaction_id"] = payment_data.get("transaction_id")
+            transaction_payload["amount"] = payment_data.get("amount", Decimal(0))
+        elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE:
+            # This expects the Event, which has a unique ID.
+            transaction_payload["transaction_id"] = payment_data.get("id")
+            if (
+                payment_data.get("data")
+                and payment_data["data"].get("object")
+                and "amount_total" in payment_data["data"]["object"]
+            ):
+                # Also, Stripe stores amounts as strings and USD amounts specifically
+                # in cents.
+
+                transaction_payload["amount"] = (
+                    Decimal(payment_data["data"]["object"]["amount_total"]) / 100
+                )
+        else:
+            msg = "Failed to record transaction: unable to determine the origin of the passed data"
+            raise ValidationError(msg)
+
+        if not transaction_payload["transaction_id"]:
+            msg = "Failed to record transaction: Missing transaction id from payment API response"
+            raise ValidationError(msg)
 
         self.order.transactions.get_or_create(
-            transaction_id=transaction_id,
-            data=payment_data,
-            amount=self.order.total_price_paid,
+            **transaction_payload,
         )
 
     def create_enrollments(self):

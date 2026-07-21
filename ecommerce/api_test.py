@@ -2,6 +2,7 @@
 
 import random
 from datetime import datetime, timedelta
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import freezegun
@@ -14,8 +15,10 @@ from django.test import RequestFactory
 from django.urls import reverse
 from factory import Faker, fuzzy
 from mitol.common.utils.datetime import now_in_utc
-from mitol.payment_gateway.api import ProcessorResponse
+from mitol.payment_gateway.api import CartItem, PaymentGateway, ProcessorResponse
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
 from reversion.models import Version
+from stripe import convert_to_stripe_object
 
 from courses.factories import (
     CourseRunEnrollmentFactory,
@@ -32,12 +35,16 @@ from ecommerce.api import (
     establish_basket,
     generate_checkout_payload,
     get_auto_apply_discounts_for_basket,
+    log_stripe_event,
     process_cybersource_payment_response,
+    process_stripe_checkout_completed,
     refund_order,
     unenroll_learner_from_order,
 )
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
+    STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+    STRIPE_PAYMENT_STATUS_PAID,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
 )
@@ -54,6 +61,7 @@ from ecommerce.factories import (
     TransactionFactory,
     UnlimitedUseDiscountFactory,
 )
+from ecommerce.fixtures import stripe_checkout_session, stripe_event
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -64,6 +72,7 @@ from ecommerce.models import (
     Order,
     OrderStatus,
     Product,
+    StripeEventLog,
     Transaction,
     UserDiscount,
 )
@@ -1231,3 +1240,66 @@ def test_establish_basket_calls_create_user(mocker, no_delay):
     establish_basket(request)
 
     assert not expected_run_mock.called
+
+
+def test_log_stripe_event():
+    """Test that the event logging functionality works as expected."""
+
+    event = stripe_event()
+    log_stripe_event(event)
+
+    assert StripeEventLog.objects.filter(event_id=event.id).exists()
+
+
+def test_process_stripe_checkout_completed(bootstrapped_verified_program):
+    """Test that the checkout processing works."""
+
+    *_, cr_product = bootstrapped_verified_program
+
+    product_version = Version.objects.get_for_object(cr_product).get()
+    order_line = LineFactory.create(
+        product_version=product_version,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+    cart_item = CartItem(
+        sku=order_line.courseware,
+        code=order_line.courseware,
+        unitprice=Decimal(order_line.unit_price),
+        name=order_line.courseware,
+    )
+
+    # This all sets up a Stripe Event with a checkout session that looks
+    # right-ish for the order. A lot of this data will be set to whatever
+    # is in the sample object, which is fine; we really only care about the
+    # reference number and status fields when processing.
+    # This is not signed - Stripe passes this in the HTTP headers and that
+    # is handled before it gets to what's under test here.
+
+    # use the payment gateway to generate the line items to get everything
+    # shaped right, then convert those to StripeObject so they match what
+    # Stripe sends. (also, their to_dict has a "for_json" that fixes
+    # Decimal and other things, but not if it's not a StripeObject.)
+    gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
+    formatted_line = gateway._generate_line_item(cart_item)  # noqa: SLF001
+    formatted_lines = convert_to_stripe_object([formatted_line])
+
+    event = stripe_event()
+
+    event.type = "checkout.session.completed"
+    event.data.object = stripe_checkout_session()
+    event.data.object.mode = "payment"
+    event.data.object.line_items = formatted_lines
+    event.data.object.client_reference_id = order_line.order.reference_number
+    event.data.object.customer_email = order_line.order.purchaser.email
+    # Stripe expects this in cents.
+    event.data.object.amount_total = int(order_line.order.total_price_paid * 100)
+    event.data.object.amount_subtotal = int(order_line.order.total_price_paid * 100)
+
+    event.data.object.payment_status = STRIPE_PAYMENT_STATUS_PAID
+    event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+
+    updated_order = process_stripe_checkout_completed(event)
+
+    assert updated_order
+    assert updated_order.id == order_line.order.id
+    assert updated_order.state == OrderStatus.FULFILLED

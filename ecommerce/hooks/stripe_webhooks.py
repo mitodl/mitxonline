@@ -42,7 +42,9 @@ class CheckoutSessionEvents:
         )
 
         if event.type == "checkout.session.completed":
-            process_stripe_checkout_completed(event)
+            return process_stripe_checkout_completed(event)
 
         if event.type == "checkout.session.expired":
-            process_stripe_checkout_expired(event)
+            return process_stripe_checkout_expired(event)
+
+        return None
