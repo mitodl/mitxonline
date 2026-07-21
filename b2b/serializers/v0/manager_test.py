@@ -268,5 +268,7 @@ class TestManagerEnrollmentCodeSerializerPrefetchBehavior:
             "redeemed_on",
             "redeemed_by",
             "last_sent",
+            "email_status",
+            "email_status_event_timestamp",
         }
         assert set(data.keys()) == expected_fields
