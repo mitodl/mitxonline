@@ -54,9 +54,9 @@ export const routes = {
   orderReceipt: "/orders/receipt/:orderId",
 
   informationLinks: include("", {
-    termsOfService: "terms-of-service",
-    privacyPolicy:  "privacy-policy",
-    honorCode:      "honor-code"
+    termsOfService: "https://learn.mit.edu/terms",
+    privacyPolicy:  "https://learn.mit.edu/privacy",
+    honorCode:      "https://learn.mit.edu/honor_code"
   }),
 
   learnerRecords:      "/records/:program/",
