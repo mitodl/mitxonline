@@ -178,6 +178,8 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     redeemed_on = serializers.SerializerMethodField()
     redeemed_by = serializers.SerializerMethodField()
     last_sent = serializers.SerializerMethodField()
+    email_status = serializers.SerializerMethodField()
+    email_status_event_timestamep = serializers.SerializerMethodField()
 
     class Meta:
         model = Discount
