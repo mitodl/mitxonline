@@ -4,20 +4,27 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0065_alter_certificatepage_product_name'),
+        ("cms", "0065_alter_certificatepage_product_name"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='coursepage',
-            name='show_stay_updated',
-            field=models.BooleanField(default=False, help_text="If true, show the 'Stay Updated' sign-up form on this course page.", null=True),
+            model_name="coursepage",
+            name="show_stay_updated",
+            field=models.BooleanField(
+                default=False,
+                help_text="If true, show the 'Stay Updated' sign-up form on this course page.",
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='programpage',
-            name='show_stay_updated',
-            field=models.BooleanField(default=False, help_text="If true, show the 'Stay Updated' sign-up form on this program page.", null=True),
+            model_name="programpage",
+            name="show_stay_updated",
+            field=models.BooleanField(
+                default=False,
+                help_text="If true, show the 'Stay Updated' sign-up form on this program page.",
+                null=True,
+            ),
         ),
     ]
