@@ -1431,7 +1431,7 @@ class CoursePage(ProductPage):
         null=True,
         help_text="If true, allow the AI chatbots to ingest the course's content files.",
     )
-    show_stay_update = models.BooleanField(
+    show_stay_updated = models.BooleanField(
         default=False,
         null=True,
         help_text="If true, show the 'Stay Updated' sign-up form on this course page.",
@@ -1452,7 +1452,7 @@ class CoursePage(ProductPage):
         *ProductPage.content_panels,
         FieldPanel("include_in_learn_catalog"),
         FieldPanel("ingest_content_files_for_ai"),
-        FieldPanel("show_stay_update"),
+        FieldPanel("show_stay_updated"),
     ]
     api_fields = [
         *ProductPage.api_fields,
@@ -1460,7 +1460,7 @@ class CoursePage(ProductPage):
         APIField("topic_list"),
         APIField("include_in_learn_catalog"),
         APIField("ingest_content_files_for_ai"),
-        APIField("show_stay_update"),
+        APIField("show_stay_updated"),
     ]
 
     @cached_property
@@ -1579,6 +1579,11 @@ class ProgramPage(ProductPage):
         null=True,
         help_text="If true, Learn should include this in its catalog.",
     )
+    show_stay_updated = models.BooleanField(
+        default=False,
+        null=True,
+        help_text="If true, show the 'Stay Updated' sign-up form on this program page.",
+    )
     list_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -1602,13 +1607,17 @@ class ProgramPage(ProductPage):
             FieldPanel("list_price"),
         ]
         + ProductPage.content_panels
-        + [FieldPanel("include_in_learn_catalog")]
+        + [
+            FieldPanel("include_in_learn_catalog"),
+            FieldPanel("show_stay_updated"),
+        ]
     )
     api_fields = [
         *ProductPage.api_fields,
         APIField("program_details"),
         APIField("list_price"),
         APIField("include_in_learn_catalog"),
+        APIField("show_stay_updated"),
     ]
 
     @property
