@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.160.3
+Version 1.160.3 (Released July 21, 2026)
 ---------------
 
 - Upgrade audit runs after program purchase (#3770)
