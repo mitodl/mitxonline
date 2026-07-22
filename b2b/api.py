@@ -1733,7 +1733,7 @@ def process_remove_org_membership(user, organization):
 
 def verify_mailgun_signature(api_key, token, timestamp, signature):
     # Cribbed from https://www.mailgun.com/blog/email/your-guide-to-webhooks/.
-    if settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
+    if not settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
         return True
 
     message = f"{timestamp}{token}"
