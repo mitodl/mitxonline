@@ -652,6 +652,24 @@ MIT_LEARN_DASHBOARD_URL = get_string(
     description="Dashboard URL for UAI enrollment emails",
 )
 
+MIT_LEARN_TERMS_URL = get_string(
+    name="MIT_LEARN_TERMS_URL",
+    default="https://learn.mit.edu/terms",
+    description="Terms of service URL",
+)
+
+MIT_LEARN_PRIVACY_URL = get_string(
+    name="MIT_LEARN_PRIVACY_URL",
+    default="https://learn.mit.edu/privacy",
+    description="Privacy policy URL",
+)
+
+MIT_LEARN_HONOR_CODE_URL = get_string(
+    name="MIT_LEARN_HONOR_CODE_URL",
+    default="https://learn.mit.edu/honor_code",
+    description="Honor code URL",
+)
+
 # Logging configuration
 LOG_LEVEL = get_string(
     name="MITX_ONLINE_LOG_LEVEL", default="INFO", description="The log level default"

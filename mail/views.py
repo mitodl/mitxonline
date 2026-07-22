@@ -1,6 +1,5 @@
 """Mail views"""
 
-from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
@@ -42,7 +41,7 @@ class EmailDebuggerView(View):
             return JsonResponse({"error": "invalid input"})
 
         email_type = form.cleaned_data["email_type"]
-        context = {"base_url": settings.SITE_BASE_URL, "site_name": settings.SITE_NAME}
+        context = api.get_base_context()
 
         email_extra_context = EMAIL_DEBUG_EXTRA_CONTEXT.get(email_type, {})
         context.update(email_extra_context)
