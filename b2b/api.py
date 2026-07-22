@@ -1733,6 +1733,9 @@ def process_remove_org_membership(user, organization):
 
 def verify_mailgun_signature(api_key, token, timestamp, signature):
     # Cribbed from https://www.mailgun.com/blog/email/your-guide-to-webhooks/.
+    if settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
+        return True
+
     message = f"{timestamp}{token}"
     expected_signature = hmac.new(
         key=api_key.encode(), msg=message.encode(), digestmod=hashlib.sha256
@@ -1742,7 +1745,10 @@ def verify_mailgun_signature(api_key, token, timestamp, signature):
 
 def is_potentially_valid_mailgun_webhook(payload):
     signing_secret = settings.MAILGUN_WEBHOOK_SIGNING_SECRET
-    if not signing_secret:
+    # If we are supposed to validate signatures but don't have a secret, fail closed
+    # If we aren't validating signatures (such as in local development w/ synthetic data),
+    # it doesnt matter if we have a secret, treat everything as potentially valid
+    if not signing_secret and settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
         return False
 
     # Check for the right message tag - if it's not there, do nothing else.
@@ -1763,7 +1769,7 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     token = signature_param["token"]
     timestamp = signature_param["timestamp"]
     signature = signature_param["signature"]
-    # Still need to provision this setting.
+
     if not verify_mailgun_signature(signing_secret, token, timestamp, signature):
         return None
 
