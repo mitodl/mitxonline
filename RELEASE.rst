@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 1.160.4
+---------------
+
+- fix: add 'stay update' boolean field for course page (#3768)
+- Remove auth requirement for post-checkout page; add backoffice API logs (#3772)
+
 Version 1.160.3 (Released July 21, 2026)
 ---------------
 
