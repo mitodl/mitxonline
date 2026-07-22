@@ -6483,6 +6483,20 @@ components:
       description: '* `course` - course'
       x-enum-descriptions:
       - course
+    EmailStatusEnum:
+      enum:
+      - delivered
+      - accepted
+      - rejected
+      type: string
+      description: |-
+        * `delivered` - delivered
+        * `accepted` - accepted
+        * `rejected` - rejected
+      x-enum-descriptions:
+      - delivered
+      - accepted
+      - rejected
     EnrollmentMode:
       type: object
       description: Enrollment mode serializer.
@@ -7197,11 +7211,22 @@ components:
           nullable: true
           description: Return when the last reminder email was sent.
           readOnly: true
+        email_status:
+          allOf:
+          - $ref: '#/components/schemas/EmailStatusEnum'
+          readOnly: true
+        email_status_event_timestamp:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
       required:
       - assigned_name
       - assigned_on
       - assigned_to
       - code
+      - email_status
+      - email_status_event_timestamp
       - id
       - last_sent
       - redeemed_by

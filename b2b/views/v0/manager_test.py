@@ -2161,4 +2161,5 @@ def test_assign_codes_and_send_emails_timestamps_are_set(org_setup, mock_email_t
     )
     assert record.created_on is not None
     assert record.updated_on is not None
-    assert record.last_reminder_sent_on is not None
+    # Since email sending happens in a task, this value should remain unset between creation and that task executing
+    assert record.last_reminder_sent_on is None

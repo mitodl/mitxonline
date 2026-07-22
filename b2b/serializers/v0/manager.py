@@ -6,6 +6,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from b2b.models import (
+    EMAIL_STATUSES,
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
     REDEMPTION_STATUS_UNASSIGNED,
@@ -178,6 +179,8 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
     redeemed_on = serializers.SerializerMethodField()
     redeemed_by = serializers.SerializerMethodField()
     last_sent = serializers.SerializerMethodField()
+    email_status = serializers.SerializerMethodField()
+    email_status_event_timestamp = serializers.SerializerMethodField()
 
     class Meta:
         model = Discount
@@ -191,6 +194,8 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
             "redeemed_on",
             "redeemed_by",
             "last_sent",
+            "email_status",
+            "email_status_event_timestamp",
         ]
 
     def _get_redemption(self, obj):
@@ -248,6 +253,15 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         """Return when the last reminder email was sent."""
         redemption = self._get_redemption(obj)
         return redemption.last_reminder_sent_on if redemption else None
+
+    @extend_schema_field(serializers.ChoiceField(choices=EMAIL_STATUSES))
+    def get_email_status(self, obj) -> str | None:
+        redemption = self._get_redemption(obj)
+        return redemption.email_status if redemption else None
+
+    def get_email_status_event_timestamp(self, obj) -> datetime | None:
+        redemption = self._get_redemption(obj)
+        return redemption.email_status_event_timestamp if redemption else None
 
 
 class BulkAssignErrorSerializer(serializers.Serializer):

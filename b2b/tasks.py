@@ -220,3 +220,10 @@ def queue_send_test_enrollment_code_assignment_email(
     email: str, contract_record_id: int
 ):
     send_test_enrollment_code_assignment_email(email, contract_record_id)
+
+
+@app.task(ignore_result=True)
+def queue_process_mailgun_webhook_for_enrollment_code_emails(payload):
+    from b2b.api import process_mailgun_webhook_for_enrollment_code_emails
+
+    process_mailgun_webhook_for_enrollment_code_emails(payload)

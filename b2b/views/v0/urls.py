@@ -11,6 +11,7 @@ from b2b.views.v0 import (
 from b2b.views.v0.manager import (
     ManagerContractViewSet,
     ManagerOrganizationViewSet,
+    ProcessMailgunWebhook,
 )
 from main.routers import SimpleRouterWithNesting
 
@@ -51,4 +52,6 @@ urlpatterns = [
         AttachContractApi.as_view(),
         name="attach-user",
     ),
+    # Probably not the place this is gonna live long term.
+    path(r"webhook", ProcessMailgunWebhook.as_view(), name="mailgun-webhook"),
 ]
