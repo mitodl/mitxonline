@@ -2598,9 +2598,9 @@ class ProgramRequirement(MP_Node):
         ):
             try:
                 value = int(self.operator_value)
-                if value < 1:
+                if value < 0:
                     raise ValidationError(
-                        {"operator_value": "Minimum # of value must be 1 or greater."}
+                        {"operator_value": "Minimum # of value must be 0 or greater."}
                     )
             except (ValueError, TypeError):
                 raise ValidationError(
