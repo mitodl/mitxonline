@@ -57,6 +57,7 @@ from courses.api import (
     pull_course_modes,
     sync_course_mode,
     sync_course_runs,
+    upgrade_audit_run_enrollments_for_program_purchase,
     upgrade_program_enrollment_if_eligible,
 )
 from courses.constants import (
@@ -653,6 +654,209 @@ def test_create_program_enrollments_creation_fail(mocker, user):
     patched_log_exception.assert_called_once()
     patched_mail_api.send_enrollment_failure_message.assert_called_once()
     assert successful_enrollments == [enrollment]
+
+
+class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
+    """Tests for upgrade_audit_run_enrollments_for_program_purchase"""
+
+    @pytest.fixture
+    def program_setup(self, user, program_with_empty_requirements):  # noqa: F811
+        """Set up a program with a course run the user is enrolled in."""
+        program = program_with_empty_requirements
+        run = CourseRunFactory.create()
+        program.add_requirement(run.course)
+        return SimpleNamespace(program=program, run=run, user=user)
+
+    def test_upgrades_audit_enrollment(self, mocker, program_setup):
+        """Eligible audit-track enrollments are upgraded to verified."""
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert len(result) == 1
+        enrollment = result[0]
+        enrollment.refresh_from_db()
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    def test_skips_verified_enrollment(self, mocker, program_setup):
+        """Existing verified-track enrollments are left unchanged."""
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_skips_inactive_enrollment(self, mocker, program_setup):
+        """Inactive audit enrollments are not upgraded."""
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=False,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_skips_past_upgrade_deadline(self, mocker, program_setup, dates):
+        """Runs whose upgrade deadline has passed are skipped."""
+        program_setup.run.upgrade_deadline = dates.past_10_days
+        program_setup.run.save()
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_upgrades_when_no_upgrade_deadline(self, mocker, program_setup):
+        """Runs with no upgrade deadline are eligible."""
+        program_setup.run.upgrade_deadline = None
+        program_setup.run.save()
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert len(result) == 1
+
+    def test_skips_non_live_run(self, mocker, program_setup):
+        """Runs that are not live are skipped."""
+        program_setup.run.live = False
+        program_setup.run.save()
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_skips_audit_only_run(self, mocker, program_setup):
+        """Runs without a verified enrollment mode are skipped."""
+        from courses.factories import EnrollmentModeFactory  # noqa: PLC0415
+
+        program_setup.run.enrollment_modes.set(
+            [EnrollmentModeFactory(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)]
+        )
+        CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_upgrades_only_program_courses(self, mocker, user, program_setup):
+        """Only runs belonging to the purchased program's courses are upgraded."""
+        unrelated_run = CourseRunFactory.create()
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=unrelated_run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_returns_empty_when_no_enrollments(self, mocker, program_setup):
+        """Returns empty list when user has no course run enrollments in the program."""
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(
+            program_setup.user, program_setup.program
+        )
+
+        assert result == []
+
+    def test_mixed_enrollments_upgrades_only_audit(
+        self,
+        mocker,
+        user,
+        program_with_empty_requirements,  # noqa: F811
+    ):
+        """When the user has a mix of audit and verified enrollments, only audit ones are upgraded."""
+        program = program_with_empty_requirements
+        audit_run = CourseRunFactory.create()
+        verified_run = CourseRunFactory.create()
+        program.add_requirement(audit_run.course)
+        program.add_requirement(verified_run.course)
+
+        CourseRunEnrollmentFactory.create(
+            user=user,
+            run=audit_run,
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            active=True,
+        )
+        verified_enrollment = CourseRunEnrollmentFactory.create(
+            user=user,
+            run=verified_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        result = upgrade_audit_run_enrollments_for_program_purchase(user, program)
+
+        assert len(result) == 1
+        assert result[0].run == audit_run
+        verified_enrollment.refresh_from_db()
+        assert verified_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
 
 class TestDeactivateEnrollments:

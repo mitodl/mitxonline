@@ -10,7 +10,9 @@ from django.forms.models import model_to_dict
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
+from mitol.payment_gateway.api import PaymentGateway
 from rest_framework import status
+from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
@@ -22,12 +24,14 @@ from ecommerce.constants import (
     PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_ONE_TIME,
+    REFERENCE_NUMBER_PREFIX,
 )
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
     DiscountFactory,
+    LineFactory,
     ProductFactory,
     UnlimitedUseDiscountFactory,
 )
@@ -1272,7 +1276,6 @@ def test_checkout_api_result(  # noqa: PLR0913
 
 @pytest.mark.skip_nplusone_check
 def test_checkout_api_result_verification_failure(
-    user_client,
     api_client,
     mocker,
     user,
@@ -1300,8 +1303,8 @@ def test_checkout_api_result_verification_failure(
 
     resp = api_client.post(reverse("checkout_result_api"), payload)
 
-    # checkout_result_api will always respond with a 403 if validate_processor_response returns False
-    assert resp.status_code == 403
+    # the validation gets checked sooner now, and returns a 401
+    assert resp.status_code == 401
 
 
 @pytest.mark.skip_nplusone_check
@@ -1560,3 +1563,93 @@ def test_program_product_purchasing(user, user_drf_client):
     assert ProgramEnrollment.objects.filter(
         user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     ).exists()
+
+
+def test_backoffice_callback_invalid_payload(mocker, client):
+    """Test that the backoffice API fails out early if the payload is invalid."""
+
+    payload = {
+        "signature": "123456",
+        "waffles": "",
+        "signed_field_names": "waffles",
+    }
+
+    mocked_get_order = mocker.patch(
+        "ecommerce.api.get_order_from_cybersource_payment_response"
+    )
+
+    response = client.post(reverse("checkout_result_api"), payload)
+
+    assert response.status_code == 401
+    mocked_get_order.assert_not_called()
+
+
+def test_backoffice_callback_bad_order(mocker, client, settings):
+    """Test that the backoffice API returns 404 if there's no order."""
+
+    last_order = Order.objects.order_by("pk").last()
+    max_order_id = (last_order.id if last_order else 0) + 200
+
+    payload = {
+        "req_consumer_id": "bob@doe.local",
+        "req_customer_ip_address": "127.0.0.1",
+        "req_reference_number": f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{max_order_id}",
+        "req_line_item_count": 0,
+    }
+
+    mocked_processor = mocker.patch(
+        "ecommerce.api.process_cybersource_payment_response"
+    )
+
+    payload = PaymentGateway.get_gateway_class(  # noqa: SLF001
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+    )._sign_cybersource_payload(payload)
+
+    response = client.post(reverse("checkout_result_api"), payload)
+
+    assert response.status_code == 404
+    mocked_processor.assert_not_called()
+
+
+def test_backoffice_callback_good_order(mocker, client, settings):
+    """Test that the backoffice API fullfils the order if it's good."""
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    product_version = Version.objects.get_for_object(product).first()
+
+    order_line = LineFactory.create(product_version=product_version)
+    order = order_line.order
+
+    # Ultimately, don't really care that much about the payload
+    # A successful one is fine - fully testing fulfillment is done elsewhere
+    payload = {
+        "req_consumer_id": "bob@doe.local",
+        "req_customer_ip_address": "127.0.0.1",
+        "req_reference_number": order.reference_number,
+        "req_line_item_count": 1,
+        "req_item_0_code": order_line.courseware,
+        "req_item_0_name": order_line.courseware,
+        "req_item_0_sku": order_line.product.id,
+        "req_item_0_unit_price": order_line.total_price,
+        "req_item_0_tax_amount": 0,
+        "req_item_0_quantity": 1,
+        "message": "Completed",
+        "reason_code": "",
+        "transaction_id": "12345abcde",
+        "decision": "ACCEPT",
+    }
+
+    mocked_processor = mocker.patch(
+        "ecommerce.api.process_cybersource_payment_response"
+    )
+
+    payload = PaymentGateway.get_gateway_class(  # noqa: SLF001
+        settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+    )._sign_cybersource_payload(payload)
+
+    response = client.post(reverse("checkout_result_api"), payload)
+
+    assert response.status_code == 200
+    mocked_processor.assert_called()
