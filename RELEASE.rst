@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.160.5
+Version 1.160.5 (Released July 22, 2026)
 ---------------
 
 - Change font color, make sure that the button is 120px, make sure the button is left aligned in outlook (#3774)
