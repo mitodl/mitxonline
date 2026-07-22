@@ -13,10 +13,12 @@ log = logging.getLogger(__name__)
 ENROLLMENT_CODE_ASSINGMENT_TAG = "enrollment-code-assignment"
 
 
-class EnrollmentCodeAssignmentMessage(TemplatedMessage):
+class BaseEnrollmentCodeAssignmentMessage(TemplatedMessage):
     template_name = "mail/enrollment_code_assignment"
     name = "Enrollment Code Assignment"
 
+
+class EnrollmentCodeAssignmentMessage(BaseEnrollmentCodeAssignmentMessage):
     @staticmethod
     def get_default_headers() -> dict:
         base_headers = TemplatedMessage.get_default_headers()
@@ -31,9 +33,16 @@ def get_learn_hostname():
     return ENV_TO_LEARN_HOSTNAME_MAP.get(settings.ENVIRONMENT, "learn.mit.edu")
 
 
-def send_email_helper(email, code, code_url, organization_name, contract_name):
+def send_email_helper(  # noqa: PLR0913
+    email, code, code_url, organization_name, contract_name, *, is_test=False
+):
+    message_type = (
+        BaseEnrollmentCodeAssignmentMessage
+        if is_test
+        else EnrollmentCodeAssignmentMessage
+    )
     try:
-        with get_message_sender(EnrollmentCodeAssignmentMessage) as sender:
+        with get_message_sender(message_type) as sender:
             message = sender.build_message(
                 email,
                 {
@@ -107,4 +116,5 @@ def send_test_enrollment_code_assignment_email(email, contract_record_id):
         f"https://{learn_hostname}/enrollmentcode/PLACEHOLDER_CODE",
         contract.organization.name,
         contract.name,
+        is_test=True,
     )
