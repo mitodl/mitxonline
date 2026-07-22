@@ -652,6 +652,12 @@ MIT_LEARN_DASHBOARD_URL = get_string(
     description="Dashboard URL for UAI enrollment emails",
 )
 
+MAILGUN_WEBHOOK_SIGNING_SECRET = get_string(
+    name="MAILGUN_WEBHOOK_SIGNING_SECRET",
+    default="",
+    description="The secret to use for signing Mailgun webhooks",
+)
+
 # Logging configuration
 LOG_LEVEL = get_string(
     name="MITX_ONLINE_LOG_LEVEL", default="INFO", description="The log level default"

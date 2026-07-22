@@ -1,5 +1,6 @@
 """B2B manager dashboard views."""
 
+import json
 import logging
 import uuid
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
@@ -18,9 +20,10 @@ from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from b2b.api import _create_discount_with_product
+from b2b.api import _create_discount_with_product, is_potentially_valid_mailgun_webhook
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
     REDEMPTION_STATUS_ASSIGNED,
@@ -47,6 +50,7 @@ from b2b.serializers.v0.manager import (
     SendTestEmailSerializer,
 )
 from b2b.tasks import (
+    queue_process_mailgun_webhook_for_enrollment_code_emails,
     queue_send_enrollment_code_assignment_email,
     queue_send_test_enrollment_code_assignment_email,
 )
@@ -856,5 +860,20 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         email = serializer.validated_data["email"]
         queue_send_test_enrollment_code_assignment_email.delay(email, contract.id)
+
+        return Response(status=http_status.HTTP_200_OK)
+
+
+class ProcessMailgunWebhook(APIView):
+    permission_classes = []
+
+    @csrf_exempt
+    def post(self, request):
+        payload = json.loads(request.body)
+        if not is_potentially_valid_mailgun_webhook(payload):
+            # Mailgun would retry on a 400, but we wanna drop the majority of webhooks without even queueing anything
+            return Response(status=200)
+
+        queue_process_mailgun_webhook_for_enrollment_code_emails.delay(payload)
 
         return Response(status=http_status.HTTP_200_OK)
