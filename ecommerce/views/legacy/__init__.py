@@ -839,7 +839,11 @@ class CheckoutCallbackView(View):
             if not PaymentGateway.validate_processor_response(
                 settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
             ):
-                self.logger.info("Could not validate payment response for order")
+                self.logger.info(
+                    "Could not validate payment response for order %s in state %s",
+                    order.reference_number,
+                    order_state,
+                )
             else:
                 processor_response = PaymentGateway.get_formatted_response(
                     settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request

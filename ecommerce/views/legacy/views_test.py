@@ -1315,9 +1315,10 @@ def test_checkout_result_callback_verification_failure(mocker):
     get_formatted_response = mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.get_formatted_response"
     )
+    order = mocker.Mock(reference_number="ref-123")
 
     response = CheckoutCallbackView().post_checkout_redirect(
-        "unknown-state", None, RequestFactory().post("/checkout/callback")
+        "unknown-state", order, RequestFactory().post("/checkout/callback")
     )
 
     assert response.status_code == 302
