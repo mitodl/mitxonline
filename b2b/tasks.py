@@ -6,7 +6,6 @@ import logging
 from django.core.cache import cache
 from django.db.models import Q
 
-from b2b.api import process_mailgun_webhook_for_enrollment_code_emails
 from b2b.mail import (
     send_enrollment_code_assignment_email,
     send_test_enrollment_code_assignment_email,
@@ -225,4 +224,6 @@ def queue_send_test_enrollment_code_assignment_email(
 
 @app.task(ignore_result=True)
 def queue_process_mailgun_webhook_for_enrollment_code_emails(payload):
+    from b2b.api import process_mailgun_webhook_for_enrollment_code_emails
+
     process_mailgun_webhook_for_enrollment_code_emails(payload)
