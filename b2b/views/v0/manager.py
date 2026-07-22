@@ -1,6 +1,5 @@
 """B2B manager dashboard views."""
 
-import json
 import logging
 import uuid
 from dataclasses import dataclass
@@ -869,9 +868,11 @@ class ProcessMailgunWebhook(APIView):
 
     @csrf_exempt
     def post(self, request):
-        payload = json.loads(request.body)
+        # Need to validate that this is proper json.
+        payload = request.data
         if not is_potentially_valid_mailgun_webhook(payload):
             # Mailgun would retry on a 400, but we wanna drop the majority of webhooks without even queueing anything
+            log.info("Got invalid mailgun webhook payload")
             return Response(status=200)
 
         queue_process_mailgun_webhook_for_enrollment_code_emails.delay(payload)
