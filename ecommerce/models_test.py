@@ -27,6 +27,7 @@ from ecommerce.factories import (
     SetLimitDiscountFactory,
     UnlimitedUseDiscountFactory,
 )
+from ecommerce.fixtures import stripe_event
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -39,6 +40,7 @@ from ecommerce.models import (
     OrderStatus,
     PendingOrder,
     Product,
+    StripeEventLog,
     Transaction,
     UserDiscount,
 )
@@ -879,3 +881,30 @@ def test_fulfill_skip_receipt(
         mock_send_receipt.assert_called_once_with(pending_order.id)
     else:
         mock_send_receipt.assert_not_called()
+
+
+def test_stripe_event_log_resave():
+    """Test that resaving a StripeEventLog works as expected."""
+
+    event = stripe_event()
+    logged_event = StripeEventLog.objects.create(
+        event_id=event.id, event_data=event.to_dict(for_json=True)
+    )
+
+    assert event.id == logged_event.event_id
+    assert not logged_event.related_order
+
+    order = OrderFactory.create()
+
+    logged_event.event_id = "some_other_id"
+    logged_event.event_data = {
+        "some other stuff": "and things",
+    }
+    logged_event.related_order = order
+    logged_event.save()
+
+    logged_event.refresh_from_db()
+
+    assert event.id == logged_event.event_id
+    assert logged_event.related_order == order
+    assert logged_event.event_data == event.to_dict(for_json=True)

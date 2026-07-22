@@ -38,13 +38,16 @@ from ecommerce.api import (
     log_stripe_event,
     process_cybersource_payment_response,
     process_stripe_checkout_completed,
+    process_stripe_checkout_expired,
     refund_order,
     unenroll_learner_from_order,
 )
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+    STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
     STRIPE_PAYMENT_STATUS_PAID,
+    STRIPE_PAYMENT_STATUS_UNPAID,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
 )
@@ -1251,29 +1254,35 @@ def test_log_stripe_event():
     assert StripeEventLog.objects.filter(event_id=event.id).exists()
 
 
-def test_process_stripe_checkout_completed(bootstrapped_verified_program):
-    """Test that the checkout processing works."""
+def _configure_checkout_session_object(
+    order_line, *, was_successful=True, is_expired=False
+):
+    """
+    Generate and configure a Stripe CheckoutSession for testing.
 
-    *_, cr_product = bootstrapped_verified_program
+    This all sets up a Stripe Event with a checkout session that looks
+    right-ish for the order. A lot of this data will be set to whatever
+    is in the sample object, which is fine; we really only care about the
+    reference number and status fields when processing.
 
-    product_version = Version.objects.get_for_object(cr_product).get()
-    order_line = LineFactory.create(
-        product_version=product_version,
-        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
-    )
+    The data is not signed - Stripe passes this in the HTTP headers and that
+    is handled before it gets to what's under test.
+
+    Note that was_successful and is_expired are different states and would
+    be different events. was_successful is ignored if is_expired is True.
+
+    Args:
+    - order_line (Line): the line item to start with
+    - was_successful (bool): if the result should be a successful one or not
+    - is_expired (bool): if the session expired
+    """
+
     cart_item = CartItem(
         sku=order_line.courseware,
         code=order_line.courseware,
         unitprice=Decimal(order_line.unit_price),
         name=order_line.courseware,
     )
-
-    # This all sets up a Stripe Event with a checkout session that looks
-    # right-ish for the order. A lot of this data will be set to whatever
-    # is in the sample object, which is fine; we really only care about the
-    # reference number and status fields when processing.
-    # This is not signed - Stripe passes this in the HTTP headers and that
-    # is handled before it gets to what's under test here.
 
     # use the payment gateway to generate the line items to get everything
     # shaped right, then convert those to StripeObject so they match what
@@ -1285,7 +1294,9 @@ def test_process_stripe_checkout_completed(bootstrapped_verified_program):
 
     event = stripe_event()
 
-    event.type = "checkout.session.completed"
+    event.type = (
+        "checkout.session.expired" if is_expired else "checkout.session.completed"
+    )
     event.data.object = stripe_checkout_session()
     event.data.object.mode = "payment"
     event.data.object.line_items = formatted_lines
@@ -1295,11 +1306,68 @@ def test_process_stripe_checkout_completed(bootstrapped_verified_program):
     event.data.object.amount_total = int(order_line.order.total_price_paid * 100)
     event.data.object.amount_subtotal = int(order_line.order.total_price_paid * 100)
 
-    event.data.object.payment_status = STRIPE_PAYMENT_STATUS_PAID
-    event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+    if is_expired:
+        event.data.object.payment_status = STRIPE_PAYMENT_STATUS_UNPAID
+        event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED
+    elif was_successful:
+        event.data.object.payment_status = STRIPE_PAYMENT_STATUS_PAID
+        event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+    else:
+        event.data.object.payment_status = STRIPE_PAYMENT_STATUS_UNPAID
+        event.data.object.status = STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+
+    return event
+
+
+@pytest.mark.parametrize(
+    "was_successful",
+    [
+        True,
+        False,
+    ],
+)
+def test_process_stripe_checkout_completed(
+    bootstrapped_verified_program, was_successful
+):
+    """Test that the checkout processing works."""
+
+    *_, cr_product = bootstrapped_verified_program
+
+    product_version = Version.objects.get_for_object(cr_product).get()
+    order_line = LineFactory.create(
+        product_version=product_version,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+
+    event = _configure_checkout_session_object(
+        order_line, was_successful=was_successful
+    )
 
     updated_order = process_stripe_checkout_completed(event)
 
     assert updated_order
     assert updated_order.id == order_line.order.id
-    assert updated_order.state == OrderStatus.FULFILLED
+    if was_successful:
+        assert updated_order.state == OrderStatus.FULFILLED
+    else:
+        assert updated_order.state == OrderStatus.ERRORED
+
+
+def test_process_stripe_checkout_expired(bootstrapped_verified_program):
+    """Test that expiry works as expected."""
+
+    *_, cr_product = bootstrapped_verified_program
+
+    product_version = Version.objects.get_for_object(cr_product).get()
+    order_line = LineFactory.create(
+        product_version=product_version,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+
+    event = _configure_checkout_session_object(order_line, is_expired=True)
+
+    updated_order = process_stripe_checkout_expired(event)
+
+    assert updated_order
+    assert updated_order.id == order_line.order.id
+    assert updated_order.state == OrderStatus.CANCELED

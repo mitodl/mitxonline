@@ -628,8 +628,11 @@ class OrderFlow:
         return self
 
     @state.transition(source=State.ANY, target=OrderStatus.ERRORED)
-    def errored(self):
+    def errored(self, *, api_response_data: dict | None = None):
         """Error this order"""
+
+        if isinstance(api_response_data, dict):
+            self.create_transaction(api_response_data)
 
     @state.transition(
         source=OrderStatus.FULFILLED,
@@ -1253,7 +1256,7 @@ class StripeEventLog(TimestampedModel):
     def save(self, **kwargs):
         """Only allow future saves to adjust the related_order field."""
 
-        if self._has_pk:
+        if self.pk:
             kwargs["update_fields"] = ["related_order"]
 
         super().save(**kwargs)

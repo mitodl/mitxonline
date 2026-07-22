@@ -1153,7 +1153,19 @@ def process_stripe_checkout_completed(event):
             checkout_session.payment_status,
         )
 
-        return None
+        if order_reference_number:
+            order = Order.objects.filter(
+                reference_number=order_reference_number
+            ).first()
+
+            if order:
+                order.get_object_flow().errored(
+                    api_response_data=event.to_dict(for_json=True)
+                )
+                order.refresh_from_db()
+                return order
+
+        return False
 
     order = Order.objects.filter(reference_number=order_reference_number).get()
     basket = Basket.objects.filter(user=order.purchaser).first()
@@ -1191,7 +1203,7 @@ def process_stripe_checkout_expired(event):
 
     order = Order.objects.filter(reference_number=order_reference_number).get()
 
-    order.get_object_flow().cancel(event.to_dict(for_json=True))
+    order.get_object_flow().cancel(api_response_data=event.to_dict(for_json=True))
 
     order.refresh_from_db()
     return order

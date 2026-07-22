@@ -57,6 +57,24 @@ def stripe_event(event):
     This doesn't set firstresult so we can have global handlers and so we can
     scope the hookimpls to specific tasks.
 
+    Implementations should return one of None, False, or Order. If the impl
+    modifies an Order, it should return the Order, and the state of it should
+    reflect the status of the operation that was taken. (In other words, if
+    there was an error processing the order, the Order's state should be set
+    to OrderState.ERRORED and it should return the Order.) If the impl
+    encounters an error but doesn't modify the Order, then it should return
+    False and do whatever logging that is necessary. If the impl finishes
+    successfully but also doesn't modify the Order, then it should return
+    True.
+
+    If the impl hits a fatal error it should raise an exception so that further
+    processing stops.
+
     Args:
     event (stripe._event.Event): The Stripe event to process.
+
+    Returns:
+    - True: success but no data
+    - Order: the order that was updated in the step
+    - False: error state
     """
