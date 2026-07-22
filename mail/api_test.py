@@ -56,6 +56,9 @@ def test_context_for_user(settings, test_user, extra_context):
     assert context_for_user(user=test_user, extra_context=extra_context) == {
         "base_url": settings.SITE_BASE_URL,
         "site_name": settings.SITE_NAME,
+        "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
+        "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
+        "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
         **(extra_context or {}),
         **user_ctx,
     }
