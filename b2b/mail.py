@@ -2,6 +2,7 @@ import logging
 import uuid
 
 from django.conf import settings
+from mitol.common.utils.datetime import now_in_utc
 from mitol.mail.api import get_message_sender
 from mitol.mail.messages import TemplatedMessage
 
@@ -80,13 +81,21 @@ def send_enrollment_code_assignment_email(assignment_record_ids):
         code = assignment.discount.discount_code
         code_url = f"https://{learn_hostname}/enrollmentcode/{code}"
         organization_name = assignment.contract.organization.name
-        send_email_helper(
+        message_id = send_email_helper(
             assignment.assigned_email,
             code,
             code_url,
             organization_name,
             assignment.contract.name,
         )
+        if message_id:
+            # If we got a message ID from mailgun, we'll treat the message as sent
+            # If anything goes wrong after that, it'll come in as a webhook
+            # We are going to perform these saves as eagerly as possibly as there's technically
+            # a race condition between saving the message ID and webhooks coming in.
+            assignment.email_message_id = message_id
+            assignment.last_reminder_sent_on = now_in_utc()
+            assignment.save(update_fields=["email_message_id", "last_reminder_sent_on"])
 
 
 def send_test_enrollment_code_assignment_email(email, contract_record_id):

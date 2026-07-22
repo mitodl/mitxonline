@@ -72,6 +72,13 @@ class CodeAssignment:
     code: str
 
 
+def clear_assignment_email_deliverability_fields(assignment):
+    assignment.email_message_id = None
+    assignment.email_status = None
+    assignment.email_status_event_timestamp = None
+    return assignment
+
+
 def assign_codes_and_send_emails(
     assignments: list[CodeAssignment], assigning_user
 ) -> bool:
