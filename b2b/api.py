@@ -1246,10 +1246,7 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     item.save()
 
     # Sync with HubSpot for CourseRun
-    sync_hubspot_cart_add(
-        request.user,
-        product
-    )
+    sync_hubspot_cart_add(request.user, product)
 
     return basket
 

@@ -1778,9 +1778,7 @@ def sync_deal_with_hubspot(  # noqa: C901
 
     # If not found by dealname, also check by unique_app_id to prevent duplicates
     if not existing_deal_id and unique_app_id:
-        existing_deal_id = _find_deal_id_by_unique_app_id(
-            hubspot_client, unique_app_id
-        )
+        existing_deal_id = _find_deal_id_by_unique_app_id(hubspot_client, unique_app_id)
 
     if existing_deal_id:
         # Deal exists, update it with the latest order data
@@ -2286,9 +2284,7 @@ def _find_product_id_by_unique_app_id(
     return None
 
 
-def _find_deal_id_by_dealname(
-    hubspot_client: HubspotApi, dealname: str
-) -> str | None:
+def _find_deal_id_by_dealname(hubspot_client: HubspotApi, dealname: str) -> str | None:
     """Find deal id in target account by dealname."""
     wait_for_hubspot_rate_limit()
     try:
@@ -2409,9 +2405,7 @@ def _find_line_item_id_by_unique_app_id(
         return None
 
 
-def _ensure_line_item_for_line(
-    line: Line, hubspot_client: HubspotApi
-) -> str | None:
+def _ensure_line_item_for_line(line: Line, hubspot_client: HubspotApi) -> str | None:
     """Return a target-account line item id, creating one when missing."""
     line_item_input = _build_line_item_message(line, hubspot_client)
     unique_app_id = str(line_item_input.properties.get("unique_app_id") or "")
@@ -2582,9 +2576,7 @@ def _sync_cart_add_deal_with_hubspot(
         hubspot_client, deal_input.properties.get("dealname")
     )
     if not existing_deal_id and unique_app_id:
-        existing_deal_id = _find_deal_id_by_unique_app_id(
-            hubspot_client, unique_app_id
-        )
+        existing_deal_id = _find_deal_id_by_unique_app_id(hubspot_client, unique_app_id)
 
     wait_for_hubspot_rate_limit()
     if existing_deal_id:
@@ -2630,7 +2622,8 @@ def _sync_cart_add_deal_with_hubspot(
 
 
 def track_cart_add_with_hubspot(
-    user: User, product: Product,
+    user: User,
+    product: Product,
 ) -> bool:
     """
     Create and sync a dedicated deal that represents a cart-add occurrence.
@@ -2652,9 +2645,7 @@ def track_cart_add_with_hubspot(
     try:
         hubspot_client = HubspotApi(access_token=token)
 
-        _ensure_hubspot_contact_properties(
-            hubspot_client, skip_certificates=False
-        )
+        _ensure_hubspot_contact_properties(hubspot_client, skip_certificates=False)
 
         contact_id = _ensure_hubspot_contact_for_user(
             user, hubspot_client, skip_certificates=False
@@ -2691,13 +2682,13 @@ def track_cart_add_with_hubspot(
             "Synced cart-add deal with HubSpot for user_id=%s product_id=%s deal_id=%s",
             user.id,
             product.id,
-            deal.id
+            deal.id,
         )
     except Exception:  # pylint: disable=broad-except
         log.exception(
             "Failed to sync HubSpot cart-add deal for user %s product %s",
             user.id,
-            product.id
+            product.id,
         )
         return False
 

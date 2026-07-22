@@ -35,9 +35,7 @@ def test_sync_hubspot_deal_uai_order_with_uai_token(
     )
 
     sync_hubspot_deal(hubspot_order)
-    mock_sync.assert_called_once_with(
-        args=(hubspot_order.id,), countdown=10
-    )
+    mock_sync.assert_called_once_with(args=(hubspot_order.id,), countdown=10)
 
     if raise_exc:
         mock_exception_log.assert_called_once_with(
@@ -61,9 +59,7 @@ def test_sync_hubspot_deal_non_uai_order(
     )
 
     sync_hubspot_deal(hubspot_order)
-    mock_sync.assert_called_once_with(
-        args=(hubspot_order.id,), countdown=10
-    )
+    mock_sync.assert_called_once_with(args=(hubspot_order.id,), countdown=10)
 
     if raise_exc:
         mock_exception_log.assert_called_once_with(

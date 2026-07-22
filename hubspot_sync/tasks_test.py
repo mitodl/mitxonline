@@ -114,10 +114,7 @@ def test_task_sync_cart_add_event_with_hubspot(mocker):
         "hubspot_sync.tasks.api.track_cart_add_with_hubspot", return_value=True
     )
 
-    assert (
-        sync_cart_add_event_with_hubspot(user.id, product.id)
-        is True
-    )
+    assert sync_cart_add_event_with_hubspot(user.id, product.id) is True
     mock_api_call.assert_called_once_with(user, product)
 
 
@@ -133,9 +130,7 @@ def test_task_sync_deal_with_hubspot(mocker, settings):
         return_value=mock_result,
     )
 
-    assert (
-        sync_deal_with_hubspot(mock_object.id) == mock_result.id
-    )
+    assert sync_deal_with_hubspot(mock_object.id) == mock_result.id
     mock_api_call.assert_called_once_with(mock_object, test_token)
 
 
