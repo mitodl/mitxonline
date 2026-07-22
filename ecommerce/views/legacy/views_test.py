@@ -960,8 +960,7 @@ def test_add_to_cart_triggers_hubspot_cart_add_for_uai_course(
     assert resp.status_code == status.HTTP_200_OK
     mock_sync.assert_called_once_with(
         user,
-        product,
-        is_uai=True,
+        product
     )
 
 

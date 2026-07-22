@@ -30,19 +30,18 @@ def test_sync_hubspot_deal_uai_order_with_uai_token(
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "regular-token"  # noqa: S105
 
     mock_sync = mocker.patch(
-        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async",
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot.apply_async",
         side_effect=(ConnectionError if raise_exc else None),
     )
-    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=True)
 
     sync_hubspot_deal(hubspot_order)
     mock_sync.assert_called_once_with(
-        args=(hubspot_order.id,), kwargs={"is_uai": True}, countdown=10
+        args=(hubspot_order.id,), countdown=10
     )
 
     if raise_exc:
         mock_exception_log.assert_called_once_with(
-            "Exception calling sync_deal_with_hubspot_targeted for order %d",
+            "Exception calling sync_deal_with_hubspot for order %d",
             hubspot_order.id,
         )
     else:
@@ -57,19 +56,18 @@ def test_sync_hubspot_deal_non_uai_order(
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "regular-token"  # noqa: S105
 
     mock_sync = mocker.patch(
-        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot_targeted.apply_async",
+        "hubspot_sync.task_helpers.tasks.sync_deal_with_hubspot.apply_async",
         side_effect=(ConnectionError if raise_exc else None),
     )
-    mocker.patch("hubspot_sync.task_helpers.is_uai_order", return_value=False)
 
     sync_hubspot_deal(hubspot_order)
     mock_sync.assert_called_once_with(
-        args=(hubspot_order.id,), kwargs={"is_uai": False}, countdown=10
+        args=(hubspot_order.id,), countdown=10
     )
 
     if raise_exc:
         mock_exception_log.assert_called_once_with(
-            "Exception calling sync_deal_with_hubspot_targeted for order %d",
+            "Exception calling sync_deal_with_hubspot for order %d",
             hubspot_order.id,
         )
     else:
@@ -178,10 +176,9 @@ def test_sync_hubspot_cart_add(mocker, mock_exception_log, user, raise_exc):
         side_effect=(ConnectionError if raise_exc else None),
     )
     product = ProductFactory.build()
-    sync_hubspot_cart_add(user, product, is_uai=True)
+    sync_hubspot_cart_add(user, product)
     mock_sync.assert_called_once_with(
         args=(user.id, product.id),
-        kwargs={"is_uai_course": True},
         countdown=5,
     )
     if raise_exc:

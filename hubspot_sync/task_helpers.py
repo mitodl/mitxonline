@@ -4,7 +4,6 @@ import logging
 
 from django.conf import settings
 
-from courses.utils import is_uai_order
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
 from hubspot_sync.api import resolve_hubspot_token
@@ -60,19 +59,16 @@ def sync_hubspot_deal(order: Order):
         )
         return
 
-    if order.lines.first() is not None:
-        is_uai = is_uai_order(order)
-
-        if resolve_hubspot_token():
-            try:
-                tasks.sync_deal_with_hubspot_targeted.apply_async(
-                    args=(order.id,), kwargs={"is_uai": is_uai}, countdown=10
-                )
-            except:  # noqa: E722
-                log.exception(
-                    "Exception calling sync_deal_with_hubspot_targeted for order %d",
-                    order.id,
-                )
+    if order.lines.first() is not None and resolve_hubspot_token():
+        try:
+            tasks.sync_deal_with_hubspot.apply_async(
+                args=(order.id,), countdown=10
+            )
+        except:  # noqa: E722
+            log.exception(
+                "Exception calling sync_deal_with_hubspot for order %d",
+                order.id,
+            )
 
 
 def sync_hubspot_line_by_line_id(line_id: int):

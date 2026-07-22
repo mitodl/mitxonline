@@ -192,29 +192,6 @@ def sync_product_with_hubspot(product_id: int) -> str:
 @single_task(10, key=task_obj_lock)
 def sync_deal_with_hubspot(order_id: int) -> str | None:
     """
-    Sync an Order with a hubspot deal
-
-    Args:
-        order_id(int): The Order ID.
-
-    Returns:
-        str | None: The hubspot id for the deal, or None if skipped for B2B users
-    """
-    result = api.sync_deal_with_hubspot(Order.objects.get(id=order_id))
-    return result.id if result else None
-
-
-@app.task(
-    acks_late=True,
-    autoretry_for=(TooManyRequestsException, BlockingIOError),
-    max_retries=3,
-    retry_backoff=60,
-    retry_jitter=True,
-)
-@raise_429
-@single_task(10, key=task_obj_lock)
-def sync_deal_with_hubspot_targeted(order_id: int) -> str | None:
-    """
     Sync an Order with a hubspot deal using the appropriate HubSpot token.
     This allows routing UAI orders to the UAI HubSpot account.
 
@@ -229,7 +206,7 @@ def sync_deal_with_hubspot_targeted(order_id: int) -> str | None:
         msg = "No HubSpot token configured"
         raise ValueError(msg)
 
-    result = api.sync_deal_with_hubspot_targeted(Order.objects.get(id=order_id), token)
+    result = api.sync_deal_with_hubspot(Order.objects.get(id=order_id), token)
     return result.id if result else None
 
 

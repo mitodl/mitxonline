@@ -23,7 +23,6 @@ from b2b.api import (
 )
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-from courses.utils import is_uai_course_run
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
@@ -1091,9 +1090,7 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     )
 
     # Sync with HubSpot for CourseRun and Program products
-    sync_hubspot_cart_add(
-        request.user, product, is_uai=(is_uai_course_run(product.purchasable_object))
-    )
+    sync_hubspot_cart_add(request.user, product)
 
     if Decimal(
         sum([basket_item.discounted_price for basket_item in basket.basket_items.all()])

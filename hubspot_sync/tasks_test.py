@@ -37,7 +37,6 @@ from hubspot_sync.tasks import (
     sync_contact_with_hubspot,
     sync_course_run_certificate_with_hubspot,
     sync_deal_with_hubspot,
-    sync_deal_with_hubspot_targeted,
     sync_product_with_hubspot,
     sync_program_certificate_with_hubspot,
 )
@@ -50,7 +49,6 @@ pytestmark = [pytest.mark.django_db]
 SYNC_FUNCTIONS = [
     "sync_contact_with_hubspot",
     "sync_product_with_hubspot",
-    "sync_deal_with_hubspot",
 ]
 
 
@@ -77,19 +75,6 @@ def test_task_sync_product_with_hubspot(mocker):
     )
 
     assert sync_product_with_hubspot(mock_object.id) == mock_result.id
-    mock_api_call.assert_called_once_with(mock_object)
-
-
-def test_task_sync_deal_with_hubspot(mocker):
-    """These task functions should call the api function of the same name and return a hubspot id"""
-    mock_object = OrderFactory.create()
-    mock_result = SimplePublicObjectFactory()
-
-    mock_api_call = mocker.patch(
-        "hubspot_sync.tasks.api.sync_deal_with_hubspot", return_value=mock_result
-    )
-
-    assert sync_deal_with_hubspot(mock_object.id) == mock_result.id
     mock_api_call.assert_called_once_with(mock_object)
 
 
@@ -130,32 +115,32 @@ def test_task_sync_cart_add_event_with_hubspot(mocker):
     )
 
     assert (
-        sync_cart_add_event_with_hubspot(user.id, product.id, is_uai_course=True)
+        sync_cart_add_event_with_hubspot(user.id, product.id)
         is True
     )
-    mock_api_call.assert_called_once_with(user, product, is_uai_course=True)
+    mock_api_call.assert_called_once_with(user, product)
 
 
-def test_task_sync_deal_with_hubspot_targeted(mocker, settings):
-    """sync_deal_with_hubspot_targeted should call the api function with Order object and resolved token, return hubspot id"""
+def test_task_sync_deal_with_hubspot(mocker, settings):
+    """sync_deal_with_hubspot should call the api function with Order object and resolved token, return hubspot id"""
     mock_object = OrderFactory.create()
     mock_result = SimplePublicObjectFactory()
     test_token = "test-token-123"  # noqa: S105
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
 
     mock_api_call = mocker.patch(
-        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted",
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot",
         return_value=mock_result,
     )
 
     assert (
-        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False) == mock_result.id
+        sync_deal_with_hubspot(mock_object.id) == mock_result.id
     )
     mock_api_call.assert_called_once_with(mock_object, test_token)
 
 
-def test_task_sync_deal_with_hubspot_targeted_order_not_found(mocker, settings):
-    """sync_deal_with_hubspot_targeted should raise Order.DoesNotExist when order ID doesn't exist"""
+def test_task_sync_deal_with_hubspot_order_not_found(mocker, settings):
+    """sync_deal_with_hubspot should raise Order.DoesNotExist when order ID doesn't exist"""
     non_existent_id = 99999
     test_token = "test-token-123"  # noqa: S105
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
@@ -164,89 +149,52 @@ def test_task_sync_deal_with_hubspot_targeted_order_not_found(mocker, settings):
     assert not Order.objects.filter(id=non_existent_id).exists()
 
     with pytest.raises(Order.DoesNotExist):
-        sync_deal_with_hubspot_targeted(non_existent_id, is_uai=False)
+        sync_deal_with_hubspot(non_existent_id)
 
 
 @pytest.mark.parametrize(
     "status, expected_error",  # noqa: PT006
     [[429, TooManyRequestsException], [500, ApiException]],  # noqa: PT007
 )
-def test_task_sync_deal_with_hubspot_targeted_api_error(
+def test_task_sync_deal_with_hubspot_api_error(
     mocker, status, expected_error, settings
 ):
-    """sync_deal_with_hubspot_targeted should propagate API exceptions properly"""
+    """sync_deal_with_hubspot should propagate API exceptions properly"""
     mock_object = OrderFactory.create()
     test_token = "test-token-123"  # noqa: S105
     settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
 
     mocker.patch(
-        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted",
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot",
         side_effect=expected_error(status=status),
     )
 
     with pytest.raises(expected_error):
-        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False)
+        sync_deal_with_hubspot(mock_object.id)
 
 
-def test_task_sync_deal_with_hubspot_targeted_uai_order(mocker, settings):
-    """sync_deal_with_hubspot_targeted should use the main token for UAI orders"""
-    mock_object = OrderFactory.create()
-    mock_result = SimplePublicObjectFactory()
-    test_token = "test-token-123"  # noqa: S105
-    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
-
-    mock_api_call = mocker.patch(
-        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted",
-        return_value=mock_result,
-    )
-
-    assert (
-        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=True) == mock_result.id
-    )
-    mock_api_call.assert_called_once_with(mock_object, test_token)
-
-
-def test_task_sync_deal_with_hubspot_targeted_no_token_error(mocker, settings):
-    """sync_deal_with_hubspot_targeted should raise ValueError when no token is configured"""
+def test_task_sync_deal_with_hubspot_no_token_error(mocker, settings):
+    """sync_deal_with_hubspot should raise ValueError when no token is configured"""
     mock_object = OrderFactory.create()
     # Don't set any token in settings
 
     with pytest.raises(ValueError, match="No HubSpot token configured"):
-        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=False)
-
-    with pytest.raises(ValueError, match="No HubSpot token configured"):
-        sync_deal_with_hubspot_targeted(mock_object.id, is_uai=True)
+        sync_deal_with_hubspot(mock_object.id)
 
 
-def test_task_sync_deal_with_hubspot_skips_b2b_users(mocker):
+def test_task_sync_deal_with_hubspot_skips_b2b_users(mocker, settings):
     """sync_deal_with_hubspot task should return None for B2B users"""
     order = OrderFactory.create()
     contract = ContractPageFactory.create()
     order.purchaser.b2b_contracts.add(contract)
+    test_token = "test-token-123"  # noqa: S105
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
 
     mock_api_call = mocker.patch(
         "hubspot_sync.tasks.api.sync_deal_with_hubspot", return_value=None
     )
 
     result = sync_deal_with_hubspot(order.id)
-
-    assert result is None
-    mock_api_call.assert_called_once_with(order)
-
-
-def test_task_sync_deal_with_hubspot_targeted_skips_b2b_users(mocker, settings):
-    """sync_deal_with_hubspot_targeted task should return None for B2B users"""
-    order = OrderFactory.create()
-    contract = ContractPageFactory.create()
-    order.purchaser.b2b_contracts.add(contract)
-    test_token = "test-token-123"  # noqa: S105
-    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = test_token
-
-    mock_api_call = mocker.patch(
-        "hubspot_sync.tasks.api.sync_deal_with_hubspot_targeted", return_value=None
-    )
-
-    result = sync_deal_with_hubspot_targeted(order.id, is_uai=False)
 
     assert result is None
     mock_api_call.assert_called_once_with(order, test_token)
@@ -264,10 +212,8 @@ def test_task_functions_error(mocker, task_func, status, expected_error):
     )
     if task_func == "sync_contact_with_hubspot":
         mock_object_id = UserFactory.create().id
-    elif task_func == "sync_product_with_hubspot":
-        mock_object_id = ProductFactory.create().id
     else:
-        mock_object_id = OrderFactory.create().id
+        mock_object_id = ProductFactory.create().id
     with pytest.raises(expected_error):
         getattr(tasks, task_func)(mock_object_id)
 
