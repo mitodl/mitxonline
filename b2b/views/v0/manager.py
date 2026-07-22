@@ -73,8 +73,8 @@ class CodeAssignment:
 
 
 def clear_assignment_email_deliverability_fields(assignment):
-    assignment.email_message_id = None
-    assignment.email_status = None
+    assignment.email_message_id = ""
+    assignment.email_status = ""
     assignment.email_status_event_timestamp = None
     return assignment
 
