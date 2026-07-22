@@ -101,7 +101,6 @@ def assign_codes_and_send_emails(
             assigned_email=assignment.email,
             assigned_name=assignment.name,
             assigned_by=assigning_user,
-            last_reminder_sent_on=now,
             created_on=now,
             updated_on=now,
         )
@@ -625,7 +624,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         # Just send the email reminder and update the last sent timestamp
         queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
-        assignment_record.last_reminder_sent_on = now_in_utc()
+        clear_assignment_email_deliverability_fields(assignment_record)
         assignment_record.save()
 
         # Set prefetched_redemptions so the serializer returns the current assignment status.
@@ -820,7 +819,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         assignment_record.assigned_email = email
         assignment_record.assigned_name = name
         assignment_record.assigned_by = request.user
-        assignment_record.last_reminder_sent_on = now_in_utc()
+        clear_assignment_email_deliverability_fields(assignment_record)
         assignment_record.save()
         queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
         discount.prefetched_redemptions = [assignment_record]
