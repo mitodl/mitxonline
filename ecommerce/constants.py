@@ -1,6 +1,10 @@
 """Constants for ecommerce."""
 
 from mitol.payment_gateway.api import ProcessorResponse
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 
 REFERENCE_NUMBER_PREFIX = "mitxonline-"
 
@@ -120,3 +124,12 @@ STRIPE_PAYMENT_STATUSES_GOOD = [STRIPE_PAYMENT_STATUS_NPR, STRIPE_PAYMENT_STATUS
 STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE = "complete"
 STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED = "expired"
 STRIPE_CHECKOUT_SESSION_STATUS_OPEN = "open"
+
+CHECKOUT_SUCCESS_ROUTE_MAP = {
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE: "checkout-result-callback",
+    MITOL_PAYMENT_GATEWAY_STRIPE: "checkout-result-callback",
+}
+CHECKOUT_CANCEL_ROUTE_MAP = {
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE: "checkout-result-callback",
+    MITOL_PAYMENT_GATEWAY_STRIPE: "checkout-result-callback",
+}
