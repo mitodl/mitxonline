@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      - name: Create test local state
+        run: ./scripts/test/stub-data.sh
+
       - name: Django system checks
         run: uv run ./manage.py check --fail-level WARNING
         env: &django-env-vars
