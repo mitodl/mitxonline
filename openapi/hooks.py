@@ -106,6 +106,7 @@ def exclude_paths_hook(endpoints, **kwargs):  # noqa: ARG001
         "/api/v2/images/",
         "/api/v2/documents/",
         "/api/internal/",
+        "/api/v0/b2b/webhook/",
     ]
 
     # Filter out endpoints whose paths start with any of the excluded prefixes

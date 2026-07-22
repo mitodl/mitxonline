@@ -840,6 +840,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
           description: ''
+  /api/v0/b2b/webhook:
+    post:
+      operationId: b2b_webhook_create
+      tags:
+      - b2b
+      responses:
+        '200':
+          description: No response body
   /api/v0/baskets/:
     get:
       operationId: baskets_list
