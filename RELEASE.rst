@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.160.4
+Version 1.160.4 (Released July 22, 2026)
 ---------------
 
 - fix: add 'stay update' boolean field for course page (#3768)
