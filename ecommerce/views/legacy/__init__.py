@@ -904,6 +904,27 @@ class CheckoutCallbackView(View):
             else:
                 return self.post_checkout_redirect(order.state, order, request)
 
+    def get(self, request):
+        """
+        Process a GET request to this endpoint.
+
+        Stripe just redirects users back to the app. We might get a checkout
+        session ID here, which we can load and check, but for now just redirect
+        back to the dashboard and wait for them to hit the webhook.
+        """
+
+        order_ref = request.session.get("order_reference_number", None)
+        if order_ref:
+            order = Order.objects.filter(reference_number=order_ref).first()
+
+            return (
+                _learn_dashboard_redirect(order)
+                if _should_redirect_to_learn(order)
+                else HttpResponseRedirect(reverse("user-dashboard"))
+            )
+
+        return HttpResponseRedirect(reverse("user-dashboard"))
+
 
 # Add a serializer for the cybersource payment response
 class CybersourcePaymentResponseSerializer(serializers.Serializer):
@@ -1081,6 +1102,20 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_BASKET_EMPTY},
             )
+
+        if checkout_payload["method"] == "GET":
+            # GET method means we redirect the learner
+            # Throw a couple of identifiers into the session because otherwise
+            # we aren't guaranteed to get them back out the other side
+            log.debug(
+                "Interstitial: payload said GET, so redirecting to %s",
+                checkout_payload["url"],
+            )
+            request.session["stripe_session_id"] = checkout_payload["payload"].id
+            request.session["order_reference_number"] = checkout_payload[
+                "payload"
+            ].client_reference_id
+            return HttpResponseRedirect(checkout_payload["url"])
 
         context = {
             "checkout_payload": checkout_payload,

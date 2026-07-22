@@ -834,6 +834,7 @@ class PendingOrder(Order):
         products: List[Product],  # noqa: UP006
         user: User,
         discounts: List[Discount] | None = None,  # noqa: UP006
+        gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
     ):
         """
         Returns an existing PendingOrder if one already exists with the same:
@@ -848,6 +849,7 @@ class PendingOrder(Order):
             user (User):  The user expected to be associated with the PendingOrder.
             discounts (List[Discounts]):  A list of Discounts to apply to each Line assocaited
                 with the order.
+            gateway_type (str): The PaymentGateway class for the order.
 
         Returns:
             PendingOrder: the retrieved or created PendingOrder.
@@ -876,6 +878,7 @@ class PendingOrder(Order):
                 lines__product_version__in=product_versions,
                 state=OrderStatus.PENDING,
                 purchaser=user,
+                gateway_type=gateway_type,
             )
         )
         # Previously, multiple PendingOrders could be created for a single user
@@ -893,6 +896,7 @@ class PendingOrder(Order):
                 state=OrderStatus.PENDING,
                 purchaser=user,
                 total_price_paid=0,
+                gateway_type=gateway_type,
             )
 
         # Apply any discounts to the PendingOrder
@@ -927,7 +931,12 @@ class PendingOrder(Order):
         return order
 
     @classmethod
-    def create_from_basket(cls, basket: Basket):
+    def create_from_basket(
+        cls,
+        basket: Basket,
+        *,
+        gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+    ):
         """
         Creates a new pending order from a basket
 
@@ -942,12 +951,17 @@ class PendingOrder(Order):
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
         ]
-        order = cls._get_or_create(cls, products, basket.user, discounts)
+        order = cls._get_or_create(cls, products, basket.user, discounts, gateway_type)
         return order  # noqa: RET504
 
     @classmethod
     def create_from_product(
-        cls, product: Product, user: User, discount: Discount | None = None
+        cls,
+        product: Product,
+        user: User,
+        discount: Discount | None = None,
+        *,
+        gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
     ):
         """
         Creates a new pending order from a product
@@ -961,7 +975,7 @@ class PendingOrder(Order):
             PendingOrder: the created pending order
         """
 
-        order = cls._get_or_create(cls, [product], user, [discount])
+        order = cls._get_or_create(cls, [product], user, [discount], gateway_type)
 
         return order  # noqa: RET504
 

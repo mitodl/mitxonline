@@ -46,8 +46,10 @@ class StripeWebhookView(APIView):
         have to do it again later.
         """
 
+        log.info("check_permissions running")
+
         try:
-            stripe_event = api.PaymentGateway.perform_processor_response_validation(
+            stripe_event = api.PaymentGateway.validate_processor_response(
                 constants.MITOL_PAYMENT_GATEWAY_STRIPE,
                 request,
             )
@@ -61,6 +63,7 @@ class StripeWebhookView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         self.event = stripe_event
+        log.info("check_permissions got an event %s", stripe_event)
         return True
 
     def post(self, request, *args, **kwargs):  # noqa: ARG002

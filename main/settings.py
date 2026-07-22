@@ -1401,20 +1401,6 @@ UAI_HUBSPOT_PIPELINE_ID = get_string(
     description="Hubspot ecommerce pipeline ID for the UAI/xPro account",
 )
 
-# Unified Ecommerce integration
-
-UNIFIED_ECOMMERCE_URL = get_string(
-    name="UNIFIED_ECOMMERCE_URL",
-    default="",
-    description="The base URL for Unified Ecommerce.",
-)
-
-UNIFIED_ECOMMERCE_API_KEY = get_string(
-    name="UNIFIED_ECOMMERCE_API_KEY",
-    default="",
-    description="The API key for Unified Ecommerce.",
-)
-
 SPECTACULAR_SETTINGS = open_spectacular_settings
 
 
