@@ -61,9 +61,7 @@ def sync_hubspot_deal(order: Order):
 
     if order.lines.first() is not None and resolve_hubspot_token():
         try:
-            tasks.sync_deal_with_hubspot.apply_async(
-                args=(order.id,), countdown=10
-            )
+            tasks.sync_deal_with_hubspot.apply_async(args=(order.id,), countdown=10)
         except:  # noqa: E722
             log.exception(
                 "Exception calling sync_deal_with_hubspot for order %d",

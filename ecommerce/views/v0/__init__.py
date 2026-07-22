@@ -240,10 +240,7 @@ def _create_basket_from_product(
         basket=basket, product=product, defaults={"quantity": quantity}
     )
 
-    sync_hubspot_cart_add(
-        request.user,
-        product
-    )
+    sync_hubspot_cart_add(request.user, product)
 
     existing_basket_discounts = [bd.redeemed_discount for bd in basket.discounts.all()]
     discounts_to_apply = [
@@ -386,10 +383,7 @@ def create_basket_with_products(request):
                 basket=basket, product=product, defaults={"quantity": quantity}
             )
 
-            sync_hubspot_cart_add(
-                request.user,
-                product
-            )
+            sync_hubspot_cart_add(request.user, product)
     except ProductBlockedError:
         return Response(
             {"error": "Product blocked from purchasing.", "product": product},

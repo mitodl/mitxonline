@@ -953,15 +953,9 @@ def test_sync_cart_add_deal_with_hubspot_sets_checkout_abandoned_stage(
         return_value=SimplePublicObjectInput(properties={"name": "line-item"}),
     )
     mocker.patch("hubspot_sync.api._find_deal_id_by_dealname", return_value=None)
-    mocker.patch(
-        "hubspot_sync.api._find_deal_id_by_unique_app_id", return_value=None
-    )
-    mocker.patch(
-        "hubspot_sync.api._ensure_hubspot_product_for_line", return_value=None
-    )
-    mock_normalize = mocker.patch(
-        "hubspot_sync.api._normalize_deal_properties"
-    )
+    mocker.patch("hubspot_sync.api._find_deal_id_by_unique_app_id", return_value=None)
+    mocker.patch("hubspot_sync.api._ensure_hubspot_product_for_line", return_value=None)
+    mock_normalize = mocker.patch("hubspot_sync.api._normalize_deal_properties")
     mocker.patch("hubspot_sync.api.wait_for_hubspot_rate_limit")
 
     api._sync_cart_add_deal_with_hubspot(hubspot_order, "contact-id", mock_client)  # noqa: SLF001
@@ -1000,12 +994,8 @@ def test_sync_cart_add_deal_with_hubspot_normalizes_stage_after_override(
         return_value=SimplePublicObjectInput(properties={"name": "line-item"}),
     )
     mocker.patch("hubspot_sync.api._find_deal_id_by_dealname", return_value=None)
-    mocker.patch(
-        "hubspot_sync.api._find_deal_id_by_unique_app_id", return_value=None
-    )
-    mocker.patch(
-        "hubspot_sync.api._ensure_hubspot_product_for_line", return_value=None
-    )
+    mocker.patch("hubspot_sync.api._find_deal_id_by_unique_app_id", return_value=None)
+    mocker.patch("hubspot_sync.api._ensure_hubspot_product_for_line", return_value=None)
 
     def _normalize_to_created(_client, deal_input):
         deal_input.properties["dealstage"] = "created"
@@ -1056,9 +1046,7 @@ def test_normalize_deal_properties_pipeline_stage_mismatch(mocker):
     assert deal_input.properties["dealstage"] == "created"
 
 
-def test_normalize_deal_properties_prefers_ecommerce_pipeline(
-    mocker, settings
-):
+def test_normalize_deal_properties_prefers_ecommerce_pipeline(mocker, settings):
     """UAI deals should fall back to UAI_HUBSPOT_PIPELINE_ID when the source pipeline is not in the target account."""
     settings.UAI_HUBSPOT_PIPELINE_ID = "uai-ecommerce-pipeline-id"
     mock_client = mocker.Mock()
@@ -1089,9 +1077,7 @@ def test_normalize_deal_properties_prefers_ecommerce_pipeline(
     assert deal_input.properties["dealstage"] == "created"
 
 
-def test_normalize_deal_properties_falls_back_to_hubspot_pipeline_id(
-    mocker, settings
-):
+def test_normalize_deal_properties_falls_back_to_hubspot_pipeline_id(mocker, settings):
     """If UAI_HUBSPOT_PIPELINE_ID is unavailable, HUBSPOT_PIPELINE_ID should be used."""
     settings.UAI_HUBSPOT_PIPELINE_ID = "missing-uai-pipeline-id"
     settings.HUBSPOT_PIPELINE_ID = "mitx-pipeline-id"
@@ -1123,9 +1109,7 @@ def test_normalize_deal_properties_falls_back_to_hubspot_pipeline_id(
     assert deal_input.properties["dealstage"] == "created"
 
 
-def test_normalize_deal_properties_falls_back_to_default_pipeline(
-    mocker, settings
-):
+def test_normalize_deal_properties_falls_back_to_default_pipeline(mocker, settings):
     """If configured pipeline ids are unavailable, the default pipeline should be used."""
     settings.UAI_HUBSPOT_PIPELINE_ID = "missing-uai-pipeline-id"
     settings.HUBSPOT_PIPELINE_ID = "missing-mitx-pipeline-id"
@@ -1207,9 +1191,7 @@ def test_build_line_item_message_uses_target_product_id_from_search(
     assert message.properties["hs_product_id"] == "target-product-123"
 
 
-def test_ensure_hubspot_product_for_line_creates_when_missing(
-    mocker, hubspot_order
-):
+def test_ensure_hubspot_product_for_line_creates_when_missing(mocker, hubspot_order):
     """A target product should be created when unique_app_id lookup misses."""
     line = hubspot_order.lines.first()
     mock_client = mocker.Mock()

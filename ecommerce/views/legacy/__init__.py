@@ -719,19 +719,13 @@ class CheckoutApiViewSet(ViewSet):
                     BasketItem.objects.create(basket=basket, product=product)
                     message = "Product added to cart"
 
-                    sync_hubspot_cart_add(
-                        self.request.user,
-                        product
-                    )
+                    sync_hubspot_cart_add(self.request.user, product)
             else:
                 # Legacy behavior: add single item
                 BasketItem.objects.create(basket=basket, product=product)
                 message = "Product added to cart"
 
-                sync_hubspot_cart_add(
-                    self.request.user,
-                    product
-                )
+                sync_hubspot_cart_add(self.request.user, product)
 
         return Response(
             {
