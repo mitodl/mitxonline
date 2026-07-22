@@ -27,6 +27,8 @@ class CheckoutSessionEvents:
 
         log_stripe_event(event)
 
+        return True
+
     @hookimpl(specname="stripe_event")
     def checkout_webhooks(self, event: Event):
         """
@@ -47,4 +49,4 @@ class CheckoutSessionEvents:
         if event.type == "checkout.session.expired":
             return process_stripe_checkout_expired(event)
 
-        return None
+        return True
