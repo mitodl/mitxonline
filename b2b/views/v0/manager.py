@@ -20,7 +20,7 @@ from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.views import CreateAPIView
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import _create_discount_with_product, is_potentially_valid_mailgun_webhook
@@ -864,7 +864,7 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         return Response(status=http_status.HTTP_200_OK)
 
 
-class ProcessMailgunWebhook(APIView):
+class ProcessMailgunWebhook(CreateAPIView):
     permission_classes = []
 
     @csrf_exempt
