@@ -1276,7 +1276,7 @@ class StripeEventLog(TimestampedModel):
 
         if self.pk:
             kwargs["update_fields"] = ["related_order"]
-        elif not self.event_type:
+        elif not self.event_type or self.event_type == "invalid.event":
             # Extract event_type
             self.event_type = self.event_data.get("type", "invalid.event")
 
