@@ -29,6 +29,7 @@ from mitol.common.settings.celery import *  # noqa: F403
 from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
@@ -1565,3 +1566,6 @@ MIT_LEARN_ATTACH_URL = get_string(
     default="https://learn.mit.edu/enrollmentcode/",
     description="The URL to use for generating contract attachment URLs for B2B.",
 )
+
+if not ECOMMERCE_DEFAULT_PAYMENT_GATEWAY:  # noqa: F405
+    ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE
