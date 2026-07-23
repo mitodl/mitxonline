@@ -13,9 +13,11 @@ from django.db.models import Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
+from mitol.olposthog.features import is_enabled
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
 from mitol.payment_gateway.api import Order as GatewayOrder
 from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
 
 from b2b.api import (
     get_active_contracts_from_basket_items,
@@ -28,6 +30,8 @@ from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
+    CHECKOUT_CANCEL_ROUTE_MAP,
+    CHECKOUT_SUCCESS_ROUTE_MAP,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     PAYMENT_TYPE_SALES,
@@ -35,6 +39,8 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
+    STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+    STRIPE_PAYMENT_STATUSES_GOOD,
     ZERO_PAYMENT_DATA,
 )
 from ecommerce.exceptions import (
@@ -54,11 +60,13 @@ from ecommerce.models import (
     OrderStatus,
     PendingOrder,
     Product,
+    StripeEventLog,
     UserDiscount,
 )
 from ecommerce.tasks import perform_downgrade_from_order
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from hubspot_sync.task_helpers import sync_hubspot_cart_add, sync_hubspot_deal
+from main import features
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
@@ -77,8 +85,32 @@ from openedx.tasks import create_user_from_id
 log = logging.getLogger(__name__)
 
 
-def generate_checkout_payload(  # noqa: PLR0911
-    request, *, skip_discount_check=False, skip_receipt=False
+def get_checkout_success_url(gateway_type):
+    """Get the success endpoint for the gateway type."""
+
+    if gateway_type not in CHECKOUT_SUCCESS_ROUTE_MAP:
+        msg = f"Gateway {gateway_type} has no success route mapped"
+        raise ValidationError(msg)
+
+    return urljoin(
+        settings.SITE_BASE_URL, reverse(CHECKOUT_SUCCESS_ROUTE_MAP[gateway_type])
+    )
+
+
+def get_checkout_cancel_url(gateway_type):
+    """Get the cancel endpoint for the gateway type."""
+
+    if gateway_type not in CHECKOUT_CANCEL_ROUTE_MAP:
+        msg = f"Gateway {gateway_type} has no cancel route mapped"
+        raise ValidationError(msg)
+
+    return urljoin(
+        settings.SITE_BASE_URL, reverse(CHECKOUT_CANCEL_ROUTE_MAP[gateway_type])
+    )
+
+
+def generate_checkout_payload(  # noqa: PLR0911, C901
+    request, *, skip_discount_check=False, skip_receipt=False, gateway_type=None
 ):
     """
     Generate the checkout payload for the current basket.
@@ -87,16 +119,31 @@ def generate_checkout_payload(  # noqa: PLR0911
     enrollment. The discount in that case is attached to the program, not the
     courserun that's being purchased, so it's technically "invalid".
 
+    This will use the default configured gateway unless it is able to determine that the current user should use a specific gateway. This can be
+    overridden by specifying gateway_type.
+
     Args:
     - request: the incoming http request
     Kwargs:
     - skip_discount_check: skip checking discounts for validity (default False)
     - skip_receipt: skip sending order receipt email (default False)
+    - gateway_type: specify specific gateway type (default None)
     """
 
     from b2b.api import validate_basket_for_b2b_purchase  # noqa: PLC0415
 
     basket = establish_basket(request)
+
+    if not gateway_type:
+        global_id = request.user.global_id
+        if global_id and is_enabled(
+            features.STRIPE_ENABLE_FEATURE_FLAG,
+            default=False,
+            opt_unique_id=global_id,
+        ):
+            gateway_type = MITOL_PAYMENT_GATEWAY_STRIPE
+        else:
+            gateway_type = ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
     if basket.has_user_blocked_products(request.user):
         return {
@@ -145,7 +192,7 @@ def generate_checkout_payload(  # noqa: PLR0911
             "error": USER_MSG_TYPE_BASKET_EMPTY,
         }
 
-    order = PendingOrder.create_from_basket(basket)
+    order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0
 
     ip = get_client_ip(request)[0]
@@ -188,12 +235,11 @@ def generate_checkout_payload(  # noqa: PLR0911
             "order_id": order.id,
         }
 
-    callback_uri = urljoin(settings.SITE_BASE_URL, reverse("checkout-result-callback"))
     payload = PaymentGateway.start_payment(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        gateway_type,
         gateway_order,
-        callback_uri,
-        callback_uri,
+        get_checkout_success_url(gateway_type),
+        get_checkout_cancel_url(gateway_type),
         merchant_fields=[basket.id],
     )
 
@@ -1111,3 +1157,102 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         raise VerifiedProgramInvalidOrderError
 
     return courserun.enrollments.filter(user=request.user).get()
+
+
+def log_stripe_event(event, *, order: Order | None = None):
+    """Log a Stripe event."""
+
+    return StripeEventLog.objects.create(
+        event_id=event.id, event_data=event.to_dict(for_json=True), related_order=order
+    )
+
+
+def process_stripe_checkout_completed(event):
+    """Process the checkout completed event."""
+
+    checkout_session = event.data.object
+    order_reference_number = checkout_session.client_reference_id
+    session_id = checkout_session.id
+
+    log.debug(
+        "process_stripe_checkout_completed: processing event %s for checkout session %s (order %s)",
+        event.id,
+        session_id,
+        order_reference_number,
+    )
+
+    # Repeating this here as a reminder: if the order includes a grace/trial
+    # period, the payment_status will still be "paid".
+
+    if (
+        checkout_session.status != STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+        or checkout_session.payment_status not in STRIPE_PAYMENT_STATUSES_GOOD
+    ):
+        log.error(
+            "process_stripe_checkout_completed: session %s for order %s ended unsuccessfully: %s - %s",
+            session_id,
+            order_reference_number,
+            checkout_session.status,
+            checkout_session.payment_status,
+        )
+
+        if order_reference_number:
+            order = Order.objects.filter(
+                reference_number=order_reference_number
+            ).first()
+
+            if order:
+                StripeEventLog.objects.filter(event_id=event.id).update(
+                    related_order=order
+                )
+                order.get_object_flow().errored(
+                    api_response_data=event.to_dict(for_json=True)
+                )
+                order.refresh_from_db()
+                return order
+
+        return False
+
+    order = Order.objects.filter(reference_number=order_reference_number).get()
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
+    basket = Basket.objects.filter(user=order.purchaser).first()
+
+    fulfill_completed_order(order, event.to_dict(for_json=True), basket)
+
+    order.refresh_from_db()
+    return order
+
+
+def process_stripe_checkout_expired(event):
+    """
+    Process the checkout expired event.
+
+    Checkout sessions last for a finite amount of time; if the user doesn't
+    complete checkout in enough time, it will expire and we'll need to cancel
+    the order.
+    """
+
+    checkout_session = event.data.object
+    order_reference_number = checkout_session.client_reference_id
+    session_id = checkout_session.id
+
+    log.debug(
+        "process_stripe_checkout_expired: processing event %s for checkout session %s (order %s)",
+        event.id,
+        session_id,
+        order_reference_number,
+    )
+    log.warning(
+        "process_stripe_checkout_expired: checkout session %s for order %s expired - cancelling the in-flight order",
+        session_id,
+        order_reference_number,
+    )
+
+    order = Order.objects.filter(reference_number=order_reference_number).get()
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
+    order.get_object_flow().cancel(api_response_data=event.to_dict(for_json=True))
+
+    order.refresh_from_db()
+    return order

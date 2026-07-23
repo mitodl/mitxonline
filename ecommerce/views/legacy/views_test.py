@@ -538,6 +538,40 @@ def test_start_checkout_with_discounts_and_b2b(
 
 
 @pytest.mark.skip_nplusone_check
+def test_start_checkout_with_stripe(mocker, user, user_client, fake):
+    """Make sure we get the right result out of the interstitial for Stripe payments."""
+
+    class FakePayload:
+        """A fake Stripe payload, so the interstitial page doesn't fail."""
+
+        id = "test1234"
+        client_reference_id = "mitxonline-test-12345"
+
+    def patched_generate_checkout_payload(request, **kwargs):
+        """Return a GET payload to test the redirect."""
+
+        return {
+            "url": fake.url(),
+            "payload": FakePayload(),
+            "method": "GET",
+        }
+
+    mocker.patch(
+        "ecommerce.api.generate_checkout_payload",
+        side_effect=patched_generate_checkout_payload,
+    )
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    create_basket(user, [product])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+
+
+@pytest.mark.skip_nplusone_check
 @pytest.mark.parametrize(
     "decision, expected_redirect_url, expected_state, basket_exists",  # noqa: PT006
     [

@@ -152,6 +152,7 @@ jobs:
           OPENEDX_API_CLIENT_ID: fake_client_id
           OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
           SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
+          MITOL_PAYMENT_GATEWAY_STRIPE_API_KEY: skc_test_123456  # pragma: allowlist secret
 
       - name: Tests
         run: |

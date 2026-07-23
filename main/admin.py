@@ -87,7 +87,7 @@ class DisplayOnlyAdminMixin:
         return False
 
 
-class ReadOnlyModelAdmin(admin.ModelAdmin):
+class ReadOnlyModelAdmin(admin.ModelAdmin, DisplayOnlyAdminMixin):
     """Read-only admin for models."""
 
     fields: Sequence[str] = []
@@ -100,13 +100,3 @@ class ReadOnlyModelAdmin(admin.ModelAdmin):
             for field in self.model._meta.fields  # noqa: SLF001
         ]
         super().__init__(*args, **kwargs)
-
-    def has_add_permission(self, request):  # noqa: ARG002
-        """Disable create."""
-
-        return False
-
-    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
-        """Disable deletions."""
-
-        return False

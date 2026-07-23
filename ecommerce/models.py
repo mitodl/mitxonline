@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -18,6 +17,10 @@ from django.db.models import TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
@@ -600,8 +603,11 @@ class OrderFlow:
         self.order.save()
 
     @state.transition(source=State.ANY, target=OrderStatus.CANCELED)
-    def cancel(self):
-        """Cancel this order"""
+    def cancel(self, *, api_response_data: dict | None = None):
+        """Cancel this order. Create a transaction if we have data for that."""
+
+        if isinstance(api_response_data, dict):
+            self.create_transaction(api_response_data)
 
     def is_approver(self, user):
         return user.is_staff
@@ -622,15 +628,18 @@ class OrderFlow:
         return self
 
     @state.transition(source=State.ANY, target=OrderStatus.ERRORED)
-    def errored(self):
+    def errored(self, *, api_response_data: dict | None = None):
         """Error this order"""
+
+        if isinstance(api_response_data, dict):
+            self.create_transaction(api_response_data)
 
     @state.transition(
         source=OrderStatus.FULFILLED,
         target=OrderStatus.REFUNDED,
         permission=this.is_approver,
     )
-    def refund(self, *, api_response_data: dict = None, **kwargs):  # noqa: RUF013
+    def refund(self, *, api_response_data: dict | None = None, **kwargs):
         """
         Records the refund, and optionally attempts to unenroll the learner from
         the things they bought.
@@ -668,23 +677,46 @@ class OrderFlow:
         return refund_transaction
 
     def create_transaction(self, payment_data):
-        log = logging.getLogger(__name__)  # noqa: F841
-        transaction_id = payment_data.get("transaction_id")
-        amount = payment_data.get("amount")
-        # There are two use cases:
-        # No payment required - no cybersource involved, so we need to generate UUID as transaction id
-        # Payment STATE_ACCEPTED - there should always be transaction_id in payment data, if not, throw ValidationError
-        if amount == 0 and transaction_id is None:
-            transaction_id = uuid.uuid1()
-        elif transaction_id is None:
-            raise ValidationError(
-                "Failed to record transaction: Missing transaction id from payment API response"  # noqa: EM101
-            )
+        """Create a record of the payment processor transaction."""
+
+        transaction_payload = {
+            "transaction_id": "",
+            "amount": Decimal(0),
+            "data": payment_data,
+        }
+
+        if self.order.total_price_paid == 0:
+            # If the price paid was $0, then we don't necessarily have a payment
+            # processor, so generate the transaction ID.
+            transaction_payload["transaction_id"] = uuid.uuid4()
+        elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_CYBERSOURCE:
+            transaction_payload["transaction_id"] = payment_data.get("transaction_id")
+            transaction_payload["amount"] = payment_data.get("amount", Decimal(0))
+        elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE:
+            # This expects the Event, which has a unique ID.
+            transaction_payload["transaction_id"] = payment_data.get("id")
+            if (
+                payment_data.get("data")
+                and payment_data["data"].get("object")
+                and "amount_total" in payment_data["data"]["object"]
+            ):
+                # Also, Stripe stores amounts as strings and USD amounts specifically
+                # in cents.
+
+                transaction_payload["amount"] = (
+                    Decimal(payment_data["data"]["object"]["amount_total"]) / 100
+                )
+        else:
+            msg = "Failed to record transaction: unable to determine the origin of the passed data"
+            raise ValidationError(msg)
+
+        if not transaction_payload["transaction_id"]:
+            msg = "Failed to record transaction: Missing transaction id from payment API response"
+            raise ValidationError(msg)
 
         self.order.transactions.get_or_create(
-            transaction_id=transaction_id,
-            data=payment_data,
-            amount=self.order.total_price_paid,
+            transaction_id=transaction_payload["transaction_id"],
+            defaults=transaction_payload,
         )
 
     def create_enrollments(self):
@@ -734,6 +766,12 @@ class Order(TimestampedModel):
         max_digits=20,
     )
     reference_number = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    gateway_type = models.CharField(
+        max_length=32,
+        blank=True,
+        default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+        help_text="The payment gateway used for this order. Must match one of the supported payment gateways in ol-django.",
+    )
 
     def get_object_flow(self):
         """Instantiate the flow without default constructor"""
@@ -797,6 +835,7 @@ class PendingOrder(Order):
         products: List[Product],  # noqa: UP006
         user: User,
         discounts: List[Discount] | None = None,  # noqa: UP006
+        gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
     ):
         """
         Returns an existing PendingOrder if one already exists with the same:
@@ -811,6 +850,7 @@ class PendingOrder(Order):
             user (User):  The user expected to be associated with the PendingOrder.
             discounts (List[Discounts]):  A list of Discounts to apply to each Line assocaited
                 with the order.
+            gateway_type (str): The PaymentGateway class for the order.
 
         Returns:
             PendingOrder: the retrieved or created PendingOrder.
@@ -839,6 +879,7 @@ class PendingOrder(Order):
                 lines__product_version__in=product_versions,
                 state=OrderStatus.PENDING,
                 purchaser=user,
+                gateway_type=gateway_type,
             )
         )
         # Previously, multiple PendingOrders could be created for a single user
@@ -856,6 +897,7 @@ class PendingOrder(Order):
                 state=OrderStatus.PENDING,
                 purchaser=user,
                 total_price_paid=0,
+                gateway_type=gateway_type,
             )
 
         # Apply any discounts to the PendingOrder
@@ -890,7 +932,12 @@ class PendingOrder(Order):
         return order
 
     @classmethod
-    def create_from_basket(cls, basket: Basket):
+    def create_from_basket(
+        cls,
+        basket: Basket,
+        *,
+        gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+    ):
         """
         Creates a new pending order from a basket
 
@@ -905,12 +952,17 @@ class PendingOrder(Order):
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
         ]
-        order = cls._get_or_create(cls, products, basket.user, discounts)
+        order = cls._get_or_create(cls, products, basket.user, discounts, gateway_type)
         return order  # noqa: RET504
 
     @classmethod
     def create_from_product(
-        cls, product: Product, user: User, discount: Discount | None = None
+        cls,
+        product: Product,
+        user: User,
+        discount: Discount | None = None,
+        *,
+        gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
     ):
         """
         Creates a new pending order from a product
@@ -924,7 +976,7 @@ class PendingOrder(Order):
             PendingOrder: the created pending order
         """
 
-        order = cls._get_or_create(cls, [product], user, [discount])
+        order = cls._get_or_create(cls, [product], user, [discount], gateway_type)
 
         return order  # noqa: RET504
 
@@ -1202,3 +1254,30 @@ class DiscountRedemption(TimestampedModel):
 
     def __str__(self):
         return f"{self.redemption_date}: {self.redeemed_discount}, {self.redeemed_by}"
+
+
+class StripeEventLog(TimestampedModel):
+    """Logs the events that are received by Stripe."""
+
+    event_id = models.CharField(max_length=255)
+    event_type = models.CharField(max_length=255, default="invalid.event")
+    event_data = models.JSONField()
+    related_order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
+
+    def __str__(self):
+        """Return a useful string representation."""
+
+        event_type = self.event_data.get("type", "Invalid Event")
+
+        return f"Event {self.event_id} type {event_type} received {self.created_on}"
+
+    def save(self, **kwargs):
+        """Only allow future saves to adjust the related_order field."""
+
+        if self.pk:
+            kwargs["update_fields"] = ["related_order"]
+        elif not self.event_type or self.event_type == "invalid.event":
+            # Extract event_type
+            self.event_type = self.event_data.get("type", "invalid.event")
+
+        super().save(**kwargs)
