@@ -10,3 +10,4 @@ ENABLE_GOOGLE_ANALYTICS_DATA_PUSH = "mitxonline-4099-dedp-google-analytics"
 REDIRECT_LEARN_DASHBOARD = "redirect-to-learn-dashboard"
 
 STRIPE_ENABLE_FEATURE_FLAG = "mitxonline-enable-stripe-payments"
+EXPORT_COMPLIANCE_CHECK_ENABLED = "EXPORT_COMPLIANCE_CHECK_ENABLED"
