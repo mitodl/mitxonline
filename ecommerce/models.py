@@ -1259,18 +1259,24 @@ class StripeEventLog(TimestampedModel):
     """Logs the events that are received by Stripe."""
 
     event_id = models.CharField(max_length=255)
+    event_type = models.CharField(max_length=255, default="invalid.event")
     event_data = models.JSONField()
     related_order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
 
     def __str__(self):
         """Return a useful string representation."""
 
-        return f"Event {self.event_id} type {self.event_data.type} received {self.created_on}"
+        event_type = self.event_data.get("type", "Invalid Event")
+
+        return f"Event {self.event_id} type {event_type} received {self.created_on}"
 
     def save(self, **kwargs):
         """Only allow future saves to adjust the related_order field."""
 
         if self.pk:
             kwargs["update_fields"] = ["related_order"]
+        elif not self.event_type:
+            # Extract event_type
+            self.event_type = self.event_data.get("type", "invalid.event")
 
         super().save(**kwargs)
