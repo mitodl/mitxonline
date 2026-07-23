@@ -25,8 +25,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from b2b.models import ContractPage
+from compliance.exceptions import ExportComplianceCheckError
 from courses.api import create_program_enrollments, deactivate_run_enrollment
 from courses.constants import COURSE_KEY_PATTERN, ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.exceptions import EnrollmentError
 from courses.models import (
     Course,
     CourseRunEnrollment,
@@ -235,9 +237,20 @@ class UserProgramEnrollmentsViewSet(
             return Response(response_serializer.data, status=status.HTTP_200_OK)
 
         # Create the enrollment using default enrollment mode (audit)
-        enrollments = create_program_enrollments(request.user, [program])
+        try:
+            enrollments = create_program_enrollments(request.user, [program])
+        except ExportComplianceCheckError as exc:
+            # Don't propagate the specifics of the compliance decision to the
+            # client - the underlying cause is logged where it's raised.
+            raise EnrollmentError from exc
+
         if not enrollments:
-            raise ValueError("Failed to create program enrollment.")  # noqa: EM101
+            log.error(
+                "create_program_enrollments returned no enrollments for user=%s program=%s",
+                request.user.id,
+                program.id,
+            )
+            raise EnrollmentError
         response_serializer = ProgramEnrollmentSerializer(enrollments[0])
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 

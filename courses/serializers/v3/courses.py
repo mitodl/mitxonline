@@ -9,8 +9,10 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
+from compliance.exceptions import ExportComplianceCheckError
 from courses import models
 from courses.api import create_run_enrollments
+from courses.exceptions import EnrollmentError
 from courses.serializers.v1.base import (
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
@@ -113,16 +115,26 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         if run is None or run.b2b_contract_id is not None:
             raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
 
-        successful_enrollments, _ = create_run_enrollments(
-            user,
-            [run],
-            keep_failed_enrollments=settings.FEATURES.get(
-                features.IGNORE_EDX_FAILURES, False
-            ),
-        )
+        try:
+            successful_enrollments, _ = create_run_enrollments(
+                user,
+                [run],
+                keep_failed_enrollments=settings.FEATURES.get(
+                    features.IGNORE_EDX_FAILURES, False
+                ),
+            )
+        except ExportComplianceCheckError as exc:
+            # Don't propagate the specifics of the compliance decision to the
+            # client - the underlying cause is logged where it's raised.
+            raise EnrollmentError from exc
+
         if not successful_enrollments:
-            msg = "Unable to create course run enrollment"
-            raise ValueError(msg)
+            log.error(
+                "create_run_enrollments returned no enrollments for user=%s run=%s",
+                user.id,
+                run.id,
+            )
+            raise EnrollmentError
 
         return successful_enrollments[0]
 
