@@ -1567,5 +1567,5 @@ MIT_LEARN_ATTACH_URL = get_string(
     description="The URL to use for generating contract attachment URLs for B2B.",
 )
 
-if not ECOMMERCE_DEFAULT_PAYMENT_GATEWAY:  # noqa: F405
+if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
     ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE
