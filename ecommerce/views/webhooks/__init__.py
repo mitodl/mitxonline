@@ -17,6 +17,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ecommerce.exceptions import PaymentGatewayError
 from ecommerce.models import Order
 from main.plugin_manager import get_plugin_manager
 
@@ -42,11 +43,15 @@ class StripeWebhookView(APIView):
         have to do it again later.
         """
 
-        stripe_event = api.PaymentGateway.validate_processor_response(
+        self.event = api.PaymentGateway.validate_processor_response(
             constants.MITOL_PAYMENT_GATEWAY_STRIPE,
             request,
         )
-        self.event = stripe_event
+
+        if not self.event:
+            msg = "StripeWebhookView: did not get an event and did not trigger a more specific error"
+            raise PaymentGatewayError(msg)
+
         return True
 
     def post(self, request, *args, **kwargs):  # noqa: ARG002
