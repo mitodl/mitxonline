@@ -919,7 +919,7 @@ class CheckoutCallbackView(View):
 
             return (
                 _learn_dashboard_redirect(order)
-                if _should_redirect_to_learn(order)
+                if order and _should_redirect_to_learn(order)
                 else HttpResponseRedirect(reverse("user-dashboard"))
             )
 
