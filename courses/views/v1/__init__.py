@@ -28,6 +28,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from reversion.models import Version
 
+from compliance.exceptions import ExportComplianceCheckError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -368,13 +369,21 @@ class CreateEnrollmentView(APIView):
             create_user(user)
             user.refresh_from_db()
 
-        _, edx_request_success = create_run_enrollments(
-            user=user,
-            runs=[run],
-            keep_failed_enrollments=settings.FEATURES.get(
-                features.IGNORE_EDX_FAILURES, False
-            ),
-        )
+        try:
+            _, edx_request_success = create_run_enrollments(
+                user=user,
+                runs=[run],
+                keep_failed_enrollments=settings.FEATURES.get(
+                    features.IGNORE_EDX_FAILURES, False
+                ),
+            )
+        except ExportComplianceCheckError:
+            # Don't propagate the specifics of the compliance decision to the
+            # client - the underlying cause is logged where it's raised.
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
 
         def respond(data, status=True):  # noqa: FBT002
             """
