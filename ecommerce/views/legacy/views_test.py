@@ -1320,9 +1320,7 @@ def test_checkout_result_callback_verification_failure(mocker):
     )
     order = mocker.Mock(reference_number="ref-123")
 
-    response = CheckoutCallbackView().post_checkout_redirect(
-        "unknown-state", order, RequestFactory().post("/checkout/callback")
-    )
+    response = CheckoutCallbackView().post_checkout_redirect("unknown-state", order)
 
     assert response.status_code == 302
     assert response.url == reverse("user-dashboard")

@@ -804,14 +804,13 @@ class CheckoutCallbackView(View):
     def __init__(self, *args, **kwargs):  # noqa: ARG002
         self.logger = logging.getLogger(__name__)
 
-    def post_checkout_redirect(self, order_state, order, request):
+    def post_checkout_redirect(self, order_state, order):
         """
         Redirect the user with a message depending on the provided state.
 
         Args:
             - order_state (str): the order state to consider
             - order (Order): the order itself
-            - request (HttpRequest): the request
 
         Returns: HttpResponse
         """
@@ -892,11 +891,9 @@ class CheckoutCallbackView(View):
                     request, order
                 )
 
-                return self.post_checkout_redirect(
-                    processed_order_state, order, request
-                )
+                return self.post_checkout_redirect(processed_order_state, order)
             else:
-                return self.post_checkout_redirect(order.state, order, request)
+                return self.post_checkout_redirect(order.state, order)
 
 
 # Add a serializer for the cybersource payment response
