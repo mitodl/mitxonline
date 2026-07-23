@@ -17,6 +17,18 @@ from users.models import ChangeEmailRequest
 from variants.serializers import SupportedVariantSerializer
 
 
+def expected_legal_address(user):
+    """Return the serialized legal address shape for a user."""
+    return {
+        "country": user.legal_address.country,
+        "street_address_1": user.legal_address.street_address_1,
+        "street_address_2": user.legal_address.street_address_2,
+        "city": user.legal_address.city,
+        "state": user.legal_address.state,
+        "postal_code": user.legal_address.postal_code,
+    }
+
+
 @pytest.mark.django_db
 def test_cannot_create_user(client):
     """Verify the api to create a user is nonexistent"""
@@ -118,10 +130,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, has_orgs):
             "email": user.email,
             "name": user.name,
             "global_id": user.global_id,
-            "legal_address": {
-                "country": user.legal_address.country,
-                "state": user.legal_address.state,
-            },
+            "legal_address": expected_legal_address(user),
             "user_profile": {
                 "gender": user.user_profile.gender,
                 "year_of_birth": user.user_profile.year_of_birth,
@@ -268,10 +277,7 @@ def test_get_userinfo(client, user, is_anonymous, has_openedx_user, has_edx_user
             "email": user.email,
             "name": user.name,
             "global_id": user.global_id,
-            "legal_address": {
-                "country": user.legal_address.country,
-                "state": user.legal_address.state,
-            },
+            "legal_address": expected_legal_address(user),
             "user_profile": {
                 "gender": user.user_profile.gender,
                 "year_of_birth": user.user_profile.year_of_birth,

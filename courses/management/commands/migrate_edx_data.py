@@ -298,7 +298,17 @@ class Command(BaseCommand):
             if not user_data:
                 continue
             country = user_data.get("user_address_country") or ""
-            legal_addresses.append(LegalAddress(user=user, country=country))
+            legal_addresses.append(
+                LegalAddress(
+                    user=user,
+                    country=country,
+                    state=user_data.get("user_address_state") or None,
+                    postal_code=user_data.get("user_address_postal_code") or "",
+                    street_address_1=user_data.get("user_address_street_1") or "",
+                    street_address_2=user_data.get("user_address_street_2") or "",
+                    city=user_data.get("user_address_city") or "",
+                )
+            )
         if legal_addresses:
             LegalAddress.objects.bulk_create(
                 legal_addresses, batch_size=batch_size, ignore_conflicts=True
