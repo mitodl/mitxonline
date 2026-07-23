@@ -861,6 +861,7 @@ class TestUpgradeAuditRunEnrollmentsForProgramPurchase:
         verified_enrollment.refresh_from_db()
         assert verified_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
+
 def test_create_run_enrollments_verifies_exports_for_verified_mode(
     mocker, user, django_capture_on_commit_callbacks
 ):
