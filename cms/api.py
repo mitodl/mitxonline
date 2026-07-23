@@ -23,9 +23,9 @@ from wagtail.models import Site
 from wagtail.rich_text import RichText
 
 from cms import models as cms_models
+from cms import utils as cms_utils
 from cms.constants import (
     CERTIFICATE_INDEX_SLUG,
-    FEATURED_ITEMS_CACHE_KEY,
     INSTRUCTOR_INDEX_SLUG,
 )
 from cms.exceptions import WagtailSpecificPageError
@@ -549,7 +549,9 @@ def create_featured_items():
 
     # Store only course IDs to avoid pickling issues and ensure fresh data on retrieval
     # Use timeout=None so the cache never auto-expires; stale data is better than no data.
-    redis_cache.set(FEATURED_ITEMS_CACHE_KEY, all_course_ids, timeout=None)
+    redis_cache.set(
+        cms_utils.get_featured_items_cache_key(), all_course_ids, timeout=None
+    )
 
     return list(
         Course.objects.filter(id__in=all_course_ids)
