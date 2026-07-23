@@ -1390,11 +1390,6 @@ HUBSPOT_PORTAL_ID = get_string(
     description="Hubspot Portal ID",
 )
 
-UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = get_string(
-    name="UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN",
-    default=None,
-    description="Hubspot private token for UAI/Learn account",
-)
 UAI_HUBSPOT_PIPELINE_ID = get_string(
     name="UAI_HUBSPOT_PIPELINE_ID",
     default="75e28846-ad0d-4be2-a027-5e1da6590b98",

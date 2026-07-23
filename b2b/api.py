@@ -36,7 +36,6 @@ from b2b.tasks import queue_contract_sheet_update_post_save, queue_enrollment_co
 from cms.api import get_home_page
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES, UAI_COURSEWARE_ID_PREFIX
 from courses.models import Course, CourseRun, Department, EnrollmentMode, Program
-from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     PAYMENT_TYPE_SALES,
@@ -1247,15 +1246,7 @@ def _prepare_basket_for_b2b_enrollment(request, product: Product) -> Basket:
     item.save()
 
     # Sync with HubSpot for CourseRun
-    sync_hubspot_cart_add(
-        request.user,
-        product,
-        is_uai=(
-            is_product_courserun(product)
-            and is_uai_course_run(product.purchasable_object)
-        )
-        or (is_product_program(product) and is_uai_program(product.purchasable_object)),
-    )
+    sync_hubspot_cart_add(request.user, product)
 
     return basket
 

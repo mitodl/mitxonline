@@ -2686,9 +2686,7 @@ def test_deactivate_run_enrollment_removes_paid_course_run(mocker):
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_line_by_line_id")
 
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
-    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
     mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
-    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
 
     enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
     fulfilled_order = OrderFactory.create(
@@ -2733,9 +2731,7 @@ def test_b2b_re_enrollment_after_multiple_unenrollments(mocker, user):
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
     mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
-    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
     mocker.patch("hubspot_sync.api.get_hubspot_id_for_object")
-    mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
 
     org_index = OrganizationIndexPageFactory.create()
     org = OrganizationPageFactory.create(parent=org_index)
