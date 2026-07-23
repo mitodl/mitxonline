@@ -1017,4 +1017,4 @@ def get_order_status(request, order_id: str):
     except Order.DoesNotExist:
         return Response({"state": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    return Response(OrderStatusSerializer().data)
+    return Response(OrderStatusSerializer(order).data)
