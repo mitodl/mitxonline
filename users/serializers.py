@@ -99,9 +99,17 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     # NOTE: the model defines these as allowing empty values for backwards compatibility
     #       so we override them here to require them for new writes
     country = serializers.CharField(max_length=2)
+    street_address_1 = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
+    street_address_2 = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
+    city = serializers.CharField(max_length=255, required=False, allow_blank=True)
     state = serializers.CharField(
         max_length=10, required=False, allow_blank=True, allow_null=True
     )
+    postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
     def validate(self, data):
         """Validate the legal address data"""
@@ -131,7 +139,11 @@ class LegalAddressSerializer(serializers.ModelSerializer):
         model = LegalAddress
         fields = (
             "country",
+            "street_address_1",
+            "street_address_2",
+            "city",
             "state",
+            "postal_code",
         )
 
 

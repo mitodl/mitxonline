@@ -98,6 +98,7 @@ def valid_address_dict():
     return dict(  # noqa: C408
         country="US",
         state="US-MA",
+        postal_code="02139",
     )
 
 
@@ -107,6 +108,7 @@ def invalid_address_dict():
     return dict(  # noqa: C408
         country="US",
         state="XX",
+        postal_code="02139",
     )
 
 
@@ -116,6 +118,7 @@ def address_no_state_dict():
     return dict(  # noqa: C408
         country="US",
         state=None,
+        postal_code="02139",
     )
 
 
@@ -126,6 +129,7 @@ def intl_address_dict():
     return dict(  # noqa: C408
         last_name="User",
         country="JP",
+        postal_code="100-0001",
     )
 
 
