@@ -715,7 +715,8 @@ class OrderFlow:
             raise ValidationError(msg)
 
         self.order.transactions.get_or_create(
-            **transaction_payload,
+            transaction_id=transaction_payload["transaction_id"],
+            defaults=transaction_payload,
         )
 
     def create_enrollments(self):
