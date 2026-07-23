@@ -2,6 +2,7 @@
 
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from faker import Faker
@@ -24,6 +25,7 @@ def default_settings(monkeypatch, settings):
 
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = False
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
 
 
 @pytest.fixture(autouse=True)
@@ -49,6 +51,20 @@ def payment_gateway_settings(settings):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET = uuid.uuid4().hex
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT = (
         "apitest.cybersource.com"
+    )
+
+
+@pytest.fixture(autouse=True)
+def mocked_export_compliance(mocker):
+    """Mock export compliance checks in shared enrollment helpers by default."""
+    return mocker.patch(
+        "courses.api.verify_user_with_exports",
+        return_value=SimpleNamespace(
+            accepted=True,
+            decision="ACCEPT",
+            reason_code=100,
+            request_id="test-request-id",
+        ),
     )
 
 
