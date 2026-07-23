@@ -327,6 +327,10 @@ if ZEAL_ENABLE or ENVIRONMENT == "pytest":
 ZEAL_RAISE = False
 ZEAL_ALLOWLIST = []
 
+# use a fast, insecure password hasher under pytest - tests don't need real hashing strength
+if ENVIRONMENT == "pytest":
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
 MITXONLINE_NEW_USER_LOGIN_URL = get_string(
