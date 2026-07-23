@@ -1297,6 +1297,9 @@ def process_stripe_checkout_completed(event):
             ).first()
 
             if order:
+                StripeEventLog.objects.filter(event_id=event.id).update(
+                    related_order=order
+                )
                 order.get_object_flow().errored(
                     api_response_data=event.to_dict(for_json=True)
                 )
@@ -1306,6 +1309,8 @@ def process_stripe_checkout_completed(event):
         return False
 
     order = Order.objects.filter(reference_number=order_reference_number).get()
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
+
     basket = Basket.objects.filter(user=order.purchaser).first()
 
     fulfill_completed_order(order, event.to_dict(for_json=True), basket)
@@ -1340,6 +1345,7 @@ def process_stripe_checkout_expired(event):
     )
 
     order = Order.objects.filter(reference_number=order_reference_number).get()
+    StripeEventLog.objects.filter(event_id=event.id).update(related_order=order)
 
     order.get_object_flow().cancel(api_response_data=event.to_dict(for_json=True))
 

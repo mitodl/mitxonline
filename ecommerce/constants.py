@@ -126,10 +126,12 @@ STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED = "expired"
 STRIPE_CHECKOUT_SESSION_STATUS_OPEN = "open"
 
 CHECKOUT_SUCCESS_ROUTE_MAP = {
+    None: "checkout-result-callback",
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE: "checkout-result-callback",
     MITOL_PAYMENT_GATEWAY_STRIPE: "checkout-result-callback",
 }
 CHECKOUT_CANCEL_ROUTE_MAP = {
+    None: "checkout-result-callback",
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE: "checkout-result-callback",
     MITOL_PAYMENT_GATEWAY_STRIPE: "checkout-result-callback",
 }

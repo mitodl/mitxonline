@@ -9,6 +9,7 @@ exposed via the OpenAPI spec.
 
 import logging
 
+from django.conf import settings
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from mitol.payment_gateway import api, constants
@@ -46,8 +47,6 @@ class StripeWebhookView(APIView):
         have to do it again later.
         """
 
-        log.info("check_permissions running")
-
         try:
             stripe_event = api.PaymentGateway.validate_processor_response(
                 constants.MITOL_PAYMENT_GATEWAY_STRIPE,
@@ -63,7 +62,6 @@ class StripeWebhookView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         self.event = stripe_event
-        log.info("check_permissions got an event %s", stripe_event)
         return True
 
     def post(self, request, *args, **kwargs):  # noqa: ARG002
@@ -81,15 +79,16 @@ class StripeWebhookView(APIView):
         pm = get_plugin_manager()
         results = pm.hook.stripe_event(event=self.event)
 
-        for i, result in enumerate(results):
-            if isinstance(result, Order):
-                log.info(
-                    "StripeWebhookView: step %s: order %s is now %s",
-                    i,
-                    result.id,
-                    result.state,
-                )
-            else:
-                log.debug("StripeWebhookView: step %i: no data returned", i)
+        if settings.DEBUG:
+            for i, result in enumerate(results):
+                if isinstance(result, Order):
+                    log.debug(
+                        "StripeWebhookView: step %s: order %s is now %s",
+                        i,
+                        result.id,
+                        result.state,
+                    )
+                else:
+                    log.debug("StripeWebhookView: step %i: no data returned", i)
 
         return Response(status=status.HTTP_200_OK)
