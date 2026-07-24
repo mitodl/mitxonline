@@ -173,6 +173,4 @@ def test_backfill_counts_each_program_enrollment_once():
     out = io.StringIO()
     call_command(COMMAND, "--commit", stdout=out)
     assert "Created 1 program enrollment(s)." in out.getvalue()
-    assert (
-        ProgramEnrollment.all_objects.filter(user=user, program=program).count() == 1
-    )
+    assert ProgramEnrollment.all_objects.filter(user=user, program=program).count() == 1
