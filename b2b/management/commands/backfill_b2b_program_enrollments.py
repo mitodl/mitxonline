@@ -76,11 +76,12 @@ matches are reported and skipped."""
         already_enrolled = 0
         no_program = 0
         ambiguous = []
-        # A user can be enrolled in several course runs that all belong to the
-        # same program (within the same contract). Those collapse to one program
-        # enrollment, so track the (user, program) pairs we've already accounted
-        # for this run to avoid double-counting - this also keeps the dry-run
-        # count consistent with what a --commit run would actually create.
+        # A user can be enrolled in several course runs that all map to the same
+        # program. ProgramEnrollment is unique on (user, program), so those
+        # collapse to a single enrollment regardless of contract. Track the
+        # (user, program) pairs already accounted for this run to avoid
+        # double-counting - this keeps the dry-run count consistent with what a
+        # --commit run would actually create.
         planned = set()
 
         self.stdout.write(
