@@ -266,6 +266,7 @@ paths:
         name: sso_organization_id
         schema:
           type: string
+          format: uuid
         description: Narrow the result to the single org with this Keycloak organization
           UUID (sso_organization_id). A non-empty response means the caller manages
           that org.

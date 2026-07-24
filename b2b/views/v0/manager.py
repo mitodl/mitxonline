@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
@@ -194,7 +195,7 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
         parameters=[
             OpenApiParameter(
                 name="sso_organization_id",
-                type=str,
+                type=OpenApiTypes.UUID,
                 location=OpenApiParameter.QUERY,
                 required=False,
                 description=(
