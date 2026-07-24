@@ -804,14 +804,13 @@ class CheckoutCallbackView(View):
     def __init__(self, *args, **kwargs):  # noqa: ARG002
         self.logger = logging.getLogger(__name__)
 
-    def post_checkout_redirect(self, order_state, order, request):
+    def post_checkout_redirect(self, order_state, order):
         """
         Redirect the user with a message depending on the provided state.
 
         Args:
             - order_state (str): the order state to consider
             - order (Order): the order itself
-            - request (HttpRequest): the request
 
         Returns: HttpResponse
         """
@@ -839,16 +838,10 @@ class CheckoutCallbackView(View):
                 },
             )
         else:
-            processor_response = PaymentGateway.get_formatted_response(
-                settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
-            )
             self.logger.error(
-                "Checkout callback unknown error for transaction_id %s, state %s, reason_code %s, message %s, and ProcessorResponse %s",
-                processor_response.transaction_id,
+                "Checkout callback unknown error for order %s, state %s",
+                order.reference_number,
                 order_state,
-                processor_response.response_code,
-                processor_response.message,
-                processor_response,
             )
             return redirect_with_user_message(
                 reverse("user-dashboard"),
@@ -898,11 +891,9 @@ class CheckoutCallbackView(View):
                     request, order
                 )
 
-                return self.post_checkout_redirect(
-                    processed_order_state, order, request
-                )
+                return self.post_checkout_redirect(processed_order_state, order)
             else:
-                return self.post_checkout_redirect(order.state, order, request)
+                return self.post_checkout_redirect(order.state, order)
 
 
 # Add a serializer for the cybersource payment response

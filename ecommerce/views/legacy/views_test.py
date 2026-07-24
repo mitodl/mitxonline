@@ -52,6 +52,7 @@ from ecommerce.serializers import (
     DiscountSerializer,
     ProductSerializer,
 )
+from ecommerce.views.legacy import CheckoutCallbackView
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from main import features
@@ -1306,6 +1307,24 @@ def test_checkout_api_result_verification_failure(
 
     # the validation gets checked sooner now, and returns a 401
     assert resp.status_code == 401
+
+
+def test_checkout_result_callback_verification_failure(mocker):
+    """Unknown callback states with invalid signatures should still redirect safely."""
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=False,
+    )
+    get_formatted_response = mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.get_formatted_response"
+    )
+    order = mocker.Mock(reference_number="ref-123")
+
+    response = CheckoutCallbackView().post_checkout_redirect("unknown-state", order)
+
+    assert response.status_code == 302
+    assert response.url == reverse("user-dashboard")
+    get_formatted_response.assert_not_called()
 
 
 @pytest.mark.skip_nplusone_check
