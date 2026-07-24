@@ -262,6 +262,13 @@ paths:
         description: Number of results to return per page.
         schema:
           type: integer
+      - in: query
+        name: sso_organization_id
+        schema:
+          type: string
+        description: Narrow the result to the single org with this Keycloak organization
+          UUID (sso_organization_id). A non-empty response means the caller manages
+          that org.
       tags:
       - b2b
       responses:
@@ -7465,6 +7472,13 @@ components:
           readOnly: true
           description: The name of the page as it will appear in URLs e.g http://domain.com/blog/[my-slug]/
           pattern: ^[-\w]+$
+        sso_organization_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          title: Organization SSO ID
+          description: The UUID for the organization in the SSO provider.
         contracts:
           type: array
           items:
@@ -7477,6 +7491,7 @@ components:
       - logo
       - name
       - slug
+      - sso_organization_id
     Override:
       type: object
       description: Serializer for overrides used in certificate pages.
