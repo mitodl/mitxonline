@@ -145,7 +145,7 @@ class Command(BaseCommand):
             recipient=record.assigned_email or "learner@example.com",
         )
 
-        url = host.rstrip("/") + reverse("v0:mailgun-webhook")
+        url = host.rstrip("/") + reverse("b2b:mailgun-webhook")
         response = requests.post(url, json=payload, timeout=30)
 
         self.stdout.write(f"POST {url} -> {response.status_code}")
