@@ -259,13 +259,13 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
             course = Course.objects.filter(readable_id=relevant_to).first()
             if course:
                 queryset = get_relevant_course_run_qset(
-                    queryset=queryset, course=course
+                    queryset=queryset, course=course, user=self.request.user
                 )
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
                 queryset = (
                     get_user_relevant_program_course_run_qset(
-                        queryset=queryset, program=program
+                        queryset=queryset, program=program, user=self.request.user
                     )
                     if program
                     else CourseRun.objects.none()
