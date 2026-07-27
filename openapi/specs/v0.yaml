@@ -6590,6 +6590,12 @@ components:
         country:
           type: string
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
         street_address_1:
           type: string
           maxLength: 255
@@ -6613,6 +6619,8 @@ components:
       required:
       - country
       - email
+      - first_name
+      - last_name
     Faculty:
       type: object
       description: Serializer for faculty details used in course pages.
@@ -6992,6 +7000,12 @@ components:
         country:
           type: string
           maxLength: 2
+        first_name:
+          type: string
+          maxLength: 60
+        last_name:
+          type: string
+          maxLength: 60
         street_address_1:
           type: string
           maxLength: 255
@@ -7010,6 +7024,8 @@ components:
           maxLength: 20
       required:
       - country
+      - first_name
+      - last_name
     LegalAddressRequest:
       type: object
       description: Serializer for legal address
@@ -7018,6 +7034,14 @@ components:
           type: string
           minLength: 1
           maxLength: 2
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 60
         street_address_1:
           type: string
           maxLength: 255
@@ -7036,6 +7060,8 @@ components:
           maxLength: 20
       required:
       - country
+      - first_name
+      - last_name
     Line:
       type: object
       description: Serializes order lines.

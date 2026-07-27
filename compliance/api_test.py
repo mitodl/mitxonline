@@ -34,7 +34,9 @@ def export_settings(settings):
 
 def test_build_export_payload_uses_user_and_legal_address(export_settings):
     """Payload should include user identifying fields and address values."""
-    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    user = UserFactory.create(name="Ignored Display Name", email="ada@example.com")
+    user.legal_address.first_name = "Ada"
+    user.legal_address.last_name = "Lovelace"
     user.legal_address.country = "US"
     user.legal_address.street_address_1 = "77 Massachusetts Ave"
     user.legal_address.street_address_2 = "Building 1"
@@ -87,7 +89,13 @@ def test_build_export_payload_requires_legal_address(export_settings):
         _build_export_payload(user)
 
     assert "contact support" in str(exc_info.value)
-    assert exc_info.value.missing_fields == ["address1", "country", "locality"]
+    assert exc_info.value.missing_fields == [
+        "address1",
+        "country",
+        "first_name",
+        "last_name",
+        "locality",
+    ]
 
 
 def test_normalize_administrative_area_strips_country_prefix():

@@ -73,19 +73,6 @@ def _get_cybersource_configuration() -> dict[str, str | int]:
     }
 
 
-def _split_user_name(user) -> tuple[str, str]:
-    """Split a user's display name into first/last values."""
-    full_name = (user.name or "").strip()
-    if not full_name:
-        return ("", "")
-
-    name_parts = full_name.split(maxsplit=1)
-    if len(name_parts) == 1:
-        return (name_parts[0], "")
-
-    return (name_parts[0], name_parts[1])
-
-
 def _normalize_administrative_area(
     country: str | None, state: str | None
 ) -> str | None:
@@ -133,14 +120,15 @@ def _build_export_payload(user) -> Any:
         legal_address = user.legal_address
     except ObjectDoesNotExist:
         legal_address = None
-    first_name, last_name = _split_user_name(user)
 
     bill_to = {
-        "first_name": first_name,
-        "last_name": last_name,
         "email": user.email,
     }
 
+    if legal_address and legal_address.first_name:
+        bill_to["first_name"] = legal_address.first_name
+    if legal_address and legal_address.last_name:
+        bill_to["last_name"] = legal_address.last_name
     if legal_address and legal_address.country:
         bill_to["country"] = legal_address.country
     if legal_address and legal_address.street_address_1:

@@ -99,6 +99,8 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     # NOTE: the model defines these as allowing empty values for backwards compatibility
     #       so we override them here to require them for new writes
     country = serializers.CharField(max_length=2)
+    first_name = serializers.CharField(max_length=60)
+    last_name = serializers.CharField(max_length=60)
     street_address_1 = serializers.CharField(
         max_length=255, required=False, allow_blank=True
     )
@@ -139,6 +141,8 @@ class LegalAddressSerializer(serializers.ModelSerializer):
         model = LegalAddress
         fields = (
             "country",
+            "first_name",
+            "last_name",
             "street_address_1",
             "street_address_2",
             "city",

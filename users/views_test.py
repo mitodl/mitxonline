@@ -21,6 +21,8 @@ def expected_legal_address(user):
     """Return the serialized legal address shape for a user."""
     return {
         "country": user.legal_address.country,
+        "first_name": user.legal_address.first_name,
+        "last_name": user.legal_address.last_name,
         "street_address_1": user.legal_address.street_address_1,
         "street_address_2": user.legal_address.street_address_2,
         "city": user.legal_address.city,
