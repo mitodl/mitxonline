@@ -6,8 +6,8 @@ import pytest
 from django.test import override_settings
 
 from hubspot_sync.rate_limiter import (
-    HubSpotRateLimiter,
     _RATE_LIMIT_LUA,
+    HubSpotRateLimiter,
 )
 
 
@@ -54,8 +54,8 @@ class TestHubSpotRateLimiter:
         call_kwargs = mock_script.call_args[1]
         assert call_kwargs["keys"] == ["hubspot:rate_limit"]
         args = call_kwargs["args"]
-        assert args[1] == "1.0"   # window_size_seconds
-        assert args[2] == "19"    # max_requests_per_second
+        assert args[1] == "1.0"  # window_size_seconds
+        assert args[2] == "19"  # max_requests_per_second
 
     @pytest.mark.parametrize("wait_ms_bytes", [b"0.0", b"100.0", b"999.9"])
     @patch("hubspot_sync.rate_limiter.time.sleep")
