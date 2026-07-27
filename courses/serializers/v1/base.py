@@ -41,7 +41,10 @@ class BaseCourseSerializer(BaseSerializer):
         page = instance.course_page
         if page is None:
             return data
-        return {**data, **CoursePageSerializer(instance=page, context=self.context).data}
+        return {
+            **data,
+            **CoursePageSerializer(instance=page, context=self.context).data,
+        }
 
     @staticmethod
     def get_type(obj) -> str:  # noqa: ARG004
