@@ -1,6 +1,7 @@
 """Tests for the certificates serializers."""
 
 import pytest
+from mitol.common.serializers import THIS_IS_NOT_AN_API
 from rest_framework.reverse import reverse
 from rest_framework.test import APIClient
 
@@ -97,7 +98,8 @@ def test_serialize_certificate(is_program, mock_context):
         expected_data["program"] = ProgramSerializer(certificate.program).data
     else:
         expected_data["course_run"] = CourseRunWithCourseSerializer(
-            certificate.course_run
+            certificate.course_run,
+            context={"skip_prefetch_checks": THIS_IS_NOT_AN_API},
         ).data
 
     assert_drf_json_equal(expected_data, serialized_data, ignore_order=True)

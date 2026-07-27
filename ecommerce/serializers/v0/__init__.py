@@ -12,6 +12,7 @@ from rest_framework import serializers
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import models
+from ecommerce.api import get_purchasable_object_prefetch
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -290,7 +291,7 @@ class BasketItemSerializer(serializers.ModelSerializer):
 class BasketSerializer(serializers.ModelSerializer):
     """Basket model serializer"""
 
-    basket_items = BasketItemSerializer()
+    basket_items = BasketItemSerializer(many=True)
 
     class Meta:
         fields = [
@@ -336,7 +337,7 @@ class BasketItemWithProductSerializer(serializers.ModelSerializer):
 class BasketWithProductSerializer(serializers.ModelSerializer):
     """Serializer for Basket model with product details"""
 
-    basket_items = BasketItemWithProductSerializer()
+    basket_items = BasketItemWithProductSerializer(many=True)
     total_price = serializers.SerializerMethodField()
     discounted_price = serializers.SerializerMethodField()
     discounts = serializers.SerializerMethodField()
@@ -411,9 +412,9 @@ class LineSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(ProductSerializer)
     def get_product(self, instance):
-        product = models.Product.all_objects.get(
-            pk=instance.product_version.field_dict["id"]
-        )
+        product = models.Product.all_objects.prefetch_related(
+            get_purchasable_object_prefetch()
+        ).get(pk=instance.product_version.field_dict["id"])
 
         return ProductSerializer(instance=product, context=self.context).data
 

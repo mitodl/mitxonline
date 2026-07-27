@@ -76,6 +76,8 @@ class IngestibleCourseViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = queryset.prefetch_related(
             "departments",
             "in_programs",
+            "page__linked_instructors",
+            "page__linked_instructors__linked_instructor_page",
             course_runs_prefetch,
             dated_runs_prefetch,
         )

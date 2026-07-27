@@ -1224,10 +1224,14 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             List of CoursesTopic
         """
-        if getattr(self, "page", None) is None:
+        page = getattr(self, "page", None)
+        if page is None:
             return []
 
-        return self.page.topics.select_related("parent")
+        if is_prefetched(page, "topics"):
+            return page.topics.all()
+
+        return page.topics.select_related("parent")
 
     @property
     def is_program(self):

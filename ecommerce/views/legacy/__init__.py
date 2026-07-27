@@ -191,7 +191,7 @@ class AllProductViewSet(ModelViewSet):
                 | (Q(description__icontains=name_search))
             )
             .select_related("content_type")
-            .prefetch_related("purchasable_object")
+            .prefetch_related(api.get_purchasable_object_prefetch())
         )
 
 
@@ -249,7 +249,7 @@ class ProductViewSet(ReadOnlyModelViewSet):
                 )
             )
             .select_related("content_type")
-            .prefetch_related("purchasable_object")
+            .prefetch_related(api.get_purchasable_object_prefetch())
         )
 
 
@@ -768,7 +768,16 @@ class CheckoutApiViewSet(ViewSet):
         Returns the current cart, with the product info embedded.
         """
         try:
-            basket = Basket.objects.filter(user=request.user).get()
+            basket = (
+                Basket.objects.filter(user=request.user)
+                .prefetch_related(
+                    "basket_items__product",
+                    api.get_purchasable_object_prefetch(
+                        "basket_items__product__purchasable_object"
+                    ),
+                )
+                .get()
+            )
         except ObjectDoesNotExist:
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 

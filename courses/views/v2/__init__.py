@@ -462,6 +462,7 @@ class CourseViewSet(
             "page__linked_instructors",
             "page__linked_instructors__linked_instructor_page",
             "page__topics",
+            "page__topics__parent",
             "departments",
             "in_programs",
             course_runs_prefetch,

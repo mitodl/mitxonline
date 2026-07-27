@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.db.models import prefetch_related_objects
 from drf_spectacular.utils import (
     extend_schema_field,
     extend_schema_serializer,
@@ -183,7 +184,14 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentWithFlexiblePriceSeri
             ),
         )
 
-        return successful_enrollments[0] if successful_enrollments else None
+        if not successful_enrollments:
+            return None
+
+        prefetch_related_objects(
+            successful_enrollments,
+            "run__course__page__linked_instructors__linked_instructor_page",
+        )
+        return successful_enrollments[0]
 
     class Meta(BaseCourseRunEnrollmentWithFlexiblePriceSerializer.Meta):
         fields = [

@@ -92,6 +92,7 @@ def test_serialize_course(
     course = courseRun1.course
     topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
     course.page.topics.set(topics)
+    course.page.save()
     department = "a course departments"
     course.departments.set([Department.objects.create(name=department)])
     program = ProgramFactory.create(program_type="Series")
