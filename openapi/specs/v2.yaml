@@ -6487,16 +6487,19 @@ components:
       enum:
       - delivered
       - accepted
-      - rejected
+      - opened
+      - clicked
       type: string
       description: |-
         * `delivered` - delivered
         * `accepted` - accepted
-        * `rejected` - rejected
+        * `opened` - opened
+        * `clicked` - clicked
       x-enum-descriptions:
       - delivered
       - accepted
-      - rejected
+      - opened
+      - clicked
     EnrollmentMode:
       type: object
       description: Enrollment mode serializer.
