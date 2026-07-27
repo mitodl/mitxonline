@@ -18,11 +18,16 @@ from django.db.models import TextChoices
 from django.utils.functional import cached_property
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
+from mitol.common.utils.queryset import is_prefetched
 from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
 
-from courses.models import CourseRun, PaidCourseRun, Program
+from courses.models import (
+    CourseRun,
+    PaidCourseRun,
+    Program,
+)
 from courses.utils import is_contract_order, is_uai_order
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -218,11 +223,14 @@ class BasketItem(TimestampedModel):
         """Return the price of the product with discounts"""
         from ecommerce.discounts import DiscountType  # noqa: PLC0415
 
+        discount_redemptions = (
+            self.basket.discounts.all()
+            if is_prefetched(self.basket, "discounts")
+            else self.basket.discounts.prefetch_related("redeemed_discount").all()
+        )
         discounts = [
             discount_redemption.redeemed_discount
-            for discount_redemption in self.basket.discounts.prefetch_related(
-                "redeemed_discount"
-            ).all()
+            for discount_redemption in discount_redemptions
         ]
 
         return (

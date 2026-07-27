@@ -9,6 +9,7 @@ import reversion
 from django.forms.models import model_to_dict
 from django.test import Client, RequestFactory
 from django.urls import reverse
+from mitol.common.serializers import THIS_IS_NOT_AN_API
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import PaymentGateway
 from rest_framework import status
@@ -105,7 +106,12 @@ def test_list_products(user_drf_client, products):
     assert len(resp_products) == len(products)
 
     for product, resp_product in zip(products, resp_products):
-        assert_drf_json_equal(resp_product, ProductSerializer(product).data)
+        assert_drf_json_equal(
+            resp_product,
+            ProductSerializer(
+                product, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
+            ).data,
+        )
 
 
 def test_get_products(user_drf_client, products):
@@ -115,7 +121,12 @@ def test_get_products(user_drf_client, products):
         reverse("products_api-detail", kwargs={"pk": product.id})
     )
 
-    assert_drf_json_equal(resp.json(), ProductSerializer(product).data)
+    assert_drf_json_equal(
+        resp.json(),
+        ProductSerializer(
+            product, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
+        ).data,
+    )
 
 
 def test_get_products_inactive(user_drf_client, products):
@@ -860,7 +871,12 @@ def test_checkout_product_cart(  # noqa: PLR0913
     if cart_empty:
         assert resp.data == expected_message
     else:
-        assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
+        assert_drf_json_equal(
+            resp.json(),
+            BasketWithProductSerializer(
+                basket, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
+            ).data,
+        )
 
 
 def test_checkout_cart_with_program_product(user, user_drf_client):

@@ -11,9 +11,10 @@ from urllib.parse import quote
 import pytest
 import reversion
 from anys import ANY_STR
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.test import Client, RequestFactory
 from django.urls import reverse
+from mitol.common.serializers import THIS_IS_NOT_AN_API
 from mitol.common.utils import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
@@ -39,7 +40,6 @@ from courses.factories import (
 )
 from courses.models import (
     Course,
-    CourseRun,
     CourseRunEnrollment,
     LearnerProgramRecordShare,
     PaidProgram,
@@ -341,7 +341,12 @@ def test_get_course_runs(user_drf_client, course_runs, django_assert_max_num_que
     # Force sorting by run id since this test has been flaky
     course_runs_data = sorted(course_runs_data, key=op.itemgetter("id"))
     for course_run, course_run_data in zip(course_runs, course_runs_data):
-        assert course_run_data == CourseRunWithCourseSerializer(course_run).data
+        assert (
+            course_run_data
+            == CourseRunWithCourseSerializer(
+                course_run, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
+            ).data
+        )
 
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
@@ -355,20 +360,6 @@ def test_get_course_runs_relevant(  # noqa: PLR0913
 ):
     """A GET request for course runs with a `relevant_to` parameter should return user-relevant course runs"""
     course_run = course_runs[0]
-    user_enrollments = Count(
-        "enrollments",
-        filter=Q(
-            enrollments__user=user,
-            enrollments__active=True,
-            enrollments__edx_enrolled=True,
-        ),
-    )
-    patched_run_qset = mocker.patch(
-        "courses.views.v1.get_relevant_course_run_qset",
-        return_value=CourseRun.objects.filter(id=course_run.id)
-        .annotate(user_enrollments=user_enrollments)
-        .order_by("-user_enrollments", "enrollment_start"),
-    )
 
     if is_enrolled:
         CourseRunEnrollmentFactory.create(user=user, run=course_run, edx_enrolled=True)
@@ -378,7 +369,6 @@ def test_get_course_runs_relevant(  # noqa: PLR0913
             f"{reverse('v1:course_runs_api-list')}?relevant_to={quote(course_run.course.readable_id)}"
         )
     duplicate_queries_check(context)
-    patched_run_qset.assert_called_once_with(course_run.course)
     course_run_data = resp.json()[0]
 
     assert course_run_data["is_enrolled"] == is_enrolled
@@ -406,7 +396,12 @@ def test_get_course_run(user_drf_client, course_runs, django_assert_max_num_quer
         )
     duplicate_queries_check(context)
     course_run_data = resp.json()
-    assert course_run_data == CourseRunWithCourseSerializer(course_run).data
+    assert (
+        course_run_data
+        == CourseRunWithCourseSerializer(
+            course_run, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
+        ).data
+    )
 
 
 def test_create_course_run(user_drf_client, course_runs, django_assert_max_num_queries):
@@ -459,7 +454,11 @@ def test_user_enrollments_list(user_drf_client, user):
         resp.json(),
         [
             CourseRunEnrollmentSerializer(
-                user_run_enrollment, context={"include_page_fields": True}
+                user_run_enrollment,
+                context={
+                    "include_page_fields": True,
+                    "skip_prefetch_checks": THIS_IS_NOT_AN_API,
+                },
             ).data
         ],
     )
@@ -859,7 +858,12 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                         "departments": [],
                         "next_run_id": getattr(course.first_unexpired_run, "id", None),
                         "current_price": None,
-                        "page": dict(CoursePageSerializer(course.page).data),
+                        "page": dict(
+                            CoursePageSerializer(
+                                course.page,
+                                context={"skip_prefetch_checks": THIS_IS_NOT_AN_API},
+                            ).data
+                        ),
                         "page_url": None,
                         "programs": None,
                         "live": course.live,
@@ -893,7 +897,12 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                     "grades": [],
                     "id": run_enrollment.id,
                     "enrollment_mode": run_enrollment.enrollment_mode,
-                    "run": dict(CourseRunWithCourseSerializer(run_enrollment.run).data),
+                    "run": dict(
+                        CourseRunWithCourseSerializer(
+                            run_enrollment.run,
+                            context={"skip_prefetch_checks": THIS_IS_NOT_AN_API},
+                        ).data
+                    ),
                 }
                 for run_enrollment in run_enrollments_by_program_id[
                     program_enrollment.program_id

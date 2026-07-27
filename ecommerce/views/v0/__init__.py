@@ -8,7 +8,7 @@ import django_filters
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Count, Q
+from django.db.models import Count, Q, prefetch_related_objects
 from django.http import Http404
 from django.shortcuts import redirect
 from django.views import View
@@ -48,6 +48,7 @@ from ecommerce.api import (
     generate_checkout_payload,
     generate_discount_code,
     get_auto_apply_discounts_for_basket,
+    get_purchasable_object_prefetch,
 )
 from ecommerce.exceptions import ProductBlockedError
 from ecommerce.models import (
@@ -146,7 +147,13 @@ class BasketViewSet(ReadOnlyModelViewSet):
         if getattr(self, "swagger_fake_view", False):
             return Basket.objects.none()
 
-        return Basket.objects.filter(user=self.request.user).all()
+        return Basket.objects.filter(user=self.request.user).prefetch_related(
+            "basket_items__product",
+            get_purchasable_object_prefetch(
+                "basket_items__product__purchasable_object"
+            ),
+            "discounts__redeemed_discount",
+        )
 
 
 @extend_schema(
@@ -275,10 +282,14 @@ def _create_basket_from_product(
         except Discount.DoesNotExist:
             pass
 
-    basket.refresh_from_db()
-
     if checkout:
         return redirect("checkout_interstitial_page")
+
+    basket = Basket.objects.prefetch_related(
+        "basket_items__product",
+        get_purchasable_object_prefetch("basket_items__product__purchasable_object"),
+        "discounts__redeemed_discount",
+    ).get(id=basket.id)
 
     return Response(
         BasketWithProductSerializer(basket).data,
@@ -427,6 +438,13 @@ def create_basket_with_products(request):
     if checkout:
         return redirect("checkout_interstitial_page")
 
+    prefetch_related_objects(
+        [basket],
+        "basket_items__product",
+        get_purchasable_object_prefetch("basket_items__product__purchasable_object"),
+        "discounts__redeemed_discount",
+    )
+
     return Response(
         BasketWithProductSerializer(basket).data,
         status=status.HTTP_200_OK,
@@ -533,7 +551,7 @@ class AllProductViewSet(ModelViewSet):
                 | (Q(description__icontains=name_search))
             )
             .select_related("content_type")
-            .prefetch_related("purchasable_object")
+            .prefetch_related(get_purchasable_object_prefetch())
         )
 
 
@@ -595,7 +613,7 @@ class ProductViewSet(ReadOnlyModelViewSet):
                 )
             )
             .select_related("content_type")
-            .prefetch_related("purchasable_object")
+            .prefetch_related(get_purchasable_object_prefetch())
         )
 
     @extend_schema(

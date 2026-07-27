@@ -12,6 +12,7 @@ import pytest
 import reversion
 from django.forms.models import model_to_dict
 from django.urls import reverse
+from mitol.common.serializers import THIS_IS_NOT_AN_API
 from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
 
@@ -138,7 +139,12 @@ def test_list_products(user_drf_client, products):
     assert len(resp_products) == len(products)
 
     for product, resp_product in zip(products, resp_products):
-        assert_drf_json_equal(resp_product, ProductSerializer(product).data)
+        assert_drf_json_equal(
+            resp_product,
+            ProductSerializer(
+                product, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
+            ).data,
+        )
 
 
 def test_get_products(user_drf_client, products):
@@ -149,7 +155,12 @@ def test_get_products(user_drf_client, products):
         reverse("v0:products_api-detail", kwargs={"pk": product.id})
     )
 
-    assert_drf_json_equal(resp.json(), ProductSerializer(product).data)
+    assert_drf_json_equal(
+        resp.json(),
+        ProductSerializer(
+            product, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
+        ).data,
+    )
 
 
 def test_get_products_inactive(user_drf_client, products):
@@ -256,7 +267,12 @@ def test_get_basket(user_drf_client, user):
     basket = BasketFactory.create(user=user)
     BasketItemFactory.create(basket=basket)
     resp = user_drf_client.get(reverse("v0:baskets_api-detail", args=[basket.id]))
-    assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
+    assert_drf_json_equal(
+        resp.json(),
+        BasketWithProductSerializer(
+            basket, context={"skip_prefetch_checks": THIS_IS_NOT_AN_API}
+        ).data,
+    )
 
 
 def test_get_basket_items(user_drf_client, user):

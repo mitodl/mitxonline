@@ -7,9 +7,10 @@ from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.prefetch import GenericPrefetch
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Prefetch, Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
@@ -21,8 +22,10 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
+from cms.models import CoursePage
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+from courses.models import CourseRun, Program, ProgramRun
 from courses.utils import is_uai_course_run
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
@@ -75,6 +78,40 @@ from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED
 from openedx.tasks import create_user_from_id
 
 log = logging.getLogger(__name__)
+
+
+def get_purchasable_object_prefetch(
+    lookup: str = "purchasable_object",
+) -> GenericPrefetch:
+    """
+    Build a GenericPrefetch for Product.purchasable_object (CourseRun, Program, or
+    ProgramRun) that prefetches everything the purchasable object serializers need,
+    so CoursePageSerializer's required "linked_instructors" prefetch is always
+    satisfied and course run/course page data doesn't N+1.
+
+    Args:
+        lookup: the field path to the purchasable object, e.g. "purchasable_object"
+            or "basket_items__product__purchasable_object".
+    """
+    course_page_prefetch = Prefetch(
+        "course__page",
+        queryset=CoursePage.objects.select_related("feature_image").prefetch_related(
+            "topics",
+            "topics__parent",
+            "linked_instructors",
+            "linked_instructors__linked_instructor_page",
+        ),
+    )
+    return GenericPrefetch(
+        lookup,
+        [
+            CourseRun.objects.select_related("course").prefetch_related(
+                course_page_prefetch, "course__courseruns"
+            ),
+            Program.objects.all(),
+            ProgramRun.objects.select_related("program"),
+        ],
+    )
 
 
 def generate_checkout_payload(  # noqa: PLR0911
@@ -1110,4 +1147,11 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         # It didn't just clear the order so something went wrong
         raise VerifiedProgramInvalidOrderError
 
-    return courserun.enrollments.filter(user=request.user).get()
+    return (
+        courserun.enrollments.filter(user=request.user)
+        .prefetch_related(
+            "run__course__page__linked_instructors",
+            "run__course__page__linked_instructors__linked_instructor_page",
+        )
+        .get()
+    )

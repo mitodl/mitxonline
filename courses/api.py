@@ -17,7 +17,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Exists, OuterRef, Prefetch, Q
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django_countries import countries
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
@@ -91,6 +91,7 @@ if TYPE_CHECKING:
     from edx_api.course_detail.models import CourseMode
 
     from cms.models import CertificatePage
+    from users.models import User
 
 
 log = logging.getLogger(__name__)
@@ -111,26 +112,62 @@ class InvalidCertificateError(Exception):
         super().__init__("Invalid input for verifiable credential generation.")
 
 
+def _annotate_user_enrollments(queryset: QuerySet, user: User | None) -> QuerySet:
+    """Annotate a CourseRun queryset with the requesting user's enrollment counts."""
+    if not user or not user.is_authenticated:
+        return queryset.order_by("enrollment_start")
+
+    user_enrollments = Count(
+        "enrollments",
+        filter=Q(
+            enrollments__user=user,
+            enrollments__active=True,
+            enrollments__edx_enrolled=True,
+        ),
+    )
+    verified_enrollments = Count(
+        "enrollments",
+        filter=Q(
+            enrollments__user=user,
+            enrollments__active=True,
+            enrollments__edx_enrolled=True,
+            enrollments__enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        ),
+    )
+    return queryset.annotate(
+        user_enrollments=user_enrollments,
+        verified_enrollments=verified_enrollments,
+    ).order_by("-user_enrollments", "enrollment_start")
+
+
 def get_relevant_course_run_qset(
+    *,
     course: Course,
-) -> QuerySet:
-    """
-    Returns a QuerySet of relevant course runs
-    """
-    enrollable_run_qset = get_enrollable_courseruns_qs(valid_courses=[course])
-    return enrollable_run_qset.order_by("enrollment_start")
-
-
-def get_user_relevant_program_course_run_qset(
-    program: Program,
+    queryset: QuerySet | None = None,
+    user: User | None = None,
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
     """
     enrollable_run_qset = get_enrollable_courseruns_qs(
-        valid_courses=program.courses_qset.all()
+        queryset=queryset, valid_courses=[course]
     )
-    return enrollable_run_qset.order_by("enrollment_start")
+    return _annotate_user_enrollments(enrollable_run_qset, user)
+
+
+def get_user_relevant_program_course_run_qset(
+    *,
+    program: Program,
+    queryset: QuerySet | None = None,
+    user: User | None = None,
+) -> QuerySet:
+    """
+    Returns a QuerySet of relevant course runs
+    """
+    enrollable_run_qset = get_enrollable_courseruns_qs(
+        queryset=queryset, valid_courses=program.courses_qset.all()
+    )
+    return _annotate_user_enrollments(enrollable_run_qset, user)
 
 
 def create_local_enrollment(user, run, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):

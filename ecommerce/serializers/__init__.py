@@ -6,6 +6,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from mitol.common.utils.queryset import is_prefetched
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
@@ -38,7 +39,7 @@ class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
 
 class CoursePageObjectField(serializers.RelatedField):
     def to_representation(self, value):
-        return CoursePageSerializer(instance=value).data
+        return CoursePageSerializer(instance=value, context=self.context).data
 
 
 class CourseProductPurchasableObjectSerializer(serializers.ModelSerializer):
@@ -71,7 +72,7 @@ class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
 
 class ProgramPageObjectField(serializers.RelatedField):
     def to_representation(self, value):
-        return ProgramPageSerializer(instance=value).data
+        return ProgramPageSerializer(instance=value, context=self.context).data
 
 
 class ProgramProductPurchasableObjectSerializer(serializers.ModelSerializer):
@@ -138,11 +139,17 @@ class ProductPurchasableObjectField(serializers.RelatedField):
     def to_representation(self, value):
         """Serialize the purchasable object using appropriate serializer"""
         if isinstance(value, ProgramRun):
-            return ProgramRunProductPurchasableObjectSerializer(instance=value).data
+            return ProgramRunProductPurchasableObjectSerializer(
+                instance=value, context=self.context
+            ).data
         elif isinstance(value, CourseRun):
-            return CourseRunProductPurchasableObjectSerializer(instance=value).data
+            return CourseRunProductPurchasableObjectSerializer(
+                instance=value, context=self.context
+            ).data
         elif isinstance(value, Program):
-            return ProgramProductPurchasableObjectSerializer(instance=value).data
+            return ProgramProductPurchasableObjectSerializer(
+                instance=value, context=self.context
+            ).data
 
         error_message = (
             f"Unexpected type for Product.purchasable_object: {value.__class__}"
@@ -307,9 +314,14 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         Returns:
             List of serialized basket items with product details
         """
+        basket_items = (
+            instance.basket_items.all()
+            if is_prefetched(instance, "basket_items")
+            else instance.basket_items.select_related("product")
+        )
         return [
             BasketItemWithProductSerializer(instance=basket, context=self.context).data
-            for basket in instance.basket_items.select_related("product")
+            for basket in basket_items
         ]
 
     @extend_schema_field(Decimal)
