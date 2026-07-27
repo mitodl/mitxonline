@@ -1751,10 +1751,14 @@ def is_potentially_valid_mailgun_webhook(payload):
     if not signing_secret and settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
         return False
 
+    # Possibly overbuilt, but we'll just make sure we're getting something shaped vaguely correctly
+    if not payload or not isinstance(payload, dict):
+        return False
+
     # Check for the right message tag - if it's not there, do nothing else.
     # We want to throw out unrelated messages as fast as possible
-    event_data = payload["event-data"]
-    return ENROLLMENT_CODE_ASSINGMENT_TAG in event_data["tags"]
+    event_data = payload.get("event-data", {})
+    return ENROLLMENT_CODE_ASSINGMENT_TAG in event_data.get("tags", [])
 
 
 # We may want to move some of the cheapest checks to the web tier, but the actual queries need to happen in a task.
