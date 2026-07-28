@@ -683,7 +683,7 @@ MAILGUN_WEBHOOK_SIGNING_SECRET = get_string(
 
 MAILGUN_WEBHOOK_VALIDATE_SIGNATURE = get_bool(
     name="MAILGUN_WEBHOOK_VALIDATE_SIGNATURE",
-    default=False,
+    default=True,
     description="Whether to validate Mailgun signature webhooks for enrollment invite emails. Most useful to disable for local development w/ synthetic payloads",
 )
 
