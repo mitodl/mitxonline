@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.db import transaction
 from wagtail.signals import page_published
 
@@ -56,7 +57,11 @@ def purge_fastly_cache_on_publish(sender, **kwargs):  # noqa: ARG001
     logger.info(
         "Scheduling Fastly surrogate key purge on page publish: %s", surrogate_key
     )
-    transaction.on_commit(lambda: queue_fastly_surrogate_key_purge.delay(surrogate_key))
+    transaction.on_commit(
+        lambda: queue_fastly_surrogate_key_purge.delay(
+            surrogate_key, settings.MIT_LEARN_FASTLY_SERVICE_ID
+        )
+    )
 
 
 page_published.connect(flex_pricing_field_check)
