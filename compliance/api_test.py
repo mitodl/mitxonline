@@ -11,10 +11,16 @@ from compliance.api import (
     ExportComplianceResult,
     _build_export_payload,
     _normalize_administrative_area,
+    decrypt_export_compliance_log,
     get_cybersource_client,
+    get_latest_export_compliance_log,
+    log_export_compliance_check,
     verify_user_with_exports,
 )
 from compliance.exceptions import ExportComplianceDataError
+from compliance.factories import ExportComplianceLogFactory
+from compliance.models import ExportComplianceLog
+from courses.factories import CourseRunFactory
 from users.factories import UserFactory
 from users.models import User
 
@@ -22,7 +28,7 @@ pytestmark = [pytest.mark.django_db]
 
 
 @pytest.fixture
-def export_settings(settings):
+def export_settings(settings, export_compliance_keypair):
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID = "merchant-id"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID = uuid.uuid4().hex
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET = uuid.uuid4().hex
@@ -135,7 +141,7 @@ def test_get_cybersource_client_uses_official_rest_sdk_configuration(export_sett
 def test_verify_user_with_exports_calls_validate_export_compliance(
     mocker, export_settings
 ):
-    """Verification should call CyberSource and normalize the response."""
+    """Verification should call CyberSource, normalize the response, and cache it."""
     user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
     user.legal_address.country = "US"
     user.legal_address.street_address_1 = "77 Massachusetts Ave"
@@ -144,6 +150,7 @@ def test_verify_user_with_exports_calls_validate_export_compliance(
     user.legal_address.state = "US-MA"
     user.legal_address.postal_code = "02139"
     user.legal_address.save()
+    run = CourseRunFactory.create()
 
     response = SimpleNamespace(
         status="COMPLETED",
@@ -156,7 +163,7 @@ def test_verify_user_with_exports_calls_validate_export_compliance(
     mock_client.validate_export_compliance.return_value = response
     mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
 
-    result = verify_user_with_exports(user)
+    result = verify_user_with_exports(user, run)
 
     assert isinstance(result, ExportComplianceResult)
     assert result.accepted is True
@@ -173,6 +180,13 @@ def test_verify_user_with_exports_calls_validate_export_compliance(
     assert payload["order_information"]["bill_to"]["postal_code"] == "02139"
     assert payload["client_reference_information"].get("partner") is None
 
+    log_entry = get_latest_export_compliance_log(user, run)
+    assert log_entry is not None
+    assert log_entry.decision == "COMPLETED"
+    assert log_entry.reason_code == "MATCH-BCO"
+    assert log_entry.request_id == "abc123"
+    assert log_entry.courseware_object == run
+
 
 def test_verify_user_with_exports_normalizes_tuple_response(mocker, export_settings):
     """Verification should handle SDK responses returned as (body, status, raw_json)."""
@@ -183,6 +197,7 @@ def test_verify_user_with_exports_normalizes_tuple_response(mocker, export_setti
     user.legal_address.state = "US-MA"
     user.legal_address.postal_code = "02139"
     user.legal_address.save()
+    run = CourseRunFactory.create()
 
     response = (
         {
@@ -199,7 +214,7 @@ def test_verify_user_with_exports_normalizes_tuple_response(mocker, export_setti
     mock_client.validate_export_compliance.return_value = response
     mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
 
-    result = verify_user_with_exports(user)
+    result = verify_user_with_exports(user, run)
 
     assert isinstance(result, ExportComplianceResult)
     assert result.accepted is True
@@ -207,3 +222,116 @@ def test_verify_user_with_exports_normalizes_tuple_response(mocker, export_setti
     assert result.reason_code == "MATCH-BCO"
     assert result.request_id == "abc123"
     assert result.raw == response
+
+
+def test_verify_user_with_exports_uses_cached_accepted_result(mocker, export_settings):
+    """An existing accepted log for the same user+run should short-circuit the CyberSource call."""
+    user = UserFactory.create()
+    run = CourseRunFactory.create()
+    ExportComplianceLogFactory.create(
+        user=user,
+        courseware_object=run,
+        decision="ACCEPT",
+        reason_code="",
+        request_id="cached-request-id",
+    )
+    mock_client = mocker.Mock()
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, run)
+
+    mock_client.validate_export_compliance.assert_not_called()
+    assert result.accepted is True
+    assert result.decision == "ACCEPT"
+    assert result.request_id == "cached-request-id"
+    assert result.raw is None
+
+
+def test_verify_user_with_exports_rechecks_after_non_accepted_result(
+    mocker, export_settings
+):
+    """A prior non-accepted log for the same user+run should not prevent a fresh check."""
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    user.legal_address.country = "US"
+    user.legal_address.street_address_1 = "77 Massachusetts Ave"
+    user.legal_address.city = "Cambridge"
+    user.legal_address.state = "US-MA"
+    user.legal_address.postal_code = "02139"
+    user.legal_address.save()
+    run = CourseRunFactory.create()
+    ExportComplianceLogFactory.create(
+        user=user, courseware_object=run, decision="REJECT"
+    )
+
+    response = SimpleNamespace(
+        status="COMPLETED",
+        id="abc123",
+        export_compliance_information=SimpleNamespace(info_codes=[]),
+        error_information=None,
+        message=None,
+    )
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.return_value = response
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, run)
+
+    mock_client.validate_export_compliance.assert_called_once()
+    assert result.decision == "COMPLETED"
+    assert ExportComplianceLog.objects.filter(user=user).count() == 2
+
+
+def test_verify_user_with_exports_cache_is_scoped_per_run(mocker, export_settings):
+    """An accepted log for a different run should not produce a cache hit."""
+    user = UserFactory.create(name="Ada Lovelace", email="ada@example.com")
+    user.legal_address.country = "US"
+    user.legal_address.street_address_1 = "77 Massachusetts Ave"
+    user.legal_address.city = "Cambridge"
+    user.legal_address.state = "US-MA"
+    user.legal_address.postal_code = "02139"
+    user.legal_address.save()
+    other_run = CourseRunFactory.create()
+    run = CourseRunFactory.create()
+    ExportComplianceLogFactory.create(
+        user=user, courseware_object=other_run, decision="ACCEPT"
+    )
+
+    response = SimpleNamespace(
+        status="COMPLETED",
+        id="abc123",
+        export_compliance_information=SimpleNamespace(info_codes=[]),
+        error_information=None,
+        message=None,
+    )
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.return_value = response
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, run)
+
+    mock_client.validate_export_compliance.assert_called_once()
+    assert result.decision == "COMPLETED"
+
+
+def test_decrypt_export_compliance_log_round_trips(export_compliance_keypair):
+    """A logged request/response should decrypt back to its original plaintext."""
+    user = UserFactory.create()
+    run = CourseRunFactory.create()
+    response = {
+        "status": "COMPLETED",
+        "id": "abc123",
+        "export_compliance_information": {"info_codes": []},
+        "error_information": None,
+        "message": None,
+    }
+    result = ExportComplianceResult(
+        decision="COMPLETED", reason_code=None, request_id="abc123", raw=response
+    )
+
+    log_entry = log_export_compliance_check(
+        user, run, '{"hello": "world"}', response, result
+    )
+
+    decrypted = decrypt_export_compliance_log(log_entry, export_compliance_keypair)
+    assert decrypted.request == '{"hello": "world"}'
+    assert json.loads(decrypted.response) == response
