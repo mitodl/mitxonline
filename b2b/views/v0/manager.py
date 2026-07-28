@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
@@ -147,9 +148,17 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = ManagerContractOrgPagination
 
     def get_queryset(self):
-        """Filter to organizations where the user is a manager."""
+        """Filter to organizations where the user is a manager.
 
-        return (
+        An optional ``sso_organization_id`` query param narrows the result to a
+        single org by its Keycloak organization UUID. This is what
+        ol-analytics-api uses to ask "does this user manage the org with this
+        UUID?" (a non-empty response means yes) without dereferencing the
+        internal PK. An unparseable UUID yields an empty queryset (fail-safe:
+        reads as "not a manager"), never a 500.
+        """
+
+        queryset = (
             OrganizationPage.objects.prefetch_related(
                 Prefetch(
                     "contracts",
@@ -170,9 +179,32 @@ class ManagerOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
             .distinct()
         )
 
+        sso_organization_id = self.request.query_params.get("sso_organization_id")
+        if sso_organization_id:
+            try:
+                org_uuid = uuid.UUID(sso_organization_id)
+            except (ValueError, TypeError):
+                return queryset.none()
+            queryset = queryset.filter(sso_organization_id=org_uuid)
+
+        return queryset
+
     @extend_schema(
         operation_id="b2b_manager_organizations_list",
         description="List managed organizations",
+        parameters=[
+            OpenApiParameter(
+                name="sso_organization_id",
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description=(
+                    "Narrow the result to the single org with this Keycloak "
+                    "organization UUID (sso_organization_id). A non-empty "
+                    "response means the caller manages that org."
+                ),
+            ),
+        ],
     )
     def list(self, request, *args, **kwargs):
         """List the orgs."""
