@@ -33,6 +33,7 @@ from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
+from main.constants import ENV_TO_LEARN_HOSTNAME_MAP
 from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
@@ -658,19 +659,19 @@ MIT_LEARN_DASHBOARD_URL = get_string(
 
 MIT_LEARN_TERMS_URL = get_string(
     name="MIT_LEARN_TERMS_URL",
-    default="https://learn.mit.edu/terms",
+    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}/terms",
     description="Terms of service URL",
 )
 
 MIT_LEARN_PRIVACY_URL = get_string(
     name="MIT_LEARN_PRIVACY_URL",
-    default="https://learn.mit.edu/privacy",
+    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}/privacy",
     description="Privacy policy URL",
 )
 
 MIT_LEARN_HONOR_CODE_URL = get_string(
     name="MIT_LEARN_HONOR_CODE_URL",
-    default="https://learn.mit.edu/honor_code",
+    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}/honor_code",
     description="Honor code URL",
 )
 
