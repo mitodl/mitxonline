@@ -1782,6 +1782,8 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     if event_type not in EMAIL_STATUSES:
         return None
 
+    # Filter out temporary failures. They might confuse users, so we'll wait for a permanent one
+
     # At this point we know that the payload is for the email we care about, it's from mailgun, and it's one of the events we care about
     # Save it to the row corresponding to the event we just got and move on with our lives
     message_id = event_data["message"]["headers"]["message-id"]

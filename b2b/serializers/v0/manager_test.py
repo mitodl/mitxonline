@@ -77,6 +77,11 @@ class TestManagerEnrollmentCodeSerializerUnassigned:
         assert data["redemption_status"] == REDEMPTION_STATUS_UNASSIGNED
         assert data["assigned_to"] is None
 
+    def test_email_status_fields_are_none(self, discount):
+        data = _serialize(discount)
+        assert data["email_status"] is None
+        assert data["email_status_event_timestamp"] is None
+
 
 class TestManagerEnrollmentCodeSerializerAssigned:
     def test_redemption_status_is_assigned(self, discount, contract):
@@ -164,6 +169,19 @@ class TestManagerEnrollmentCodeSerializerAssigned:
         )
         data = _serialize(discount, [redemption])
         assert data["assigned_name"] == ""
+
+    def test_email_status_fields_populated_when_set(self, discount, contract):
+        now = timezone.now()
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+            email_status="delivered",
+            email_status_event_timestamp=now,
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] == "delivered"
+        assert data["email_status_event_timestamp"] is not None
 
 
 class TestManagerEnrollmentCodeSerializerRedeemed:
