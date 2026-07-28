@@ -6,6 +6,7 @@ from mitol.mail.api import get_message_sender
 from mitol.mail.messages import TemplatedMessage
 
 from b2b.models import ContractPage, DiscountContractAttachmentRedemption
+from main.constants import ENV_TO_LEARN_HOSTNAME_MAP
 
 log = logging.getLogger(__name__)
 
@@ -25,8 +26,6 @@ class EnrollmentCodeAssignmentMessage(TemplatedMessage):
 
 
 def get_learn_hostname():
-    from courses.api import ENV_TO_LEARN_HOSTNAME_MAP  # noqa: PLC0415
-
     return ENV_TO_LEARN_HOSTNAME_MAP.get(settings.ENVIRONMENT, "learn.mit.edu")
 
 
