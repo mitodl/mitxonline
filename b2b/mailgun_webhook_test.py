@@ -19,6 +19,8 @@ from b2b.models import (
     EMAIL_STATUS_ACCEPTED,
     EMAIL_STATUS_CLICKED,
     EMAIL_STATUS_DELIVERED,
+    EMAIL_STATUS_FAILED,
+    EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY,
     EMAIL_STATUS_OPENED,
     DiscountContractAttachmentRedemption,
 )
@@ -47,8 +49,17 @@ def _build_payload(  # noqa: PLR0913
     timestamp=TIMESTAMP,
     signature=None,
     signing_secret=SIGNING_SECRET,
+    severity=None,
 ):
     """Build a Mailgun-shaped webhook payload for tests."""
+
+    event_data = {
+        "event": event_type,
+        "tags": list(tags),
+        "message": {"headers": {"message-id": message_id}},
+    }
+    if severity is not None:
+        event_data["severity"] = severity
 
     return {
         "signature": {
@@ -60,11 +71,7 @@ def _build_payload(  # noqa: PLR0913
                 else _valid_signature(signing_secret, token, timestamp)
             ),
         },
-        "event-data": {
-            "event": event_type,
-            "tags": list(tags),
-            "message": {"headers": {"message-id": message_id}},
-        },
+        "event-data": event_data,
     }
 
 
@@ -219,6 +226,42 @@ class TestProcessMailgunWebhookForEnrollmentCodeEmails:
         assert result == assignment
         assignment.refresh_from_db()
         assert assignment.email_status == event_type
+        assert assignment.email_status_event_timestamp is not None
+
+    @override_settings(
+        MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=True,
+        MAILGUN_WEBHOOK_SIGNING_SECRET=SIGNING_SECRET,
+    )
+    def test_returns_none_for_temporary_failure(self, assignment):
+        """Temporary failures should be filtered out and leave the assignment untouched."""
+        payload = _build_payload(
+            event_type=EMAIL_STATUS_FAILED,
+            message_id=assignment.email_message_id,
+            severity=EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY,
+        )
+
+        assert process_mailgun_webhook_for_enrollment_code_emails(payload) is None
+        assignment.refresh_from_db()
+        assert assignment.email_status == ""
+        assert assignment.email_status_event_timestamp is None
+
+    @override_settings(
+        MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=True,
+        MAILGUN_WEBHOOK_SIGNING_SECRET=SIGNING_SECRET,
+    )
+    def test_updates_matching_assignment_for_permanent_failure(self, assignment):
+        """Permanent failures are the ones contract managers should actually see."""
+        payload = _build_payload(
+            event_type=EMAIL_STATUS_FAILED,
+            message_id=assignment.email_message_id,
+            severity="permanent",
+        )
+
+        result = process_mailgun_webhook_for_enrollment_code_emails(payload)
+
+        assert result == assignment
+        assignment.refresh_from_db()
+        assert assignment.email_status == EMAIL_STATUS_FAILED
         assert assignment.email_status_event_timestamp is not None
 
     @override_settings(
