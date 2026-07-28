@@ -55,9 +55,8 @@ def test_queue_fastly_surrogate_key_purge_sends_hard_purge(fastly_settings):
     """
     The surrogate key purge must be a hard purge -- no Fastly-Soft-Purge header.
 
-    A soft purge only marks objects stale, and MIT Learn serves pages with a long
-    stale-while-revalidate window, so each cache node would serve the outdated
-    page at least once more instead of refetching from origin.
+    A soft purge only marks objects stale, so each cache node would serve the
+    outdated page once more instead of refetching from origin.
     """
     responses.add(
         responses.POST,
