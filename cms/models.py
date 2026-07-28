@@ -91,6 +91,7 @@ from flexiblepricing.models import (
 )
 from main import features
 from main.serializers import RichTextSerializer
+from main.utils import get_learn_product_url
 from main.views import get_base_context
 
 log = logging.getLogger()
@@ -862,7 +863,10 @@ class HomePage(VideoPlayerConfigMixin):
                     "description": page.description,
                     "feature_image": page.feature_image,
                     "start_date": run.start_date if run is not None else None,
-                    "url_path": page.get_url(),
+                    "url_path": get_learn_product_url(
+                        "programs" if page.is_program_page else "courses",
+                        page.product.readable_id,
+                    ),
                     "is_program": page.is_program_page,
                     "is_self_paced": run.is_self_paced if run is not None else None,
                     "program_type": (
@@ -890,7 +894,10 @@ class HomePage(VideoPlayerConfigMixin):
                     "description": product_page.description,
                     "feature_image": product_page.feature_image,
                     "start_date": run.start_date if run is not None else None,
-                    "url_path": product_page.get_url(),
+                    "url_path": get_learn_product_url(
+                        "programs" if product_page.is_program_page else "courses",
+                        product_page.product.readable_id,
+                    ),
                     "is_program": product_page.is_program_page,
                     "is_self_paced": run.is_self_paced if run is not None else None,
                     "program_type": (

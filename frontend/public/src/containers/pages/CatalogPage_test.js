@@ -47,7 +47,7 @@ const displayedCourse = {
       ],
       page: {
         feature_image_src:             null,
-        page_url:                      "/courses/course-v1:edX+E2E-101/",
+        page_url:                      "https://learn.mit.edu/courses/course-v1:edX+E2E-101",
         financial_assistance_form_url: "",
         description:                   "E2E Test Course",
         current_price:                 999.0,
@@ -65,7 +65,7 @@ const displayedCourse = {
   ],
   page: {
     feature_image_src:             null,
-    page_url:                      "/courses/course-v1:edX+E2E-101/",
+    page_url:                      "https://learn.mit.edu/courses/course-v1:edX+E2E-101",
     financial_assistance_form_url: "",
     description:                   "E2E Test Course",
     current_price:                 999.0,
