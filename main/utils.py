@@ -17,13 +17,36 @@ from django.http import HttpRequest, HttpResponseRedirect
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
 
-from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
+from main.constants import (
+    ENV_TO_LEARN_HOSTNAME_MAP,
+    USER_MSG_COOKIE_MAX_AGE,
+    USER_MSG_COOKIE_NAME,
+)
 from main.settings import TIME_ZONE
 
 if TYPE_CHECKING:
     from decimal import Decimal
 
     from rest_framework.response import Response
+
+
+def get_learn_hostname() -> str:
+    """Get the MIT Learn hostname for the current environment."""
+    return ENV_TO_LEARN_HOSTNAME_MAP.get(settings.ENVIRONMENT, "learn.mit.edu")
+
+
+def get_learn_product_url(product_type: str, readable_id: str) -> str:
+    """
+    Build the MIT Learn URL for a course or program product page.
+
+    Args:
+        product_type: "courses" or "programs"
+        readable_id: the course or program's readable_id
+
+    Returns:
+        str: the absolute MIT Learn URL for the given product
+    """
+    return f"https://{get_learn_hostname()}/{product_type}/{readable_id}"
 
 
 def get_js_settings(request: HttpRequest):  # noqa: ARG001
@@ -52,6 +75,10 @@ def get_js_settings(request: HttpRequest):  # noqa: ARG001
         "oidc_login_url": None,
         "api_gateway_enabled": not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE,
         "mit_learn_dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,
+        "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
+        "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
+        "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
+        "mit_learn_base_url": f"https://{get_learn_hostname()}",
     }
 
 

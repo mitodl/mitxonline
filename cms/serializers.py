@@ -9,6 +9,7 @@ from rest_framework import serializers
 from cms import models
 from cms.api import get_wagtail_img_src
 from cms.models import FlexiblePricingRequestForm, ProgramPage
+from main.utils import get_learn_product_url
 
 
 class BaseCoursePageSerializer(serializers.ModelSerializer):
@@ -29,8 +30,8 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.URLField)
     def get_page_url(self, instance):
-        """Get the page URL for the instance."""
-        return instance.get_url()
+        """Get the Learn URL for the instance."""
+        return get_learn_product_url("courses", instance.product.readable_id)
 
     @extend_schema_field(str)
     def get_description(self, instance):
@@ -278,8 +279,8 @@ class ProgramPageSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.URLField)
     def get_page_url(self, instance):
-        """Get the page URL for the instance."""
-        return instance.get_url()
+        """Get the Learn URL for the instance."""
+        return get_learn_product_url("programs", instance.product.readable_id)
 
     @extend_schema_field(str)
     def get_description(self, instance):

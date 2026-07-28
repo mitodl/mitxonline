@@ -64,6 +64,7 @@ from courses.utils import (
 )
 from ecommerce.models import OrderStatus, Product
 from main import features
+from main.utils import get_learn_product_url
 from openedx.api import (
     create_edx_course_mode,
     enroll_in_edx_course_runs,
@@ -1718,14 +1719,6 @@ ACHIEVEMENT_TYPE_MAP = {
     "program": "Program",
 }
 
-# Maps the value of settings.ENVIRONMENT to the hostname for that environment's Learn instance
-# This is ugly, if anyone has other suggestions I'm all ears.
-ENV_TO_LEARN_HOSTNAME_MAP = {
-    "production": "learn.mit.edu",
-    "rc": "rc.learn.mit.edu",
-    "ci": "ci.learn.mit.edu",
-}
-
 
 def get_verifiable_credentials_payload(
     certificate: CourseRunCertificate | ProgramCertificate,
@@ -1733,9 +1726,6 @@ def get_verifiable_credentials_payload(
 ) -> dict:
     # TODO: We could optimize these queries #noqa: TD002, TD003, FIX002
     # It's not a massive priority though, as we have a total of 20k certs in prod as of 12/25
-    learn_hostname = ENV_TO_LEARN_HOSTNAME_MAP.get(
-        settings.ENVIRONMENT, "learn.mit.edu"
-    )
 
     if isinstance(certificate, CourseRunCertificate):
         cert_type = "course_run"
@@ -1744,7 +1734,7 @@ def get_verifiable_credentials_payload(
         course_page = course.course_page
 
         course_url_id = course.readable_id
-        url = f"https://{learn_hostname}/courses/{course_url_id}"
+        url = get_learn_product_url("courses", course_url_id)
         certificate_name = certificate.course_run.title
         activity_start_date = CourseRunEnrollment.all_objects.get(
             user_id=certificate.user_id, run=course_run
@@ -1760,7 +1750,7 @@ def get_verifiable_credentials_payload(
         cert_type = "program"
         program = certificate.program
         program_page = program.program_page
-        url = f"https://{learn_hostname}/programs/{program.readable_id}"
+        url = get_learn_product_url("programs", program.readable_id)
         certificate_name = certificate.program.title
         activity_start_date = ProgramEnrollment.all_objects.get(
             user_id=certificate.user_id, program=program
