@@ -18,7 +18,7 @@ class ExportComplianceError(ExportComplianceCheckError):
 
         Args:
             user (users.models.User): The user who failed the export compliance check
-            decision (str): The decision returned by CyberSource (e.g. "REJECT")
+            decision (str): The decision returned by CyberSource (e.g. "DECLINED")
             reason_code (str or int): The reason code returned by CyberSource
         """
         self.user = user
