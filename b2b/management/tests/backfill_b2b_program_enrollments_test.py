@@ -1,5 +1,7 @@
 """Tests for the backfill_b2b_program_enrollments command."""
 
+import io
+
 import pytest
 from django.core.management import call_command
 
@@ -131,3 +133,44 @@ def test_backfill_ignores_non_b2b_enrollments():
     call_command(COMMAND, "--commit")
 
     assert not ProgramEnrollment.objects.filter(user=enrollment.user).exists()
+
+
+def test_backfill_counts_each_program_enrollment_once():
+    """Multiple runs mapping to one program collapse to a single enrollment.
+
+    Regression: a user enrolled in several B2B course runs that all belong to
+    the same program used to inflate the dry-run "Would create" count (one per
+    run) even though a --commit run only ever creates a single ProgramEnrollment.
+    The dry-run count must match what --commit actually creates.
+    """
+
+    contract = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+    )
+    program = ProgramFactory.create()
+    user = None
+
+    for _ in range(3):
+        course = CourseFactory.create()
+        program.add_requirement(course)
+        ContractProgramItem.objects.get_or_create(
+            contract=contract, program=program, defaults={"sort_order": 0}
+        )
+        run = CourseRunFactory.create(course=course, b2b_contract=contract)
+        # Reuse the same user across all three runs.
+        enrollment = CourseRunEnrollmentFactory.create(
+            run=run, **({"user": user} if user else {})
+        )
+        user = enrollment.user
+
+    # Dry run: reports a single planned enrollment, not one per course run.
+    out = io.StringIO()
+    call_command(COMMAND, stdout=out)
+    assert "Would create 1 program enrollment(s)." in out.getvalue()
+    assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
+
+    # Commit: creates exactly one ProgramEnrollment, matching the dry-run count.
+    out = io.StringIO()
+    call_command(COMMAND, "--commit", stdout=out)
+    assert "Created 1 program enrollment(s)." in out.getvalue()
+    assert ProgramEnrollment.all_objects.filter(user=user, program=program).count() == 1
