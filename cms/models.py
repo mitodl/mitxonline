@@ -49,6 +49,7 @@ from wagtail.search import index
 from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
 
+from cms import utils as cms_utils
 from cms.blocks import (
     CourseRunCertificateOverrides,
     PriceBlock,
@@ -811,7 +812,9 @@ class HomePage(VideoPlayerConfigMixin):
         """
         now = now_in_utc()
         redis_cache = caches["redis"]
-        cached_featured_course_ids = redis_cache.get("CMS_homepage_featured_courses")
+        cached_featured_course_ids = redis_cache.get(
+            cms_utils.get_featured_items_cache_key()
+        )
         if cached_featured_course_ids and len(cached_featured_course_ids) > 0:
             # Load fresh course data from database using cached IDs
             relevant_run_course_ids = (

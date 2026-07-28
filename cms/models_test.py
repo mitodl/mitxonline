@@ -20,6 +20,7 @@ from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 
+from cms import utils as cms_utils
 from cms.api import create_featured_items
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
@@ -704,10 +705,10 @@ def test_homepage_featured_products(settings, mocker):
     furthest_future_date = further_future_date + timedelta(days=1)
     redis_cache = caches["redis"]
     # Ensure the key is empty since pytest doesn't clear the cache between tests
-    featured_courses = redis_cache.get("CMS_homepage_featured_courses")
+    featured_courses = redis_cache.get(cms_utils.get_featured_items_cache_key())
     if featured_courses is not None:
-        redis_cache.delete("CMS_homepage_featured_courses")
-    assert redis_cache.get("CMS_homepage_featured_courses") is None
+        redis_cache.delete(cms_utils.get_featured_items_cache_key())
+    assert redis_cache.get(cms_utils.get_featured_items_cache_key()) is None
 
     enrollable_future_course = CourseFactory.create(page=None, live=True)
     enrollable_future_course_page = CoursePageFactory.create(
@@ -722,7 +723,7 @@ def test_homepage_featured_products(settings, mocker):
         end_date=furthest_future_date,
     )
     create_featured_items()
-    assert len(redis_cache.get("CMS_homepage_featured_courses")) == 1
+    assert len(redis_cache.get(cms_utils.get_featured_items_cache_key())) == 1
     hf = HomePageFactory.create()
     assert hf.get_cached_featured_products == [
         {
@@ -755,7 +756,7 @@ def test_homepage_featured_products(settings, mocker):
         end_date=furthest_future_date,
     )
     create_featured_items()
-    assert len(redis_cache.get("CMS_homepage_featured_courses")) == 1
+    assert len(redis_cache.get(cms_utils.get_featured_items_cache_key())) == 1
     hf = HomePageFactory.create()
     assert hf.get_cached_featured_products == [
         {

@@ -10,6 +10,7 @@ from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 from wagtail_factories import PageFactory
 
+from cms import utils as cms_utils
 from cms.api import (
     RESOURCE_PAGE_TITLES,
     create_default_courseware_page,
@@ -21,7 +22,6 @@ from cms.api import (
     get_home_page,
     get_wagtail_img_src,
 )
-from cms.constants import FEATURED_ITEMS_CACHE_KEY
 from cms.exceptions import WagtailSpecificPageError
 from cms.factories import CoursePageFactory, HomePageFactory, ProgramPageFactory
 from cms.models import (
@@ -295,9 +295,9 @@ def test_create_featured_items():
     # pytest does not clear cache thus if we have a cache value set, it will persist between tests and test runs
     # thus we need to clear the cache before running the test
     redis_cache = caches["redis"]
-    featured_courses = redis_cache.get("CMS_homepage_featured_courses")
+    featured_courses = redis_cache.get(cms_utils.get_featured_items_cache_key())
     if featured_courses is not None:
-        redis_cache.delete("CMS_homepage_featured_courses")
+        redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     future_date = now + timedelta(days=1)
@@ -358,7 +358,7 @@ def test_create_featured_items():
     )
 
     create_featured_items()
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
 
     assert len(cache_value) == 4
     assert set(cache_value) == {
@@ -381,10 +381,10 @@ def test_create_featured_items_no_courses():
     """Test create_featured_items with no courses leaves stale cache intact"""
     redis_cache = caches["redis"]
     stale_value = [999]
-    redis_cache.set("CMS_homepage_featured_courses", stale_value)
+    redis_cache.set(cms_utils.get_featured_items_cache_key(), stale_value)
 
     result = create_featured_items()
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
 
     # Returns empty list but does NOT wipe stale cache data
     assert result == []
@@ -395,10 +395,10 @@ def test_create_featured_items_no_courses():
 def test_create_featured_items_no_courses_no_prior_cache():
     """Test create_featured_items with no courses and no prior cache entry"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     result = create_featured_items()
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
 
     assert result == []
     assert cache_value is None
@@ -409,7 +409,7 @@ def test_create_featured_items_no_enrollable_courses():
     """Test create_featured_items with courses but no enrollable runs leaves stale cache intact"""
     redis_cache = caches["redis"]
     stale_value = [888]
-    redis_cache.set("CMS_homepage_featured_courses", stale_value)
+    redis_cache.set(cms_utils.get_featured_items_cache_key(), stale_value)
 
     # Create course with no enrollable runs
     course = CourseFactory.create(page=None, live=True)
@@ -417,7 +417,7 @@ def test_create_featured_items_no_enrollable_courses():
     CourseRunFactory.create(course=course, live=False, past_enrollment_end=True)
 
     result = create_featured_items()
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
 
     # Returns empty list but does NOT wipe stale cache data
     assert result == []
@@ -428,7 +428,7 @@ def test_create_featured_items_no_enrollable_courses():
 def test_create_featured_items_many_self_paced_courses():
     """Test create_featured_items limits self-paced courses to 2"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     further_future_date = now + timedelta(days=2)
@@ -459,7 +459,7 @@ def test_create_featured_items_many_self_paced_courses():
 def test_create_featured_items_many_regular_courses():
     """Test create_featured_items limits regular courses to 20"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     future_date = now + timedelta(days=1)
@@ -492,7 +492,7 @@ def test_create_featured_items_many_regular_courses():
 def test_create_featured_items_course_run_at_exact_time():
     """Test create_featured_items with course run starting exactly at now"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     further_future_date = now + timedelta(days=2)
@@ -511,7 +511,7 @@ def test_create_featured_items_course_run_at_exact_time():
     )
 
     result = create_featured_items()
-    cache_value = redis_cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
 
     assert len(result) == 1
     assert result[0] == exact_time_course
@@ -522,7 +522,7 @@ def test_create_featured_items_course_run_at_exact_time():
 def test_create_featured_items_mixed_course_types():
     """Test create_featured_items with mix of self-paced, future, and started courses"""
     redis_cache = caches["redis"]
-    redis_cache.delete("CMS_homepage_featured_courses")
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     now = now_in_utc()
     future_date = now + timedelta(days=1)
@@ -579,7 +579,7 @@ def test_create_featured_items_mixed_course_types():
 def test_create_featured_items_cache_no_expiry():
     """Test that cache is set with timeout=None so it never auto-expires"""
     redis_cache = caches["redis"]
-    redis_cache.delete(FEATURED_ITEMS_CACHE_KEY)
+    redis_cache.delete(cms_utils.get_featured_items_cache_key())
 
     # Create a simple course to have something to cache
     course = CourseFactory.create(page=None, live=True)
@@ -596,7 +596,7 @@ def test_create_featured_items_cache_no_expiry():
     create_featured_items()
 
     # Verify cache is still set and correct
-    cache_value = redis_cache.get(FEATURED_ITEMS_CACHE_KEY)
+    cache_value = redis_cache.get(cms_utils.get_featured_items_cache_key())
     assert cache_value is not None
     assert len(cache_value) == 1
 
@@ -606,9 +606,9 @@ def test_create_featured_items_cache_no_expiry():
     # note that the actual key in redis is prefixed with ":1:"
     # we use the raw client, not the one provided by redis_django,
     # because the latter rewrites the return values
-    ttl = redis_client.ttl(f":1:{FEATURED_ITEMS_CACHE_KEY}")
+    ttl = redis_client.ttl(f":1:{cms_utils.get_featured_items_cache_key()}")
     assert ttl == -1, (
-        f"Key `{FEATURED_ITEMS_CACHE_KEY}` is missing"
+        f"Key `{cms_utils.get_featured_items_cache_key()}` is missing"
         if ttl == -2
-        else f"Unexpected ttl value `{ttl}` for `{FEATURED_ITEMS_CACHE_KEY}`"
+        else f"Unexpected ttl value `{ttl}` for `{cms_utils.get_featured_items_cache_key()}`"
     )

@@ -33,11 +33,12 @@ from mitol.scim.settings.scim import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
+from main.constants import ENV_TO_LEARN_HOSTNAME_MAP
 from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.160.4"
+VERSION = "1.160.5"
 
 log = logging.getLogger()
 
@@ -326,6 +327,10 @@ if ZEAL_ENABLE or ENVIRONMENT == "pytest":
 
 ZEAL_RAISE = False
 ZEAL_ALLOWLIST = []
+
+# use a fast, insecure password hasher under pytest - tests don't need real hashing strength
+if ENVIRONMENT == "pytest":
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
@@ -652,6 +657,24 @@ MIT_LEARN_DASHBOARD_URL = get_string(
     description="Dashboard URL for UAI enrollment emails",
 )
 
+MIT_LEARN_TERMS_URL = get_string(
+    name="MIT_LEARN_TERMS_URL",
+    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}/terms",
+    description="Terms of service URL",
+)
+
+MIT_LEARN_PRIVACY_URL = get_string(
+    name="MIT_LEARN_PRIVACY_URL",
+    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}/privacy",
+    description="Privacy policy URL",
+)
+
+MIT_LEARN_HONOR_CODE_URL = get_string(
+    name="MIT_LEARN_HONOR_CODE_URL",
+    default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}/honor_code",
+    description="Honor code URL",
+)
+
 MAILGUN_WEBHOOK_SIGNING_SECRET = get_string(
     name="MAILGUN_WEBHOOK_SIGNING_SECRET",
     default="",
@@ -661,7 +684,7 @@ MAILGUN_WEBHOOK_VALIDATE_SIGNATURE = get_bool(
     name="MAILGUN_WEBHOOK_VALIDATE_SIGNATURE",
     default=False,
     description="Whether to validate Mailgun signature webhooks for enrollment invite emails. Most useful to disable for local development w/ synthetic payloads",
-)
+
 
 # Logging configuration
 LOG_LEVEL = get_string(

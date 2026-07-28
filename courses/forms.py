@@ -141,7 +141,7 @@ def program_requirements_schema():
                                 "format": "number",
                                 "title": "Value",
                                 "default": 1,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "options": {
                                     "dependencies": {
                                         "node_type": ProgramRequirementNodeType.OPERATOR.value,
@@ -305,13 +305,13 @@ class ProgramAdminForm(ModelForm):
                 # Ensure the value is not negative
                 try:
                     value = int(operator["data"]["operator_value"])
-                    if value < 1:
+                    if value < 0:
                         raise ValidationError(
-                            '"Minimum # of" operator must have Value equal to 1 or more.'  # noqa: EM101
+                            '"Minimum # of" operator must have Value equal to 0 or more.'  # noqa: EM101
                         )
                 except (ValueError, TypeError):
                     raise ValidationError(
-                        '"Minimum # of" operator must have a valid numeric Value equal to 1 or more.'  # noqa: EM101
+                        '"Minimum # of" operator must have a valid numeric Value equal to 0 or more.'  # noqa: EM101
                     ) from None
 
         def _validate_operator_title(operator):

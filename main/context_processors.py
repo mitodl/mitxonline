@@ -26,4 +26,7 @@ def configuration_context(request):  # noqa: ARG001
     """
     return {
         "site_name": settings.SITE_NAME,
+        "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
+        "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
+        "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
     }

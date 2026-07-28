@@ -59,3 +59,10 @@ DISALLOWED_CURRENCY_TYPES = [
 ]
 
 USER_REGISTRATION_FAILED_MSG = "Unable to register at this time, please try again later"
+
+# Maps the value of settings.ENVIRONMENT to the hostname for that environment's Learn instance
+ENV_TO_LEARN_HOSTNAME_MAP = {
+    "production": "learn.mit.edu",
+    "rc": "rc.learn.mit.edu",
+    "ci": "ci.learn.mit.edu",
+}

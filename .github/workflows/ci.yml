@@ -1,8 +1,88 @@
 name: CI
 on: [push]
 jobs:
+  python-checks:
+    runs-on: ubuntu-24.04
+
+    services:
+      db:
+        image: postgres:15.16
+        # Health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres  # pragma: allowlist secret
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Apt update
+        run: sudo apt-get update -y
+
+      - name: Apt install
+        run: cat Aptfile | sudo xargs apt-get install
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Create test local state
+        run: ./scripts/test/stub-data.sh
+
+      - name: Django system checks
+        run: uv run ./manage.py check --fail-level WARNING
+        env: &django-env-vars
+          DEBUG: False
+          NODE_ENV: 'production'
+          CELERY_TASK_ALWAYS_EAGER: 'True'
+          CELERY_BROKER_URL: redis://localhost:6379/4
+          CELERY_RESULT_BACKEND: redis://localhost:6379/4
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres  # pragma: allowlist secret
+          MAILGUN_KEY: fake_mailgun_key
+          MAILGUN_SENDER_DOMAIN: other.fake.site
+          MITX_ONLINE_ADMIN_EMAIL: example@localhost
+          MITX_ONLINE_BASE_URL: http://localhost:8013
+          MITX_ONLINE_DB_DISABLE_SSL: 'True'
+          MITX_ONLINE_EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+          MITX_ONLINE_NOTIFICATION_EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+          MITX_ONLINE_SECURE_SSL_REDIRECT: 'False'
+          MITX_ONLINE_USE_S3: 'False'
+          OPENEDX_API_BASE_URL: http://localhost:18000
+          OPENEDX_API_CLIENT_ID: fake_client_id
+          OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
+          SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
+
+      - name: Migration and OpenAPI spec checks
+        run: ./scripts/test/python_checks.sh
+        env: *django-env-vars
+
   python-tests:
     runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
+
+    env:
+      # coverage instrumentation roughly doubles suite runtime and nothing in CI
+      # consumes the coverage output (no upload step, all codecov.yml thresholds
+      # disabled) - skip it here, it's still available locally via a plain `pytest --cov`.
+      PYTEST_ADDOPTS: "--no-cov"
 
     services:
       db:
@@ -52,7 +132,7 @@ jobs:
         run: |
           celery -A main worker -B -l INFO &
           sleep 10
-        env: &django-env-vars
+        env: &django-shard-env-vars
           DEBUG: False
           NODE_ENV: 'production'
           CELERY_TASK_ALWAYS_EAGER: 'True'
@@ -73,16 +153,12 @@ jobs:
           OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
           SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
 
-      - name: Django system checks
-        run: uv run ./manage.py check --fail-level WARNING
-        env: *django-env-vars
-
       - name: Tests
         run: |
           export MEDIA_ROOT="$(mktemp -d)"
           cp scripts/test/data/webpack-stats/* webpack-stats/
-          ./scripts/test/python_tests.sh
-        env: *django-env-vars
+          ./scripts/test/python_tests.sh -n logical --splits 4 --group ${{ matrix.group }}
+        env: *django-shard-env-vars
 
   javascript-tests:
     runs-on: ubuntu-24.04

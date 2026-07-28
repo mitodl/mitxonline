@@ -111,6 +111,7 @@ dev = [
     "mitol-drf-lint>=2025.3.27",
     "pytest-urllib3>=0.2.0",
     "granian[reload]>=2.5.4,<3",
+    "pytest-split>=0.9,<1",
 ]
 
 [tool.uv]
@@ -252,7 +253,7 @@ fixture-parentheses = false
 
 
 [tool.pytest.ini_options]
-addopts = "--cov . --cov-report xml --cov-report term --cov-report html --ds=main.settings --reuse-db --color=yes"
+addopts = "--cov . --cov-report xml --cov-report term --ds=main.settings --reuse-db --color=yes"
 norecursedirs = [
   "node_modules",
   ".git",
