@@ -16,7 +16,7 @@ describe("CourseInfoBox", () => {
       programs: [
         {
           readable_id: "program-v1:MITx+DEDP",
-          title: "Data, Economics, and Design of Policy"
+          title:       "Data, Economics, and Design of Policy"
         }
       ]
     }
