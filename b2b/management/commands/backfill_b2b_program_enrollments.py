@@ -76,6 +76,13 @@ matches are reported and skipped."""
         already_enrolled = 0
         no_program = 0
         ambiguous = []
+        # A user can be enrolled in several course runs that all map to the same
+        # program. ProgramEnrollment is unique on (user, program), so those
+        # collapse to a single enrollment regardless of contract. Track the
+        # (user, program) pairs already accounted for this run to avoid
+        # double-counting - this keeps the dry-run count consistent with what a
+        # --commit run would actually create.
+        planned = set()
 
         self.stdout.write(
             f"Scanning {enrollments.count()} active B2B course-run enrollment(s)..."
@@ -106,11 +113,16 @@ matches are reported and skipped."""
 
             program = candidate_programs[0]
 
-            if ProgramEnrollment.all_objects.filter(
+            # Skip if the user is already enrolled in this program, or if another
+            # course run for the same user+program was already handled this run.
+            # The latter keeps the dry-run count consistent with what a --commit
+            # run would create (each program enrollment counted exactly once).
+            if (user.id, program.id) in planned or ProgramEnrollment.all_objects.filter(
                 user=user, program=program
             ).exists():
                 already_enrolled += 1
                 continue
+            planned.add((user.id, program.id))
 
             self.stdout.write(
                 f"\t{user.email}: enrolling in program {program.readable_id} "
