@@ -51,6 +51,28 @@ def test_queue_fastly_surrogate_key_purge_targets_given_service(fastly_settings)
 
 
 @responses.activate
+def test_queue_fastly_surrogate_key_purge_sends_hard_purge(fastly_settings):
+    """
+    The surrogate key purge must be a hard purge -- no Fastly-Soft-Purge header.
+
+    A soft purge only marks objects stale, and MIT Learn serves pages with a long
+    stale-while-revalidate window, so each cache node would serve the outdated
+    page at least once more instead of refetching from origin.
+    """
+    responses.add(
+        responses.POST,
+        f"{FASTLY_URL}/service/{LEARN_SERVICE_ID}/purge/{SURROGATE_KEY}",
+        json={"status": "ok"},
+        status=200,
+    )
+
+    assert queue_fastly_surrogate_key_purge(SURROGATE_KEY, LEARN_SERVICE_ID) is True
+
+    sent_headers = responses.calls[0].request.headers
+    assert "fastly-soft-purge" not in {key.lower() for key in sent_headers}
+
+
+@responses.activate
 def test_queue_fastly_surrogate_key_purge_falls_back_to_settings(fastly_settings):
     """
     Called with the surrogate key alone, the task purges Learn's service anyway.
