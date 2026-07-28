@@ -678,7 +678,7 @@ MIT_LEARN_HONOR_CODE_URL = get_string(
 MAILGUN_WEBHOOK_SIGNING_SECRET = get_string(
     name="MAILGUN_WEBHOOK_SIGNING_SECRET",
     default="",
-    description="The secret to use for signing Mailgun webhooks",
+    description="The secret to use for validating Mailgun webhook signatures",
 )
 
 MAILGUN_WEBHOOK_VALIDATE_SIGNATURE = get_bool(
