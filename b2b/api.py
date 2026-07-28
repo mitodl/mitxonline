@@ -29,6 +29,8 @@ from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
 from b2b.mail import ENROLLMENT_CODE_ASSINGMENT_TAG
 from b2b.models import (
+    EMAIL_STATUS_FAILED,
+    EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY,
     EMAIL_STATUSES,
     ContractPage,
     ContractProgramItem,
@@ -1782,7 +1784,13 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     if event_type not in EMAIL_STATUSES:
         return None
 
-    # Filter out temporary failures. They might confuse users, so we'll wait for a permanent one
+    if event_type == EMAIL_STATUS_FAILED:
+        # This field is only present on temporary and permanent failures.
+        # We don't want to show temporary ones to contract managers since there's nothing to do but wait for resolution
+        severity = event_data.get("severity", "")
+        if severity == EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY:
+            # We don't want to save
+            return None
 
     # At this point we know that the payload is for the email we care about, it's from mailgun, and it's one of the events we care about
     # Save it to the row corresponding to the event we just got and move on with our lives
