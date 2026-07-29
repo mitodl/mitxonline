@@ -1090,7 +1090,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         ga_purchase_flag = is_posthog_enabled(
             features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH,
             False,  # noqa: FBT003
-            self.request.user.id,
+            self.request.user.global_id,
         )
         ga_purchase_payload = None
         if ga_purchase_flag:

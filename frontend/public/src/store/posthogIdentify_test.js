@@ -36,7 +36,7 @@ describe("posthogIdentifyMiddleware", () => {
 
     sinon.assert.calledWith(identifyStub, "guid-123", {
       environment: "test",
-      user_id:     5
+      user_id:     "guid-123"
     })
   })
 

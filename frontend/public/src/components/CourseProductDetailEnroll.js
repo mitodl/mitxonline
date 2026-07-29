@@ -291,7 +291,9 @@ export class CourseProductDetailEnroll extends React.Component<
     const product = run && run.products ? run.products[0] : null
     const newCartDesign = checkFeatureFlag(
       "new-cart-design",
-      currentUser && currentUser.id ? currentUser.id : "anonymousUser"
+      currentUser && currentUser.global_id ?
+        currentUser.global_id :
+        "anonymousUser"
     )
     const canUpgrade = !!(run && run.is_upgradable && product)
     return upgradableCourseRuns.length > 0 ||

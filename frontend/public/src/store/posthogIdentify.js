@@ -29,7 +29,7 @@ const posthogIdentifyMiddleware = () => (next: Function) => (action: any) => {
     if (currentUser && currentUser.global_id) {
       posthog.identify(currentUser.global_id, {
         environment: SETTINGS.environment,
-        user_id:     currentUser.id
+        user_id:     currentUser.global_id
       })
     }
   }
