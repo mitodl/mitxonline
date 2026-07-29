@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 1.161.0
+---------------
+
+- Fix oasdiff for large diffs (#3796)
+- feat(b2b): look up managed orgs by sso_organization_id; expose the org UUID (#3789)
+- Use Redis-backed HubSpot rate limiter (#3790)
+- Add redirect for terms, privacy, and honor code (#3776)
+- fix: count each B2B program enrollment once in backfill (#3787)
+- Fix OAS comment generation (#3788)
+- Shard CI pytest run across a 4-way matrix, drop unused coverage instrumentation (#3783)
+- Speed up pytest: fast password hasher, drop unused coverage html report (#3782)
+- fix: allow 0 as minimum # of value (#3779)
+
 Version 1.160.5 (Released July 22, 2026)
 ---------------
 
