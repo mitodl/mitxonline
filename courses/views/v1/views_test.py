@@ -1435,3 +1435,32 @@ def test_partner_schools_endpoint_unfiltered_by_default(user_drf_client):
 
     assert resp.status_code == status.HTTP_200_OK
     assert [s["name"] for s in resp.json()] == ["Some School"]
+
+
+@pytest.mark.parametrize("program_id", ["abc", "1.5"])
+def test_partner_schools_endpoint_invalid_program_returns_400(
+    user_drf_client, program_id
+):
+    """A non-integer program value returns a 400, not a 500 or an unfiltered response."""
+    resp = user_drf_client.get(
+        reverse("v1:partner_schools_api-list"), {"program": program_id}
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_partner_schools_endpoint_distinct_with_multiple_program_rows(
+    user_drf_client,
+):
+    """A school with two recipient rows for the same program is returned once."""
+    program = ProgramFactory.create()
+    school = PartnerSchoolFactory.create(name="Duplicate Rows School")
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+
+    resp = user_drf_client.get(
+        reverse("v1:partner_schools_api-list"), {"program": program.id}
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [s["name"] for s in resp.json()] == ["Duplicate Rows School"]
