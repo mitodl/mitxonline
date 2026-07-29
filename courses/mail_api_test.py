@@ -6,6 +6,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     LearnerProgramRecordShareFactory,
+    PartnerSchoolProgramFactory,
     ProgramFactory,
 )
 from courses.mail_api import (
@@ -75,7 +76,73 @@ def test_send_enrollment_failure_message(user, mocker, is_program):
 
 
 def test_send_partner_school_sharing_message(mocker):
-    """Test that the partner school message goes to the right spot"""
+    """The record goes to the per-program recipient address."""
+    record = LearnerProgramRecordShareFactory()
+    PartnerSchoolProgramFactory.create(
+        partner_school=record.partner_school,
+        program=record.program,
+        email="scm@example.com",
+    )
+    record_link = f"{SITE_BASE_URL}/records/shared/{record.share_uuid}"
+
+    patched_get_message_sender = mocker.patch("courses.mail_api.get_message_sender")
+    mock_sender = patched_get_message_sender.return_value.__enter__.return_value
+
+    send_partner_school_sharing_message(record)
+
+    patched_get_message_sender.assert_called_once_with(PartnerSchoolSharingMessage)
+    mock_sender.build_and_send_message.assert_called_once_with(
+        "scm@example.com",
+        {"learner_record": record, "record_link": record_link},
+    )
+
+
+def test_send_partner_school_sharing_message_all_recipients(mocker):
+    """A school with two recipients for the program gets one message each."""
+    record = LearnerProgramRecordShareFactory()
+    for email in ["vd@example.com", "cs@example.com"]:
+        PartnerSchoolProgramFactory.create(
+            partner_school=record.partner_school,
+            program=record.program,
+            email=email,
+        )
+    record_link = f"{SITE_BASE_URL}/records/shared/{record.share_uuid}"
+
+    patched_get_message_sender = mocker.patch("courses.mail_api.get_message_sender")
+    mock_sender = patched_get_message_sender.return_value.__enter__.return_value
+
+    send_partner_school_sharing_message(record)
+
+    context = {"learner_record": record, "record_link": record_link}
+    assert mock_sender.build_and_send_message.call_count == 2
+    mock_sender.build_and_send_message.assert_any_call("vd@example.com", context)
+    mock_sender.build_and_send_message.assert_any_call("cs@example.com", context)
+
+
+def test_send_partner_school_sharing_message_never_sends_to_alt_email(mocker):
+    """alt_email is reference data only and must never receive a record."""
+    record = LearnerProgramRecordShareFactory()
+    PartnerSchoolProgramFactory.create(
+        partner_school=record.partner_school,
+        program=record.program,
+        email="primary@example.com",
+        alt_email="alternative@example.com",
+    )
+
+    patched_get_message_sender = mocker.patch("courses.mail_api.get_message_sender")
+    mock_sender = patched_get_message_sender.return_value.__enter__.return_value
+
+    send_partner_school_sharing_message(record)
+
+    recipients = [
+        call.args[0] for call in mock_sender.build_and_send_message.call_args_list
+    ]
+    assert recipients == ["primary@example.com"]
+    assert "alternative@example.com" not in recipients
+
+
+def test_send_partner_school_sharing_message_falls_back_to_school_email(mocker):
+    """With no per-program address the school's own email is used."""
     record = LearnerProgramRecordShareFactory()
     record_link = f"{SITE_BASE_URL}/records/shared/{record.share_uuid}"
 
@@ -83,7 +150,7 @@ def test_send_partner_school_sharing_message(mocker):
     mock_sender = patched_get_message_sender.return_value.__enter__.return_value
 
     send_partner_school_sharing_message(record)
-    patched_get_message_sender.assert_called_once_with(PartnerSchoolSharingMessage)
+
     mock_sender.build_and_send_message.assert_called_once_with(
         record.partner_school.email,
         {"learner_record": record, "record_link": record_link},
