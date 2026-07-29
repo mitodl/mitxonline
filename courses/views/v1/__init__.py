@@ -32,6 +32,7 @@ from courses.api import (
     deactivate_run_enrollment,
     get_relevant_course_run_qset,
     get_user_relevant_program_course_run_qset,
+    partner_schools_for_program,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -684,7 +685,9 @@ class LearnerRecordShareView(APIView):
             and request.data["partnerSchool"] is not None
         ):
             try:
-                school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
+                school = partner_schools_for_program(program).get(
+                    pk=request.data["partnerSchool"]
+                )
             except PartnerSchool.DoesNotExist:
                 return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
 
