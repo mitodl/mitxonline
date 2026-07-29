@@ -13,6 +13,8 @@ from courses.factories import (
     CourseRunFactory,
     CourseRunGradeFactory,
     EnrollmentModeFactory,
+    PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
     ProgramFactory,
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
@@ -25,8 +27,10 @@ from courses.serializers.v1.programs import (
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
 )
+from main import features
 from main.test_utils import assert_drf_json_equal
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -489,3 +493,88 @@ def test_program_requirement_serializer_valid(data):
     """Verify that the ProgramRequirementSerializer validates data"""
     serializer = ProgramRequirementSerializer(data=data)
     serializer.is_valid(raise_exception=True)
+
+
+def test_learner_record_only_includes_schools_for_that_program(settings):
+    """A learner sharing an SCM record must not see DEDP-only schools."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    user = UserFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    data = LearnerRecordSerializer(scm, context={"user": user}).data
+
+    assert [school["name"] for school in data["partner_schools"]] == ["SCM School"]
+
+
+def test_learner_record_schools_are_alphabetical(settings):
+    """The school list is sorted by name regardless of insertion order."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    user = UserFactory.create()
+    for name in ["Zhejiang University", "Arizona State University", "MIT"]:
+        school = PartnerSchoolFactory.create(name=name)
+        PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+
+    assert [school["name"] for school in data["partner_schools"]] == [
+        "Arizona State University",
+        "MIT",
+        "Zhejiang University",
+    ]
+
+
+def test_learner_record_school_with_two_recipients_appears_once(settings):
+    """Two recipient rows for one school must not duplicate the dropdown entry."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    user = UserFactory.create()
+    school = PartnerSchoolFactory.create(name="Reykjavik University")
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="vd@example.com"
+    )
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="cs@example.com"
+    )
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+
+    assert [school["name"] for school in data["partner_schools"]] == [
+        "Reykjavik University"
+    ]
+
+
+def test_learner_record_excludes_unassigned_schools(settings):
+    """A school with no program assignment is shown to nobody."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    user = UserFactory.create()
+    PartnerSchoolFactory.create(name="Unassigned School")
+
+    data = LearnerRecordSerializer(program, context={"user": user}).data
+
+    assert data["partner_schools"] == []
+
+
+def test_learner_record_shows_all_schools_when_flag_off(settings):
+    """With the flag off the pre-12321 behavior is preserved exactly."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    user = UserFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    data = LearnerRecordSerializer(scm, context={"user": user}).data
+
+    assert [school["name"] for school in data["partner_schools"]] == [
+        "DEDP School",
+        "SCM School",
+    ]

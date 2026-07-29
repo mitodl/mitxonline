@@ -7,6 +7,7 @@ from rest_framework.exceptions import ValidationError
 
 from cms.serializers import ProgramPageSerializer
 from courses import models
+from courses.api import partner_schools_for_program
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
@@ -365,7 +366,7 @@ class LearnerRecordSerializer(serializers.Serializer):
             if "anonymous_pull" not in self.context
             else [],
             "partner_schools": PartnerSchoolSerializer(
-                models.PartnerSchool.objects.all(), many=True
+                partner_schools_for_program(instance), many=True
             ).data
             if "anonymous_pull" not in self.context
             else [],
