@@ -22,10 +22,17 @@ const Header = ({ currentUser, cartItemsCount, location }: Props) => {
       username: currentUser.username,
       name:     currentUser.name
     })
-    posthog.identify(currentUser.id, {
-      environment: SETTINGS.environment,
-      user_id:     currentUser.id
-    })
+    if (currentUser.global_id) {
+      // Identify by the Keycloak global id rather than our Django user id.
+      // This posthog project is shared with other MIT applications, and
+      // xpro identifies people by its own integer user ids, so integer ids
+      // collide across applications. Users with no global id are left
+      // unidentified rather than identified by a colliding id.
+      posthog.identify(currentUser.global_id, {
+        environment: SETTINGS.environment,
+        user_id:     currentUser.id
+      })
+    }
   } else {
     Sentry.getCurrentScope().setUser(null)
   }

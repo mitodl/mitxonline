@@ -8,7 +8,6 @@ import { compose } from "redux"
 import { mutateAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { pathOr } from "ramda"
-import posthog from "posthog-js"
 import Loader from "../../components/Loader"
 import { DASHBOARD_PAGE_TITLE } from "../../constants"
 import {
@@ -84,16 +83,9 @@ export class DashboardPage extends React.Component<
   componentDidMount() {
     const { currentUser } = this.props
 
-    // Identify the user to PostHog using their global_id (GUID) if available
+    // Identifying happens in Header, which renders on every page. Here we
+    // just check the feature flag and redirect if enabled.
     if (currentUser && currentUser.global_id && SETTINGS.posthog_api_host) {
-      posthog.identify(currentUser.global_id, {
-        email:       currentUser.email,
-        name:        currentUser.name,
-        user_id:     currentUser.id,
-        environment: SETTINGS.environment
-      })
-
-      // Wait a short time for PostHog to process the identify call before checking feature flags
       setTimeout(() => {
         try {
           // Check feature flag and redirect if enabled
@@ -114,7 +106,7 @@ export class DashboardPage extends React.Component<
         } catch (error) {
           console.warn("Feature flag check failed:", error)
         }
-      }, 500) // Wait 500ms for PostHog to process the identify call
+      }, 500) // Wait for PostHog to process the identify call made in Header
     }
   }
 

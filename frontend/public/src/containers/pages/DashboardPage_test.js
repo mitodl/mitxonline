@@ -1,7 +1,6 @@
 // @flow
 import { assert } from "chai"
 import sinon from "sinon"
-import posthog from "posthog-js"
 
 import DashboardPage, {
   DashboardPage as InnerDashboardPage
@@ -86,15 +85,12 @@ describe("DashboardPage", () => {
   })
 
   describe("PostHog feature flag redirect", () => {
-    let mockLocation, posthogIdentifyStub, checkFeatureFlagStub, clock
+    let mockLocation, checkFeatureFlagStub, clock
 
     beforeEach(() => {
       // Mock window.location.href and search
       mockLocation = { href: "", search: "" }
       sandbox.stub(window, "location").value(mockLocation)
-
-      // Mock PostHog methods
-      posthogIdentifyStub = sandbox.stub(posthog, "identify")
 
       // Mock checkFeatureFlag
       checkFeatureFlagStub = sandbox.stub(util, "checkFeatureFlag")
@@ -108,7 +104,7 @@ describe("DashboardPage", () => {
       mockSettings.mit_learn_dashboard_url = undefined
     })
 
-    it("identifies user to PostHog and redirects when feature flag is enabled", async () => {
+    it("redirects when feature flag is enabled", async () => {
       const mockUser = makeUser()
       mockUser.global_id = "test-guid-123"
 
@@ -126,18 +122,6 @@ describe("DashboardPage", () => {
         },
         { currentUser: mockUser }
       )
-
-      // Component mounts automatically, so PostHog calls should have been made
-      // Check that PostHog identify was called
-      sinon.assert.called(posthogIdentifyStub)
-
-      // Check the identify call had the correct GUID
-      const identifyCall = posthogIdentifyStub.getCall(0)
-      assert.equal(identifyCall.args[0], "test-guid-123")
-      assert.equal(identifyCall.args[1].email, mockUser.email)
-      assert.equal(identifyCall.args[1].name, mockUser.name)
-      assert.equal(identifyCall.args[1].user_id, mockUser.id)
-      assert.equal(identifyCall.args[1].environment, "test")
 
       // Feature flag check hasn't happened yet (it's in setTimeout)
       sinon.assert.notCalled(checkFeatureFlagStub)
@@ -200,10 +184,6 @@ describe("DashboardPage", () => {
         { currentUser: mockUser }
       )
 
-      // Component mounts automatically, so PostHog calls should have been made
-      // Verify PostHog identify was called
-      sinon.assert.called(posthogIdentifyStub)
-
       // Feature flag check hasn't happened yet (it's in setTimeout)
       sinon.assert.notCalled(checkFeatureFlagStub)
 
@@ -221,7 +201,7 @@ describe("DashboardPage", () => {
       assert.equal(mockLocation.href, "")
     })
 
-    it("does not redirect when user has no global_id", async () => {
+    it("does not check the feature flag when user has no global_id", async () => {
       const mockUser = {
         id:               123,
         email:            "test@example.com",
@@ -241,15 +221,15 @@ describe("DashboardPage", () => {
         { currentUser: mockUser }
       )
 
-      // Component mounts automatically
-      // Since there's no global_id, PostHog identify should not be called
-      sinon.assert.notCalled(posthogIdentifyStub)
+      clock.tick(500)
+
+      sinon.assert.notCalled(checkFeatureFlagStub)
 
       // Verify no redirect happened
       assert.equal(mockLocation.href, "")
     })
 
-    it("does not redirect when PostHog is not configured", async () => {
+    it("does not check the feature flag when PostHog is not configured", async () => {
       const mockUser = makeUser()
       mockUser.global_id = "test-guid-123"
 
@@ -266,9 +246,9 @@ describe("DashboardPage", () => {
         { currentUser: mockUser }
       )
 
-      // Component mounts automatically
-      // Verify PostHog identify was not called
-      sinon.assert.notCalled(posthogIdentifyStub)
+      clock.tick(500)
+
+      sinon.assert.notCalled(checkFeatureFlagStub)
 
       // Verify no redirect happened
       assert.equal(mockLocation.href, "")
@@ -292,9 +272,6 @@ describe("DashboardPage", () => {
         },
         { currentUser: mockUser }
       )
-
-      // Verify PostHog identify was called
-      sinon.assert.called(posthogIdentifyStub)
 
       // Feature flag check hasn't happened yet (it's in setTimeout)
       sinon.assert.notCalled(checkFeatureFlagStub)
@@ -332,9 +309,6 @@ describe("DashboardPage", () => {
         { currentUser: mockUser }
       )
 
-      // Verify PostHog identify was called
-      sinon.assert.called(posthogIdentifyStub)
-
       // Feature flag check hasn't happened yet (it's in setTimeout)
       sinon.assert.notCalled(checkFeatureFlagStub)
 
@@ -368,9 +342,9 @@ describe("DashboardPage", () => {
         { currentUser: null }
       )
 
-      // Component mounts automatically with null user
-      // Since there's no currentUser, PostHog identify should not be called
-      sinon.assert.notCalled(posthogIdentifyStub)
+      clock.tick(500)
+
+      sinon.assert.notCalled(checkFeatureFlagStub)
 
       // Verify no redirect happened
       assert.equal(mockLocation.href, "")
@@ -398,10 +372,6 @@ describe("DashboardPage", () => {
         },
         { currentUser: mockUser }
       )
-
-      // Component mounts automatically
-      // Verify PostHog identify was called
-      sinon.assert.called(posthogIdentifyStub)
 
       // Feature flag check hasn't happened yet (it's in setTimeout)
       sinon.assert.notCalled(checkFeatureFlagStub)
@@ -441,10 +411,6 @@ describe("DashboardPage", () => {
         },
         { currentUser: mockUser }
       )
-
-      // Component mounts automatically
-      // Verify PostHog identify was called
-      sinon.assert.called(posthogIdentifyStub)
 
       // Feature flag check hasn't happened yet (it's in setTimeout)
       sinon.assert.notCalled(checkFeatureFlagStub)
