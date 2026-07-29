@@ -1412,3 +1412,32 @@ def test_share_learner_record_allows_any_school_when_flag_off(
 
     assert resp.status_code == status.HTTP_200_OK
     patched_send_email.assert_called_once()
+
+
+def test_partner_schools_endpoint_filters_by_program(user_drf_client):
+    """The partner schools list can be scoped to a single program."""
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    resp = user_drf_client.get(
+        reverse("v1:partner_schools_api-list"), {"program": scm.id}
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [school["name"] for school in resp.json()] == ["SCM School"]
+
+
+def test_partner_schools_endpoint_unfiltered_by_default(user_drf_client):
+    """Without a program param the endpoint returns every active school."""
+    program = ProgramFactory.create()
+    school = PartnerSchoolFactory.create(name="Some School")
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+
+    resp = user_drf_client.get(reverse("v1:partner_schools_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [s["name"] for s in resp.json()] == ["Some School"]

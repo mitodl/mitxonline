@@ -633,6 +633,27 @@ class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PartnerSchoolSerializer
     queryset = PartnerSchool.objects.all()
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="program",
+                type=int,
+                description="Only return schools assigned to this program id.",
+                required=False,
+            )
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        """Optionally scope the list to a single program."""
+        queryset = super().get_queryset()
+        program_id = self.request.query_params.get("program")
+        if program_id:
+            queryset = queryset.filter(programs__id=program_id).distinct()
+        return queryset
+
 
 def get_enrolled_program_or_404(user, program_id: int) -> Program:
     """Return a program only if the user has an active enrollment for it."""
