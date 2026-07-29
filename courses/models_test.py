@@ -26,6 +26,8 @@ from courses.factories import (
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -37,6 +39,7 @@ from courses.models import (
     CourseRun,
     CourseRunEnrollment,
     PaidCourseRun,
+    PartnerSchool,
     Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
@@ -1710,3 +1713,93 @@ def test_nonvariant_filter():
     assert CourseRun.objects.filter(course=cr1.course).nonvariant().count() == 2
     assert CourseRun.all_objects.filter(course=cr1.course).count() == 5
     assert CourseRun.all_objects.filter(course=cr1.course).nonvariant().count() == 2
+
+
+def test_partner_school_emails_for_program_uses_link_email():
+    """emails_for_program returns the per-program address, not the school default."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="scm@example.com"
+    )
+
+    assert school.emails_for_program(program) == ["scm@example.com"]
+
+
+def test_partner_school_emails_for_program_returns_all_recipients():
+    """A school may notify several addresses for one program (Reykjavik under SDS)."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="vd@example.com"
+    )
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="cs@example.com"
+    )
+
+    assert sorted(school.emails_for_program(program)) == [
+        "cs@example.com",
+        "vd@example.com",
+    ]
+
+
+def test_partner_school_emails_for_program_falls_back_to_school_email():
+    """A link with a blank email falls back to the school's own address."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program, email="")
+
+    assert school.emails_for_program(program) == ["default@example.com"]
+
+
+def test_partner_school_emails_for_program_ignores_other_programs():
+    """A link for a different program must not leak into this program's recipients."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=scm, email="scm@example.com"
+    )
+
+    assert school.emails_for_program(dedp) == ["default@example.com"]
+
+
+def test_partner_school_alt_email_is_stored_but_not_a_recipient():
+    """alt_email round-trips to the database but is never a send target."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    link = PartnerSchoolProgramFactory.create(
+        partner_school=school,
+        program=program,
+        email="primary@example.com",
+        alt_email="alternative@example.com",
+    )
+    link.refresh_from_db()
+
+    assert link.alt_email == "alternative@example.com"
+    assert school.emails_for_program(program) == ["primary@example.com"]
+
+
+def test_partner_school_alt_email_alone_does_not_make_a_recipient():
+    """A link with only alt_email set falls back to the school default."""
+    school = PartnerSchoolFactory.create(email="default@example.com")
+    program = ProgramFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=school,
+        program=program,
+        email="",
+        alt_email="alternative@example.com",
+    )
+
+    assert school.emails_for_program(program) == ["default@example.com"]
+
+
+def test_partner_school_default_ordering_is_alphabetical():
+    """PartnerSchool queries come back sorted by name."""
+    PartnerSchoolFactory.create(name="Zhejiang University")
+    PartnerSchoolFactory.create(name="Arizona State University")
+    PartnerSchoolFactory.create(name="Massachusetts Institute of Technology")
+
+    names = list(PartnerSchool.objects.values_list("name", flat=True))
+
+    assert names == sorted(names)
