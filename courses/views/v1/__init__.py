@@ -19,6 +19,7 @@ from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -651,6 +652,11 @@ class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = super().get_queryset()
         program_id = self.request.query_params.get("program")
         if program_id:
+            try:
+                program_id = int(program_id)
+            except ValueError:
+                msg = "program must be an integer id."
+                raise ValidationError({"program": msg}) from None
             queryset = queryset.filter(programs__id=program_id).distinct()
         return queryset
 
