@@ -83,8 +83,9 @@ export class DashboardPage extends React.Component<
   componentDidMount() {
     const { currentUser } = this.props
 
-    // Identifying happens in Header, which renders on every page. Here we
-    // just check the feature flag and redirect if enabled.
+    // Identifying happens in a store middleware (see
+    // store/posthogIdentify.js) whenever /current_user/ loads. Here we just
+    // check the feature flag and redirect if enabled.
     if (currentUser && currentUser.global_id && SETTINGS.posthog_api_host) {
       setTimeout(() => {
         try {
@@ -106,7 +107,7 @@ export class DashboardPage extends React.Component<
         } catch (error) {
           console.warn("Feature flag check failed:", error)
         }
-      }, 500) // Wait for PostHog to process the identify call made in Header
+      }, 500) // Wait for PostHog to process the identify call
     }
   }
 
