@@ -2720,12 +2720,50 @@ class PartnerSchool(TimestampedModel):
     name = models.CharField(max_length=255)
     email = models.TextField(null=False)
     is_active = models.BooleanField(default=True, blank=True)
+    programs = models.ManyToManyField(
+        "courses.Program",
+        through="courses.PartnerSchoolProgram",
+        blank=True,
+        related_name="partner_schools",
+        help_text=(
+            "Programs this school accepts records for. Learners only see schools "
+            "assigned to the program whose record they are sharing."
+        ),
+    )
 
     objects = PartnerSchoolActiveUndeleteManager()
     all_objects = models.Manager()
 
+    class Meta:
+        ordering = ["name"]
+
     def __str__(self):
         return self.name
+
+    def emails_for_program(self, program):
+        """
+        Return the recipient addresses for this school for the given program.
+
+        A school may have more than one recipient per program (product confirmed
+        Reykjavik University notifies two offices for SDS), so this returns a list.
+        Falls back to the school's own email when no link supplies one, which keeps
+        pre-existing rows working.
+
+        `PartnerSchoolProgram.alt_email` is deliberately NOT included: product
+        asked for it to be recorded for reference only. Do not add it here.
+
+        Args:
+            program (Program): the program whose record is being shared
+
+        Returns:
+            list of str: email addresses to send the record to
+        """
+        emails = [
+            link.email
+            for link in self.program_links.filter(program=program).order_by("id")
+            if link.email
+        ]
+        return emails or [self.email]
 
     def delete(self, *, using=None, keep_parents=False):  # noqa: ARG002
         """Soft-delete the record."""
@@ -2733,6 +2771,54 @@ class PartnerSchool(TimestampedModel):
         self.is_active = False
         self.save(update_fields=("is_active",))
         return (1, {"courses.PartnerSchool": 1})
+
+
+class PartnerSchoolProgram(TimestampedModel):
+    """
+    Links a PartnerSchool to a Program along with the recipient address for that
+    program.
+
+    There is deliberately no unique constraint on (partner_school, program): a
+    school may need records sent to more than one address for a single program.
+    Add one row per recipient.
+    """
+
+    partner_school = models.ForeignKey(
+        "courses.PartnerSchool",
+        on_delete=models.CASCADE,
+        related_name="program_links",
+    )
+    program = models.ForeignKey(
+        "courses.Program",
+        on_delete=models.CASCADE,
+        related_name="partner_school_links",
+    )
+    email = models.TextField(
+        blank=True,
+        help_text=(
+            "Recipient address for this program. Leave blank to use the school's "
+            "default email."
+        ),
+    )
+    alt_email = models.TextField(
+        blank=True,
+        help_text=(
+            "Alternative contact address, recorded for reference only. Learner "
+            "records are NOT sent here."
+        ),
+    )
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(
+                name="partner_school_program_email_unique",
+                fields=("partner_school", "program", "email"),
+            )
+        ]
+        indexes = [models.Index(fields=("program", "partner_school"))]
+
+    def __str__(self):
+        return f"{self.partner_school.name} - {self.program.readable_id} <{self.email or self.partner_school.email}>"
 
 
 class LearnerProgramRecordShare(TimestampedModel):
