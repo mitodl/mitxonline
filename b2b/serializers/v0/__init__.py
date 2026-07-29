@@ -97,6 +97,7 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
             "description",
             "logo",
             "slug",
+            "sso_organization_id",
             "contracts",
         ]
         read_only_fields = [
@@ -105,6 +106,7 @@ class OrganizationPageSerializer(serializers.ModelSerializer):
             "description",
             "logo",
             "slug",
+            "sso_organization_id",
             "contracts",
         ]
 

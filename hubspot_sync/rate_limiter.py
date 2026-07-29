@@ -4,85 +4,100 @@ Rate limiting for HubSpot API calls
 
 import logging
 import random
-import threading
 import time
-from collections import deque
+import uuid
 
 from django.conf import settings
 
 log = logging.getLogger(__name__)
 
+# Atomic sliding-window rate limiter implemented as a Redis Lua script.
+#
+# The sorted set stores claimed slots: member = unique ID, score = scheduled
+# execution time. Cleanup removes slots whose window has expired. When all
+# slots in the current window are claimed, the next slot is pushed past the
+# oldest slot's window boundary, distributing load across workers automatically.
+_RATE_LIMIT_LUA = """
+local key       = KEYS[1]
+local now       = tonumber(ARGV[1])
+local window    = tonumber(ARGV[2])
+local max_req   = tonumber(ARGV[3])
+local min_delay = tonumber(ARGV[4])
+local member    = ARGV[5]
+
+redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+
+local count = redis.call('ZCARD', key)
+local target
+
+if count < max_req then
+    if count > 0 then
+        local last   = redis.call('ZRANGE', key, -1, -1, 'WITHSCORES')
+        local last_t = tonumber(last[2])
+        target = math.max(now, last_t + min_delay)
+    else
+        target = now
+    end
+else
+    local oldest   = redis.call('ZRANGE', key,  0,  0, 'WITHSCORES')
+    local last     = redis.call('ZRANGE', key, -1, -1, 'WITHSCORES')
+    local oldest_t = tonumber(oldest[2])
+    local last_t   = tonumber(last[2])
+    target = math.max(oldest_t + window, last_t + min_delay, now)
+end
+
+redis.call('ZADD', key, target, member)
+redis.call('EXPIRE', key, math.ceil(window) + 1)
+
+local wait_ms = (target - now) * 1000
+if wait_ms < 0 then wait_ms = 0 end
+return tostring(wait_ms)
+"""
+
 
 class HubSpotRateLimiter:
     """
-    A scalable rate limiter that uses a sliding window approach.
+    Distributed rate limiter using a Redis sorted-set sliding window.
+
+    All Celery workers share the same Redis key, so rate limiting is enforced
+    globally across processes rather than per-process.
     """
 
     def __init__(self):
         self.min_delay_ms = getattr(settings, "HUBSPOT_TASK_DELAY", 60)
-
-        self._lock = threading.Lock()
-        self._request_times = deque()
-
         self._window_size_seconds = 1.0
         self._max_requests_per_second = 19
+        self._redis_key = "hubspot:rate_limit"
 
-        self._cleanup_counter = 0
-        self._cleanup_interval = 50
+    def _get_redis(self):
+        from django_redis import get_redis_connection  # noqa: PLC0415
+
+        return get_redis_connection("redis")
 
     def wait_for_rate_limit(self) -> None:
-        """
-        Wait for an amount of time based on sliding window rate limiting.
-        """
-        current_time = time.time()
+        redis_client = self._get_redis()
+        now = time.time()
+        member = str(uuid.uuid4())
 
-        with self._lock:
-            self._cleanup_counter += 1
-            if self._cleanup_counter >= self._cleanup_interval:
-                self._cleanup_old_timestamps(current_time)
-                self._cleanup_counter = 0
+        script = redis_client.register_script(_RATE_LIMIT_LUA)
+        result = script(
+            keys=[self._redis_key],
+            args=[
+                str(now),
+                str(self._window_size_seconds),
+                str(self._max_requests_per_second),
+                str(self.min_delay_ms / 1000),
+                member,
+            ],
+        )
+        wait_ms = float(result)
 
-            target_time = self._calculate_next_available_time(current_time)
-
-            self._request_times.append(target_time)
-
-            sleep_time = max(0, target_time - current_time)
-
-        if sleep_time > 0:
+        if wait_ms > 0:
+            sleep_time = wait_ms / 1000
             jitter = random.uniform(-0.05, 0.05) * sleep_time  # noqa: S311
             sleep_time = max(0, sleep_time + jitter)
-
             log.debug("Rate limiting: sleeping for %.3f seconds", sleep_time)
             time.sleep(sleep_time)
-
-    def _cleanup_old_timestamps(self, current_time: float) -> None:
-        """Remove timestamps outside the sliding window."""
-        cutoff_time = current_time - self._window_size_seconds
-        while self._request_times and self._request_times[0] < cutoff_time:
-            self._request_times.popleft()
-
-    def _calculate_next_available_time(self, current_time: float) -> float:
-        """
-        Calculate when the next request can be made based on the sliding window.
-        """
-        self._cleanup_old_timestamps(current_time)
-
-        if len(self._request_times) < self._max_requests_per_second:
-            if self._request_times:
-                last_request_time = self._request_times[-1]
-                min_next_time = last_request_time + (self.min_delay_ms / 1000)
-                return max(current_time, min_next_time)
-            return current_time
-
-        oldest_in_window = self._request_times[0]
-        next_available = oldest_in_window + self._window_size_seconds
-
-        if self._request_times:
-            last_request_time = self._request_times[-1]
-            min_next_time = last_request_time + (self.min_delay_ms / 1000)
-            next_available = max(next_available, min_next_time)
-
-        return max(next_available, current_time)
 
 
 rate_limiter = HubSpotRateLimiter()
