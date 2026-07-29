@@ -870,7 +870,7 @@ def test_create_run_enrollments_verifies_exports_for_verified_mode(
     patched_verify = mocker.patch(
         "courses.api.verify_user_with_exports",
         return_value=ExportComplianceResult(
-            decision="ACCEPT",
+            decision="COMPLETED",
             reason_code=100,
             request_id="req-123",
             raw={},
@@ -901,7 +901,7 @@ def test_create_run_enrollments_verifies_exports_for_audit_mode(mocker, user):
     patched_verify = mocker.patch(
         "courses.api.verify_user_with_exports",
         return_value=ExportComplianceResult(
-            decision="ACCEPT",
+            decision="COMPLETED",
             reason_code=100,
             request_id="req-123",
             raw={},
@@ -973,7 +973,7 @@ def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, u
     patched_verify = mocker.patch(
         "courses.api.verify_user_with_exports",
         return_value=ExportComplianceResult(
-            decision="ACCEPT",
+            decision="COMPLETED",
             reason_code=100,
             request_id="req-123",
             raw={},
@@ -997,7 +997,7 @@ def test_create_program_enrollments_verifies_exports_for_default_mode(mocker, us
     patched_verify = mocker.patch(
         "courses.api.verify_user_with_exports",
         return_value=ExportComplianceResult(
-            decision="ACCEPT",
+            decision="COMPLETED",
             reason_code=100,
             request_id="req-123",
             raw={},
