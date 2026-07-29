@@ -77,13 +77,15 @@ def send_partner_school_sharing_message(learner_record):
         learner_record (LearnerProgramRecordShare): the learner record to send
     """
     try:
+        recipients = learner_record.partner_school.emails_for_program(
+            learner_record.program
+        )
+        context = {
+            "learner_record": learner_record,
+            "record_link": f"{SITE_BASE_URL}/records/shared/{learner_record.share_uuid}",
+        }
         with get_message_sender(PartnerSchoolSharingMessage) as sender:
-            sender.build_and_send_message(
-                learner_record.partner_school.email,
-                {
-                    "learner_record": learner_record,
-                    "record_link": f"{SITE_BASE_URL}/records/shared/{learner_record.share_uuid}",
-                },
-            )
+            for recipient in recipients:
+                sender.build_and_send_message(recipient, context)
     except Exception:  # pylint: disable=broad-except
         log.exception("Error sending partner school sharing email")
