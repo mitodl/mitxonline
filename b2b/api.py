@@ -17,6 +17,8 @@ from django.db import transaction
 from django.db.models import Count, Manager, Prefetch, Q
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ValidationError as PydanticValidationError
 from wagtail.models import Page
 
 from b2b.constants import (
@@ -1745,6 +1747,50 @@ def verify_mailgun_signature(api_key, token, timestamp, signature):
     return signature == expected_signature
 
 
+class MailgunWebhookSignature(BaseModel):
+    """The signature block Mailgun attaches to every webhook payload."""
+
+    token: str
+    timestamp: str
+    signature: str
+
+
+class MailgunWebhookMessageHeaders(BaseModel):
+    """The subset of message headers Mailgun includes with an event."""
+
+    model_config = ConfigDict(extra="allow")
+
+    message_id: str = Field(alias="message-id")
+
+
+class MailgunWebhookMessage(BaseModel):
+    """The message block describing the email an event pertains to."""
+
+    model_config = ConfigDict(extra="allow")
+
+    headers: MailgunWebhookMessageHeaders
+
+
+class MailgunWebhookEventData(BaseModel):
+    """The event-data block of a Mailgun webhook payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    event: str
+    tags: list[str] = Field(default_factory=list)
+    message: MailgunWebhookMessage
+    severity: str | None = None
+
+
+class MailgunWebhookPayload(BaseModel):
+    """A synthetic or real Mailgun webhook payload, as built by build_payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    signature: MailgunWebhookSignature
+    event_data: MailgunWebhookEventData = Field(alias="event-data")
+
+
 def is_potentially_valid_mailgun_webhook(payload):
     signing_secret = settings.MAILGUN_WEBHOOK_SIGNING_SECRET
     # If we are supposed to validate signatures but don't have a secret, fail closed
@@ -1753,14 +1799,14 @@ def is_potentially_valid_mailgun_webhook(payload):
     if not signing_secret and settings.MAILGUN_WEBHOOK_VALIDATE_SIGNATURE:
         return False
 
-    # Possibly overbuilt, but we'll just make sure we're getting something shaped vaguely correctly
-    if not payload or not isinstance(payload, dict):
+    try:
+        webhook = MailgunWebhookPayload.model_validate(payload)
+    except PydanticValidationError:
         return False
 
     # Check for the right message tag - if it's not there, do nothing else.
     # We want to throw out unrelated messages as fast as possible
-    event_data = payload.get("event-data", {})
-    return ENROLLMENT_CODE_ASSINGMENT_TAG in event_data.get("tags", [])
+    return ENROLLMENT_CODE_ASSINGMENT_TAG in webhook.event_data.tags
 
 
 # We may want to move some of the cheapest checks to the web tier, but the actual queries need to happen in a task.
