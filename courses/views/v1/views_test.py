@@ -76,7 +76,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLLED,
 )
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
-from main.utils import encode_json_cookie_value
+from main.utils import encode_json_cookie_value, get_learn_product_url
 from openedx.exceptions import NoEdxApiAuthError
 from users.factories import UserFactory
 
@@ -860,7 +860,9 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
                         "next_run_id": getattr(course.first_unexpired_run, "id", None),
                         "current_price": None,
                         "page": dict(CoursePageSerializer(course.page).data),
-                        "page_url": None,
+                        "page_url": get_learn_product_url(
+                            "courses", course.readable_id
+                        ),
                         "programs": None,
                         "live": course.live,
                         "effort": course.page.effort,
