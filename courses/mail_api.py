@@ -3,6 +3,7 @@
 import logging
 
 from mitol.mail.api import get_message_sender
+from mitol.olposthog.features import is_enabled
 
 from courses.messages import (
     CourseRunEnrollmentMessage,
@@ -11,6 +12,7 @@ from courses.messages import (
     PartnerSchoolSharingMessage,
 )
 from courses.models import CourseRun
+from main import features
 from main.settings import SITE_BASE_URL
 
 log = logging.getLogger()
@@ -77,9 +79,16 @@ def send_partner_school_sharing_message(learner_record):
         learner_record (LearnerProgramRecordShare): the learner record to send
     """
     try:
-        recipients = learner_record.partner_school.emails_for_program(
-            learner_record.program
-        )
+        # Second of two deliberate flag reads for hq#12321 (the other is
+        # courses.api.partner_schools_for_program). Gating mail here keeps the
+        # flag's promise: entering program assignments cannot change delivery
+        # until the flag is flipped, so data-entry mistakes stay harmless.
+        if is_enabled(features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS):
+            recipients = learner_record.partner_school.emails_for_program(
+                learner_record.program
+            )
+        else:
+            recipients = [learner_record.partner_school.email]
         context = {
             "learner_record": learner_record,
             "record_link": f"{SITE_BASE_URL}/records/shared/{learner_record.share_uuid}",
