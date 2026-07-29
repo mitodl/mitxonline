@@ -6,7 +6,7 @@ from mitol.common.utils.datetime import now_in_utc
 
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision
-from courses.factories import CourseRunFactory, ProgramRunFactory
+from courses.factories import CourseRunFactory, ProgramFactory
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -63,8 +63,8 @@ def test_courseware_object_resolves_course_run():
     assert log_entry.courseware_object == run
 
 
-def test_courseware_object_resolves_program_run():
-    """courseware_object should resolve to the ProgramRun it was created with."""
-    run = ProgramRunFactory.create()
-    log_entry = ExportComplianceLogFactory.create(courseware_object=run)
-    assert log_entry.courseware_object == run
+def test_courseware_object_resolves_program():
+    """courseware_object should resolve to the Program it was created with."""
+    program = ProgramFactory.create()
+    log_entry = ExportComplianceLogFactory.create(courseware_object=program)
+    assert log_entry.courseware_object == program

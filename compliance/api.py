@@ -326,7 +326,7 @@ def decrypt_export_compliance_log(
 def verify_user_with_exports(user, run) -> ExportComplianceResult:
     """
     Verify a user against CyberSource export compliance services for a given
-    CourseRun or ProgramRun, reusing any cached result (accepted or failed)
+    CourseRun or Program, reusing any cached result (accepted or failed)
     for the same courseware object, from the last 24 hours, or representing
     a prior failed check for this user.
     """

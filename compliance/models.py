@@ -10,9 +10,9 @@ from users.models import User
 
 
 def valid_courseware_run_types_list():
-    """Return a Q filter limiting content types to CourseRun/ProgramRun"""
+    """Return a Q filter limiting content types to CourseRun/Program"""
     return models.Q(app_label="courses", model="courserun") | models.Q(
-        app_label="courses", model="programrun"
+        app_label="courses", model="program"
     )
 
 
@@ -33,7 +33,7 @@ class ExportComplianceDecision(models.TextChoices):
 class ExportComplianceLog(TimestampedModel):
     """
     Encrypted record of a CyberSource export compliance check for a user
-    against a specific CourseRun or ProgramRun.
+    against a specific CourseRun or Program.
     """
 
     valid_courseware_run_types = valid_courseware_run_types_list()
