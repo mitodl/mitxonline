@@ -282,12 +282,21 @@ def audit_course_run(
     if fetch_edx:
         try:
             edx_run = get_edx_course(run.courseware_id, client=client)
+
+            def _edx_value(attr, edx_run=edx_run):
+                """Stringify an edX attribute, keeping None as None."""
+                value = getattr(edx_run, attr, None)
+                return None if value is None else str(value)
+
             audit.edx_details = {
-                "title": getattr(edx_run, "title", None),
-                "start": str(getattr(edx_run, "start", None)),
-                "end": str(getattr(edx_run, "end", None)),
-                "enrollment_start": str(getattr(edx_run, "enrollment_start", None)),
-                "enrollment_end": str(getattr(edx_run, "enrollment_end", None)),
+                attr: _edx_value(attr)
+                for attr in (
+                    "title",
+                    "start",
+                    "end",
+                    "enrollment_start",
+                    "enrollment_end",
+                )
             }
         except Exception as exc:  # noqa: BLE001
             audit.edx_error = str(exc)

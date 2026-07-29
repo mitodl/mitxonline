@@ -229,7 +229,10 @@ class Command(BaseCommand):
         target = Path(snapshot_dir) / f"retire_{safe_id}_{timestamp}.json"
 
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(snapshot, indent=2))
+        # default=str so an unexpected object from the edX client can never be
+        # the thing that aborts a retirement. The snapshot is a safety net; it
+        # should degrade to a string rather than raise.
+        target.write_text(json.dumps(snapshot, indent=2, default=str))
 
         return target.resolve()
 

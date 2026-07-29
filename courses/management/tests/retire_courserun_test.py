@@ -260,8 +260,15 @@ class TestCommit:
         # CourseRun.save() calls clean(), which rejects an expiration_date
         # earlier than start/end. Without clearing it, retiring an already
         # finished run raises ValidationError *after* the edX write landed.
-        run.expiration_date = now_in_utc() - timedelta(days=90)
-        run.end_date = now_in_utc() - timedelta(days=120)
+        #
+        # The setup itself has to satisfy clean(), so the whole run is pushed
+        # well into the past: start < end < expiration, all historic. Retiring
+        # then moves end to yesterday, which lands after expiration and is what
+        # forces the reset.
+        now = now_in_utc()
+        run.start_date = now - timedelta(days=200)
+        run.end_date = now - timedelta(days=120)
+        run.expiration_date = now - timedelta(days=90)
         run.save()
 
         _run_command(run, tmp_path, commit=True)
@@ -451,7 +458,21 @@ class TestContractHandling:
 class TestCollisionCheck:
     """The holding contract can't be allowed to violate a unique constraint."""
 
-    def test_language_collision_refused(self, mock_edx):  # noqa: ARG002
+    @pytest.fixture
+    def source_contract(self):
+        """
+        A normal contract, created before anything asks for the holding one.
+
+        ContractPageFactory bootstraps HomePage -> OrganizationIndexPage ->
+        OrganizationPage. get_or_create_retirement_contract() falls back to
+        ensure_b2b_organization_index(), which calls cms.api.get_home_page() and
+        raises Page.DoesNotExist when no Wagtail tree exists yet, so the ordering
+        matters.
+        """
+
+        return ContractPageFactory.create()
+
+    def test_language_collision_refused(self, source_contract, mock_edx):  # noqa: ARG002
         """A parked run with the same course/tag/language/variant blocks the move."""
 
         holding = get_or_create_retirement_contract()
@@ -460,7 +481,7 @@ class TestCollisionCheck:
         )
         incoming = CourseRunFactory.create(
             course=parked.course,
-            b2b_contract=ContractPageFactory.create(),
+            b2b_contract=source_contract,
             language="de_DE",
             run_tag="1T9C2026",
         )
@@ -468,7 +489,7 @@ class TestCollisionCheck:
         with pytest.raises(RetirementContractCollisionError, match="already parked"):
             move_run_to_retirement_contract(incoming)
 
-    def test_primary_language_collision_refused(self, mock_edx):  # noqa: ARG002
+    def test_primary_language_collision_refused(self, source_contract, mock_edx):  # noqa: ARG002
         """A parked primary-language run blocks another for the same group."""
 
         holding = get_or_create_retirement_contract()
@@ -480,7 +501,7 @@ class TestCollisionCheck:
         )
         incoming = CourseRunFactory.create(
             course=parked.course,
-            b2b_contract=ContractPageFactory.create(),
+            b2b_contract=source_contract,
             language="",
             is_primary_language=True,
             run_tag="1T9C2026",
@@ -489,7 +510,7 @@ class TestCollisionCheck:
         with pytest.raises(RetirementContractCollisionError, match="primary-language"):
             move_run_to_retirement_contract(incoming)
 
-    def test_distinct_run_tags_do_not_collide(self, mock_edx):  # noqa: ARG002
+    def test_distinct_run_tags_do_not_collide(self, source_contract, mock_edx):  # noqa: ARG002
         """Different run tags park side by side, which is the normal case."""
 
         holding = get_or_create_retirement_contract()
@@ -498,14 +519,14 @@ class TestCollisionCheck:
         )
         incoming = CourseRunFactory.create(
             course=parked.course,
-            b2b_contract=ContractPageFactory.create(),
+            b2b_contract=source_contract,
             language="de_DE",
             run_tag="1T9C2027",
         )
 
         assert move_run_to_retirement_contract(incoming).id == holding.id
 
-    def test_already_parked_run_is_a_no_op(self, mock_edx):  # noqa: ARG002
+    def test_already_parked_run_is_a_no_op(self, source_contract, mock_edx):  # noqa: ARG002
         """Re-parking a run that's already in the holding contract is fine."""
 
         holding = get_or_create_retirement_contract()
