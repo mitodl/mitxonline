@@ -32,6 +32,7 @@ from courses.models import (
     PaidCourseRun,
     PaidProgram,
     PartnerSchool,
+    PartnerSchoolProgram,
     Program,
     ProgramCertificate,
     ProgramCollectionItem,
@@ -1137,18 +1138,42 @@ class VerifiableCredentialAdmin(TimestampedModelAdmin):
         return qs.select_related("programcertificate", "courseruncertificate")
 
 
+class PartnerSchoolProgramInline(admin.TabularInline):
+    """Inline for assigning a partner school to programs."""
+
+    model = PartnerSchoolProgram
+    extra = 1
+    fields = ("program", "email", "alt_email")
+    autocomplete_fields = ("program",)
+    verbose_name = "Program assignment"
+    verbose_name_plural = (
+        "Program assignments (add one row per recipient address; "
+        "leave email blank to use the school's default)"
+    )
+
+
 @admin.register(PartnerSchool)
 class PartnerSchoolAdmin(TimestampedModelAdmin):
     """Admin for PartnerSchool"""
 
     model = PartnerSchool
-    list_display = ["name", "email"]
+    inlines = [PartnerSchoolProgramInline]
+    list_display = ["name", "email", "assigned_programs"]
+    list_filter = ["programs"]
     search_fields = ["name", "email"]
 
     def get_queryset(self, request):  # noqa: ARG002
         """Use the all_objects manager so we can see everything."""
 
-        return self.model.all_objects.get_queryset()
+        return self.model.all_objects.get_queryset().prefetch_related("programs")
+
+    @admin.display(description="Programs")
+    def assigned_programs(self, obj):
+        """Comma-separated list of assigned programs for the changelist."""
+
+        return ", ".join(
+            sorted({program.readable_id for program in obj.programs.all()})
+        )
 
     def delete_model(self, request, obj):  # noqa: ARG002
         """Soft-delete the model."""
