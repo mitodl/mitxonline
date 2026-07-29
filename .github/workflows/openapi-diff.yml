@@ -18,26 +18,38 @@ jobs:
           ref: ${{ github.base_ref }}
           path: base
       - name: Generate oasdiff changelog
-        id: oasdif_changelog
-        run: | # Capture changelog as a multiline output
-          echo "changelog<<EOF" > $GITHUB_OUTPUT
-          for spec in base/openapi/specs/*.yaml; do
-            base_spec="$spec"
-            head_spec="head/openapi/specs/$(basename "$spec")"
-            if [ -f "$head_spec" ]; then
-              echo "## Changes for $(basename "$spec"):" >> $GITHUB_OUTPUT
-              docker run --rm \
-                --workdir ${{ github.workspace }} \
-                --volume ${{ github.workspace }}:${{ github.workspace }}:rw \
-                -e GITHUB_WORKSPACE=${{ github.workspace }} \
-                tufin/oasdiff changelog \
-                "$base_spec" \
-                "$head_spec" \
-                >> $GITHUB_OUTPUT
-              echo "" >> $GITHUB_OUTPUT
-            fi
-          done
-          echo "EOF" >> $GITHUB_OUTPUT
+        run: | # Write the full comment body to a file rather than a step output.
+          # A large changelog interpolated into a JS action's `body:` input becomes a
+          # huge INPUT_BODY env var, which can blow past the OS argv+envp size limit
+          # and crash the action with "Argument list too long". Writing straight to a
+          # file and using `body-path` avoids that entirely.
+          {
+            echo "## OpenAPI Changes"
+            echo ""
+            echo "<details>"
+            echo "<summary>Show/hide changes</summary>"
+            echo ""
+            echo '```'
+            for spec in base/openapi/specs/*.yaml; do
+              base_spec="$spec"
+              head_spec="head/openapi/specs/$(basename "$spec")"
+              if [ -f "$head_spec" ]; then
+                echo "## Changes for $(basename "$spec"):"
+                docker run --rm \
+                  --workdir ${{ github.workspace }} \
+                  --volume ${{ github.workspace }}:${{ github.workspace }}:rw \
+                  -e GITHUB_WORKSPACE=${{ github.workspace }} \
+                  tufin/oasdiff changelog \
+                  "$base_spec" \
+                  "$head_spec"
+                echo ""
+              fi
+            done
+            echo '```'
+            echo ""
+            echo "Unexpected changes? Ensure your branch is up-to-date with \`main\` (consider rebasing)."
+            echo "</details>"
+          } > comment_body.md
       - name: Find existing comment
         id: find_comment
         uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4
@@ -55,18 +67,7 @@ jobs:
           repository: ${{ github.repository }}
           issue-number: ${{ github.event.pull_request.number }}
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
-          body: |
-            ## OpenAPI Changes
-
-            <details>
-            <summary>Show/hide changes</summary>
-
-            ```
-            ${{ steps.oasdif_changelog.outputs.changelog }}
-            ```
-
-            Unexpected changes? Ensure your branch is up-to-date with `main` (consider rebasing).
-            </details>
+          body-path: comment_body.md
       - name: Check for breaking changes
         id: oasdif_breaking
         run: |

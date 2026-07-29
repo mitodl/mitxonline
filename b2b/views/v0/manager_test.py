@@ -1,5 +1,7 @@
 """Tests for the B2B Manager views"""
 
+import uuid
+
 import pytest
 import reversion
 from django.urls import reverse
@@ -2009,6 +2011,74 @@ def test_manager_org_list_multiple_managed_orgs():
     result_ids = {r["id"] for r in resp.json()["results"]}
     assert org_1.id in result_ids
     assert org_2.id in result_ids
+
+
+def test_manager_org_list_filters_by_sso_organization_id():
+    """?sso_organization_id=<uuid> narrows the managed-org list to that one org --
+    the lookup ol-analytics-api uses to ask "does this user manage org UUID X?".
+    The org's UUID is also serialized in the response.
+    """
+    manager = UserFactory.create()
+    org_1 = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE
+    ).organization
+    org_2 = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE
+    ).organization
+    org_1.sso_organization_id = uuid.uuid4()
+    org_1.save()
+    org_2.sso_organization_id = uuid.uuid4()
+    org_2.save()
+    UserOrganization.objects.create(user=manager, organization=org_1, is_manager=True)
+    UserOrganization.objects.create(user=manager, organization=org_2, is_manager=True)
+    client = APIClient()
+    client.force_login(manager)
+    url = reverse("b2b:b2b-manager-organization-list")
+
+    resp = client.get(url, {"sso_organization_id": str(org_1.sso_organization_id)})
+    assert resp.status_code == status.HTTP_200_OK
+    results = resp.json()["results"]
+    assert {r["id"] for r in results} == {org_1.id}
+    assert results[0]["sso_organization_id"] == str(org_1.sso_organization_id)
+
+
+def test_manager_org_list_sso_filter_excludes_orgs_the_user_does_not_manage():
+    """The filter only narrows the manager-scoped queryset -- filtering by an org
+    the user does NOT manage returns empty, never that org.
+    """
+    manager = UserFactory.create()
+    managed = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE
+    ).organization
+    other = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE
+    ).organization
+    other.sso_organization_id = uuid.uuid4()
+    other.save()
+    UserOrganization.objects.create(user=manager, organization=managed, is_manager=True)
+    client = APIClient()
+    client.force_login(manager)
+    url = reverse("b2b:b2b-manager-organization-list")
+
+    resp = client.get(url, {"sso_organization_id": str(other.sso_organization_id)})
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["results"] == []
+
+
+def test_manager_org_list_invalid_sso_uuid_returns_empty_not_500():
+    """An unparseable sso_organization_id yields an empty result, not a 500."""
+    manager = UserFactory.create()
+    org = ContractPageFactory.create(
+        membership_type=CONTRACT_MEMBERSHIP_CODE
+    ).organization
+    UserOrganization.objects.create(user=manager, organization=org, is_manager=True)
+    client = APIClient()
+    client.force_login(manager)
+    url = reverse("b2b:b2b-manager-organization-list")
+
+    resp = client.get(url, {"sso_organization_id": "not-a-uuid"})
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["results"] == []
 
 
 # ---------------------------------------------------------------------------
