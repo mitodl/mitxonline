@@ -26,6 +26,7 @@ def default_settings(monkeypatch, settings):
 
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = False
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
 
 
 @pytest.fixture(autouse=True)
