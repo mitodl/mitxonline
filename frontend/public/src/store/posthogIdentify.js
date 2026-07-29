@@ -11,6 +11,11 @@ import { CURRENT_USER_URL } from "../lib/queries/users"
 // identifies people by its own integer user ids, so integer ids collide
 // across applications. Users with no global id are left unidentified
 // rather than identified by a colliding id.
+//
+// Nothing here guards against identifying the same person twice, because
+// posthog "will ignore the subsequent calls" when identify is called
+// repeatedly with the same data within a page load:
+// https://posthog.com/docs/getting-started/identify-users
 const posthogIdentifyMiddleware = () => (next: Function) => (action: any) => {
   const result = next(action)
 
