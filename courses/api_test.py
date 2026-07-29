@@ -885,7 +885,7 @@ def test_create_run_enrollments_verifies_exports_for_verified_mode(
             user, [run], mode=EDX_ENROLLMENT_VERIFIED_MODE
         )
 
-    patched_verify.assert_called_once_with(user)
+    patched_verify.assert_called_once_with(user, run)
     patched_edx_enroll.assert_called_once_with(
         user,
         [run],
@@ -913,7 +913,7 @@ def test_create_run_enrollments_verifies_exports_for_audit_mode(mocker, user):
 
     create_run_enrollments(user, [run], mode=EDX_ENROLLMENT_AUDIT_MODE)
 
-    patched_verify.assert_called_once_with(user)
+    patched_verify.assert_called_once_with(user, run)
     patched_edx_enroll.assert_called_once()
 
 
@@ -936,7 +936,7 @@ def test_create_run_enrollments_rejects_nonaccepted_exports(mocker, user):
     ):
         create_run_enrollments(user, [run], mode=EDX_ENROLLMENT_VERIFIED_MODE)
 
-    patched_verify.assert_called_once_with(user)
+    patched_verify.assert_called_once_with(user, run)
     patched_edx_enroll.assert_not_called()
     assert not CourseRunEnrollment.objects.filter(user=user, run=run).exists()
 
@@ -986,7 +986,7 @@ def test_create_program_enrollments_verifies_exports_for_verified_mode(mocker, u
         enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
     )
 
-    patched_verify.assert_called_once_with(user)
+    patched_verify.assert_called_once_with(user, program)
     assert len(successful_enrollments) == 1
     assert successful_enrollments[0].program == program
 
@@ -1009,7 +1009,7 @@ def test_create_program_enrollments_verifies_exports_for_default_mode(mocker, us
         [program],
     )
 
-    patched_verify.assert_called_once_with(user)
+    patched_verify.assert_called_once_with(user, program)
     assert len(successful_enrollments) == 1
     assert successful_enrollments[0].program == program
 
@@ -1036,7 +1036,7 @@ def test_create_program_enrollments_rejects_nonaccepted_exports(mocker, user):
             enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         )
 
-    patched_verify.assert_called_once_with(user)
+    patched_verify.assert_called_once_with(user, program)
     assert not ProgramEnrollment.objects.filter(user=user, program=program).exists()
 
 

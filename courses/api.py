@@ -205,7 +205,7 @@ def create_run_enrollments(  # noqa: C901
             created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
-    _verify_exports_compliance_for_enrollment(user)
+    _verify_exports_compliance_for_enrollment(user, runs[0])
 
     if keep_failed_enrollments is None:
         keep_failed_enrollments = settings.FEATURES.get(
@@ -323,10 +323,10 @@ def create_program_enrollments(
     Returns:
         list of ProgramEnrollment: A list of enrollment objects that were successfully created
     """
-    _verify_exports_compliance_for_enrollment(user)
-
     successful_enrollments = []
     for program in programs:
+        _verify_exports_compliance_for_enrollment(user, program)
+
         try:
             enrollment, created = ProgramEnrollment.all_objects.get_or_create(
                 user=user,
@@ -343,7 +343,7 @@ def create_program_enrollments(
 
             if not created and enrollment.enrollment_mode != enrollment_mode:
                 enrollment.update_mode_and_save(enrollment_mode)
-        except:  # pylint: disable=bare-except  # noqa: PERF203, E722
+        except:  # pylint: disable=bare-except  # noqa: E722
             mail_api.send_enrollment_failure_message(
                 user, program, details=format_exc()
             )
@@ -403,12 +403,12 @@ def upgrade_audit_run_enrollments_for_program_purchase(user, program):
     return upgraded_enrollments
 
 
-def _verify_exports_compliance_for_enrollment(user) -> None:
+def _verify_exports_compliance_for_enrollment(user, courseware_object) -> None:
     """Verify users with CyberSource before creating enrollments."""
     if not settings.FEATURES.get(features.EXPORT_COMPLIANCE_CHECK_ENABLED, False):
         return
 
-    result = verify_user_with_exports(user)
+    result = verify_user_with_exports(user, courseware_object)
     if result.accepted:
         return
 
