@@ -468,6 +468,37 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
 
         return self.model.all_objects
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """
+        Show inactive contracts in the b2b_contract dropdown.
+
+        By default the admin builds this field from
+        ``ContractPage._default_manager``. ContractPage declares
+        ``active_objects`` as its only local manager, and Django orders local
+        managers ahead of ones inherited from the concrete parent, so
+        ``_default_manager`` is ``ActiveContractManager`` and filters
+        ``active=True``.
+
+        That means a run attached to an inactive contract - a retired run parked
+        in the holding contract, or any run on an expired contract - renders with
+        an empty dropdown, because its current value isn't among the choices.
+        Since the field is ``null=True, blank=True``, saving that form is valid
+        and silently sets ``b2b_contract`` to NULL, which turns a B2B run into a
+        public-catalog run (``CourseRunQuerySet.exclude_b2b`` treats a null
+        contract as "not B2B").
+        """
+
+        if db_field.name == "b2b_contract":
+            # Imported here to avoid a circular dependency at module load time,
+            # matching ProgramContractPageInline above.
+            from b2b.models import ContractPage  # noqa: PLC0415
+
+            kwargs["queryset"] = ContractPage.objects.order_by(
+                "organization__name", "name"
+            )
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
     @admin.display(description="Primary?", ordering="is_primary_language")
     def primary(self, obj):
         """Return the primary language run flag."""

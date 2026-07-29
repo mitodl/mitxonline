@@ -7,7 +7,6 @@ Allows you to
 import logging
 from argparse import RawTextHelpFormatter
 
-from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand, CommandError
 from mitol.common.utils.datetime import now_in_utc
 from opaque_keys import InvalidKeyError
@@ -18,8 +17,12 @@ from b2b.tasks import queue_enrollment_code_check
 from courses.api import resolve_courseware_object_from_id
 from courses.constants import UAI_COURSEWARE_ID_PREFIX
 from courses.models import CourseRun, CourseRunEnrollment
-from ecommerce.models import Discount, DiscountProduct, Product
-from openedx.api import update_edx_course
+from courses.retirement import (
+    deactivate_run_products,
+    get_run_products,
+    push_run_dates_to_edx,
+)
+from ecommerce.models import Discount, DiscountProduct
 
 log = logging.getLogger(__name__)
 
@@ -457,23 +460,13 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
                 courseware.save()
 
-                # Deactivate products for this run
-                # Use all_objects so we can find products regardless of
-                # their current is_active state, and evaluate to a list so
-                # subsequent updates don't affect the collection we use
-                # below when removing discount associations.
-                content_type = ContentType.objects.get_for_model(CourseRun)
-                run_products = list(
-                    Product.all_objects.filter(
-                        content_type=content_type,
-                        object_id=courseware.id,
-                    ).all()
-                )
-
-                for product in run_products:
-                    if product.is_active:
-                        product.is_active = False
-                        product.save(update_fields=("is_active",))
+                # Deactivate products for this run. get_run_products uses
+                # all_objects so it finds products regardless of their current
+                # is_active state, and returns a list so the deactivation below
+                # doesn't mutate the collection we reuse when removing discount
+                # associations. Shared with the retire_courserun command.
+                run_products = get_run_products(courseware)
+                deactivate_run_products(courseware)
 
                 # Invalidate/delete any enrollment codes (Discounts) associated with this run's products
                 discounts = Discount.objects.filter(
@@ -497,26 +490,17 @@ Specifying a program will only unlink the program from the contract, unless "--r
 
                 # Attempt to push the new enrollment_end to edX so it isn't
                 # overwritten by the next sync from edX.
+                #
+                # NOTE: edX will not accept an enrollment window for a run that
+                # has no start and end date, so for a run with a null end_date
+                # the new enrollment_end never reaches edX and the next sync
+                # reverts it. push_run_dates_to_edx returns False and logs a
+                # warning in that case. Fixing it properly means also moving
+                # end_date into the past, which is what the retire_courserun
+                # command does; this command's contract is narrower, so the
+                # behaviour is left as-is here.
                 try:
-                    pacing_type = (
-                        "self_paced" if courseware.is_self_paced else "instructor_paced"
-                    )
-
-                    course_params = [
-                        courseware.courseware_id,
-                        courseware.title,
-                        pacing_type,
-                    ]
-
-                    if courseware.start_date and courseware.end_date:
-                        course_params.append(courseware.start_date)
-                        course_params.append(courseware.end_date)
-
-                        if courseware.enrollment_start and courseware.enrollment_end:
-                            course_params.append(courseware.enrollment_start)
-                            course_params.append(courseware.enrollment_end)
-
-                    update_edx_course(*course_params)
+                    push_run_dates_to_edx(courseware)
                 except Exception:
                     log.exception(
                         "Failed to update enrollment end date on edX for %s",
