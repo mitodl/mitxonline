@@ -1087,10 +1087,18 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             "form": checkout_payload["payload"],
         }
 
-        ga_purchase_flag = is_posthog_enabled(
-            features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH,
-            False,  # noqa: FBT003
-            self.request.user.global_id,
+        # NOTE: Leave a user with no global_id unflagged rather than passing
+        # None through. is_posthog_enabled falls back to its default unique id
+        # (the hostname) when opt_unique_id is empty, which would evaluate and
+        # cache the flag once for every such user collectively.
+        global_id = self.request.user.global_id
+        ga_purchase_flag = bool(
+            global_id
+            and is_posthog_enabled(
+                features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH,
+                default=False,
+                opt_unique_id=global_id,
+            )
         )
         ga_purchase_payload = None
         if ga_purchase_flag:
