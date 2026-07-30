@@ -978,9 +978,7 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
     def get_redirect_url(self, *args, **kwargs):
         """Populate the basket before redirecting"""
         with transaction.atomic():
-            basket, _ = Basket.objects.select_for_update().get_or_create(
-                user=self.request.user
-            )
+            basket = api.establish_basket_for_request(self.request, for_update=True)
             basket.basket_items.all().delete()
             BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
