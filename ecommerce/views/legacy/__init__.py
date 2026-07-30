@@ -26,7 +26,7 @@ from rest_framework.authentication import SessionAuthentication, TokenAuthentica
 from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError
 from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import (
@@ -587,6 +587,12 @@ class CheckoutApiViewSet(ViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
 
+    def get_permissions(self):
+        """Allow anonymous access to everything except discount redemption"""
+        if self.action == "redeem_discount":
+            return [IsAuthenticated()]
+        return [AllowAny()]
+
     @extend_schema(
         request=RedeemDiscountRequestSerializer,
         responses={200: RedeemDiscountResponseSerializer},
@@ -970,7 +976,7 @@ class BackofficeCallbackView(APIView):
             return Response(status=status.HTTP_200_OK)
 
 
-class CheckoutProductView(LoginRequiredMixin, RedirectView):
+class CheckoutProductView(RedirectView):
     """View to add products to the cart and proceed to the checkout page"""
 
     pattern_name = "cart"
