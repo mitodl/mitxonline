@@ -489,6 +489,42 @@ def establish_basket_for_request(request):
     return basket
 
 
+def claim_anonymous_basket(request):
+    """
+    Convert the anonymous basket identified by the current session into a
+    basket for the now-authenticated request.user.
+
+    If request.user already has a basket, it is discarded in favor of the
+    anonymous basket - the anonymous basket reflects what was just shown on
+    the cart page, and merging would silently change the price the user saw.
+
+    Returns the claimed basket, or None if there's no anonymous basket to
+    claim (e.g. an expired session).
+    """
+    anonymous_id = get_anonymous_basket_id(request, create=False)
+    if anonymous_id is None:
+        return None
+
+    with transaction.atomic():
+        try:
+            anon_basket = Basket.objects.select_for_update().get(
+                anonymous_id=anonymous_id
+            )
+        except Basket.DoesNotExist:
+            return None
+
+        Basket.objects.filter(user=request.user).exclude(pk=anon_basket.pk).delete()
+
+        anon_basket.user = request.user
+        anon_basket.anonymous_id = None
+        anon_basket.save(update_fields=["user", "anonymous_id"])
+
+    del request.session[ANONYMOUS_BASKET_SESSION_KEY]
+    apply_user_discounts(request)
+
+    return anon_basket
+
+
 def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013
     """
     A function that performs refund for a given order id
