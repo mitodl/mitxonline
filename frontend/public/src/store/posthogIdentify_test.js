@@ -6,14 +6,24 @@ import posthog from "posthog-js"
 
 import posthogIdentifyMiddleware from "./posthogIdentify"
 import { CURRENT_USER_URL } from "../lib/queries/users"
-import { makeUser } from "../factories/user"
+import { makeAnonymousUser, makeUser } from "../factories/user"
 
 describe("posthogIdentifyMiddleware", () => {
-  let sandbox, identifyStub, next, invoke, currentUser
+  let sandbox,
+    identifyStub,
+    resetStub,
+    getPropertyStub,
+    next,
+    invoke,
+    currentUser
 
   beforeEach(() => {
     sandbox = sinon.createSandbox()
     identifyStub = sandbox.stub(posthog, "identify")
+    resetStub = sandbox.stub(posthog, "reset")
+    getPropertyStub = sandbox
+      .stub(posthog, "get_property")
+      .returns("identified")
     global.SETTINGS = {
       posthog_api_host: "https://posthog.example.com",
       environment:      "test"
@@ -44,9 +54,33 @@ describe("posthogIdentifyMiddleware", () => {
     })
   })
 
-  it("does not identify a user with no global_id", () => {
+  it("leaves an authenticated user with no global_id alone", () => {
     invoke(currentUserSuccess({ ...currentUser, global_id: null }))
 
+    sinon.assert.notCalled(identifyStub)
+    sinon.assert.notCalled(resetStub)
+  })
+
+  it("resets when the browser is anonymous but PostHog is still identified", () => {
+    invoke(currentUserSuccess(makeAnonymousUser()))
+
+    sinon.assert.calledWith(getPropertyStub, "$user_state")
+    sinon.assert.called(resetStub)
+    sinon.assert.notCalled(identifyStub)
+  })
+
+  it("does not reset when PostHog already considers the browser anonymous", () => {
+    getPropertyStub.returns("anonymous")
+
+    invoke(currentUserSuccess(makeAnonymousUser()))
+
+    sinon.assert.notCalled(resetStub)
+  })
+
+  it("does not reset when the response carries no user", () => {
+    invoke({ ...currentUserSuccess(), entities: {} })
+
+    sinon.assert.notCalled(resetStub)
     sinon.assert.notCalled(identifyStub)
   })
 
