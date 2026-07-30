@@ -764,9 +764,17 @@ class CheckoutApiViewSet(ViewSet):
         """
         Returns the current cart, with the product info embedded.
         """
-        try:
-            basket = Basket.objects.filter(user=request.user).get()
-        except ObjectDoesNotExist:
+        if request.user.is_authenticated:
+            basket = Basket.objects.filter(user=request.user).first()
+        else:
+            anonymous_id = api.get_anonymous_basket_id(request, create=False)
+            basket = (
+                Basket.objects.filter(anonymous_id=anonymous_id).first()
+                if anonymous_id
+                else None
+            )
+
+        if basket is None:
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
         if not basket.get_products():
@@ -774,7 +782,8 @@ class CheckoutApiViewSet(ViewSet):
                 "No product in basket", status=status.HTTP_406_NOT_ACCEPTABLE
             )
 
-        api.apply_user_discounts(request)
+        if request.user.is_authenticated:
+            api.apply_user_discounts(request)
 
         return Response(BasketWithProductSerializer(basket).data)
 
