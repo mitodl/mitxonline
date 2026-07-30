@@ -401,9 +401,10 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                         refund_reason=refund_reason,
                         unenroll=should_unenroll,
                     )
-                except Exception as ex:  # noqa: BLE001
+                except Exception as ex:
                     log.exception(
-                        "Unexpected error while refunding order %s", order.reference_number
+                        "Unexpected error while refunding order %s",
+                        order.reference_number,
                     )
                     messages.error(
                         request,
