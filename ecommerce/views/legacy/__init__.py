@@ -1018,6 +1018,16 @@ class CheckoutProductView(RedirectView):
         return super().get_redirect_url(*args, **kwargs)
 
 
+class AnonymousCheckoutView(LoginRequiredMixin, RedirectView):
+    """Claim the anonymous basket for the now-authenticated user, then proceed to checkout"""
+
+    pattern_name = "checkout_interstitial_page"
+
+    def get_redirect_url(self, *args, **kwargs):
+        api.claim_anonymous_basket(self.request)
+        return super().get_redirect_url(*args, **kwargs)
+
+
 class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
     template_name = "checkout_interstitial.html"
 
