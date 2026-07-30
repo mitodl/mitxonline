@@ -451,6 +451,30 @@ def establish_basket(request, *, no_delay=False):
     return basket
 
 
+ANONYMOUS_BASKET_SESSION_KEY = "anonymous_basket_id"
+
+
+def get_anonymous_basket_id(request, *, create=False):
+    """
+    Get the anonymous basket id stored in the request's session, minting one
+    if requested and none exists yet.
+
+    Kwargs:
+        create (bool): mint and store a new id in the session if one isn't
+            already present. Only pass True from call sites that are about to
+            write to the basket - minting an id writes to the session, which
+            forces a Set-Cookie header and defeats caching for anonymous page
+            views that don't need one.
+    """
+    anonymous_id = request.session.get(ANONYMOUS_BASKET_SESSION_KEY)
+
+    if anonymous_id is None and create:
+        anonymous_id = str(uuid.uuid4())
+        request.session[ANONYMOUS_BASKET_SESSION_KEY] = anonymous_id
+
+    return anonymous_id
+
+
 def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013
     """
     A function that performs refund for a given order id
