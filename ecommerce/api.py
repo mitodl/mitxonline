@@ -475,16 +475,24 @@ def get_anonymous_basket_id(request, *, create=False):
     return anonymous_id
 
 
-def establish_basket_for_request(request):
+def establish_basket_for_request(request, *, for_update=False):
     """
     Get or create the basket for the current request, whether the requester
     is authenticated or anonymous.
+
+    Kwargs:
+        for_update (bool): re-fetch the basket with select_for_update() so it's
+            locked for the remainder of the caller's transaction. Pass True
+            when the caller is about to mutate basket contents.
     """
     if request.user.is_authenticated:
-        return establish_basket(request)
+        basket = establish_basket(request)
+    else:
+        anonymous_id = get_anonymous_basket_id(request, create=True)
+        basket, _ = Basket.objects.get_or_create(anonymous_id=anonymous_id)
 
-    anonymous_id = get_anonymous_basket_id(request, create=True)
-    basket, _ = Basket.objects.get_or_create(anonymous_id=anonymous_id)
+    if for_update:
+        basket = Basket.objects.select_for_update().get(pk=basket.pk)
 
     return basket
 

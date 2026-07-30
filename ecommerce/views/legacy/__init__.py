@@ -687,9 +687,7 @@ class CheckoutApiViewSet(ViewSet):
     def add_to_cart(self, request):
         """Add product to the cart"""
         with transaction.atomic():
-            basket, _ = Basket.objects.select_for_update().get_or_create(
-                user=self.request.user
-            )
+            basket = api.establish_basket_for_request(request, for_update=True)
 
             # Check if multiple cart items feature is enabled
             allow_multiple_items = getattr(
