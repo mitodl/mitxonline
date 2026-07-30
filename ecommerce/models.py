@@ -132,6 +132,11 @@ class Basket(TimestampedModel):
             )
         ]
 
+    @property
+    def is_anonymous(self):
+        """Return True if this basket belongs to an anonymous (unauthenticated) user."""
+        return self.user_id is None
+
     def has_user_blocked_products(self, user):
         """Return true if any of the courses in the basket block user's country"""
         basket_items = self.basket_items.prefetch_related("product")
