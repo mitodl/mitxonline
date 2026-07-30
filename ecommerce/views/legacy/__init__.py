@@ -794,9 +794,17 @@ class CheckoutApiViewSet(ViewSet):
         url_name="basket_items_count",
     )
     def basket_items_count(self, request):
-        basket, _ = Basket.objects.get_or_create(user=request.user)
+        if request.user.is_authenticated:
+            basket, _ = Basket.objects.get_or_create(user=request.user)
+        else:
+            anonymous_id = api.get_anonymous_basket_id(request, create=False)
+            basket = (
+                Basket.objects.filter(anonymous_id=anonymous_id).first()
+                if anonymous_id
+                else None
+            )
 
-        return Response(basket.basket_items.count())
+        return Response(basket.basket_items.count() if basket else 0)
 
 
 @method_decorator(csrf_exempt, name="dispatch")
