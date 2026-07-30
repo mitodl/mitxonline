@@ -173,7 +173,7 @@ describe("DashboardPage", () => {
     })
 
     it("does not check the flag when PostHog is not configured", async () => {
-      mockSettings.posthog_api_host = null
+      global.SETTINGS.posthog_api_host = null
 
       await renderForUser(makeUser())
       clock.tick(500)
