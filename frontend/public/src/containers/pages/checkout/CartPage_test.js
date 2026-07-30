@@ -34,8 +34,8 @@ describe("CartPage", () => {
   const cartItem = {
     product: {
       id:                 1,
-      price:               "100.00",
-      description:         "test product",
+      price:              "100.00",
+      description:        "test product",
       purchasable_object: {
         course: {
           page: {

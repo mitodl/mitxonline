@@ -214,10 +214,7 @@ const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = () => [
-  users.currentUserQuery(),
-  cartItemsCountQuery()
-]
+const mapPropsToConfig = () => [users.currentUserQuery(), cartItemsCountQuery()]
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)

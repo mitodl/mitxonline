@@ -126,7 +126,9 @@ export class OrderSummaryCard extends React.Component<Props, State> {
   }
 
   getCheckoutUrl() {
-    return this.props.isAuthenticated ? "/checkout/to_payment" : "/checkout/anonymous/"
+    return this.props.isAuthenticated ?
+      "/checkout/to_payment" :
+      "/checkout/anonymous/"
   }
 
   handlePlaceOrder = async () => {
