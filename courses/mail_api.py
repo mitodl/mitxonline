@@ -95,6 +95,13 @@ def send_partner_school_sharing_message(learner_record):
         }
         with get_message_sender(PartnerSchoolSharingMessage) as sender:
             for recipient in recipients:
-                sender.build_and_send_message(recipient, context)
+                try:
+                    sender.build_and_send_message(recipient, context)
+                except Exception:  # pylint: disable=broad-except  # noqa: PERF203
+                    log.exception(
+                        "Error sending partner school sharing email to %s for share %s",
+                        recipient,
+                        learner_record.share_uuid,
+                    )
     except Exception:  # pylint: disable=broad-except
         log.exception("Error sending partner school sharing email")

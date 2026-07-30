@@ -215,3 +215,27 @@ def test_send_partner_school_sharing_message_flag_off_single_recipient(
         call.args[0] for call in mock_sender.build_and_send_message.call_args_list
     ]
     assert recipients == ["generic@example.com"]
+
+
+def test_send_partner_school_sharing_message_continues_after_failure(mocker, settings):
+    """A failure for one recipient must not prevent the others from being sent."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    record = LearnerProgramRecordShareFactory()
+    for email in ["first@example.com", "second@example.com"]:
+        PartnerSchoolProgramFactory.create(
+            partner_school=record.partner_school, program=record.program, email=email
+        )
+
+    patched_get_message_sender = mocker.patch("courses.mail_api.get_message_sender")
+    mock_sender = patched_get_message_sender.return_value.__enter__.return_value
+    mock_sender.build_and_send_message.side_effect = [
+        Exception("mailgun rejected"),
+        None,
+    ]
+
+    send_partner_school_sharing_message(record)
+
+    recipients = [
+        call.args[0] for call in mock_sender.build_and_send_message.call_args_list
+    ]
+    assert recipients == ["first@example.com", "second@example.com"]
