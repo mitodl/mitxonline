@@ -7226,9 +7226,11 @@ components:
           description: Return when the last reminder email was sent.
           readOnly: true
         email_status:
-          allOf:
-          - $ref: '#/components/schemas/EmailStatusEnum'
+          nullable: true
           readOnly: true
+          oneOf:
+          - $ref: '#/components/schemas/EmailStatusEnum'
+          - $ref: '#/components/schemas/NullEnum'
         email_status_event_timestamp:
           type: string
           format: date-time

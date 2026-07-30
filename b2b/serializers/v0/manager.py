@@ -254,10 +254,14 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         redemption = self._get_redemption(obj)
         return redemption.last_reminder_sent_on if redemption else None
 
-    @extend_schema_field(serializers.ChoiceField(choices=EMAIL_STATUSES))
+    @extend_schema_field(
+        serializers.ChoiceField(choices=EMAIL_STATUSES, allow_null=True)
+    )
     def get_email_status(self, obj) -> str | None:
         redemption = self._get_redemption(obj)
-        return redemption.email_status if redemption else None
+        if not redemption:
+            return None
+        return redemption.email_status or None
 
     def get_email_status_event_timestamp(self, obj) -> datetime | None:
         redemption = self._get_redemption(obj)

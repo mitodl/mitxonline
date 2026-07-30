@@ -1835,15 +1835,23 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
         # We don't want to show temporary ones to contract managers since there's nothing to do but wait for resolution
         severity = event_data.get("severity", "")
         if severity == EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY:
-            # We don't want to save
             return None
 
     # At this point we know that the payload is for the email we care about, it's from mailgun, and it's one of the events we care about
     # Save it to the row corresponding to the event we just got and move on with our lives
     message_id = event_data["message"]["headers"]["message-id"]
+    message_timestamp = event_data["timestamp"]
     assignment = DiscountContractAttachmentRedemption.objects.get(
         email_message_id=message_id
     )
+    saved_event_timestamp = assignment.email_status_event_timestamp
+
+    # We want to store event with the most recent timestamp we get from mailgun.
+    # Event receipt/processing is not guaranteed to be chronologically ordered, so this prevents older events from
+    # clobbering ones which actually occurred later.
+    if saved_event_timestamp and saved_event_timestamp >= message_timestamp:
+        return assignment
+
     assignment.email_status = event_type
     assignment.email_status_event_timestamp = now_in_utc()
     assignment.save()
