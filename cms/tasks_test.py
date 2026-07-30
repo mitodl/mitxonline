@@ -21,20 +21,20 @@ def fastly_settings(settings):
     """
     Configure the Fastly settings the purge tasks read.
 
-    MIT_LEARN_FASTLY_SERVICE_ID is set to a decoy so that a task reading the
-    service from settings instead of its argument fails rather than passing on a
-    coincidence.
+    MIT_LEARN_FASTLY_SERVICE_ID is set to a value the tests never register a
+    response for, so that a test meaning to exercise an explicitly passed
+    service ID cannot pass by falling back to settings.
     """
     settings.FASTLY_URL = FASTLY_URL
     settings.FASTLY_AUTH_TOKEN = FASTLY_AUTH_TOKEN
     settings.SITE_BASE_URL = SITE_BASE_URL
-    settings.MIT_LEARN_FASTLY_SERVICE_ID = "decoy-service-id-not-used"
+    settings.MIT_LEARN_FASTLY_SERVICE_ID = "unregistered-fallback-service-id"
     return settings
 
 
 @responses.activate
 def test_queue_fastly_surrogate_key_purge_targets_given_service(fastly_settings):
-    """The purge goes to the service ID passed in, not one read from settings."""
+    """An explicitly passed service ID takes precedence over the setting."""
     purge = responses.add(
         responses.POST,
         f"{FASTLY_URL}/service/{LEARN_SERVICE_ID}/purge/{SURROGATE_KEY}",
@@ -49,14 +49,36 @@ def test_queue_fastly_surrogate_key_purge_targets_given_service(fastly_settings)
 
 
 @responses.activate
+def test_queue_fastly_surrogate_key_purge_falls_back_to_settings(fastly_settings):
+    """
+    Called with the surrogate key alone, the task purges Learn's service anyway.
+
+    This is the shape of a message enqueued by a release that does not pass
+    service_id, so the fallback is what keeps purges working across a rolling
+    deploy rather than silently skipping them.
+    """
+    fastly_settings.MIT_LEARN_FASTLY_SERVICE_ID = LEARN_SERVICE_ID
+    purge = responses.add(
+        responses.POST,
+        f"{FASTLY_URL}/service/{LEARN_SERVICE_ID}/purge/{SURROGATE_KEY}",
+        json={"status": "ok"},
+        status=200,
+    )
+
+    assert queue_fastly_surrogate_key_purge(SURROGATE_KEY) is True
+
+    assert purge.call_count == 1
+
+
+@responses.activate
 def test_queue_fastly_surrogate_key_purge_skips_without_service_id(fastly_settings):
     """
-    A missing service ID skips the purge instead of calling Fastly.
+    With no service ID passed and none configured, the purge is skipped.
 
-    Called with the surrogate key alone, as a message enqueued by a release
-    predating the service_id argument would be during a rolling deploy. The task
-    must skip rather than raise or request `/service/None/purge/...`.
+    It must skip rather than raise or request `/service/None/purge/...`.
     """
+    fastly_settings.MIT_LEARN_FASTLY_SERVICE_ID = None
+
     assert queue_fastly_surrogate_key_purge(SURROGATE_KEY) is False
     assert not responses.calls
 

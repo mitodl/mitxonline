@@ -107,8 +107,7 @@ def queue_fastly_surrogate_key_purge(surrogate_key, service_id=None):
     they depend on (via the Surrogate-Key response header), which lets MITxOnline
     invalidate those pages when course/program data changes. The service is
     therefore Learn's -- purging MITxOnline's own Fastly service would do nothing,
-    since it tags no responses with these keys. It is passed in rather than read
-    from settings so that the target is visible at the call site.
+    since it tags no responses with these keys.
 
     Key format: mitxonline:course:<readable_id> or mitxonline:program:<readable_id>
 
@@ -116,11 +115,11 @@ def queue_fastly_surrogate_key_purge(surrogate_key, service_id=None):
         surrogate_key (str): The surrogate key to purge, e.g.
             "mitxonline:course:course-v1:MITx+6.00.1x"
         service_id (str): The Fastly service ID whose cache should be purged.
-            Callers pass settings.MIT_LEARN_FASTLY_SERVICE_ID. Defaults to None
-            so that messages enqueued by an older release, before this argument
-            existed, skip the purge rather than raising during a rolling deploy.
+            Falls back to settings.MIT_LEARN_FASTLY_SERVICE_ID when omitted.
     """
     logger = logging.getLogger("fastly_purge")
+
+    service_id = service_id or settings.MIT_LEARN_FASTLY_SERVICE_ID
 
     if not service_id:
         logger.warning(

@@ -123,59 +123,41 @@ def test_sync_program_certificate_with_hubspot_on_save(
 # Fastly surrogate-key purge signal tests
 # ---------------------------------------------------------------------------
 
-LEARN_SERVICE_ID = "test-learn-service-id"
-
 
 @patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
 @patch("cms.tasks.queue_fastly_surrogate_key_purge.delay")
-def test_purge_fastly_cache_on_course_save_update(
-    mock_purge_delay, mock_on_commit, settings
-):
+def test_purge_fastly_cache_on_course_save_update(mock_purge_delay, mock_on_commit):
     """
     Updating (re-saving) a Course enqueues a fresh purge each time.
     """
-    settings.MIT_LEARN_FASTLY_SERVICE_ID = LEARN_SERVICE_ID
-
     course = CourseFactory.create()
-    mock_purge_delay.assert_called_with(
-        f"mitxonline:course:{course.readable_id}", LEARN_SERVICE_ID
-    )
+    mock_purge_delay.assert_called_with(f"mitxonline:course:{course.readable_id}")
 
     course.title = "Updated Title"
     course.save()
 
-    mock_purge_delay.assert_called_with(
-        f"mitxonline:course:{course.readable_id}", LEARN_SERVICE_ID
-    )
+    mock_purge_delay.assert_called_with(f"mitxonline:course:{course.readable_id}")
 
 
 @patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
 @patch("cms.tasks.queue_fastly_surrogate_key_purge.delay")
-def test_purge_fastly_cache_on_course_run_save(
-    mock_purge_delay, mock_on_commit, settings
-):
+def test_purge_fastly_cache_on_course_run_save(mock_purge_delay, mock_on_commit):
     """
     Saving a CourseRun enqueues a Fastly surrogate-key purge for the parent
     course: mitxonline:course:<readable_id>.
     """
-    settings.MIT_LEARN_FASTLY_SERVICE_ID = LEARN_SERVICE_ID
-
     course_run = CourseRunFactory.create()
     mock_purge_delay.assert_called_with(
-        f"mitxonline:course:{course_run.course.readable_id}", LEARN_SERVICE_ID
+        f"mitxonline:course:{course_run.course.readable_id}"
     )
 
 
 @patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
 @patch("cms.tasks.queue_fastly_surrogate_key_purge.delay")
-def test_purge_fastly_cache_on_program_save(mock_purge_delay, mock_on_commit, settings):
+def test_purge_fastly_cache_on_program_save(mock_purge_delay, mock_on_commit):
     """
     Saving a Program enqueues a Fastly surrogate-key purge for
     mitxonline:program:<readable_id>.
     """
-    settings.MIT_LEARN_FASTLY_SERVICE_ID = LEARN_SERVICE_ID
-
     program = ProgramFactory.create()
-    mock_purge_delay.assert_called_with(
-        f"mitxonline:program:{program.readable_id}", LEARN_SERVICE_ID
-    )
+    mock_purge_delay.assert_called_with(f"mitxonline:program:{program.readable_id}")
