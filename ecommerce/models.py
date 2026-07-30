@@ -116,7 +116,21 @@ class Product(TimestampedModel):
 class Basket(TimestampedModel):
     """Represents a User's basket."""
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="basket")
+    anonymous_id = models.UUIDField(null=True, blank=True, unique=True, db_index=True)
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="basket", null=True, blank=True
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(user__isnull=False, anonymous_id__isnull=True)
+                    | models.Q(user__isnull=True, anonymous_id__isnull=False)
+                ),
+                name="basket_user_xor_anonymous_id",
+            )
+        ]
 
     def has_user_blocked_products(self, user):
         """Return true if any of the courses in the basket block user's country"""
