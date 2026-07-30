@@ -4474,6 +4474,7 @@ components:
           readOnly: true
         user:
           type: integer
+          nullable: true
         basket_items:
           type: array
           items:
@@ -4482,7 +4483,6 @@ components:
       required:
       - basket_items
       - id
-      - user
     BasketDiscountDetail:
       type: object
       description: BasketDiscount model serializer
@@ -4518,6 +4518,7 @@ components:
           readOnly: true
         user:
           type: integer
+          nullable: true
         basket_items:
           type: array
           items:
@@ -4562,7 +4563,6 @@ components:
       - discounts
       - id
       - total_price
-      - user
     BlankEnum:
       enum:
       - ''
