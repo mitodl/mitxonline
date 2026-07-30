@@ -475,6 +475,20 @@ def get_anonymous_basket_id(request, *, create=False):
     return anonymous_id
 
 
+def establish_basket_for_request(request):
+    """
+    Get or create the basket for the current request, whether the requester
+    is authenticated or anonymous.
+    """
+    if request.user.is_authenticated:
+        return establish_basket(request)
+
+    anonymous_id = get_anonymous_basket_id(request, create=True)
+    basket, _ = Basket.objects.get_or_create(anonymous_id=anonymous_id)
+
+    return basket
+
+
 def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013
     """
     A function that performs refund for a given order id
