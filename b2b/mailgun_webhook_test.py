@@ -30,7 +30,7 @@ pytestmark = [pytest.mark.django_db]
 
 SIGNING_SECRET = "test-signing-secret"
 TOKEN = "some-token"
-TIMESTAMP = "1700000000"
+TIMESTAMP = "1700000000.0"
 
 
 def _valid_signature(signing_secret=SIGNING_SECRET, token=TOKEN, timestamp=TIMESTAMP):
@@ -47,6 +47,7 @@ def _build_payload(  # noqa: PLR0913
     tags=(ENROLLMENT_CODE_ASSINGMENT_TAG,),
     token=TOKEN,
     timestamp=TIMESTAMP,
+    event_timestamp=1700000000.0,
     signature=None,
     signing_secret=SIGNING_SECRET,
     severity=None,
@@ -57,6 +58,7 @@ def _build_payload(  # noqa: PLR0913
         "event": event_type,
         "tags": list(tags),
         "message": {"headers": {"message-id": message_id}},
+        "timestamp": event_timestamp,
     }
     if severity is not None:
         event_data["severity"] = severity
@@ -277,3 +279,108 @@ class TestProcessMailgunWebhookForEnrollmentCodeEmails:
 
         with pytest.raises(DiscountContractAttachmentRedemption.DoesNotExist):
             process_mailgun_webhook_for_enrollment_code_emails(payload)
+
+
+class TestProcessMailgunWebhookEventOrdering:
+    """Mailgun doesn't guarantee events arrive in the order they occurred, so
+    a later-arriving event with an earlier timestamp shouldn't clobber a
+    status that came from an event which occurred more recently.
+    """
+
+    @override_settings(
+        MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=True,
+        MAILGUN_WEBHOOK_SIGNING_SECRET=SIGNING_SECRET,
+    )
+    def test_newer_event_updates_status(self, assignment):
+        first = _build_payload(
+            event_type=EMAIL_STATUS_DELIVERED,
+            message_id=assignment.email_message_id,
+            event_timestamp=1000.0,
+        )
+        process_mailgun_webhook_for_enrollment_code_emails(first)
+        assignment.refresh_from_db()
+        first_timestamp = assignment.email_status_event_timestamp
+
+        second = _build_payload(
+            event_type=EMAIL_STATUS_OPENED,
+            message_id=assignment.email_message_id,
+            event_timestamp=2000.0,
+        )
+        result = process_mailgun_webhook_for_enrollment_code_emails(second)
+
+        assert result == assignment
+        assignment.refresh_from_db()
+        assert assignment.email_status == EMAIL_STATUS_OPENED
+        assert assignment.email_status_event_timestamp > first_timestamp
+
+    @override_settings(
+        MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=True,
+        MAILGUN_WEBHOOK_SIGNING_SECRET=SIGNING_SECRET,
+    )
+    def test_older_event_does_not_clobber_status(self, assignment):
+        first = _build_payload(
+            event_type=EMAIL_STATUS_OPENED,
+            message_id=assignment.email_message_id,
+            event_timestamp=2000.0,
+        )
+        process_mailgun_webhook_for_enrollment_code_emails(first)
+        assignment.refresh_from_db()
+        first_timestamp = assignment.email_status_event_timestamp
+
+        second = _build_payload(
+            event_type=EMAIL_STATUS_DELIVERED,
+            message_id=assignment.email_message_id,
+            event_timestamp=1000.0,
+        )
+        result = process_mailgun_webhook_for_enrollment_code_emails(second)
+
+        assert result == assignment
+        assignment.refresh_from_db()
+        assert assignment.email_status == EMAIL_STATUS_OPENED
+        assert assignment.email_status_event_timestamp == first_timestamp
+
+    @override_settings(
+        MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=True,
+        MAILGUN_WEBHOOK_SIGNING_SECRET=SIGNING_SECRET,
+    )
+    def test_event_with_same_timestamp_does_not_reapply(self, assignment):
+        """A duplicate/replayed event at the same timestamp is treated as stale, not new."""
+        first = _build_payload(
+            event_type=EMAIL_STATUS_DELIVERED,
+            message_id=assignment.email_message_id,
+            event_timestamp=1000.0,
+        )
+        process_mailgun_webhook_for_enrollment_code_emails(first)
+        assignment.refresh_from_db()
+        first_timestamp = assignment.email_status_event_timestamp
+
+        duplicate = _build_payload(
+            event_type=EMAIL_STATUS_OPENED,
+            message_id=assignment.email_message_id,
+            event_timestamp=1000.0,
+        )
+        result = process_mailgun_webhook_for_enrollment_code_emails(duplicate)
+
+        assert result == assignment
+        assignment.refresh_from_db()
+        assert assignment.email_status == EMAIL_STATUS_DELIVERED
+        assert assignment.email_status_event_timestamp == first_timestamp
+
+    @override_settings(
+        MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=True,
+        MAILGUN_WEBHOOK_SIGNING_SECRET=SIGNING_SECRET,
+    )
+    def test_first_event_is_applied_regardless_of_timestamp(self, assignment):
+        """There's nothing saved yet, so even an old-looking timestamp should be stored."""
+        payload = _build_payload(
+            event_type=EMAIL_STATUS_DELIVERED,
+            message_id=assignment.email_message_id,
+            event_timestamp=1.0,
+        )
+
+        result = process_mailgun_webhook_for_enrollment_code_emails(payload)
+
+        assert result == assignment
+        assignment.refresh_from_db()
+        assert assignment.email_status == EMAIL_STATUS_DELIVERED
+        assert assignment.email_status_event_timestamp is not None

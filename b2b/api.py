@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import logging
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Union
 from uuid import uuid4
@@ -1840,7 +1841,7 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
     # At this point we know that the payload is for the email we care about, it's from mailgun, and it's one of the events we care about
     # Save it to the row corresponding to the event we just got and move on with our lives
     message_id = event_data["message"]["headers"]["message-id"]
-    message_timestamp = event_data["timestamp"]
+    message_timestamp = datetime.fromtimestamp(event_data["timestamp"], tz=UTC)
     assignment = DiscountContractAttachmentRedemption.objects.get(
         email_message_id=message_id
     )
@@ -1853,7 +1854,7 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
         return assignment
 
     assignment.email_status = event_type
-    assignment.email_status_event_timestamp = now_in_utc()
+    assignment.email_status_event_timestamp = message_timestamp
     assignment.save()
 
     return assignment

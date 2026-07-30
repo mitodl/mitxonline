@@ -183,6 +183,21 @@ class TestManagerEnrollmentCodeSerializerAssigned:
         assert data["email_status"] == "delivered"
         assert data["email_status_event_timestamp"] is not None
 
+    def test_email_status_is_none_when_redemption_has_no_status_yet(
+        self, discount, contract
+    ):
+        """A redemption exists (the code was assigned) but no webhook event has
+        arrived yet, so email_status defaults to "" - that should still
+        serialize as None, not an empty string.
+        """
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] is None
+
 
 class TestManagerEnrollmentCodeSerializerRedeemed:
     def test_redemption_status_redeemed_when_user_set(self, discount, contract):
