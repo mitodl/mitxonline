@@ -1,5 +1,7 @@
 """Admin management for Ecommerce module"""
 
+import logging
+
 import reversion
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
@@ -12,6 +14,8 @@ from django.views.generic import TemplateView
 from mitol.common.admin import TimestampedModelAdmin
 from reversion.admin import VersionAdmin
 from viewflow import fsm
+
+log = logging.getLogger(__name__)
 
 from ecommerce.api import refund_order
 from ecommerce.forms import AdminRefundOrderForm
@@ -431,12 +435,26 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                 refund_amount = refund_form.cleaned_data.get("refund_amount")
 
                 # Call the refund CyberSource API with provided reason and amount
-                refund_api_success, _ = refund_order(
-                    order_id=order.id,
-                    refund_amount=refund_amount,
-                    refund_reason=refund_reason,
-                    unenroll=should_unenroll,
-                )
+                try:
+                    refund_api_success, _ = refund_order(
+                        order_id=order.id,
+                        refund_amount=refund_amount,
+                        refund_reason=refund_reason,
+                        unenroll=should_unenroll,
+                    )
+                except Exception as ex:  # noqa: BLE001
+                    log.exception(
+                        "Unexpected error while refunding order %s", order.reference_number
+                    )
+                    messages.error(
+                        request,
+                        f"Order {order.reference_number} refund failed with an unexpected error: {ex}",
+                    )
+                    return HttpResponseRedirect(
+                        reverse(
+                            "admin:ecommerce_fulfilledorder_change", args=(order.id,)
+                        )
+                    )
 
                 if not refund_api_success:
                     messages.error(
