@@ -1,5 +1,7 @@
 """Tests for cms.tasks"""
 
+import logging
+
 import pytest
 import responses
 
@@ -71,25 +73,33 @@ def test_queue_fastly_surrogate_key_purge_falls_back_to_settings(fastly_settings
 
 
 @responses.activate
-def test_queue_fastly_surrogate_key_purge_skips_without_service_id(fastly_settings):
+def test_queue_fastly_surrogate_key_purge_skips_without_service_id(
+    fastly_settings, caplog
+):
     """
     With no service ID passed and none configured, the purge is skipped.
 
-    It must skip rather than raise or request `/service/None/purge/...`.
+    It must skip rather than raise or request `/service/None/purge/...`, and it
+    must say so at error level -- an unconfigured service ID disables cache
+    invalidation, and only ERROR and above reaches Sentry as an issue.
     """
     fastly_settings.MIT_LEARN_FASTLY_SERVICE_ID = None
 
     assert queue_fastly_surrogate_key_purge(SURROGATE_KEY) is False
     assert not responses.calls
+    assert [record.levelno for record in caplog.records] == [logging.ERROR]
 
 
 @responses.activate
-def test_queue_fastly_surrogate_key_purge_skips_without_auth_token(fastly_settings):
+def test_queue_fastly_surrogate_key_purge_skips_without_auth_token(
+    fastly_settings, caplog
+):
     """A missing auth token skips the purge rather than sending it unauthenticated."""
     fastly_settings.FASTLY_AUTH_TOKEN = None
 
     assert queue_fastly_surrogate_key_purge(SURROGATE_KEY, LEARN_SERVICE_ID) is False
     assert not responses.calls
+    assert [record.levelno for record in caplog.records] == [logging.ERROR]
 
 
 @responses.activate
