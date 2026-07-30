@@ -33,6 +33,7 @@ from ecommerce.api import (
     claim_anonymous_basket,
     create_verified_program_course_run_enrollment,
     create_verified_program_discount,
+    cull_anonymous_baskets,
     establish_basket,
     establish_basket_for_request,
     generate_checkout_payload,
@@ -1389,3 +1390,26 @@ def test_claim_anonymous_basket_applies_user_discount_after_conversion(user):
         ).count()
         == 1
     )
+
+
+def test_cull_anonymous_baskets(settings, user):
+    """Test that only anonymous baskets older than the cutoff are removed"""
+    settings.ANONYMOUS_BASKET_CULL_AGE = 100
+
+    old_anon_basket = Basket.objects.create(anonymous_id=uuid.uuid4())
+    Basket.objects.filter(pk=old_anon_basket.pk).update(
+        updated_on=now_in_utc() - timedelta(seconds=200)
+    )
+
+    recent_anon_basket = Basket.objects.create(anonymous_id=uuid.uuid4())
+
+    old_user_basket = Basket.objects.create(user=user)
+    Basket.objects.filter(pk=old_user_basket.pk).update(
+        updated_on=now_in_utc() - timedelta(seconds=200)
+    )
+
+    cull_anonymous_baskets()
+
+    assert not Basket.objects.filter(pk=old_anon_basket.pk).exists()
+    assert Basket.objects.filter(pk=recent_anon_basket.pk).exists()
+    assert Basket.objects.filter(pk=old_user_basket.pk).exists()

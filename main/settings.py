@@ -334,6 +334,12 @@ if ENVIRONMENT == "pytest":
 
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
+ANONYMOUS_BASKET_CULL_AGE = get_int(
+    name="ANONYMOUS_BASKET_CULL_AGE",
+    default=global_settings.SESSION_COOKIE_AGE,
+    description="Seconds of inactivity after which an anonymous (unclaimed) basket is deleted",
+)
+
 MITXONLINE_NEW_USER_LOGIN_URL = get_string(
     name="MITXONLINE_NEW_USER_LOGIN_URL",
     default="http://mitxonline.odl.local:8013/create-profile",
@@ -1055,6 +1061,10 @@ CELERY_BEAT_SCHEDULE = {
             run_every=timedelta(seconds=B2B_GSHEETS_UPDATE_FREQUENCY),
             offset=timedelta(seconds=B2B_GSHEETS_UPDATE_OFFSET),
         ),
+    },
+    "cull-anonymous-baskets": {
+        "task": "ecommerce.tasks.perform_cull_anonymous_baskets",
+        "schedule": crontab(minute=0, hour=4),
     },
 }
 

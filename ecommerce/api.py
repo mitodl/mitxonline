@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import urljoin
 
@@ -531,6 +532,18 @@ def claim_anonymous_basket(request):
     apply_user_discounts(request)
 
     return anon_basket
+
+
+def cull_anonymous_baskets():
+    """
+    Delete anonymous baskets that haven't been touched in a while (abandoned
+    carts). A basket's anonymous_id is only reachable via its session cookie,
+    so once that cookie could plausibly have expired there's no way for a
+    basket to ever be claimed - it's safe to remove.
+    """
+    cutoff = now_in_utc() - timedelta(seconds=settings.ANONYMOUS_BASKET_CULL_AGE)
+
+    Basket.objects.filter(anonymous_id__isnull=False, updated_on__lt=cutoff).delete()
 
 
 def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013
