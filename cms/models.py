@@ -924,8 +924,8 @@ class HomePage(VideoPlayerConfigMixin):
         hubspot_portal_id = settings.HUBSPOT_PORTAL_ID
         hubspot_home_page_form_guid = settings.HUBSPOT_HOME_PAGE_FORM_GUID
 
-        if request.user.is_authenticated:
-            user = request.user.id
+        if request.user.is_authenticated and request.user.global_id:
+            user = request.user.global_id
         else:
             if "anonymous_session_id" not in request.session:
                 request.session["anonymous_session_id"] = str(uuid.uuid4())
