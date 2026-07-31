@@ -1072,6 +1072,8 @@ paths:
       description: Clears the basket for the current user.
       tags:
       - baskets
+      security:
+      - {}
       responses:
         '204':
           description: Basket cleared successfully
@@ -1088,6 +1090,8 @@ paths:
         required: true
       tags:
       - baskets
+      security:
+      - {}
       responses:
         '200':
           content:
