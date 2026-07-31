@@ -848,6 +848,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
           description: ''
+  /api/v0/b2b/service/organization-manager-check/:
+    get:
+      operationId: b2b_service_organization_manager_check
+      description: Check whether a user is a manager of an organization. Service-to-service
+        only; requires the `b2b:manager-check` scope.
+      parameters:
+      - in: query
+        name: sso_organization_id
+        schema:
+          type: string
+          format: uuid
+        description: The organization's Keycloak UUID (OrganizationPage.sso_organization_id).
+        required: true
+      - in: query
+        name: user_global_id
+        schema:
+          type: string
+        description: The user's Keycloak subject (User.global_id).
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationManagerCheck'
+          description: ''
   /api/v0/baskets/:
     get:
       operationId: baskets_list
@@ -7447,6 +7475,15 @@ components:
       required:
       - state
       - total_price_paid
+    OrganizationManagerCheck:
+      type: object
+      description: Response shape for the org-manager check.
+      properties:
+        is_manager:
+          type: boolean
+          description: True if the user manages the organization.
+      required:
+      - is_manager
     OrganizationPage:
       type: object
       description: Serializer for the OrganizationPage model.

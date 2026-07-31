@@ -1093,6 +1093,10 @@ OAUTH2_PROVIDER = {
         "write": "Write scope",
         "openid": "OpenID Connect scope",
         "user:read": "Can read user and profile data",
+        # Service-to-service only, never granted to a user-facing client.
+        # Remove with b2b/views/v0/service.py once org-manager status is
+        # visible in Keycloak (mitodl/hq#10594).
+        "b2b:manager-check": "Can check whether a user manages an organization",
         # "digitalcredentials": "Can read and write Digital Credentials data",  # noqa: ERA001
     },
     "DEFAULT_SCOPES": ["user:read"],
