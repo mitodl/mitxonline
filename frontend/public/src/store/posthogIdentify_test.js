@@ -21,9 +21,12 @@ describe("posthogIdentifyMiddleware", () => {
     sandbox = sinon.createSandbox()
     identifyStub = sandbox.stub(posthog, "identify")
     resetStub = sandbox.stub(posthog, "reset")
-    getPropertyStub = sandbox
-      .stub(posthog, "get_property")
-      .returns("identified")
+    // Scoped to $user_state on purpose. posthog reads its own feature flags
+    // through get_property too, and handing those a string throws
+    // "Cannot use 'in' operator", which surfaces as an uncaught error here
+    // whenever a stray render elsewhere in the suite checks a flag.
+    getPropertyStub = sandbox.stub(posthog, "get_property")
+    getPropertyStub.withArgs("$user_state").returns("identified")
     global.SETTINGS = {
       posthog_api_host: "https://posthog.example.com",
       environment:      "test"
@@ -70,7 +73,7 @@ describe("posthogIdentifyMiddleware", () => {
   })
 
   it("does not reset when PostHog already considers the browser anonymous", () => {
-    getPropertyStub.returns("anonymous")
+    getPropertyStub.withArgs("$user_state").returns("anonymous")
 
     invoke(currentUserSuccess(makeAnonymousUser()))
 
