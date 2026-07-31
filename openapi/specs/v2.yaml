@@ -4523,6 +4523,10 @@ components:
         user:
           type: integer
           nullable: true
+        anonymous_id:
+          type: string
+          format: uuid
+          nullable: true
         basket_items:
           type: array
           items:

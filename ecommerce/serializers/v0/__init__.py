@@ -446,6 +446,7 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "user",
+            "anonymous_id",
             "basket_items",
             "total_price",
             "discounted_price",

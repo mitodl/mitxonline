@@ -304,6 +304,7 @@ MIDDLEWARE = (
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
+    "main.middleware.AnonymousBasketHandoffMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "main.middleware.HostBasedCSRFMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
