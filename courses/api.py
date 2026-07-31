@@ -721,7 +721,10 @@ def sync_course_runs(runs):
         runs ([CourseRun]): list of CourseRun objects.
 
     Returns:
-        tuple: (success_count, failure_count) - counts of successful and failed syncs
+        tuple: (success_count, failure_count) where success_count is the number
+        of runs that had changed edX values and were saved (runs already in sync
+        are skipped and counted as neither success nor failure), and
+        failure_count is the number of runs that errored while syncing.
     """
     api_client = get_edx_api_course_list_client()
 

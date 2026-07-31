@@ -1262,16 +1262,20 @@ def test_sync_course_runs_skips_unchanged(
     mock_course_list = mocker.patch("courses.api.get_edx_api_course_list_client")
     mock_course_list.return_value.get_courses.return_value = [course_detail]
 
-    # First pass writes the edX values and enqueues one purge.
+    # Ignore any purges enqueued by the factory setup above so we only measure
+    # purges caused by the sync calls themselves.
+    mock_purge_delay.reset_mock()
+
+    # First pass writes the edX values and enqueues exactly one purge.
     success_count, failure_count = sync_course_runs([course_run])
     assert (success_count, failure_count) == (1, 0)
-    purge_calls_after_first = mock_purge_delay.call_count
-    assert purge_calls_after_first >= 1
+    assert mock_purge_delay.call_count == 1
 
     # Second pass with identical edX data is a no-op: no save, no new purge.
+    mock_purge_delay.reset_mock()
     success_count, failure_count = sync_course_runs([course_run])
     assert (success_count, failure_count) == (0, 0)
-    assert mock_purge_delay.call_count == purge_calls_after_first
+    assert mock_purge_delay.call_count == 0
 
 
 @pytest.mark.parametrize(
