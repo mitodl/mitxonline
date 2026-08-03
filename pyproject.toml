@@ -116,6 +116,7 @@ dev = [
 [tool.uv]
 package = false
 default-groups = "all"
+exclude-newer = "7d"
 
 [tool.uv.build-backend]
 module-root = ""
