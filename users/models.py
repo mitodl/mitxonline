@@ -457,6 +457,10 @@ class LegalAddress(TimestampedModel):
         max_length=2, blank=True, validators=[validate_iso_3166_1_code]
     )  # ISO-3166-1
     state = models.CharField(max_length=255, blank=True, null=True)  # noqa: DJ001
+    postal_code = models.CharField(max_length=20, blank=True)
+    street_address_1 = models.CharField(max_length=255, blank=True)
+    street_address_2 = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=255, blank=True)
 
     @property
     def us_state(self):
