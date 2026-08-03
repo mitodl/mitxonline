@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 1.161.0
+Version 1.161.0 (Released August 03, 2026)
 ---------------
 
 - Fix oasdiff for large diffs (#3796)
