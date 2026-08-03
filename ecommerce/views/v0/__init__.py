@@ -991,7 +991,9 @@ class RefundRequestView(CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        from ecommerce.tasks import send_refund_request_notification_email  # noqa: PLC0415
+        from ecommerce.tasks import (
+            send_refund_request_notification_email,
+        )
 
         instance = serializer.save()
         send_refund_request_notification_email.delay(instance.id)
