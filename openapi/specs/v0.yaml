@@ -876,6 +876,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationManagerCheck'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDetailError'
+          description: ''
   /api/v0/baskets/:
     get:
       operationId: baskets_list
@@ -8824,6 +8830,24 @@ components:
           minLength: 1
       required:
       - email
+    ServiceDetailError:
+      type: object
+      description: |-
+        Response shape for the 400 error responses below.
+
+        Same shape as b2b.serializers.v0.manager.DetailErrorSerializer, but
+        duplicated rather than imported (and distinctly named, since
+        drf-spectacular keys its component registry on class identity, not
+        structural equality -- reusing the same name for a different class
+        produces a "components with identical names" warning and an
+        unpredictable schema) so this module stays self-contained and its
+        deletion remains a plain file removal (see the module docstring in
+        b2b/views/v0/service.py).
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     SignatoryItem:
       type: object
       description: Serializer for signatory items used in certificate pages.

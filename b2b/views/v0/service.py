@@ -33,7 +33,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from b2b.models import OrganizationPage, is_organization_manager
-from b2b.serializers.v0.service import OrganizationManagerCheckSerializer
+from b2b.serializers.v0.service import (
+    OrganizationManagerCheckSerializer,
+    ServiceDetailErrorSerializer,
+)
 from users.models import User
 
 # Distinct from the user-facing scopes in OAUTH2_PROVIDER["SCOPES"]: this one
@@ -81,7 +84,10 @@ class OrganizationManagerCheckView(APIView):
                 description="The user's Keycloak subject (User.global_id).",
             ),
         ],
-        responses=OrganizationManagerCheckSerializer,
+        responses={
+            200: OrganizationManagerCheckSerializer,
+            400: ServiceDetailErrorSerializer,
+        },
     )
     def get(self, request, *args, **kwargs):  # noqa: ARG002
         """Return the manager status for the (user, organization) pair."""

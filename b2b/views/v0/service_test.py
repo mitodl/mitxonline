@@ -187,10 +187,10 @@ def test_requires_authentication(api_client, url, org):
         },
     )
 
-    assert response.status_code in (
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_403_FORBIDDEN,
-    )
+    # No authenticator succeeds, so DRF's permission_denied() raises
+    # NotAuthenticated (401) rather than PermissionDenied (403) -- see
+    # rest_framework.views.APIView.permission_denied.
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 def test_requires_the_manager_check_scope(api_client, url, service_application, org):
@@ -232,10 +232,12 @@ def test_expired_token_is_rejected(api_client, url, service_application, org):
         },
     )
 
-    assert response.status_code in (
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_403_FORBIDDEN,
-    )
+    # OAuth2Authentication.authenticate() returns None for an expired token
+    # (same as no token at all), so this hits the same NotAuthenticated (401)
+    # path as test_requires_authentication above -- it never reaches
+    # TokenHasScope, which is what produces 403 in
+    # test_requires_the_manager_check_scope below.
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.parametrize(
