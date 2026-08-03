@@ -848,6 +848,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrganizationPage'
           description: ''
+  /api/v0/b2b/service/organization-manager-check/:
+    get:
+      operationId: b2b_service_organization_manager_check
+      description: Check whether a user is a manager of an organization. Service-to-service
+        only; requires the `b2b:manager-check` scope.
+      parameters:
+      - in: query
+        name: sso_organization_id
+        schema:
+          type: string
+          format: uuid
+        description: The organization's Keycloak UUID (OrganizationPage.sso_organization_id).
+        required: true
+      - in: query
+        name: user_global_id
+        schema:
+          type: string
+        description: The user's Keycloak subject (User.global_id).
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationManagerCheck'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDetailError'
+          description: ''
   /api/v0/baskets/:
     get:
       operationId: baskets_list
@@ -7447,6 +7481,15 @@ components:
       required:
       - state
       - total_price_paid
+    OrganizationManagerCheck:
+      type: object
+      description: Response shape for the org-manager check.
+      properties:
+        is_manager:
+          type: boolean
+          description: True if the user manages the organization.
+      required:
+      - is_manager
     OrganizationPage:
       type: object
       description: Serializer for the OrganizationPage model.
@@ -8787,6 +8830,24 @@ components:
           minLength: 1
       required:
       - email
+    ServiceDetailError:
+      type: object
+      description: |-
+        Response shape for the 400 error responses below.
+
+        Same shape as b2b.serializers.v0.manager.DetailErrorSerializer, but
+        duplicated rather than imported (and distinctly named, since
+        drf-spectacular keys its component registry on class identity, not
+        structural equality -- reusing the same name for a different class
+        produces a "components with identical names" warning and an
+        unpredictable schema) so this module stays self-contained and its
+        deletion remains a plain file removal (see the module docstring in
+        b2b/views/v0/service.py).
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
     SignatoryItem:
       type: object
       description: Serializer for signatory items used in certificate pages.
