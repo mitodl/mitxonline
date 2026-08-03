@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 1.162.0
+---------------
+
+- feat(b2b): add a service-scoped org-manager check endpoint (#3807)
+- Identify PostHog persons by Keycloak global_id, not Django pk (#3798)
+- Use psycopg's C implementation and drop unused psycopg2 (#3801)
+- fix: read Learn's Fastly service ID from MIT_LEARN_FASTLY_SERVICE_ID (#3794)
+- feat: retire course run cmd added to retire a b2b contract (#3797)
+
 Version 1.161.0 (Released August 03, 2026)
 ---------------
 
