@@ -19,7 +19,7 @@ from ecommerce.constants import (
     PAYMENT_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
-from ecommerce.models import Basket, BasketItem, Order, Product
+from ecommerce.models import Basket, BasketItem, Order, OrderStatus, Product, RefundRequest
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.settings import TIME_ZONE
 from users.serializers import ExtendedLegalAddressSerializer
@@ -405,6 +405,11 @@ class OrderSerializer(serializers.ModelSerializer):
     purchaser = serializers.SerializerMethodField()
     transactions = serializers.SerializerMethodField()
     street_address = serializers.SerializerMethodField()
+    refund_eligible = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_refund_eligible(self, instance):
+        return instance.is_refund_eligible
 
     @extend_schema_field(LineSerializer(many=True))
     def get_lines(self, instance):
@@ -556,6 +561,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "created_on",
             "transactions",
             "street_address",
+            "refund_eligible",
         ]
         model = models.Order
 
@@ -899,3 +905,40 @@ class OrderReceiptSerializer(serializers.ModelSerializer):
     class Meta:
         fields = ["purchaser", "lines", "coupon", "order", "receipt"]
         model = models.Order
+
+
+class RefundRequestSerializer(serializers.ModelSerializer):
+    """Serializer for creating learner-submitted refund requests."""
+
+    class Meta:
+        model = RefundRequest
+        fields = ["order", "refund_reason", "refund_reason_text", "consent_given"]
+
+    def validate_order(self, order):
+        from courses.utils import is_contract_order  # noqa: PLC0415
+
+        user = self.context["request"].user
+        if order.purchaser != user:
+            raise serializers.ValidationError(
+                "You can only request a refund for your own orders."
+            )
+        if order.state != OrderStatus.FULFILLED:
+            raise serializers.ValidationError(
+                "Refund requests can only be submitted for fulfilled orders."
+            )
+        if is_contract_order(order):
+            raise serializers.ValidationError(
+                "B2B contract orders are not eligible for self-service refund requests."
+            )
+        return order
+
+    def validate_consent_given(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                "You must acknowledge the consequences of requesting a refund."
+            )
+        return value
+
+    def create(self, validated_data):
+        validated_data["user"] = self.context["request"].user
+        return super().create(validated_data)

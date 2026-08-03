@@ -14,6 +14,7 @@ from ecommerce.views.v0 import (
     OrderHistoryViewSet,
     OrderReceiptView,
     ProductViewSet,
+    RefundRequestView,
     add_discount_to_basket,
     checkout_basket,
     clear_basket,
@@ -100,6 +101,11 @@ urlpatterns = [
         "orders/receipt/<int:pk>/",
         OrderReceiptView.as_view(),
         name="order_receipt_api",
+    ),
+    path(
+        "orders/refund-requests/",
+        RefundRequestView.as_view(),
+        name="refund_requests_api",
     ),
     re_path(
         r"^",

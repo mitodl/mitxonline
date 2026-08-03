@@ -11,3 +11,8 @@ class OrderReceiptMessage(TemplatedMessage):
 class OrderRefundMessage(TemplatedMessage):
     template_name = "mail/order_refund_message"
     name = "Refund of MITx Online Order"
+
+
+class RefundRequestNotificationMessage(TemplatedMessage):
+    template_name = "mail/refund_request_notification"
+    name = "Refund Request Submitted"

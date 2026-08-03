@@ -616,6 +616,12 @@ EMAIL_SUPPORT = get_string(
     description="Email address listed for customer support in the frontend. Not used for sending email.",
 )
 
+REFUND_REQUEST_EMAIL = get_string(
+    name="MITX_ONLINE_REFUND_REQUEST_EMAIL",
+    default=EMAIL_SUPPORT,
+    description="Email address that receives refund request notifications from learners.",
+)
+
 NOTIFICATION_EMAIL_BACKEND = get_string(
     name="MITX_ONLINE_NOTIFICATION_EMAIL_BACKEND",
     default="anymail.backends.mailgun.EmailBackend",

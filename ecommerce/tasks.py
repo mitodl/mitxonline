@@ -60,3 +60,12 @@ def perform_check_for_duplicate_discount_redemptions():
     from ecommerce.api import check_for_duplicate_discount_redemptions
 
     check_for_duplicate_discount_redemptions()
+
+
+@app.task
+def send_refund_request_notification_email(refund_request_id):
+    from ecommerce.mail_api import send_refund_request_notification
+    from ecommerce.models import RefundRequest
+
+    refund_request = RefundRequest.objects.get(pk=refund_request_id)
+    send_refund_request_notification(refund_request)

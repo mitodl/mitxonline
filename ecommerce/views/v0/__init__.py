@@ -25,7 +25,7 @@ from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ParseError
-from rest_framework.generics import RetrieveAPIView
+from rest_framework.generics import CreateAPIView, RetrieveAPIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -62,6 +62,7 @@ from ecommerce.models import (
     Product,
     UserDiscount,
 )
+from ecommerce.serializers import RefundRequestSerializer
 from ecommerce.serializers.v0 import (
     BasketItemSerializer,
     BasketWithProductSerializer,
@@ -976,3 +977,21 @@ class ReceiptByProgramView(LoginRequiredMixin, View):
         if paid_program is None:
             raise Http404
         return redirect(f"/orders/receipt/{paid_program.order_id}/")
+
+
+@extend_schema(
+    description="Submit a refund request for a fulfilled order. Only the order's purchaser may submit a request, and B2B contract orders are excluded.",
+    request=RefundRequestSerializer,
+    responses={201: RefundRequestSerializer},
+)
+class RefundRequestView(CreateAPIView):
+    """Accept and store a learner-submitted refund request, then notify customer service."""
+
+    serializer_class = RefundRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        from ecommerce.tasks import send_refund_request_notification_email  # noqa: PLC0415
+
+        instance = serializer.save()
+        send_refund_request_notification_email.delay(instance.id)
