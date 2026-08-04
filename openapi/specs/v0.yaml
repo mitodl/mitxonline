@@ -6616,9 +6616,19 @@ components:
           type: string
           description: Get email from the linked user object
           readOnly: true
+        name:
+          type: string
+          description: |-
+            Get the purchaser's full name.
+
+            Prefers the legal address name, which is what was recorded for billing.
+            Falls back to the user's profile name, since the legal address name fields
+            are newer than most existing addresses and are often blank.
+          readOnly: true
       required:
       - country
       - email
+      - name
     Faculty:
       type: object
       description: Serializer for faculty details used in course pages.
@@ -7406,14 +7416,13 @@ components:
         state:
           $ref: '#/components/schemas/StateEnum'
         purchaser:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExtendedLegalAddress'
+          allOf:
+          - $ref: '#/components/schemas/ExtendedLegalAddress'
           readOnly: true
         total_price_paid:
           type: string
           format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
         lines:
           type: array
           items:
@@ -7430,7 +7439,7 @@ components:
             type: object
             properties:
               amount:
-                type: number
+                type: string
               date:
                 type: string
                 format: date-time
@@ -7535,7 +7544,7 @@ components:
         total_price_paid:
           type: string
           format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
         reference_number:
           type: string
           nullable: true
@@ -8401,6 +8410,10 @@ components:
             properties:
               id:
                 type: integer
+              content_type:
+                type: string
+                enum:
+                - programrun
               run_tag:
                 type: string
               start_date:
@@ -8442,10 +8455,18 @@ components:
                 format: date-time
               course_number:
                 type: string
+              content_type:
+                type: string
+                enum:
+                - courserun
           - type: object
             properties:
               id:
                 type: integer
+              content_type:
+                type: string
+                enum:
+                - program
               title:
                 type: string
               readable_id:

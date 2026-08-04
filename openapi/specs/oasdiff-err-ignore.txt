@@ -172,3 +172,44 @@ GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body `type` changed from `array<object>` to `object` for status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `total_codes` became nullable for the status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `unassigned_codes` became nullable for the status `200`
+
+# Spec correction: `purchasable_object` gained a `content_type` discriminator.
+# The property was added inside each of the three existing oneOf subschemas, but
+# oasdiff reports it as new subschemas being added to the list. No subschema was
+# added or removed and no existing property changed, so nothing a client already
+# reads is affected.
+GET /api/v0/discounts/{parent_lookup_discount}/products/ added 'subschema #1, subschema #2, subschema #3' to the 'results/items/product/purchasable_object' response property 'oneOf' list for the response status '200'
+GET /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added 'subschema #1, subschema #2, subschema #3' to the 'product/purchasable_object' response property 'oneOf' list for the response status '200'
+GET /api/v0/orders/history/ added 'subschema #1, subschema #2, subschema #3' to the 'results/items/lines/items/product/allOf[#/components/schemas/Product]/purchasable_object' response property 'oneOf' list for the response status '200'
+GET /api/v0/orders/history/{id}/ added 'subschema #1, subschema #2, subschema #3' to the 'lines/items/product/allOf[#/components/schemas/Product]/purchasable_object' response property 'oneOf' list for the response status '200'
+GET /api/v0/products/ added 'subschema #1, subschema #2, subschema #3' to the 'results/items/purchasable_object' response property 'oneOf' list for the response status '200'
+GET /api/v0/products/all/ added 'subschema #1, subschema #2, subschema #3' to the 'results/items/purchasable_object' response property 'oneOf' list for the response status '200'
+GET /api/v0/products/all/{id}/ added 'subschema #1, subschema #2, subschema #3' to the 'purchasable_object' response property 'oneOf' list for the response status '200'
+GET /api/v0/products/{id}/ added 'subschema #1, subschema #2, subschema #3' to the 'purchasable_object' response property 'oneOf' list for the response status '200'
+PATCH /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added 'subschema #1, subschema #2, subschema #3' to the 'product/purchasable_object' response property 'oneOf' list for the response status '200'
+PATCH /api/v0/products/all/{id}/ added 'subschema #1, subschema #2, subschema #3' to the 'purchasable_object' response property 'oneOf' list for the response status '200'
+POST /api/v0/discounts/{parent_lookup_discount}/products/ added 'subschema #1, subschema #2, subschema #3' to the 'product/purchasable_object' response property 'oneOf' list for the response status '201'
+POST /api/v0/products/all/ added 'subschema #1, subschema #2, subschema #3' to the 'purchasable_object' response property 'oneOf' list for the response status '201'
+PUT /api/v0/discounts/{parent_lookup_discount}/products/{id}/ added 'subschema #1, subschema #2, subschema #3' to the 'product/purchasable_object' response property 'oneOf' list for the response status '200'
+PUT /api/v0/products/all/{id}/ added 'subschema #1, subschema #2, subschema #3' to the 'purchasable_object' response property 'oneOf' list for the response status '200'
+
+# Spec correction: `purchaser` was annotated `many=True` but the serializer method
+# has always returned a single object. The schema is now correct; the response
+# bodies are unchanged.
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'results/items/redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+GET /api/v0/orders/receipt/{id}/ the 'purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '201'
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/purchaser' response's property type/format changed from 'array'/'' to ''/'' for status '200'
+
+# Accepted behavioral change: `refunds[].amount` moves from a JSON number to a 2dp
+# string, so that every money field in the payload has one type and one precision.
+# No known consumer reads `refunds` yet, which makes this the cheapest point to
+# make it consistent.
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'results/items/redeemed_order/refunds/items/amount' response's property type/format changed from 'number'/'' to 'string'/'' for status '200'
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/refunds/items/amount' response's property type/format changed from 'number'/'' to 'string'/'' for status '200'
+GET /api/v0/orders/receipt/{id}/ the 'refunds/items/amount' response's property type/format changed from 'number'/'' to 'string'/'' for status '200'
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/refunds/items/amount' response's property type/format changed from 'number'/'' to 'string'/'' for status '200'
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the 'redeemed_order/refunds/items/amount' response's property type/format changed from 'number'/'' to 'string'/'' for status '201'
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the 'redeemed_order/refunds/items/amount' response's property type/format changed from 'number'/'' to 'string'/'' for status '200'

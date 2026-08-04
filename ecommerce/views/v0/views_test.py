@@ -1296,7 +1296,13 @@ def test_order_history_list(user, user_drf_client):
 
     assert resp.status_code == 200
 
-    returned_orders = resp.json()
+    payload = resp.json()
+    # Paginated even with no `limit` in the request: the response shape must not
+    # depend on whether the caller passed a pagination parameter.
+    assert set(payload) == {"count", "next", "previous", "results"}
+    assert payload["count"] == 2
+
+    returned_orders = payload["results"]
     assert len(returned_orders) == 2
     for returned_order in returned_orders:
         assert returned_order["id"] in [
@@ -1325,7 +1331,7 @@ def test_order_history_retrieve(user, user_drf_client):
 
     assert resp.status_code == 200
 
-    returned_orders = resp.json()
+    returned_orders = resp.json()["results"]
     assert len(returned_orders) == 1
     returned_order = returned_orders[0]
     assert returned_order["id"] == order_1.id
