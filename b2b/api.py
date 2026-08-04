@@ -1935,6 +1935,7 @@ class MailgunWebhookEventData(BaseModel):
     tags: list[str] = Field(default_factory=list)
     message: MailgunWebhookMessage
     severity: str | None = None
+    timestamp: float
 
 
 class MailgunWebhookPayload(BaseModel):
