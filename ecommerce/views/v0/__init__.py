@@ -63,6 +63,7 @@ from ecommerce.models import (
     UserDiscount,
 )
 from ecommerce.serializers import RefundRequestSerializer
+from ecommerce.tasks import send_refund_request_notification_email
 from ecommerce.serializers.v0 import (
     BasketItemSerializer,
     BasketWithProductSerializer,
@@ -991,7 +992,5 @@ class RefundRequestView(CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        from ecommerce.tasks import send_refund_request_notification_email  # noqa: PLC0415
-
         instance = serializer.save()
         send_refund_request_notification_email.delay(instance.id)

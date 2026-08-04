@@ -919,24 +919,20 @@ class RefundRequestSerializer(serializers.ModelSerializer):
 
         user = self.context["request"].user
         if order.purchaser != user:
-            raise serializers.ValidationError(
-                "You can only request a refund for your own orders."
-            )
+            msg = "You can only request a refund for your own orders."
+            raise serializers.ValidationError(msg)
         if order.state != OrderStatus.FULFILLED:
-            raise serializers.ValidationError(
-                "Refund requests can only be submitted for fulfilled orders."
-            )
+            msg = "Refund requests can only be submitted for fulfilled orders."
+            raise serializers.ValidationError(msg)
         if is_contract_order(order):
-            raise serializers.ValidationError(
-                "B2B contract orders are not eligible for self-service refund requests."
-            )
+            msg = "B2B contract orders are not eligible for self-service refund requests."
+            raise serializers.ValidationError(msg)
         return order
 
     def validate_consent_given(self, value):
         if not value:
-            raise serializers.ValidationError(
-                "You must acknowledge the consequences of requesting a refund."
-            )
+            msg = "You must acknowledge the consequences of requesting a refund."
+            raise serializers.ValidationError(msg)
         return value
 
     def create(self, validated_data):

@@ -776,9 +776,8 @@ class Order(TimestampedModel):
         if now <= self.created_on + timedelta(days=7):
             return True
         for run in self.purchased_runs:
-            if run.start_date and run.start_date > self.created_on:
-                if now <= run.start_date + timedelta(days=7):
-                    return True
+            if run.start_date and run.start_date > self.created_on and now <= run.start_date + timedelta(days=7):
+                return True
         return False
 
     def _generate_reference_number(self):
