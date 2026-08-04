@@ -32,7 +32,6 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from b2b.api import is_product_courserun, is_product_program
 from courses.models import (
     Course,
     CourseRun,
@@ -41,7 +40,6 @@ from courses.models import (
     Program,
     ProgramRun,
 )
-from courses.utils import is_uai_course_run, is_uai_program
 from ecommerce.api import (
     apply_discount_to_basket,
     establish_basket,
@@ -242,15 +240,7 @@ def _create_basket_from_product(
         basket=basket, product=product, defaults={"quantity": quantity}
     )
 
-    sync_hubspot_cart_add(
-        request.user,
-        product,
-        is_uai=(
-            is_product_courserun(product)
-            and is_uai_course_run(product.purchasable_object)
-        )
-        or (is_product_program(product) and is_uai_program(product.purchasable_object)),
-    )
+    sync_hubspot_cart_add(request.user, product)
 
     existing_basket_discounts = [bd.redeemed_discount for bd in basket.discounts.all()]
     discounts_to_apply = [
@@ -393,18 +383,7 @@ def create_basket_with_products(request):
                 basket=basket, product=product, defaults={"quantity": quantity}
             )
 
-            sync_hubspot_cart_add(
-                request.user,
-                product,
-                is_uai=(
-                    is_product_courserun(product)
-                    and is_uai_course_run(product.purchasable_object)
-                )
-                or (
-                    is_product_program(product)
-                    and is_uai_program(product.purchasable_object)
-                ),
-            )
+            sync_hubspot_cart_add(request.user, product)
     except ProductBlockedError:
         return Response(
             {"error": "Product blocked from purchasing.", "product": product},

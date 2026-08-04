@@ -145,9 +145,9 @@ def mock_create_run_enrollments(mocker):
 
 @pytest.fixture
 def mock_hubspot_order(mocker):
-    """Mock sync_deal_with_hubspot."""
+    """Mock sync_hubspot_deal."""
 
-    return mocker.patch("hubspot_sync.api.sync_deal_with_hubspot")
+    return mocker.patch("hubspot_sync.task_helpers.sync_hubspot_deal")
 
 
 @pytest.fixture
