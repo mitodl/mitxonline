@@ -3,7 +3,7 @@
 # pylint: disable=redefined-outer-name
 import itertools
 import logging
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import ANY, call, patch
 from urllib.parse import parse_qsl
 
@@ -12,6 +12,7 @@ import pytest
 import responses
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
+from edx_api.course_detail.models import CourseMode
 from edx_api.course_runs.exceptions import CourseRunAPIError
 from freezegun import freeze_time
 from mitol.common.utils.datetime import now_in_utc
@@ -26,6 +27,7 @@ from courses.factories import (
     CourseRunFactory,
     EnrollmentModeFactory,
 )
+from main import features
 from main.test_utils import MockHttpError, MockResponse
 from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
@@ -50,6 +52,7 @@ from openedx.api import (
     repair_faulty_openedx_users,
     retry_failed_edx_enrollments,
     subscribe_to_edx_course_emails,
+    sync_courserun_upgrade_deadline_to_edx,
     sync_enrollments_with_edx,
     unenroll_edx_course_run,
     unsubscribe_from_edx_course_emails,
@@ -66,6 +69,7 @@ from openedx.constants import (
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     OPENEDX_USERNAME_MAX_LEN,
     PLATFORM_EDX,
+    UpgradeDeadlineSyncResult,
 )
 from openedx.exceptions import (
     EdxApiCourseOutlineError,
@@ -1881,3 +1885,203 @@ def test_process_course_run_clone(mocker):
     mocked_clone_course.assert_called_with(
         cloneable_key, course_run.courseware_id, client=ANY
     )
+
+
+@pytest.fixture
+def deadline_sync_enabled(settings):
+    """Turn on the upgrade deadline sync feature flag."""
+    settings.FEATURES[features.SYNC_UPGRADE_DEADLINE_TO_EDX] = True
+    return settings
+
+
+def _edx_mode(
+    mode_slug=EDX_ENROLLMENT_VERIFIED_MODE, expiration_datetime=None, **extra
+):
+    """Build an edx-api-client CourseMode the way the modes endpoint returns one."""
+    payload = {
+        "course_id": "course-v1:edX+Test+Run",
+        "mode_slug": mode_slug,
+        "mode_display_name": mode_slug.title(),
+        "min_price": 100,
+        "currency": "usd",
+        "description": "a description",
+        "expiration_datetime": expiration_datetime,
+        **extra,
+    }
+    return CourseMode(payload)
+
+
+def test_sync_upgrade_deadline_disabled_makes_no_edx_calls(mocker):
+    """With the flag off we should not even read the course modes from edX."""
+    mocked_get_modes = mocker.patch("openedx.api.get_edx_course_modes")
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=now_in_utc())
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run)
+        == UpgradeDeadlineSyncResult.DISABLED
+    )
+    mocked_get_modes.assert_not_called()
+    mocked_update.assert_not_called()
+
+
+@pytest.mark.usefixtures("deadline_sync_enabled")
+def test_sync_upgrade_deadline_no_verified_mode(mocker):
+    """A run with only an audit mode in edX has nothing to set a deadline on."""
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(mode_slug=EDX_ENROLLMENT_AUDIT_MODE)],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=now_in_utc())
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run)
+        == UpgradeDeadlineSyncResult.NO_VERIFIED_MODE
+    )
+    mocked_update.assert_not_called()
+
+
+@pytest.mark.usefixtures("deadline_sync_enabled")
+def test_sync_upgrade_deadline_pushes_new_deadline(mocker):
+    """
+    A changed deadline is pushed, and the rest of the mode's fields are echoed
+    back so the PATCH only moves expiration_datetime.
+
+    min_price especially: update_edx_course_mode defaults it to 0, and
+    edx-api-client only strips None, so omitting it would zero out the price of
+    the paid mode in edX.
+    """
+    deadline = now_in_utc() + timedelta(days=30)
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime="2020-01-01T00:00:00Z")],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=deadline)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run) == UpgradeDeadlineSyncResult.UPDATED
+    )
+    mocked_update.assert_called_once_with(
+        course_id=run.courseware_id,
+        mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+        mode_display_name="Verified",
+        description="a description",
+        currency="usd",
+        min_price=100,
+        expiration_datetime=deadline,
+        client=ANY,
+    )
+
+
+@pytest.mark.usefixtures("deadline_sync_enabled")
+def test_sync_upgrade_deadline_skips_when_already_matching(mocker):
+    """An identical deadline in edX should not produce a write."""
+    deadline = datetime(2030, 6, 1, tzinfo=UTC)
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime="2030-06-01T00:00:00Z")],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=deadline)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run)
+        == UpgradeDeadlineSyncResult.UNCHANGED
+    )
+    mocked_update.assert_not_called()
+
+
+@pytest.mark.usefixtures("deadline_sync_enabled")
+def test_sync_upgrade_deadline_cannot_clear_existing_edx_deadline(mocker, caplog):
+    """
+    Clearing the deadline here cannot be propagated: edX's serializer rejects a
+    null expiration_datetime and edx-api-client drops None from the payload, so
+    the write would silently do nothing. Report it instead of pretending.
+    """
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime="2030-06-01T00:00:00Z")],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=None)
+
+    with caplog.at_level(logging.WARNING):
+        result = sync_courserun_upgrade_deadline_to_edx(run)
+
+    assert result == UpgradeDeadlineSyncResult.CLEAR_UNSUPPORTED
+    mocked_update.assert_not_called()
+    assert "cannot unset an existing expiration date" in caplog.text
+    assert run.courseware_id in caplog.text
+
+
+@pytest.mark.usefixtures("deadline_sync_enabled")
+def test_sync_upgrade_deadline_no_deadline_on_either_side(mocker):
+    """No deadline here and none in edX is already consistent."""
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime=None)],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=None)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run)
+        == UpgradeDeadlineSyncResult.UNCHANGED
+    )
+    mocked_update.assert_not_called()
+
+
+@pytest.mark.usefixtures("deadline_sync_enabled")
+def test_sync_upgrade_deadline_tolerates_unparseable_edx_value(mocker):
+    """
+    edx-api-client parses expiration_datetime with dateutil and only guards
+    against a missing key, so a non-null unparseable value raises. Treat it as
+    "no deadline set" and push ours rather than blowing up the caller.
+    """
+    deadline = now_in_utc() + timedelta(days=10)
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime="")],
+    )
+    mocked_update = mocker.patch("openedx.api.update_edx_course_mode")
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=deadline)
+
+    assert (
+        sync_courserun_upgrade_deadline_to_edx(run) == UpgradeDeadlineSyncResult.UPDATED
+    )
+    assert mocked_update.call_args.kwargs["expiration_datetime"] == deadline
+
+
+@pytest.mark.usefixtures("deadline_sync_enabled")
+def test_sync_upgrade_deadline_propagates_edx_errors(mocker):
+    """Failures from edX should surface so the celery task can retry them."""
+    mocker.patch(
+        "openedx.api.get_edx_course_modes",
+        return_value=[_edx_mode(expiration_datetime=None)],
+    )
+    mocker.patch(
+        "openedx.api.update_edx_course_mode",
+        side_effect=HTTPError(response=MockResponse({}, status.HTTP_502_BAD_GATEWAY)),
+    )
+    mocker.patch("openedx.api.get_edx_api_service_client")
+
+    run = CourseRunFactory.create(upgrade_deadline=now_in_utc())
+
+    with pytest.raises(HTTPError):
+        sync_courserun_upgrade_deadline_to_edx(run)

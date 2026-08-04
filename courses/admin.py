@@ -468,6 +468,42 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
 
         return self.model.all_objects
 
+    def save_model(self, request, obj, form, change):
+        """
+        Save the run, then tell the operator what we did about the edX side.
+
+        The push itself is queued by the CourseRun post_save signal so that
+        every write path gets it. This only adds the admin feedback, because a
+        cleared deadline cannot be propagated (edX's course modes API has no way
+        to unset an existing expiration date) and a warning buried in the celery
+        log would never be seen by the person who made the change.
+        """
+        deadline_changed = "upgrade_deadline" in (form.changed_data or [])
+        super().save_model(request, obj, form, change)
+
+        if not deadline_changed:
+            return
+
+        if obj.upgrade_deadline is None:
+            messages.warning(
+                request,
+                (
+                    f"Upgrade deadline cleared for {obj.courseware_id}. edX cannot "
+                    f"unset an existing deadline through its API, so if edX still "
+                    f"has one you must clear it by hand in the edX Django admin "
+                    f"under Course Modes."
+                ),
+            )
+        else:
+            messages.info(
+                request,
+                (
+                    f"Queued a sync to push the upgrade deadline "
+                    f"{obj.upgrade_deadline} to the edX verified mode of "
+                    f"{obj.courseware_id}."
+                ),
+            )
+
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """
         Show inactive contracts in the b2b_contract dropdown.
