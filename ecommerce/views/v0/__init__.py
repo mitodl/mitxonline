@@ -63,7 +63,6 @@ from ecommerce.models import (
     UserDiscount,
 )
 from ecommerce.serializers import RefundRequestSerializer
-from ecommerce.tasks import send_refund_request_notification_email
 from ecommerce.serializers.v0 import (
     BasketItemSerializer,
     BasketWithProductSerializer,
@@ -80,6 +79,7 @@ from ecommerce.serializers.v0 import (
     V0DiscountSerializer,
     requests,
 )
+from ecommerce.tasks import send_refund_request_notification_email
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from hubspot_sync.task_helpers import sync_hubspot_cart_add
