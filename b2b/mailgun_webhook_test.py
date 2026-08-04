@@ -22,6 +22,7 @@ from b2b.models import (
     EMAIL_STATUS_FAILED,
     EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY,
     EMAIL_STATUS_OPENED,
+    EMAIL_STATUS_PENDING,
     DiscountContractAttachmentRedemption,
 )
 from ecommerce.factories import DiscountFactory
@@ -202,6 +203,24 @@ class TestProcessMailgunWebhookForEnrollmentCodeEmails:
     def test_returns_none_for_uninteresting_event_type(self, assignment):  # noqa: ARG002
         payload = _build_payload(event_type="unsubscribed")
         assert process_mailgun_webhook_for_enrollment_code_emails(payload) is None
+
+    @override_settings(
+        MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=True,
+        MAILGUN_WEBHOOK_SIGNING_SECRET=SIGNING_SECRET,
+    )
+    def test_returns_none_for_pending_event_type(self, assignment):
+        """
+        "pending" is a status we set locally, not a real mailgun event - a
+        payload claiming to be one should be discarded rather than applied.
+        """
+        payload = _build_payload(
+            event_type=EMAIL_STATUS_PENDING, message_id=assignment.email_message_id
+        )
+
+        assert process_mailgun_webhook_for_enrollment_code_emails(payload) is None
+        assignment.refresh_from_db()
+        assert assignment.email_status == ""
+        assert assignment.email_status_event_timestamp is None
 
     @override_settings(
         MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=True,

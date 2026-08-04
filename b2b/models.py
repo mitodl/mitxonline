@@ -52,14 +52,14 @@ EMAIL_STATUS_FAILED = "failed"
 # Pending is a special case in that it does not map to a mailgun event.
 # It is set by us to indicate that we've queued the task but we have not yet received any webhook from mailgun
 EMAIL_STATUS_PENDING = "pending"
-EMAIL_STATUSES = (
+MAILGUN_EMAIL_EVENT_TYPES = (
     EMAIL_STATUS_DELIVERED,
     EMAIL_STATUS_ACCEPTED,
     EMAIL_STATUS_OPENED,
     EMAIL_STATUS_CLICKED,
     EMAIL_STATUS_FAILED,
-    EMAIL_STATUS_PENDING,
 )
+EMAIL_STATUSES = (*MAILGUN_EMAIL_EVENT_TYPES, EMAIL_STATUS_PENDING)
 
 
 class OrganizationObjectIndexPage(Page):

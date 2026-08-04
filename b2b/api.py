@@ -38,7 +38,7 @@ from b2b.mail import ENROLLMENT_CODE_ASSINGMENT_TAG
 from b2b.models import (
     EMAIL_STATUS_FAILED,
     EMAIL_STATUS_FAILED_TEMPORARY_SEVERITY,
-    EMAIL_STATUSES,
+    MAILGUN_EMAIL_EVENT_TYPES,
     ContractPage,
     ContractProgramItem,
     DiscountContractAttachmentRedemption,
@@ -1982,7 +1982,7 @@ def process_mailgun_webhook_for_enrollment_code_emails(payload):
 
     # We only want to store some email statuses. If it's not one of the ones we care about, we can toss the event
     event_type = event_data["event"]
-    if event_type not in EMAIL_STATUSES:
+    if event_type not in MAILGUN_EMAIL_EVENT_TYPES:
         return None
 
     if event_type == EMAIL_STATUS_FAILED:

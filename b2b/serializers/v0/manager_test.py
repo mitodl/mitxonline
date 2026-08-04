@@ -198,6 +198,53 @@ class TestManagerEnrollmentCodeSerializerAssigned:
         data = _serialize(discount, [redemption])
         assert data["email_status"] is None
 
+    def test_email_status_pending_serializes_as_pending(self, discount, contract):
+        """The synthetic "pending" status we set on assignment/reminder/reassign
+        should be surfaced to managers as-is.
+        """
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+            email_status="pending",
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] == "pending"
+
+    def test_email_status_accepted_is_masked_as_pending(self, discount, contract):
+        """
+        "accepted" is a real mailgun event, but we deliberately don't expose
+        it to managers - it should be collapsed into the vaguer "pending" status.
+        """
+        now = timezone.now()
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+            email_status="accepted",
+            email_status_event_timestamp=now,
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] == "pending"
+
+    @pytest.mark.parametrize(
+        "email_status", ["opened", "clicked", "failed", "delivered"]
+    )
+    def test_other_email_statuses_are_not_masked(
+        self, discount, contract, email_status
+    ):
+        """Only "accepted" gets collapsed into "pending" - every other tracked
+        status should be reported as-is.
+        """
+        redemption = DiscountContractAttachmentRedemption.objects.create(
+            discount=discount,
+            contract=contract,
+            assigned_email="learner@example.com",
+            email_status=email_status,
+        )
+        data = _serialize(discount, [redemption])
+        assert data["email_status"] == email_status
+
 
 class TestManagerEnrollmentCodeSerializerRedeemed:
     def test_redemption_status_redeemed_when_user_set(self, discount, contract):

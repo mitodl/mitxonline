@@ -9,7 +9,7 @@ from django.core.management import BaseCommand, CommandError
 from django.urls import reverse
 
 from b2b.mail import ENROLLMENT_CODE_ASSINGMENT_TAG
-from b2b.models import EMAIL_STATUSES, DiscountContractAttachmentRedemption
+from b2b.models import MAILGUN_EMAIL_EVENT_TYPES, DiscountContractAttachmentRedemption
 
 # Static signature block - signature validation is expected to be disabled
 # (MAILGUN_WEBHOOK_VALIDATE_SIGNATURE=False) when using this command.
@@ -101,7 +101,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "event_type",
             type=str,
-            choices=EMAIL_STATUSES,
+            choices=MAILGUN_EMAIL_EVENT_TYPES,
             help="The Mailgun event type to simulate.",
         )
         parser.add_argument(
