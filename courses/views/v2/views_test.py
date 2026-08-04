@@ -1664,10 +1664,14 @@ def test_program_enrollments(user_drf_client, user_with_enrollments_and_certific
         for program_enrollment in program_enrollments
     }
 
-    # assert that we ended up with data
+    # Assert that we ended up with data, covering both cases: a program the user
+    # has course run enrollments in, and one they have none in. Enrolling in a
+    # program does not imply enrolling in its courses, so the response has to be
+    # right either way.
     assert len(program_enrollments) > 0
-    for runs in run_enrollments_by_program_id.values():
-        assert len(runs) > 0
+    runs_per_program = list(run_enrollments_by_program_id.values())
+    assert [runs for runs in runs_per_program if len(runs) > 0]
+    assert [runs for runs in runs_per_program if len(runs) == 0]
 
     resp = user_drf_client.get(reverse("v2:user_program_enrollments_api-list"))
 

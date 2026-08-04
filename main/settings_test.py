@@ -100,7 +100,7 @@ def test_admin_settings(settings_sandbox, settings):
 def test_csrf_cookie_domain(settings_sandbox):
     """Verify that we can configure CSRF_COOKIE_DOMAIN with a var"""
     # Test the default
-    settings_vars = settings_sandbox.get()
+    settings_vars = settings_sandbox.reload()
     assert settings_vars.get("CSRF_COOKIE_DOMAIN") is None
 
     # Verify the env var works
@@ -111,7 +111,7 @@ def test_csrf_cookie_domain(settings_sandbox):
 def test_csrf_trusted_origins(settings_sandbox):
     """Verify that we can configure CSRF_TRUSTED_ORIGINS with a var"""
     # Test the default
-    settings_vars = settings_sandbox.get()
+    settings_vars = settings_sandbox.reload()
     assert settings_vars.get("CSRF_TRUSTED_ORIGINS") == []
 
     # Verify the env var works
@@ -129,7 +129,7 @@ def test_csrf_trusted_origins(settings_sandbox):
 def test_mitol_apigateway_allowed_redirect_hosts(settings_sandbox):
     """Verify that we can configure MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS with a var"""
     # Test the default
-    settings_vars = settings_sandbox.get()
+    settings_vars = settings_sandbox.reload()
     assert settings_vars.get("MITOL_APIGATEWAY_ALLOWED_REDIRECT_HOSTS") == [
         "localhost",
         "mitxonline.odl.local",
