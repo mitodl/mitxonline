@@ -81,12 +81,12 @@ class TransactionLineSerializer(serializers.Serializer):
         """Returns the representation of the object."""
 
         coupon_redemption = instance.order.discounts.first()
-        discount = 0.0
+        discount = Decimal("0.00")
 
         if coupon_redemption:
             discount = instance.product.price - instance.discounted_price
 
-        total_paid = (instance.product.price - Decimal(discount)) * instance.quantity
+        total_paid = (instance.product.price - discount) * instance.quantity
 
         content_object = instance.product.purchasable_object
         (content_title, readable_id) = (None, None)
@@ -107,15 +107,17 @@ class TransactionLineSerializer(serializers.Serializer):
 
         line = dict(  # noqa: C408
             quantity=instance.quantity,
-            total_paid=str(total_paid),
-            discount=str(discount),
+            total_paid=str(total_paid.quantize(Decimal("0.01"))),
+            discount=str(discount.quantize(Decimal("0.01"))),
             CEUs=None,
             content_title=content_title,
             content_type=content_type,
             readable_id=readable_id,
-            price=str(instance.product.price),
-            start_date=content_object.start_date,
-            end_date=content_object.end_date,
+            price=str(instance.product.price.quantize(Decimal("0.01"))),
+            # `purchasable_object` is a generic FK and can dangle if the
+            # courseware object was deleted; the order still has to serialize.
+            start_date=content_object.start_date if content_object else None,
+            end_date=content_object.end_date if content_object else None,
         )
 
         return line  # noqa: RET504
@@ -500,6 +502,9 @@ class OrderSerializer(serializers.ModelSerializer):
     purchaser = serializers.SerializerMethodField()
     transactions = serializers.SerializerMethodField()
     street_address = serializers.SerializerMethodField()
+    # The model field is decimal_places=5, which serializes as "149.00000".
+    # Currency is presented at 2dp, consistent with the line-level amounts.
+    total_price_paid = serializers.DecimalField(max_digits=20, decimal_places=2)
 
     @extend_schema_field(TransactionLineSerializer(many=True))
     def get_lines(self, instance):
@@ -519,7 +524,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "items": {
                 "type": "object",
                 "properties": {
-                    "amount": {"type": "number"},
+                    "amount": {"type": "string"},
                     "date": {"type": "string", "format": "date-time"},
                 },
             },
@@ -533,7 +538,10 @@ class OrderSerializer(serializers.ModelSerializer):
             .all()
         ):
             refunds.append(  # noqa: PERF401
-                {"amount": transaction.amount, "date": transaction.created_on}
+                {
+                    "amount": str(transaction.amount.quantize(Decimal("0.01"))),
+                    "date": transaction.created_on,
+                }
             )
 
         return refunds
@@ -582,7 +590,9 @@ class OrderSerializer(serializers.ModelSerializer):
                 data["name"] = (
                     f"{transaction.data.get('req_bill_to_forename')} {transaction.data.get('req_bill_to_surname')}"
                 )
-            return data
+            # Return null rather than an object of all nulls, so consumers have
+            # only two shapes to handle: absent, or populated.
+            return data if any(value is not None for value in data.values()) else None
         return None
 
     @extend_schema_field(
@@ -630,7 +640,13 @@ class OrderSerializer(serializers.ModelSerializer):
                     "req_bill_to_address_country"
                 ]
 
-            return street_address
+            # As with transactions: null rather than an all-null object.
+            has_data = street_address["line"] or any(
+                value is not None
+                for key, value in street_address.items()
+                if key != "line"
+            )
+            return street_address if has_data else None
         return None
 
     @extend_schema_field(ExtendedLegalAddressSerializer)

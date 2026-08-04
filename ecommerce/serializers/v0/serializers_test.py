@@ -52,12 +52,12 @@ def create_order(mocker, user, products):
 def build_expected_line(instance):
     """Build the expected serialized line dict for a given order line."""
     coupon_redemption = instance.order.discounts.first()
-    discount = 0.0
+    discount = Decimal("0.00")
 
     if coupon_redemption:
         discount = instance.product.price - instance.discounted_price
 
-    total_paid = (instance.product.price - Decimal(discount)) * instance.quantity
+    total_paid = (instance.product.price - discount) * instance.quantity
 
     content_object = instance.product.purchasable_object
     (content_title, readable_id) = (None, None)
@@ -71,13 +71,13 @@ def build_expected_line(instance):
 
     return dict(  # noqa: C408
         quantity=instance.quantity,
-        total_paid=str(total_paid),
-        discount=str(discount),
+        total_paid=str(total_paid.quantize(Decimal("0.01"))),
+        discount=str(discount.quantize(Decimal("0.01"))),
         CEUs=None,
         content_title=content_title,
         content_type=instance.product.content_type.model,
         readable_id=readable_id,
-        price=str(instance.product.price),
+        price=str(instance.product.price.quantize(Decimal("0.01"))),
         start_date=content_object.start_date,
         end_date=content_object.end_date,
     )

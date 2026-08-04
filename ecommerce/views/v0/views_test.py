@@ -1354,9 +1354,10 @@ def test_order_receipt_retrieve(user, user_drf_client):
 
     assert receipt["reference_number"] == order_1.reference_number
     assert Decimal(receipt["lines"][0]["price"]) == order_1_line.total_price
-    # The TransactionFactory creates a transaction with no payment data so this
-    # should be None.
-    assert receipt["transactions"]["card_number"] is None
+    # The TransactionFactory creates a transaction with no payment data. That now
+    # serializes as null rather than an object of all-null fields, so consumers
+    # have only two shapes to handle: absent, or populated.
+    assert receipt["transactions"] is None
 
 
 @pytest.mark.skip_nplusone_check
