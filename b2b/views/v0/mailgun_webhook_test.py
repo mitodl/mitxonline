@@ -22,6 +22,7 @@ def _payload(tags=(ENROLLMENT_CODE_ASSINGMENT_TAG,), event_type=EMAIL_STATUS_DEL
         "event-data": {
             "event": event_type,
             "tags": list(tags),
+            "timestamp": "1700000000",
             "message": {"headers": {"message-id": "message-id-1"}},
         },
     }
