@@ -26,6 +26,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 from b2b.api import _create_discount_with_product, is_potentially_valid_mailgun_webhook
 from b2b.constants import CONTRACT_MEMBERSHIP_AUTOS
 from b2b.models import (
+    EMAIL_STATUS_PENDING,
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
     ContractPage,
@@ -107,6 +108,7 @@ def assign_codes_and_send_emails(
             assigned_by=assigning_user,
             created_on=now,
             updated_on=now,
+            email_status=EMAIL_STATUS_PENDING,
         )
         # Set the prefetched_redemptions attribute on the discount so that serializers
         # can return the updated redemption info without needing an extra query.
@@ -658,9 +660,10 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
 
         # Just send the email reminder and update the last sent timestamp
-        queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
         clear_assignment_email_deliverability_fields(assignment_record)
+        assignment_record.email_status = EMAIL_STATUS_PENDING
         assignment_record.save()
+        queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
 
         # Set prefetched_redemptions so the serializer returns the current assignment status.
         discount.prefetched_redemptions = [assignment_record]
@@ -854,7 +857,9 @@ class ManagerContractViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         assignment_record.assigned_email = email
         assignment_record.assigned_name = name
         assignment_record.assigned_by = request.user
+        assignment_record.last_reminder_sent_on = None
         clear_assignment_email_deliverability_fields(assignment_record)
+        assignment_record.email_status = EMAIL_STATUS_PENDING
         assignment_record.save()
         queue_send_enrollment_code_assignment_email.delay([assignment_record.id])
         discount.prefetched_redemptions = [assignment_record]

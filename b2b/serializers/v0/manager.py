@@ -6,6 +6,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from b2b.models import (
+    EMAIL_STATUS_ACCEPTED,
+    EMAIL_STATUS_PENDING,
     EMAIL_STATUSES,
     REDEMPTION_STATUS_ASSIGNED,
     REDEMPTION_STATUS_REDEEMED,
@@ -261,6 +263,12 @@ class ManagerEnrollmentCodeSerializer(serializers.ModelSerializer):
         redemption = self._get_redemption(obj)
         if not redemption:
             return None
+
+        # For the time being, we don't really want to expose accepted as a status - pending is sort of a
+        # deliberately vague user-facing status that covers delays in our system and in mailguns.
+        if redemption.email_status in (EMAIL_STATUS_PENDING, EMAIL_STATUS_ACCEPTED):
+            return EMAIL_STATUS_PENDING
+
         return redemption.email_status or None
 
     def get_email_status_event_timestamp(self, obj) -> datetime | None:

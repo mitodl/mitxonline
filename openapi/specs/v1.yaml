@@ -6532,6 +6532,7 @@ components:
       - opened
       - clicked
       - failed
+      - pending
       type: string
       description: |-
         * `delivered` - delivered
@@ -6539,12 +6540,14 @@ components:
         * `opened` - opened
         * `clicked` - clicked
         * `failed` - failed
+        * `pending` - pending
       x-enum-descriptions:
       - delivered
       - accepted
       - opened
       - clicked
       - failed
+      - pending
     EnrollmentMode:
       type: object
       description: Enrollment mode serializer.
