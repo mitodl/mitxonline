@@ -1,5 +1,5 @@
 import React from "react"
-import { emptyOrNil } from "../lib/util"
+import { emptyOrNil, formatLocalePrice } from "../lib/util"
 import moment from "moment-timezone"
 
 import type {
@@ -183,7 +183,8 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
             <div className="enrollment-info-text">
               {product ? (
                 <>
-                  Certificate track: {program.page.price}
+                  Certificate track:{" "}
+                  {formatLocalePrice(Number(program.page.list_price))}
                   <div>
                     <a
                       target="_blank"

@@ -52,7 +52,6 @@ from wagtailmetadata.models import MetadataPageMixin
 from cms import utils as cms_utils
 from cms.blocks import (
     CourseRunCertificateOverrides,
-    PriceBlock,
     ResourceBlock,
     validate_unique_readable_ids,
 )
@@ -1116,12 +1115,6 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         help_text="A short description indicating how much effort is required (e.g. 1-3 hours per week).",
     )
 
-    price = StreamField(
-        StreamBlock([("price_details", PriceBlock())], max_num=1),
-        help_text="Specify the product price details.",
-        use_json_field=True,
-    )
-
     min_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -1233,7 +1226,6 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         FieldPanel("max_weekly_hours"),
         FieldPanel("min_weeks"),
         FieldPanel("max_weeks"),
-        FieldPanel("price"),
         FieldPanel("min_price"),
         FieldPanel("max_price"),
         FieldPanel("prerequisites"),
@@ -1291,7 +1283,6 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         APIField("max_weekly_hours"),
         APIField("min_weeks"),
         APIField("max_weeks"),
-        APIField("price"),
         APIField("min_price"),
         APIField("max_price"),
         APIField("prerequisites", serializer=RichTextSerializer()),

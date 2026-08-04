@@ -57,16 +57,6 @@ class FacultySerializer(serializers.Serializer):
     feature_image_src = serializers.CharField(allow_null=True)
 
 
-class PriceItemSerializer(serializers.Serializer):
-    """
-    Serializer for price items used in course pages.
-    """
-
-    type = serializers.CharField()
-    value = serializers.DictField()
-    id = serializers.UUIDField()
-
-
 class OverrideValueSerializer(serializers.Serializer):
     """
     Serializer for override values used in certificate pages.
@@ -182,7 +172,6 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
             "max_weekly_hours",
             "min_weeks",
             "max_weeks",
-            "price",
             "min_price",
             "max_price",
             "prerequisites",
@@ -206,7 +195,6 @@ class CoursePageItemSerializer(serializers.ModelSerializer):
         # And only for GET requests, in which all fields are returned.
         extra_kwargs = {field: {"required": True} for field in fields}
 
-    price = PriceItemSerializer(many=True)
     meta = PageMetaSerializer()
     feature_image = FeatureImageSerializer()
     faculty = FacultySerializer(many=True)
@@ -245,7 +233,6 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
             "max_weekly_hours",
             "min_weeks",
             "max_weeks",
-            "price",
             "min_price",
             "max_price",
             "prerequisites",
@@ -274,7 +261,6 @@ class ProgramPageItemSerializer(serializers.ModelSerializer):
         return ""
 
     meta = PageMetaSerializer()
-    price = PriceItemSerializer(many=True)
     feature_image = FeatureImageSerializer()
     faculty = FacultySerializer(many=True)
     certificate_page = CertificatePageSerializer()

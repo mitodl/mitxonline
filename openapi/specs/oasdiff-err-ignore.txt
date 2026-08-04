@@ -172,3 +172,23 @@ GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/course_runs/{course_run_id}/enrollments/ the response's body `type` changed from `array<object>` to `object` for status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `total_codes` became nullable for the status `200`
 GET /api/v0/b2b/manager/organizations/{parent_lookup_organization}/contracts/{id}/ the response property `unassigned_codes` became nullable for the status `200`
+# Intentional removal (hq#6123): the non-functional CMS `price` StreamField was removed
+# from CoursePage/ProgramPage. Prices now come only from min_price/max_price (MIT Learn)
+# and ProgramPage.list_price. Nothing consumed the removed property.
+GET /api/v1/program_enrollments/ removed the required property `items/program/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+DELETE /api/v1/program_enrollments/{id}/ removed the required property `program/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v1/program_enrollments/{id}/ removed the required property `program/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v1/programs/ removed the required property `results/items/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v1/programs/{id}/ removed the required property `page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v2/pages/?fields=*&type=cms.coursepage removed the required property `items/items/price` from the response with the `200` status
+GET /api/v2/pages/?fields=*&type=cms.programpage removed the required property `items/items/price` from the response with the `200` status
+GET /api/v2/pages/?fields=*&type=cms.programpage removed the required property `items/items/program_details/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v2/pages/{id}/ removed the required property `oneOf[#/components/schemas/CoursePageItem]/price` from the response with the `200` status
+GET /api/v2/pages/{id}/ removed the required property `oneOf[#/components/schemas/ProgramPageItem]/price` from the response with the `200` status
+GET /api/v2/pages/{id}/ removed the required property `oneOf[#/components/schemas/ProgramPageItem]/program_details/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v2/program_certificates/{uuid}/ removed the required property `program/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v2/program_enrollments/ removed the required property `items/program/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+DELETE /api/v2/program_enrollments/{id}/ removed the required property `items/program/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v2/program_enrollments/{id}/ removed the required property `program/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v2/programs/ removed the required property `results/items/page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status
+GET /api/v2/programs/{id}/ removed the required property `page/allOf[#/components/schemas/ProgramPage]/price` from the response with the `200` status

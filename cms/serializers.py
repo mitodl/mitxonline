@@ -260,7 +260,6 @@ class ProgramPageSerializer(serializers.ModelSerializer):
 
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
-    price = serializers.SerializerMethodField()
     list_price = serializers.SerializerMethodField()
     financial_assistance_form_url = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
@@ -287,15 +286,6 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         if instance.description:
             return bleach.clean(instance.description, tags={}, strip=True)
         return ""
-
-    @extend_schema_field(str)
-    def get_price(self, instance):
-        """Get the price text from the program page."""
-        if hasattr(instance, "price") and instance.price:
-            return (
-                instance.price[0].value.get("text") if len(instance.price) > 0 else None
-            )
-        return None
 
     @extend_schema_field(serializers.DecimalField(max_digits=10, decimal_places=2))
     def get_list_price(self, instance):
@@ -389,7 +379,6 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "include_in_learn_catalog",
             "length",
             "effort",
-            "price",
             "list_price",
         ]
 

@@ -17,21 +17,6 @@ class ResourceBlock(blocks.StructBlock):
     detail = blocks.RichTextBlock()
 
 
-class PriceBlock(blocks.StructBlock):
-    """
-    A custom block for price field.
-    """
-
-    text = blocks.CharBlock(
-        max_length=150,
-        help="Displayed over the product detail page under the price tile.",
-    )
-    link = blocks.URLBlock(
-        required=False,
-        help="Specify the URL to redirect the user for the product's price details page.",
-    )
-
-
 class CourseRunFieldBlock(blocks.FieldBlock):
     """
     Block class that allows selecting a course run
