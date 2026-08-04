@@ -932,7 +932,9 @@ class RefundRequestSerializer(serializers.ModelSerializer):
             msg = "Refund requests can only be submitted for fulfilled orders."
             raise serializers.ValidationError(msg)
         if is_contract_order(order):
-            msg = "B2B contract orders are not eligible for self-service refund requests."
+            msg = (
+                "B2B contract orders are not eligible for self-service refund requests."
+            )
             raise serializers.ValidationError(msg)
         return order
 
