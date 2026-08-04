@@ -38,7 +38,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "1.160.5"
+VERSION = "1.161.0"
 
 log = logging.getLogger()
 
@@ -1105,6 +1105,10 @@ OAUTH2_PROVIDER = {
         "write": "Write scope",
         "openid": "OpenID Connect scope",
         "user:read": "Can read user and profile data",
+        # Service-to-service only, never granted to a user-facing client.
+        # Remove with b2b/views/v0/service.py once org-manager status is
+        # visible in Keycloak (mitodl/hq#10594).
+        "b2b:manager-check": "Can check whether a user manages an organization",
         # "digitalcredentials": "Can read and write Digital Credentials data",  # noqa: ERA001
     },
     "DEFAULT_SCOPES": ["user:read"],
@@ -1362,22 +1366,36 @@ MITOL_GOOGLE_SHEETS_DEFERRALS_PLUGINS = ["sheets.deferrals_plugin.DeferralPlugin
 
 
 # Fastly configuration
-MITX_ONLINE_FASTLY_AUTH_TOKEN = get_string(
-    name="FASTLY_AUTH_TOKEN",
+# MITxOnline's own Fastly config follows the convention used throughout this file:
+# the MITX_ONLINE_-prefixed name is the *env var*, the unprefixed one the setting
+# (as EMAIL_BACKEND is read from MITX_ONLINE_EMAIL_BACKEND, and 16 others).
+# These three previously inverted that -- prefixed settings reading bare env vars --
+# which is how the env vars came to be renamed to the setting names, breaking the
+# read entirely: https://github.com/mitodl/ol-infrastructure/pull/5119
+FASTLY_AUTH_TOKEN = get_string(
+    name="MITX_ONLINE_FASTLY_AUTH_TOKEN",
     default=None,
     description="Optional token for the Fastly purge API.",
 )
 
-MITX_ONLINE_FASTLY_URL = get_string(
-    name="FASTLY_URL",
+FASTLY_URL = get_string(
+    name="MITX_ONLINE_FASTLY_URL",
     default="https://api.fastly.com",
     description="The URL to the Fastly API.",
 )
 
-MITX_ONLINE_FASTLY_SERVICE_ID = get_string(
-    name="FASTLY_SERVICE_ID",
+# Not MITX_ONLINE_-prefixed, because the value is not MITxOnline's: MIT_LEARN_* is
+# this file's namespace for MIT Learn config, and those seven settings all use the
+# env var name unchanged.
+MIT_LEARN_FASTLY_SERVICE_ID = get_string(
+    name="MIT_LEARN_FASTLY_SERVICE_ID",
     default=None,
-    description="Fastly service ID used for surrogate key (tag) purging.",
+    description=(
+        "Fastly service ID for the MIT Learn frontend, used for surrogate key "
+        "(tag) purging. MIT Learn tags its product page responses with MITxOnline "
+        "surrogate keys, so this is Learn's service ID -- not the service ID of "
+        "MITxOnline's own Fastly service."
+    ),
 )
 
 # Hubspot sync settings

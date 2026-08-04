@@ -1547,6 +1547,27 @@ def test_checkout_interstitial_google_analytics_object(
         assert isinstance(item["quantity"], int)
 
 
+def test_checkout_interstitial_no_ga_flag_without_global_id(
+    mocker, settings, user_client, products
+):
+    """A user with no global_id is left unflagged rather than sharing a bucket."""
+
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+
+    user_no_global_id = UserFactory.create(global_id=None)
+    user_client.force_login(user_no_global_id)
+
+    mock_is_enabled = mocker.patch("ecommerce.views.legacy.is_posthog_enabled")
+
+    basket = create_basket_with_product(user_no_global_id, products[0])
+    PendingOrder.create_from_basket(basket)
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 200
+    assert "ga_purchase_payload" not in resp.context
+    mock_is_enabled.assert_not_called()
+
+
 @pytest.mark.skip_nplusone_check
 def test_program_product_purchasing(user, user_drf_client):
     """Test that we can purchase products that are for programs."""

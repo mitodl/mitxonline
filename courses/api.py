@@ -667,6 +667,52 @@ def _filter_valid_course_keys(runs):
     return valid_course_keys, runs_by_course_id
 
 
+def _sync_course_run_from_edx(run, course_detail):
+    """
+    Apply edX course detail values to a CourseRun, saving only when something
+    actually changed.
+
+    Skipping the save when nothing differs avoids a pointless full-column
+    UPDATE and, more importantly, the Fastly purge that the run's post_save
+    signal would otherwise trigger for its parent course on every sync pass.
+
+    Args:
+        run (CourseRun): the run to update.
+        course_detail (CourseDetail): the incoming edX course detail.
+
+    Returns:
+        bool: True if the run was changed and saved, False if it was unchanged.
+    """
+    # Only sync the certificate date if it's set in edX, otherwise fall back
+    # to the course's end date.
+    certificate_available_date = (
+        course_detail.certificate_available_date or course_detail.end
+    )
+    incoming_values = {
+        "title": course_detail.name,
+        "start_date": course_detail.start,
+        "end_date": course_detail.end,
+        "enrollment_start": course_detail.enrollment_start,
+        "enrollment_end": course_detail.enrollment_end,
+        "is_self_paced": course_detail.is_self_paced(),
+        "certificate_available_date": certificate_available_date,
+    }
+
+    if all(getattr(run, field) == value for field, value in incoming_values.items()):
+        return False
+
+    # Reset the expiration_date so it is calculated automatically and does not
+    # raise a validation error now that the start or end date has changed.
+    if run.start_date != course_detail.start or run.end_date != course_detail.end:
+        run.expiration_date = None
+
+    for field, value in incoming_values.items():
+        setattr(run, field, value)
+
+    run.save()
+    return True
+
+
 def sync_course_runs(runs):
     """
     Sync course run dates and title from Open edX using course list API
@@ -675,7 +721,10 @@ def sync_course_runs(runs):
         runs ([CourseRun]): list of CourseRun objects.
 
     Returns:
-        tuple: (success_count, failure_count) - counts of successful and failed syncs
+        tuple: (success_count, failure_count) where success_count is the number
+        of runs that had changed edX values and were saved (runs already in sync
+        are skipped and counted as neither success nor failure), and
+        failure_count is the number of runs that errored while syncing.
     """
     api_client = get_edx_api_course_list_client()
 
@@ -706,32 +755,11 @@ def sync_course_runs(runs):
             run = runs_by_course_id[course_detail.course_id]
 
             try:
-                # Reset the expiration_date so it is calculated automatically and
-                # does not raise a validation error now that the start or end date
-                # has changed.
-                if (
-                    run.start_date != course_detail.start
-                    or run.end_date != course_detail.end
-                ):
-                    run.expiration_date = None
-
-                run.title = course_detail.name
-                run.start_date = course_detail.start
-                run.end_date = course_detail.end
-                run.enrollment_start = course_detail.enrollment_start
-                run.enrollment_end = course_detail.enrollment_end
-                run.is_self_paced = course_detail.is_self_paced()
-                # Only sync the date if it's set in edX, Otherwise set it to course's end date
-                if course_detail.certificate_available_date:
-                    run.certificate_available_date = (
-                        course_detail.certificate_available_date
-                    )
+                if _sync_course_run_from_edx(run, course_detail):
+                    success_count += 1
+                    log.info("Updated course run: %s", run.courseware_id)
                 else:
-                    run.certificate_available_date = course_detail.end
-
-                run.save()
-                success_count += 1
-                log.info("Updated course run: %s", run.courseware_id)
+                    log.debug("No changes for course run: %s", run.courseware_id)
 
             except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
                 # Report any validation or otherwise model errors

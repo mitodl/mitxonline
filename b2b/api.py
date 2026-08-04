@@ -25,7 +25,11 @@ from wagtail.models import Page
 from b2b.constants import (
     B2B_RUN_TAG_FORMAT,
     CONTRACT_MEMBERSHIP_AUTOS,
+    CONTRACT_MEMBERSHIP_MANAGED,
     ORG_KEY_MAX_LENGTH,
+    RETIREMENT_CONTRACT_NAME,
+    RETIREMENT_ORG_KEY,
+    RETIREMENT_ORG_NAME,
 )
 from b2b.exceptions import SourceCourseIncompleteError
 from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
@@ -119,6 +123,156 @@ def ensure_b2b_organization_index() -> OrganizationIndexPage:
             org_page.move(org_index_page, "last-child")
         log.info("Moved organization pages under organization index page")
     return org_index_page
+
+
+class RetirementContractCollisionError(Exception):
+    """Raised when a run can't be moved into the holding contract."""
+
+
+def get_or_create_retirement_contract() -> ContractPage:
+    """
+    Get (or create) the holding contract that retired course runs live in.
+
+    Moving a retired run here rather than nulling its ``b2b_contract`` matters:
+    ``CourseRunQuerySet.exclude_b2b()`` is ``b2b_contract__isnull=True``, so a
+    run with no contract becomes a candidate for the *public* catalog. Parking
+    it against an inactive contract keeps it out of the public catalog and out
+    of every org/contract catalog query, which filter on
+    ``b2b_contract__active=True``.
+
+    Both pages are created unpublished so they are never served, and the
+    contract is inactive with a zero learner cap. The org has no
+    ``sso_organization_id``, which is safe: ``reconcile_keycloak_orgs`` only
+    creates or updates pages for orgs Keycloak knows about and never prunes
+    ones it doesn't.
+
+    Returns:
+        ContractPage: the holding contract.
+    """
+
+    org = OrganizationPage.objects.filter(org_key=RETIREMENT_ORG_KEY).first()
+
+    if not org:
+        # Prefer an existing index page. ensure_b2b_organization_index() also
+        # re-parents every OrganizationPage when its child count doesn't match,
+        # which is a side effect we don't want to trigger from here.
+        org_index = OrganizationIndexPage.objects.first() or (
+            ensure_b2b_organization_index()
+        )
+        org = OrganizationPage(
+            name=RETIREMENT_ORG_NAME,
+            org_key=RETIREMENT_ORG_KEY,
+            live=False,
+            description=(
+                "System organization. Holds course runs that have been retired. "
+                "Not a real customer - do not add members or contracts."
+            ),
+        )
+        org_index.add_child(instance=org)
+        org.refresh_from_db()
+        log.info("Created retirement holding organization %s", org)
+
+    contract = ContractPage.objects.filter(
+        organization=org, name=RETIREMENT_CONTRACT_NAME
+    ).first()
+
+    if not contract:
+        contract = ContractPage(
+            name=RETIREMENT_CONTRACT_NAME,
+            organization=org,
+            membership_type=CONTRACT_MEMBERSHIP_MANAGED,
+            active=False,
+            max_learners=0,
+            contract_start=None,
+            contract_end=None,
+            live=False,
+            description=(
+                "System contract. Retired course runs are parked here so they "
+                "stay hidden but keep their courseware IDs. Never add programs "
+                "or learners to this contract."
+            ),
+        )
+        org.add_child(instance=contract)
+        contract.refresh_from_db()
+        log.info("Created retirement holding contract %s", contract)
+
+    return contract
+
+
+def check_retirement_contract_collision(run: CourseRun, contract: ContractPage) -> None:
+    """
+    Check that moving the run into the holding contract won't break a constraint.
+
+    ``CourseRun`` has two unique constraints that include ``b2b_contract`` with
+    ``nulls_distinct=False`` - ``unique_primary_language_per_group`` and
+    ``unique_language_per_group``. Collisions are unlikely in practice because
+    the B2B run tag embeds the source contract ID and year, but an
+    ``IntegrityError`` mid-command is a much worse outcome than a clear refusal.
+
+    Args:
+        run (CourseRun): the run being moved.
+        contract (ContractPage): the holding contract.
+    Raises:
+        RetirementContractCollisionError: if a conflicting run is already parked.
+    """
+
+    siblings = CourseRun.all_objects.filter(
+        course=run.course,
+        run_tag=run.run_tag,
+        is_source_run=run.is_source_run,
+        b2b_contract=contract,
+    ).exclude(pk=run.pk)
+
+    if (
+        run.language
+        and siblings.filter(
+            language=run.language,
+            variant_length=run.variant_length,
+            variant_industry=run.variant_industry,
+        ).exists()
+    ):
+        msg = (
+            f"A run for {run.course.readable_id} with run tag '{run.run_tag}', "
+            f"language '{run.language}' and variant "
+            f"'{run.variant_length}/{run.variant_industry}' is already parked in "
+            f"{contract}. Rename the run tag or clear the existing one first."
+        )
+        raise RetirementContractCollisionError(msg)
+
+    if run.is_primary_language and siblings.filter(is_primary_language=True).exists():
+        msg = (
+            f"A primary-language run for {run.course.readable_id} with run tag "
+            f"'{run.run_tag}' is already parked in {contract}. Rename the run tag "
+            "or clear the existing one first."
+        )
+        raise RetirementContractCollisionError(msg)
+
+
+def move_run_to_retirement_contract(run: CourseRun) -> ContractPage:
+    """
+    Move a course run into the holding contract.
+
+    Args:
+        run (CourseRun): the run to park.
+    Returns:
+        ContractPage: the holding contract the run was moved to.
+    Raises:
+        RetirementContractCollisionError: if a conflicting run is already parked.
+    """
+
+    contract = get_or_create_retirement_contract()
+
+    if run.b2b_contract_id == contract.id:
+        return contract
+
+    check_retirement_contract_collision(run, contract)
+
+    run.b2b_contract = contract
+    run.save()
+
+    log.info("Moved course run %s to %s", run.courseware_id, contract)
+
+    return contract
 
 
 @transaction.atomic

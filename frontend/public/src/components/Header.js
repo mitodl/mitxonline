@@ -1,8 +1,6 @@
 // @flow
-/* global SETTINGS:false*/
 import React from "react"
 import * as Sentry from "@sentry/browser"
-import posthog from "posthog-js"
 
 import type { CurrentUser } from "../flow/authTypes"
 import type { Location } from "react-router"
@@ -21,10 +19,6 @@ const Header = ({ currentUser, cartItemsCount, location }: Props) => {
       email:    currentUser.email,
       username: currentUser.username,
       name:     currentUser.name
-    })
-    posthog.identify(currentUser.id, {
-      environment: SETTINGS.environment,
-      user_id:     currentUser.id
     })
   } else {
     Sentry.getCurrentScope().setUser(null)

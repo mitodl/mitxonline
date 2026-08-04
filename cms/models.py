@@ -924,8 +924,8 @@ class HomePage(VideoPlayerConfigMixin):
         hubspot_portal_id = settings.HUBSPOT_PORTAL_ID
         hubspot_home_page_form_guid = settings.HUBSPOT_HOME_PAGE_FORM_GUID
 
-        if request.user.is_authenticated:
-            user = request.user.id
+        if request.user.is_authenticated and request.user.global_id:
+            user = request.user.global_id
         else:
             if "anonymous_session_id" not in request.session:
                 request.session["anonymous_session_id"] = str(uuid.uuid4())
@@ -1320,7 +1320,11 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             courseware_object = self.course
         elif self.is_program_page:
             courseware_object = self.program
-        if courseware_object:
+        # Only push the title down (and save) when it actually changed. An
+        # unconditional save here fires the courseware object's post_save
+        # Fastly purge signal on every page save, so publishing one page
+        # would otherwise emit several redundant purges of the same key.
+        if courseware_object and courseware_object.title != self.title:
             courseware_object.title = self.title
             courseware_object.save()
 

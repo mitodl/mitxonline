@@ -32,8 +32,8 @@ const TopBar = ({ currentUser, cartItemsCount }: Props) => {
 
   const newCartDesign = checkFeatureFlag(
     "new-cart-design",
-    currentUser && currentUser.is_authenticated && currentUser.id ?
-      currentUser.id :
+    currentUser && currentUser.is_authenticated && currentUser.global_id ?
+      currentUser.global_id :
       "anonymousUser"
   )
   return (
