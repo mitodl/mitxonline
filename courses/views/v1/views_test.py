@@ -33,6 +33,7 @@ from courses.factories import (
     CourseRunFactory,
     LearnerProgramRecordShareFactory,
     PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -1358,3 +1359,108 @@ def test_get_shared_learner_record_inactive_share_returns_404(user):
 
     assert resp.status_code == status.HTTP_404_NOT_FOUND
     assert resp.json() == []
+
+
+def test_share_learner_record_rejects_school_from_another_program(
+    user_drf_client, user, mocker, settings
+):
+    """Sharing with a school that is not assigned to this program is refused."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    other_program = ProgramFactory.create()
+    other_school = PartnerSchoolFactory.create()
+    PartnerSchoolProgramFactory.create(
+        partner_school=other_school, program=other_program
+    )
+    patched_send_email = mocker.patch(
+        "courses.views.v1.send_partner_school_email.delay"
+    )
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
+        data={"partnerSchool": other_school.id},
+    )
+
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+    assert not LearnerProgramRecordShare.objects.filter(
+        user=user, partner_school=other_school
+    ).exists()
+    patched_send_email.assert_not_called()
+
+
+def test_share_learner_record_allows_any_school_when_flag_off(
+    user_drf_client, user, mocker, settings
+):
+    """With the flag off the endpoint accepts any school, as it does today."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
+    enrollment = ProgramEnrollmentFactory.create(user=user)
+    unassigned_school = PartnerSchoolFactory.create()
+    patched_send_email = mocker.patch(
+        "courses.views.v1.send_partner_school_email.delay"
+    )
+
+    resp = user_drf_client.post(
+        reverse("learner-record-share", kwargs={"pk": enrollment.program.id}),
+        data={"partnerSchool": unassigned_school.id},
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    patched_send_email.assert_called_once()
+
+
+def test_partner_schools_endpoint_filters_by_program(user_drf_client):
+    """The partner schools list can be scoped to a single program."""
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    resp = user_drf_client.get(
+        reverse("v1:partner_schools_api-list"), {"program": scm.id}
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [school["name"] for school in resp.json()] == ["SCM School"]
+
+
+def test_partner_schools_endpoint_unfiltered_by_default(user_drf_client):
+    """Without a program param the endpoint returns every active school."""
+    program = ProgramFactory.create()
+    school = PartnerSchoolFactory.create(name="Some School")
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+
+    resp = user_drf_client.get(reverse("v1:partner_schools_api-list"))
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [s["name"] for s in resp.json()] == ["Some School"]
+
+
+@pytest.mark.parametrize("program_id", ["abc", "1.5"])
+def test_partner_schools_endpoint_invalid_program_returns_400(
+    user_drf_client, program_id
+):
+    """A non-integer program value returns a 400, not a 500 or an unfiltered response."""
+    resp = user_drf_client.get(
+        reverse("v1:partner_schools_api-list"), {"program": program_id}
+    )
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_partner_schools_endpoint_distinct_with_multiple_program_rows(
+    user_drf_client,
+):
+    """A school with two recipient rows for the same program is returned once."""
+    program = ProgramFactory.create()
+    school = PartnerSchoolFactory.create(name="Duplicate Rows School")
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+    PartnerSchoolProgramFactory.create(partner_school=school, program=program)
+
+    resp = user_drf_client.get(
+        reverse("v1:partner_schools_api-list"), {"program": program.id}
+    )
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert [s["name"] for s in resp.json()] == ["Duplicate Rows School"]

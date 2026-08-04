@@ -53,6 +53,7 @@ from courses.api import (
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
+    partner_schools_for_program,
     process_course_run_grade_certificate,
     pull_course_modes,
     sync_course_mode,
@@ -76,6 +77,8 @@ from courses.factories import (
     CourseRunGradeFactory,
     DepartmentFactory,
     EnrollmentModeFactory,
+    PartnerSchoolFactory,
+    PartnerSchoolProgramFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -98,6 +101,7 @@ from courses.models import (
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Basket, OrderStatus
+from main import features
 from main.constants import USER_MSG_TYPE_B2B_ENROLL_SUCCESS
 from main.test_utils import MockHttpError
 from openedx.constants import (
@@ -4110,3 +4114,59 @@ def test_generate_missing_program_certificates_failure_isolation(mock_upsert, mo
     assert stats["failed"] == 1
     assert stats["processed"] == 2
     assert mock_generate.call_count == 2
+
+
+def test_partner_schools_for_program_unfiltered_when_flag_off(settings):
+    """With the flag off every active school is returned, preserving old behavior."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    result = partner_schools_for_program(scm)
+
+    assert sorted(school.name for school in result) == ["DEDP School", "SCM School"]
+
+
+def test_partner_schools_for_program_filtered_when_flag_on(settings):
+    """With the flag on only the program's own schools are returned."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    scm = ProgramFactory.create()
+    dedp = ProgramFactory.create()
+    scm_school = PartnerSchoolFactory.create(name="SCM School")
+    dedp_school = PartnerSchoolFactory.create(name="DEDP School")
+    PartnerSchoolProgramFactory.create(partner_school=scm_school, program=scm)
+    PartnerSchoolProgramFactory.create(partner_school=dedp_school, program=dedp)
+
+    result = partner_schools_for_program(scm)
+
+    assert [school.name for school in result] == ["SCM School"]
+
+
+def test_partner_schools_for_program_deduplicates_multi_recipient_school(settings):
+    """A school with two recipient rows appears once when the flag is on."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    school = PartnerSchoolFactory.create(name="Reykjavik University")
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="vd@example.com"
+    )
+    PartnerSchoolProgramFactory.create(
+        partner_school=school, program=program, email="cs@example.com"
+    )
+
+    result = partner_schools_for_program(program)
+
+    assert [school.name for school in result] == ["Reykjavik University"]
+
+
+def test_partner_schools_for_program_excludes_unassigned_when_flag_on(settings):
+    """An untagged school is invisible once filtering is live."""
+    settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = True
+    program = ProgramFactory.create()
+    PartnerSchoolFactory.create(name="Unassigned School")
+
+    assert list(partner_schools_for_program(program)) == []

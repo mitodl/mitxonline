@@ -26,6 +26,7 @@ from courses.models import (
     EnrollmentMode,
     LearnerProgramRecordShare,
     PartnerSchool,
+    PartnerSchoolProgram,
     Program,
     ProgramCertificate,
     ProgramEnrollment,
@@ -384,6 +385,16 @@ class PartnerSchoolFactory(DjangoModelFactory):
 
     class Meta:
         model = PartnerSchool
+
+
+class PartnerSchoolProgramFactory(DjangoModelFactory):
+    partner_school = SubFactory(PartnerSchoolFactory)
+    program = SubFactory(ProgramFactory)
+    email = fuzzy.FuzzyText(suffix="@example.com")
+    alt_email = ""
+
+    class Meta:
+        model = PartnerSchoolProgram
 
 
 class LearnerProgramRecordShareFactory(DjangoModelFactory):
